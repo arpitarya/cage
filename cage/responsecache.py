@@ -1,0 +1,52 @@
+"""Tier-0 exact-match response cache → eliminated-call receipts (plan §4.5, §6).
+
+A cache hit eliminates a call entirely: `actual: 0`, the full alternative cost
+saved, `method: measured` — Cage's "4′33″" case, the highest-value receipt there
+is. Keyed by a content hash of the prompt. Semantic matching is the opt-in
+`[embeddings]` Tier-1 upgrade over this exact-match floor — never required.
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+from pathlib import Path
+
+from cage import paths, schema
+
+
+def _file(root: Path) -> Path:
+    return paths.Footprint(root).base / "cache" / "responses.json"
+
+
+def key_for(prompt: str) -> str:
+    return hashlib.sha256(prompt.encode("utf-8")).hexdigest()[:16]
+
+
+def _load(root: Path) -> dict:
+    f = _file(root)
+    if f.exists():
+        try:
+            return json.loads(f.read_text(encoding="utf-8"))
+        except ValueError:
+            return {}
+    return {}
+
+
+def lookup(root: Path, prompt: str) -> dict | None:
+    """Return the cached `{value, tokens}` for a prompt, or None on a miss."""
+    return _load(root).get(key_for(prompt))
+
+
+def store(root: Path, prompt: str, value: str, call_tokens: int) -> None:
+    """Cache a response and the call-token count its future reuse would save."""
+    data = _load(root)
+    data[key_for(prompt)] = {"value": value, "tokens": int(call_tokens)}
+    f = _file(root)
+    f.parent.mkdir(parents=True, exist_ok=True)
+    f.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+
+
+def hit_receipt(call_tokens: int, *, call: str = "", task: str = "") -> dict:
+    """The receipt for an eliminated call (actual: 0, full alternative saved)."""
+    return schema.make_receipt(tool="response-cache", raw_alternative=int(call_tokens),
+                               actual=0, call=call, task=task, method="measured")

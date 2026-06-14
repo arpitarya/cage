@@ -1,0 +1,15 @@
+# Build / packaging
+*.egg-info/
+dist/
+build/
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# Cage's own runtime ledger inside this repo (append-only, machine-local).
+.cage/ledger/
+.cage/out/
+
+# macOS
+.DS_Store

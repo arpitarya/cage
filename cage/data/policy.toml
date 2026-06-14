@@ -1,0 +1,39 @@
+# Cage policy — the only place numbers live. Versioned, deterministic (plan §3.3).
+
+# Prices in USD per million tokens. `cache_read` is the discounted rate the
+# provider bills for prefix-cache *reads* (makes cache-alignment measurable).
+[prices.anthropic."claude-opus-4-8"]
+input = 3.00
+output = 15.00
+cache_read = 0.30
+
+[prices.anthropic."claude-sonnet-4-6"]
+input = 3.00
+output = 15.00
+cache_read = 0.30
+
+[prices.anthropic."claude-haiku-4-5"]
+input = 0.80
+output = 4.00
+cache_read = 0.08
+
+[prices.openai."gpt-4o"]
+input = 2.50
+output = 10.00
+cache_read = 1.25
+
+# Canonical pipeline order. Marginal attribution walks this once; each tool's
+# receipt is the delta it produced *given the tools upstream of it* (plan §4.2).
+[tools]
+order = ["graphify", "fux", "router", "compressor", "cache", "response-cache"]
+
+# Budget ceilings (plan §8.1). on_exceed: warn | block.
+[budgets]
+session_usd = 2.00
+daily_usd = 25.00
+on_exceed = "warn"
+
+# Cost is only honest paired with outcome (plan §8.2). `task_ok` = task succeeded
+# without a human redo; cost-per-*successful*-task is the metric that matters.
+[quality]
+signal = "task_ok"
