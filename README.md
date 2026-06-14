@@ -119,7 +119,7 @@ four agents share one ledger contract:
 | **Your code / Orff** | `cage.meter()` library adapter | `cage` CLI / MCP |
 
 ```bash
-cage setup                 # install the /cage skill into ~/.claude + ~/.codex
+cage setup                 # install a global /cage asset into all four agent homes
 cage hooks install         # wire claude/codex/copilot/kiro in this project
 cage hooks install --claude   # or one surface at a time
 cage proxy --port 8788     # the universal meter for clients you can't edit

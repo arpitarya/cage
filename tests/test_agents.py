@@ -65,3 +65,17 @@ def test_mcp_tools_list_and_call(seeded, monkeypatch):
 def test_mcp_unknown_method_errors():
     r = mcpserver._handle({"jsonrpc": "2.0", "id": 9, "method": "bogus"})
     assert r["error"]["code"] == -32601
+
+
+def test_setup_installs_global_asset_for_all_four(tmp_path, monkeypatch):
+    from cage import setupcmd
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "claude"))
+    monkeypatch.setenv("CODEX_HOME", str(tmp_path / "codex"))
+    monkeypatch.setenv("CAGE_VSCODE_USER", str(tmp_path / "vscode"))
+    monkeypatch.setenv("KIRO_HOME", str(tmp_path / "kiro"))
+    out = setupcmd.run()
+    assert set(out) == {"claude", "codex", "copilot", "kiro"}
+    assert (tmp_path / "claude" / "skills" / "cage" / "SKILL.md").exists()
+    assert (tmp_path / "codex" / "skills" / "cage" / "SKILL.md").exists()
+    assert (tmp_path / "vscode" / "prompts" / "cage.prompt.md").exists()
+    assert (tmp_path / "kiro" / "steering" / "cage.md").exists()

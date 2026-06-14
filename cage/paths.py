@@ -27,6 +27,19 @@ def codex_home() -> Path:
     return Path(os.environ.get("CODEX_HOME", Path.home() / ".codex"))
 
 
+def vscode_user_dir() -> Path:
+    """VS Code user dir where Copilot user prompt files live. Override CAGE_VSCODE_USER."""
+    env = os.environ.get("CAGE_VSCODE_USER")
+    if env:
+        return Path(env)
+    mac = Path.home() / "Library" / "Application Support" / "Code" / "User"
+    return mac if mac.exists() else Path.home() / ".config" / "Code" / "User"
+
+
+def kiro_home() -> Path:
+    return Path(os.environ.get("KIRO_HOME", Path.home() / ".kiro"))
+
+
 class Footprint:
     """The per-project ``.cage/`` layout (plan §3).
 

@@ -117,8 +117,8 @@ def cmd_mcp(_args) -> int:
 
 
 def cmd_setup(_args) -> int:
-    for home, where in setupcmd.run().items():
-        print(f"✔ /cage skill → {where}")
+    for agent, where in setupcmd.run().items():
+        print(f"✔ {agent:<8} → {where}")
     print("Next, in a project: `cage hooks install` then `cage init`.")
     return 0
 

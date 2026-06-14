@@ -94,7 +94,7 @@ def build_parser() -> argparse.ArgumentParser:
     mt.set_defaults(fn=clicmds.cmd_meter)
 
     sub.add_parser("mcp", help="serve the ledger over MCP (stdio JSON-RPC) for any agent").set_defaults(fn=clicmds.cmd_mcp)
-    sub.add_parser("setup", help="install the /cage skill into ~/.claude + ~/.codex").set_defaults(fn=clicmds.cmd_setup)
+    sub.add_parser("setup", help="install the global /cage asset into all agent homes (claude/codex/copilot/kiro)").set_defaults(fn=clicmds.cmd_setup)
 
     hk = sub.add_parser("hooks", help="wire Cage into agents (claude/codex/copilot/kiro)")
     hk.add_argument("action", choices=["install", "status"], nargs="?", default="install")

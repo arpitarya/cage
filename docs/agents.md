@@ -4,11 +4,16 @@ Cage meters whatever speaks the OpenAI/Anthropic wire format and reads the ledge
 over MCP. One ledger contract, four surfaces — nothing about an agent is hardcoded.
 
 ```bash
-cage setup            # install the /cage skill into ~/.claude + ~/.codex (once)
+cage setup            # install a global /cage asset into every agent home (once):
+                      #   claude/codex → skill · copilot → prompt · kiro → steering
 cd your-project
 cage init             # scaffold .cage/ (policy + gitignored ledger)
 cage hooks install    # wire claude + codex + copilot + kiro (or pass --claude etc.)
 ```
+
+`cage setup` is symmetric across all four agents (paths are env-overridable —
+`CAGE_VSCODE_USER` for Copilot's prompt dir, `KIRO_HOME` for Kiro). The per-project
+MCP/hook wiring is `cage hooks install`.
 
 ## Claude Code
 
