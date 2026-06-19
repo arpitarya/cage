@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from cage import ledger, prices, render
+from cage import convert, ledger, render
 
 _TRUST = {"measured": 2, "modeled": 1, "estimated": 0}
 
@@ -46,16 +46,15 @@ def receipts_by_tool(receipts: list[dict], order: list[str]) -> list[dict]:
 
 def attribute(root: Path, task: str, pol: dict) -> dict:
     """Per-tool marginal savings for one task, in tokens and USD (the §4.2 table)."""
-    rows = receipts_by_tool(ledger.by_task(ledger.receipts(root), task),
+    rows = receipts_by_tool([r for r in ledger.by_task(ledger.receipts(root), task)
+                             if r.get("tool") != "human"],
                             list(pol.get("tools", {}).get("order", [])))
     provider, model = task_model(ledger.calls(root), task)
+    call = {"provider": provider, "model": model}
     steps, tot_tok, tot_usd = [], 0.0, 0.0
     for a in rows:
-        if a["unit"] == "usd":
-            saved_usd, saved_tok = a["saved"], 0.0
-        else:
-            saved_tok = a["saved"]
-            saved_usd = prices.input_cost_usd(pol, provider, model, int(saved_tok))
+        saved_tok = a["saved"] if a["unit"] == "tokens" else 0.0
+        saved_usd = convert.saved_usd(a, call, pol)
         tot_tok += saved_tok
         tot_usd += saved_usd
         steps.append({"tool": a["tool"], "unit": a["unit"], "saved_tokens": saved_tok,

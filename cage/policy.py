@@ -1,6 +1,7 @@
 """Load `.cage/policy.toml` — prices, pipeline order, budgets, quality (plan §3.3)."""
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 try:
@@ -27,7 +28,7 @@ def load(policy_path: Path | None = None) -> dict:
     if policy_path and policy_path.exists() and tomllib is not None:
         with policy_path.open("rb") as fh:
             data = tomllib.load(fh)
-        for section in ("prices", "tools", "budgets", "quality"):
+        for section in ("prices", "tools", "budgets", "quality", "human"):
             if section in data:
                 merged = {**pol.get(section, {}), **data[section]}
                 pol[section] = merged
@@ -42,6 +43,25 @@ def price(pol: dict, provider: str, model: str) -> dict:
     """Per-million-token price row for a model, or zeros if unpriced."""
     row = pol.get("prices", {}).get(provider, {}).get(model)
     return row or {"input": 0.0, "output": 0.0, "cache_read": 0.0}
+
+
+def human_rates(pol: dict) -> dict:
+    """The `[human]` block (rate, default minutes, per-type table, confidence)."""
+    return pol.get("human", {})
+
+
+def human_rate_source(pol: dict) -> tuple[float, str]:
+    """Resolved default $/hr and its provenance: env override beats policy (§3.2).
+
+    Env is explicit config, not entropy — `(ledger, policy, env) ⇒ tables` holds.
+    """
+    env = os.environ.get("CAGE_HUMAN_RATE")
+    if env:
+        try:
+            return (float(env), "env")
+        except ValueError:
+            pass
+    return (float(pol.get("human", {}).get("rate_usd_per_hr", 0.0)), "policy")
 
 
 def budgets(pol: dict) -> dict:

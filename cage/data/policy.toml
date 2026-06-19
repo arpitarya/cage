@@ -37,3 +37,42 @@ on_exceed = "warn"
 # without a human redo; cost-per-*successful*-task is the metric that matters.
 [quality]
 signal = "task_ok"
+
+# Human-labor baseline (Tier-1 counterfactual, design §3.1). The only place human
+# numbers live. Bundled values are illustrative blended estimates (like the model
+# prices); override per-project, or inject a real rate via CAGE_HUMAN_RATE.
+[human]
+rate_usd_per_hr = 80        # blended default rate
+default_minutes = 60        # fallback when a task has no type and no minutes
+currency = "USD"
+
+# Per-task-type lookup (mode 3 — the recommended default path). One subtable per
+# type; the resolver reads minutes + rate_usd_per_hr.
+[human.tasks.feature]
+minutes = 120
+rate_usd_per_hr = 90
+
+[human.tasks.bugfix]
+minutes = 45
+rate_usd_per_hr = 80
+
+[human.tasks.refactor]
+minutes = 90
+rate_usd_per_hr = 90
+
+[human.tasks.research]
+minutes = 180
+rate_usd_per_hr = 70
+
+[human.tasks.review]
+minutes = 30
+rate_usd_per_hr = 100
+
+# Confidence by how the human figure was obtained (design §3 + §5b.3 ladder).
+# Tunable, never hard-coded in code; every read surface shows it.
+[human.confidence]
+measured = 0.9      # real quote / timesheet
+estimated = 0.7     # explicit usd or minutes, but a guess
+diff_sized = 0.6    # type estimate scaled by diff size
+type_table = 0.5    # flat task-type lookup
+default = 0.3       # global fallback

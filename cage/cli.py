@@ -12,6 +12,10 @@ def _json_flag(p: argparse.ArgumentParser) -> None:
     p.add_argument("--json", action="store_true", help="machine-readable output (agent-as-user)")
 
 
+def _html_flag(p: argparse.ArgumentParser) -> None:
+    p.add_argument("--html", metavar="PATH", help="write a standalone HTML page (no CDN)")
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="cage",
                                 description="Cage — a flux: LLM cost + savings ledger ($0, deterministic).")
@@ -33,7 +37,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     mx = sub.add_parser("matrix", help="counterfactual permutation table for a task (§4.4)")
     mx.add_argument("--task", help="task id (default: most recent)")
+    mx.add_argument("--human", action="store_true", help="add the Tier-1 human anchor row + vs-human columns")
     _json_flag(mx)
+    _html_flag(mx)
     mx.set_defaults(fn=clicmds.cmd_matrix)
 
     bd = sub.add_parser("budget", help="session/day spend vs policy ceilings (§8.1)")
@@ -45,6 +51,33 @@ def build_parser() -> argparse.ArgumentParser:
     ro.add_argument("--since", metavar="WINDOW", help="window like 30d / 2w")
     _json_flag(ro)
     ro.set_defaults(fn=clicmds.cmd_roi)
+
+    hu = sub.add_parser("human", help="agent-vs-human savings: $ and hours saved (§4.1)")
+    hu.add_argument("--since", metavar="WINDOW", help="window like 30d / 2w")
+    hu.add_argument("--task", help="single task id")
+    hu.add_argument("--agent", help="filter to one agent")
+    _json_flag(hu)
+    _html_flag(hu)
+    hu.set_defaults(fn=clicmds.cmd_human)
+
+    hr = sub.add_parser("human-record", help="record a Tier-1 human alternative for a task (§5)")
+    hr.add_argument("--task", required=True)
+    hr.add_argument("--type", dest="task_type", help="task type (feature/bugfix/refactor/research/review)")
+    hr.add_argument("--minutes", type=float, help="human-minutes the task would have taken")
+    hr.add_argument("--usd", type=float, help="a directly-quoted dollar alternative")
+    hr.add_argument("--rate", type=float, help="override $/hr for this receipt")
+    hr.add_argument("--call", default="", help="the agent call this is the alternative to")
+    hr.add_argument("--agent", default="", help="attribute the saving to this agent")
+    hr.add_argument("--measured", action="store_true", help="a real timesheet/quote (not an estimate)")
+    hr.set_defaults(fn=clicmds.cmd_human_record)
+
+    tr = sub.add_parser("trend", help="cost+time savings over time, by week or month (§5b.4)")
+    tr.add_argument("--by", choices=["week", "month"], default="week")
+    tr.add_argument("--metric", choices=["cost", "time", "both"], default="both")
+    tr.add_argument("--since", metavar="WINDOW")
+    _json_flag(tr)
+    _html_flag(tr)
+    tr.set_defaults(fn=clicmds.cmd_trend)
 
     wy = sub.add_parser("why", help="full provenance: a call + every receipt against it")
     wy.add_argument("call_id")
@@ -92,6 +125,11 @@ def build_parser() -> argparse.ArgumentParser:
     mt.add_argument("--upstream", default="https://api.anthropic.com")
     mt.add_argument("argv", nargs=argparse.REMAINDER, help="-- <command> [args…]")
     mt.set_defaults(fn=clicmds.cmd_meter)
+
+    gf = sub.add_parser("graphify", help="meter a third-party graphify call: cage graphify -- graphify query …")
+    gf.add_argument("--task", default="", help="task id to bind the saving to (default: project dir name)")
+    gf.add_argument("argv", nargs=argparse.REMAINDER, help="-- graphify <query|path|explain> …")
+    gf.set_defaults(fn=clicmds.cmd_graphify)
 
     sub.add_parser("mcp", help="serve the ledger over MCP (stdio JSON-RPC) for any agent").set_defaults(fn=clicmds.cmd_mcp)
     sub.add_parser("setup", help="install the global /cage asset into all agent homes (claude/codex/copilot/kiro)").set_defaults(fn=clicmds.cmd_setup)

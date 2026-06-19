@@ -65,6 +65,10 @@ class Footprint:
         return self.ledger / "receipts.jsonl"
 
     @property
+    def tasks(self) -> Path:
+        return self.ledger / "tasks.jsonl"
+
+    @property
     def policy(self) -> Path:
         return self.base / "policy.toml"
 

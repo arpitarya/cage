@@ -55,3 +55,36 @@ MCP/hook wiring is `cage hooks install`.
 - **`cage mcp`** — the read surface for any MCP-capable agent.
 - **`cage.meter()` / `cage.record_call()`** — the library adapter for code you own
   (this is how Orff meters; see the Anton integration).
+- **`cage.record_human(task=…, minutes=…|usd=…|task_type=…)`** — the Tier-1 human
+  alternative. Orff's `LLMGateway` calls it fail-open when it closes a task, so the
+  ledger carries *agent vs human* ($ and time saved) alongside tool-vs-tool savings.
+
+## Tool-savings receipts — two integration strategies
+
+A *savings receipt* is what makes `cage attrib` / `cage matrix` / `cage roi` show
+real with/without numbers (token contract in
+[tool-receipts.graphify-fux.handoff.md](tool-receipts.graphify-fux.handoff.md)).
+How a tool files one depends on who owns it:
+
+- **In-tool shim (tools you own) — e.g. fux.** fux carries a ~15-line fail-open
+  `cage_receipt.py` and emits its own `tool="fux"` receipt at the hook-recall
+  assembly point (it knows the exact injected payload + the rules it selected, so
+  this is the most accurate). cage stays an *optional* dependency: the shim
+  `try/except`-imports cage and no-ops if it's absent, so fux runs byte-identically
+  without cage.
+
+- **External adapter (third-party tools you can't edit) — e.g. graphify.**
+  `cage graphify -- graphify query "…"` runs the unmodified `graphify` command,
+  passes its **stdout/stderr/exit through unchanged**, and on the side parses the
+  answer for the `source_file`s it cites — filing one `tool="graphify"` receipt
+  (`actual` = answer tokens; `raw_alternative` = the whole *touched, present-on-disk*
+  source files, deduped, never the repo). A metering error never alters graphify's
+  result; if no source file resolves it files **nothing** (unmeasurable ≠ zero).
+  graphify is never edited. This is the same "meter what you observe" family as
+  `cage meter -- <cmd>` and `cage import-codex`. Alias
+  `graphify='cage graphify -- graphify'` to make it transparent.
+
+  > Token receipts carry their model price via the task's calls, so `attrib`/`matrix`
+  > show real dollars. `roi` prices a receipt only when it links a specific `call`
+  > id; both emitters default to `call=""`, so `roi` lists the tools but shows $0
+  > saved unless a call is linked — honest, per the receipt contract.

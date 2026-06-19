@@ -10,7 +10,7 @@ import datetime as _dt
 
 from cage import ids
 
-UNITS = ("tokens", "usd", "ms", "gco2")
+UNITS = ("tokens", "usd", "ms", "gco2", "minutes")
 METHODS = ("measured", "modeled", "estimated")
 
 CALL_FIELDS = ("id", "ts", "session", "task", "agent", "route", "provider", "model",

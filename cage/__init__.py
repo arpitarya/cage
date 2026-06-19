@@ -13,7 +13,9 @@ Public library API (the protocol-targeted adapter, plan §5):
         m.usage(provider="anthropic", model="claude-opus-4-8",
                 tokens_in=8600, tokens_out=1500, cached_in=3200)
 """
-from cage.metering import Recorder, meter, record_call, record_receipt
+from cage.metering import (Recorder, meter, record_call, record_human,
+                           record_receipt)
 
-__version__ = "0.2.1"
-__all__ = ["meter", "record_call", "record_receipt", "Recorder", "__version__"]
+__version__ = "0.3.0"
+__all__ = ["meter", "record_call", "record_receipt", "record_human", "Recorder",
+           "__version__"]

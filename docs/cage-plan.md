@@ -137,7 +137,27 @@ on_exceed  = "warn"                     # warn | block
 
 [quality]                               # cost is only honest when paired with outcome
 signal = "task_ok"                      # did the task succeed without human redo?
+
+[human]                                 # Tier-1 human baseline (§4.6) — rates only
+rate_usd_per_hr = 80                    # blended default; CAGE_HUMAN_RATE overrides
+default_minutes = 60                    # fallback when a task has no type/minutes
+[human.tasks.feature]                   # per-type lookup + [human.confidence] ladder
+minutes = 120
+rate_usd_per_hr = 90
 ```
+
+### 3.4 The task record — `tasks.jsonl` (third append-only file)
+
+A `task` was only a foreign-key string; nothing described the task itself. A third
+append-only file carries one row per task (last-write-wins by `id` at derive time),
+referenced by the calls/receipts that already carry `task`. It is **auto-collected
+from git at task close** (SessionEnd hook / `cage outcome`) by *shelling out* — never
+importing git — and is **fail-open**: a non-repo / no-git / detached HEAD omits those
+fields and never raises (write-path discipline, like `ledger.append`). PII guard
+(carried from "prompt bodies are never a field"): it stores the **short SHA, branch,
+numeric diff counts, and top-level changed dirs only** — never the commit *message*,
+author name/email, or file contents. It absorbs the existing `outcome` signal and
+powers `cage trend` and the diff-informed confidence bump.
 
 ---
 
@@ -234,6 +254,30 @@ a total.
 - **Eliminated calls (response-cache / skipped).** `actual: 0`, full
   alternative cost saved, `method: "measured"`. The biggest wins are here.
 
+### 4.6 Tier-1 — the human baseline (agent vs human)
+
+§4.2–4.4 are **Tier-2**: tool-vs-tool *within* the agent path. **Tier-1** is the
+orthogonal axis — *what a person would have cost* for the whole task. It is one more
+baseline layer in the same ledger, not a parallel subsystem: a human alternative is
+a receipt whose `tool` is `"human"`, in `unit: "minutes"` (or `"usd"` for a quote).
+Money **derives** at read time — minutes are the ground-truth quantity for human
+labor exactly as tokens are for the agent path, so a rate change re-prices the
+backlog with no ledger rewrite. The full design is `docs/human-baseline.design.md`.
+
+- **Resolver** (`human.py`) — one precedence chain: explicit usd → per-receipt
+  minutes → task-type table → global default, each with a `confidence` rung
+  (0.9 / 0.7 / 0.5 / 0.3). Cost is **`estimated`** unless a real timesheet/quote
+  (`measured`); never `modeled`. Rates live in `[human]` in `policy.toml`;
+  `CAGE_HUMAN_RATE` overrides at derive time with visible provenance.
+- **Unit→USD** (`convert.py`) — the single dispatch (`usd`/`tokens`/`minutes`/0),
+  so `roi`, `attribution`, `human` all agree. Human never enters the 2ⁿ matrix as a
+  tool; it sits **above** the stack as a single anchor (`matrix --human`).
+- **Two clocks (`§5b.1`)** — every surface that prints *saved $* also prints *saved
+  time*: `time_saved = human_minutes − agent_active_minutes`, where
+  `agent_active_minutes` = the task's call-span wall-clock floored by `Σ latency_ms`,
+  tagged `estimated`. It can go **negative** (agent thrashed) — the metric must be
+  able to embarrass the agent. `cage trend` turns `ts` into a cost+time time-series.
+
 ---
 
 ## 5. Architecture
@@ -286,9 +330,12 @@ reinvent Kompress** — Tier 2 is a pluggable adapter you may never switch on.
 cage meter -- <cmd>           # run a command through the proxy, record calls
 cage report [--since 7d]      # ledger: spend by agent / route / model / day
 cage attrib [--task ID]       # per-tool marginal savings (the §4.2 table)
-cage matrix [--task ID]       # the counterfactual permutation table (§4.4)
+cage matrix [--task ID] [--human]  # counterfactual permutation table; --human = anchor (§4.4/§4.6)
 cage budget                   # current session/day spend vs. policy ceilings
-cage roi [--since 30d]        # saved $ vs. each tool's own cost + latency
+cage roi [--since 30d]        # saved $ vs. each tool's own cost + latency (tool-only)
+cage human [--task|--agent|--since] [--html]   # Tier-1 agent-vs-human: $ and hours saved (§4.6)
+cage human-record --task ID (--type T | --minutes N | --usd N)  # record a human alternative
+cage trend [--by week|month] [--metric cost|time|both]  # savings as a time-series (§4.6)
 cage serve                    # dashboard (reuse fux's serve/assets pattern)
 cage why <call-id>            # full provenance: call + every receipt against it
 ```

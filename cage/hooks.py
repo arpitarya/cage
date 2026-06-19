@@ -13,7 +13,7 @@ import json
 import sys
 from pathlib import Path
 
-from cage import budget, ledger, paths, policy, transcript
+from cage import budget, ledger, paths, policy, tasks, transcript
 
 
 def _stdin_json() -> dict:
@@ -48,9 +48,20 @@ def session_end() -> int:
             root = _root(payload)
             rows = transcript.parse_calls(Path(tp), session=payload.get("session_id", ""))
             append_new(root, rows)
+            _snapshot_tasks(root, rows)
         except Exception:  # pragma: no cover — best-effort
             pass
     return 0
+
+
+def _snapshot_tasks(root: Path, rows: list[dict]) -> None:
+    """Record a git-aware task row for each task this session touched (fail-open)."""
+    seen: set[str] = set()
+    for row in rows:
+        t = row.get("task")
+        if t and t not in seen:
+            seen.add(t)
+            tasks.record(root, t, agents=[row.get("agent", "")] if row.get("agent") else None)
 
 
 def session_start() -> int:

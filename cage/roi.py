@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from cage import ledger, prices, render
+from cage import convert, ledger, render
 
 
 def by_tool(root: Path, pol: dict, since: str | None = None) -> dict:
@@ -16,21 +16,16 @@ def by_tool(root: Path, pol: dict, since: str | None = None) -> dict:
     rcpts = ledger.since(ledger.receipts(root), since)
     tools: dict[str, dict] = {}
     for r in rcpts:
+        if r.get("tool") == "human":  # Tier-1 baseline, not a within-agent tool (§4.4)
+            continue
         t = tools.setdefault(r["tool"], {"receipts": 0, "saved_usd": 0.0,
                                          "cost_usd": 0.0, "added_ms": 0})
         t["receipts"] += 1
-        t["saved_usd"] += _saved_usd(r, calls.get(r.get("call"), {}), pol)
+        t["saved_usd"] += convert.saved_usd(r, calls.get(r.get("call"), {}), pol)
         meta = r.get("meta") or {}
         t["cost_usd"] += float(meta.get("tool_cost_usd", 0.0))
         t["added_ms"] += int(meta.get("added_latency_ms", 0))
     return {"since": since, "tools": tools}
-
-
-def _saved_usd(receipt: dict, call: dict, pol: dict) -> float:
-    if receipt.get("unit") == "usd":
-        return float(receipt.get("saved", 0.0))
-    return prices.input_cost_usd(pol, call.get("provider", ""), call.get("model", ""),
-                                 int(receipt.get("saved", 0.0)))
 
 
 def render_roi(data: dict) -> str:

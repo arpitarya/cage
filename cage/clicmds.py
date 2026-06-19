@@ -3,10 +3,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from cage import (agents, attribution, budget, demo, forecast, hooks, initcmd,
-                  ledger, matrix, mcpserver, metercmd, paths, policy, provenance,
-                  proxy, quality, recommend, regression, report, roi, serve,
-                  setupcmd, transcript)
+from cage import (agents, attribution, budget, demo, forecast, graphifymeter,
+                  hooks, humanview, initcmd, ledger, matrix, mcpserver, metercmd,
+                  metering, paths, policy, provenance, proxy, quality, recommend,
+                  regression, report, roi, serve, setupcmd, tasks, trend, transcript)
 from cage.cliutil import emit, root
 
 
@@ -44,8 +44,44 @@ def cmd_attrib(args) -> int:
 def cmd_matrix(args) -> int:
     r = root()
     task = args.task or _latest_task(r)
-    data = matrix.matrix(r, task, _policy())
-    return emit(args, data, matrix.render_matrix(data))
+    data = matrix.matrix(r, task, _policy(), human=getattr(args, "human", False))
+    text = matrix.render_matrix(data)
+    if getattr(args, "html", None):
+        serve.write_html(args.html, f"Matrix · {task}", {f"Matrix · {task}": text})
+        print(f"✔ wrote {args.html}")
+        return 0
+    return emit(args, data, text)
+
+
+def cmd_human(args) -> int:
+    r = root()
+    data = humanview.rollup(r, _policy(), since=args.since, agent=args.agent, task=args.task)
+    text = humanview.render_human(data)
+    if getattr(args, "html", None):
+        serve.write_html(args.html, "Agent vs human", {"Agent vs human": text})
+        print(f"✔ wrote {args.html}")
+        return 0
+    return emit(args, data, text)
+
+
+def cmd_human_record(args) -> int:
+    rid = metering.record_human(task=args.task, minutes=args.minutes, usd=args.usd,
+                                task_type=args.task_type or "", rate_usd_per_hr=args.rate,
+                                call=args.call, agent=args.agent, measured=args.measured,
+                                root=root())
+    print(f"✔ recorded human alternative for {args.task!r}." if rid
+          else f"· {args.task!r} already has a human receipt for that call (no double count).")
+    return 0
+
+
+def cmd_trend(args) -> int:
+    data = trend.series(root(), _policy(), by=args.by, since=args.since)
+    text = trend.render_trend(data, metric=args.metric)
+    if getattr(args, "html", None):
+        serve.write_html(args.html, "Savings trend", {"Savings trend": text})
+        print(f"✔ wrote {args.html}")
+        return 0
+    return emit(args, data, text)
 
 
 def cmd_budget(args) -> int:
@@ -82,7 +118,9 @@ def cmd_quality(args) -> int:
 
 
 def cmd_outcome(args) -> int:
-    quality.record_outcome(root(), args.task, ok=not args.redo)
+    r = root()
+    quality.record_outcome(r, args.task, ok=not args.redo)
+    tasks.record(r, args.task, outcome="ok" if not args.redo else "redo")
     print(f"✔ recorded {args.task!r} as {'redo' if args.redo else 'ok'}.")
     return 0
 
@@ -110,6 +148,10 @@ def cmd_proxy(args) -> int:
 
 def cmd_meter(args) -> int:
     return metercmd.run(root(), args.argv, upstream=args.upstream)
+
+
+def cmd_graphify(args) -> int:
+    return graphifymeter.run(root(), args.argv, task=args.task)
 
 
 def cmd_mcp(_args) -> int:

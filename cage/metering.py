@@ -49,6 +49,35 @@ def record_receipt(*, tool: str, raw_alternative: float, actual: float,
     return row["id"] if ledger.append(paths.Footprint(r).receipts, row) else ""
 
 
+def record_human(*, task: str, minutes: float | None = None, usd: float | None = None,
+                 task_type: str = "", rate_usd_per_hr: float | None = None,
+                 call: str = "", agent: str = "", measured: bool = False,
+                 root: Path | None = None) -> str:
+    """Append one ``tool="human"`` Tier-1 receipt (design §5). Fail-open + idempotent.
+
+    Re-recording the same ``(task, call)`` is a no-op (returns "") so a replayed
+    outcome flow never double-counts (criterion 6). Stores the *input* (minutes /
+    type / usd); USD is derived at read time by `human.py`.
+    """
+    r = _resolve_root(root)
+    for existing in ledger.receipts(r):
+        if existing.get("tool") == "human" and existing.get("task") == task \
+                and existing.get("call", "") == call:
+            return ""  # already recorded — idempotent, no double count
+    method = "measured" if measured else "estimated"
+    meta = {k: v for k, v in (("task_type", task_type), ("rate_usd_per_hr", rate_usd_per_hr),
+                              ("agent", agent)) if v}
+    if usd is not None:
+        unit, raw = "usd", float(usd)
+    elif minutes is not None:
+        unit, raw = "minutes", float(minutes)
+    else:
+        unit, raw = "tokens", 0.0  # resolver falls to task-type table / global default
+    row = schema.make_receipt(tool="human", raw_alternative=raw, actual=0.0, unit=unit,
+                              call=call, task=task, method=method, meta=meta)
+    return row["id"] if ledger.append(paths.Footprint(r).receipts, row) else ""
+
+
 @dataclass
 class Recorder:
     """Mutable handle yielded by `meter()` — fill it in inside the block."""

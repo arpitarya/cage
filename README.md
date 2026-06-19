@@ -3,9 +3,10 @@
 > **Cage** is a *flux*: a deterministic engine for the **flow of tokens and calls**
 > through an AI tool stack. It meters every LLM call, collects a **savings receipt**
 > from each tool in the stack, and turns the raw stream into an **attribution
-> ledger** — what you spent, what each tool saved you, and what any *other*
-> combination of tools would have cost. `$0`, stdlib-only, deterministic, and
-> independent of any single AI tool.
+> ledger** — what you spent, what each tool saved you, what any *other* combination
+> of tools would have cost, and **how much money *and time* the agent saved vs a
+> person** doing the task (anchored to the commit it produced). `$0`, stdlib-only,
+> deterministic, and independent of any single AI tool.
 
 Cage is the third in a family of deterministic *substrate → derived views* tools:
 [graphify](https://github.com/arpitarya/graphify) (code → graph),
@@ -16,7 +17,7 @@ The full design of record is in [docs/cage-plan.md](docs/cage-plan.md).
 
 ---
 
-## Status — v0.2 (plan §9 complete)
+## Status — v0.3 (Tier-1 human axis + tool-savings receipts)
 
 | Build-order step (plan §9) | Status |
 | -------------------------- | ------ |
@@ -29,9 +30,22 @@ The full design of record is in [docs/cage-plan.md](docs/cage-plan.md).
 | 7. Tier-0 savings (compressor, exact-match cache) + §8 features | ✅ |
 
 The attribution engine (§4, the differentiator) reproduces the plan's worked
-example against a real ledger — `cage demo`. 48 tests passing. The optional
+example against a real ledger — `cage demo`. 78 tests passing. The optional
 `[embeddings]`/`[ml]` tiers stay off by default (semantic cache + learned
 compressor are pluggable adapters over the same receipt shape).
+
+**Tier-1 — agent vs human.** Beyond tool-vs-tool savings, Cage models the
+whole-task counterfactual: what a *person* would have cost in time and money. A
+human receipt is just a receipt whose `tool` is `"human"`, priced in minutes →
+money at a configured rate (`[human]` in `policy.toml`, or `CAGE_HUMAN_RATE`).
+Every figure is `estimated` (never `measured` unless you supply a real timesheet)
+and carries a confidence so round task-type guesses *read* as low-credibility:
+
+```
+Agent vs human · 14 tasks · rate source: policy ($80/hr)
+agent     tasks   human $    agent $    saved $   saved hrs   conf   method
+claude       9    $1,140.00    $4.12    $1,135.88     13.2     0.51   estimated
+```
 
 ---
 
@@ -95,11 +109,16 @@ actually ran is `measured`; no projection masquerades as an invoice (plan §4.1)
 | `cage matrix [--task ID]` | counterfactual permutation table (§4.4) |
 | `cage budget [--session ID]` | session/day spend vs `policy.toml` ceilings |
 | `cage roi [--since 30d]` | saved $ per tool vs its own cost + latency |
+| `cage human [--since\|--task\|--agent] [--html]` | agent-vs-human: **$ and hours saved** per agent (§4.1) |
+| `cage human-record --task ID (--type T\|--minutes N\|--usd N)` | record the Tier-1 human alternative for a task (§5) |
+| `cage matrix --human` | the §4.4 matrix with a human anchor row + vs-human columns |
+| `cage trend [--by week\|month] [--metric cost\|time\|both]` | cost+time savings as a time-series (§5b.4) |
 | `cage why <call-id>` | full provenance: a call + every receipt against it |
 | `cage quality` / `cage outcome <task>` | cost per *successful* task (§8.2) |
 | `cage regression` | alert when cost-per-call drifts up (§8.3) |
 | `cage recommend` | cheapest-path: which tools to enable/skip (§8.4) |
 | `cage forecast` | project monthly spend vs the budget (§8.5) |
+| `cage graphify -- graphify <query\|path\|explain> …` | meter a third-party graphify call (transparent passthrough; files a savings receipt) |
 | `cage serve` | local dashboard over the ledger |
 | `cage demo` | seed the §4.4 worked example |
 
@@ -125,6 +144,20 @@ cage hooks install --claude   # or one surface at a time
 cage proxy --port 8788     # the universal meter for clients you can't edit
 cage meter -- codex exec   # run any agent under the proxy for one shot
 ```
+
+### Tool-savings receipts — owned vs third-party
+
+A tool earns rows in `attrib`/`matrix`/`roi` by filing a *savings receipt*. Two
+strategies, by who owns the tool (see [docs/agents.md](docs/agents.md) and the
+[receipt contract](docs/tool-receipts.graphify-fux.handoff.md)):
+
+- **In-tool (you own it) — e.g. fux** carries a fail-open `cage_receipt.py` and
+  emits its own `tool="fux"` receipt; cage stays optional (fux runs unchanged with
+  cage absent).
+- **External adapter (third-party) — e.g. graphify:** `cage graphify -- graphify
+  query "…"` runs graphify unmodified, passes its output through byte-for-byte, and
+  files a `tool="graphify"` receipt by parsing the cited `source_file`s. graphify is
+  never edited; a metering error never alters its result.
 
 ## Design constitution
 
