@@ -194,7 +194,7 @@ Named after *John Cage*, whose *4′33″* framed four and a half minutes of "si
 
 ---
 
-If you've ever been the one in the room with no numbers, **★ star the repo** and run `cage demo` — `pip install cage-flux`.
+If you've ever been the one in the room with no numbers, run `cage demo` — `pip install cage-flux`.
 
 ## License
 
