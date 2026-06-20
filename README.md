@@ -1,70 +1,68 @@
-# Cage — a *flux*
+<!-- launch: drop a cage lockup image here, matching fux's, when the art exists. -->
 
-> **Cage** is a *flux*: a deterministic engine for the **flow of tokens and calls**
-> through an AI tool stack. It meters every LLM call, collects a **savings receipt**
-> from each tool in the stack, and turns the raw stream into an **attribution
-> ledger** — what you spent, what each tool saved you, what any *other* combination
-> of tools would have cost, and **how much money *and time* the agent saved vs a
-> person** doing the task (anchored to the commit it produced). `$0`, stdlib-only,
-> deterministic, and independent of any single AI tool.
+# Cage
 
-Cage is the third in a family of deterministic *substrate → derived views* tools:
-[graphify](https://github.com/arpitarya/graphify) (code → graph),
-[fux](https://github.com/arpitarya/fux) (decisions → rules/memory), and now Cage
-(**LLM traffic + savings receipts → ledger, attribution, counterfactuals**).
+> **Cost dashboards tell you what your AI stack *spent*. Cage tells you what each tool actually *saved* you — and what a human would have cost instead.**
 
-The full design of record is in [docs/cage-plan.md](docs/cage-plan.md).
+[![PyPI](https://img.shields.io/pypi/v/cage-flux.svg)](https://pypi.org/project/cage-flux/)
+[![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
+[![Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)](#the-0-guarantee)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
----
+You're paying for an agent, a graph tool, a rules engine, maybe Copilot. At the end of the month someone asks *"is any of this worth it?"* — and the honest answer is a shrug and a Slack thread. Cage meters every LLM call, collects a **savings receipt** from each tool in the stack, and turns the raw stream into an **attribution ledger**: what you spent, what each tool saved you, what *every other combination* of tools would have cost, and **how much money *and time* the agent saved versus a person** doing the same task. **`$0`, deterministic, zero dependencies, no model in the maintenance path.**
 
-## Status — v0.3 (Tier-1 human axis + tool-savings receipts)
+**Named after *John Cage*.** · Python ≥ 3.11 · stdlib only · MIT · sits beside `fux`, `graphify`, `bach`, `wagner`, `orff`.
 
-| Build-order step (plan §9) | Status |
-| -------------------------- | ------ |
-| 1. Substrate contract (call record, receipt, `policy.toml`) | ✅ |
-| 2. Tier-0 meter + ledger (`record_call`, `cage report`) | ✅ |
-| 3. Receipt emitters (`record_receipt`, compressor, response-cache) | ✅ |
-| 4. Attribution + matrix (`cage attrib`, `cage matrix`) | ✅ |
-| 5. Adapters — library `meter()` · proxy · transcript hooks · `cage meter` | ✅ |
-| 6. Plugin — `cage mcp` · `/cage` skill · agent hooks/wiring | ✅ |
-| 7. Tier-0 savings (compressor, exact-match cache) + §8 features | ✅ |
+<p align="center"><em>▶ Demo GIF coming soon.</em></p>
 
-The attribution engine (§4, the differentiator) reproduces the plan's worked
-example against a real ledger — `cage demo`. 78 tests passing. The optional
-`[embeddings]`/`[ml]` tiers stay off by default (semantic cache + learned
-compressor are pluggable adapters over the same receipt shape).
+## The story
 
-**Tier-1 — agent vs human.** Beyond tool-vs-tool savings, Cage models the
-whole-task counterfactual: what a *person* would have cost in time and money. A
-human receipt is just a receipt whose `tool` is `"human"`, priced in minutes →
-money at a configured rate (`[human]` in `policy.toml`, or `CAGE_HUMAN_RATE`).
-Every figure is `estimated` (never `measured` unless you supply a real timesheet)
-and carries a confidence so round task-type guesses *read* as low-credibility:
+> *Another README story. Yeah. Because nobody ever walked out of a meeting humming a feature table, and you will not remember mine. So forget the table. Here's ninety seconds about a conference room, a pile of money, and a bunch of people who have no idea what they're talking about. One of them is you. — Arpit*
 
-```
-Agent vs human · 14 tasks · rate source: policy ($80/hr)
-agent     tasks   human $    agent $    saved $   saved hrs   conf   method
-claude       9    $1,140.00    $4.12    $1,135.88     13.2     0.51   estimated
+You ever notice how *everybody's* saving money now? Everybody. The agent's saving money. The graph tool's saving money. Copilot's saving money. Two tools you built over a weekend — saving money. Add it all up and you should be getting a check in the mail. Funny thing about that. The bill went *up*.
+
+Here's the con. Nobody — and I mean *nobody* — can show you the number. They got slides. They got a roadmap. They got a guy named Kevin who "feels like it's a game-changer." What they don't got is one honest figure that says *this* tool saved *this much* on *this* task, and here's what it would've cost to do the boring old way, by hand. Ask for *that* number and watch the room go quiet and somebody suggest we "circle back."
+
+And the kicker — you built half of it. So when finance points at you and says "is this worth it," you, the expert, the one who's supposed to *know* — you got a screenshot and a feeling. You're not in trouble for spending the money, folks. You're in trouble because you bought the same fog everybody else did.
+
+**Cage is the thing that ruins the fog.** It's the itemized receipt nobody asks for and everybody needs: graphify saved 27,000 tokens here, fux saved 6,400, the agent did in four minutes what a person does in two hours — plus every other combo you *could've* run, priced out, each number stamped so you know which ones are real and which ones are some computer's best guess. It doesn't do synergy. It does arithmetic.
+
+## See it
+
+```bash
+$ cage matrix --task fix-handover-bug
 ```
 
----
+```
+Counterfactual matrix · task 'fix-handover-bug' · anthropic/claude-opus-4-8
+  base 2,000 tok + output 1,500 tok held constant
+
+graphify  fux  compressor   input tok    cost    source
+   ✗       ✗       ✗           50,000   $0.1725   modeled
+   ✓       ✗       ✗           23,000   $0.0915   modeled
+   ✓       ✓       ✗           16,600   $0.0723   modeled
+   ✓       ✓       ✓            8,600   $0.0483   measured   ← the run you actually made
+
+  full stack vs all-off: 72% cheaper ($0.1725 → $0.0483)
+```
+
+Per-tool savings any meter can attempt. The part no cost dashboard does is the rest of that table — **what each stack you *didn't* run would have cost** — and the `source` column, so you always know which row is an invoice and which is a reconstruction. Only the configuration you actually ran is `measured`; **no projection ever masquerades as an invoice.** That discipline is the whole product.
 
 ## Quickstart
 
 ```bash
-./install.sh                 # editable install → the `cage` binary ($0, stdlib only)
-cd your-project && cage init # scaffold .cage/ (policy + gitignored ledger)
-
-cage demo                    # seed the plan's §4.4 worked example
-cage attrib                  # per-tool marginal savings (the §4.2 table)
-cage matrix                  # the counterfactual permutation table (§4.4)
-cage report --by model       # ledger rollup: spend by model
+pip install cage-flux           # the CLI, zero third-party deps
+cd your-project
+cage init                       # scaffold .cage/ (policy + gitignored ledger)
+cage adopt                      # wire all four agents + the graphify interceptor
+cage demo                       # seed the worked example
+cage matrix                     # the counterfactual permutation table
+cage human                      # agent-vs-human: $ and hours saved
 ```
 
-### Metering from your code (the library adapter)
+> **Adopting into a project** is one idempotent command — `cage adopt` wires Claude Code / Codex / Copilot / Kiro onto one ledger and drops a transparent `bin/graphify` interceptor. Pass `--claude` (etc.) for a subset, `--no-graphify` / `--no-hooks` to skip parts.
 
-The adapter targets the *protocol*, not any named tool — you call it, it doesn't
-wrap you, and it is fail-open (a metering error never breaks your call):
+Metering from your own code is the library adapter — it targets the *protocol*, not any named client, and is fail-open (a metering error never breaks your call):
 
 ```python
 import cage
@@ -79,95 +77,125 @@ cage.record_receipt(tool="fux", raw_alternative=8000, actual=1600,
                     call=m.call_id, task="fix-bug", method="modeled")
 ```
 
-## What `cage demo` proves
+## Explain it like I'm five
 
-The §4.4 worked example — one task, three deterministic tools each shrinking a
-different slice of context — reproduced against a real ledger:
+You and a robot helper did the chores. At the end of the day someone wants to know: did the robot actually help, or did it just look busy?
+
+**Cage is the chart on the fridge.** It writes down how long each chore took with the robot, and how long it *would* have taken if you'd done it yourself — so you can see, in real minutes and real dollars, which helper earned its place and which one just made noise. And it's careful to mark which numbers it actually timed and which ones are its best guess, so nobody gets fooled by a confident-looking total. It does all of this for free, without ever phoning a friend for the answer.
+
+## Why it's different
+
+It's not another cost dashboard. The difference is a set of *properties*, not features:
+
+- **Deterministic.** Every derived view — report, attribution, the counterfactual matrix, ROI, the human axis — is pure parse/arithmetic over an append-only log. Same ledger + same policy ⇒ identical tables, every time. The numbers never drift because nothing guesses.
+- **Honest by construction.** Every figure carries a `method`: `measured` (a real invoice), `modeled` (a reconstructed counterfactual), or `estimated` (a human/labor guess). A projection can never read as an invoice — the one property a "trust me, it paid off" slide can't offer.
+- **`$0` and zero-dependency.** Stdlib-only Python, `dependencies = []`. Heavy ML is an opt-in, off-by-default tier (`[embeddings]`, `[ml]`), never on the default path. Portable as a tarball, auditable line by line.
+- **Agent-native.** Every read command takes `--json`; the ledger is served over MCP. Built so an agent can pull its own cost numbers *and verify them*, not just read a chart.
+
+The "so what" chain: deterministic → so the numbers never hallucinate → so each one carries a defensible `method` → so you can put the savings claim in front of finance, or an auditor. That last clause is the one a dashboard can't say.
+
+## Honest attribution — the part that survives the room
+
+Anyone can sum a bill. Cage's job is to divide credit **without lying about it**, and it does that with three rules:
+
+- **Marginal-by-fixed-order.** Each tool's receipt reports the saving it produced *given the tools upstream of it* in the canonical pipeline. The marginals sum exactly to the total — no overlap, no double-counting, `$0` to compute, and defensible because the order is fixed and visible (not a black-box Shapley pass; that's a deferred opt-in audit mode).
+- **The counterfactual matrix.** For a task whose tools each shrank a slice of context, Cage enumerates the 2ⁿ on/off permutations and prices each at the task's model — so "what would graphify-off + fux-on have cost?" is a row, not a hand-wave. Only the configuration actually run is `measured`; every reconstructed cell is `modeled` (or `estimated` if it leans on an estimate).
+- **Tier-1 — agent vs human.** Beyond tool-vs-tool, Cage models the whole-task counterfactual: what a *person* would have cost in time and money. A human receipt is just a receipt whose `tool` is `"human"`, priced in minutes → money at a configured rate (`[human]` in `policy.toml`, or `CAGE_HUMAN_RATE`). It is `estimated` unless you supply a real timesheet, and carries a **confidence** so round task-type guesses *read* as low-credibility instead of masquerading as precise. The time metric can go **negative** — if the agent thrashed longer than a human would have, the table says so.
 
 ```
-Marginal attribution · task 'fix-handover-bug' · anthropic/claude-opus-4-8
-tool        saved tok  saved $  method
-graphify       27,000  $0.0810  modeled
-fux             6,400  $0.0192  modeled
-compressor      8,000  $0.0240  measured
-TOTAL          41,400  $0.1242
+Agent vs human · 14 tasks · rate source: policy ($80/hr)
 
-Counterfactual matrix … full stack vs all-off: 72% cheaper ($0.1725 → $0.0483)
+agent     tasks   human $    agent $    saved $   saved hrs   conf   method
+claude       9    $1,140.00    $4.12    $1,135.88     13.2     0.51   estimated
+codex        3      $260.00    $1.55      $258.45      3.1     0.50   estimated
+TOTAL       14    $1,530.00    $6.55    $1,523.45     17.9     0.51
 ```
 
-Every cell is tagged `measured` / `modeled` / `estimated` — you always know which
-numbers are invoices and which are projections. Only the configuration you
-actually ran is `measured`; no projection masquerades as an invoice (plan §4.1).
+The savings are anchored to the commit they produced — Cage snapshots a git-aware task record (SHA, branch, diff size, wall-clock) at task close, so a number can always be traced back to the change that earned it.
 
-## CLI
+## How it works
 
-| Command | What it does |
-| ------- | ------------ |
-| `cage init` | scaffold `.cage/` (policy + gitignored ledger) |
-| `cage report [--by route\|model\|day\|agent] [--since 7d]` | ledger rollup |
-| `cage attrib [--task ID]` | per-tool marginal savings (§4.2) |
-| `cage matrix [--task ID]` | counterfactual permutation table (§4.4) |
-| `cage budget [--session ID]` | session/day spend vs `policy.toml` ceilings |
-| `cage roi [--since 30d]` | saved $ per tool vs its own cost + latency |
-| `cage human [--since\|--task\|--agent] [--html]` | agent-vs-human: **$ and hours saved** per agent (§4.1) |
-| `cage human-record --task ID (--type T\|--minutes N\|--usd N)` | record the Tier-1 human alternative for a task (§5) |
-| `cage matrix --human` | the §4.4 matrix with a human anchor row + vs-human columns |
-| `cage trend [--by week\|month] [--metric cost\|time\|both]` | cost+time savings as a time-series (§5b.4) |
-| `cage why <call-id>` | full provenance: a call + every receipt against it |
-| `cage quality` / `cage outcome <task>` | cost per *successful* task (§8.2) |
-| `cage regression` | alert when cost-per-call drifts up (§8.3) |
-| `cage recommend` | cheapest-path: which tools to enable/skip (§8.4) |
-| `cage forecast` | project monthly spend vs the budget (§8.5) |
-| `cage graphify -- graphify <query\|path\|explain> …` | meter a third-party graphify call (transparent passthrough; files a savings receipt) |
-| `cage serve` | local dashboard over the ledger |
-| `cage demo` | seed the §4.4 worked example |
+One append-only log in, every view derived from it for `$0`:
 
+```
+record_call / record_receipt  →  .cage/ledger/{calls,receipts,tasks}.jsonl  (append-only)
+        (meter, fail-open)                    │
+                                              ▼  derive ($0, no model)
+   policy.toml (prices/order/budgets/rates) → report · attrib · matrix · roi
+                                             · human · trend · budget · why
+```
+
+You meter at the provider boundary (library adapter, a reverse proxy for clients you can't edit, or by parsing a Claude Code / Codex transcript). Everything downstream is a deterministic projection. The ledger carries token **counts**, never prompt bodies — PII-safe by construction; point `CAGE_LEDGER` at a private store to keep even the counts off-disk.
+
+A tool earns rows in `attrib`/`matrix`/`roi` by filing a **savings receipt**, and there are two ways in, by who owns the tool:
+
+- **In-tool (you own it) — e.g. fux** carries a fail-open `cage_receipt.py` and emits its own `tool="fux"` receipt. Cage stays optional; fux runs unchanged with cage absent.
+- **External adapter (third-party) — e.g. graphify:** `cage graphify -- graphify query "…"` runs graphify unmodified, passes its output through byte-for-byte, and files a `tool="graphify"` receipt by parsing the cited `source_file`s. graphify is never edited; a metering error never alters its result.
+
+<details>
+<summary><strong>The full command surface</strong> (ledger · attribution · human axis · ops · agents)</summary>
+
+```bash
+cage init                      # scaffold .cage/ (policy + gitignored ledger)
+cage adopt [--no-graphify]     # per-project setup: wire 4 agents + graphify interceptor
+cage doctor --json             # verify this project's setup is correct (non-zero on failure)
+cage report --by model         # ledger rollup: spend by route / model / day / agent
+cage attrib --task ID          # per-tool marginal savings (sum of marginals = total)
+cage matrix --task ID          # the counterfactual permutation table (2ⁿ on/off)
+cage matrix --task ID --human  # …with a human anchor row + vs-human columns
+cage roi --since 30d           # saved $ per tool vs its own cost + added latency
+cage human [--agent claude]    # agent-vs-human: $ AND hours saved, per agent
+cage human-record --task ID --type feature   # record a Tier-1 human alternative
+cage trend --by week --metric both           # cost + time savings as a time-series
+cage why <call-id>             # full provenance: a call + every receipt against it
+cage quality / cage outcome ID # cost per *successful* task (cost is honest with outcome)
+cage regression                # alert when cost-per-call drifts up
+cage recommend                 # cheapest-path: which tools to enable / skip
+cage forecast                  # project monthly spend vs the budget
+cage graphify -- graphify …    # meter a third-party graphify call (transparent passthrough)
+cage setup                     # install /cage + /cage-doctor into every agent home
+cage proxy --port 8788         # the universal meter for clients you can't edit
+cage mcp                       # serve the ledger to agents over MCP (stdio)
+cage serve                     # local dashboard over the ledger
+cage demo                      # seed the worked example that proves the thesis
+```
 Every read command takes `--json` for the agent-as-user (machine-readable, typed).
+</details>
 
 ## Works with any agent — target the protocol, not the tool
 
-Cage meters whatever speaks the wire format and reads the ledger over MCP, so all
-four agents share one ledger contract:
+Cage meters whatever speaks the wire format and reads the ledger over MCP, so all four agents share **one** ledger contract:
 
 | Agent | Meter its spend | Read the ledger |
 | ----- | --------------- | --------------- |
-| **Claude Code** | SessionEnd hook parses the transcript (proxy-free) | `/cage` skill + `cage` MCP |
+| **Claude Code** | SessionEnd hook parses the transcript (proxy-free) | `cage` MCP (`.mcp.json`) |
 | **Codex** | `cage meter -- codex …` / `cage import-codex` | `cage` MCP (`~/.codex/config.toml`) |
-| **Copilot** | `cage proxy` (point its base URL at it) | `cage` MCP (`.vscode/mcp.json`) + instructions |
-| **Kiro** | `cage proxy` | `cage` MCP (`.kiro/settings/mcp.json`) + steering |
+| **Copilot** | `cage proxy` (point its base URL at it) | `cage` MCP + instructions (`.vscode/`) |
+| **Kiro** | `cage proxy` | `cage` MCP + steering (`.kiro/`) |
 | **Your code / Orff** | `cage.meter()` library adapter | `cage` CLI / MCP |
 
-```bash
-cage setup                 # install a global /cage asset into all four agent homes
-cage hooks install         # wire claude/codex/copilot/kiro in this project
-cage hooks install --claude   # or one surface at a time
-cage proxy --port 8788     # the universal meter for clients you can't edit
-cage meter -- codex exec   # run any agent under the proxy for one shot
-```
+`cage setup` installs two assets into **every** agent home, idiomatically per agent: **`/cage`** (read the ledger) and **`/cage-doctor`** (verify the wiring works). Any agent can then report Cage health on request, in any project.
 
-### Tool-savings receipts — owned vs third-party
+## The `$0` guarantee
 
-A tool earns rows in `attrib`/`matrix`/`roi` by filing a *savings receipt*. Two
-strategies, by who owns the tool (see [docs/agents.md](docs/agents.md) and the
-[receipt contract](docs/tool-receipts.graphify-fux.handoff.md)):
+Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 92 tests passing; `cage demo` reproduces the worked attribution example against a real ledger.
 
-- **In-tool (you own it) — e.g. fux** carries a fail-open `cage_receipt.py` and
-  emits its own `tool="fux"` receipt; cage stays optional (fux runs unchanged with
-  cage absent).
-- **External adapter (third-party) — e.g. graphify:** `cage graphify -- graphify
-  query "…"` runs graphify unmodified, passes its output through byte-for-byte, and
-  files a `tool="graphify"` receipt by parsing the cited `source_file`s. graphify is
-  never edited; a metering error never alters its result.
+**Honest limits.** Cage doesn't decide your human rate — it prices minutes at a blended rate you set, and labels the result `estimated` so it never pretends to be a timesheet. Marginal-by-fixed-order is defensible and `$0`, but it is an *ordering convention*, not a Shapley value (that's a deferred audit mode). And a counterfactual cell is an honest reconstruction, never an invoice — the `method` column says so on every row, on purpose.
 
-## Design constitution
+## What's new
 
-- **`$0`, stdlib-only, deterministic** — no model in the maintenance path. Heavy
-  ML is an *optional, off-by-default* tier (`[embeddings]`, `[ml]`), never required.
-- **Target the wire protocol, never the tool** — Cage speaks the message format
-  and the receipt schema. Anything that speaks them works; nothing is named.
-- **PII-safe by construction** — the ledger stores token *counts*, never prompt
-  bodies. Point `CAGE_LEDGER` at a private store to keep even the counts off-disk.
-- **Honest attribution** — marginal-by-fixed-order ($0, defensible); every number
-  carries its `method`. Shapley is a deferred opt-in audit mode (plan §9).
+- **v0.3.0 — the Tier-1 human axis.** `cage human` / `cage trend` price agent-vs-human in **dollars and hours**, anchored to a git-aware task record; a `minutes` unit, a `[human]` rate table with confidence laddering, and `CAGE_HUMAN_RATE`. Third-party tools join via the external adapter (`cage graphify`).
+- **v0.2.0 — attribution + the counterfactual matrix.** Marginal-by-fixed-order attribution, the 2ⁿ permutation table, ROI per tool, and the `measured`/`modeled`/`estimated` discipline — the differentiator.
+- **v0.1.0 — substrate + meter.** The call/receipt contract, the append-only ledger, `policy.toml`, and `cage report`.
 
-MIT licensed.
+## The name
+
+Named after *John Cage*, whose *4′33″* framed four and a half minutes of "silence" so an audience would finally *hear* the ambient cost they'd been ignoring. Cage the tool does the same to your AI stack: it takes the spend and the savings everyone assumed were free or unknowable, and makes them something you can actually account for. It's the third in a family of deterministic *substrate → derived views* tools — [graphify](https://github.com/arpitarya/graphify) (code → graph), [fux](https://github.com/arpitarya/fux) (decisions → rules) — and now Cage (LLM traffic + receipts → ledger). The names are deliberate, and they sit beside `bach`, `wagner`, and `orff`.
+
+---
+
+If you've ever been the one in the room with no numbers, **★ star the repo** and run `cage demo` — `pip install cage-flux`.
+
+## License
+
+MIT — see [LICENSE](LICENSE).

@@ -51,6 +51,36 @@ def test_install_selected_surface_only(homes):
     assert s["kiro"] is True and s["claude"] is False
 
 
+def test_adopt_wires_all_four_surfaces(homes):
+    from cage import adoptcmd
+    proj = homes / "proj"
+    proj.mkdir()
+    res = adoptcmd.run(proj, graphify=False)  # no PATH/shim mutation in tests
+    assert set(res["hooks"]) == {"claude", "codex", "copilot", "kiro"}
+    assert agents.status(proj) == {"claude": True, "codex": True,
+                                   "copilot": True, "kiro": True}
+
+
+def test_adopt_surface_subset(homes):
+    from cage import adoptcmd
+    proj = homes / "proj"
+    proj.mkdir()
+    res = adoptcmd.run(proj, graphify=False, surfaces=("kiro",))
+    assert set(res["hooks"]) == {"kiro"}
+    s = agents.status(proj)
+    assert s["kiro"] is True and s["claude"] is False
+
+
+def test_adopt_no_hooks_skips_all_wiring(homes):
+    from cage import adoptcmd
+    proj = homes / "proj"
+    proj.mkdir()
+    res = adoptcmd.run(proj, hooks=False, graphify=False)
+    assert "hooks" not in res
+    assert agents.status(proj) == {"claude": False, "codex": False,
+                                   "copilot": False, "kiro": False}
+
+
 def test_mcp_tools_list_and_call(seeded, monkeypatch):
     root, _ = seeded
     monkeypatch.chdir(root)
@@ -74,8 +104,16 @@ def test_setup_installs_global_asset_for_all_four(tmp_path, monkeypatch):
     monkeypatch.setenv("CAGE_VSCODE_USER", str(tmp_path / "vscode"))
     monkeypatch.setenv("KIRO_HOME", str(tmp_path / "kiro"))
     out = setupcmd.run()
-    assert set(out) == {"claude", "codex", "copilot", "kiro"}
+    # Both skills (cage + cage-doctor) ship to all four agents — namespaced keys.
+    assert set(out) == {
+        "claude:cage", "codex:cage", "copilot:cage", "kiro:cage",
+        "claude:cage-doctor", "codex:cage-doctor", "copilot:cage-doctor", "kiro:cage-doctor",
+    }
     assert (tmp_path / "claude" / "skills" / "cage" / "SKILL.md").exists()
     assert (tmp_path / "codex" / "skills" / "cage" / "SKILL.md").exists()
     assert (tmp_path / "vscode" / "prompts" / "cage.prompt.md").exists()
     assert (tmp_path / "kiro" / "steering" / "cage.md").exists()
+    # The new doctor skill is installed for every agent too.
+    assert (tmp_path / "claude" / "skills" / "cage-doctor" / "SKILL.md").exists()
+    assert (tmp_path / "vscode" / "prompts" / "cage-doctor.prompt.md").exists()
+    assert (tmp_path / "kiro" / "steering" / "cage-doctor.md").exists()

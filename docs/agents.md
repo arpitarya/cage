@@ -15,6 +15,10 @@ cage hooks install    # wire claude + codex + copilot + kiro (or pass --claude e
 `CAGE_VSCODE_USER` for Copilot's prompt dir, `KIRO_HOME` for Kiro). The per-project
 MCP/hook wiring is `cage hooks install`.
 
+`cage adopt` is the one-command wrapper for a project: `cage init` + agent wiring
+(all four surfaces by default — pass `--claude`/`--codex`/`--copilot`/`--kiro` for a
+subset, or `--no-hooks` to skip wiring) + the graphify interceptor. Idempotent.
+
 ## Claude Code
 
 - **Meter (proxy-free):** `cage hooks install --claude` adds a **SessionEnd** hook

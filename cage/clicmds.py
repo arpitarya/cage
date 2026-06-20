@@ -3,10 +3,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from cage import (agents, attribution, budget, demo, forecast, graphifymeter,
-                  hooks, humanview, initcmd, ledger, matrix, mcpserver, metercmd,
-                  metering, paths, policy, provenance, proxy, quality, recommend,
-                  regression, report, roi, serve, setupcmd, tasks, trend, transcript)
+from cage import (adoptcmd, agents, attribution, budget, demo, doctorcmd,
+                  forecast, graphifymeter, hooks, humanview, initcmd, ledger,
+                  matrix, mcpserver, metercmd, metering, paths, policy, provenance,
+                  proxy, quality, recommend, regression, report, roi, serve,
+                  setupcmd, tasks, trend, transcript)
 from cage.cliutil import emit, root
 
 
@@ -161,8 +162,47 @@ def cmd_mcp(_args) -> int:
 def cmd_setup(_args) -> int:
     for agent, where in setupcmd.run().items():
         print(f"✔ {agent:<8} → {where}")
-    print("Next, in a project: `cage hooks install` then `cage init`.")
+    print("Next, in a project: `cage adopt` "
+          "(init + wire claude/codex/copilot/kiro + graphify interceptor).")
     return 0
+
+
+def cmd_adopt(args) -> int:
+    picked = tuple(s for s in agents.SURFACES if getattr(args, s, False)) or None
+    res = adoptcmd.run(root(), hooks=args.hooks, graphify=args.graphify,
+                       surfaces=picked)
+    if getattr(args, "json", False):
+        import json
+        print(json.dumps(res))
+        return 0
+    print(f"✔ .cage/ ready → {res['init']}")
+    if "hooks" in res:
+        wired = ", ".join(res["hooks"])  # one ledger, the surfaces actually wired
+        print(f"✔ agent metering + MCP wired for: {wired}")
+    if "shim" in res:
+        print(f"✔ graphify interceptor → {res['shim']}")
+        if res.get("path"):
+            print(f"✔ bin/ added to PATH in {res['path']} — open a new shell to meter graphify")
+    elif args.graphify:
+        print("· graphify not installed — interceptor skipped")
+    print("Done. Verify with `cage doctor`; then `cage report` / `cage matrix`.")
+    return 0
+
+
+def cmd_doctor(args) -> int:
+    res = doctorcmd.run(root())
+    if getattr(args, "json", False):
+        import json
+        print(json.dumps(res))
+    else:
+        glyph = {"ok": "✔", "warn": "·", "fail": "✗"}
+        for c in res["checks"]:
+            print(f"  {glyph[c['level']]} {c['name']:<12} {c['detail']}")
+        verdict = {"ok": "Cage is set up and working.",
+                   "warn": "Cage works; some optional wiring is missing (see ·).",
+                   "fail": "Cage setup is broken (see ✗) — run `cage adopt`."}
+        print(f"\n{glyph[res['status']]} {verdict[res['status']]}")
+    return 1 if res["status"] == "fail" else 0
 
 
 def cmd_hooks(args) -> int:

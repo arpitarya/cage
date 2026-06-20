@@ -134,6 +134,18 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("mcp", help="serve the ledger over MCP (stdio JSON-RPC) for any agent").set_defaults(fn=clicmds.cmd_mcp)
     sub.add_parser("setup", help="install the global /cage asset into all agent homes (claude/codex/copilot/kiro)").set_defaults(fn=clicmds.cmd_setup)
 
+    ad = sub.add_parser("adopt", help="full per-project setup: init + agent wiring (claude/codex/copilot/kiro) + graphify interceptor + PATH")
+    ad.add_argument("--no-hooks", dest="hooks", action="store_false", help="skip all agent wiring (claude/codex/copilot/kiro)")
+    ad.add_argument("--no-graphify", dest="graphify", action="store_false", help="skip the graphify interceptor")
+    for _s in SURFACES:
+        ad.add_argument(f"--{_s}", action="store_true", help=f"wire only the {_s} surface (default: all four)")
+    ad.add_argument("--json", action="store_true", help="machine-readable output")
+    ad.set_defaults(fn=clicmds.cmd_adopt)
+
+    dr = sub.add_parser("doctor", help="verify this project's Cage setup is correct and working")
+    dr.add_argument("--json", action="store_true", help="machine-readable output")
+    dr.set_defaults(fn=clicmds.cmd_doctor)
+
     hk = sub.add_parser("hooks", help="wire Cage into agents (claude/codex/copilot/kiro)")
     hk.add_argument("action", choices=["install", "status"], nargs="?", default="install")
     for _s in SURFACES:

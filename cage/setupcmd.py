@@ -30,21 +30,26 @@ def _copy_file(src: Path, dst: Path) -> None:
     shutil.copy2(src, dst)
 
 
+# Each tuple: (skill dir under data/skills, prompt file stem, steering file stem).
+# `cage` reads the ledger; `cage-doctor` verifies the setup. Both ship to all agents.
+_ASSETS = (("cage", "cage", "cage"), ("cage-doctor", "cage-doctor", "cage-doctor"))
+
+
 def run() -> dict:
     data = paths.bundled_data_dir()
-    skill = data / "skills" / "cage"
     out: dict[str, str] = {}
 
-    for name, home in (("claude", paths.claude_home()), ("codex", paths.codex_home())):
-        dst = home / "skills" / "cage"
-        _copy_skill(skill, dst)
-        out[name] = str(dst)
+    for skill, prompt, steer in _ASSETS:
+        for name, home in (("claude", paths.claude_home()), ("codex", paths.codex_home())):
+            dst = home / "skills" / skill
+            _copy_skill(data / "skills" / skill, dst)
+            out[f"{name}:{skill}"] = str(dst)
 
-    copilot = paths.vscode_user_dir() / "prompts" / "cage.prompt.md"
-    _copy_file(data / "prompts" / "cage.prompt.md", copilot)
-    out["copilot"] = str(copilot)
+        copilot = paths.vscode_user_dir() / "prompts" / f"{prompt}.prompt.md"
+        _copy_file(data / "prompts" / f"{prompt}.prompt.md", copilot)
+        out[f"copilot:{prompt}"] = str(copilot)
 
-    kiro = paths.kiro_home() / "steering" / "cage.md"
-    _copy_file(data / "steering" / "cage.md", kiro)
-    out["kiro"] = str(kiro)
+        kiro = paths.kiro_home() / "steering" / f"{steer}.md"
+        _copy_file(data / "steering" / f"{steer}.md", kiro)
+        out[f"kiro:{steer}"] = str(kiro)
     return out
