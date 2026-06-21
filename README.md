@@ -1,4 +1,6 @@
-<!-- launch: drop a cage lockup image here, matching fux's, when the art exists. -->
+<p align="center">
+  <img src="https://raw.githubusercontent.com/arpitarya/cage/main/docs/assets/cage-lockup.png" alt="Cage — Alpha Forge · Value Ledger" width="460">
+</p>
 
 # Cage
 

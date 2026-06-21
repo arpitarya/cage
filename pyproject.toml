@@ -49,7 +49,7 @@ where = ["."]
 include = ["cage*"]
 
 [tool.setuptools.package-data]
-cage = ["data/policy.toml", "data/skills/**/*", "data/prompts/*", "data/steering/*", "data/shims/*"]
+cage = ["data/policy.toml", "data/skills/**/*", "data/prompts/*", "data/steering/*", "data/shims/*", "data/assets/*"]
 
 [tool.ruff]
 line-length = 100

@@ -1,0 +1,4 @@
+include README.md LICENSE
+include docs/assets/*.svg
+include docs/assets/*.png
+recursive-include cage/data *

@@ -1,0 +1,41 @@
+<svg width="460" height="160" viewBox="0 0 460 160" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Cage — Alpha Forge value ledger">
+  <title>Cage — Alpha Forge · Value Ledger</title>
+  <defs>
+    <linearGradient id="cage-grad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#9DECFF"/>
+      <stop offset="55%" stop-color="#2FC4E8"/>
+      <stop offset="100%" stop-color="#1186AE"/>
+    </linearGradient>
+    <linearGradient id="cage-bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#121110"/>
+      <stop offset="100%" stop-color="#0a0a09"/>
+    </linearGradient>
+    <linearGradient id="cage-rule" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="50%" stop-color="#ffffff" stop-opacity=".14"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <rect x=".5" y=".5" width="459" height="159" rx="14" fill="url(#cage-bg)" stroke="#ffffff" stroke-opacity=".07"/>
+
+  <!-- mark, 74px, vertically centered (translate by lockup padding) -->
+  <g transform="translate(34,43) scale(1.156)">
+    <rect x="9" y="50" width="46" height="2.6" rx="1.3" fill="#000" opacity=".22"/>
+    <rect x="14" y="15" width="14" height="35" rx="2" fill="url(#cage-grad)"/>
+    <rect x="33" y="37" width="14" height="13" rx="2" fill="url(#cage-grad)"/>
+    <rect x="14" y="15" width="2.6" height="35" rx="1.3" fill="#fff" opacity=".2"/>
+    <rect x="33" y="37" width="2.4" height="13" rx="1.2" fill="#fff" opacity=".16"/>
+    <path d="M50 15 h3 v22 h-3" fill="none" stroke="#fff" stroke-width="2.2" opacity=".5" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <!-- divider rule -->
+  <rect x="142" y="40" width="1" height="80" fill="url(#cage-rule)"/>
+
+  <!-- text block -->
+  <g font-family="'Space Grotesk','Helvetica Neue',Arial,sans-serif">
+    <text x="172" y="58" fill="#7a756b" font-family="'Space Mono','SFMono-Regular',Consolas,monospace" font-size="8.5" letter-spacing="3">ALPHA FORGE</text>
+    <text x="172" y="92" fill="#f2efe9" font-size="30" font-weight="700" letter-spacing="4.8">CAGE</text>
+    <text x="172" y="114" fill="#2fc4e8" font-family="'Space Mono','SFMono-Regular',Consolas,monospace" font-size="10" letter-spacing="2.6">VALUE LEDGER</text>
+  </g>
+</svg>
