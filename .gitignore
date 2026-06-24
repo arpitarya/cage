@@ -10,6 +10,7 @@ __pycache__/
 # Cage's own runtime ledger inside this repo (append-only, machine-local).
 .cage/ledger/
 .cage/out/
+.cage/state/
 
 # macOS
 .DS_Store

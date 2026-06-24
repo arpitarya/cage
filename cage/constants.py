@@ -31,3 +31,11 @@ DEFAULT_CONFIDENCE = {"measured": 0.9, "estimated": 0.7,      # fallback ladder 
                       "type_table": 0.5, "default": 0.3}      # policy omits a key
 GRAPHIFY_RECEIPT_CONFIDENCE = 0.6  # a graphify receipt is modeled, never measured
 SINCE_WINDOW_DAYS = {"h": 1 / 24, "d": 1, "w": 7}  # `24h` / `7d` / `2w` → days
+
+# Authorship-provenance trust ranking (cage/originrecord.py) — a parallel ladder to
+# METHOD_TRUST, for the *different* enum PROV_METHODS (schema.py): hooked (live
+# PostToolUse capture) outranks transcript (parsed after the fact) outranks heuristic
+# (inferred from git alone, no agent signal). Used to resolve which fragment wins when
+# two provenance rows disagree on the same (sha, file) during notes union.
+PROVENANCE_METHOD_TRUST = {"hooked": 2, "transcript": 1, "heuristic": 0}
+PROVENANCE_CORROBORATION_BONUS = 0.2  # confidence bump when 2 independent paths agree

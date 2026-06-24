@@ -9,7 +9,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-_HOOK = {"SessionStart": "cage hook-session-start", "SessionEnd": "cage hook-session-end"}
+_HOOK = {"SessionStart": "cage hook-session-start", "SessionEnd": "cage hook-session-end",
+        "PostToolUse": "cage hook-post-tool-use"}
 
 
 def _load(path: Path) -> dict:

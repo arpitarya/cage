@@ -1,9 +1,13 @@
-"""Claude Code hook entrypoints (plan §5, §9.5) — wired by `cage hooks install`.
+"""Claude Code hook entrypoints (plan §5, §9.5, §3.5) — wired by `cage hooks install`.
 
 - SessionEnd  → parse the session transcript, append any not-yet-recorded turns
   (idempotent on the turn uuid). Off the request path: never blocks a call.
 - SessionStart → print a one-line spend/budget banner; Claude Code injects hook
   stdout into context, the same way the fux INDEX is surfaced.
+- PostToolUse → buffer the file(s) an Edit/Write/MultiEdit touched, keyed by
+  session, into `.cage/state/pending-<session>.jsonl` (plan §3.5). The edit is
+  still uncommitted at this point, so no provenance row is written yet — a
+  `post-commit` git hook resolves the buffer to a real sha (see `post_commit`).
 
 Every entrypoint is fail-open and exits 0 — a hook must never break the session.
 """
@@ -13,7 +17,9 @@ import json
 import sys
 from pathlib import Path
 
-from cage import budget, ledger, paths, policy, tasks, transcript
+from cage import budget, ledger, originrecord, paths, policy, tasks, transcript
+
+_EDIT_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit"}
 
 
 def _stdin_json() -> dict:
@@ -49,9 +55,32 @@ def session_end() -> int:
             rows = transcript.parse_calls(Path(tp), session=payload.get("session_id", ""))
             append_new(root, rows)
             _snapshot_tasks(root, rows)
+            _record_transcript_provenance(root, Path(tp), payload.get("session_id", ""))
         except Exception:  # pragma: no cover — best-effort
             pass
     return 0
+
+
+def _record_transcript_provenance(root: Path, transcript_path: Path, session_id: str) -> None:
+    """Fallback authorship capture: a sibling signal to the live PostToolUse hook,
+    resolved against the current HEAD sha (the transcript itself can't say which
+    commit an edit landed in — plan §3.5)."""
+    edits = transcript.parse_provenance(transcript_path, session=session_id)
+    if not edits:
+        return
+    sha = originrecord.current_sha(root)
+    if not sha:
+        return
+    files = [e["file"] for e in edits]
+    rel: list[str] = []
+    for f in files:
+        try:
+            rel.append(str(Path(f).resolve().relative_to(root)))
+        except ValueError:
+            continue
+    if rel:
+        originrecord.record_transcript(root, sha=sha, files=rel, agent="claude-code",
+                                       session_id=session_id)
 
 
 def _snapshot_tasks(root: Path, rows: list[dict]) -> None:
@@ -62,6 +91,107 @@ def _snapshot_tasks(root: Path, rows: list[dict]) -> None:
         if t and t not in seen:
             seen.add(t)
             tasks.record(root, t, agents=[row.get("agent", "")] if row.get("agent") else None)
+
+
+def _edit_paths(tool_name: str, tool_input: dict) -> list[str]:
+    """File path(s) an Edit/Write/MultiEdit/NotebookEdit call touched."""
+    if tool_name not in _EDIT_TOOLS:
+        return []
+    fp = tool_input.get("file_path") or tool_input.get("notebook_path")
+    return [fp] if fp else []
+
+
+def post_tool_use() -> int:
+    payload = _stdin_json()
+    try:
+        tool_name = payload.get("tool_name", "")
+        files = _edit_paths(tool_name, payload.get("tool_input") or {})
+        if not files:
+            return 0
+        root = _root(payload)
+        session_id = payload.get("session_id", "")
+        buf = paths.Footprint(root).pending_edits(session_id)
+        rel = []
+        for f in files:
+            try:
+                rel.append(str(Path(f).resolve().relative_to(root)))
+            except ValueError:
+                continue  # outside the project root — never buffer an absolute foreign path
+        for f in rel:
+            added, removed = 0, 0
+            for fname, a, r in originrecord.working_tree_numstat(root, f):
+                if fname == f:
+                    added, removed = a, r
+                    break
+            ledger.append(buf, {"file": f, "added": added, "removed": removed,
+                                "agent": "claude-code"})
+    except Exception:  # pragma: no cover — best-effort
+        pass
+    return 0
+
+
+def post_commit() -> int:
+    """Git `post-commit` hook — resolve this session's pending-edit buffer to the
+    just-made commit's sha, write the hooked provenance row, clear the buffer."""
+    try:
+        root = paths.find_project_root() or Path.cwd()
+        sha = originrecord.current_sha(root)
+        if not sha:
+            return 0
+        state_dir = paths.Footprint(root).state
+        if not state_dir.is_dir():
+            return 0
+        for buf in state_dir.glob("pending-*.jsonl"):
+            rows = ledger.read(buf)
+            if not rows:
+                buf.unlink(missing_ok=True)
+                continue
+            files = sorted({r["file"] for r in rows if r.get("file")})
+            added = sum(r.get("added", 0) for r in rows)
+            removed = sum(r.get("removed", 0) for r in rows)
+            agent = rows[0].get("agent", "") if rows else ""
+            session_id = buf.stem.removeprefix("pending-")
+            if files:
+                originrecord.record_hooked(root, sha=sha, files=files, agent=agent,
+                                           lines_added=added, lines_removed=removed,
+                                           session_id=session_id)
+            buf.unlink(missing_ok=True)
+    except Exception:  # pragma: no cover — best-effort
+        pass
+    return 0
+
+
+def prepare_commit_msg(msg_path: str) -> int:
+    """Git `prepare-commit-msg` hook — append `Co-authored-by` / `Change-Origin` /
+    `Agent-Session` trailers from this session's pending-edit buffers. Ergonomics
+    only: a record-keeping convenience, never the provenance ledger's source of
+    truth (that's `post_commit`). Bypassable via `git commit --no-verify`."""
+    try:
+        root = paths.find_project_root() or Path.cwd()
+        state_dir = paths.Footprint(root).state
+        if not state_dir.is_dir():
+            return 0
+        trailers: list[str] = []
+        for buf in sorted(state_dir.glob("pending-*.jsonl")):
+            rows = ledger.read(buf)
+            if not rows:
+                continue
+            agent = rows[0].get("agent", "") if rows else ""
+            session_id = buf.stem.removeprefix("pending-")
+            if agent:
+                trailers.append(f"Co-authored-by: {agent} <noreply@cage.local>")
+                trailers.append(f"Change-Origin: agent")
+                trailers.append(f"Agent-Session: {session_id}")
+        if not trailers:
+            return 0
+        path = Path(msg_path)
+        text = path.read_text(encoding="utf-8")
+        if "Agent-Session:" in text:  # already stamped (e.g. a retried hook) — no dup
+            return 0
+        path.write_text(text.rstrip("\n") + "\n\n" + "\n".join(trailers) + "\n", encoding="utf-8")
+    except Exception:  # pragma: no cover — best-effort
+        pass
+    return 0
 
 
 def session_start() -> int:

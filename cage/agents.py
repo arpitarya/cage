@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from cage import claudewire, codexwire, pointers
+from cage import claudewire, codexwire, gitcommithook, pointers
 
 SURFACES = ("claude", "codex", "copilot", "kiro")
 
@@ -23,6 +23,9 @@ def install(root: Path, surfaces: tuple[str, ...] | None = None) -> dict:
     out: dict[str, dict] = {}
     if "claude" in picked:
         out["claude"] = claudewire.install(root)
+        gh = gitcommithook.install(root)  # PostToolUse capture buffer → sha resolution (plan §3.5)
+        if gh["installed"]:
+            out["claude"]["git-hooks"] = ", ".join(gh["installed"])
     if "codex" in picked:
         out["codex"] = codexwire.install(root)
     if "copilot" in picked:

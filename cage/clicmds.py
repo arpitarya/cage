@@ -5,9 +5,9 @@ from pathlib import Path
 
 from cage import (adoptcmd, agents, attribution, budget, demo, doctorcmd,
                   explain, forecast, graphifymeter, hooks, humanview, initcmd,
-                  ledger, matrix, mcpserver, metercmd, metering, paths, policy,
-                  provenance, proxy, quality, recommend, regression, report, roi,
-                  serve, setupcmd, tasks, trend, transcript)
+                  ledger, matrix, mcpserver, metercmd, metering, notessync, origin,
+                  paths, policy, provenance, proxy, quality, recommend, regression,
+                  report, roi, serve, setupcmd, tasks, trend, transcript, verifycmd)
 from cage.cliutil import emit, root
 
 
@@ -246,6 +246,39 @@ def cmd_hooks(args) -> int:
     for surface, where in agents.install(here, picked).items():
         print(f"  {surface:<8} → {', '.join(where.values())}")
     print("Metering: claude=transcript hook · others=`cage meter -- <cmd>` or `cage proxy`.")
+    return 0
+
+
+def cmd_notes_sync(args) -> int:
+    res = notessync.sync(root(), write=True if args.write else None)
+    if getattr(args, "json", False):
+        import json
+        print(json.dumps(res))
+        return 0
+    if res["wrote"]:
+        print(f"✔ wrote {len(res['shas'])} note(s) to refs/notes/cage-provenance.")
+    else:
+        print(f"· dry-run — {len(res['shas'])} sha(s) have buffered provenance to merge.")
+        print("  Set CAGE_NOTES_WRITE=1 (CI) or pass --write to actually push notes.")
+    return 0
+
+
+def cmd_origin(args) -> int:
+    r = root()
+    if args.attest:
+        ok = origin.attest(r, args.sha, origin=args.attest, agent=args.agent)
+        print(f"✔ attested {args.sha!r} as origin={args.attest!r}." if ok
+              else f"· attestation for {args.sha!r} was a no-op (no diff found, or origin=unknown).")
+        return 0
+    data = origin.explain(r, args.sha)
+    return emit(args, data, origin.render_origin(data))
+
+
+def cmd_verify(_args) -> int:
+    res = verifycmd.run(root())
+    for w in res["warnings"]:
+        print(f"  · {w}")
+    print(f"\ncage verify: {len(res['warnings'])} warning(s) — report-only, never fails the build.")
     return 0
 
 

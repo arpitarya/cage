@@ -10,11 +10,14 @@ the substrate contract or the attribution engine.
 ## Architecture (the one-way data flow)
 
 ```
-record_call / record_receipt  →  .cage/ledger/{calls,receipts,tasks}.jsonl  (append-only)
+record_call / record_receipt  →  .cage/ledger/{calls,receipts,tasks,provenance}.jsonl  (append-only)
         (meter, plan §5)                      │
                                               ▼  derive ($0, no model)
   policy.toml (prices/order/budgets/human) → report · attrib · matrix · budget
-                                             · roi · human · trend · why
+                                             · roi · human · trend · why · origin
+
+provenance.jsonl is a local buffer only — canonical storage is
+refs/notes/cage-provenance, written by CI alone (plan §3.5).
 ```
 
 - **Substrate** ([schema.py](cage/schema.py)) — `make_call` / `make_receipt` stamp
@@ -80,6 +83,31 @@ record_call / record_receipt  →  .cage/ledger/{calls,receipts,tasks}.jsonl  (a
   outcome`). **Shelled out to git, never imported; fail-open** (non-repo/detached ⇒
   omit fields). PII guard: SHA + diff *counts* + top-level dirs only — never the
   commit message, author identity, or file paths.
+- **Provenance (authorship attribution)** ([schema.py](cage/schema.py) `make_provenance`,
+  [originrecord.py](cage/originrecord.py) write side, [origin.py](cage/origin.py) read
+  surface, [notessync.py](cage/notessync.py) distribution, [verifycmd.py](cage/verifycmd.py))
+  — *who wrote which files in which commit* (plan §3.5), a fourth append-only file
+  (`provenance.jsonl`) answering a different question than calls/receipts/tasks. Its
+  own closed enums, deliberately separate from `METHODS`/`UNITS`: `method ∈
+  {hooked, transcript, heuristic}` (ranked by `constants.PROVENANCE_METHOD_TRUST`,
+  a parallel ladder to `METHOD_TRUST`) and `origin ∈ {human, agent,
+  agent-autonomous, unknown}`. **`unknown` is a read-time default, never a written
+  row** — a sha with no signal has no row at all; `origin.explain` derives unknown
+  from absence. `origin="human"` is reachable only via explicit attestation
+  (`cage origin <sha> --attest human`), always paired with `method="heuristic"`
+  (enforced at `make_provenance` construction). Captured by a `PostToolUse` hook
+  (buffers edits per session) resolved at a `post-commit` git hook
+  ([gitcommithook.py](cage/gitcommithook.py), installed by `cage adopt`/`agents.install`
+  alongside the Claude Code hooks) into the highest-trust `hooked` row, with a
+  `SessionEnd`-time transcript fallback ([transcript.py](cage/transcript.py)
+  `parse_provenance`) for what the live hook missed. The local jsonl is a **buffer
+  only**; canonical storage is `refs/notes/cage-provenance`, merged by row id
+  (never overwritten) and **written only by CI** (`CAGE_NOTES_WRITE=1`) — a dev
+  machine's `cage notes-sync` defaults to a dry-run print. `cage verify` is
+  **report-only and always exits 0** (never a CI gate). Widens the PII surface to
+  repo-relative file *paths* (vs. `tasks.jsonl`'s top-level-dirs-only) — justified
+  in plan §3.5 — but counts-never-content still holds: no diff bodies, no commit
+  messages, paths validated repo-relative at construction time.
 
 ## Must-Know Rules
 
@@ -108,9 +136,12 @@ each agent only needs thin idiomatic wiring (`agents.py` orchestrates):
 - **Meter:** `metering.py` (library), `proxy.py` + `usageparse.py` (any client you
   point a base URL at), `transcript.py` (Claude Code / Codex session logs).
 - **Read:** `mcpserver.py` (MCP, every agent), `report/attrib/matrix/budget/roi`,
-  plus the Tier-1 human axis (`human`/`trend`, `matrix --human`).
+  plus the Tier-1 human axis (`human`/`trend`, `matrix --human`) and authorship
+  (`origin`/`notes-sync`/`verify`, plan §3.5).
 - **Wiring:** `claudewire.py` (hooks+MCP), `codexwire.py` (TOML MCP), `pointers.py`
-  (copilot/kiro steering+MCP), `setupcmd.py` (`/cage` skill). All idempotent.
+  (copilot/kiro steering+MCP), `setupcmd.py` (`/cage` skill), `gitcommithook.py`
+  (local `post-commit`/`prepare-commit-msg` git hooks, riding along with
+  `claudewire.py` inside `agents.install`). All idempotent.
 - **§8 features:** `quality.py`, `regression.py`, `recommend.py`, `forecast.py`.
 - **Tier-0 savings:** `compress.py`, `responsecache.py` (emit receipts).
 

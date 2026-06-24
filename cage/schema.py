@@ -7,17 +7,29 @@ never reaches the log. Prompt *bodies* are never a field — counts only (plan �
 from __future__ import annotations
 
 import datetime as _dt
+from pathlib import Path
 
 from cage import ids
 
 UNITS = ("tokens", "usd", "ms", "gco2", "minutes")
 METHODS = ("measured", "modeled", "estimated")
 
+# Provenance (authorship attribution) is a separate record type with its own closed
+# enums — `measured/modeled/estimated` answers "how do we know a saving"; this answers
+# "how do we know who wrote it". Keeping the two method vocabularies distinct (rather
+# than overloading METHODS) means a provenance row can never misread as a cost claim
+# or vice versa. See docs/cage-plan.md §3.5.
+PROV_METHODS = ("hooked", "transcript", "heuristic")
+ORIGINS = ("human", "agent", "agent-autonomous", "unknown")
+
 CALL_FIELDS = ("id", "ts", "session", "task", "agent", "route", "provider", "model",
                "tokens_in", "tokens_out", "cached_in", "est_cost_usd",
                "latency_ms", "ok", "retries")
 RECEIPT_FIELDS = ("id", "ts", "call", "task", "tool", "unit", "raw_alternative",
                   "actual", "saved", "method", "confidence", "meta")
+PROVENANCE_FIELDS = ("schema_ver", "id", "ts", "sha", "agent", "files",
+                     "lines_added", "lines_removed", "method", "origin",
+                     "confidence", "session_id")
 
 
 def _now() -> str:
@@ -54,3 +66,37 @@ def make_receipt(*, tool: str, raw_alternative: float, actual: float,
             "tool": tool, "unit": unit, "raw_alternative": float(raw_alternative),
             "actual": float(actual), "saved": float(raw_alternative) - float(actual),
             "method": method, "confidence": float(confidence), "meta": meta or {}}
+
+
+def _repo_relative(path: str) -> None:
+    if path.startswith("/") or path.startswith("~") or ".." in Path(path).parts:
+        raise ValueError(f"provenance file path must be repo-relative: {path!r}")
+
+
+def make_provenance(*, sha: str, files: list[str], agent: str = "",
+                    lines_added: int = 0, lines_removed: int = 0,
+                    method: str = "heuristic", origin: str = "unknown",
+                    confidence: float = 0.0, session_id: str = "",
+                    ts: str | None = None, schema_ver: int = 1,
+                    row_id: str | None = None) -> dict:
+    """One authorship-attribution row — which agent touched which files in `sha`.
+
+    `origin="human"` is reachable only by explicit attestation (plan §3.5), which is
+    always `method="heuristic"` (no automated signal fired; a person asserted it) — so
+    this combination is the one case where the row's own fields enforce that rule.
+    Counts-never-content: `files` are validated repo-relative, never absolute, and the
+    row carries paths + line counts only — never diff bodies or commit messages.
+    """
+    if method not in PROV_METHODS:
+        raise ValueError(f"method {method!r} not in {PROV_METHODS}")
+    if origin not in ORIGINS:
+        raise ValueError(f"origin {origin!r} not in {ORIGINS}")
+    if origin == "human" and method != "heuristic":
+        raise ValueError("origin='human' is only reachable via attestation (method='heuristic')")
+    for f in files:
+        _repo_relative(f)
+    return {"schema_ver": schema_ver, "id": row_id or ids.new_id("p"), "ts": ts or _now(),
+            "sha": sha, "agent": agent, "files": list(files),
+            "lines_added": int(lines_added), "lines_removed": int(lines_removed),
+            "method": method, "origin": origin, "confidence": float(confidence),
+            "session_id": session_id}

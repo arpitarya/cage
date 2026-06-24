@@ -55,6 +55,45 @@ def parse_calls(transcript_path: Path, session: str = "") -> list[dict]:
     return rows
 
 
+_EDIT_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit"}
+
+
+def parse_provenance(transcript_path: Path, session: str = "") -> list[dict]:
+    """File paths an Edit/Write/MultiEdit/NotebookEdit `tool_use` block touched,
+    walking the same transcript `parse_calls` reads. Lower trust than the live
+    `PostToolUse` hook (no in-process line counts) — the caller (`hooks.session_end`)
+    tags these `method="transcript"` and resolves them against `HEAD` at session end,
+    since the transcript alone can't say which commit an edit landed in.
+
+    v2: archiving the transcript itself (beyond reading it once, here) is out of
+    scope — cage never copies or retains transcript content.
+    """
+    if not transcript_path.exists():
+        return []
+    session = session or transcript_path.stem
+    files: list[str] = []
+    for line in transcript_path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            rec = json.loads(line)
+        except ValueError:
+            continue
+        if rec.get("type") != "assistant":
+            continue
+        for block in (rec.get("message") or {}).get("content") or []:
+            if not isinstance(block, dict) or block.get("type") != "tool_use":
+                continue
+            if block.get("name") not in _EDIT_TOOLS:
+                continue
+            inp = block.get("input") or {}
+            fp = inp.get("file_path") or inp.get("notebook_path")
+            if fp:
+                files.append(fp)
+    return [{"session": session, "file": f} for f in dict.fromkeys(files)]  # de-dup, order kept
+
+
 def _find_usage(obj) -> dict | None:
     """Depth-first search for the first dict carrying token-usage keys (Codex's
     rollout schema shifts between versions, so we match by shape not by path)."""

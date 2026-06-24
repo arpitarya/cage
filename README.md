@@ -116,6 +116,19 @@ TOTAL       14    $1,530.00    $6.55    $1,523.45     17.9     0.51
 
 The savings are anchored to the commit they produced — Cage snapshots a git-aware task record (SHA, branch, diff size, wall-clock) at task close, so a number can always be traced back to the change that earned it.
 
+## Authorship — who wrote which commit, and how sure are we
+
+A different question than *what did this cost*: **who is accountable for this diff.** `cage origin <sha>` answers it from the same append-only substrate — a fourth record type that records *which agent wrote which files in which commit*, captured by a `PostToolUse` hook with a transcript fallback, never blocking an edit or a commit:
+
+```
+$ cage origin HEAD
+sha 9f3c1a2 · origin: agent (claude-code) · confidence 0.83 · method hooked
+  cage/origin.py        +118  -0
+  cage/originrecord.py   +97  -0
+```
+
+The same honesty discipline as everywhere else, in a parallel namespace: a row carries a `method` (`hooked` > `transcript` > `heuristic`, never upgraded when fragments merge) and an `origin` (`human` / `agent` / `agent-autonomous`). **`unknown` is never a stored row** — a commit with no cage signal is `unknown` *by absence*, derived at read time, so the ledger stays sparse and pre-Cage history reads honestly without bloating it. `origin=human` is reachable only through an explicit human attestation (`cage origin <sha> --attest human`). Distribution is git-notes (`refs/notes/cage-provenance`, **CI is the sole writer**); `cage verify` is **report-only and always exits 0** — visibility in CI, never a gate. Counts-never-content holds: file paths and line counts only, never a diff body or a commit message.
+
 ## Every number is reviewable — and you can ask it
 
 Cage keeps its numbers in **three layers, never mixed**, so any figure is auditable in exactly one place:
@@ -147,12 +160,14 @@ Set `CAGE_HUMAN_RATE=200` and that printed rate changes — proof it's the code'
 One append-only log in, every view derived from it for `$0`:
 
 ```
-record_call / record_receipt  →  .cage/ledger/{calls,receipts,tasks}.jsonl  (append-only)
+record_call / record_receipt  →  .cage/ledger/{calls,receipts,tasks,provenance}.jsonl  (append-only)
         (meter, fail-open)                    │
                                               ▼  derive ($0, no model)
    policy.toml (prices/order/budgets/rates) → report · attrib · matrix · roi
-                                             · human · trend · budget · why
+                                             · human · trend · budget · why · origin
 ```
+
+`provenance.jsonl` is a local buffer only — canonical authorship lives in `refs/notes/cage-provenance`, written by CI alone.
 
 You meter at the provider boundary (library adapter, a reverse proxy for clients you can't edit, or by parsing a Claude Code / Codex transcript). Everything downstream is a deterministic projection. The ledger carries token **counts**, never prompt bodies — PII-safe by construction; point `CAGE_LEDGER` at a private store to keep even the counts off-disk.
 
@@ -177,6 +192,9 @@ cage human [--agent claude]    # agent-vs-human: $ AND hours saved, per agent
 cage human-record --task ID --type feature   # record a Tier-1 human alternative
 cage trend --by week --metric both           # cost + time savings as a time-series
 cage why <call-id>             # full provenance: a call + every receipt against it
+cage origin <sha> [--attest human]   # who wrote which files in a commit (authorship)
+cage notes-sync [--write]      # distribute authorship → refs/notes/cage-provenance (CI writes)
+cage verify                    # report-only consistency pass over the ledger (always exits 0)
 cage quality / cage outcome ID # cost per *successful* task (cost is honest with outcome)
 cage regression                # alert when cost-per-call drifts up
 cage recommend                 # cheapest-path: which tools to enable / skip
@@ -209,12 +227,13 @@ Cage meters whatever speaks the wire format and reads the ledger over MCP, so al
 
 ## The `$0` guarantee
 
-Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 112 tests passing; `cage demo` reproduces the worked attribution example against a real ledger.
+Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 135 tests passing; `cage demo` reproduces the worked attribution example against a real ledger.
 
 **Honest limits.** Cage doesn't decide your human rate — it prices minutes at a blended rate you set, and labels the result `estimated` so it never pretends to be a timesheet. Marginal-by-fixed-order is defensible and `$0`, but it is an *ordering convention*, not a Shapley value (that's a deferred audit mode). And a counterfactual cell is an honest reconstruction, never an invoice — the `method` column says so on every row, on purpose.
 
 ## What's new
 
+- **v0.6.0 — authorship attribution.** `cage origin <sha>` answers *who wrote which files in which commit* — a fourth append-only record captured by a `PostToolUse` hook (transcript fallback), with `hooked`/`transcript`/`heuristic` method ranks and `human`/`agent`/`agent-autonomous` origins. `unknown` is read-derived from absence, never a stored row; `origin=human` only via explicit attestation. Distributed over `refs/notes/cage-provenance` (CI is the sole writer); `cage verify` is report-only and never gates the build.
 - **v0.3.0 — the Tier-1 human axis.** `cage human` / `cage trend` price agent-vs-human in **dollars and hours**, anchored to a git-aware task record; a `minutes` unit, a `[human]` rate table with confidence laddering, and `CAGE_HUMAN_RATE`. Third-party tools join via the external adapter (`cage graphify`).
 - **v0.2.0 — attribution + the counterfactual matrix.** Marginal-by-fixed-order attribution, the 2ⁿ permutation table, ROI per tool, and the `measured`/`modeled`/`estimated` discipline — the differentiator.
 - **v0.1.0 — substrate + meter.** The call/receipt contract, the append-only ledger, `policy.toml`, and `cage report`.

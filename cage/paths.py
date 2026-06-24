@@ -69,6 +69,10 @@ class Footprint:
         return self.ledger / "tasks.jsonl"
 
     @property
+    def provenance(self) -> Path:
+        return self.ledger / "provenance.jsonl"
+
+    @property
     def policy(self) -> Path:
         return self.base / "policy.toml"
 
@@ -79,3 +83,13 @@ class Footprint:
     def out_file(self, name: str) -> Path:
         self.out.mkdir(parents=True, exist_ok=True)
         return self.out / name
+
+    @property
+    def state(self) -> Path:
+        return self.base / "state"
+
+    def pending_edits(self, session_id: str) -> Path:
+        """Per-session buffer of uncommitted `PostToolUse` edits (plan §3.5) — a
+        `post-commit` hook resolves these to a real sha and clears the file."""
+        safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in (session_id or "nosession"))
+        return self.state / f"pending-{safe}.jsonl"

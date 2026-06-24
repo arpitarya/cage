@@ -159,6 +159,104 @@ numeric diff counts, and top-level changed dirs only** — never the commit *mes
 author name/email, or file contents. It absorbs the existing `outcome` signal and
 powers `cage trend` and the diff-informed confidence bump.
 
+### 3.5 The provenance record — `provenance.jsonl` (fourth append-only file, v1)
+
+A fourth, separate substrate answering a different question than §3.1–3.4: not
+"what did this cost" but **"which agent wrote which files, in which commit, and how
+sure are we?"** — authorship attribution, not spend attribution. It is a new record
+type and read surface (`cage origin`), never a new tool; it reuses the same
+append-only-buffer + git-shell-out + fail-open idioms as `tasks.jsonl`.
+
+```jsonc
+// .cage/ledger/provenance.jsonl   (append-only, local buffer only — see below)
+{
+  "schema_ver": 1, "id": "p_01J...", "ts": "2026-06-14T10:22:03Z",
+  "sha": "a1b2c3d", "agent": "claude-code",
+  "files": ["cage/origin.py", "cage/originrecord.py"],   // repo-relative, never absolute
+  "lines_added": 142, "lines_removed": 3,
+  "method": "hooked",        // hooked | transcript | heuristic — see below
+  "origin": "agent",         // human | agent | agent-autonomous | unknown
+  "confidence": 0.83,
+  "session_id": "claude-code:4f1a"
+}
+```
+
+**Two closed enums, deliberately separate from `UNITS`/`METHODS` (§3.1–3.2).**
+`METHODS = (measured, modeled, estimated)` answers "how do we know a *saving*";
+provenance answers "how do we know *who wrote it*" — a different question, so it
+gets its own vocabulary rather than overloading the existing one:
+
+- `method ∈ {hooked, transcript, heuristic}` — `hooked` is a live `PostToolUse`
+  capture (sees `tool_input`'s file path as the agent acts — the highest-trust
+  signal); `transcript` is parsed after the fact from a session log (the same
+  idiom as `transcript.py`'s call-metering path, lower trust because it can't see
+  in-process line counts); `heuristic` is inferred with no agent-side signal at
+  all (git alone, or a human attestation — see below). Ranked by
+  `constants.PROVENANCE_METHOD_TRUST` (`hooked=2 > transcript=1 > heuristic=0`), a
+  parallel ladder to `METHOD_TRUST` for this different enum. **`method` is sacred
+  here too**: a union of two fragments that disagree on the same file never reads
+  as a stronger method than its weakest real input.
+- `origin ∈ {human, agent, agent-autonomous, unknown}` — defaults to `unknown` and
+  is **never written as `human` automatically**. The only way `origin="human"`
+  reaches the ledger is through an explicit attestation (`cage origin <sha>
+  --attest human`), which is always `method="heuristic"` by construction (a person
+  looked at it; no automated signal fired) — `schema.make_provenance` enforces
+  this pairing at construction time, not just by convention.
+
+**`unknown` is a read-time default, never a written row.** A commit with zero
+cage signal (no hook, no transcript, no attestation) gets **no row at all** —
+`cage origin <sha>` derives `origin="unknown", confidence=0.0` from the *absence*
+of any fragment, computed at read time in `origin.explain`. This keeps the ledger
+sparse (facts only) and avoids materializing a row for cage's entire pre-adoption
+git history. The one way a not-otherwise-signaled commit gets a row is a human
+attesting to it — a genuinely new fact, worth appending.
+
+**Confidence and corroboration.** Base confidence derives from the method rank
+(`originrecord.confidence_for`); it's bumped by `PROVENANCE_CORROBORATION_BONUS`
+when a *second, independent* capture path (e.g. both the live hook and the
+transcript fallback) reports an overlapping file for the same `(sha, session)` —
+two paths agreeing is stronger evidence than either alone, the same spirit as
+`human.py`'s confidence ladder, applied to a different signal.
+
+**Widened PII surface — repo-relative file *paths*, not just top-level dirs.**
+`tasks.jsonl` (§3.4) deliberately stored only top-level changed *directories*,
+never full paths, as its PII guard. Provenance needs more: "who wrote which
+*file*" is meaningless without the file. The guard that holds instead:
+counts-never-content — `files` are repo-relative paths and line *counts* only,
+validated at `schema.make_provenance` construction time (reject any absolute path
+or `..` segment) — never diff bodies, never commit messages, never author
+name/email. This is a deliberate, narrow widening of the existing PII line, not a
+relaxation of it.
+
+**Distribution: local buffer → `refs/notes/cage-provenance`.** The local
+`provenance.jsonl` is a buffer only (gitignored, machine-local, exactly like
+`.cage/ledger/`); the canonical record is `refs/notes/cage-provenance`, and **CI is
+the sole writer to it** (`cage notes-sync` defaults to a dry-run print of the
+merge plan; it only pushes when `CAGE_NOTES_WRITE=1`, which CI sets). Merge policy
+is **append/merge by row id, never overwrite** — `notessync.merge_rows` unions
+fragments from possibly-multiple CI runs touching the same sha, resolving any
+disagreement on the same file by `PROVENANCE_METHOD_TRUST` rank.
+
+**Read surface.** `cage origin <sha>` (`origin.py`) reports the highest-confidence
+row(s) for a sha, or the derived unknown default. `cage verify` (`verifycmd.py`)
+is a **report-only** consistency pass (shas exist in git, `origin=human` rows are
+all attestations, methods are in the closed enum) that **always exits 0** — a
+hard constraint, never wired as a CI gate.
+
+**Capture.** A `PostToolUse` Claude Code hook (`hooks.post_tool_use`) buffers
+file-level diffs per session as edits happen; a local `post-commit` git hook
+(`gitcommithook.py`, installed alongside the Claude Code hooks by `cage adopt`)
+resolves that buffer against the just-made commit's sha and writes the `hooked`
+row. A `SessionEnd`-time transcript fallback (`transcript.parse_provenance`)
+covers agents/edits the live hook missed, tagged `transcript`. A
+`prepare-commit-msg` git hook stamps `Co-authored-by`/`Change-Origin`/
+`Agent-Session` commit trailers from the same buffer as a bypassable ergonomic
+convenience — never the ledger's source of truth.
+
+**Out of scope (v1).** Signed notes, hunk-range fingerprinting, build-blocking in
+`cage verify`, and transcript archival are explicitly deferred — each has a
+one-line `# v2:` marker at its natural call site rather than being half-built.
+
 ---
 
 ## 4. The attribution engine (the part that's actually novel)

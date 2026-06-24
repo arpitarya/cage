@@ -53,6 +53,14 @@ def receipts_for(root: Path, call_id: str) -> list[dict]:
     return [r for r in receipts(root) if r.get("call") == call_id]
 
 
+def provenance(root: Path) -> list[dict]:
+    return read(paths.Footprint(root).provenance)
+
+
+def provenance_for_sha(root: Path, sha: str) -> list[dict]:
+    return [r for r in provenance(root) if r.get("sha") == sha]
+
+
 def by_task(rows: list[dict], task: str | None) -> list[dict]:
     return [r for r in rows if r.get("task") == task] if task else rows
 

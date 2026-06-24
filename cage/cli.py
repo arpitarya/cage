@@ -19,6 +19,7 @@ commands by category:
   ledger        report · budget · why            spend & per-call provenance
   attribution   attrib · matrix · roi            per-tool savings (the differentiator)
   human axis    human · human-record · trend     agent-vs-human $ and hours saved
+  authorship    origin · notes-sync · verify     who wrote which files (§3.5)
   ops           quality · regression · recommend · forecast · outcome
   setup         init · adopt · doctor · setup · hooks · proxy · meter · mcp · serve
   meta          query · demo · graphify · import-codex
@@ -207,9 +208,37 @@ def build_parser() -> argparse.ArgumentParser:
     ic.add_argument("path", help="a rollout-*.jsonl file or ~/.codex/sessions dir")
     ic.set_defaults(fn=clicmds.cmd_import_codex)
 
+    ns = sub.add_parser("notes-sync", help="merge buffered provenance into refs/notes/cage-provenance (§3.5)",
+                        epilog="example:\n"
+                               "  cage notes-sync                 # dry-run: print the merge plan\n"
+                               "  CAGE_NOTES_WRITE=1 cage notes-sync  # actually push the notes (CI only)",
+                        formatter_class=argparse.RawDescriptionHelpFormatter)
+    ns.add_argument("--write", action="store_true", help="push to refs/notes (default: dry-run unless CAGE_NOTES_WRITE=1)")
+    _json_flag(ns)
+    ns.set_defaults(fn=clicmds.cmd_notes_sync)
+
+    og = sub.add_parser("origin", help="authorship attribution for a commit (§3.5)",
+                        epilog="examples:\n"
+                               "  cage origin HEAD                       # who wrote this commit\n"
+                               "  cage origin a1b2c3d --attest human     # human triage: assert origin\n"
+                               "  cage origin a1b2c3d --attest agent --agent claude-code",
+                        formatter_class=argparse.RawDescriptionHelpFormatter)
+    og.add_argument("sha")
+    og.add_argument("--attest", choices=["human", "agent", "agent-autonomous"], help="record a human-triage attestation for this sha")
+    og.add_argument("--agent", default="", help="agent name to attach to --attest")
+    _json_flag(og)
+    og.set_defaults(fn=clicmds.cmd_origin)
+
+    sub.add_parser("verify", help="report-only consistency check over the provenance ledger (never fails the build)").set_defaults(fn=clicmds.cmd_verify)
+
     # Internal hook entrypoints (wired by `cage hooks install`, not for direct use).
     sub.add_parser("hook-session-start").set_defaults(fn=lambda a: hooks.session_start())
     sub.add_parser("hook-session-end").set_defaults(fn=lambda a: hooks.session_end())
+    sub.add_parser("hook-post-tool-use").set_defaults(fn=lambda a: hooks.post_tool_use())
+    sub.add_parser("hook-post-commit").set_defaults(fn=lambda a: hooks.post_commit())
+    pcm = sub.add_parser("hook-prepare-commit-msg")
+    pcm.add_argument("msg_path")
+    pcm.set_defaults(fn=lambda a: hooks.prepare_commit_msg(a.msg_path))
     return p
 
 
