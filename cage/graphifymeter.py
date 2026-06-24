@@ -8,7 +8,8 @@ token-saving receipt. A metering error never alters graphify's result (fail-open
 Counterfactual (handoff §4): `actual = toks(answer)`; `raw_alternative` = the whole
 *touched* source files the answer cites (`src=`/`Source:` paths), deduped, present on
 disk only — never the repo. If no path parses/resolves, emit **nothing** (a parse
-miss is "unmeasurable," not zero saving). `method="modeled"`, `confidence=0.6`.
+miss is "unmeasurable," not zero saving). `method="modeled"`, confidence from
+`constants.GRAPHIFY_RECEIPT_CONFIDENCE`.
 """
 from __future__ import annotations
 
@@ -16,6 +17,8 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+
+from cage.constants import CHARS_PER_TOKEN, GRAPHIFY_RECEIPT_CONFIDENCE
 
 # Expected graphify output formats (owned by graphify; pinned here so a format
 # drift fails closed → "unmeasurable" → no receipt, never a fabricated saving):
@@ -27,7 +30,7 @@ _SRC_EXPLAIN = re.compile(r"^\s*Source:\s+(.+?)\s+L\d+\s*$", re.MULTILINE)
 
 
 def toks(text: str) -> int:
-    return max(0, round(len(text) / 4))
+    return max(0, round(len(text) / CHARS_PER_TOKEN))
 
 
 def _op_of(argv: list[str]) -> str:
@@ -81,7 +84,8 @@ def _meter(root: Path, answer: str, argv: list[str], task: str) -> None:
             return
         from cage import record_receipt
         record_receipt(tool="graphify", unit="tokens", raw_alternative=raw,
-                       actual=actual, method="modeled", confidence=0.6,
+                       actual=actual, method="modeled",
+                       confidence=GRAPHIFY_RECEIPT_CONFIDENCE,
                        task=task, root=root, meta={"op": op})
     except Exception:                     # any metering error → graphify result intact
         return

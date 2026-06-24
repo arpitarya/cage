@@ -8,6 +8,33 @@ from cage.agents import SURFACES
 from cage.report import DIMENSIONS
 
 
+_DESCRIPTION = """\
+Cage — a flux: a deterministic attribution ledger for LLM token traffic and tool
+savings. $0, stdlib-only, deterministic; the ledger is append-only and every view
+is derived (same ledger + same policy ⇒ same numbers). Third in the family after
+graphify (code→graph) and fux (decisions→rules)."""
+
+_EPILOG = """\
+commands by category:
+  ledger        report · budget · why            spend & per-call provenance
+  attribution   attrib · matrix · roi            per-tool savings (the differentiator)
+  human axis    human · human-record · trend     agent-vs-human $ and hours saved
+  ops           quality · regression · recommend · forecast · outcome
+  setup         init · adopt · doctor · setup · hooks · proxy · meter · mcp · serve
+  meta          query · demo · graphify · import-codex
+
+examples:
+  cage report --by model --since 7d        # where the spend went, last 7 days
+  cage matrix --human                       # what each tool stack would cost vs a person
+  cage human-record --task T --type feature # log the human alternative for a task
+  cage query "how is human cost calculated" # explain any number with its live formula
+  cage adopt                                # wire cage into this project's agents
+
+Global flag: --json on any read command emits structured output (agent-as-user).
+Ask how anything works: `cage query "how does cage work"` — and how any value is
+computed: `cage query "how is X calculated"` — both deterministic, live numbers."""
+
+
 def _json_flag(p: argparse.ArgumentParser) -> None:
     p.add_argument("--json", action="store_true", help="machine-readable output (agent-as-user)")
 
@@ -17,8 +44,8 @@ def _html_flag(p: argparse.ArgumentParser) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="cage",
-                                description="Cage — a flux: LLM cost + savings ledger ($0, deterministic).")
+    p = argparse.ArgumentParser(prog="cage", description=_DESCRIPTION, epilog=_EPILOG,
+                                formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--version", action="version", version=f"cage {__version__}")
     sub = p.add_subparsers(dest="cmd", required=True)
 
@@ -35,7 +62,9 @@ def build_parser() -> argparse.ArgumentParser:
     _json_flag(at)
     at.set_defaults(fn=clicmds.cmd_attrib)
 
-    mx = sub.add_parser("matrix", help="counterfactual permutation table for a task (§4.4)")
+    mx = sub.add_parser("matrix", help="counterfactual permutation table for a task (§4.4)",
+                        epilog="example:\n  cage matrix --human   # add a human-baseline row + vs-human columns",
+                        formatter_class=argparse.RawDescriptionHelpFormatter)
     mx.add_argument("--task", help="task id (default: most recent)")
     mx.add_argument("--human", action="store_true", help="add the Tier-1 human anchor row + vs-human columns")
     _json_flag(mx)
@@ -60,7 +89,12 @@ def build_parser() -> argparse.ArgumentParser:
     _html_flag(hu)
     hu.set_defaults(fn=clicmds.cmd_human)
 
-    hr = sub.add_parser("human-record", help="record a Tier-1 human alternative for a task (§5)")
+    hr = sub.add_parser("human-record", help="record a Tier-1 human alternative for a task (§5)",
+                        epilog="examples:\n"
+                               "  cage human-record --task T --type feature   # price by task-type table\n"
+                               "  cage human-record --task T --minutes 90      # or by explicit minutes\n"
+                               "  cage human-record --task T --usd 150 --measured  # a real quote",
+                        formatter_class=argparse.RawDescriptionHelpFormatter)
     hr.add_argument("--task", required=True)
     hr.add_argument("--type", dest="task_type", help="task type (feature/bugfix/refactor/research/review)")
     hr.add_argument("--minutes", type=float, help="human-minutes the task would have taken")
@@ -89,6 +123,21 @@ def build_parser() -> argparse.ArgumentParser:
     sv.set_defaults(fn=clicmds.cmd_serve)
 
     sub.add_parser("demo", help="seed the plan's §4.4 worked example to prove the thesis").set_defaults(fn=clicmds.cmd_demo)
+
+    qy = sub.add_parser("query", help="explain how a value is calculated, or how cage itself works ($0, deterministic)",
+                        epilog="examples:\n"
+                               "  cage query \"how does cage work\"      # concept: the front door\n"
+                               "  cage query \"how is human cost calculated\"\n"
+                               "  cage query cost                      # exact topic id\n"
+                               "  cage query --list --kind concept     # just the how-it-works topics\n"
+                               "  cage query roi --json                # structured, for an agent",
+                        formatter_class=argparse.RawDescriptionHelpFormatter)
+    qy.add_argument("question", nargs="?", default="", help="a question or an exact topic id")
+    qy.add_argument("--list", action="store_true", help="list every explainer topic")
+    qy.add_argument("--kind", choices=["calculation", "concept"], help="filter --list to one kind")
+    qy.add_argument("--all", action="store_true", help="show the top matches, not just the best")
+    _json_flag(qy)
+    qy.set_defaults(fn=clicmds.cmd_query)
 
     # ── §8 ledger features ───────────────────────────────────────────────────
     ql = sub.add_parser("quality", help="quality-adjusted cost: cost per successful task (§8.2)")
@@ -126,7 +175,9 @@ def build_parser() -> argparse.ArgumentParser:
     mt.add_argument("argv", nargs=argparse.REMAINDER, help="-- <command> [args…]")
     mt.set_defaults(fn=clicmds.cmd_meter)
 
-    gf = sub.add_parser("graphify", help="meter a third-party graphify call: cage graphify -- graphify query …")
+    gf = sub.add_parser("graphify", help="meter a third-party graphify call without touching it",
+                        epilog="example:\n  cage graphify -- graphify query \"auth flow\"   # runs graphify, files one savings receipt",
+                        formatter_class=argparse.RawDescriptionHelpFormatter)
     gf.add_argument("--task", default="", help="task id to bind the saving to (default: project dir name)")
     gf.add_argument("argv", nargs=argparse.REMAINDER, help="-- graphify <query|path|explain> …")
     gf.set_defaults(fn=clicmds.cmd_graphify)

@@ -20,6 +20,30 @@ record_call / record_receipt  →  .cage/ledger/{calls,receipts,tasks}.jsonl  (a
 - **Substrate** ([schema.py](cage/schema.py)) — `make_call` / `make_receipt` stamp
   ids + validate the closed enums. Rows are plain JSON. Prompt bodies are never a
   field (counts only). Change here = change the contract; update the plan §3.
+- **Constants** ([constants.py](cage/constants.py)) — the *third audit layer*. Cage
+  keeps its numbers in three places, never mixed: **contract** = the enums in
+  `schema.py`; **policy** = user-economics in `policy.toml`; **constants** = code
+  heuristics not meant as config but that must be reviewable (`CHARS_PER_TOKEN`,
+  `TOKENS_PER_MILLION`, `MAX_MATRIX_TOOLS`, `METHOD_TRUST`, `DEFAULT_CONFIDENCE`,
+  `GRAPHIFY_RECEIPT_CONFIDENCE`, `SINCE_WINDOW_DAYS`). `compress`/`prices`/`matrix`/
+  `attribution`/`human`/`ledger`/`graphifymeter` import from here. `DEFAULT_CONFIDENCE`
+  is a *fallback* — `human.py` still prefers policy `[human.confidence]`. The
+  third-party shims (`fux/cage_receipt.py`, graphify) keep a local `len/4` copy
+  because they're zero-dep; it's an intentional duplicate of `CHARS_PER_TOKEN`.
+- **Explain** ([explain.py](cage/explain.py) engine,
+  [explain_data.py](cage/explain_data.py) registry) — `cage query` answers both
+  "how is X calculated" (`kind="calculation"`, the original 12 — formulas
+  interpolate **live** values from policy + constants; set `CAGE_HUMAN_RATE` ⇒ the
+  printed rate changes, never a hard-coded literal) and "how does cage work"
+  (`kind="concept"` — `overview`/`data-flow`/`metering`/`attribution`/
+  `matrix-concept`/`method-law`/`receipts`/`human-axis`/`determinism`/
+  `pii-safety`/`numbers-layers`; structural facts interpolate live too — ledger
+  paths from `paths.Footprint`, pipeline order from `policy.tool_order(pol)`,
+  agent surfaces from `agents.SURFACES`, subcommand count from the CLI parser —
+  and every concept entry carries a `code_refs` + `plan_ref` anchor). Matching is
+  stdlib token-overlap across both kinds; **no LLM, no network** (cage law). No
+  match ⇒ suggest closest ids, never guess. `--list --kind concept|calculation`
+  filters; `cage --help` groups subcommands and points at `cage query`.
 - **Ledger** ([ledger.py](cage/ledger.py)) — the only mutation is append; reads
   tolerate a truncated tail. Everything else derives.
 - **Meter** ([metering.py](cage/metering.py)) — the library adapter. **Fail-open**:
@@ -34,6 +58,14 @@ record_call / record_receipt  →  .cage/ledger/{calls,receipts,tasks}.jsonl  (a
   `saved` in dollars: `usd` passthrough · `tokens` at model price · `minutes` at the
   human rate · `ms`/`gco2` → `$0`. `roi`/`attribution` route through it (one place
   unit semantics live).
+- **Per-call cost** ([prices.py](cage/prices.py) `call_usd`) — `report`/`budget`
+  **recompute** each call from `tokens × policy` at derive time, falling back to the
+  stored `est_cost_usd` only when the model is unpriced. A token-only meter (the
+  transcript meter never sets `est_cost_usd`) thus still costs out, and a
+  self-costing provider Cage can't tokenize keeps its figure. Derive-time only — the
+  ledger is never rewritten. A call prices only if `(provider, model)` is in the
+  table; the transcript meter stamps `provider="anthropic"`, so that key must carry
+  the Claude rows (the bundled `data/policy.toml` does; a project policy must too).
 - **Tier-1 human axis** ([human.py](cage/human.py), [humanview.py](cage/humanview.py),
   [trend.py](cage/trend.py)) — *agent vs human* (design doc `docs/human-baseline.design.md`).
   A human receipt is just `tool="human"`; `human.py` resolves minutes/type/usd → USD
@@ -63,7 +95,7 @@ record_call / record_receipt  →  .cage/ledger/{calls,receipts,tasks}.jsonl  (a
 ## Dev
 
 ```bash
-just test          # python -m pytest -q   (78 passing)
+just test          # python -m pytest -q   (112 passing)
 just demo          # seed §4.4 + print attrib/matrix
 cage --version
 ```

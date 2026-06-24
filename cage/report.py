@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from cage import ledger, render
+from cage import ledger, prices, render
 
 DIMENSIONS = ("route", "agent", "model", "provider", "day", "task")
 
@@ -18,7 +18,8 @@ def _key(call: dict, dim: str) -> str:
     return str(call.get(dim) or "—")
 
 
-def summarize(root: Path, dim: str = "route", since: str | None = None) -> dict:
+def summarize(root: Path, pol: dict, dim: str = "route",
+              since: str | None = None) -> dict:
     calls = ledger.since(ledger.calls(root), since)
     groups: dict[str, dict] = {}
     for c in calls:
@@ -28,7 +29,7 @@ def summarize(root: Path, dim: str = "route", since: str | None = None) -> dict:
         g["tokens_in"] += c.get("tokens_in", 0)
         g["tokens_out"] += c.get("tokens_out", 0)
         g["cached_in"] += c.get("cached_in", 0)
-        g["usd"] += c.get("est_cost_usd", 0.0)
+        g["usd"] += prices.call_usd(pol, c)
     total = {"calls": sum(g["calls"] for g in groups.values()),
              "usd": sum(g["usd"] for g in groups.values()),
              "tokens_in": sum(g["tokens_in"] for g in groups.values()),

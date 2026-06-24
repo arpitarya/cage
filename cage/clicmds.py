@@ -4,10 +4,10 @@ from __future__ import annotations
 from pathlib import Path
 
 from cage import (adoptcmd, agents, attribution, budget, demo, doctorcmd,
-                  forecast, graphifymeter, hooks, humanview, initcmd, ledger,
-                  matrix, mcpserver, metercmd, metering, paths, policy, provenance,
-                  proxy, quality, recommend, regression, report, roi, serve,
-                  setupcmd, tasks, trend, transcript)
+                  explain, forecast, graphifymeter, hooks, humanview, initcmd,
+                  ledger, matrix, mcpserver, metercmd, metering, paths, policy,
+                  provenance, proxy, quality, recommend, regression, report, roi,
+                  serve, setupcmd, tasks, trend, transcript)
 from cage.cliutil import emit, root
 
 
@@ -31,7 +31,7 @@ def cmd_init(_args) -> int:
 
 
 def cmd_report(args) -> int:
-    rep = report.summarize(root(), dim=args.by, since=args.since)
+    rep = report.summarize(root(), _policy(), dim=args.by, since=args.since)
     return emit(args, rep, report.render_report(rep))
 
 
@@ -102,6 +102,36 @@ def cmd_why(args) -> int:
 
 def cmd_serve(args) -> int:
     return serve.serve(root(), port=args.port)
+
+
+def cmd_query(args) -> int:
+    """Explain how a value is calculated, or how cage itself works — deterministic,
+    live numbers, $0 (no LLM)."""
+    import json
+    pol = _policy()
+    kind = getattr(args, "kind", None)
+    if getattr(args, "list", False):
+        rows = [e for e in explain.REGISTRY if kind is None or e.kind == kind]
+        if getattr(args, "json", False):
+            print(json.dumps([explain.payload(e, pol) for e in rows],
+                             ensure_ascii=False, indent=2))
+        else:
+            print("cage query topics — `cage query <id>` or a question:\n")
+            print(explain.render_list(kind=kind))
+        return 0
+    hits = explain.match(args.question, top=5 if getattr(args, "all", False) else 1)
+    if not hits:
+        ids = ", ".join(explain.closest_ids(args.question))
+        print(f"cage: no explainer matched {args.question!r}. Closest topics: {ids}")
+        print("Run `cage query --list` for all topics.")
+        return 1
+    if getattr(args, "json", False):
+        out = [explain.payload(e, pol) for e in hits]
+        print(json.dumps(out if getattr(args, "all", False) else out[0],
+                         ensure_ascii=False, indent=2))
+        return 0
+    print("\n\n".join(explain.render(e, pol) for e in hits))
+    return 0
 
 
 def cmd_demo(_args) -> int:

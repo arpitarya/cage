@@ -9,18 +9,18 @@ from __future__ import annotations
 import datetime as _dt
 from pathlib import Path
 
-from cage import ledger, policy, render
+from cage import ledger, policy, prices, render
 
 
 def _today_utc() -> str:
     return _dt.datetime.now(_dt.timezone.utc).date().isoformat()
 
 
-def spend(root: Path, session: str | None = None) -> dict:
+def spend(root: Path, pol: dict, session: str | None = None) -> dict:
     calls = ledger.calls(root)
     today = _today_utc()
-    day_usd = sum(c.get("est_cost_usd", 0.0) for c in calls if (c.get("ts") or "")[:10] == today)
-    sess_usd = sum(c.get("est_cost_usd", 0.0) for c in calls
+    day_usd = sum(prices.call_usd(pol, c) for c in calls if (c.get("ts") or "")[:10] == today)
+    sess_usd = sum(prices.call_usd(pol, c) for c in calls
                    if session and c.get("session") == session)
     return {"day_usd": round(day_usd, 6), "session_usd": round(sess_usd, 6),
             "session": session, "day": today}
@@ -30,7 +30,7 @@ def check(root: Path, pol: dict, session: str | None = None,
           add_usd: float = 0.0) -> dict:
     """Would spending `add_usd` more breach a ceiling? Returns the verdict, never raises."""
     b = policy.budgets(pol)
-    s = spend(root, session)
+    s = spend(root, pol, session)
     verdicts = {}
     for scope, cap_key in (("session", "session_usd"), ("day", "daily_usd")):
         cap = b.get(cap_key)

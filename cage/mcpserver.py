@@ -60,7 +60,8 @@ def _latest_task(root: Path) -> str | None:
 def _call(name: str, args: dict) -> str:
     root = _root()
     if name == "cage_report":
-        return report.render_report(report.summarize(root, dim=args.get("by", "route"),
+        return report.render_report(report.summarize(root, _pol(root),
+                                                      dim=args.get("by", "route"),
                                                       since=args.get("since")))
     if name == "cage_attrib":
         task = args.get("task") or _latest_task(root)

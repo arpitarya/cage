@@ -10,8 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from cage import convert, ledger, render
-
-_TRUST = {"measured": 2, "modeled": 1, "estimated": 0}
+from cage.constants import METHOD_TRUST as _TRUST
 
 
 def task_model(calls: list[dict], task: str) -> tuple[str, str]:

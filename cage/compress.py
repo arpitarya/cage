@@ -10,10 +10,11 @@ from __future__ import annotations
 import json
 
 from cage import schema
+from cage.constants import CHARS_PER_TOKEN
 
 
 def _toks(text: str) -> int:
-    return max(0, round(len(text) / 4))  # ~4 chars/token, deterministic heuristic
+    return max(0, round(len(text) / CHARS_PER_TOKEN))  # deterministic heuristic
 
 
 def _shrink(obj, max_items: int, max_str: int):

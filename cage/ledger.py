@@ -11,6 +11,7 @@ import re
 from pathlib import Path
 
 from cage import paths
+from cage.constants import SINCE_WINDOW_DAYS
 
 
 def append(path: Path, row: dict) -> bool:
@@ -57,7 +58,7 @@ def by_task(rows: list[dict], task: str | None) -> list[dict]:
 
 
 _SINCE = re.compile(r"^(\d+)([dhw])$")
-_UNIT = {"h": 1 / 24, "d": 1, "w": 7}
+_UNIT = SINCE_WINDOW_DAYS
 
 
 def since_cutoff(spec: str | None) -> _dt.datetime | None:

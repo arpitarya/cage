@@ -12,8 +12,7 @@ from itertools import product
 from pathlib import Path
 
 from cage import attribution, ledger, prices, render
-
-_MAX_TOOLS = 12  # 2^12 = 4096 rows — a generous ceiling on a single task's stack
+from cage.constants import MAX_MATRIX_TOOLS, TOKENS_PER_MILLION
 
 
 def _trust_of_off_set(off_tools: list[dict]) -> str:
@@ -34,7 +33,7 @@ def matrix(root: Path, task: str, pol: dict, human: bool = False) -> dict:
     rcpts = [r for r in ledger.by_task(ledger.receipts(root), task)
              if r.get("unit", "tokens") == "tokens" and r.get("tool") != "human"]
     tools = attribution.receipts_by_tool(rcpts, list(pol.get("tools", {}).get("order", [])))
-    tools = tools[:_MAX_TOOLS]
+    tools = tools[:MAX_MATRIX_TOOLS]
     provider, model = attribution.task_model(calls, task)
     runs = [c for c in calls if c.get("task") == task]
     out_tok = max((c.get("tokens_out", 0) for c in runs), default=0)
@@ -80,7 +79,7 @@ def _human_anchor(root: Path, task: str, pol: dict) -> dict | None:
 
 def _output_cost(pol: dict, provider: str, model: str, out_tok: int) -> float:
     from cage import policy
-    return out_tok * policy.price(pol, provider, model)["output"] / 1_000_000
+    return out_tok * policy.price(pol, provider, model)["output"] / TOKENS_PER_MILLION
 
 
 def render_matrix(data: dict) -> str:

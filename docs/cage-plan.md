@@ -338,10 +338,41 @@ cage human-record --task ID (--type T | --minutes N | --usd N)  # record a human
 cage trend [--by week|month] [--metric cost|time|both]  # savings as a time-series (§4.6)
 cage serve                    # dashboard (reuse fux's serve/assets pattern)
 cage why <call-id>            # full provenance: call + every receipt against it
+cage query "how is X computed" [--list] [--all] [--json] [--kind calc|concept]  # explain
 ```
 
 Every command is `$0`, deterministic, and emits JSON with `--json` for the
 agent-as-user (machine-readable, typed, no hidden state).
+
+`cage query` is the math's self-documentation: a curated registry
+([explain_data.py](../cage/explain_data.py), rendered by the engine in
+[explain.py](../cage/explain.py)) of `Explanation` entries, each tagged
+`kind="calculation"` or `kind="concept"`. **Calculation** entries (the original
+12 — `cost`, `human-cost`, `matrix`, …) read their numbers **live** from policy +
+constants at render time, so an explanation can't drift from the code (set
+`CAGE_HUMAN_RATE` ⇒ the printed rate moves). **Concept** entries (`overview`,
+`data-flow`, `metering`, `attribution`, `matrix-concept`, `method-law`,
+`receipts`, `human-axis`, `determinism`, `pii-safety`, `numbers-layers`) answer
+"how does cage work" instead of "how is X computed" — they interpolate
+*structural* facts the same way: live ledger paths from `paths.Footprint`, live
+pipeline order from `policy.tool_order(pol)`, live agent surfaces from
+`agents.SURFACES`, and a live subcommand count from the CLI parser, plus a
+`code_refs` + `plan_ref` anchor back to this document. Matching is deterministic
+stdlib token-overlap — **no LLM, no network** — across both kinds at once; on a
+miss it suggests the closest topic ids rather than guessing, and `--list --kind
+concept` filters to just the how-it-works topics. This is the third *audit
+layer* made interrogable: contract (`schema.py` enums) · policy (`policy.toml`
+economics) · constants (`constants.py` heuristics).
+
+`report` and `budget` **recompute** each call's cost from `tokens × policy` at
+derive time (like `attrib`/`matrix`/`roi`/`human`), falling back to the stored
+`est_cost_usd` only when the model is unpriced — so a meter that records tokens
+but no cost (e.g. the Claude Code transcript meter, which never sets
+`est_cost_usd`) still costs out, while a self-costing provider Cage can't
+tokenize (a search API) keeps its reported figure. The ledger is never rewritten;
+counts stay ground truth. A call only prices if its `(provider, model)` is in the
+price table — the transcript meter stamps `provider="anthropic"`, so that key must
+carry the Claude rows.
 
 ---
 

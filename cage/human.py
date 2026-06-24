@@ -9,12 +9,12 @@ figure was obtained (§3) so round type-table guesses *read* as low-credibility.
 from __future__ import annotations
 
 from cage import policy
-
-_DEFAULT_CONF = {"measured": 0.9, "estimated": 0.7, "type_table": 0.5, "default": 0.3}
+from cage.constants import DEFAULT_CONFIDENCE
 
 
 def _conf(pol: dict, key: str) -> float:
-    return float(policy.human_rates(pol).get("confidence", {}).get(key, _DEFAULT_CONF[key]))
+    # Policy [human.confidence] wins; the constant is only the unset-key fallback.
+    return float(policy.human_rates(pol).get("confidence", {}).get(key, DEFAULT_CONFIDENCE[key]))
 
 
 def _rate(receipt: dict, pol: dict) -> float:

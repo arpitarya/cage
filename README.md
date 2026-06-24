@@ -60,6 +60,7 @@ cage adopt                      # wire all four agents + the graphify intercepto
 cage demo                       # seed the worked example
 cage matrix                     # the counterfactual permutation table
 cage human                      # agent-vs-human: $ and hours saved
+cage query "how is human cost calculated"   # explain any number — live formula, $0
 ```
 
 > **Adopting into a project** is one idempotent command — `cage adopt` wires Claude Code / Codex / Copilot / Kiro onto one ledger and drops a transparent `bin/graphify` interceptor. Pass `--claude` (etc.) for a subset, `--no-graphify` / `--no-hooks` to skip parts.
@@ -115,6 +116,32 @@ TOTAL       14    $1,530.00    $6.55    $1,523.45     17.9     0.51
 
 The savings are anchored to the commit they produced — Cage snapshots a git-aware task record (SHA, branch, diff size, wall-clock) at task close, so a number can always be traced back to the change that earned it.
 
+## Every number is reviewable — and you can ask it
+
+Cage keeps its numbers in **three layers, never mixed**, so any figure is auditable in exactly one place:
+
+| Layer | Holds | Lives in |
+| ----- | ----- | -------- |
+| **Contract** | the closed enums (`UNITS`, `METHODS`) — the substrate's shape | `schema.py` |
+| **Policy** | user-tunable economics: prices, the human rate, default minutes, budgets, pipeline order, confidence | `policy.toml` — *the only place economic numbers live* |
+| **Constants** | code heuristics not meant as config but that must be reviewable: the token divisor, the matrix ceiling, the provenance ranks, the confidence fallback | `constants.py` |
+
+And because the math should explain itself, **`cage query`** prints the real formula for any value with its numbers read *live* from policy + constants — never a hard-coded literal, so an explanation can't drift from the code:
+
+```
+$ cage query "how is human cost calculated"
+human-cost · how a human alternative is priced
+  formula:  usd = minutes / 60 × rate     (rate = $80/hr, source: policy)
+  chain: explicit usd > per-receipt minutes > task-type table > global default
+  confidence: measured 0.9 · estimated 0.7 · type-table 0.5 · default 0.3
+  method:   estimated — a labor guess; never 'measured' unless a real timesheet/quote.
+  code:     cage/human.py · cage/convert.py · policy.toml [human]
+```
+
+Set `CAGE_HUMAN_RATE=200` and that printed rate changes — proof it's the code's actual number, not a slide. It's deterministic and `$0`: a curated explainer registry, no LLM, no network. Try `cage query --list` for every topic, or `--json` for the agent-as-user.
+
+`cage query` also explains *how cage itself works*, not just how a value is computed — `cage query "how does cage work"` walks the data flow, fail-open metering, attribution, method tags, receipts, and the rest, with the same live-fact guarantee (the printed ledger paths, pipeline order, and subcommand count are read from the running code, never typed in). `cage query --list --kind concept` lists just those topics.
+
 ## How it works
 
 One append-only log in, every view derived from it for `$0`:
@@ -159,6 +186,8 @@ cage setup                     # install /cage + /cage-doctor into every agent h
 cage proxy --port 8788         # the universal meter for clients you can't edit
 cage mcp                       # serve the ledger to agents over MCP (stdio)
 cage serve                     # local dashboard over the ledger
+cage query "how is X computed"  # explain any number deterministically, with live values
+cage query "how does cage work" # …or the mechanism itself: data flow, attribution, method tags…
 cage demo                      # seed the worked example that proves the thesis
 ```
 Every read command takes `--json` for the agent-as-user (machine-readable, typed).
@@ -180,7 +209,7 @@ Cage meters whatever speaks the wire format and reads the ledger over MCP, so al
 
 ## The `$0` guarantee
 
-Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 92 tests passing; `cage demo` reproduces the worked attribution example against a real ledger.
+Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 112 tests passing; `cage demo` reproduces the worked attribution example against a real ledger.
 
 **Honest limits.** Cage doesn't decide your human rate — it prices minutes at a blended rate you set, and labels the result `estimated` so it never pretends to be a timesheet. Marginal-by-fixed-order is defensible and `$0`, but it is an *ordering convention*, not a Shapley value (that's a deferred audit mode). And a counterfactual cell is an honest reconstruction, never an invoice — the `method` column says so on every row, on purpose.
 

@@ -31,8 +31,8 @@ def write_html(path: str, title: str, blocks: dict[str, str]) -> None:
 def dashboard_html(root: Path) -> str:
     pol = policy.load(paths.Footprint(root).policy)
     blocks = {
-        "Spend by route": report.render_report(report.summarize(root, "route")),
-        "Spend by model": report.render_report(report.summarize(root, "model")),
+        "Spend by route": report.render_report(report.summarize(root, pol, "route")),
+        "Spend by model": report.render_report(report.summarize(root, pol, "model")),
         "ROI by tool": roi.render_roi(roi.by_tool(root, pol)),
         "Agent vs human": humanview.render_human(humanview.rollup(root, pol)),
         "Savings trend": trend.render_trend(trend.series(root, pol)),
