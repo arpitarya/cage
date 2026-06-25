@@ -1,13 +1,11 @@
 """Command handlers — load policy, derive a view, print it (plan §7, §8)."""
 from __future__ import annotations
 
-from pathlib import Path
-
 from cage import (agents, attribution, budget, demo, doctorcmd,
-                  explain, forecast, graphifymeter, hooks, humanview, initcmd,
+                  explain, forecast, graphifymeter, humanview, importcmd, initcmd,
                   ledger, matrix, mcpserver, metercmd, metering, notessync, origin,
                   paths, policy, provenance, proxy, quality, recommend, regression,
-                  report, roi, serve, tasks, trend, transcript, verifycmd, wizard)
+                  report, roi, serve, tasks, trend, verifycmd, wizard)
 from cage.cliutil import emit, root
 
 
@@ -307,14 +305,18 @@ def cmd_verify(_args) -> int:
     return 0
 
 
+def cmd_import(args) -> int:
+    """Umbrella hookless import across all four agents (default ``--agent all``).
+    Each agent prints its own line: an import count for log-bearing agents, the proxy
+    fallback for those with no on-disk usage log. Always exits 0 (fail-open)."""
+    for line in importcmd.run(root(), args.agent, args):
+        print(line)
+    return 0
+
+
 def cmd_import_codex(args) -> int:
-    here = root()
-    src = Path(args.path)
-    files = sorted(src.glob("**/rollout-*.jsonl")) if src.is_dir() else [src]
-    total = 0
-    for f in files:
-        total += hooks.append_new(here, transcript.parse_codex_calls(f))
-    print(f"✔ imported {total} Codex call(s) from {len(files)} rollout file(s).")
+    n, m = importcmd.import_codex(root(), args)
+    print(f"✔ imported {n} Codex call(s) from {m} rollout file(s).")
     return 0
 
 
@@ -322,30 +324,6 @@ def cmd_import_claude(args) -> int:
     """Meter Claude Code with no hooks/MCP — pull the transcripts it already writes
     to disk. Idempotent (append_new dedupes on the per-turn call id), fail-open per
     file (an unreadable transcript is skipped, never raised), $0/offline."""
-    here = root()
-    if args.path:
-        src = Path(args.path)
-    elif args.project:
-        src = paths.claude_home() / "projects" / paths.claude_project_slug(Path(args.project))
-    else:
-        src = paths.claude_home() / "projects"
-    files = sorted(src.glob("**/*.jsonl")) if src.is_dir() else [src]
-    cut = ledger.since_cutoff(args.since)  # reuses constants.SINCE_WINDOW_DAYS — no new literal
-    if cut is not None:
-        files = [f for f in files if _mtime_utc(f) is not None and _mtime_utc(f) >= cut]
-    total = 0
-    for f in files:
-        try:
-            total += hooks.append_new(here, transcript.parse_calls(f, session=f.stem))
-        except Exception:  # fail-open: a broken/unreadable transcript never aborts the scan
-            continue
-    print(f"✔ imported {total} Claude call(s) from {len(files)} transcript(s).")
+    n, m = importcmd.import_claude(root(), args)
+    print(f"✔ imported {n} Claude call(s) from {m} transcript(s).")
     return 0
-
-
-def _mtime_utc(f: Path):
-    import datetime as _dt
-    try:
-        return _dt.datetime.fromtimestamp(f.stat().st_mtime, _dt.timezone.utc)
-    except OSError:
-        return None

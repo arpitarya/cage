@@ -37,5 +37,15 @@ def test_doctor_records_nothing_in_the_project(proj):
 def test_every_check_has_a_known_level(proj):
     res = doctorcmd.run(proj)
     names = {c["name"] for c in res["checks"]}
-    assert names == {"tool", "footprint", "policy", "pricing", "hooks", "interceptor", "ledger"}
+    assert names == {"tool", "footprint", "policy", "pricing", "hooks", "metering",
+                     "interceptor", "ledger"}
     assert all(c["level"] in {"ok", "warn", "fail"} for c in res["checks"])
+
+
+def test_metering_matrix_lists_all_four_agents(proj):
+    from cage import agents
+    detail = next(c["detail"] for c in doctorcmd.run(proj)["checks"] if c["name"] == "metering")
+    for a in agents.SURFACES:  # every surface is first-class — none silently dropped
+        assert a in detail
+    assert "cage import --agent claude" in detail   # log-bearing → import
+    assert "cage meter -- <cmd>" in detail            # copilot/kiro → proxy

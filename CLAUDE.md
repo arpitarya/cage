@@ -132,7 +132,7 @@ refs/notes/cage-provenance, written by CI alone (plan §3.5).
 ## Dev
 
 ```bash
-just test          # python -m pytest -q   (171 passing)
+just test          # python -m pytest -q   (180 passing)
 just demo          # seed §4.4 + print attrib/matrix
 cage --version
 ```

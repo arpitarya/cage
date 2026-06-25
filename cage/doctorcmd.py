@@ -14,7 +14,7 @@ import shutil
 import tempfile
 from pathlib import Path
 
-from cage import agents, ledger, paths, policy, prices, schema
+from cage import agents, importcmd, ledger, paths, policy, prices, schema
 
 _OK, _WARN, _FAIL = "ok", "warn", "fail"
 _RANK = {_OK: 0, _WARN: 1, _FAIL: 2}
@@ -45,9 +45,30 @@ def _hooks(root: Path) -> tuple[str, str]:
     wired = [s for s, on in agents.status(root).items() if on]
     if not wired:
         return _WARN, ("no agent hooks wired — `cage setup` (wizard) or `cage setup --wire-only --<agent>`. "
-                       "Hooks blocked by your org? Meter Claude Code with `cage import-claude` "
-                       "(pulls on-disk transcripts) or any client via `cage proxy`")
+                       "Hooks blocked by your org? See the metering matrix below for each agent's "
+                       "hookless path (`cage import` / `cage proxy`)")
     return _OK, f"metering hooks wired: {', '.join(wired)}"
+
+
+def _metering(root: Path) -> tuple[str, str]:
+    """Four-agent metering matrix — every surface in ``agents.SURFACES`` gets a row with
+    its hookless path. The proxy is universal, so capture is always reachable (level ok);
+    a log-bearing agent with neither a hook nor any imported call is a `warn` nudge."""
+    wired = agents.status(root)
+    have_calls = bool(ledger.calls(root))
+    rows, worst = [], _OK
+    for a in agents.SURFACES:
+        hooked = wired.get(a, False)
+        if a in importcmd.LOG_BEARING:
+            cap = "hooks wired ✔" if hooked else "no hooks"
+            path = f"hookless: cage import --agent {a}"
+            if not hooked and not have_calls:
+                worst = _WARN
+        else:
+            cap = "hooks wired ✔" if hooked else "MCP read-only"
+            path = "proxy: cage meter -- <cmd>"
+        rows.append(f"\n      · {a:<8} {cap:<14} | {path}")
+    return worst, "metering paths per agent (hooks stay the default; below is hookless):" + "".join(rows)
 
 
 def _pricing(root: Path) -> tuple[str, str]:
@@ -110,6 +131,7 @@ def run(root: Path) -> dict:
         ("policy", *_policy(root)),
         ("pricing", *_pricing(root)),
         ("hooks", *_hooks(root)),
+        ("metering", *_metering(root)),
         ("interceptor", *_interceptor(root)),
         ("ledger", *_ledger_roundtrip()),
     ]

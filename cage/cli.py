@@ -22,7 +22,7 @@ commands by category:
   authorship    origin · notes-sync · verify     who wrote which files (§3.5)
   ops           quality · regression · recommend · forecast · outcome
   setup         init · doctor · setup · proxy · meter · mcp · serve
-  meta          query · demo · graphify · import-codex · import-claude
+  meta          query · demo · graphify · import (· import-claude · import-codex)
 
 examples:
   cage report --by model --since 7d        # where the spend went, last 7 days
@@ -207,6 +207,20 @@ def build_parser() -> argparse.ArgumentParser:
     dr = sub.add_parser("doctor", help="verify this project's Cage setup is correct and working")
     dr.add_argument("--json", action="store_true", help="machine-readable output")
     dr.set_defaults(fn=clicmds.cmd_doctor)
+
+    im = sub.add_parser("import", help="hookless metering for all four agents (claude/codex import · copilot/kiro proxy)",
+                        epilog="examples:\n"
+                               "  cage import                              # every agent (default --agent all)\n"
+                               "  cage import --agent claude --project .    # only this repo's Claude sessions\n"
+                               "  cage import --agent codex --since 7d      # Codex rollouts touched in 7d\n"
+                               "  cage import --agent copilot               # prints the proxy fallback (no usage log)",
+                        formatter_class=argparse.RawDescriptionHelpFormatter)
+    im.add_argument("--agent", choices=[*SURFACES, "all"], default="all",
+                    help="which agent to meter (default: all)")
+    im.add_argument("--path", help="a transcript file or dir to scan (log-bearing agents only)")
+    im.add_argument("--project", help="restrict to one repo's sessions (Claude only)")
+    im.add_argument("--since", metavar="WINDOW", help="only transcripts modified within a window like 7d / 24h / 2w")
+    im.set_defaults(fn=clicmds.cmd_import)
 
     ic = sub.add_parser("import-codex", help="best-effort meter a Codex rollout JSONL (file or dir)")
     ic.add_argument("path", help="a rollout-*.jsonl file or ~/.codex/sessions dir")

@@ -230,12 +230,13 @@ Cage meters whatever speaks the wire format and reads the ledger over MCP, so al
 
 ## The `$0` guarantee
 
-Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 171 tests passing; `cage demo` reproduces the worked attribution example against a real ledger.
+Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 180 tests passing; `cage demo` reproduces the worked attribution example against a real ledger.
 
 **Honest limits.** Cage doesn't decide your human rate — it prices minutes at a blended rate you set, and labels the result `estimated` so it never pretends to be a timesheet. Marginal-by-fixed-order is defensible and `$0`, but it is an *ordering convention*, not a Shapley value (that's a deferred audit mode). And a counterfactual cell is an honest reconstruction, never an invoice — the `method` column says so on every row, on purpose.
 
 ## What's new
 
+- **v0.8.0 — one hookless front door for all four agents.** `cage import [--agent claude|codex|copilot|kiro|all]` (default `all`) unifies hookless metering: Claude Code and Codex import the usage transcripts they write to disk, while Copilot and Kiro — which expose no usage log — print their supported proxy fallback (`cage meter -- <cmd>`) instead of being silently skipped. Additive to hooks/MCP and deduped by call id (a turn seen by both a hook and an import counts once); the old `import-claude`/`import-codex` stay as aliases. `cage doctor` now renders a four-agent metering matrix (hook / import / proxy per agent).
 - **v0.7.1 — docs + the four-agents invariant.** README "What's new" and test
   counts brought current, and a durable rule recorded for every agent
   (`CLAUDE.md` + `AGENTS.md`): Cage keeps **Claude Code · Codex · Copilot · Kiro**
