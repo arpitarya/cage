@@ -118,12 +118,21 @@ refs/notes/cage-provenance, written by CI alone (plan §3.5).
 - **Determinism** — no clocks/random in derived views; ids carry the only entropy.
   Same ledger + same policy ⇒ same tables. Tests assert exact plan numbers.
 - **`method` is sacred** — never let a projection read as `measured`. Tag every cell.
+- **Four agents, always** — Cage supports **Claude Code · Codex · Copilot · Kiro**
+  (`agents.SURFACES = ("claude", "codex", "copilot", "kiro")`). Never drop or
+  silently break one: every wiring/read surface (`agents.py`, `mcpserver.py`,
+  `cage setup`, the skill/steering data) must keep all four first-class, and new
+  surface work fans out to all four. This is a product invariant, not a default.
+- **Every release updates the README "What's new"** — bump `__version__`, add a
+  `What's new` entry for the new version (don't skip versions), and refresh the
+  "N tests passing" count in the README `$0` section + this file's `just test`
+  comment. A shipped version with no changelog line is a release bug.
 - Keep modules small and single-purpose (fux spirit). Tests live in `tests/`.
 
 ## Dev
 
 ```bash
-just test          # python -m pytest -q   (112 passing)
+just test          # python -m pytest -q   (171 passing)
 just demo          # seed §4.4 + print attrib/matrix
 cage --version
 ```

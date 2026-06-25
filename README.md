@@ -230,13 +230,19 @@ Cage meters whatever speaks the wire format and reads the ledger over MCP, so al
 
 ## The `$0` guarantee
 
-Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 135 tests passing; `cage demo` reproduces the worked attribution example against a real ledger.
+Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 171 tests passing; `cage demo` reproduces the worked attribution example against a real ledger.
 
 **Honest limits.** Cage doesn't decide your human rate — it prices minutes at a blended rate you set, and labels the result `estimated` so it never pretends to be a timesheet. Marginal-by-fixed-order is defensible and `$0`, but it is an *ordering convention*, not a Shapley value (that's a deferred audit mode). And a counterfactual cell is an honest reconstruction, never an invoice — the `method` column says so on every row, on purpose.
 
 ## What's new
 
+- **v0.7.1 — docs + the four-agents invariant.** README "What's new" and test
+  counts brought current, and a durable rule recorded for every agent
+  (`CLAUDE.md` + `AGENTS.md`): Cage keeps **Claude Code · Codex · Copilot · Kiro**
+  first-class on every surface, and each release must update this changelog.
+- **v0.7.0 — one front door + hookless metering.** `cage setup` is now the single onboarding command: `--project-only` (scaffold + graphify, no global skill), `--wire-only` (agent wiring only), and `--status` (report wiring) absorb the old `adopt`/`hooks` verbs, which are gone. Internal `hook-*` entrypoints are hidden from `--help`. Ships alongside hookless transcript metering (`cage import-claude`), a per-call pricing fallback, and the bare-`cage` spent-and-saved headline. All four agents (Claude Code · Codex · Copilot · Kiro) stay first-class.
 - **v0.6.0 — authorship attribution.** `cage origin <sha>` answers *who wrote which files in which commit* — a fourth append-only record captured by a `PostToolUse` hook (transcript fallback), with `hooked`/`transcript`/`heuristic` method ranks and `human`/`agent`/`agent-autonomous` origins. `unknown` is read-derived from absence, never a stored row; `origin=human` only via explicit attestation. Distributed over `refs/notes/cage-provenance` (CI is the sole writer); `cage verify` is report-only and never gates the build.
+- **v0.5.0 — DX + concept explainers.** A constants/query-help layer and `cage query` concept topics: ask *how cage works*, not just *how a number is computed*, all deterministic and `$0`.
 - **v0.3.0 — the Tier-1 human axis.** `cage human` / `cage trend` price agent-vs-human in **dollars and hours**, anchored to a git-aware task record; a `minutes` unit, a `[human]` rate table with confidence laddering, and `CAGE_HUMAN_RATE`. Third-party tools join via the external adapter (`cage graphify`).
 - **v0.2.0 — attribution + the counterfactual matrix.** Marginal-by-fixed-order attribution, the 2ⁿ permutation table, ROI per tool, and the `measured`/`modeled`/`estimated` discipline — the differentiator.
 - **v0.1.0 — substrate + meter.** The call/receipt contract, the append-only ledger, `policy.toml`, and `cage report`.
