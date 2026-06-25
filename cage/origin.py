@@ -50,17 +50,32 @@ def render_origin(data: dict) -> str:
     return head + "\n\nProvenance rows\n" + body
 
 
-def attest(root: Path, sha: str, *, origin: str, agent: str = "") -> bool:
+def attest(root: Path, sha: str, *, origin: str, agent: str = "") -> str:
     """Human-triage path: a person asserts this sha's origin. Always
     `method="heuristic"` (no automated signal fired — a person looked at it) and a
     fixed, policy-overridable low confidence. Attesting `origin="unknown"` is a
-    no-op — unknown isn't a fact worth writing, it's the absence of one."""
+    no-op — unknown isn't a fact worth writing, it's the absence of one.
+
+    Returns a status: ``"recorded"`` (a row was written), ``"invalid-origin"``
+    (unknown / not in the enum), ``"no-diff"`` (sha not found or empty diff), or
+    ``"already-attested"`` (an attestation already covers this sha+agent — the
+    append-only ledger won't shadow it). The truthiness of the status maps to the
+    old bool contract: only ``"recorded"`` is truthy as a written-a-row signal,
+    so callers can still branch on it, while the distinct strings let the CLI
+    report *why* a no-op happened instead of guessing."""
     if origin == "unknown" or origin not in schema.ORIGINS:
-        return False
+        return "invalid-origin"
     resolved = _resolve_sha(root, sha)
     files = [f for f, _, _ in originrecord.commit_numstat(root, resolved)]
     if not files:
-        return False  # sha not found / no diff — nothing to attest against
+        return "no-diff"  # sha not found / no diff — nothing to attest against
+    # The append-only dedup key omits `origin`, so a prior heuristic attestation
+    # on this (sha, agent) would silently shadow a new one — surface it instead.
+    prior = [r for r in originrecord.for_sha(root, resolved)
+             if r.get("method") == "heuristic" and (r.get("agent") or "") == (agent or "")]
+    if prior:
+        return "already-attested"
     conf = DEFAULT_CONFIDENCE["estimated"]
-    return originrecord.record(root, sha=resolved, files=files, agent=agent,
-                               method="heuristic", origin=origin, confidence=conf)
+    ok = originrecord.record(root, sha=resolved, files=files, agent=agent,
+                             method="heuristic", origin=origin, confidence=conf)
+    return "recorded" if ok else "no-diff"

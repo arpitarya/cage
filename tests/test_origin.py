@@ -62,8 +62,8 @@ def test_unsignaled_commit_is_unknown_and_writes_no_row(proj):
 # ── attestation: the only way origin=human reaches the ledger
 def test_attest_human_writes_one_heuristic_row(proj):
     _git_init(proj)
-    ok = origin.attest(proj, "HEAD", origin="human")
-    assert ok is True
+    status = origin.attest(proj, "HEAD", origin="human")
+    assert status == "recorded"
     rows = originrecord.read_all(proj)
     assert len(rows) == 1
     assert rows[0]["origin"] == "human" and rows[0]["method"] == "heuristic"
@@ -71,16 +71,27 @@ def test_attest_human_writes_one_heuristic_row(proj):
 
 def test_attest_unknown_is_a_no_op(proj):
     _git_init(proj)
-    ok = origin.attest(proj, "HEAD", origin="unknown")
-    assert ok is False
+    status = origin.attest(proj, "HEAD", origin="unknown")
+    assert status == "invalid-origin"
     assert originrecord.read_all(proj) == []
 
 
 def test_attest_nonexistent_sha_is_a_no_op(proj):
     _git_init(proj)
-    ok = origin.attest(proj, "0000000", origin="human")
-    assert ok is False
+    status = origin.attest(proj, "0000000", origin="human")
+    assert status == "no-diff"
     assert originrecord.read_all(proj) == []
+
+
+def test_attest_second_time_reports_already_attested(proj):
+    _git_init(proj)
+    assert origin.attest(proj, "HEAD", origin="human") == "recorded"
+    # A second attestation (even with a different origin) must not silently
+    # shadow the first — the dedup key omits `origin`, so we surface it.
+    status = origin.attest(proj, "HEAD", origin="agent")
+    assert status == "already-attested"
+    rows = originrecord.read_all(proj)
+    assert len(rows) == 1 and rows[0]["origin"] == "human"
 
 
 # ── union-by-sha: a stronger method wins on overlapping files when fragments merge

@@ -266,9 +266,15 @@ def cmd_notes_sync(args) -> int:
 def cmd_origin(args) -> int:
     r = root()
     if args.attest:
-        ok = origin.attest(r, args.sha, origin=args.attest, agent=args.agent)
-        print(f"✔ attested {args.sha!r} as origin={args.attest!r}." if ok
-              else f"· attestation for {args.sha!r} was a no-op (no diff found, or origin=unknown).")
+        status = origin.attest(r, args.sha, origin=args.attest, agent=args.agent)
+        msg = {
+            "recorded": f"✔ attested {args.sha!r} as origin={args.attest!r}.",
+            "already-attested": f"· {args.sha!r} is already attested — the append-only "
+                                f"ledger keeps the first attestation (run `cage origin {args.sha}` to see it).",
+            "no-diff": f"· attestation for {args.sha!r} was a no-op — sha not found or no diff to attest against.",
+            "invalid-origin": f"· {args.attest!r} can't be attested (unknown isn't a fact worth writing).",
+        }.get(status, f"· attestation for {args.sha!r} was a no-op.")
+        print(msg)
         return 0
     data = origin.explain(r, args.sha)
     return emit(args, data, origin.render_origin(data))
