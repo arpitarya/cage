@@ -41,10 +41,10 @@ def test_reimport_is_idempotent(tmp_path, monkeypatch):
     tp = tmp_path / "s.jsonl"
     tp.write_text(_claude_line("u1", 100, 50) + "\n", encoding="utf-8")
     clicmds.cmd_import_claude(_args(path=str(tp)))
-    after_first = paths.Footprint(root).calls.read_bytes()
+    after_first = b"".join(p.read_bytes() for p in paths.Footprint(root).shards("calls"))
     clicmds.cmd_import_claude(_args(path=str(tp)))  # same uuid → no double count
     assert len(ledger.calls(root)) == 1
-    assert paths.Footprint(root).calls.read_bytes() == after_first  # byte-identical ledger
+    assert b"".join(p.read_bytes() for p in paths.Footprint(root).shards("calls")) == after_first  # byte-identical ledger
 
 
 def test_project_filter_selects_only_matching_slug(tmp_path, monkeypatch):

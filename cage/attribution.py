@@ -43,12 +43,23 @@ def receipts_by_tool(receipts: list[dict], order: list[str]) -> list[dict]:
     return sorted(agg.values(), key=lambda a: (rank.get(a["tool"], len(order)), a["tool"]))
 
 
-def attribute(root: Path, task: str, pol: dict) -> dict:
-    """Per-tool marginal savings for one task, in tokens and USD (the §4.2 table)."""
-    rows = receipts_by_tool([r for r in ledger.by_task(ledger.receipts(root), task)
+def attribute(root: Path, task: str, pol: dict, scope: str | None = None,
+              team: bool = False) -> dict:
+    """Per-tool marginal savings for one task, in tokens and USD (the §4.2 table).
+
+    With ``scope`` set, only rows in that top-level dir count (plan §3.6.2); ``None`` is
+    the unfiltered, byte-identical default. With ``team``, rows come from the merged
+    `refs/notes/cage-ledger` ref, falling back to local when it's empty (§3.6.3)."""
+    all_calls, all_receipts = ledger.calls(root), ledger.receipts(root)
+    if team:
+        from cage import ledgersync
+        t = ledgersync.read_team(root)
+        if t is not None:
+            all_calls, all_receipts = t["calls"], t["receipts"]
+    rows = receipts_by_tool([r for r in ledger.by_scope(ledger.by_task(all_receipts, task), scope)
                              if r.get("tool") != "human"],
                             list(pol.get("tools", {}).get("order", [])))
-    provider, model = task_model(ledger.calls(root), task)
+    provider, model = task_model(ledger.by_scope(all_calls, scope), task)
     call = {"provider": provider, "model": model}
     steps, tot_tok, tot_usd = [], 0.0, 0.0
     for a in rows:

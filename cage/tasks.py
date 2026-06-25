@@ -13,7 +13,7 @@ import re
 import subprocess
 from pathlib import Path
 
-from cage import ledger, paths
+from cage import ledger
 
 _SHORTSTAT = re.compile(r"(\d+) files? changed(?:, (\d+) insertion)?(?:.*?(\d+) deletion)?")
 
@@ -50,6 +50,17 @@ def git_snapshot(root: Path) -> dict:
     return snap
 
 
+def scope_for(root: Path) -> str:
+    """The single top-level changed dir of the working tree, for `scope` (plan §3.6.2).
+
+    Reuses `git_snapshot`'s `dirs` (the same top-level-dirs-only PII guard, decision F)
+    — no new git code path. A monorepo commit touching exactly one component resolves to
+    that component; a multi-dir or empty diff (or non-repo) resolves to `""` (unknown),
+    fail-open. Deterministic: derived from git, never a clock."""
+    dirs = git_snapshot(root).get("dirs") or []
+    return dirs[0] if len(dirs) == 1 else ""
+
+
 def record(root: Path, task: str, *, type: str = "", outcome: str = "",
            agents: list[str] | None = None, ts: str | None = None,
            snapshot: bool = True, **extra) -> bool:
@@ -65,13 +76,13 @@ def record(root: Path, task: str, *, type: str = "", outcome: str = "",
     row.update({k: v for k, v in extra.items() if v not in (None, "", [])})
     if snapshot:
         row.update(git_snapshot(root))
-    return ledger.append(paths.Footprint(root).tasks, row)
+    return ledger.append_row(root, "tasks", row)
 
 
 def read(root: Path) -> dict[str, dict]:
     """Latest row per task id (last-write-wins) keyed by id — pure derive."""
     latest: dict[str, dict] = {}
-    for r in ledger.read(paths.Footprint(root).tasks):
+    for r in ledger.read_kind(root, "tasks"):
         if r.get("id"):
             latest[r["id"]] = {**latest.get(r["id"], {}), **r}
     return latest

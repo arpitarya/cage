@@ -43,6 +43,47 @@ def test_install_is_idempotent(homes):
     assert len(settings["hooks"]["SessionEnd"]) == 1  # not duplicated
 
 
+def _start_cmds(settings: dict) -> list[str]:
+    return [h["command"] for e in settings["hooks"]["SessionStart"] for h in e["hooks"]]
+
+
+def test_claude_sessionstart_backfill_before_banner(homes):
+    # SessionStart is the reliable default: import the previous session, *then* banner.
+    proj = homes / "proj"
+    proj.mkdir()
+    agents.install(proj, ("claude",))
+    cmds = _start_cmds(cfgio.load_json(proj / ".claude" / "settings.json"))
+    assert "cage import-claude --project ." in cmds
+    assert "cage hook-session-start" in cmds
+    # backfill runs before the banner so the banner reflects the just-imported spend
+    assert cmds.index("cage import-claude --project .") < cmds.index("cage hook-session-start")
+    assert agents.backfill_status(proj)["claude"] is True
+
+
+def test_claude_sessionstart_backfill_no_duplicate_on_reinstall(homes):
+    proj = homes / "proj"
+    proj.mkdir()
+    agents.install(proj, ("claude",))
+    agents.install(proj, ("claude",))
+    cmds = _start_cmds(cfgio.load_json(proj / ".claude" / "settings.json"))
+    assert cmds.count("cage import-claude --project .") == 1
+    assert cmds.count("cage hook-session-start") == 1
+
+
+def test_codex_sessionstart_backfill_wired_and_idempotent(homes):
+    # Codex reads a project .codex/hooks.json (same schema as Claude) — wire the backfill.
+    proj = homes / "proj"
+    proj.mkdir()
+    agents.install(proj, ("codex",))
+    agents.install(proj, ("codex",))  # idempotent
+    hooks = cfgio.load_json(proj / ".codex" / "hooks.json")["hooks"]["SessionStart"]
+    cmds = [h["command"] for e in hooks for h in e["hooks"]]
+    assert cmds == ["cage import --agent codex --since 7d"]  # exactly once
+    assert agents.backfill_status(proj)["codex"] is True
+    # the MCP read surface is still wired in the global config
+    assert "[mcp_servers.cage]" in (homes / "codex_home" / "config.toml").read_text()
+
+
 def test_install_selected_surface_only(homes):
     proj = homes / "proj"
     proj.mkdir()

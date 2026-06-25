@@ -31,7 +31,7 @@ def _parse(ts):
 def rollup(root: Path, pol: dict, since: str | None = None,
            agent: str | None = None, task: str | None = None) -> dict:
     calls = ledger.calls(root)
-    rcpts = [r for r in ledger.since(ledger.receipts(root), since) if r.get("tool") == "human"]
+    rcpts = [r for r in ledger.since(ledger.receipts(root, since=since), since) if r.get("tool") == "human"]
     if task:
         rcpts = [r for r in rcpts if r.get("task") == task]
     by_call = {c["id"]: c for c in calls}

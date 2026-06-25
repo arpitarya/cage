@@ -25,7 +25,7 @@ def _bucket(ts: str, by: str) -> str:
 
 def series(root: Path, pol: dict, by: str = "week", since: str | None = None) -> dict:
     calls = ledger.calls(root)
-    rcpts = [r for r in ledger.since(ledger.receipts(root), since) if r.get("tool") == "human"]
+    rcpts = [r for r in ledger.since(ledger.receipts(root, since=since), since) if r.get("tool") == "human"]
     buckets: dict[str, dict] = {}
     for r in rcpts:
         b = buckets.setdefault(_bucket(r.get("ts", ""), by),

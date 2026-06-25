@@ -46,6 +46,8 @@ def _live(pol: dict) -> dict:
         "calls_path": str(foot.calls), "receipts_path": str(foot.receipts),
         "tasks_path": str(foot.tasks),
         "agent_surfaces": " · ".join(agents.SURFACES),
+        "partition": constants.PARTITION_GRANULARITY,
+        "warn_mb": f"{constants.LEDGER_WARN_BYTES / 1_000_000:.0f}",
         "n_subcommands": len(_subcommand_names()),
         "concept_ids": ", ".join(e.id for e in REGISTRY if e.kind == "concept" and e.id != "overview"),
         "ledger_env": "CAGE_LEDGER",

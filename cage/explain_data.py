@@ -120,10 +120,12 @@ REGISTRY: tuple[Explanation, ...] = (
         "data-flow", ("data-flow", "dataflow", "pipeline", "flow", "ledger",
                       "append-only", "jsonl", "record"),
         "the one-way path from a call to a derived table",
-        "record_call/record_receipt append rows to:\n"
+        "record_call/record_receipt append rows to {partition}-partitioned shards of:\n"
         "    {calls_path}\n    {receipts_path}\n    {tasks_path}\n"
-        "  every read (report/attrib/matrix/budget/roi/human/trend) derives from\n"
-        "  those three files at read time — nothing is ever rewritten in place.",
+        "  i.e. calls-YYYY-MM.jsonl etc., named from each row's ts. Every read\n"
+        "  (report/attrib/matrix/budget/roi/human/trend) globs the shards (+ any legacy\n"
+        "  single file) and derives at read time — nothing is ever rewritten in place;\n"
+        "  new writes target dated files (plan §3.6.1).",
         ("cage/ledger.py", "cage/paths.py"),
         "n/a — describes the pipeline shape, not a number.",
         kind="concept", plan_ref="§3"),
@@ -134,6 +136,10 @@ REGISTRY: tuple[Explanation, ...] = (
         "surfaces: library (metering.py context manager) · proxy (usageparse.py,\n"
         "  any client you point a base URL at) · transcript (transcript.py, Claude\n"
         "  Code/Codex session logs) · MCP (mcpserver.py, read-only).\n"
+        "  reliable default for the transcript agents is SessionStart-backfill: import\n"
+        "  the previous session on the next start (the transcript is always on disk).\n"
+        "  SessionEnd is best-effort — it doesn't fire on a kill/crash/idle session;\n"
+        "  running both is safe because cage import dedupes by call id.\n"
         "  fail-open: a metering error is swallowed, never raised into the request path.",
         ("cage/metering.py", "cage/proxy.py", "cage/transcript.py", "cage/mcpserver.py"),
         "n/a — describes a mechanism, not a number.",
@@ -222,4 +228,20 @@ REGISTRY: tuple[Explanation, ...] = (
         ("cage/schema.py", "cage/constants.py", "policy.toml"),
         "n/a — describes where numbers live, not a number itself.",
         kind="concept", plan_ref="§3.3"),
+    Explanation(
+        "ledger-scale", ("partition", "shard", "month", "scope", "monorepo", "team",
+                         "ledger-sync", "aggregate", "notes-ledger", "scale"),
+        "how the ledger survives heavy / multi-dev / monorepo use",
+        "partitions: each log is split into {partition}ly shards (calls-YYYY-MM.jsonl,\n"
+        "  same for receipts/tasks), named from each row's own ts — readers glob +\n"
+        "  concatenate, and --since skips whole below-cutoff months.\n"
+        "  scope: calls/receipts carry an optional top-level changed dir (same PII guard\n"
+        "  as tasks); report/attrib/budget/matrix --scope <dir> slice one component.\n"
+        "  team: cage ledger-sync unions local rows into refs/notes/cage-ledger by row\n"
+        "  id (CI-sole-writer, like notes-sync); report/attrib --team read the merge,\n"
+        "  rolled up by scope, never per-person. Size warning: one stderr line past\n"
+        "  ~{warn_mb} MB (policy [ledger] warn_mb overrides) — warn-only, never blocks.",
+        ("cage/ledger.py", "cage/ledgersync.py", "cage/mergeutil.py", "cage/constants.py"),
+        "n/a — describes the on-disk layout + aggregation, not a number.",
+        kind="concept", plan_ref="§3.6"),
 )

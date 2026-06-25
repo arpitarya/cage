@@ -36,6 +36,15 @@ session_usd = 2.00
 daily_usd = 25.00
 on_exceed = "warn"
 
+# Ledger-size warning (plan §3.6.4). When the partitioned shards together exceed
+# warn_mb (in MB), `cage` prints ONE hint to stderr (never stdout — stdout is the
+# deterministic table surface) pointing at the remedy (archive old *-YYYY-MM.jsonl
+# shards / `cage ledger-sync` then prune). Warn-only, never blocks a read or write.
+# Uncomment to override the derived default (constants.LEDGER_WARN_BYTES, ≈418 MB ≈
+# 2 heavy solo-years); the constant is the fallback when this key is absent.
+# [ledger]
+# warn_mb = 418
+
 # Cost is only honest paired with outcome (plan §8.2). `task_ok` = task succeeded
 # without a human redo; cost-per-*successful*-task is the metric that matters.
 [quality]

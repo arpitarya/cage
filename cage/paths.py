@@ -80,6 +80,28 @@ class Footprint:
     def provenance(self) -> Path:
         return self.ledger / "provenance.jsonl"
 
+    def shard(self, kind: str, ts: str) -> Path:
+        """Month-partition path for ``kind`` (``calls``/``receipts``/``tasks``) derived
+        from a row's own ``ts`` — ``calls-2026-06.jsonl`` (plan §3.6.1). Determinism:
+        the name comes from the row, never a write-time clock. A missing/unparseable
+        ``ts`` falls back to the legacy unpartitioned file so a malformed row still lands
+        somewhere readable. ``provenance`` is intentionally never partitioned (buffer)."""
+        month = ts[:7] if (ts and len(ts) >= 7 and ts[4] == "-") else ""
+        return self.ledger / (f"{kind}-{month}.jsonl" if month else f"{kind}.jsonl")
+
+    def shards(self, kind: str) -> list[Path]:
+        """Every readable shard for ``kind``: the legacy unpartitioned file first
+        (oldest), then dated month shards in ascending — i.e. chronological — order, so
+        a concatenated read keeps oldest→newest (``_latest_task`` stays correct). Same
+        rows ⇒ same set ⇒ byte-identical reads. Only existing files are returned."""
+        base = self.ledger
+        out: list[Path] = []
+        legacy = base / f"{kind}.jsonl"
+        if legacy.exists():
+            out.append(legacy)
+        out.extend(sorted(base.glob(f"{kind}-*.jsonl")))
+        return out
+
     @property
     def policy(self) -> Path:
         return self.base / "policy.toml"

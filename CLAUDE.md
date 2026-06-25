@@ -10,27 +10,38 @@ the substrate contract or the attribution engine.
 ## Architecture (the one-way data flow)
 
 ```
-record_call / record_receipt  →  .cage/ledger/{calls,receipts,tasks,provenance}.jsonl  (append-only)
-        (meter, plan §5)                      │
+record_call / record_receipt  →  .cage/ledger/{calls,receipts,tasks}-YYYY-MM.jsonl  (+ legacy *.jsonl)
+        (meter, plan §5)                      │           · provenance.jsonl (unpartitioned buffer)
                                               ▼  derive ($0, no model)
-  policy.toml (prices/order/budgets/human) → report · attrib · matrix · budget
-                                             · roi · human · trend · why · origin
-
-provenance.jsonl is a local buffer only — canonical storage is
-refs/notes/cage-provenance, written by CI alone (plan §3.5).
+  policy.toml (prices/order/budgets/human) → report · attrib · matrix · budget · roi
+                                             · human · trend · why · origin
+                                             + --scope (monorepo slice) · --team · ledger-sync (§3.6)
 ```
+
+Long-lived logs are month-partitioned (writers append to a dated shard chosen from
+the row's own `ts`; readers glob + concatenate, legacy single files still read; `--since`
+skips below-cutoff months). provenance.jsonl is a local buffer only — canonical storage
+is refs/notes/cage-provenance, written by CI alone (plan §3.5). The calls/receipts/tasks
+rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team view
+(`--team`, plan §3.6.3).
 
 - **Substrate** ([schema.py](cage/schema.py)) — `make_call` / `make_receipt` stamp
   ids + validate the closed enums. Rows are plain JSON. Prompt bodies are never a
-  field (counts only). Change here = change the contract; update the plan §3.
+  field (counts only). Change here = change the contract; update the plan §3. Calls/
+  receipts also carry an additive optional `scope` (top-level changed dir, same PII
+  guard as tasks; empty = the legacy contract, plan §3.6.2), and the long-lived logs
+  are month-partitioned behind `ledger.append_row`/`read_kind` (plan §3.6.1).
 - **Constants** ([constants.py](cage/constants.py)) — the *third audit layer*. Cage
   keeps its numbers in three places, never mixed: **contract** = the enums in
   `schema.py`; **policy** = user-economics in `policy.toml`; **constants** = code
   heuristics not meant as config but that must be reviewable (`CHARS_PER_TOKEN`,
   `TOKENS_PER_MILLION`, `MAX_MATRIX_TOOLS`, `METHOD_TRUST`, `DEFAULT_CONFIDENCE`,
-  `GRAPHIFY_RECEIPT_CONFIDENCE`, `SINCE_WINDOW_DAYS`). `compress`/`prices`/`matrix`/
-  `attribution`/`human`/`ledger`/`graphifymeter` import from here. `DEFAULT_CONFIDENCE`
-  is a *fallback* — `human.py` still prefers policy `[human.confidence]`. The
+  `GRAPHIFY_RECEIPT_CONFIDENCE`, `SINCE_WINDOW_DAYS`, `PARTITION_GRANULARITY`, and the
+  ledger-size threshold `LEDGER_WARN_BYTES` — derived from `LEDGER_ROW_BYTES` ×
+  `LEDGER_HEAVY_ROWS_PER_DAY` × `LEDGER_WARN_MONTHS`, a policy-preferred fallback like
+  `DEFAULT_CONFIDENCE` (`policy.toml [ledger] warn_mb` wins)). `compress`/`prices`/
+  `matrix`/`attribution`/`human`/`ledger`/`graphifymeter` import from here.
+  `DEFAULT_CONFIDENCE` is a *fallback* — `human.py` still prefers policy `[human.confidence]`. The
   third-party shims (`fux/cage_receipt.py`, graphify) keep a local `len/4` copy
   because they're zero-dep; it's an intentional duplicate of `CHARS_PER_TOKEN`.
 - **Explain** ([explain.py](cage/explain.py) engine,
@@ -132,7 +143,7 @@ refs/notes/cage-provenance, written by CI alone (plan §3.5).
 ## Dev
 
 ```bash
-just test          # python -m pytest -q   (180 passing)
+just test          # python -m pytest -q   (205 passing)
 just demo          # seed §4.4 + print attrib/matrix
 cage --version
 ```
@@ -145,8 +156,10 @@ each agent only needs thin idiomatic wiring (`agents.py` orchestrates):
 - **Meter:** `metering.py` (library), `proxy.py` + `usageparse.py` (any client you
   point a base URL at), `transcript.py` (Claude Code / Codex session logs).
 - **Read:** `mcpserver.py` (MCP, every agent), `report/attrib/matrix/budget/roi`,
-  plus the Tier-1 human axis (`human`/`trend`, `matrix --human`) and authorship
-  (`origin`/`notes-sync`/`verify`, plan §3.5).
+  plus the Tier-1 human axis (`human`/`trend`, `matrix --human`), authorship
+  (`origin`/`notes-sync`/`verify`, plan §3.5), and the ledger-scale surface
+  (`--scope` / `--team` filters, `ledger-sync` into refs/notes/cage-ledger via the
+  shared `mergeutil.union_by_id` core, plan §3.6).
 - **Wiring:** `claudewire.py` (hooks+MCP), `codexwire.py` (TOML MCP), `pointers.py`
   (copilot/kiro steering+MCP), `setupcmd.py` (`/cage` skill), `gitcommithook.py`
   (local `post-commit`/`prepare-commit-msg` git hooks, riding along with

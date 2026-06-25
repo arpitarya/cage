@@ -3,8 +3,8 @@ from __future__ import annotations
 
 from cage import (agents, attribution, budget, demo, doctorcmd,
                   explain, forecast, graphifymeter, humanview, importcmd, initcmd,
-                  ledger, matrix, mcpserver, metercmd, metering, notessync, origin,
-                  paths, policy, provenance, proxy, quality, recommend, regression,
+                  ledger, ledgersync, matrix, mcpserver, metercmd, metering, notessync,
+                  origin, paths, policy, provenance, proxy, quality, recommend, regression,
                   report, roi, serve, tasks, trend, verifycmd, wizard)
 from cage.cliutil import emit, root
 
@@ -29,7 +29,9 @@ def cmd_init(_args) -> int:
 
 
 def cmd_report(args) -> int:
-    rep = report.summarize(root(), _policy(), dim=args.by, since=args.since)
+    rep = report.summarize(root(), _policy(), dim=args.by, since=args.since,
+                           scope=getattr(args, "scope", None),
+                           team=getattr(args, "team", False))
     return emit(args, rep, report.render_report(rep))
 
 
@@ -42,14 +44,16 @@ def cmd_overview(args) -> int:
 def cmd_attrib(args) -> int:
     r = root()
     task = args.task or _latest_task(r)
-    data = attribution.attribute(r, task, _policy())
+    data = attribution.attribute(r, task, _policy(), scope=getattr(args, "scope", None),
+                                 team=getattr(args, "team", False))
     return emit(args, data, attribution.render_attrib(data))
 
 
 def cmd_matrix(args) -> int:
     r = root()
     task = args.task or _latest_task(r)
-    data = matrix.matrix(r, task, _policy(), human=getattr(args, "human", False))
+    data = matrix.matrix(r, task, _policy(), human=getattr(args, "human", False),
+                         scope=getattr(args, "scope", None))
     text = matrix.render_matrix(data)
     if getattr(args, "html", None):
         serve.write_html(args.html, f"Matrix · {task}", {f"Matrix · {task}": text})
@@ -90,7 +94,8 @@ def cmd_trend(args) -> int:
 
 
 def cmd_budget(args) -> int:
-    verdict = budget.check(root(), _policy(), session=args.session)
+    verdict = budget.check(root(), _policy(), session=args.session,
+                           scope=getattr(args, "scope", None))
     return emit(args, verdict, budget.render_budget(verdict))
 
 
@@ -276,6 +281,22 @@ def cmd_notes_sync(args) -> int:
         print(f"✔ wrote {len(res['shas'])} note(s) to refs/notes/cage-provenance.")
     else:
         print(f"· dry-run — {len(res['shas'])} sha(s) have buffered provenance to merge.")
+        print("  Set CAGE_NOTES_WRITE=1 (CI) or pass --write to actually push notes.")
+    return 0
+
+
+def cmd_ledger_sync(args) -> int:
+    """Merge the local ledger buffer into refs/notes/cage-ledger (§3.6.3). Dry-run by
+    default — mirrors `cage notes-sync`; CI (`CAGE_NOTES_WRITE=1`) is the sole writer."""
+    res = ledgersync.sync(root(), write=True if args.write else None)
+    if getattr(args, "json", False):
+        import json
+        print(json.dumps(res))
+        return 0
+    if res["wrote"]:
+        print(f"✔ wrote {res['rows']} row(s) to refs/notes/cage-ledger.")
+    else:
+        print(f"· dry-run — {res['rows']} merged call/receipt row(s) ready for the team ref.")
         print("  Set CAGE_NOTES_WRITE=1 (CI) or pass --write to actually push notes.")
     return 0
 

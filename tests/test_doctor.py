@@ -49,3 +49,12 @@ def test_metering_matrix_lists_all_four_agents(proj):
         assert a in detail
     assert "cage import --agent claude" in detail   # log-bearing → import
     assert "cage meter -- <cmd>" in detail            # copilot/kiro → proxy
+
+
+def test_metering_matrix_shows_wired_backfill_mechanism(proj):
+    # Once SessionStart-backfill is wired, the matrix names the actual mechanism.
+    from cage import agents
+    initcmd.run(proj)
+    agents.install(proj, ("claude",))
+    detail = next(c["detail"] for c in doctorcmd.run(proj)["checks"] if c["name"] == "metering")
+    assert "SessionStart-backfill" in detail

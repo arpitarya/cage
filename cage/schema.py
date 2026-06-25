@@ -24,9 +24,9 @@ ORIGINS = ("human", "agent", "agent-autonomous", "unknown")
 
 CALL_FIELDS = ("id", "ts", "session", "task", "agent", "route", "provider", "model",
                "tokens_in", "tokens_out", "cached_in", "est_cost_usd",
-               "latency_ms", "ok", "retries")
+               "latency_ms", "ok", "retries", "scope")
 RECEIPT_FIELDS = ("id", "ts", "call", "task", "tool", "unit", "raw_alternative",
-                  "actual", "saved", "method", "confidence", "meta")
+                  "actual", "saved", "method", "confidence", "meta", "scope")
 PROVENANCE_FIELDS = ("schema_ver", "id", "ts", "sha", "agent", "files",
                      "lines_added", "lines_removed", "method", "origin",
                      "confidence", "session_id")
@@ -40,24 +40,35 @@ def make_call(*, route: str, provider: str, model: str, tokens_in: int = 0,
               tokens_out: int = 0, cached_in: int = 0, est_cost_usd: float = 0.0,
               session: str = "", task: str = "", agent: str = "lib",
               latency_ms: int = 0, ok: bool = True, retries: int = 0,
-              ts: str | None = None, call_id: str | None = None) -> dict:
+              scope: str = "", ts: str | None = None, call_id: str | None = None) -> dict:
     """One ground-truth call row. `cached_in` ⊆ `tokens_in` (billed at discount).
 
     `call_id` may be supplied for idempotent sources (a transcript turn's uuid) so
     re-parsing the same transcript never double-records the call.
+
+    `scope` is the optional top-level changed dir of the work (plan §3.6.2) — the same
+    coarse, counts-safe key `tasks.jsonl` carries (top-level dir only, never sub-paths
+    or filenames). Empty string is the default and the non-monorepo case; an empty
+    `scope` makes a row byte-identical to the pre-§3.6 contract.
     """
     return {"id": call_id or ids.new_id("c"), "ts": ts or _now(), "session": session, "task": task,
             "agent": agent, "route": route, "provider": provider, "model": model,
             "tokens_in": int(tokens_in), "tokens_out": int(tokens_out),
             "cached_in": int(cached_in), "est_cost_usd": round(float(est_cost_usd), 6),
-            "latency_ms": int(latency_ms), "ok": bool(ok), "retries": int(retries)}
+            "latency_ms": int(latency_ms), "ok": bool(ok), "retries": int(retries),
+            "scope": str(scope)}
 
 
 def make_receipt(*, tool: str, raw_alternative: float, actual: float,
                  call: str = "", task: str = "", unit: str = "tokens",
                  method: str = "modeled", confidence: float = 1.0,
-                 meta: dict | None = None, ts: str | None = None) -> dict:
-    """One savings receipt. `saved` is derived so it can never disagree (plan §3.2)."""
+                 meta: dict | None = None, scope: str = "", ts: str | None = None) -> dict:
+    """One savings receipt. `saved` is derived so it can never disagree (plan §3.2).
+
+    `scope` is the optional top-level changed dir (plan §3.6.2) — same counts-safe key
+    as `make_call`; empty by default (non-monorepo), so an unset `scope` is the legacy
+    contract.
+    """
     if unit not in UNITS:
         raise ValueError(f"unit {unit!r} not in {UNITS}")
     if method not in METHODS:
@@ -65,7 +76,8 @@ def make_receipt(*, tool: str, raw_alternative: float, actual: float,
     return {"id": ids.new_id("r"), "ts": ts or _now(), "call": call, "task": task,
             "tool": tool, "unit": unit, "raw_alternative": float(raw_alternative),
             "actual": float(actual), "saved": float(raw_alternative) - float(actual),
-            "method": method, "confidence": float(confidence), "meta": meta or {}}
+            "method": method, "confidence": float(confidence), "meta": meta or {},
+            "scope": str(scope)}
 
 
 def _repo_relative(path: str) -> None:

@@ -28,9 +28,10 @@ def _trust_of_off_set(off_tools: list[dict]) -> str:
     return "modeled"
 
 
-def matrix(root: Path, task: str, pol: dict, human: bool = False) -> dict:
-    calls = ledger.calls(root)
-    rcpts = [r for r in ledger.by_task(ledger.receipts(root), task)
+def matrix(root: Path, task: str, pol: dict, human: bool = False,
+           scope: str | None = None) -> dict:
+    calls = ledger.by_scope(ledger.calls(root), scope)
+    rcpts = [r for r in ledger.by_scope(ledger.by_task(ledger.receipts(root), task), scope)
              if r.get("unit", "tokens") == "tokens" and r.get("tool") != "human"]
     tools = attribution.receipts_by_tool(rcpts, list(pol.get("tools", {}).get("order", [])))
     tools = tools[:MAX_MATRIX_TOOLS]
@@ -58,14 +59,15 @@ def matrix(root: Path, task: str, pol: dict, human: bool = False) -> dict:
     out = {"task": task, "provider": provider, "model": model, "base_tokens": base,
            "output_tokens": out_tok, "tools": [a["tool"] for a in tools], "rows": rows}
     if human:
-        out["human"] = _human_anchor(root, task, pol)
+        out["human"] = _human_anchor(root, task, pol, scope)
     return out
 
 
-def _human_anchor(root: Path, task: str, pol: dict) -> dict | None:
+def _human_anchor(root: Path, task: str, pol: dict, scope: str | None = None) -> dict | None:
     """The Tier-1 human alternative for the task: total USD + worst-case method."""
     from cage import human as human_mod
-    hr = [r for r in ledger.by_task(ledger.receipts(root), task) if r.get("tool") == "human"]
+    hr = [r for r in ledger.by_scope(ledger.by_task(ledger.receipts(root), task), scope)
+          if r.get("tool") == "human"]
     if not hr:
         return None
     usd, method = 0.0, "measured"

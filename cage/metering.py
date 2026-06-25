@@ -25,28 +25,45 @@ def _policy_for(root_str: str) -> dict:
     return policy.load(paths.Footprint(Path(root_str)).policy)
 
 
+@lru_cache(maxsize=8)
+def _scope_for(root_str: str) -> str:
+    """Best-effort `scope` (top-level changed dir) for a root, cached per process so the
+    git shell-out runs once per root — never on every metered call (plan §3.6.2; the
+    write-path-perf design note). Fail-open ⇒ ""; reuses `tasks.scope_for`, no new git."""
+    try:
+        from cage import tasks
+        return tasks.scope_for(Path(root_str))
+    except Exception:  # noqa: BLE001 — metering must never raise out of resolution
+        return ""
+
+
 def record_call(*, route: str, provider: str, model: str, tokens_in: int = 0,
                 tokens_out: int = 0, cached_in: int = 0, est_cost_usd: float | None = None,
-                root: Path | None = None, **fields) -> str:
-    """Append one call row; return its id (empty string if the write failed)."""
+                scope: str = "", root: Path | None = None, **fields) -> str:
+    """Append one call row; return its id (empty string if the write failed).
+
+    `scope` (top-level changed dir, plan §3.6.2) is passed through when known; callers
+    that don't supply it leave it "" (the legacy, non-monorepo case). `meter()` resolves
+    it best-effort via `_scope_for`."""
     r = _resolve_root(root)
     if est_cost_usd is None:
         est_cost_usd = prices.call_cost_usd(_policy_for(str(r)), provider, model,
                                             tokens_in, tokens_out, cached_in)
     row = schema.make_call(route=route, provider=provider, model=model,
                            tokens_in=tokens_in, tokens_out=tokens_out,
-                           cached_in=cached_in, est_cost_usd=est_cost_usd, **fields)
-    return row["id"] if ledger.append(paths.Footprint(r).calls, row) else ""
+                           cached_in=cached_in, est_cost_usd=est_cost_usd,
+                           scope=scope, **fields)
+    return row["id"] if ledger.append_row(r, "calls", row) else ""
 
 
 def record_receipt(*, tool: str, raw_alternative: float, actual: float,
-                   call: str = "", task: str = "", root: Path | None = None,
-                   **fields) -> str:
+                   call: str = "", task: str = "", scope: str = "",
+                   root: Path | None = None, **fields) -> str:
     """Append one savings receipt; return its id (empty string on failure)."""
     r = _resolve_root(root)
     row = schema.make_receipt(tool=tool, raw_alternative=raw_alternative, actual=actual,
-                              call=call, task=task, **fields)
-    return row["id"] if ledger.append(paths.Footprint(r).receipts, row) else ""
+                              call=call, task=task, scope=scope, **fields)
+    return row["id"] if ledger.append_row(r, "receipts", row) else ""
 
 
 def record_human(*, task: str, minutes: float | None = None, usd: float | None = None,
@@ -75,7 +92,7 @@ def record_human(*, task: str, minutes: float | None = None, usd: float | None =
         unit, raw = "tokens", 0.0  # resolver falls to task-type table / global default
     row = schema.make_receipt(tool="human", raw_alternative=raw, actual=0.0, unit=unit,
                               call=call, task=task, method=method, meta=meta)
-    return row["id"] if ledger.append(paths.Footprint(r).receipts, row) else ""
+    return row["id"] if ledger.append_row(r, "receipts", row) else ""
 
 
 @dataclass
@@ -122,6 +139,7 @@ def meter(route: str, *, task: str = "", session: str = "", agent: str = "lib",
                     tokens_in=rec.tokens_in, tokens_out=rec.tokens_out,
                     cached_in=rec.cached_in, task=rec.task, session=rec.session,
                     agent=rec.agent, latency_ms=latency_ms, ok=rec.ok,
-                    retries=rec.retries, root=rec.root)
+                    retries=rec.retries, scope=_scope_for(str(_resolve_root(rec.root))),
+                    root=rec.root)
         except Exception:
             pass

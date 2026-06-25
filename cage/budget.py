@@ -16,8 +16,9 @@ def _today_utc() -> str:
     return _dt.datetime.now(_dt.timezone.utc).date().isoformat()
 
 
-def spend(root: Path, pol: dict, session: str | None = None) -> dict:
-    calls = ledger.calls(root)
+def spend(root: Path, pol: dict, session: str | None = None,
+          scope: str | None = None) -> dict:
+    calls = ledger.by_scope(ledger.calls(root), scope)
     today = _today_utc()
     day_usd = sum(prices.call_usd(pol, c) for c in calls if (c.get("ts") or "")[:10] == today)
     sess_usd = sum(prices.call_usd(pol, c) for c in calls
@@ -27,17 +28,21 @@ def spend(root: Path, pol: dict, session: str | None = None) -> dict:
 
 
 def check(root: Path, pol: dict, session: str | None = None,
-          add_usd: float = 0.0) -> dict:
-    """Would spending `add_usd` more breach a ceiling? Returns the verdict, never raises."""
+          add_usd: float = 0.0, scope: str | None = None) -> dict:
+    """Would spending `add_usd` more breach a ceiling? Returns the verdict, never raises.
+
+    `scope` (top-level dir, plan §3.6.2) optionally restricts the spend to one monorepo
+    component; ``None`` totals the whole ledger as before. (Distinct from the output's
+    ``scope`` column, which is the session/day *axis* — a pre-existing name.)"""
     b = policy.budgets(pol)
-    s = spend(root, pol, session)
+    s = spend(root, pol, session, scope)
     verdicts = {}
-    for scope, cap_key in (("session", "session_usd"), ("day", "daily_usd")):
+    for axis, cap_key in (("session", "session_usd"), ("day", "daily_usd")):
         cap = b.get(cap_key)
-        used = s["session_usd"] if scope == "session" else s["day_usd"]
-        verdicts[scope] = {"cap": cap, "used": round(used, 6),
-                           "would_be": round(used + add_usd, 6),
-                           "over": bool(cap and used + add_usd > cap)}
+        used = s["session_usd"] if axis == "session" else s["day_usd"]
+        verdicts[axis] = {"cap": cap, "used": round(used, 6),
+                          "would_be": round(used + add_usd, 6),
+                          "over": bool(cap and used + add_usd > cap)}
     over = any(v["over"] for v in verdicts.values())
     return {"on_exceed": b.get("on_exceed", "warn"), "over": over,
             "proceed": not (over and b.get("on_exceed") == "block"), "scopes": verdicts}

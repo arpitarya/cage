@@ -29,10 +29,16 @@ Agent wiring is **opt-in everywhere**: `cage adopt`/`cage hooks install` with no
 
 ## Claude Code
 
-- **Meter (proxy-free):** `cage hooks install --claude` adds a **SessionEnd** hook
-  that parses the session transcript (which already records per-turn `usage`) and
-  appends call rows. Off the request path; works on API and subscription alike.
-  A **SessionStart** hook prints a one-line spend banner into context.
+- **Meter (proxy-free, reliable default):** `cage hooks install --claude` wires a
+  **SessionStart** hook that first **backfills the previous session** —
+  `cage import-claude --project .` parses the transcript Claude Code always writes to
+  disk — and then prints the one-line spend banner (`cage hook-session-start`), so the
+  banner reflects the just-backfilled spend. This is the reliable trigger: the
+  transcript is on disk no matter how the session ended.
+- A **SessionEnd** hook (`cage hook-session-end`) is also wired, but it is
+  *best-effort* — Claude Code only fires it on certain clean terminations (`/exit`,
+  logout, clear), never on a killed terminal, crash, or idle session. It is additive,
+  not the primary path; running both is safe because `cage import` dedupes by call id.
 - **Read:** the `cage` MCP server is wired in `.mcp.json`; the `/cage` skill answers
   "what did this cost / what saved money" from the ledger.
 - **Alt meter (real-time, for budget blocking):** `export ANTHROPIC_BASE_URL=$(cage proxy)`.
@@ -43,23 +49,30 @@ Agent wiring is **opt-in everywhere**: `cage adopt`/`cage hooks install` with no
 
 ## Codex
 
-- **Meter:** `cage meter -- codex exec …` runs Codex under the proxy (sets
-  `OPENAI_BASE_URL`); or `cage import-codex ~/.codex/sessions` parses rollout logs
-  after the fact (best-effort — Codex's schema shifts between versions).
+- **Meter (reliable default):** Codex CLI reads a project `.codex/hooks.json` using the
+  same hook schema as Claude Code, so `cage hooks install --codex` wires a
+  **SessionStart** backfill — `cage import --agent codex --since 7d` parses the rollouts
+  Codex always writes to `~/.codex/sessions`, on the next start. The window only bounds
+  the scan (import dedupes by id). Symmetric with Claude's SessionStart-backfill.
+- **Meter (alt):** `cage meter -- codex exec …` runs Codex under the proxy (sets
+  `OPENAI_BASE_URL`) for real-time/budget-blocking capture.
 - **Read:** `cage hooks install --codex` registers `[mcp_servers.cage]` in
   `~/.codex/config.toml`; the `/cage` skill is installed to `~/.codex/skills/`.
 
 ## GitHub Copilot
 
-- **Meter:** the proxy — point Copilot's model endpoint at `cage proxy` where your
+- **Meter (proxy, reliable path):** Copilot writes no usage transcript, so the proxy
+  is its reliable capture path — point Copilot's model endpoint at `cage proxy` where
+  your
   setup allows a custom base URL.
 - **Read:** `cage hooks install --copilot` adds the `cage` MCP server to
   `.vscode/mcp.json` and a Cage pointer to `.github/copilot-instructions.md`.
 
 ## Kiro
 
-- **Meter:** the proxy (`cage proxy` / `cage meter -- <cmd>`), or a Kiro agent hook
-  that shells `cage report` on save.
+- **Meter (proxy, reliable path):** Kiro writes no usage transcript, so the proxy is
+  its reliable capture path (`cage proxy` / `cage meter -- <cmd>`), or a Kiro agent
+  hook that shells `cage report` on save.
 - **Read:** `cage hooks install --kiro` adds the `cage` MCP server to
   `.kiro/settings/mcp.json` and a steering doc at `.kiro/steering/cage.md`.
 

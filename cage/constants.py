@@ -32,6 +32,28 @@ DEFAULT_CONFIDENCE = {"measured": 0.9, "estimated": 0.7,      # fallback ladder 
 GRAPHIFY_RECEIPT_CONFIDENCE = 0.6  # a graphify receipt is modeled, never measured
 SINCE_WINDOW_DAYS = {"h": 1 / 24, "d": 1, "w": 7}  # `24h` / `7d` / `2w` → days
 
+# Ledger partition granularity (plan §3.6.1). Writers append to `calls-YYYY-MM.jsonl`
+# (same for receipts/tasks); readers glob + concatenate. Reviewable here (third audit
+# layer), not user-config — month is the only supported granularity. Determinism: the
+# shard a row lands in derives from the row's own `ts`, never a write-time clock.
+PARTITION_GRANULARITY = "month"
+
+# Ledger-size warning threshold (plan §3.6.4 (d)). NOT a vibes number: a stamped
+# call/receipt row serializes to ~290 B (measured: call 314 / receipt 264 B), and the
+# plan's heavy-agent figure is 1–2k call rows/day. So a heavy *monthly* shard ≈
+# 2000×30×290 B ≈ 17 MB and a heavy solo *year* ≈ 210 MB. The threshold is a multiple
+# of a monthly shard (≈ 24 healthy months ≈ 2 heavy solo-years), so a power user never
+# trips it inside a sane retention window — it flags a genuinely unbounded ledger, not
+# heavy use. Tied to the partition mechanic, not a magic MB. Policy `[ledger] warn_mb`
+# overrides; this is the fallback (the DEFAULT_CONFIDENCE policy-preferred pattern).
+# The read/derive path is WARN-ONLY — the flux invariant is that a derive never
+# refuses. A write-path block (cf. budgets `on_exceed = warn|block`, the CI disk-quota
+# case) is a separate decision, deliberately not taken here; see the ADR.
+LEDGER_ROW_BYTES = 290              # measured avg serialized JSONL row (call 314 / receipt 264 B)
+LEDGER_HEAVY_ROWS_PER_DAY = 2000   # plan §3.6: a heavy agent user emits 1–2k call rows/day
+LEDGER_WARN_MONTHS = 24            # warn only past ~2 years of un-pruned monthly shards
+LEDGER_WARN_BYTES = LEDGER_WARN_MONTHS * 30 * LEDGER_HEAVY_ROWS_PER_DAY * LEDGER_ROW_BYTES
+
 # Model-price family fallback (policy.price_match). Claude Code stamps full dated
 # model ids (`claude-sonnet-4-5-20250929`); policies key short aliases
 # (`claude-sonnet-4-6`). When an id has no exact price row, fall back to the

@@ -52,23 +52,32 @@ def _hooks(root: Path) -> tuple[str, str]:
 
 def _metering(root: Path) -> tuple[str, str]:
     """Four-agent metering matrix — every surface in ``agents.SURFACES`` gets a row with
-    its hookless path. The proxy is universal, so capture is always reachable (level ok);
-    a log-bearing agent with neither a hook nor any imported call is a `warn` nudge."""
+    the capture mechanism actually wired. The reliable default for the two log-bearing
+    agents is **SessionStart-backfill** (import the previous session on the next start);
+    copilot/kiro have no transcript, so the proxy is their reliable path. A log-bearing
+    agent with no reliable trigger and no recorded calls is a `warn` nudge."""
     wired = agents.status(root)
+    backfill = agents.backfill_status(root)
     have_calls = bool(ledger.calls(root))
     rows, worst = [], _OK
     for a in agents.SURFACES:
-        hooked = wired.get(a, False)
         if a in importcmd.LOG_BEARING:
-            cap = "hooks wired ✔" if hooked else "no hooks"
-            path = f"hookless: cage import --agent {a}"
-            if not hooked and not have_calls:
-                worst = _WARN
+            if backfill.get(a, False):
+                mech = "SessionStart-backfill ✔"
+            elif wired.get(a, False):
+                mech = "SessionEnd only (best-effort)"
+                if not have_calls:
+                    worst = _WARN
+            else:
+                mech = "no reliable trigger"
+                if not have_calls:
+                    worst = _WARN
+            path = f"reliable: cage import --agent {a}"
         else:
-            cap = "hooks wired ✔" if hooked else "MCP read-only"
-            path = "proxy: cage meter -- <cmd>"
-        rows.append(f"\n      · {a:<8} {cap:<14} | {path}")
-    return worst, "metering paths per agent (hooks stay the default; below is hookless):" + "".join(rows)
+            mech = "proxy (no transcript)"
+            path = "reliable: cage meter -- <cmd>"
+        rows.append(f"\n      · {a:<8} {mech:<30} | {path}")
+    return worst, "capture mechanism per agent (SessionStart-backfill is the reliable default):" + "".join(rows)
 
 
 def _pricing(root: Path) -> tuple[str, str]:

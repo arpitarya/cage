@@ -13,7 +13,7 @@ from cage import convert, ledger, render
 
 def by_tool(root: Path, pol: dict, since: str | None = None) -> dict:
     calls = {c["id"]: c for c in ledger.calls(root)}
-    rcpts = ledger.since(ledger.receipts(root), since)
+    rcpts = ledger.since(ledger.receipts(root, since=since), since)
     tools: dict[str, dict] = {}
     for r in rcpts:
         if r.get("tool") == "human":  # Tier-1 baseline, not a within-agent tool (§4.4)

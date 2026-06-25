@@ -259,6 +259,93 @@ one-line `# v2:` marker at its natural call site rather than being half-built.
 
 ---
 
+## 3.6 Ledger scale — partitions, scope, team aggregation
+
+§3.1–3.5 each describe a single append-only file. That shape is correct for one
+developer on one machine; three pressures break it — **volume** (a heavy agent user
+emits 1–2k call rows/day, so every derive re-scans full history), **monorepo** (one
+`.cage/` at repo root spans many sub-projects with no component key), and **team view**
+(machine-local ledgers never combine). The fix for all three reuses idioms already in
+the plan, and changes only *how the append-only files are laid out / combine* — never a
+new mutation of derived state.
+
+### 3.6.1 Time-partitioned ledger files (read-path layout)
+
+Each long-lived log (`calls`/`receipts`/`tasks`) is partitioned by UTC month: the
+writer appends to `calls-YYYY-MM.jsonl` (`ledger.append_row` picks the shard from the
+row's own `ts`, `paths.Footprint.shard`); readers glob the set + any legacy single file
+and concatenate (`ledger.read_kind`). Paired with `SINCE_WINDOW_DAYS`, a `--since`
+query *skips* whole shards whose month is entirely below `since_cutoff`
+(`ledger._month_entirely_below`) rather than filtering rows it already loaded — the
+point of the partition. **Determinism:** the shard name derives from the row's `ts`,
+never a write-time clock; same rows ⇒ same shards ⇒ byte-identical reads.
+**Backward-compatible:** a legacy `calls.jsonl` is still globbed (read first, oldest);
+migration is "new writes go to the dated file," never a rewrite of the past (the ledger
+is never rewritten). `provenance.jsonl` is exempt — it is a buffer flushed to notes
+(§3.5), not a long-lived store. Granularity (`constants.PARTITION_GRANULARITY="month"`)
+lives in the third audit layer — reviewable, not user-config.
+
+### 3.6.2 The `scope` dimension (additive contract change)
+
+Calls and receipts gain one optional field, `scope` — the **top-level changed dir** of
+the work, reusing `tasks.jsonl`'s "top-level-dirs-only, never full paths" PII guard
+(§3.4). `schema.make_call`/`make_receipt` gain `scope: str = ""` (appended to
+`CALL_FIELDS`/`RECEIPT_FIELDS`); empty string is the default and the non-monorepo case.
+It is resolved the same way tasks resolve theirs — `tasks.scope_for` reads
+`git_snapshot`'s top-level `dirs` (single dir ⇒ that component, ambiguous/none ⇒ `""`),
+fail-open, no new git path; the meter resolves it best-effort and cached
+(`metering._scope_for`), never a git shell-out per call. `report`/`attrib`/`budget`/
+`matrix` gain an optional `--scope <dir>` filter (`ledger.by_scope`); no flag ⇒
+byte-identical to today (the §3.5 no-flag invariant).
+
+### 3.6.3 Team aggregation via `refs/notes`, not a backend
+
+The ledger stays gitignored and machine-local (committing per-dev per-task cost into
+permanent shared git history is a surveillance surface even counts-only). The team view
+reuses the **exact** §3.5 distribution model rather than an external collector (which
+would break `$0`/stdlib/no-infra): each machine's `.cage/ledger/` is the local buffer;
+`cage ledger-sync` unions local call/receipt rows into a single
+`refs/notes/cage-ledger` ref **by row id** (`mergeutil.union_by_id`, the pure core
+shared with provenance's `merge_rows` — ledger uses plain first-by-id, no method
+tie-break, since ulids never legitimately collide), written **only by CI**
+(`CAGE_NOTES_WRITE=1`; a dev's `ledger-sync` is a dry-run). Rows live in one note on the
+repo's empty-tree object (a universal, deterministic anchor — ledger rows have no commit
+to attach to). `report`/`attrib --team` read the merged ref and degrade to the local
+view when it's empty/missing (fail-open); the rollup dimension is `scope`, **never
+per-developer identity** (opt-in per-person attribution is deferred — a `# v2:` marker
+in `ledgersync.read_team`).
+
+> **DECISION (flag for review):** team aggregation uses `refs/notes/cage-ledger`, not an
+> external sink. Rationale: keeps `$0`/stdlib/no-infra, reuses the proven merge-by-id
+> law, and the aggregate travels with the repo on clone. **Veto point:** if call/receipt
+> volume per repo genuinely exceeds what notes should hold (single-digit GB/yr is fine;
+> 100s of GB is not), revisit with an `export` shard to an out-of-repo store — but only
+> then, and only with a named volume number.
+
+### 3.6.4 Ledger-size warning (read-path, warn-only)
+
+On the read path (`ledger.read_kind`), the byte size of the globbed shards is summed and,
+past a threshold, **one** line is printed to **stderr** (never stdout — stdout is the
+deterministic table surface; a warning there would break byte-identity) pointing at the
+remedy (archive old `*-YYYY-MM.jsonl` shards / `ledger-sync` then prune). The threshold
+resolves policy-first (`policy.toml [ledger] warn_mb`, MB) then the derived
+`constants.LEDGER_WARN_BYTES` fallback (≈24 healthy monthly shards ≈ 2 heavy solo-years
+— tied to the partition mechanic, not a magic MB). Warn-only and fail-open: fires at most
+once per dir per process, swallows a `stat` error, never blocks or raises. **A `block`
+mode is deliberately absent on the read/derive path** — a derive never refuses (the flux
+invariant); a write-path block (cf. `[budgets] on_exceed = warn|block`, the CI
+disk-quota case) is a separate, un-taken decision (see ADR).
+
+### 3.6.5 Invariants this amendment must not break
+
+`$0`/stdlib-only (glob, datetime, git shell-out — never `import git`); determinism
+(shard names from `ts`, no clock/random on read); ledger never rewritten (new write
+targets only); four agents always (`scope` + `ledger-sync` fan out to all four); method
+is sacred (aggregation is a row union, not a re-derivation); no-flag byte-identity
+(`--scope`/`--team`/partitioning all default off ⇒ output identical to pre-amendment).
+
+---
+
 ## 4. The attribution engine (the part that's actually novel)
 
 The question Cage answers is not "what did I spend" (any meter does that). It's

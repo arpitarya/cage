@@ -41,7 +41,7 @@ def append_new(root: Path, rows: list[dict]) -> int:
     added = 0
     for row in rows:
         if row.get("id") not in seen:
-            if ledger.append(paths.Footprint(root).calls, row):
+            if ledger.append_row(root, "calls", row):
                 added += 1
     return added
 

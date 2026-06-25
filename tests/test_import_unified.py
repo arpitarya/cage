@@ -63,9 +63,9 @@ def test_claude_import_counts_and_idempotent(tmp_path, monkeypatch, capsys):
     assert len(calls) == 2
     assert calls[0]["tokens_in"] == 100 and calls[0]["tokens_out"] == 50
     assert "✔ claude: imported 2 call(s) from 1 file(s)." in capsys.readouterr().out
-    before = paths.Footprint(root).calls.read_bytes()
+    before = b"".join(p.read_bytes() for p in paths.Footprint(root).shards("calls"))
     clicmds.cmd_import(_args(agent="claude", path=str(tp)))  # re-import → no double count
-    assert paths.Footprint(root).calls.read_bytes() == before
+    assert b"".join(p.read_bytes() for p in paths.Footprint(root).shards("calls")) == before
 
 
 def test_codex_import_counts_and_idempotent(tmp_path, monkeypatch, capsys):
@@ -76,9 +76,9 @@ def test_codex_import_counts_and_idempotent(tmp_path, monkeypatch, capsys):
     calls = ledger.calls(root)
     assert len(calls) == 1 and calls[0]["tokens_in"] == 80 and calls[0]["agent"] == "codex"
     assert "✔ codex: imported 1 call(s) from 1 file(s)." in capsys.readouterr().out
-    before = paths.Footprint(root).calls.read_bytes()
+    before = b"".join(p.read_bytes() for p in paths.Footprint(root).shards("calls"))
     clicmds.cmd_import(_args(agent="codex", path=str(tp)))
-    assert paths.Footprint(root).calls.read_bytes() == before
+    assert b"".join(p.read_bytes() for p in paths.Footprint(root).shards("calls")) == before
 
 
 def test_import_is_noop_when_hook_already_recorded_same_turns(tmp_path, monkeypatch, capsys):

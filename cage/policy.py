@@ -30,7 +30,7 @@ def load(policy_path: Path | None = None) -> dict:
     if policy_path and policy_path.exists() and tomllib is not None:
         with policy_path.open("rb") as fh:
             data = tomllib.load(fh)
-        for section in ("prices", "tools", "budgets", "quality", "human"):
+        for section in ("prices", "tools", "budgets", "quality", "human", "ledger"):
             if section in data:
                 merged = {**pol.get(section, {}), **data[section]}
                 pol[section] = merged

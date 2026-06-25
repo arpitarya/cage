@@ -50,7 +50,7 @@ def test_files_one_modeled_receipt(proj, capsys):
     big.write_text("z" * 4000, encoding="utf-8")     # ~1000 toks whole
     answer = f"NODE foo [src={big} loc=L1 community=1]\nshort\n"
     gm.run(proj, [*_stub(proj, answer, "", 0), "query", "x"], task="t1")
-    rcpts = ledger.read(paths.Footprint(proj).receipts)
+    rcpts = ledger.receipts(proj)
     assert len(rcpts) == 1
     r = rcpts[0]
     assert r["tool"] == "graphify" and r["unit"] == "tokens"
@@ -64,14 +64,14 @@ def test_files_one_modeled_receipt(proj, capsys):
 def test_no_emit_when_no_file_resolves(proj, capsys):
     answer = "NODE foo [src=/does/not/exist.py loc=L1 community=1]\n" + "x" * 100
     gm.run(proj, [*_stub(proj, answer, "", 0), "query", "x"])
-    assert ledger.read(paths.Footprint(proj).receipts) == []
+    assert ledger.receipts(proj) == []
 
 
 def test_no_emit_for_path_op_citing_no_files(proj):
     # `path` output cites no src= — unmeasurable → no receipt
     answer = "Shortest path (2 hops):\n  a --calls--> b\n"
     gm.run(proj, [*_stub(proj, answer, "", 0), "path", "a", "b"])
-    assert ledger.read(paths.Footprint(proj).receipts) == []
+    assert ledger.receipts(proj) == []
 
 
 # ── explain format (Source: <file> Lnn) parses too ──────────────────────────────
@@ -80,6 +80,6 @@ def test_explain_source_line_parses(proj):
     f.write_text("q" * 8000, encoding="utf-8")       # ~2000 toks
     answer = f"Node: run()\n  Source:    {f} L71\n  Type: code\n"
     gm.run(proj, [*_stub(proj, answer, "", 0), "explain", "run"], task="t2")
-    rcpts = ledger.read(paths.Footprint(proj).receipts)
+    rcpts = ledger.receipts(proj)
     assert len(rcpts) == 1 and rcpts[0]["meta"] == {"op": "explain"}
     assert rcpts[0]["raw_alternative"] == 2000

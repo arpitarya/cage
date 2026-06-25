@@ -17,7 +17,7 @@ import os
 import subprocess
 from pathlib import Path
 
-from cage import originrecord
+from cage import mergeutil, originrecord
 from cage.constants import PROVENANCE_METHOD_TRUST
 
 _REF = "refs/notes/cage-provenance"
@@ -48,25 +48,19 @@ def _existing_note(root: Path, sha: str) -> list[dict]:
     return rows
 
 
+def _method_rank_winner(prior: dict, row: dict) -> dict:
+    """Same id reappearing (e.g. a re-synced buffer): keep whichever `method` ranks
+    higher (PROVENANCE_METHOD_TRUST) — never let the union read as a stronger method
+    than its real input, nor let a weaker method silently overwrite a stronger one."""
+    return row if (PROVENANCE_METHOD_TRUST.get(row.get("method", ""), -1) >
+                   PROVENANCE_METHOD_TRUST.get(prior.get("method", ""), -1)) else prior
+
+
 def merge_rows(existing: list[dict], incoming: list[dict]) -> list[dict]:
-    """Union by row `id`; on an (sha, file) the two disagree about, keep the row
-    whose `method` ranks highest (PROVENANCE_METHOD_TRUST) — never let the union
-    read as a stronger method than its weakest real input, but also never let a
-    weaker method silently overwrite a stronger one already on file."""
-    by_id: dict[str, dict] = {r["id"]: r for r in existing if r.get("id")}
-    for row in incoming:
-        rid = row.get("id")
-        if not rid:
-            continue
-        prior = by_id.get(rid)
-        if prior is None:
-            by_id[rid] = row
-            continue
-        # Same id reappearing (e.g. re-synced buffer) — keep whichever ranks higher.
-        if PROVENANCE_METHOD_TRUST.get(row.get("method", ""), -1) > \
-           PROVENANCE_METHOD_TRUST.get(prior.get("method", ""), -1):
-            by_id[rid] = row
-    return list(by_id.values())
+    """Union provenance fragments by row `id` (the shared `mergeutil.union_by_id` core),
+    breaking a repeated id by `method` rank. Ledger sync reuses the same core with no
+    tie-break (plain first-by-id) — see `ledgersync`."""
+    return mergeutil.union_by_id(existing, incoming, on_collision=_method_rank_winner)
 
 
 def plan(root: Path) -> dict[str, dict]:

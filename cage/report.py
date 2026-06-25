@@ -23,24 +23,52 @@ def _new_group() -> dict:
     return {"calls": 0, "tokens_in": 0, "tokens_out": 0, "cached_in": 0, "usd": 0.0}
 
 
-def _nonhuman_savings(root: Path, pol: dict, since: str | None):
-    """Yield ``(receipt, call, saved_usd)`` for each non-human receipt in the window.
+def _team_rows(root: Path, team: bool):
+    """`(calls, receipts)` from the merged `refs/notes/cage-ledger` ref when ``--team``
+    and it's non-empty, else ``(None, None)`` ⇒ read the local ledger (plan §3.6.3).
+    Fail-open: an empty/missing ref degrades to local, never an error."""
+    if team:
+        from cage import ledgersync
+        t = ledgersync.read_team(root)
+        if t is not None:
+            return t["calls"], t["receipts"]
+    return None, None
+
+
+def _grouping_calls(root: Path, since: str | None, team_calls):
+    """Window-filtered calls for the rollup. Local path keeps the partition shard-skip
+    (`ledger.calls(..., since=...)`); team rows are a plain list filtered by `ledger.since`."""
+    if team_calls is not None:
+        return ledger.since(team_calls, since)
+    return ledger.since(ledger.calls(root, since=since), since)
+
+
+def _nonhuman_savings(all_calls: list[dict], receipts: list[dict], pol: dict,
+                      scope: str | None = None):
+    """Yield ``(receipt, call, saved_usd)`` for each non-human receipt (already window-
+    filtered). ``all_calls`` is the *unfiltered* join table so an in-window receipt can
+    still find its (possibly older) call.
 
     Tier-1 ``tool="human"`` receipts are a *different axis* (`cage human`); counting
     them here would double-count and mix axes — skip them, matching `roi.by_tool` (§4.4).
-    USD comes only through the one unit→USD dispatch (`convert.saved_usd`).
+    USD comes only through the one unit→USD dispatch (`convert.saved_usd`). With ``scope``
+    set, only receipts in that top-level dir count (plan §3.6.2).
     """
-    by_id = {c.get("id"): c for c in ledger.calls(root)}
-    for r in ledger.since(ledger.receipts(root), since):
+    by_id = {c.get("id"): c for c in all_calls}
+    for r in ledger.by_scope(receipts, scope):
         if r.get("tool") == "human":
             continue
         call = by_id.get(r.get("call"), {})
         yield r, call, convert.saved_usd(r, call, pol)
 
 
-def summarize(root: Path, pol: dict, dim: str = "route",
-              since: str | None = None) -> dict:
-    calls = ledger.since(ledger.calls(root), since)
+def summarize(root: Path, pol: dict, dim: str = "route", since: str | None = None,
+              scope: str | None = None, team: bool = False) -> dict:
+    tc, tr = _team_rows(root, team)
+    all_calls = tc if tc is not None else ledger.calls(root)
+    windowed_receipts = (ledger.since(tr, since) if tr is not None
+                         else ledger.since(ledger.receipts(root, since=since), since))
+    calls = ledger.by_scope(_grouping_calls(root, since, tc), scope)
     groups: dict[str, dict] = {}
     unpriced: set[str] = set()       # provider/model that billed $0 with no price row
     family: dict[str, str] = {}      # model → matched key (approximate, no exact row)
@@ -62,7 +90,7 @@ def summarize(root: Path, pol: dict, dim: str = "route",
              "tokens_out": sum(g["tokens_out"] for g in groups.values())}
     if dim in SAVINGS_DIMS:  # second pass over receipts → saved + net (§3.1)
         total_saved = 0.0
-        for r, call, saved in _nonhuman_savings(root, pol, since):
+        for r, call, saved in _nonhuman_savings(all_calls, windowed_receipts, pol, scope):
             key = str(r.get("task") or "—") if dim == "task" else str(call.get("agent") or "—")
             g = groups.setdefault(key, _new_group())  # receipt-only group (e.g. "—" bucket)
             g["saved_usd"] = g.get("saved_usd", 0.0) + saved
@@ -78,10 +106,11 @@ def summarize(root: Path, pol: dict, dim: str = "route",
 
 def overview(root: Path, pol: dict, since: str | None = None) -> dict:
     """The bare-`cage` headline: spent / saved / net / tokens over the window (§4)."""
-    calls = ledger.since(ledger.calls(root), since)
+    calls = ledger.since(ledger.calls(root, since=since), since)
     spent = sum(prices.call_usd(pol, c) for c in calls)
     tokens = sum(c.get("tokens_in", 0) + c.get("tokens_out", 0) for c in calls)
-    saved = sum(s for _, _, s in _nonhuman_savings(root, pol, since))
+    saved = sum(s for _, _, s in _nonhuman_savings(
+        ledger.calls(root), ledger.since(ledger.receipts(root, since=since), since), pol))
     return {"since": since, "empty": not calls, "calls": len(calls),
             "spent_usd": spent, "saved_usd": saved, "net_usd": saved - spent,
             "tokens": tokens}

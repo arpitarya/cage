@@ -16,7 +16,7 @@ graphify (code→graph) and fux (decisions→rules)."""
 
 _EPILOG = """\
 commands by category:
-  ledger        report · budget · why            spend & per-call provenance
+  ledger        report · budget · why · ledger-sync   spend, per-call provenance, team view (§3.6)
   attribution   attrib · matrix · roi            per-tool savings (the differentiator)
   human axis    human · human-record · trend     agent-vs-human $ and hours saved
   authorship    origin · notes-sync · verify     who wrote which files (§3.5)
@@ -57,11 +57,15 @@ def build_parser() -> argparse.ArgumentParser:
     rep = sub.add_parser("report", help="ledger: spend by agent / route / model / day")
     rep.add_argument("--by", choices=DIMENSIONS, default="route", help="group dimension")
     rep.add_argument("--since", metavar="WINDOW", help="window like 7d / 24h / 2w")
+    rep.add_argument("--scope", metavar="DIR", help="filter to one monorepo top-level dir (§3.6.2)")
+    rep.add_argument("--team", action="store_true", help="read the merged refs/notes/cage-ledger team view (§3.6.3)")
     _json_flag(rep)
     rep.set_defaults(fn=clicmds.cmd_report)
 
     at = sub.add_parser("attrib", help="per-tool marginal savings for a task (§4.2)")
     at.add_argument("--task", help="task id (default: most recent)")
+    at.add_argument("--scope", metavar="DIR", help="filter to one monorepo top-level dir (§3.6.2)")
+    at.add_argument("--team", action="store_true", help="read the merged refs/notes/cage-ledger team view (§3.6.3)")
     _json_flag(at)
     at.set_defaults(fn=clicmds.cmd_attrib)
 
@@ -69,6 +73,7 @@ def build_parser() -> argparse.ArgumentParser:
                         epilog="example:\n  cage matrix --human   # add a human-baseline row + vs-human columns",
                         formatter_class=argparse.RawDescriptionHelpFormatter)
     mx.add_argument("--task", help="task id (default: most recent)")
+    mx.add_argument("--scope", metavar="DIR", help="filter to one monorepo top-level dir (§3.6.2)")
     mx.add_argument("--human", action="store_true", help="add the Tier-1 human anchor row + vs-human columns")
     _json_flag(mx)
     _html_flag(mx)
@@ -76,6 +81,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     bd = sub.add_parser("budget", help="session/day spend vs policy ceilings (§8.1)")
     bd.add_argument("--session", help="session id to total against the session cap")
+    bd.add_argument("--scope", metavar="DIR", help="filter to one monorepo top-level dir (§3.6.2)")
     _json_flag(bd)
     bd.set_defaults(fn=clicmds.cmd_budget)
 
@@ -246,6 +252,16 @@ def build_parser() -> argparse.ArgumentParser:
     ns.add_argument("--write", action="store_true", help="push to refs/notes (default: dry-run unless CAGE_NOTES_WRITE=1)")
     _json_flag(ns)
     ns.set_defaults(fn=clicmds.cmd_notes_sync)
+
+    ls = sub.add_parser("ledger-sync", help="merge local call/receipt rows into refs/notes/cage-ledger for a team view (§3.6.3)",
+                        epilog="example:\n"
+                               "  cage ledger-sync                # dry-run: print the merge plan\n"
+                               "  CAGE_NOTES_WRITE=1 cage ledger-sync  # actually push the team ledger (CI only)\n"
+                               "  cage report --team              # read the merged team view",
+                        formatter_class=argparse.RawDescriptionHelpFormatter)
+    ls.add_argument("--write", action="store_true", help="push to refs/notes (default: dry-run unless CAGE_NOTES_WRITE=1)")
+    _json_flag(ls)
+    ls.set_defaults(fn=clicmds.cmd_ledger_sync)
 
     og = sub.add_parser("origin", help="authorship attribution for a commit (§3.5)",
                         epilog="examples:\n"
