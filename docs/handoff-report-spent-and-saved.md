@@ -1,0 +1,233 @@
+# Handoff — `report` spent-and-saved + bare-`cage` banner
+
+**Owner:** Arpit · **For:** Claude Code (this repo) · **Status:** ready to implement
+**Effort:** ~1 sprint sitting · contained to `report.py`, `cli.py`, `clicmds.py`, plus tests.
+
+---
+
+## 1. Why
+
+The most-wanted view — *"tokens and credit spent **and** saved"* — is not a single
+command today. `cage report` shows **spent only** (calls, tokens in/out, cost). The
+**saved** side lives in separate verbs (`attrib`, `roi`, `human`), so answering the
+one question you ask daily means running two commands and joining them in your head.
+
+This change makes the spent-and-saved view the front door. No new engine, no new
+data — the savings numbers already exist and already route through one place.
+
+Two parts, independently shippable:
+
+- **A. Savings columns on `report`** — add `saved` + `net` to the rollup.
+- **B. Bare `cage` banner** — `cage` with no subcommand prints a headline overview.
+
+---
+
+## 2. The cage laws this must respect (non-negotiable)
+
+These are from `CLAUDE.md` / the plan. Violating any of them fails review:
+
+- **$0, stdlib-only.** `dependencies = []`. No imports off the default path.
+- **Derive-time only.** The ledger is never rewritten. `saved`/`net` are computed
+  at read time from receipts + policy, exactly like `prices.call_usd` recomputes cost.
+- **Determinism.** No clocks/random in the derived view. Same ledger + same policy ⇒
+  byte-identical table. Tests assert exact numbers.
+- **`method` is sacred.** Don't surface a projected number as `measured`. (We're
+  aggregating existing receipts here, so this is mostly inherited — but if a total
+  mixes confidences, don't relabel it.)
+- **One place for unit semantics.** Convert a receipt's `saved` to USD **only** via
+  `convert.saved_usd(receipt, call, pol)`. Do not re-implement the unit dispatch.
+- **Fail-open on read.** A malformed/truncated receipt tail must not crash `report`;
+  `ledger.receipts` already tolerates this — keep that contract.
+
+---
+
+## 3. Part A — savings columns on `report`
+
+### 3.1 Behavior
+
+`report.summarize(...)` currently groups **calls** by a dimension and sums cost. Add a
+parallel pass over **receipts** so each group also carries `saved_usd`, and compute
+`net = saved_usd − usd` per group and for the total.
+
+**Which dimensions get savings columns:**
+
+| dimension | savings columns? | why |
+|-----------|------------------|-----|
+| `task`    | **yes**          | receipts carry `task` directly — clean join |
+| `agent`   | **yes**          | resolve via the receipt's `call` → `call.agent` |
+| `route` / `model` / `provider` / `day` | **no** | attributing a receipt to these is fuzzy; showing it would imply precision we don't have |
+
+For dimensions without savings, render the table exactly as today (byte-identical —
+there is a regression test for this).
+
+### 3.2 Attribution rules (bake these in)
+
+- **Group receipts on the same dimension as calls.**
+  - `--by task`: group on `receipt["task"]`. (Field exists, see `schema.make_receipt`.)
+  - `--by agent`: group on `calls[receipt["call"]]["agent"]`; if the receipt has no
+    `call` or the call is missing, bucket it under `"—"` (do **not** drop the dollars —
+    they still count in the TOTAL).
+- **Exclude human receipts.** Skip `receipt["tool"] == "human"` — same as `roi.by_tool`.
+  Rationale: Tier-1 agent-vs-human savings are a *different axis* and live in
+  `cage human`; counting them here would double-count and mix axes. Leave a one-line
+  comment citing §4.4 / the `roi` precedent.
+- **Respect `--since`.** Window the receipts with `ledger.since(ledger.receipts(root),
+  since)`, matching how `roi` does it. (Calls are already windowed.)
+- **USD conversion:** `convert.saved_usd(r, calls.get(r.get("call"), {}), pol)`.
+
+### 3.3 Output shape
+
+`--by task`, text:
+
+```
+Ledger by task (since 7d)
+
+task            calls   tok in   tok out     cost    saved      net
+auth-refactor      12    48.2k     9.1k    $2.14    $5.80    +$3.66
+graph-query         8    31.0k     4.2k    $1.05    $0.00    -$1.05
+TOTAL              20    79.2k    13.3k    $3.19    $5.80    +$2.61
+```
+
+- New columns `saved`, `net` are right-aligned (`render.usd`).
+- `net` shows an explicit sign: `+$3.66` for a win, `-$1.05` for a loss. Add a
+  `render.signed_usd` helper (or a `signed=` flag on `render.usd`) — keep it in
+  `render.py` so formatting stays in one place. `$0.00` saved is fine (no receipts yet).
+- Sort order unchanged (by `usd` desc), TOTAL row last.
+
+`--json` must include the new fields in both per-group and total objects, e.g.
+`{"groups": {"auth-refactor": {..., "saved_usd": 5.80, "net_usd": 3.66}}, "total":
+{..., "saved_usd": 5.80, "net_usd": 2.61}}`. Omit `saved_usd`/`net_usd` keys entirely
+for dimensions that don't attribute (don't emit `0.0` and imply a real zero).
+
+### 3.4 Signature
+
+Keep it additive — don't break existing callers:
+
+```python
+def summarize(root, pol, dim="route", since=None) -> dict:
+    # ...existing call rollup...
+    if dim in ("task", "agent"):
+        # second pass over receipts → group["saved_usd"]; net per group + total
+    return {"dim": dim, "since": since, "groups": groups, "total": total}
+```
+
+`render_report` branches on whether the groups carry `saved_usd` to decide column set.
+
+---
+
+## 4. Part B — bare `cage` banner
+
+### 4.1 Behavior
+
+`cage` with **no subcommand** prints a one-look overview instead of an argparse error:
+
+```
+spent $3.19  ·  saved $5.80  ·  net +$2.61  ·  92.5k tokens   (7d)
+  drill:  cage report --by agent   ·   cage why <call>   ·   cage attrib --task <t>
+```
+
+- Headline = totals over a default window (use the same default as `report` with no
+  `--since`: the full ledger; if you want a sane default window, `SINCE_WINDOW_DAYS`
+  from `constants.py` already exists — reuse it, don't hard-code). State the window in
+  the banner so it's never ambiguous.
+- `saved` = the same non-human receipt total as Part A, computed over the whole ledger
+  (no dimension). `net = saved − spent`.
+- Empty ledger ⇒ a friendly nudge, matching `report`'s
+  `"cage: no calls recorded yet — meter some traffic first."` Don't print a banner of zeros.
+- The `drill:` hint line is static text.
+
+### 4.2 Wiring
+
+`cli.py` currently does `sub = p.add_subparsers(dest="cmd", required=True)`. Change
+`required=True` → `required=False`, and in `main()`:
+
+```python
+def main(argv=None):
+    args = build_parser().parse_args(argv)
+    if getattr(args, "fn", None) is None:        # no subcommand
+        return clicmds.cmd_overview(args)
+    return args.fn(args)
+```
+
+Add `cmd_overview` in `clicmds.py` and an `overview(root, pol)` in `report.py` (reuse
+`summarize` internals; don't duplicate the receipt-sum logic — factor a small helper
+both call). `--json` on bare `cage` should emit the headline dict.
+
+Keep `cage --help` and `cage --version` working (they short-circuit before dispatch —
+verify after the `required` change).
+
+---
+
+## 5. Files to touch
+
+- `cage/report.py` — receipt pass in `summarize`; column logic in `render_report`;
+  new `overview`.
+- `cage/render.py` — `signed_usd` (or `signed=` on `usd`).
+- `cage/clicmds.py` — `cmd_overview`.
+- `cage/cli.py` — `required=False`; `main()` no-subcommand branch.
+- `tests/` — see §6.
+
+Do **not** touch: `schema.py`, `convert.py`, `ledger.py`, the policy contract, or any
+write path. This is a read-surface change only.
+
+---
+
+## 6. Acceptance criteria
+
+Ship only when all pass:
+
+1. `just test` green (112 → 112 + new). No existing test edited except to add columns.
+2. **Regression:** `report --by model|route|provider|day` output is **byte-identical**
+   to before this change (add a test asserting this if one doesn't exist).
+3. `report --by task` on the `cage demo` seed shows `saved` and `net` with the exact
+   §4.4 numbers; `net` carries a sign; TOTAL row sums correctly.
+4. `report --by agent` attributes savings via the call; receipts with no `call` land in
+   `"—"` but still count in TOTAL.
+5. Human receipts (`tool="human"`) are excluded from `report` savings (assert a seeded
+   human receipt does **not** move the `report` `saved` total, but **does** show in
+   `cage human`).
+6. `report --json --by task` includes `saved_usd`/`net_usd`; `--json --by model` does not.
+7. Bare `cage` prints the banner; `cage --json` emits the headline dict; empty ledger
+   prints the nudge, not zeros.
+8. `cage --help` and `cage --version` still work after the `required=False` change.
+9. **Determinism:** run `report --by task` twice on the same ledger ⇒ identical bytes.
+
+---
+
+## 7. Out of scope (don't gold-plate)
+
+- Savings attribution for `route`/`model`/`provider`/`day` — explicitly punted (§3.1).
+- Any change to how receipts are recorded or to `convert`/`schema`.
+- Touching `roi`/`attrib`/`human` — they stay as the drill-downs.
+- The §8 `ops` consolidation (`recommend`/`forecast`/`quality`/`regression`) — separate
+  handoff.
+
+---
+
+## 8. Ready-to-paste prompt for Claude Code
+
+> Implement the spent-and-saved report change specified in
+> `docs/handoff-report-spent-and-saved.md`. Read that file and `CLAUDE.md` first.
+>
+> Scope, in order:
+> 1. `report.py`: in `summarize`, when `dim in ("task","agent")`, add a second pass over
+>    `ledger.since(ledger.receipts(root), since)`, skipping `tool=="human"` receipts,
+>    converting each via `convert.saved_usd(r, calls.get(r.get("call"), {}), pol)`, and
+>    accumulating `saved_usd` per group + a `net_usd = saved_usd - usd` per group and on
+>    the total. Group `task` on `r["task"]`, `agent` on the receipt's call's agent
+>    (missing call ⇒ `"—"` bucket, still counted in total). Leave other dimensions
+>    unchanged.
+> 2. `render.py`: add signed-USD formatting for the `net` column.
+> 3. `report.render_report`: show `saved`/`net` columns only when the groups carry
+>    `saved_usd`; otherwise render byte-identically to today.
+> 4. `report.overview` + `clicmds.cmd_overview` + `cli.py` `required=False` and a
+>    no-subcommand branch in `main()` that prints the headline banner from §4.
+> 5. Tests in `tests/` covering every item in §6 of the handoff.
+>
+> Hard constraints: $0/stdlib-only, derive-time only (never rewrite the ledger),
+> deterministic (no clocks/random; assert exact numbers), unit→USD only through
+> `convert.saved_usd`, fail-open on a truncated receipt tail. Don't touch `schema.py`,
+> `convert.py`, `ledger.py`, or any write path.
+>
+> Produce a plan first and show me the diff before running anything beyond `just test`.
+> When done, run `just test` and `cage demo && cage report --by task` and paste the output.

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 
 
@@ -21,6 +22,13 @@ def bundled_data_dir() -> Path:
 
 def claude_home() -> Path:
     return Path(os.environ.get("CLAUDE_CONFIG_DIR", Path.home() / ".claude"))
+
+
+def claude_project_slug(project: Path) -> str:
+    """The `~/.claude/projects/<slug>` dir name Claude Code derives from a repo path:
+    the absolute path with every non-alphanumeric char replaced by ``-`` (verified
+    empirically against `~/.claude/projects/`)."""
+    return re.sub(r"[^a-zA-Z0-9]", "-", str(project.resolve()))
 
 
 def codex_home() -> Path:

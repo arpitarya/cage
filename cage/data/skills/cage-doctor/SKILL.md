@@ -21,8 +21,8 @@ setup with the built-in health check — never eyeball files yourself.
      `bin/` not yet on PATH in this shell). Cage still works.
    - `✗ fail` — broken (no `.cage/`, policy won't parse, ledger not writable).
 3. **Map each finding to the fix**, don't just relay it:
-   - `footprint ✗ no .cage/` → run **`cage adopt`** (full setup) or `cage init`.
-   - `hooks · none wired` → `cage adopt` or `cage hooks install`.
+   - `footprint ✗ no .cage/` → run **`cage setup`** (guided) or `cage init` (scaffold only).
+   - `hooks · none wired` → `cage setup` (wizard) or `cage setup --wire-only --<agent>` (wiring is opt-in).
    - `interceptor · bin/ not on PATH` → tell the user to open a new shell (the PATH
      line was added to their shell rc).
    - `policy ✗` / `ledger ✗` → surface the exact error string from the detail.

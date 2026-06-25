@@ -1,11 +1,13 @@
-"""`cage adopt` — full per-project setup in one command (plan §6).
+"""Per-project setup engine — the project-scaffold half of `cage setup` (plan §6).
 
+Drives `cage setup --project-only` (and the project steps of the guided wizard).
 Everything a consumer app needs to start metering, with no repo to clone — it all
 ships in the `cage-flux` PyPI package:
 
   1. `cage init`           — scaffold .cage/ (policy + gitignored ledger).
-  2. agent wiring          — wire claude/codex/copilot/kiro symmetrically (unless
-     --no-hooks); pass `surfaces` to pick a subset. One ledger, four surfaces.
+  2. agent wiring          — **opt-in**: wires only the surfaces named in `surfaces`
+     (e.g. `--claude`). With no surface flag, no agent is wired — that is a separate,
+     explicit step (`cage setup --wire-only <agent>`). One ledger, many surfaces.
   3. graphify interceptor  — drop bin/graphify (routes `graphify query…` through
      `cage graphify`) and add bin/ to the shell rc PATH (unless --no-graphify).
 
@@ -51,11 +53,15 @@ def _wire_path(root: Path) -> str | None:
     return str(rc)
 
 
-def run(root: Path, *, hooks: bool = True, graphify: bool = True,
+def run(root: Path, *, graphify: bool = True,
         surfaces: tuple[str, ...] | None = None) -> dict:
-    """Adopt cage into ``root``. Each key present only if that step ran."""
+    """Set cage up in ``root``. Each key present only if that step ran.
+
+    Agent wiring is opt-in: ``out["hooks"]`` appears only when ``surfaces`` names
+    at least one agent. With no surface flag this scaffolds + (optionally) the
+    graphify shim, but touches no agent config."""
     out: dict[str, object] = {"init": initcmd.run(root)["footprint"]}
-    if hooks:
+    if surfaces:
         out["hooks"] = agents.install(root, surfaces)
     if graphify:
         if shim := _install_shim(root):

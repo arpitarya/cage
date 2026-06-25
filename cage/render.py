@@ -6,6 +6,11 @@ def usd(x: float) -> str:
     return f"${x:,.4f}"
 
 
+def signed_usd(x: float) -> str:
+    """Like ``usd`` but always carries an explicit sign (for a net win/loss column)."""
+    return f"{'+' if x >= 0 else '-'}${abs(x):,.4f}"
+
+
 def tok(n: float) -> str:
     return f"{int(round(n)):,}"
 

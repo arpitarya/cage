@@ -97,7 +97,7 @@ refs/notes/cage-provenance, written by CI alone (plan §3.5).
   (`cage origin <sha> --attest human`), always paired with `method="heuristic"`
   (enforced at `make_provenance` construction). Captured by a `PostToolUse` hook
   (buffers edits per session) resolved at a `post-commit` git hook
-  ([gitcommithook.py](cage/gitcommithook.py), installed by `cage adopt`/`agents.install`
+  ([gitcommithook.py](cage/gitcommithook.py), installed by `cage setup`/`agents.install`
   alongside the Claude Code hooks) into the highest-trust `hooked` row, with a
   `SessionEnd`-time transcript fallback ([transcript.py](cage/transcript.py)
   `parse_provenance`) for what the live hook missed. The local jsonl is a **buffer
@@ -150,3 +150,13 @@ each agent only needs thin idiomatic wiring (`agents.py` orchestrates):
 - **AlphaForge Anton (Orff)** — first consumer. Anton's `LLMGateway` records each
   `ProviderResponse` via a fail-open `cage_meter` adapter (`anton/docs/cage.md`).
   Cage is wired there as an optional `[cage]` extra (uv path source).
+
+<!-- cage:start -->
+## Cage — LLM cost & savings ledger
+
+This project meters LLM traffic into `.cage/` (a *flux*: $0, deterministic).
+
+- Spend so far: `cage report` · per-tool savings: `cage attrib` · budget: `cage budget`
+- The ledger carries token *counts*, never prompt text — PII-safe by construction.
+- Edit prices / budgets / pipeline order in `.cage/policy.toml`.
+<!-- cage:end -->

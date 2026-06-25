@@ -24,8 +24,9 @@ _OUT = 1500    # output held constant
 
 def seed(root: Path) -> str:
     actual_in = _BASE + sum(w for _, _, w, _ in _SLICES)
+    # Sonnet ($3/M in, $15/M out) — the rates the plan §4.4 numbers were computed at.
     call_id = metering.record_call(
-        route="code-edit", provider="anthropic", model="claude-opus-4-8",
+        route="code-edit", provider="anthropic", model="claude-sonnet-4-6",
         tokens_in=actual_in, tokens_out=_OUT, task=TASK, agent="claude-code",
         session="demo", root=root)
     for tool, without, with_, method in _SLICES:

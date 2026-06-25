@@ -3,11 +3,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from cage import (adoptcmd, agents, attribution, budget, demo, doctorcmd,
+from cage import (agents, attribution, budget, demo, doctorcmd,
                   explain, forecast, graphifymeter, hooks, humanview, initcmd,
                   ledger, matrix, mcpserver, metercmd, metering, notessync, origin,
                   paths, policy, provenance, proxy, quality, recommend, regression,
-                  report, roi, serve, setupcmd, tasks, trend, transcript, verifycmd)
+                  report, roi, serve, tasks, trend, transcript, verifycmd, wizard)
 from cage.cliutil import emit, root
 
 
@@ -33,6 +33,12 @@ def cmd_init(_args) -> int:
 def cmd_report(args) -> int:
     rep = report.summarize(root(), _policy(), dim=args.by, since=args.since)
     return emit(args, rep, report.render_report(rep))
+
+
+def cmd_overview(args) -> int:
+    """Bare `cage` — the one-look spent/saved/net headline (§4). No subcommand."""
+    o = report.overview(root(), _policy())
+    return emit(args, o, report.render_overview(o))
 
 
 def cmd_attrib(args) -> int:
@@ -189,34 +195,59 @@ def cmd_mcp(_args) -> int:
     return mcpserver.serve()
 
 
-def cmd_setup(_args) -> int:
-    for agent, where in setupcmd.run().items():
-        print(f"✔ {agent:<8} → {where}")
-    print("Next, in a project: `cage adopt` "
-          "(init + wire claude/codex/copilot/kiro + graphify interceptor).")
-    return 0
+def cmd_setup(args) -> int:
+    import sys
 
+    here = root()
 
-def cmd_adopt(args) -> int:
-    picked = tuple(s for s in agents.SURFACES if getattr(args, s, False)) or None
-    res = adoptcmd.run(root(), hooks=args.hooks, graphify=args.graphify,
-                       surfaces=picked)
-    if getattr(args, "json", False):
-        import json
-        print(json.dumps(res))
+    # Handle --status: report current wiring and exit
+    if getattr(args, "status", False):
+        for surface, on in agents.status(here).items():
+            print(f"  {'✔' if on else '·'} {surface:<8} {'wired' if on else 'not wired'}")
         return 0
-    print(f"✔ .cage/ ready → {res['init']}")
-    if "hooks" in res:
-        wired = ", ".join(res["hooks"])  # one ledger, the surfaces actually wired
-        print(f"✔ agent metering + MCP wired for: {wired}")
-    if "shim" in res:
-        print(f"✔ graphify interceptor → {res['shim']}")
-        if res.get("path"):
-            print(f"✔ bin/ added to PATH in {res['path']} — open a new shell to meter graphify")
-    elif args.graphify:
-        print("· graphify not installed — interceptor skipped")
-    print("Done. Verify with `cage doctor`; then `cage report` / `cage matrix`.")
+
+    # Handle --wire-only: agent wiring only, no scaffold/graphify
+    if getattr(args, "wire_only", False):
+        flagged = tuple(s for s in agents.SURFACES if getattr(args, s, False))
+        if not flagged:
+            print("Pick an agent to wire: " + " | ".join(agents.SURFACES))
+            print("e.g. `cage setup --wire-only --claude`")
+            return 2
+        print("✔ Cage wired into:")
+        for surface, where in agents.install(here, flagged).items():
+            print(f"  {surface:<8} → {', '.join(where.values())}")
+        print("Metering: claude=transcript hook · others=`cage meter -- <cmd>` or `cage proxy`.")
+        return 0
+
+    # Handle --project-only: scaffold + graphify + PATH, no global skill
+    project_only = getattr(args, "project_only", False)
+    if project_only:
+        # Override the flags for project-only mode
+        args.skill = False
+        args.project = True
+        args.graphify = getattr(args, "graphify", True)
+
+    # Standard setup: interactive wizard or flagged agents
+    flagged = tuple(s for s in agents.SURFACES if getattr(args, s, False))
+    if not flagged:
+        if not sys.stdin.isatty():
+            print("Pick an agent: " + " | ".join(agents.SURFACES))
+            print("e.g. `cage setup --claude`  (or run `cage setup` in a terminal "
+                  "for the guided wizard)")
+            return 2
+        plans = [wizard.interactive_plan()]
+    else:
+        plans = [{"agent": a, "skill": args.skill, "project": args.project,
+                  "graphify": args.graphify} for a in flagged]
+
+    for plan in plans:
+        print(f"\n▸ cage setup — {plan['agent']}")
+        for line in wizard.apply(here, **plan):
+            print(f"  {line}")
+    print("\nDone. Verify with `cage doctor`; then `cage report`.")
     return 0
+
+
 
 
 def cmd_doctor(args) -> int:
@@ -230,23 +261,11 @@ def cmd_doctor(args) -> int:
             print(f"  {glyph[c['level']]} {c['name']:<12} {c['detail']}")
         verdict = {"ok": "Cage is set up and working.",
                    "warn": "Cage works; some optional wiring is missing (see ·).",
-                   "fail": "Cage setup is broken (see ✗) — run `cage adopt`."}
+                   "fail": "Cage setup is broken (see ✗) — run `cage setup`."}
         print(f"\n{glyph[res['status']]} {verdict[res['status']]}")
     return 1 if res["status"] == "fail" else 0
 
 
-def cmd_hooks(args) -> int:
-    here = root()
-    if args.action == "status":
-        for surface, on in agents.status(here).items():
-            print(f"  {'✔' if on else '·'} {surface:<8} {'wired' if on else 'not wired'}")
-        return 0
-    picked = tuple(s for s in agents.SURFACES if getattr(args, s, False)) or None
-    print("✔ Cage wired into:")
-    for surface, where in agents.install(here, picked).items():
-        print(f"  {surface:<8} → {', '.join(where.values())}")
-    print("Metering: claude=transcript hook · others=`cage meter -- <cmd>` or `cage proxy`.")
-    return 0
 
 
 def cmd_notes_sync(args) -> int:
@@ -297,3 +316,36 @@ def cmd_import_codex(args) -> int:
         total += hooks.append_new(here, transcript.parse_codex_calls(f))
     print(f"✔ imported {total} Codex call(s) from {len(files)} rollout file(s).")
     return 0
+
+
+def cmd_import_claude(args) -> int:
+    """Meter Claude Code with no hooks/MCP — pull the transcripts it already writes
+    to disk. Idempotent (append_new dedupes on the per-turn call id), fail-open per
+    file (an unreadable transcript is skipped, never raised), $0/offline."""
+    here = root()
+    if args.path:
+        src = Path(args.path)
+    elif args.project:
+        src = paths.claude_home() / "projects" / paths.claude_project_slug(Path(args.project))
+    else:
+        src = paths.claude_home() / "projects"
+    files = sorted(src.glob("**/*.jsonl")) if src.is_dir() else [src]
+    cut = ledger.since_cutoff(args.since)  # reuses constants.SINCE_WINDOW_DAYS — no new literal
+    if cut is not None:
+        files = [f for f in files if _mtime_utc(f) is not None and _mtime_utc(f) >= cut]
+    total = 0
+    for f in files:
+        try:
+            total += hooks.append_new(here, transcript.parse_calls(f, session=f.stem))
+        except Exception:  # fail-open: a broken/unreadable transcript never aborts the scan
+            continue
+    print(f"✔ imported {total} Claude call(s) from {len(files)} transcript(s).")
+    return 0
+
+
+def _mtime_utc(f: Path):
+    import datetime as _dt
+    try:
+        return _dt.datetime.fromtimestamp(f.stat().st_mtime, _dt.timezone.utc)
+    except OSError:
+        return None

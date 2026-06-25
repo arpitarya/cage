@@ -2,10 +2,13 @@
 
 # Prices in USD per million tokens. `cache_read` is the discounted rate the
 # provider bills for prefix-cache *reads* (makes cache-alignment measurable).
+# Keys are short aliases; Claude Code stamps full dated ids
+# (`claude-sonnet-4-5-20250929`) which resolve to the matching family row by
+# longest shared prefix (policy.price_match) — opus never borrows a sonnet price.
 [prices.anthropic."claude-opus-4-8"]
-input = 3.00
-output = 15.00
-cache_read = 0.30
+input = 15.00
+output = 75.00
+cache_read = 1.50
 
 [prices.anthropic."claude-sonnet-4-6"]
 input = 3.00

@@ -31,8 +31,8 @@ def test_make_receipt_rejects_bad_enums():
 
 def test_call_cost_matches_plan_worked_example():
     pol = policy.load(None)
-    # §4.4 full-stack call: 8,600 in / 1,500 out on Opus → $0.0483.
-    cost = prices.call_cost_usd(pol, "anthropic", "claude-opus-4-8", 8600, 1500)
+    # §4.4 full-stack call: 8,600 in / 1,500 out on Sonnet ($3/$15) → $0.0483.
+    cost = prices.call_cost_usd(pol, "anthropic", "claude-sonnet-4-6", 8600, 1500)
     assert cost == pytest.approx(0.0483, abs=1e-6)
 
 
@@ -77,5 +77,5 @@ def test_policy_project_overrides_bundled(proj):
     fp.policy.write_text('[budgets]\nsession_usd = 9.5\n', encoding="utf-8")
     pol = policy.load(fp.policy)
     assert policy.budgets(pol)["session_usd"] == 9.5
-    # bundled prices still present after the merge
-    assert policy.price(pol, "anthropic", "claude-opus-4-8")["input"] == 3.00
+    # bundled prices still present after the merge (Opus corrected to $15/M input)
+    assert policy.price(pol, "anthropic", "claude-opus-4-8")["input"] == 15.00

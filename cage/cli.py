@@ -21,15 +21,15 @@ commands by category:
   human axis    human · human-record · trend     agent-vs-human $ and hours saved
   authorship    origin · notes-sync · verify     who wrote which files (§3.5)
   ops           quality · regression · recommend · forecast · outcome
-  setup         init · adopt · doctor · setup · hooks · proxy · meter · mcp · serve
-  meta          query · demo · graphify · import-codex
+  setup         init · doctor · setup · proxy · meter · mcp · serve
+  meta          query · demo · graphify · import-codex · import-claude
 
 examples:
   cage report --by model --since 7d        # where the spend went, last 7 days
   cage matrix --human                       # what each tool stack would cost vs a person
   cage human-record --task T --type feature # log the human alternative for a task
   cage query "how is human cost calculated" # explain any number with its live formula
-  cage adopt                                # wire cage into this project's agents
+  cage setup --claude                       # guided onboarding: scaffold + wire one agent
 
 Global flag: --json on any read command emits structured output (agent-as-user).
 Ask how anything works: `cage query "how does cage work"` — and how any value is
@@ -48,7 +48,9 @@ def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="cage", description=_DESCRIPTION, epilog=_EPILOG,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--version", action="version", version=f"cage {__version__}")
-    sub = p.add_subparsers(dest="cmd", required=True)
+    p.add_argument("--json", action="store_true", help="machine-readable output (bare cage: the headline dict)")
+    # required=False: bare `cage` (no subcommand) prints the headline banner via main().
+    sub = p.add_subparsers(dest="cmd", required=False, metavar="<command>")
 
     sub.add_parser("init", help="scaffold .cage/ (policy + gitignored ledger)").set_defaults(fn=clicmds.cmd_init)
 
@@ -184,29 +186,43 @@ def build_parser() -> argparse.ArgumentParser:
     gf.set_defaults(fn=clicmds.cmd_graphify)
 
     sub.add_parser("mcp", help="serve the ledger over MCP (stdio JSON-RPC) for any agent").set_defaults(fn=clicmds.cmd_mcp)
-    sub.add_parser("setup", help="install the global /cage asset into all agent homes (claude/codex/copilot/kiro)").set_defaults(fn=clicmds.cmd_setup)
-
-    ad = sub.add_parser("adopt", help="full per-project setup: init + agent wiring (claude/codex/copilot/kiro) + graphify interceptor + PATH")
-    ad.add_argument("--no-hooks", dest="hooks", action="store_false", help="skip all agent wiring (claude/codex/copilot/kiro)")
-    ad.add_argument("--no-graphify", dest="graphify", action="store_false", help="skip the graphify interceptor")
+    st = sub.add_parser("setup", help="guided onboarding wizard: skill + init + per-project wiring + graphify for one agent (interactive, or drive it with --<agent>)",
+                        epilog="examples:\n"
+                               "  cage setup                      # interactive: pick an agent, y/n each step\n"
+                               "  cage setup --claude             # non-interactive: all steps for claude\n"
+                               "  cage setup --project-only --claude  # scaffold + graphify only, no global skill\n"
+                               "  cage setup --wire-only --claude     # agent wiring only, no scaffold\n"
+                               "  cage setup --status             # show which agents are wired",
+                        formatter_class=argparse.RawDescriptionHelpFormatter)
     for _s in SURFACES:
-        ad.add_argument(f"--{_s}", action="store_true", help=f"wire only the {_s} surface (default: all four)")
-    ad.add_argument("--json", action="store_true", help="machine-readable output")
-    ad.set_defaults(fn=clicmds.cmd_adopt)
+        st.add_argument(f"--{_s}", action="store_true", help=f"set up the {_s} agent non-interactively (skips the wizard)")
+    st.add_argument("--project-only", action="store_true", help="scaffold .cage/ + graphify + PATH only; skip the global skill")
+    st.add_argument("--wire-only", action="store_true", help="wire agent(s) only; skip scaffold and graphify")
+    st.add_argument("--status", action="store_true", help="report which agents are wired (no changes)")
+    st.add_argument("--no-skill", dest="skill", action="store_false", help="skip installing the global /cage skill")
+    st.add_argument("--no-project", dest="project", action="store_false", help="skip per-project .cage/ scaffold + hook wiring")
+    st.add_argument("--no-graphify", dest="graphify", action="store_false", help="skip the graphify interceptor")
+    st.set_defaults(fn=clicmds.cmd_setup)
 
     dr = sub.add_parser("doctor", help="verify this project's Cage setup is correct and working")
     dr.add_argument("--json", action="store_true", help="machine-readable output")
     dr.set_defaults(fn=clicmds.cmd_doctor)
 
-    hk = sub.add_parser("hooks", help="wire Cage into agents (claude/codex/copilot/kiro)")
-    hk.add_argument("action", choices=["install", "status"], nargs="?", default="install")
-    for _s in SURFACES:
-        hk.add_argument(f"--{_s}", action="store_true", help=f"only the {_s} surface")
-    hk.set_defaults(fn=clicmds.cmd_hooks)
-
     ic = sub.add_parser("import-codex", help="best-effort meter a Codex rollout JSONL (file or dir)")
     ic.add_argument("path", help="a rollout-*.jsonl file or ~/.codex/sessions dir")
     ic.set_defaults(fn=clicmds.cmd_import_codex)
+
+    icl = sub.add_parser("import-claude", help="meter Claude Code from its on-disk transcripts (no hooks/MCP needed)",
+                         epilog="examples:\n"
+                                "  cage import-claude                       # every project on this machine\n"
+                                "  cage import-claude --project .           # only this repo's sessions\n"
+                                "  cage import-claude --path run.jsonl      # one transcript\n"
+                                "  cage import-claude --since 7d            # only transcripts touched in 7d",
+                         formatter_class=argparse.RawDescriptionHelpFormatter)
+    icl.add_argument("--path", help="a transcript .jsonl file or dir to scan (default: ~/.claude/projects)")
+    icl.add_argument("--project", help="restrict to one repo's sessions (resolves its ~/.claude/projects slug)")
+    icl.add_argument("--since", metavar="WINDOW", help="only transcripts modified within a window like 7d / 24h / 2w")
+    icl.set_defaults(fn=clicmds.cmd_import_claude)
 
     ns = sub.add_parser("notes-sync", help="merge buffered provenance into refs/notes/cage-provenance (§3.5)",
                         epilog="example:\n"
@@ -231,7 +247,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("verify", help="report-only consistency check over the provenance ledger (never fails the build)").set_defaults(fn=clicmds.cmd_verify)
 
-    # Internal hook entrypoints (wired by `cage hooks install`, not for direct use).
+    # Internal hook entrypoints (wired by `cage setup --wire-only`, not for direct use).
     sub.add_parser("hook-session-start").set_defaults(fn=lambda a: hooks.session_start())
     sub.add_parser("hook-session-end").set_defaults(fn=lambda a: hooks.session_end())
     sub.add_parser("hook-post-tool-use").set_defaults(fn=lambda a: hooks.post_tool_use())
@@ -244,4 +260,6 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if getattr(args, "fn", None) is None:  # no subcommand → the bare-`cage` headline (§4)
+        return clicmds.cmd_overview(args)
     return args.fn(args)

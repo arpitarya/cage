@@ -4,20 +4,28 @@ Cage meters whatever speaks the OpenAI/Anthropic wire format and reads the ledge
 over MCP. One ledger contract, four surfaces — nothing about an agent is hardcoded.
 
 ```bash
-cage setup            # install a global /cage asset into every agent home (once):
-                      #   claude/codex → skill · copilot → prompt · kiro → steering
 cd your-project
-cage init             # scaffold .cage/ (policy + gitignored ledger)
-cage hooks install    # wire claude + codex + copilot + kiro (or pass --claude etc.)
+cage setup            # guided wizard: pick ONE agent, then y/n each step
+                      #   (global skill · scaffold .cage/ · wire hooks+MCP · graphify)
+# non-interactive equivalent:
+cage setup --claude   # all steps for claude; --no-skill/--no-project/--no-graphify to trim
 ```
 
-`cage setup` is symmetric across all four agents (paths are env-overridable —
-`CAGE_VSCODE_USER` for Copilot's prompt dir, `KIRO_HOME` for Kiro). The per-project
-MCP/hook wiring is `cage hooks install`.
+`cage setup` is the front door — interactive in a terminal, flag-driven otherwise.
+It wires only the agent you name; nothing is installed for an agent by default.
+Global-asset paths are env-overridable (`CAGE_VSCODE_USER` for Copilot's prompt dir,
+`KIRO_HOME` for Kiro).
 
-`cage adopt` is the one-command wrapper for a project: `cage init` + agent wiring
-(all four surfaces by default — pass `--claude`/`--codex`/`--copilot`/`--kiro` for a
-subset, or `--no-hooks` to skip wiring) + the graphify interceptor. Idempotent.
+The granular commands underneath, if you want them directly:
+
+```bash
+cage init                     # scaffold .cage/ only (no agent touched)
+cage adopt [--claude]         # init + graphify shim; agent wiring opt-in via --<agent>
+cage hooks install --claude   # wire just one agent's metering hooks + MCP (errors if no agent)
+```
+
+Agent wiring is **opt-in everywhere**: `cage adopt`/`cage hooks install` with no
+`--<agent>` flag wire nothing and tell you to pick one. All steps are idempotent.
 
 ## Claude Code
 
@@ -28,6 +36,10 @@ subset, or `--no-hooks` to skip wiring) + the graphify interceptor. Idempotent.
 - **Read:** the `cage` MCP server is wired in `.mcp.json`; the `/cage` skill answers
   "what did this cost / what saved money" from the ledger.
 - **Alt meter (real-time, for budget blocking):** `export ANTHROPIC_BASE_URL=$(cage proxy)`.
+- **Alt meter (no hooks):** `cage import-claude` parses the transcripts Claude Code
+  already writes to `~/.claude/projects/` — same rows the SessionEnd hook would
+  produce, off the request path. `--project <dir>` scopes it to one repo, `--since 7d`
+  to recent sessions. Idempotent (deduped on the per-turn id), so it's safe on a cron.
 
 ## Codex
 
@@ -50,6 +62,20 @@ subset, or `--no-hooks` to skip wiring) + the graphify interceptor. Idempotent.
   that shells `cage report` on save.
 - **Read:** `cage hooks install --kiro` adds the `cage` MCP server to
   `.kiro/settings/mcp.json` and a steering doc at `.kiro/steering/cage.md`.
+
+## Restricted orgs (no hooks / no MCP)
+
+Some orgs block Claude Code hooks and/or MCP servers by policy. Cage still works —
+the two questions decouple:
+
+- **Hooks blocked (can't capture):** meter off the request path instead. Either
+  `cage import-claude` (pull the on-disk transcripts after the fact — cron/CI/login
+  script friendly, idempotent) or `cage proxy` (wire-level: point
+  `ANTHROPIC_BASE_URL` at it and record `usage` live). Either path fills the same
+  ledger the SessionEnd hook would.
+- **MCP blocked (can't read in-agent):** this costs only the *agent-facing* read
+  surface (the `/cage` skill / MCP tools). The `cage` CLI reads the ledger directly,
+  so `cage report` / `attrib` / `matrix` / `budget` are unaffected.
 
 ## The universal fallbacks
 

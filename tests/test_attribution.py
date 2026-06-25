@@ -12,7 +12,7 @@ def test_attrib_reproduces_plan_marginals(seeded):
     saved = {s["tool"]: s["saved_tokens"] for s in data["steps"]}
     assert saved == {"graphify": 27000, "fux": 6400, "compressor": 8000}
     assert data["total_saved_tokens"] == 41400
-    # 41,400 input tokens at Opus $3/M = $0.1242 (plan §4.4 total).
+    # 41,400 input tokens at Sonnet $3/M = $0.1242 (plan §4.4 total).
     assert data["total_saved_usd"] == pytest.approx(0.1242, abs=1e-6)
 
 

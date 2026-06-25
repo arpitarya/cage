@@ -8,7 +8,7 @@ from cage import ledger, metering as meter
 
 def test_record_call_computes_cost_from_policy(proj):
     cid = meter.record_call(route="code-edit", provider="anthropic",
-                            model="claude-opus-4-8", tokens_in=8600, tokens_out=1500,
+                            model="claude-sonnet-4-6", tokens_in=8600, tokens_out=1500,
                             task="t", root=proj)
     assert cid.startswith("c_")
     (call,) = ledger.calls(proj)

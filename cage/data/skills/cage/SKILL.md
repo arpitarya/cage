@@ -22,7 +22,7 @@ wired) to answer cost/savings/budget questions from real recorded data — never
    - **"explain this call"** → `cage why <call-id>`.
 2. Every command takes `--json` for machine-readable output.
 3. If `cage report` is empty, metering isn't recording yet — point the user at
-   `cage hooks install` (Claude Code/Codex) or `cage meter -- <cmd>` (any agent).
+   `cage setup --wire-only` (Claude Code/Codex) or `cage meter -- <cmd>` (any agent).
 
 ## Don't
 

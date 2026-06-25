@@ -14,7 +14,7 @@ import shutil
 import tempfile
 from pathlib import Path
 
-from cage import agents, ledger, paths, policy, schema
+from cage import agents, ledger, paths, policy, prices, schema
 
 _OK, _WARN, _FAIL = "ok", "warn", "fail"
 _RANK = {_OK: 0, _WARN: 1, _FAIL: 2}
@@ -29,7 +29,7 @@ def _tool() -> tuple[str, str]:
 
 def _footprint(root: Path) -> tuple[str, str]:
     if not (root / ".cage").is_dir():
-        return _FAIL, "no .cage/ — run `cage adopt` (or `cage init`)"
+        return _FAIL, "no .cage/ — run `cage setup` (or `cage init`)"
     return _OK, f".cage/ present at {root / '.cage'}"
 
 
@@ -44,8 +44,35 @@ def _policy(root: Path) -> tuple[str, str]:
 def _hooks(root: Path) -> tuple[str, str]:
     wired = [s for s, on in agents.status(root).items() if on]
     if not wired:
-        return _WARN, "no agent hooks wired — `cage adopt` or `cage hooks install`"
+        return _WARN, ("no agent hooks wired — `cage setup` (wizard) or `cage setup --wire-only --<agent>`. "
+                       "Hooks blocked by your org? Meter Claude Code with `cage import-claude` "
+                       "(pulls on-disk transcripts) or any client via `cage proxy`")
     return _OK, f"metering hooks wired: {', '.join(wired)}"
+
+
+def _pricing(root: Path) -> tuple[str, str]:
+    """Scan recorded calls for models that bill $0 with no exact *or* family price
+    row — the silent-$0 sharp edge. A wrong $0 must read as UNPRICED here, not hide."""
+    try:
+        pol = policy.load(paths.Footprint(root).policy)
+        calls = ledger.calls(root)
+    except Exception:  # noqa: BLE001 — a broken policy/ledger is reported by other checks
+        return _OK, "no priced ledger to check yet"
+    if not calls:
+        return _OK, "no calls recorded yet — nothing to price-check"
+    unpriced, family = set(), set()
+    for c in calls:
+        _, match, _ = prices.call_usd_match(pol, c)
+        tag = f"{c.get('provider') or '—'}/{c.get('model') or '—'}"
+        if match == "none":
+            unpriced.add(tag)
+        elif match == "family":
+            family.add(tag)
+    if unpriced:
+        return _WARN, "UNPRICED models billing $0 (add a price row): " + ", ".join(sorted(unpriced))
+    if family:
+        return _OK, "all models priced (some by family approx): " + ", ".join(sorted(family))
+    return _OK, "all recorded models have an exact price row"
 
 
 def _interceptor(root: Path) -> tuple[str, str]:
@@ -81,6 +108,7 @@ def run(root: Path) -> dict:
         ("tool", *_tool()),
         ("footprint", *_footprint(root)),
         ("policy", *_policy(root)),
+        ("pricing", *_pricing(root)),
         ("hooks", *_hooks(root)),
         ("interceptor", *_interceptor(root)),
         ("ledger", *_ledger_roundtrip()),

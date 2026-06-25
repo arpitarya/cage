@@ -55,15 +55,15 @@ Per-tool savings any meter can attempt. The part no cost dashboard does is the r
 ```bash
 pip install cage-flux           # the CLI, zero third-party deps
 cd your-project
-cage init                       # scaffold .cage/ (policy + gitignored ledger)
-cage adopt                      # wire all four agents + the graphify interceptor
+cage setup                      # guided wizard: pick an agent, wire skill + hooks + graphify
+# or non-interactively: cage setup --claude   (just the one agent you use)
 cage demo                       # seed the worked example
 cage matrix                     # the counterfactual permutation table
 cage human                      # agent-vs-human: $ and hours saved
 cage query "how is human cost calculated"   # explain any number — live formula, $0
 ```
 
-> **Adopting into a project** is one idempotent command — `cage adopt` wires Claude Code / Codex / Copilot / Kiro onto one ledger and drops a transparent `bin/graphify` interceptor. Pass `--claude` (etc.) for a subset, `--no-graphify` / `--no-hooks` to skip parts.
+> **Adopting into a project** — `cage setup` is the single front door: it asks which agent you use (Claude Code / Codex / Copilot / Kiro) and wires only that one onto the ledger, step by step. Drive it non-interactively with `cage setup --claude` (`--no-skill` / `--no-project` / `--no-graphify` to skip parts). For finer control: `cage setup --project-only` scaffolds `.cage/` + the `bin/graphify` interceptor without the global skill (agent wiring opt-in via `--<agent>`), `cage setup --wire-only --claude` wires just one agent's hooks + MCP, and `cage setup --status` reports what's already wired.
 
 Metering from your own code is the library adapter — it targets the *protocol*, not any named client, and is fail-open (a metering error never breaks your call):
 
@@ -181,7 +181,10 @@ A tool earns rows in `attrib`/`matrix`/`roi` by filing a **savings receipt**, an
 
 ```bash
 cage init                      # scaffold .cage/ (policy + gitignored ledger)
-cage adopt [--no-graphify]     # per-project setup: wire 4 agents + graphify interceptor
+cage setup [--claude]          # guided onboarding: skill + init + wiring + graphify for one agent
+cage setup --project-only --claude   # scaffold + graphify + PATH only (no global skill)
+cage setup --wire-only --claude      # wire just one agent's metering hooks + MCP
+cage setup --status            # report which agents are wired (changes nothing)
 cage doctor --json             # verify this project's setup is correct (non-zero on failure)
 cage report --by model         # ledger rollup: spend by route / model / day / agent
 cage attrib --task ID          # per-tool marginal savings (sum of marginals = total)

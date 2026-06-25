@@ -7,13 +7,13 @@ from cage import attribution, convert, policy, roi, schema
 
 
 def _call():
-    return {"provider": "anthropic", "model": "claude-opus-4-8"}
+    return {"provider": "anthropic", "model": "claude-sonnet-4-6"}
 
 
 def test_saved_usd_dispatches_by_unit():
     pol = policy.load(None)
     call = _call()
-    # 1M input tokens on Opus ($3/M) == $3.00; a $3 usd receipt == $3.00; equal value.
+    # 1M input tokens on Sonnet ($3/M) == $3.00; a $3 usd receipt == $3.00; equal value.
     tokens = schema.make_receipt(tool="t", raw_alternative=1_000_000, actual=0, unit="tokens")
     usd = schema.make_receipt(tool="t", raw_alternative=3.0, actual=0.0, unit="usd")
     assert convert.saved_usd(tokens, call, pol) == pytest.approx(3.0, abs=1e-6)
