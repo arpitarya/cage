@@ -138,6 +138,17 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   `What's new` entry for the new version (don't skip versions), and refresh the
   "N tests passing" count in the README `$0` section + this file's `just test`
   comment. A shipped version with no changelog line is a release bug.
+- **Never publish from local. Every release ships a GitHub release, and the GitHub
+  release *is* the publish trigger.** The one true release flow: bump `__version__`
+  + changelog, commit + push `main`, tag `vX.Y.Z`, push the tag, then
+  `gh release create vX.Y.Z` with notes drawn from the README "What's new" entry.
+  Creating that GitHub release fires `.github/workflows/publish.yml` (`on: release:
+  published`), which builds and publishes to PyPI via **OIDC trusted publishing**
+  (no stored token, nothing to leak). **Do not run `uv publish` / `twine` / `cage`'s
+  own publish by hand — ever.** The CI pipeline is the sole publisher
+  (`skip-existing: true` makes it idempotent). A version on PyPI with no matching
+  GitHub release/tag — or published from a laptop — is a release bug. `uv build`
+  locally is fine for a smoke check, but never upload the artifacts.
 - Keep modules small and single-purpose (fux spirit). Tests live in `tests/`.
 
 ## Dev
