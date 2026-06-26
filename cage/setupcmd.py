@@ -1,15 +1,22 @@
-"""`cage setup` — install a global /cage asset into a chosen agent home (plan §6, §9.6).
+"""`cage setup` — install the /cage assets for a chosen agent (plan §6, §9.6).
 
-One-time global asset copy, per agent (per-project hook/MCP wiring is
-`cage hooks install`). The target agent is **explicit** — `cage setup` installs only
-the surfaces it is asked for, never all four by default:
+Asset copy, per agent (per-project hook/MCP wiring is `cage hooks install`). The
+target agent is **explicit** — `cage setup` installs only the surfaces it is asked
+for, never all four by default. Two scopes, same assets:
 
-  claude  → ~/.claude/skills/cage/        (slash-command skill)
-  codex   → ~/.codex/skills/cage/         (slash-command skill)
-  copilot → <vscode-user>/prompts/cage.prompt.md   (reusable Copilot prompt)
-  kiro    → ~/.kiro/steering/cage.md       (user steering doc)
+  scope=global (default — one machine-wide copy, every repo sees it):
+    claude  → ~/.claude/skills/cage/            (slash-command skill)
+    codex   → ~/.codex/skills/cage/             (slash-command skill)
+    copilot → <vscode-user>/prompts/cage.prompt.md   (reusable Copilot prompt)
+    kiro    → ~/.kiro/steering/cage.md           (user steering doc)
 
-Idempotent. Paths are env-overridable (CAGE_VSCODE_USER, KIRO_HOME, …).
+  scope=project (committed with the repo — the team gets it, nothing machine-wide):
+    claude  → <root>/.claude/skills/cage/
+    codex   → <root>/.codex/skills/cage/         (Codex scans repo .codex/skills, issue #21907)
+    copilot → <root>/.github/prompts/cage.prompt.md
+    kiro    → <root>/.kiro/steering/cage.md
+
+Idempotent. Global paths are env-overridable (CAGE_VSCODE_USER, KIRO_HOME, …).
 """
 from __future__ import annotations
 
@@ -37,29 +44,43 @@ def _copy_file(src: Path, dst: Path) -> None:
 _ASSETS = (("cage", "cage", "cage"), ("cage-doctor", "cage-doctor", "cage-doctor"))
 
 
-def run(surfaces: tuple[str, ...] | None = None) -> dict:
-    """Install the global assets for ``surfaces`` (default: all four).
+def _skill_base(name: str, project: bool, root: Path | None) -> Path:
+    """Skill-dir parent for a skills agent (claude/codex): repo `.<name>` vs home."""
+    if project:
+        return root / f".{name}"  # .claude / .codex at the repo root
+    return paths.claude_home() if name == "claude" else paths.codex_home()
 
-    The CLI layer requires an explicit choice; ``None`` (all four) is kept for
-    callers that genuinely want every agent."""
+
+def run(surfaces: tuple[str, ...] | None = None, *, scope: str = "global",
+        root: Path | None = None) -> dict:
+    """Install the assets for ``surfaces`` (default: all four).
+
+    ``scope="project"`` writes the assets into the repo at ``root`` (committed,
+    team-shared) instead of the machine-wide home. The CLI layer requires an
+    explicit choice; ``None`` (all four) is kept for callers that want every agent."""
+    project = scope == "project"
+    if project and root is None:
+        raise ValueError("project scope needs a root")
     picked = surfaces or SURFACES
     data = paths.bundled_data_dir()
     out: dict[str, str] = {}
 
     for skill, prompt, steer in _ASSETS:
-        for name, home in (("claude", paths.claude_home()), ("codex", paths.codex_home())):
+        for name in ("claude", "codex"):
             if name in picked:
-                dst = home / "skills" / skill
+                dst = _skill_base(name, project, root) / "skills" / skill
                 _copy_skill(data / "skills" / skill, dst)
                 out[f"{name}:{skill}"] = str(dst)
 
         if "copilot" in picked:
-            copilot = paths.vscode_user_dir() / "prompts" / f"{prompt}.prompt.md"
+            base = (root / ".github") if project else paths.vscode_user_dir()
+            copilot = base / "prompts" / f"{prompt}.prompt.md"
             _copy_file(data / "prompts" / f"{prompt}.prompt.md", copilot)
             out[f"copilot:{prompt}"] = str(copilot)
 
         if "kiro" in picked:
-            kiro = paths.kiro_home() / "steering" / f"{steer}.md"
+            steer_dir = (root / ".kiro") if project else paths.kiro_home()
+            kiro = steer_dir / "steering" / f"{steer}.md"
             _copy_file(data / "steering" / f"{steer}.md", kiro)
             out[f"kiro:{steer}"] = str(kiro)
     return out

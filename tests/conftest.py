@@ -6,6 +6,13 @@ import pytest
 from cage import demo, metering
 
 
+@pytest.fixture(autouse=True)
+def _bare_cage_in_hooks(monkeypatch):
+    """Pin `paths.cage_bin` to bare ``cage`` for tests. Production resolves it to the
+    absolute path (so GUI agents' hooks find it); tests assert the stable bare command."""
+    monkeypatch.setattr("cage.paths.cage_bin", lambda: "cage")
+
+
 @pytest.fixture
 def proj(tmp_path):
     """A clean project root (no .cage/ yet — the ledger auto-creates on append)."""

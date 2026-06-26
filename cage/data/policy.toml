@@ -5,10 +5,11 @@
 # Keys are short aliases; Claude Code stamps full dated ids
 # (`claude-sonnet-4-5-20250929`) which resolve to the matching family row by
 # longest shared prefix (policy.price_match) — opus never borrows a sonnet price.
+# Anthropic — Claude Code / Kiro (both run Claude models). Per-MTok, current rates.
 [prices.anthropic."claude-opus-4-8"]
-input = 15.00
-output = 75.00
-cache_read = 1.50
+input = 5.00
+output = 25.00
+cache_read = 0.50
 
 [prices.anthropic."claude-sonnet-4-6"]
 input = 3.00
@@ -16,14 +17,56 @@ output = 15.00
 cache_read = 0.30
 
 [prices.anthropic."claude-haiku-4-5"]
-input = 0.80
-output = 4.00
-cache_read = 0.08
+input = 1.00
+output = 5.00
+cache_read = 0.10
+
+# OpenAI — Codex CLI + Copilot (both emit gpt-5-family ids). A dotted minor like
+# `gpt-5.5` is its own family (only `gpt` is shared with `gpt-5`, < 2 segments), so
+# each minor needs its own row; `gpt-5-codex`/`gpt-5-mini` fall back to `gpt-5`/exact.
+[prices.openai."gpt-5"]
+input = 1.25
+output = 10.00
+cache_read = 0.125
+
+[prices.openai."gpt-5-mini"]
+input = 0.25
+output = 2.00
+cache_read = 0.025
+
+[prices.openai."gpt-5.5"]
+input = 5.00
+output = 30.00
+cache_read = 1.25
+
+[prices.openai."gpt-5.4"]
+input = 2.50
+output = 15.00
+cache_read = 0.625
+
+[prices.openai."gpt-5.3-codex"]
+input = 1.75
+output = 14.00
+cache_read = 0.175
 
 [prices.openai."gpt-4o"]
 input = 2.50
 output = 10.00
 cache_read = 1.25
+
+# Kiro — its usage log stamps a generic provider/model (`kiro`/`agent`), not the real
+# Claude model it runs underneath, so this is a blended *estimate* (Sonnet-tier rates).
+# Override if you know Kiro's configured model; output tokens are often under-reported.
+[prices.kiro."agent"]
+input = 3.00
+output = 15.00
+cache_read = 0.30
+
+# Auto-capture switch. Each agent's hook runs `cage import --agent <itself>` to meter
+# its own on-disk usage log; set enabled=false to pause that without unwiring any hooks
+# (the hooks still fire, the import is a no-op). Env CAGE_CAPTURE (0/1) overrides.
+[capture]
+enabled = true
 
 # Canonical pipeline order. Marginal attribution walks this once; each tool's
 # receipt is the delta it produced *given the tools upstream of it* (plan §4.2).

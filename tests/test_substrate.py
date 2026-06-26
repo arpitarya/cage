@@ -77,5 +77,7 @@ def test_policy_project_overrides_bundled(proj):
     fp.policy.write_text('[budgets]\nsession_usd = 9.5\n', encoding="utf-8")
     pol = policy.load(fp.policy)
     assert policy.budgets(pol)["session_usd"] == 9.5
-    # bundled prices still present after the merge (Opus corrected to $15/M input)
-    assert policy.price(pol, "anthropic", "claude-opus-4-8")["input"] == 15.00
+    # bundled prices still present after the merge (Opus 4.8 = $5/M input, current rate)
+    assert policy.price(pol, "anthropic", "claude-opus-4-8")["input"] == 5.00
+    # OpenAI gpt-5 family present too (Codex / Copilot)
+    assert policy.price(pol, "openai", "gpt-5")["output"] == 10.00

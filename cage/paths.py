@@ -3,7 +3,45 @@ from __future__ import annotations
 
 import os
 import re
+import shutil
+import sys
 from pathlib import Path
+
+
+def cage_bin() -> str:
+    """Absolute path to the `cage` executable, for the commands cage writes into agent
+    hook files. **GUI-launched agents** (Kiro IDE, the Copilot extension, a Codex app)
+    run hooks with a minimal PATH that omits `~/.local/bin`, so a bare `cage` in a hook
+    fails silently with 'command not found' and nothing is captured — the #1 reason a
+    wired hook doesn't fire. Resolve it at wire time; fall back to the package's own
+    console-script dir, then to bare `cage`."""
+    resolved = shutil.which("cage")
+    if resolved:
+        return resolved
+    candidate = Path(sys.executable).parent / "cage"  # same venv as the running interpreter
+    return str(candidate) if candidate.exists() else "cage"
+
+
+def is_cage_import_command(command: str) -> bool:
+    """True if ``command`` is a cage ``import …`` hook command (any agent/flags). Lets the
+    wiring collapse a superseded per-agent import (e.g. `cage import --agent codex`) into
+    the current per-agent import on re-setup, instead of leaving both."""
+    return reresolve_cage_command(command) is not None and " import" in (command or "")
+
+
+def reresolve_cage_command(command: str) -> str | None:
+    """If ``command`` is a cage hook command (`cage …` or `/abs/path/cage …`), return it
+    rewritten to the currently-resolved cage path, preserving the subcommand; else None.
+    Lets `cage setup` *heal* a stale bare-`cage` (or moved-binary) hook on re-run — the
+    reason a previously-wired hook silently stopped firing under a GUI agent's PATH."""
+    parts = command.split(None, 1) if command else []
+    if not parts:
+        return None
+    bin0 = parts[0]
+    if bin0 != "cage" and not bin0.endswith("/cage"):
+        return None  # a foreign (non-cage) hook — never touch it
+    sub = parts[1] if len(parts) == 2 else ""
+    return f"{cage_bin()} {sub}".rstrip()
 
 
 def find_project_root(start: Path | None = None) -> Path | None:
@@ -35,6 +73,12 @@ def codex_home() -> Path:
     return Path(os.environ.get("CODEX_HOME", Path.home() / ".codex"))
 
 
+def copilot_home() -> Path:
+    """Copilot CLI home (`$COPILOT_HOME` or ~/.copilot). Holds `session-state/<id>/
+    events.jsonl` (the usage log) and `hooks/` (the lifecycle hook config)."""
+    return Path(os.environ.get("COPILOT_HOME", Path.home() / ".copilot"))
+
+
 def vscode_user_dir() -> Path:
     """VS Code user dir where Copilot user prompt files live. Override CAGE_VSCODE_USER."""
     env = os.environ.get("CAGE_VSCODE_USER")
@@ -46,6 +90,22 @@ def vscode_user_dir() -> Path:
 
 def kiro_home() -> Path:
     return Path(os.environ.get("KIRO_HOME", Path.home() / ".kiro"))
+
+
+def kiro_token_log() -> Path:
+    """Kiro's per-call usage log (`kiro.kiroagent/dev_data/tokens_generated.jsonl`):
+    one JSON object per LLM call, `{model, provider, promptTokens, generatedTokens}`.
+    Coarse — Kiro reports prompt tokens reliably, output tokens often 0. Override the
+    containing user-data dir with KIRO_DATA_DIR (the rest of the path is appended)."""
+    env = os.environ.get("KIRO_DATA_DIR")
+    if env:
+        base = Path(env)
+    else:
+        mac = (Path.home() / "Library" / "Application Support" / "Kiro" / "User"
+               / "globalStorage" / "kiro.kiroagent")
+        base = mac if mac.exists() else (Path.home() / ".config" / "Kiro" / "User"
+                                         / "globalStorage" / "kiro.kiroagent")
+    return base / "dev_data" / "tokens_generated.jsonl"
 
 
 class Footprint:

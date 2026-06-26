@@ -30,7 +30,7 @@ def load(policy_path: Path | None = None) -> dict:
     if policy_path and policy_path.exists() and tomllib is not None:
         with policy_path.open("rb") as fh:
             data = tomllib.load(fh)
-        for section in ("prices", "tools", "budgets", "quality", "human", "ledger"):
+        for section in ("prices", "tools", "budgets", "quality", "human", "ledger", "capture"):
             if section in data:
                 merged = {**pol.get(section, {}), **data[section]}
                 pol[section] = merged
@@ -111,6 +111,27 @@ def budgets(pol: dict) -> dict:
     b = pol.get("budgets", {})
     return {"session_usd": b.get("session_usd"), "daily_usd": b.get("daily_usd"),
             "on_exceed": b.get("on_exceed", "warn")}
+
+
+def _flag(env_name: str, pol: dict, key: str, default: bool) -> bool:
+    """A boolean switch: env override (`0/false/no/off` vs `1/true/yes/on`) beats the
+    `[capture]` policy key, which beats ``default``. Env is explicit config, not entropy,
+    so `(ledger, policy, env) ⇒ tables` still holds."""
+    env = os.environ.get(env_name)
+    if env is not None:
+        v = env.strip().lower()
+        if v in ("0", "false", "no", "off"):
+            return False
+        if v in ("1", "true", "yes", "on"):
+            return True
+    return bool(pol.get("capture", {}).get(key, default))
+
+
+def capture_enabled(pol: dict) -> bool:
+    """Whether hook-driven `cage import` actually runs — the consumer's on/off switch
+    for auto-metering, without unwiring any hooks. Env `CAGE_CAPTURE` overrides policy
+    `[capture] enabled`; default on."""
+    return _flag("CAGE_CAPTURE", pol, "enabled", True)
 
 
 def default_toml() -> str:

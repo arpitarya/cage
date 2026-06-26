@@ -143,7 +143,7 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
 ## Dev
 
 ```bash
-just test          # python -m pytest -q   (205 passing)
+just test          # python -m pytest -q   (226 passing)
 just demo          # seed §4.4 + print attrib/matrix
 cage --version
 ```
@@ -154,16 +154,29 @@ Cage targets the **wire protocol**, so the meter and read surface are universal 
 each agent only needs thin idiomatic wiring (`agents.py` orchestrates):
 
 - **Meter:** `metering.py` (library), `proxy.py` + `usageparse.py` (any client you
-  point a base URL at), `transcript.py` (Claude Code / Codex session logs).
+  point a base URL at), `transcript.py` (Claude Code / Codex / Copilot CLI / Kiro session
+  logs — `LOG_BEARING` is now all four of `agents.SURFACES`; Kiro's `tokens_generated.jsonl`
+  is coarse so the proxy stays its higher-fidelity fallback). **Each agent's hook imports
+  only its own log** (`cage import --agent <itself>`) — no cross-agent sweep. The
+  hook-driven `importcmd.run` honors a **consumer capture switch** —
+  `policy.capture_enabled(pol)`: env `CAGE_CAPTURE` (0/1) overrides `policy.toml [capture]
+  enabled` (default on), so a consumer can pause auto-metering without unwiring hooks (the
+  hooks fire, import no-ops). `importcmd.run` also no-ops outside a `.cage` project, so a
+  global hook (Copilot's user-level hook) never scatters stray ledgers.
 - **Read:** `mcpserver.py` (MCP, every agent), `report/attrib/matrix/budget/roi`,
   plus the Tier-1 human axis (`human`/`trend`, `matrix --human`), authorship
   (`origin`/`notes-sync`/`verify`, plan §3.5), and the ledger-scale surface
   (`--scope` / `--team` filters, `ledger-sync` into refs/notes/cage-ledger via the
   shared `mergeutil.union_by_id` core, plan §3.6).
-- **Wiring:** `claudewire.py` (hooks+MCP), `codexwire.py` (TOML MCP), `pointers.py`
-  (copilot/kiro steering+MCP), `setupcmd.py` (`/cage` skill), `gitcommithook.py`
-  (local `post-commit`/`prepare-commit-msg` git hooks, riding along with
-  `claudewire.py` inside `agents.install`). All idempotent.
+- **Wiring — one `<agent>wire.py` per agent (a standing convention):** `claudewire.py`
+  (hooks+MCP), `codexwire.py` (TOML MCP), `copilotwire.py` (user-level `~/.copilot/hooks`+MCP+pointer),
+  `kirowire.py` (Agent Hooks+MCP+steering). Each exposes `install`/`status`/
+  `backfill_status`/`realtime_status`; `agents.py` dispatches via the `_WIRE` map (add a
+  row + a `SURFACES` entry for a new agent). `pointers.py` is now just the shared steering
+  *pointer text* both copilot/kiro embed. Plus `setupcmd.py` (`/cage` skill) and
+  `gitcommithook.py` (local `post-commit`/`prepare-commit-msg` git hooks, riding along
+  with `claudewire.py` inside `agents.install`). All idempotent. Every agent's hook runs
+  the same all-agent sweep (`paths.cage_import_all`) so any agent captures the whole stack.
 - **§8 features:** `quality.py`, `regression.py`, `recommend.py`, `forecast.py`.
 - **Tier-0 savings:** `compress.py`, `responsecache.py` (emit receipts).
 

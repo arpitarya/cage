@@ -1,5 +1,9 @@
 """Claude Code hook entrypoints (plan §5, §9.5, §3.5) — wired by `cage hooks install`.
 
+- Stop        → fires when Claude finishes each turn; parse the transcript and
+  append the just-completed turn (idempotent on the turn uuid). This is the
+  **real-time** capture path — spend lands as soon as a turn ends, with no wait
+  for SessionEnd or the next session's SessionStart-backfill.
 - SessionEnd  → parse the session transcript, append any not-yet-recorded turns
   (idempotent on the turn uuid). Off the request path: never blocks a call.
 - SessionStart → print a one-line spend/budget banner; Claude Code injects hook
@@ -46,16 +50,41 @@ def append_new(root: Path, rows: list[dict]) -> int:
     return added
 
 
+def _capture_calls(payload: dict) -> int:
+    """Token capture from the live transcript — shared by Stop and SessionEnd.
+    Idempotent on the turn uuid (`append_new`), so firing on every Stop never
+    double-records and stacks safely with the SessionStart-backfill."""
+    tp = payload.get("transcript_path")
+    if not tp:
+        return 0
+    root = _root(payload)
+    rows = transcript.parse_calls(Path(tp), session=payload.get("session_id", ""))
+    added = append_new(root, rows)
+    _snapshot_tasks(root, rows)
+    return added
+
+
+def stop() -> int:
+    """Stop hook — fires when Claude finishes a turn. Records *that turn's* tokens in
+    near-real-time (no wait for SessionEnd or the next SessionStart-backfill). Claude
+    only — each agent captures its own data via its own hooks; cage never sweeps another
+    agent's logs from this hook. Provenance stays a PostToolUse+post-commit concern;
+    Stop is token capture only. Fail-open, exits 0."""
+    try:
+        _capture_calls(_stdin_json())
+    except Exception:  # pragma: no cover — best-effort
+        pass
+    return 0
+
+
 def session_end() -> int:
     payload = _stdin_json()
     tp = payload.get("transcript_path")
     if tp:
         try:
-            root = _root(payload)
-            rows = transcript.parse_calls(Path(tp), session=payload.get("session_id", ""))
-            append_new(root, rows)
-            _snapshot_tasks(root, rows)
-            _record_transcript_provenance(root, Path(tp), payload.get("session_id", ""))
+            _capture_calls(payload)
+            _record_transcript_provenance(_root(payload), Path(tp),
+                                          payload.get("session_id", ""))
         except Exception:  # pragma: no cover — best-effort
             pass
     return 0

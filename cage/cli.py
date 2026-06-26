@@ -202,10 +202,12 @@ def build_parser() -> argparse.ArgumentParser:
                         formatter_class=argparse.RawDescriptionHelpFormatter)
     for _s in SURFACES:
         st.add_argument(f"--{_s}", action="store_true", help=f"set up the {_s} agent non-interactively (skips the wizard)")
+    st.add_argument("--all", dest="all_agents", action="store_true", help="set up all four agents non-interactively (capture works for any of them)")
     st.add_argument("--project-only", action="store_true", help="scaffold .cage/ + graphify + PATH only; skip the global skill")
     st.add_argument("--wire-only", action="store_true", help="wire agent(s) only; skip scaffold and graphify")
     st.add_argument("--status", action="store_true", help="report which agents are wired (no changes)")
-    st.add_argument("--no-skill", dest="skill", action="store_false", help="skip installing the global /cage skill")
+    st.add_argument("--no-skill", dest="skill", action="store_false", help="skip installing the /cage skill")
+    st.add_argument("--repo-skill", dest="repo_skill", action="store_true", help="install the /cage skill into this repo (committed, team-shared) instead of the machine-wide home")
     st.add_argument("--no-project", dest="project", action="store_false", help="skip per-project .cage/ scaffold + hook wiring")
     st.add_argument("--no-graphify", dest="graphify", action="store_false", help="skip the graphify interceptor")
     st.set_defaults(fn=clicmds.cmd_setup)
@@ -279,6 +281,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     # Internal hook entrypoints (wired by `cage setup --wire-only`, not for direct use).
     sub.add_parser("hook-session-start").set_defaults(fn=lambda a: hooks.session_start())
+    sub.add_parser("hook-stop").set_defaults(fn=lambda a: hooks.stop())
     sub.add_parser("hook-session-end").set_defaults(fn=lambda a: hooks.session_end())
     sub.add_parser("hook-post-tool-use").set_defaults(fn=lambda a: hooks.post_tool_use())
     sub.add_parser("hook-post-commit").set_defaults(fn=lambda a: hooks.post_commit())

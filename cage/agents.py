@@ -1,51 +1,54 @@
 """Multi-agent integration orchestrator (plan §5, §6, §9.5-6).
 
 One ledger contract, four surfaces. Cage targets the wire protocol, so the *meter*
-is universal (proxy / transcript) and the *read* surface is universal (MCP) — these
-installers only wire each agent's idiomatic config to those two universals:
+is universal (transcript import) and the *read* surface is universal (MCP) — each agent
+has **its own wire file** that wires that agent's idiomatic config to those universals:
 
-  claude  → SessionStart-backfill + SessionEnd hooks (transcript metering) + .mcp.json
-  codex   → .codex/hooks.json SessionStart-backfill + ~/.codex/config.toml MCP server
-  copilot → .github/copilot-instructions.md + .vscode/mcp.json   (metering via proxy)
-  kiro    → .kiro/steering/cage.md + .kiro/settings/mcp.json      (metering via proxy)
+  claude  → claudewire.py   (.claude/settings.json hooks + .mcp.json)
+  codex   → codexwire.py    (.codex/hooks.json + ~/.codex/config.toml MCP server)
+  copilot → copilotwire.py  (~/.copilot/hooks/cage.json + .vscode/mcp.json + instructions)
+  kiro    → kirowire.py     (.kiro/hooks/cage.kiro.hook + .kiro/settings/mcp.json + steering)
 
-The reliable capture path is **SessionStart-backfill**: import the previous session's
-on-disk transcript on the next start (Claude/Codex both persist one). It is the default
-for the two log-bearing agents; copilot/kiro have no transcript, so their path is the
-proxy. SessionEnd stays wired but is best-effort (deduped by id, so both is safe).
+**Convention: one `<agent>wire.py` per agent** — a new agent gets its own wire file
+exposing `install` / `status` / `backfill_status` / `realtime_status`, and is added to
+`SURFACES` + the dispatch maps below. Each agent's hook imports **only its own** on-disk
+log (`cage import --agent <itself>`) — cage never sweeps another agent's data from a hook.
 """
 from __future__ import annotations
 
 from pathlib import Path
 
-from cage import claudewire, codexwire, gitcommithook, pointers
+from cage import claudewire, codexwire, copilotwire, gitcommithook, kirowire
 
 SURFACES = ("claude", "codex", "copilot", "kiro")
+
+# The wire module for each surface — add a row here when integrating a new agent.
+_WIRE = {"claude": claudewire, "codex": codexwire,
+         "copilot": copilotwire, "kiro": kirowire}
 
 
 def install(root: Path, surfaces: tuple[str, ...] | None = None) -> dict:
     picked = surfaces or SURFACES
     out: dict[str, dict] = {}
-    if "claude" in picked:
-        out["claude"] = claudewire.install(root)
+    for name in (s for s in SURFACES if s in picked):
+        out[name] = _WIRE[name].install(root)
+    if "claude" in out:
         gh = gitcommithook.install(root)  # PostToolUse capture buffer → sha resolution (plan §3.5)
         if gh["installed"]:
             out["claude"]["git-hooks"] = ", ".join(gh["installed"])
-    if "codex" in picked:
-        out["codex"] = codexwire.install(root)
-    if "copilot" in picked:
-        out["copilot"] = pointers.copilot(root)
-    if "kiro" in picked:
-        out["kiro"] = pointers.kiro(root)
     return out
 
 
 def status(root: Path) -> dict:
-    return {"claude": claudewire.status(root), "codex": codexwire.status(root),
-            "copilot": pointers.copilot_status(root), "kiro": pointers.kiro_status(root)}
+    return {name: wire.status(root) for name, wire in _WIRE.items()}
 
 
 def backfill_status(root: Path) -> dict:
-    """Per-log-bearing-agent: is the reliable SessionStart-backfill capture wired?"""
-    return {"claude": claudewire.backfill_status(root),
-            "codex": codexwire.backfill_status(root)}
+    """Per-agent: is a SessionStart-backfill capture hook wired? All four support one."""
+    return {name: wire.backfill_status(root) for name, wire in _WIRE.items()}
+
+
+def realtime_status(root: Path) -> dict:
+    """Per-agent: is a real-time per-turn hook wired? Claude/Codex/Kiro fire `Stop`,
+    Copilot fires `agentStop` — all four have one."""
+    return {name: wire.realtime_status(root) for name, wire in _WIRE.items()}

@@ -32,13 +32,20 @@ def run(root: Path) -> dict:
 
 def _gitignore(fp: paths.Footprint) -> None:
     gi = fp.base / ".gitignore"
-    if gi.exists():
-        return
-    gi.write_text("# Append-only event log — machine-local, may carry holdings counts.\n"
-                  "# Point CAGE_LEDGER at elgar to keep even the counts private (plan §10).\n"
-                  "ledger/\n"
-                  "# Generated dashboards.\n"
-                  "out/\n", encoding="utf-8")
+    fresh = not gi.exists()
+    lines = (gi.read_text(encoding="utf-8").splitlines() if not fresh else
+             ["# Append-only event log — machine-local, may carry holdings counts.",
+              "# Point CAGE_LEDGER at elgar to keep even the counts private (plan §10).",
+              "ledger/",
+              "# Generated dashboards.",
+              "out/"])
+    # Heal older footprints: state/ holds machine-local hook buffers (pending edits,
+    # session state) — never commit them. Idempotent on re-run.
+    needs_state = "state/" not in lines
+    if needs_state:
+        lines += ["# Machine-local hook buffers (pending edits, session state).", "state/"]
+    if fresh or needs_state:
+        gi.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def _claude_pointer(root: Path) -> Path:

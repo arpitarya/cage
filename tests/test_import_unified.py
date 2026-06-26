@@ -1,6 +1,6 @@
 """`cage import [--agent ...]` — unified hookless metering across all four agents.
 
-Claude + Codex import on-disk transcripts; Copilot + Kiro (no usage log) print the
+Claude + Codex + Copilot import on-disk usage logs; Kiro (no usage log) prints the
 proxy fallback. Every surface in agents.SURFACES is reachable and first-class.
 """
 from __future__ import annotations
@@ -17,6 +17,10 @@ def _args(agent="all", path=None, project=None, since=None):
 
 def _init_root(d, monkeypatch):
     (d / ".cage").mkdir(parents=True)
+    # Isolate every agent home so a default (path-less) import never reads real machine
+    # data (~/.claude, ~/.codex, ~/.copilot, Kiro's user-data dir).
+    for env in ("CLAUDE_CONFIG_DIR", "CODEX_HOME", "COPILOT_HOME", "KIRO_DATA_DIR"):
+        monkeypatch.setenv(env, str(d / f"home-{env.lower()}"))
     monkeypatch.chdir(d)
     return d
 
@@ -32,6 +36,59 @@ def _codex_line(cid, tin, tout):
                        "payload": {"type": "token_count", "model": "gpt-5",
                                    "info": {"last_token_usage": {"input_tokens": tin,
                                                                  "output_tokens": tout}}}})
+
+
+# --- consumer capture switches ------------------------------------------------
+
+def test_capture_switch_env_overrides_policy(monkeypatch):
+    from cage import policy
+    monkeypatch.delenv("CAGE_CAPTURE", raising=False)
+    assert policy.capture_enabled({}) is True                            # default on
+    assert policy.capture_enabled({"capture": {"enabled": False}}) is False
+    monkeypatch.setenv("CAGE_CAPTURE", "0")                              # env beats policy
+    assert policy.capture_enabled({"capture": {"enabled": True}}) is False
+    monkeypatch.setenv("CAGE_CAPTURE", "1")
+    assert policy.capture_enabled({"capture": {"enabled": False}}) is True
+
+
+def test_stop_hook_captures_claude_only_no_sweep(tmp_path, monkeypatch):
+    # The Claude Stop hook records Claude's own turn and never sweeps another agent's log.
+    import io
+    root = _init_root(tmp_path, monkeypatch)             # isolates CODEX_HOME etc.
+    cx = tmp_path / "home-codex_home" / "sessions" / "rollout-x.jsonl"
+    cx.parent.mkdir(parents=True)
+    cx.write_text(_codex_line("c1", 50, 10) + "\n", encoding="utf-8")  # would be swept, if we swept
+    tp = tmp_path / "live.jsonl"
+    tp.write_text(_claude_line("u1", 100, 40) + "\n", encoding="utf-8")
+    monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(
+        {"transcript_path": str(tp), "cwd": str(tmp_path), "session_id": "s"})))
+    hooks.stop()
+    assert {c["agent"] for c in ledger.calls(root)} == {"claude-code"}   # codex NOT pulled in
+
+
+def test_import_skipped_when_capture_disabled(tmp_path, monkeypatch, capsys):
+    root = _init_root(tmp_path, monkeypatch)
+    tp = tmp_path / "s.jsonl"
+    tp.write_text(_claude_line("u1", 100, 50) + "\n", encoding="utf-8")
+    monkeypatch.setenv("CAGE_CAPTURE", "0")                              # consumer pauses capture
+    assert clicmds.cmd_import(_args(agent="claude", path=str(tp))) == 0
+    assert "capture disabled" in capsys.readouterr().out
+    assert ledger.calls(root) == []                                     # nothing imported
+    monkeypatch.setenv("CAGE_CAPTURE", "1")                              # re-enable
+    clicmds.cmd_import(_args(agent="claude", path=str(tp)))
+    assert len(ledger.calls(root)) == 1
+
+
+def test_import_skipped_when_policy_disables_capture(tmp_path, monkeypatch, capsys):
+    root = _init_root(tmp_path, monkeypatch)
+    monkeypatch.delenv("CAGE_CAPTURE", raising=False)
+    (root / ".cage").mkdir(exist_ok=True)
+    (root / ".cage" / "policy.toml").write_text("[capture]\nenabled = false\n", encoding="utf-8")
+    tp = tmp_path / "s.jsonl"
+    tp.write_text(_claude_line("u1", 100, 50) + "\n", encoding="utf-8")
+    assert clicmds.cmd_import(_args(agent="claude", path=str(tp))) == 0
+    assert "capture disabled" in capsys.readouterr().out
+    assert ledger.calls(root) == []
 
 
 # --- every agent is reachable -------------------------------------------------
@@ -104,19 +161,55 @@ def test_malformed_file_does_not_abort(tmp_path, monkeypatch):
     assert len(ledger.calls(root)) == 1  # the good file still imported
 
 
-# --- no-log agents: proxy fallback, zero writes -------------------------------
+def _copilot_shutdown(model, tin, tout, cached=0):
+    # Real Copilot CLI 1.0.65 shape: per-model metrics nest tokens under `usage`;
+    # inputTokens is the TOTAL input (already includes cache read/write).
+    return json.dumps({"type": "session.shutdown", "timestamp": "2026-06-14T10:00:00Z",
+                       "data": {"totalPremiumRequests": 1, "currentModel": model,
+                                "modelMetrics": {model: {"usage": {
+                                    "inputTokens": tin, "outputTokens": tout,
+                                    "cacheReadTokens": cached}}}}})
 
-def test_copilot_and_kiro_print_proxy_line_and_write_nothing(tmp_path, monkeypatch, capsys):
+
+def test_copilot_import_counts_and_idempotent(tmp_path, monkeypatch, capsys):
     root = _init_root(tmp_path, monkeypatch)
-    for a in ("copilot", "kiro"):
-        assert clicmds.cmd_import(_args(agent=a)) == 0
-        out = capsys.readouterr().out
-        assert out.strip() == f"· {a}: no on-disk usage log — meter via the proxy: cage meter -- <cmd>"
-    assert ledger.calls(root) == []  # no usage signal fabricated for a log-less agent
+    # a Copilot CLI session dir: session-state/<id>/events.jsonl
+    ev = tmp_path / "home-copilot_home" / "session-state" / "sess-1" / "events.jsonl"
+    ev.parent.mkdir(parents=True)
+    ev.write_text(_copilot_shutdown("gpt-5-mini", 1200, 80, cached=300) + "\n", encoding="utf-8")
+    clicmds.cmd_import(_args(agent="copilot"))
+    calls = ledger.calls(root)
+    assert len(calls) == 1
+    assert calls[0]["agent"] == "copilot" and calls[0]["provider"] == "openai"
+    # inputTokens is the total (already includes cache) — not summed again
+    assert calls[0]["tokens_in"] == 1200 and calls[0]["tokens_out"] == 80
+    assert calls[0]["cached_in"] == 300
+    assert "✔ copilot: imported 1 call(s) from 1 file(s)." in capsys.readouterr().out
+    before = b"".join(p.read_bytes() for p in paths.Footprint(root).shards("calls"))
+    clicmds.cmd_import(_args(agent="copilot"))  # re-import → idempotent by session id
+    assert b"".join(p.read_bytes() for p in paths.Footprint(root).shards("calls")) == before
 
 
-def test_proxy_line_helper_matches_for_every_non_log_agent():
-    for a in agents.SURFACES:
-        if a not in importcmd.LOG_BEARING:
-            assert importcmd.proxy_line(a) == \
-                f"· {a}: no on-disk usage log — meter via the proxy: cage meter -- <cmd>"
+def test_kiro_import_counts_and_idempotent(tmp_path, monkeypatch, capsys):
+    # Kiro's coarse usage log: one JSON object per call (prompt tokens reliable,
+    # output often 0, generic provider/model). Imported best-effort, deduped by content.
+    root = _init_root(tmp_path, monkeypatch)
+    log = tmp_path / "tokens_generated.jsonl"
+    log.write_text(
+        json.dumps({"model": "agent", "provider": "kiro", "promptTokens": 1200,
+                    "generatedTokens": 340}) + "\n"
+        + json.dumps({"model": "agent", "provider": "kiro", "promptTokens": 13,
+                      "generatedTokens": 0}) + "\n", encoding="utf-8")
+    clicmds.cmd_import(_args(agent="kiro", path=str(log)))
+    calls = ledger.calls(root)
+    assert len(calls) == 2 and {c["agent"] for c in calls} == {"kiro"}
+    assert {c["tokens_in"] for c in calls} == {1200, 13}  # the 0-output line still counts
+    assert "✔ kiro: imported 2 call(s) from 1 file(s)." in capsys.readouterr().out
+    before = b"".join(p.read_bytes() for p in paths.Footprint(root).shards("calls"))
+    clicmds.cmd_import(_args(agent="kiro", path=str(log)))  # re-import → idempotent
+    assert b"".join(p.read_bytes() for p in paths.Footprint(root).shards("calls")) == before
+
+
+def test_all_four_agents_are_log_bearing():
+    # Every surface now has an on-disk import path — none is proxy-only.
+    assert set(importcmd.LOG_BEARING) == set(agents.SURFACES)

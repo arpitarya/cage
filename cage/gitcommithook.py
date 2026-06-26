@@ -16,19 +16,19 @@ import os
 import stat
 from pathlib import Path
 
+from cage import paths
+
 _MARKER = "# cage-managed-hook"
 
-_POST_COMMIT = f"""#!/bin/sh
-{_MARKER}
-cage hook-post-commit
-"""
 
-_PREPARE_COMMIT_MSG = f"""#!/bin/sh
-{_MARKER}
-cage hook-prepare-commit-msg "$1"
-"""
-
-_FILES = {"post-commit": _POST_COMMIT, "prepare-commit-msg": _PREPARE_COMMIT_MSG}
+def _files() -> dict:
+    # Resolved cage path — a GUI git client (IDE commit button) runs hooks with a
+    # minimal PATH that omits ~/.local/bin, so a bare `cage` would not be found.
+    c = paths.cage_bin()
+    return {
+        "post-commit": f"#!/bin/sh\n{_MARKER}\n{c} hook-post-commit\n",
+        "prepare-commit-msg": f'#!/bin/sh\n{_MARKER}\n{c} hook-prepare-commit-msg "$1"\n',
+    }
 
 
 def _git_dir(root: Path) -> Path | None:
@@ -47,7 +47,7 @@ def install(root: Path) -> dict:
     hooks_dir = git_dir / "hooks"
     try:
         hooks_dir.mkdir(parents=True, exist_ok=True)
-        for name, content in _FILES.items():
+        for name, content in _files().items():
             path = hooks_dir / name
             if path.exists() and _MARKER not in path.read_text(encoding="utf-8", errors="ignore"):
                 skipped.append(name)  # a real, non-cage hook already lives here
@@ -66,4 +66,4 @@ def status(root: Path) -> bool:
         return False
     return any((git_dir / "hooks" / name).exists()
               and _MARKER in (git_dir / "hooks" / name).read_text(encoding="utf-8", errors="ignore")
-              for name in _FILES)
+              for name in _files())

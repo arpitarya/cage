@@ -52,17 +52,21 @@ def _hooks(root: Path) -> tuple[str, str]:
 
 def _metering(root: Path) -> tuple[str, str]:
     """Four-agent metering matrix — every surface in ``agents.SURFACES`` gets a row with
-    the capture mechanism actually wired. The reliable default for the two log-bearing
-    agents is **SessionStart-backfill** (import the previous session on the next start);
+    the capture mechanism actually wired. The two log-bearing agents capture in real time
+    via a turn-scoped **Stop** hook, backed by a **SessionStart-backfill** safety net;
     copilot/kiro have no transcript, so the proxy is their reliable path. A log-bearing
     agent with no reliable trigger and no recorded calls is a `warn` nudge."""
     wired = agents.status(root)
     backfill = agents.backfill_status(root)
+    realtime = agents.realtime_status(root)
     have_calls = bool(ledger.calls(root))
     rows, worst = [], _OK
     for a in agents.SURFACES:
         if a in importcmd.LOG_BEARING:
-            if backfill.get(a, False):
+            if realtime.get(a, False):
+                mech = ("real-time Stop + backfill ✔" if backfill.get(a, False)
+                        else "real-time Stop ✔")
+            elif backfill.get(a, False):
                 mech = "SessionStart-backfill ✔"
             elif wired.get(a, False):
                 mech = "SessionEnd only (best-effort)"
@@ -77,7 +81,7 @@ def _metering(root: Path) -> tuple[str, str]:
             mech = "proxy (no transcript)"
             path = "reliable: cage meter -- <cmd>"
         rows.append(f"\n      · {a:<8} {mech:<30} | {path}")
-    return worst, "capture mechanism per agent (SessionStart-backfill is the reliable default):" + "".join(rows)
+    return worst, "capture mechanism per agent (real-time Stop hook, SessionStart-backfill safety net):" + "".join(rows)
 
 
 def _pricing(root: Path) -> tuple[str, str]:

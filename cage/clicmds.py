@@ -209,9 +209,12 @@ def cmd_setup(args) -> int:
             print(f"  {'✔' if on else '·'} {surface:<8} {'wired' if on else 'not wired'}")
         return 0
 
+    all_agents = getattr(args, "all_agents", False)
+
     # Handle --wire-only: agent wiring only, no scaffold/graphify
     if getattr(args, "wire_only", False):
-        flagged = tuple(s for s in agents.SURFACES if getattr(args, s, False))
+        flagged = agents.SURFACES if all_agents else \
+            tuple(s for s in agents.SURFACES if getattr(args, s, False))
         if not flagged:
             print("Pick an agent to wire: " + " | ".join(agents.SURFACES))
             print("e.g. `cage setup --wire-only --claude`")
@@ -230,18 +233,22 @@ def cmd_setup(args) -> int:
         args.project = True
         args.graphify = getattr(args, "graphify", True)
 
-    # Standard setup: interactive wizard or flagged agents
+    # Standard setup: interactive wizard, --all, or per-agent flags
     flagged = tuple(s for s in agents.SURFACES if getattr(args, s, False))
-    if not flagged:
+    scope = "project" if getattr(args, "repo_skill", False) else "global"
+    if all_agents:  # one plan that fans out to every agent (wizard.apply handles "all")
+        plans = [{"agent": "all", "skill": args.skill, "skill_scope": scope,
+                  "project": args.project, "graphify": args.graphify}]
+    elif not flagged:
         if not sys.stdin.isatty():
-            print("Pick an agent: " + " | ".join(agents.SURFACES))
-            print("e.g. `cage setup --claude`  (or run `cage setup` in a terminal "
-                  "for the guided wizard)")
+            print("Pick an agent: " + " | ".join(agents.SURFACES) + " | all")
+            print("e.g. `cage setup --claude` or `cage setup --all`  (or run `cage setup` "
+                  "in a terminal for the guided wizard)")
             return 2
         plans = [wizard.interactive_plan()]
     else:
-        plans = [{"agent": a, "skill": args.skill, "project": args.project,
-                  "graphify": args.graphify} for a in flagged]
+        plans = [{"agent": a, "skill": args.skill, "skill_scope": scope,
+                  "project": args.project, "graphify": args.graphify} for a in flagged]
 
     for plan in plans:
         print(f"\n▸ cage setup — {plan['agent']}")
