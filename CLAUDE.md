@@ -134,10 +134,12 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   silently break one: every wiring/read surface (`agents.py`, `mcpserver.py`,
   `cage setup`, the skill/steering data) must keep all four first-class, and new
   surface work fans out to all four. This is a product invariant, not a default.
-- **Every release updates the README "What's new"** — bump `__version__`, add a
-  `What's new` entry for the new version (don't skip versions), and refresh the
+- **Every release updates the changelog** — bump `__version__`, add the full release
+  notes to `CHANGELOG.md` (newest first, don't skip versions) and a **1–2 line**
+  summary to the README "What's new" list (the README points at `CHANGELOG.md` for
+  detail — keep README terse, full prose lives in the changelog), and refresh the
   "N tests passing" count in the README `$0` section + this file's `just test`
-  comment. A shipped version with no changelog line is a release bug.
+  comment. A shipped version with no changelog entry is a release bug.
 - **Never publish from local. Every release ships a GitHub release, and the GitHub
   release *is* the publish trigger.** The one true release flow: bump `__version__`
   + changelog, commit + push `main`, tag `vX.Y.Z`, push the tag, then
