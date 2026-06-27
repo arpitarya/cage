@@ -181,7 +181,10 @@ each agent only needs thin idiomatic wiring (`agents.py` orchestrates):
   shared `mergeutil.union_by_id` core, plan §3.6).
 - **Wiring — one `<agent>wire.py` per agent (a standing convention):** `claudewire.py`
   (hooks+MCP), `codexwire.py` (TOML MCP), `copilotwire.py` (user-level `~/.copilot/hooks`+MCP+pointer),
-  `kirowire.py` (Agent Hooks+MCP+steering). Each exposes `install`/`status`/
+  `kirowire.py` (one `agentStop` Agent Hook+MCP+steering — Kiro's hook file is
+  *one hook per file*: `{name,version,description,when:{type},then:{type,command}}`,
+  not a `hooks[]` container, and Kiro has no session-start trigger so the single
+  `agentStop` hook self-backfills by re-importing the whole log each turn). Each exposes `install`/`status`/
   `backfill_status`/`realtime_status`; `agents.py` dispatches via the `_WIRE` map (add a
   row + a `SURFACES` entry for a new agent). `pointers.py` is now just the shared steering
   *pointer text* both copilot/kiro embed. Plus `setupcmd.py` (`/cage` skill) and

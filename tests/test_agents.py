@@ -49,11 +49,12 @@ def test_install_all_surfaces(homes):
     cop_hooks = cfgio.load_json(homes / "copilot_home" / "hooks" / "cage.json")["hooks"]
     for ev in ("agentStop", "sessionStart"):
         assert any(h["bash"] == "cage import --agent copilot --since 7d" for h in cop_hooks[ev])
-    # Kiro Agent Hooks: real-time Stop + SessionStart backfill, Kiro only
-    kiro_hooks = cfgio.load_json(proj / ".kiro" / "hooks" / "cage.kiro.hook")["hooks"]
-    for trig in ("Stop", "SessionStart"):
-        assert any(h["trigger"] == trig and h["action"]["command"] == "cage import --agent kiro"
-                   for h in kiro_hooks)
+    # Kiro Agent Hook: one hook per file (when/then), agentStop trigger, Kiro only.
+    # Kiro has no session-start trigger; the single agentStop hook self-backfills.
+    kiro_hook = cfgio.load_json(proj / ".kiro" / "hooks" / "cage.kiro.hook")
+    assert kiro_hook["when"]["type"] == "agentStop"
+    assert kiro_hook["then"]["type"] == "runCommand"
+    assert kiro_hook["then"]["command"] == "cage import --agent kiro"
     # All four now have BOTH real-time and backfill capture wired
     assert agents.realtime_status(proj) == {a: True for a in agents.SURFACES}
     assert agents.backfill_status(proj) == {a: True for a in agents.SURFACES}
@@ -105,8 +106,8 @@ def test_hooks_use_resolved_cage_path(homes, monkeypatch):
     assert s["Stop"][0]["hooks"][0]["command"] == "/opt/cage/bin/cage hook-stop"
     cx = cfgio.load_json(proj / ".codex" / "hooks.json")["hooks"]
     assert cx["Stop"][0]["hooks"][0]["command"] == "/opt/cage/bin/cage import --agent codex --since 7d"
-    k = cfgio.load_json(proj / ".kiro" / "hooks" / "cage.kiro.hook")["hooks"]
-    assert k[0]["action"]["command"] == "/opt/cage/bin/cage import --agent kiro"
+    k = cfgio.load_json(proj / ".kiro" / "hooks" / "cage.kiro.hook")
+    assert k["then"]["command"] == "/opt/cage/bin/cage import --agent kiro"
     assert cfgio.load_json(proj / ".mcp.json")["mcpServers"]["cage"]["command"] == "/opt/cage/bin/cage"
 
 
