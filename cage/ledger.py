@@ -82,6 +82,18 @@ def _warn_threshold(foot) -> int:
     return LEDGER_WARN_BYTES
 
 
+def _shard_bytes(shards: list[Path]) -> int:
+    """Total size of the globbed shards; a per-shard `stat` failure is skipped, not
+    raised (the byte-sum is best-effort — it feeds only the warning, never the read)."""
+    total = 0
+    for sh in shards:
+        try:
+            total += sh.stat().st_size
+        except OSError:
+            continue
+    return total
+
+
 def _warn_if_large(foot, shards: list[Path]) -> None:
     """One stderr line when the globbed shard bytes cross the threshold (plan §3.6.4 (d)).
 
@@ -94,12 +106,7 @@ def _warn_if_large(foot, shards: list[Path]) -> None:
         key = str(foot.ledger)
         if key in _warned_dirs:
             return
-        total = 0
-        for sh in shards:
-            try:
-                total += sh.stat().st_size
-            except OSError:
-                continue
+        total = _shard_bytes(shards)
         if total > _warn_threshold(foot):
             _warned_dirs.add(key)
             print(f"cage: ledger is {total / 1_000_000:.0f} MB across {len(shards)} "

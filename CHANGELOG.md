@@ -2,6 +2,16 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
+## v0.12.1 — green CI: tests no longer depend on ambient git identity or pathlib internals
+
+A bug-fix release: the `Python package` workflow was red on `main` (the publish workflow was unaffected — releases still shipped). Three `tests/test_ledger_scale.py` cases passed locally but failed on the CI matrix because they leaned on the developer's environment rather than asserting the contract:
+
+- **Git-notes writes assumed a global git identity.** `test_ledger_sync_writes_under_env` and `test_team_read_uses_merged_ref` drive `ledgersync.sync(..., write=True)`, which shells `git notes add` through production's env-less `_git`. A dev machine has a global `user.email`/`user.name`; a CI runner has none, so the write failed and `wrote` came back `False`. The shared `_git_init` helper now pins identity **on the repo itself** (`git config user.email/user.name`), matching how CI configures the sole-writer — the tests are hermetic instead of borrowing ambient config.
+
+- **A size-warning test clobbered global `pathlib.Path.stat`.** `test_size_warning_swallows_stat_error` monkeypatched `Path.stat` to raise, intending to prove the ledger-size byte-sum never breaks a read. On 3.14 `Path.exists()` doesn't route through `Path.stat`, so it passed; on the CI 3.11/3.12 it does, so the `OSError` escaped `ledger.read()`'s own `exists()` check (which the warning's try/except never covered) — and the wrong `boom()` signature even crashed pytest's traceback formatter. The byte-sum is now a discrete `ledger._shard_bytes(shards)` helper; the test patches *that* (version-independent), asserting the real contract: even a total failure to size the shards never perturbs the read.
+
+No behavior change to any shipped surface — counts-never-content, determinism, and the $0/stdlib-only invariants are untouched; 262 tests pass across Python 3.11–3.13.
+
 ## v0.12.0 — universal capture: global ledger + explicit `import`/`export`
 
 Capture was hook-led and project-local, and in the field that left whole classes of users uncaptured: hooks are client-specific and mostly don't fire (a VS Code extension never runs `.codex/hooks.json` / `.kiro/hooks/*.hook` / `~/.copilot/hooks` — only Claude Code's extension honors its hooks), and the importer no-oped outside a project `.cage/`. A Copilot-only user, or anyone in a VS Code extension, could run for days with an empty ledger and a `cage doctor` that cheerfully reported their unfireable hook as "capture wired." This release makes capture **pull-based and universal** — `cage import` (capture) and `cage export` (import-then-emit) are the canonical verbs over a **global ledger**, hooks are demoted to an optional real-time add-on, and **cage installs nothing in the background**.

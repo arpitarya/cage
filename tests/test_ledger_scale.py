@@ -25,6 +25,11 @@ def _git_init(root):
     def run(*a):
         subprocess.run(("git", "-C", str(root), *a), check=True, capture_output=True, env=env)
     run("init")
+    # Pin identity on the repo itself — production's `_git` (ledgersync/notessync) shells
+    # git with no env, so `git notes add` needs repo-local config, not just the env above.
+    # A CI runner has no global git identity; without this the notes write fails.
+    run("config", "user.email", "t@t")
+    run("config", "user.name", "t")
     (root / "a.py").write_text("x = 1\n")
     run("add", "a.py")
     run("commit", "-m", "init")
@@ -239,17 +244,16 @@ def test_size_warning_fires_once_per_dir(proj):
 
 
 def test_size_warning_swallows_stat_error(proj, monkeypatch):
-    # a stat failure during the byte-sum must never raise out of a read
+    # a failure while byte-summing the shards must never raise out of a read
     foot = paths.Footprint(proj)
     foot.policy.parent.mkdir(parents=True, exist_ok=True)
     foot.policy.write_text("[ledger]\nwarn_mb = 0.0001\n")
     ledger.append_row(proj, "calls", _call("2026-06-01T00:00:00Z"))
-    import pathlib
-    def boom(self):
+    def boom(shards):
         raise OSError("stat blew up")
-    monkeypatch.setattr(pathlib.Path, "stat", boom)
+    monkeypatch.setattr(ledger, "_shard_bytes", boom)
     ledger._warned_dirs.clear()
-    assert len(ledger.calls(proj)) == 1  # read still succeeds
+    assert len(ledger.calls(proj)) == 1  # warning's failure never breaks the read
 
 
 # ── determinism ─────────────────────────────────────────────────────────────────
