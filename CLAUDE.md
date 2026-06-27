@@ -29,8 +29,11 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   ids + validate the closed enums. Rows are plain JSON. Prompt bodies are never a
   field (counts only). Change here = change the contract; update the plan §3. Calls/
   receipts also carry an additive optional `scope` (top-level changed dir, same PII
-  guard as tasks; empty = the legacy contract, plan §3.6.2), and the long-lived logs
-  are month-partitioned behind `ledger.append_row`/`read_kind` (plan §3.6.1).
+  guard as tasks; empty = the legacy contract, plan §3.6.2); calls additionally carry an
+  additive optional `project` (working-dir basename, same PII guard; empty = legacy) — a
+  *derived* `cage report --project` view, deliberately distinct from `scope`'s monorepo
+  axis (plan §3.7). The long-lived logs are month-partitioned behind
+  `ledger.append_row`/`read_kind` (plan §3.6.1).
 - **Constants** ([constants.py](cage/constants.py)) — the *third audit layer*. Cage
   keeps its numbers in three places, never mixed: **contract** = the enums in
   `schema.py`; **policy** = user-economics in `policy.toml`; **constants** = code
@@ -156,7 +159,7 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
 ## Dev
 
 ```bash
-just test          # python -m pytest -q   (226 passing)
+just test          # python -m pytest -q   (262 passing)
 just demo          # seed §4.4 + print attrib/matrix
 cage --version
 ```
@@ -169,13 +172,20 @@ each agent only needs thin idiomatic wiring (`agents.py` orchestrates):
 - **Meter:** `metering.py` (library), `proxy.py` + `usageparse.py` (any client you
   point a base URL at), `transcript.py` (Claude Code / Codex / Copilot CLI / Kiro session
   logs — `LOG_BEARING` is now all four of `agents.SURFACES`; Kiro's `tokens_generated.jsonl`
-  is coarse so the proxy stays its higher-fidelity fallback). **Each agent's hook imports
-  only its own log** (`cage import --agent <itself>`) — no cross-agent sweep. The
-  hook-driven `importcmd.run` honors a **consumer capture switch** —
-  `policy.capture_enabled(pol)`: env `CAGE_CAPTURE` (0/1) overrides `policy.toml [capture]
-  enabled` (default on), so a consumer can pause auto-metering without unwiring hooks (the
-  hooks fire, import no-ops). `importcmd.run` also no-ops outside a `.cage` project, so a
-  global hook (Copilot's user-level hook) never scatters stray ledgers.
+  is coarse so the proxy stays its higher-fidelity fallback). Capture is **pull-based and
+  global** (plan §3.7): `cage import`/`cage export` over a **resolved** ledger
+  (`--ledger`/`CAGE_BASE` → project `.cage/` → global `~/.cage`, via `paths.resolve_root`)
+  is the universal path that works with no hooks and no project; hooks are an optional
+  CLI-only real-time add-on (they don't fire under a VS Code extension). `importcmd.run`
+  honors the **consumer capture switch** — `policy.capture_enabled(pol)`: env `CAGE_CAPTURE`
+  (0/1) overrides `policy.toml [capture] enabled` (default on), so a consumer can pause
+  metering without unwiring hooks. It **no longer guards on a cwd `.cage/`**: a hook firing
+  outside any project lands in the global ledger (the resolver prevents stray local
+  footprints), and a per-agent high-water cursor (`state/cursors.json`, last-seen
+  `(size, mtime)`) keeps re-imports incremental (the shared `seen` set bounds the ledger
+  read to once per run). **cage installs no OS scheduler** — no launchd/systemd/cron/
+  schtasks, no `cage scheduler`; hands-off automation is the user's own cron line calling
+  `cage import`, and `cage watch` is an optional foreground `sleep` loop they Ctrl-C.
 - **Read:** `mcpserver.py` (MCP, every agent), `report/attrib/matrix/budget/roi`,
   plus the Tier-1 human axis (`human`/`trend`, `matrix --human`), authorship
   (`origin`/`notes-sync`/`verify`, plan §3.5), and the ledger-scale surface

@@ -214,23 +214,34 @@ cage demo                      # seed the worked example that proves the thesis
 Every read command takes `--json` for the agent-as-user (machine-readable, typed).
 </details>
 
-## Works with any agent — target the protocol, not the tool
+## Works with any agent — explicit capture over one global ledger
 
-Cage meters whatever speaks the wire format and reads the ledger over MCP, so all four agents share **one** ledger contract:
+Cage meters whatever speaks the wire format, so all four agents share **one** ledger contract. Capture is **pull-based and universal**: `cage import` reads each agent's on-disk usage log into the ledger, and `cage export` refreshes then emits it — they need no hooks, no project, and work the same whether you run a CLI or a VS Code extension.
 
-| Agent | Meter its spend | Read the ledger |
-| ----- | --------------- | --------------- |
-| **Claude Code** | SessionEnd hook parses the transcript (proxy-free) | `cage` MCP (`.mcp.json`) |
-| **Codex** | `cage meter -- codex …` / `cage import-codex` | `cage` MCP (`~/.codex/config.toml`) |
-| **Copilot** | `cage proxy` (point its base URL at it) | `cage` MCP + instructions (`.vscode/`) |
-| **Kiro** | `cage proxy` | `cage` MCP + steering (`.kiro/`) |
-| **Your code / Orff** | `cage.meter()` library adapter | `cage` CLI / MCP |
+```bash
+cage import                 # capture every agent's spend into the active ledger
+cage export --format csv    # refresh, then emit (jsonl | csv | json)
+cage report                 # where the spend went
+cage watch                  # optional: a foreground loop you Ctrl-C (no daemon)
+```
 
-`cage setup` installs two assets into **every** agent home, idiomatically per agent: **`/cage`** (read the ledger) and **`/cage-doctor`** (verify the wiring works). Any agent can then report Cage health on request, in any project.
+The ledger resolves **`--ledger`/`CAGE_BASE` → project `.cage/` → global `~/.cage`** — so a user with no project captures into the global ledger (`cage setup --global` to seed it). cage installs **no background job** (no launchd/systemd/cron); automate it, if you like, with your own cron line calling `cage import`.
+
+| Agent | Capture (universal) | Optional real-time | Read |
+| ----- | ------------------- | ------------------ | ---- |
+| **Claude Code** | `cage import` (transcript) | Stop hook (CLI only) | `cage` MCP |
+| **Codex** | `cage import` (rollouts) | Stop hook (CLI only) | `cage` MCP |
+| **Copilot** | `cage import` (session log) | `agentStop` hook (CLI only) | `cage` MCP |
+| **Kiro** | `cage import` (token log) | `agentStop` hook (CLI only) | `cage` MCP |
+| **Your code / Orff** | `cage.meter()` library | — | `cage` CLI / MCP |
+
+Hooks are an **optional** real-time add-on — they fire only under a CLI client, never under a VS Code extension — so `cage import`/`cage export` is the path that always works. `cage report --project <name>` slices the global ledger by working dir (exact for Claude; Copilot/Kiro/Codex logs carry no project, so they're excluded from that filter).
+
+**An agent's spend isn't showing up?** `cage doctor` shows the active ledger, each agent's real capture state, and "last import: N ago"; the metadata-only debug log says per agent whether a hook fired or raised — see [Debugging capture](docs/debugging-capture.md).
 
 ## The `$0` guarantee
 
-Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 226 tests passing; `cage demo` reproduces the worked attribution example against a real ledger.
+Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 262 tests passing; `cage demo` reproduces the worked attribution example against a real ledger.
 
 **Honest limits.** Cage doesn't decide your human rate — it prices minutes at a blended rate you set, and labels the result `estimated` so it never pretends to be a timesheet. Marginal-by-fixed-order is defensible and `$0`, but it is an *ordering convention*, not a Shapley value (that's a deferred audit mode). And a counterfactual cell is an honest reconstruction, never an invoice — the `method` column says so on every row, on purpose.
 
@@ -238,6 +249,8 @@ Every derived view is parse / arithmetic over the log — **no LLM call, ever, o
 
 Latest releases below — full notes in [CHANGELOG.md](CHANGELOG.md).
 
+- **v0.12.0 — universal capture: global ledger + explicit `import`/`export`.** Capture is now pull-based and works for any agent, any client, and the no-project user: `cage import` captures into a resolved ledger (`--ledger`/`CAGE_BASE` → project `.cage/` → global `~/.cage`), `cage export` emits jsonl/csv/json, `cage watch` is an optional foreground loop. A new additive `project` field gives `cage report --project` (Claude-exact); incremental file-stat cursors keep import cheap; `cage doctor` is honest about hooks (CLI-only) and shows "last import: N ago". cage installs **no** OS scheduler.
+- **v0.11.0 — observable capture (`CAGE_DEBUG`).** The fail-open capture path now records a metadata-only per-hook heartbeat + previously-swallowed tracebacks to `.cage/state/debug.log`; `cage doctor` shows per-agent last-fired, `cage debug` tails events. Off by default, $0, counts-never-content, ledger byte-identical on/off. See [Debugging capture](docs/debugging-capture.md).
 - **v0.10.2 — Kiro hook format fixed (it never fired before).** Kiro hooks are one-hook-per-file (`when`/`then`); Cage now writes a single `agentStop` hook in the correct shape (the old container shape + a nonexistent `SessionStart` trigger meant it silently never ran).
 - **v0.10.1 — release process codified.** GitHub release is the publish trigger (OIDC trusted publishing); never publish from a laptop. CI is the sole publisher.
 - **v0.10.0 — real-time per-turn capture + four log-bearing agents.** Stop-hook capture for Claude/Codex (spend lands as each turn ends); Copilot and Kiro now metered too; resolved-absolute `cage` path fixes silent GUI-launch failures; refreshed pricing; repo-level `/cage` skill.

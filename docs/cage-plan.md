@@ -85,9 +85,18 @@ This is the invoice-grade truth; provider `usage` fields are authoritative.
   "tokens_in": 8600, "tokens_out": 1500,
   "cached_in": 3200,            // provider cache-read tokens (billed at discount)
   "est_cost_usd": 0.0483,
-  "latency_ms": 5120, "ok": true, "retries": 0
+  "latency_ms": 5120, "ok": true, "retries": 0,
+  "scope": "",                  // optional monorepo top-level dir (§3.6.2)
+  "project": "cage"             // optional working-dir basename — derived attribution axis (§3.7)
 }
 ```
+
+`scope` and `project` are both optional and basename-only (the counts-never-content PII
+guard); empty is the legacy contract. They are **different axes**: `scope` is the
+monorepo top-level changed dir (§3.6.2); `project` is the working directory a call ran
+under (§3.7), a derived `cage report --project` view of the global ledger. Only logs that
+expose the cwd populate `project` (Claude transcripts do; Copilot/Kiro/Codex leave it
+empty).
 
 ### 3.2 The savings receipt — what a tool claims it saved
 
@@ -343,6 +352,63 @@ disk-quota case) is a separate, un-taken decision (see ADR).
 targets only); four agents always (`scope` + `ledger-sync` fan out to all four); method
 is sacred (aggregation is a row union, not a re-derivation); no-flag byte-identity
 (`--scope`/`--team`/partitioning all default off ⇒ output identical to pre-amendment).
+
+## 3.7 Universal capture — global ledger + explicit import/export
+
+cage is a package any user installs, often using **only** Copilot, only Codex, only Kiro,
+or any mix, in a CLI **or a VS Code extension**. Field-proven: hooks are client-specific
+and mostly don't fire (a VS Code extension never runs `.codex/hooks.json` /
+`.kiro/hooks/*.hook` / `~/.copilot/hooks`; only Claude Code's extension honors its hooks),
+yet the on-disk import works for all four, always. So capture **leads with explicit
+`cage import` / `cage export`** over a global ledger, and cage installs **nothing in the
+background**.
+
+**Capture is pull-based.** Nothing runs on its own. `cage import` (capture) and
+`cage export` (import-then-emit) are the canonical verbs; hooks are demoted to an optional
+real-time add-on. cage installs **no OS scheduler** — no launchd/systemd/cron/schtasks,
+no `cage scheduler` command. Hands-off automation, if wanted, is the user's own cron line
+calling `cage import` (documented, never installed). `cage watch` is an optional
+*foreground* `sleep` poll loop the user starts and Ctrl-Cs; it registers nothing.
+
+**Ledger resolution (one active sink per run, never a double-write):**
+`--ledger`/`CAGE_BASE` → nearest project `.cage/` from cwd → global `~/.cage`
+(`paths.resolve_root`/`active_ledger_source`). The global ledger mirrors a project
+`.cage/` (its own `ledger/`, `state/`, `policy.toml`), is month-partitioned like any other
+(§3.6.1), and is created on first write or by `cage setup --global`. `--ledger PATH`
+re-bases the whole footprint via `CAGE_BASE`; the legacy `CAGE_LEDGER` (a *ledger-dir*
+override, e.g. Orff's elgar store) keeps its meaning, honored independently by
+`Footprint.ledger`. The cwd-`.cage` guard is gone: a hook firing outside any project now
+lands in the **global** ledger rather than scattering a stray local `.cage/` (the resolver
+prevents scatter structurally), so a Copilot-only user is captured even via the hook.
+
+**Project as a derived view (the `project` field, §3.1).** Per-project *capture* is
+impossible for Copilot/Kiro/Codex (their logs carry no cwd), so project is only ever a
+derived *attribution view*, exact where the log supports it. `cage report --project <name>`
+(or `--project .`/bare = cwd basename) filters the global ledger by the `project` field;
+the view is exact for Claude and silently excludes the projectless rows of the other
+agents (surfaced in the output). `scope` (§3.6.2) is untouched.
+
+**Incremental import (scale).** With no daemon, the hot paths are manual `cage import`,
+`export`'s import-first refresh, and the `cage watch` loop — each would otherwise re-parse
+every transcript and reload the whole 22k+-row ledger per run. A per-agent high-water
+**cursor** (`.cage/state/cursors.json`, last-seen `(size, mtime)` per source file) skips
+unchanged files before parsing, and the ledger `seen` set is built once per run and shared
+across agents; `hooks.append_new`'s id-dedupe stays the correctness backstop. The cursor
+also stamps `_last_import`, surfaced as "last import: N ago" by `cage doctor`/`cage report`
+(the pull-based staleness nudge).
+
+**Honest doctor.** `cage doctor` infers each agent's capture state from the debug
+heartbeat (fired recently ⇒ real-time active; never ⇒ a hook that's *wired* is not one
+that *fires*, e.g. under a VS Code extension); it never labels an unfireable hook "capture
+wired," names the active ledger sink, shows last-import staleness, and points at
+`cage import`/`cage export` as the universal path. No scheduler row (cage installs none).
+
+**Invariants:** `$0`/stdlib (`csv`/`json` only; no fs-watch lib, no network on the
+capture/read path); counts-never-content (no prompt bodies in any export; `project`/`scope`
+basename-only); deterministic byte-identical export for the same `--since` window;
+fail-open + idempotent (a malformed `policy.toml` degrades to the bundled default, never a
+traceback); additive (the one new optional `project` field; hooks, MCP, and the
+project-local `.cage/` ledger all unchanged); four agents always.
 
 ---
 

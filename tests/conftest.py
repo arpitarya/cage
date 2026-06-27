@@ -7,10 +7,19 @@ from cage import demo, metering
 
 
 @pytest.fixture(autouse=True)
-def _bare_cage_in_hooks(monkeypatch):
+def _bare_cage_in_hooks(monkeypatch, tmp_path):
     """Pin `paths.cage_bin` to bare ``cage`` for tests. Production resolves it to the
-    absolute path (so GUI agents' hooks find it); tests assert the stable bare command."""
+    absolute path (so GUI agents' hooks find it); tests assert the stable bare command.
+
+    Also redirect the global ledger (`paths.global_home`) off the real ``~/.cage`` to a
+    throwaway per-test dir via ``CAGE_HOME``, so a no-project read/capture (which now falls
+    back to the global ledger, plan §3.6.5) can never see or pollute the developer's real
+    global ledger — tests stay hermetic and deterministic."""
     monkeypatch.setattr("cage.paths.cage_bin", lambda: "cage")
+    monkeypatch.setenv("CAGE_HOME", str(tmp_path / "global-home"))
+    # `cage --ledger` sets `CAGE_BASE` via os.environ (process-scoped in production); clear
+    # it per test so a `--ledger` test can't re-base a later test's Footprint.
+    monkeypatch.delenv("CAGE_BASE", raising=False)
 
 
 @pytest.fixture

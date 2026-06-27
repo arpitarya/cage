@@ -18,16 +18,19 @@ This project meters LLM traffic into `.cage/` (a *flux*: $0, deterministic).
 {POINTER_END}"""
 
 
-def run(root: Path) -> dict:
+def run(root: Path, pointer: bool = True) -> dict:
+    """Scaffold the `.cage/` footprint at ``root``. ``pointer=False`` skips writing the
+    `CLAUDE.md` pointer — used by `cage setup --global`, which inits ``~/.cage`` and must
+    never edit the user's home `CLAUDE.md`."""
     fp = paths.Footprint(root)
     fp.base.mkdir(parents=True, exist_ok=True)
     fp.ledger.mkdir(parents=True, exist_ok=True)
     if not fp.policy.exists():
         fp.policy.write_text(policy.default_toml(), encoding="utf-8")
     _gitignore(fp)
-    pointer = _claude_pointer(root)
+    claude_md = str(_claude_pointer(root)) if pointer else ""
     return {"footprint": str(fp.base), "policy": str(fp.policy),
-            "ledger": str(fp.ledger), "claude_md": str(pointer)}
+            "ledger": str(fp.ledger), "claude_md": claude_md}
 
 
 def _gitignore(fp: paths.Footprint) -> None:

@@ -57,7 +57,7 @@ def test_every_check_has_a_known_level(proj):
     res = doctorcmd.run(proj)
     names = {c["name"] for c in res["checks"]}
     assert names == {"tool", "footprint", "policy", "pricing", "hooks", "metering",
-                     "interceptor", "ledger"}
+                     "trace", "interceptor", "ledger"}
     assert all(c["level"] in {"ok", "warn", "fail"} for c in res["checks"])
 
 
@@ -69,11 +69,25 @@ def test_metering_matrix_lists_all_four_agents(proj):
         assert f"cage import --agent {a}" in detail  # all four now have an import path
 
 
-def test_metering_matrix_shows_realtime_mechanism_when_wired(proj):
-    # Once the agent is wired, the matrix names the real-time Stop capture path.
+def test_metering_matrix_is_honest_about_wired_hooks(proj):
+    # Honest doctor (plan §3.6.5): a *wired* hook is not a *firing* one — hooks fire only
+    # under a CLI client, never a VS Code extension, so the matrix never claims "capture
+    # wired". It frames hooks as an optional CLI-only add-on and points at the universal
+    # pull-based path (`cage import`/`cage export`) plus the last-import staleness signal.
     from cage import agents
     initcmd.run(proj)
     agents.install(proj, ("claude", "codex"))
     detail = next(c["detail"] for c in doctorcmd.run(proj)["checks"] if c["name"] == "metering")
-    assert "real-time Stop + backfill ✔" in detail
-    assert "SessionStart-backfill" in detail  # named as the safety net in the summary
+    assert "pull-based" in detail
+    assert "hook wired" in detail and "VS Code" in detail
+    assert "last import:" in detail
+    assert "cage installs no scheduler" in detail
+
+
+def test_doctor_has_no_scheduler_row(proj):
+    # cage installs no OS scheduler — there must be no scheduler check anywhere, and no
+    # check should claim one is registered (the doctor may only *mention* a user cron).
+    res = doctorcmd.run(proj)
+    assert not any(c["name"] == "scheduler" for c in res["checks"])
+    blob = " ".join(c["detail"] for c in res["checks"]).lower()
+    assert "launchd" not in blob and "systemd" not in blob and "schtasks" not in blob

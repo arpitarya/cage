@@ -21,9 +21,31 @@ import json
 import sys
 from pathlib import Path
 
-from cage import budget, ledger, originrecord, paths, policy, tasks, transcript
+from cage import budget, debuglog, ledger, originrecord, paths, policy, tasks, transcript
 
 _EDIT_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit"}
+
+_AGENT = "claude"  # hooks.py is Claude Code's real-time hook surface
+
+
+def _pol(root: Path) -> dict:
+    """Load policy once per hook firing so the debug gate (`debuglog.enabled`) and every
+    log call share it — when debug is off this is the path's only added cost (one tiny
+    toml read), and no debug file is written."""
+    return policy.load(paths.Footprint(root).policy)
+
+
+def _trace_entry(root: Path, event: str, payload: dict, *, pol: dict | None = None,
+                 **fields) -> None:
+    """Log a hook firing (entry + heartbeat) for the capture-debug trail. No-op unless
+    debug is enabled; metadata only — `transcript_path` is recorded as a presence bool,
+    never its contents (counts-never-content)."""
+    cwd = payload.get("cwd") or str(Path.cwd())
+    debuglog.heartbeat(root, _AGENT, event, cwd, pol=pol)
+    debuglog.event(root, pol=pol, agent=_AGENT, event=event, cwd=cwd, resolved_root=str(root),
+                   cage_present=(root / ".cage").is_dir(),
+                   transcript_path_present=bool(payload.get("transcript_path")),
+                   **fields)
 
 
 def _stdin_json() -> dict:
@@ -39,13 +61,21 @@ def _root(payload: dict) -> Path:
     return paths.find_project_root(start) or start
 
 
-def append_new(root: Path, rows: list[dict]) -> int:
-    """Append only call rows whose id isn't already in the ledger. Returns #added."""
-    seen = {c.get("id") for c in ledger.calls(root)}
+def append_new(root: Path, rows: list[dict], seen: set | None = None) -> int:
+    """Append only call rows whose id isn't already in the ledger. Returns #added.
+
+    ``seen`` is an optional caller-owned set of already-known call ids: pass it to skip
+    the per-call ledger reload and amortize the dedupe across a multi-file run (the
+    ledger is 22k+ rows — re-reading it per file/call is the import hot path, plan
+    §3.7). It is mutated in place with each appended id so later batches see them.
+    Omit it and the legacy self-contained behavior holds (reload once here)."""
+    if seen is None:
+        seen = {c.get("id") for c in ledger.calls(root)}
     added = 0
     for row in rows:
         if row.get("id") not in seen:
             if ledger.append_row(root, "calls", row):
+                seen.add(row.get("id"))
                 added += 1
     return added
 
@@ -70,23 +100,32 @@ def stop() -> int:
     only — each agent captures its own data via its own hooks; cage never sweeps another
     agent's logs from this hook. Provenance stays a PostToolUse+post-commit concern;
     Stop is token capture only. Fail-open, exits 0."""
+    payload = _stdin_json()
+    root = _root(payload)
+    pol = _pol(root)
+    _trace_entry(root, "stop", payload, pol=pol)
     try:
-        _capture_calls(_stdin_json())
-    except Exception:  # pragma: no cover — best-effort
-        pass
+        added = _capture_calls(payload)
+        debuglog.event(root, pol=pol, agent=_AGENT, event="stop", result="ok", appended=added)
+    except Exception as e:  # fail-open: a capture error never breaks the turn
+        debuglog.exception(root, "hook.stop", e, pol=pol)
     return 0
 
 
 def session_end() -> int:
     payload = _stdin_json()
+    root = _root(payload)
+    pol = _pol(root)
     tp = payload.get("transcript_path")
+    _trace_entry(root, "session_end", payload, pol=pol)
     if tp:
         try:
-            _capture_calls(payload)
-            _record_transcript_provenance(_root(payload), Path(tp),
-                                          payload.get("session_id", ""))
-        except Exception:  # pragma: no cover — best-effort
-            pass
+            added = _capture_calls(payload)
+            _record_transcript_provenance(root, Path(tp), payload.get("session_id", ""))
+            debuglog.event(root, pol=pol, agent=_AGENT, event="session_end", result="ok",
+                           appended=added)
+        except Exception as e:  # fail-open
+            debuglog.exception(root, "hook.session_end", e, pol=pol)
     return 0
 
 
@@ -132,12 +171,15 @@ def _edit_paths(tool_name: str, tool_input: dict) -> list[str]:
 
 def post_tool_use() -> int:
     payload = _stdin_json()
+    root = _root(payload)
+    pol = _pol(root)
     try:
         tool_name = payload.get("tool_name", "")
         files = _edit_paths(tool_name, payload.get("tool_input") or {})
+        _trace_entry(root, "post_tool_use", payload, pol=pol, tool_name=tool_name,
+                     files_buffered=len(files))
         if not files:
             return 0
-        root = _root(payload)
         session_id = payload.get("session_id", "")
         buf = paths.Footprint(root).pending_edits(session_id)
         rel = []
@@ -154,23 +196,29 @@ def post_tool_use() -> int:
                     break
             ledger.append(buf, {"file": f, "added": added, "removed": removed,
                                 "agent": "claude-code"})
-    except Exception:  # pragma: no cover — best-effort
-        pass
+    except Exception as e:  # fail-open
+        debuglog.exception(root, "hook.post_tool_use", e, pol=pol)
     return 0
 
 
 def post_commit() -> int:
     """Git `post-commit` hook — resolve this session's pending-edit buffer to the
     just-made commit's sha, write the hooked provenance row, clear the buffer."""
+    root = paths.find_project_root() or Path.cwd()
+    pol = _pol(root)
+    debuglog.heartbeat(root, "git", "post_commit", str(Path.cwd()), pol=pol)
     try:
-        root = paths.find_project_root() or Path.cwd()
         sha = originrecord.current_sha(root)
         if not sha:
+            debuglog.event(root, pol=pol, agent="git", event="post_commit", skip="no sha (not a repo / no HEAD)")
             return 0
         state_dir = paths.Footprint(root).state
         if not state_dir.is_dir():
+            debuglog.event(root, pol=pol, agent="git", event="post_commit", skip="no .cage/state dir")
             return 0
+        buffers, rows_written = 0, 0
         for buf in state_dir.glob("pending-*.jsonl"):
+            buffers += 1
             rows = ledger.read(buf)
             if not rows:
                 buf.unlink(missing_ok=True)
@@ -184,9 +232,12 @@ def post_commit() -> int:
                 originrecord.record_hooked(root, sha=sha, files=files, agent=agent,
                                            lines_added=added, lines_removed=removed,
                                            session_id=session_id)
+                rows_written += 1
             buf.unlink(missing_ok=True)
-    except Exception:  # pragma: no cover — best-effort
-        pass
+        debuglog.event(root, pol=pol, agent="git", event="post_commit", result="ok",
+                       sha_present=True, buffers=buffers, rows_written=rows_written)
+    except Exception as e:  # fail-open
+        debuglog.exception(root, "hook.post_commit", e, pol=pol)
     return 0
 
 
@@ -224,15 +275,20 @@ def prepare_commit_msg(msg_path: str) -> int:
 
 
 def session_start() -> int:
+    payload = _stdin_json()
+    root = _root(payload)
+    pol = policy.load(paths.Footprint(root).policy)
+    _trace_entry(root, "session_start", payload, pol=pol)
     try:
-        root = _root(_stdin_json())
-        pol = policy.load(paths.Footprint(root).policy)
         v = budget.check(root, pol)
         day = v["scopes"]["day"]
-        if day["used"]:
+        shown = bool(day["used"])
+        if shown:
             cap = f" / ${day['cap']:.2f} cap" if day["cap"] else ""
             flag = "  ⚠ over budget" if day["over"] else ""
             print(f"Cage: ${day['used']:.4f} spent today{cap}{flag}. `cage report` for detail.")
-    except Exception:  # pragma: no cover — best-effort
-        pass
+        debuglog.event(root, pol=pol, agent=_AGENT, event="session_start", result="ok",
+                       banner_shown=shown)
+    except Exception as e:  # fail-open
+        debuglog.exception(root, "hook.session_start", e, pol=pol)
     return 0

@@ -30,7 +30,7 @@ def load(policy_path: Path | None = None) -> dict:
     if policy_path and policy_path.exists() and tomllib is not None:
         with policy_path.open("rb") as fh:
             data = tomllib.load(fh)
-        for section in ("prices", "tools", "budgets", "quality", "human", "ledger", "capture"):
+        for section in ("prices", "tools", "budgets", "quality", "human", "ledger", "capture", "debug"):
             if section in data:
                 merged = {**pol.get(section, {}), **data[section]}
                 pol[section] = merged
@@ -113,10 +113,10 @@ def budgets(pol: dict) -> dict:
             "on_exceed": b.get("on_exceed", "warn")}
 
 
-def _flag(env_name: str, pol: dict, key: str, default: bool) -> bool:
+def _flag(env_name: str, pol: dict, section: str, key: str, default: bool) -> bool:
     """A boolean switch: env override (`0/false/no/off` vs `1/true/yes/on`) beats the
-    `[capture]` policy key, which beats ``default``. Env is explicit config, not entropy,
-    so `(ledger, policy, env) ⇒ tables` still holds."""
+    ``[section] key`` policy value, which beats ``default``. Env is explicit config, not
+    entropy, so `(ledger, policy, env) ⇒ tables` still holds."""
     env = os.environ.get(env_name)
     if env is not None:
         v = env.strip().lower()
@@ -124,14 +124,21 @@ def _flag(env_name: str, pol: dict, key: str, default: bool) -> bool:
             return False
         if v in ("1", "true", "yes", "on"):
             return True
-    return bool(pol.get("capture", {}).get(key, default))
+    return bool(pol.get(section, {}).get(key, default))
 
 
 def capture_enabled(pol: dict) -> bool:
     """Whether hook-driven `cage import` actually runs — the consumer's on/off switch
     for auto-metering, without unwiring any hooks. Env `CAGE_CAPTURE` overrides policy
     `[capture] enabled`; default on."""
-    return _flag("CAGE_CAPTURE", pol, "enabled", True)
+    return _flag("CAGE_CAPTURE", pol, "capture", "enabled", True)
+
+
+def debug_enabled(pol: dict) -> bool:
+    """Whether the capture path writes its metadata-only debug log + hook heartbeat
+    (`cage/debuglog.py`). Env `CAGE_DEBUG` overrides policy `[debug] enabled`; default
+    **off** — observability is opt-in, never on by default ($0, no file written)."""
+    return _flag("CAGE_DEBUG", pol, "debug", "enabled", False)
 
 
 def default_toml() -> str:

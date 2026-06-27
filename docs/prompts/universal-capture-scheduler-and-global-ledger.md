@@ -1,0 +1,104 @@
+# Claude Code prompt — make capture work for ANY agent/any client (scheduler + global ledger)
+
+Self-contained. Paste into Claude Code from the cage repo root.
+
+## The problem (this is a product-defining fix, read carefully)
+
+cage is a package anyone installs. A user may use **only Copilot**, or only Codex, or
+only Kiro, in any client (standalone CLI **or** a VS Code extension). Field-proven
+reality:
+
+- **Hooks are client-specific and mostly don't fire.** `.codex/hooks.json` and
+  `.kiro/hooks/*.hook` are CLI/native-app features; the **VS Code extensions of those
+  agents don't execute them**. Only Claude Code's extension honors `.claude/settings.json`.
+  So hook-based capture silently works for ~one agent and fails for the rest — yet
+  `cage doctor` reports the hooks "wired." That makes cage useless for a non-Claude user.
+- **On-disk import works for ALL of them, always.** Every agent writes a usage log
+  regardless of hooks (`~/.claude/projects`, `~/.codex/sessions`,
+  `~/.copilot/session-state`, Kiro's `tokens_generated.jsonl`). `cage import --agent all`
+  already captures all four, idempotently.
+
+**Therefore: scheduled background import must become the default, universal capture
+path. Hooks demote to a real-time optimization on clients that fire them.** Read
+`cage/importcmd.py`, `cage/setupcmd.py`/`wizard.py`, `cage/doctorcmd.py`,
+`cage/paths.py`, `cage/policy.py`, `CLAUDE.md`, and `docs/cage-plan.md` (§5, §10) first.
+
+## Hard invariants
+
+- **Works for any single agent or any mix, in CLI or VS Code-extension form** — never
+  assume Claude. All four (Claude, Codex, Copilot, Kiro) first-class.
+- **Additive** — keep hooks + MCP working unchanged; this adds the scheduler + global
+  ledger. Hooks that *do* fire still give real-time capture; the scheduler backstops
+  everything and dedupes by id (no double-count).
+- **$0 / stdlib only**, fail-open, idempotent, deterministic, counts-never-content.
+
+## What to build
+
+### 1. Cross-platform background sweeper, installed by `cage setup` (default on)
+A scheduled job that runs `cage import --agent all` against a configured ledger every
+N minutes (default 5; `[capture] interval_min` in policy). Install per OS, idempotent,
+detected at setup time:
+- **macOS** → launchd LaunchAgent in `~/Library/LaunchAgents`.
+- **Linux** → systemd user timer (fallback to a crontab line if systemd-user absent).
+- **Windows** → Scheduled Task via `schtasks`.
+Add `cage setup --no-scheduler` to opt out, and `cage scheduler {install,status,remove}`
+to manage it directly. The job invokes the **resolved absolute** cage binary
+(`paths.cage_bin()`), runs with an explicit `--ledger` target (see §2), and logs to a
+known path. `cage doctor` shows scheduler status + last run + last import counts.
+
+### 2. Global ledger (so a no-project user still captures)
+Today `importcmd.run` no-ops without a `.cage/` in cwd — fatal for "I only use Copilot
+and never made a cage repo." Add a global ledger and a clear resolution precedence:
+1. explicit `--ledger PATH` / `CAGE_LEDGER` env,
+2. nearest project `.cage/` from cwd,
+3. **global ledger** (`~/.cage` or platform config dir) when enabled.
+`cage setup --global` initializes the global ledger and points the scheduler at it.
+Keep the existing cwd-`.cage` guard **for hook-triggered imports** (so a global Copilot
+hook firing in a random repo still doesn't scatter ledgers) — but the scheduler always
+runs with an explicit target, so it's safe and unguarded. `cage report`/all read
+surfaces must accept the same `--ledger`/global resolution.
+
+### 3. Optional foreground daemon `cage watch`
+A stdlib poll loop (`while: import_all; sleep interval`) for users who want lower latency
+than the scheduler, no new deps, Ctrl-C clean. Same idempotent import underneath.
+
+### 4. Tell the truth in `cage doctor` and `cage setup`
+- Per-agent capture matrix shows the method **actually in effect**: `scheduled import:
+  active (every 5m, last run 2m ago, N calls)` and, where applicable, `hook: real-time,
+  CLI-only`. Explicitly warn: **hooks do not fire under VS Code extensions — scheduled
+  import is your capture path there.**
+- Stop reporting a hook as "capture wired" when it can't fire for the user's client;
+  at minimum label hooks "CLI-only real-time (optional)".
+- `cage setup` summary states plainly: "Capture for all agents runs via the background
+  sweeper every N min; hooks add real-time where the client supports them."
+
+### 5. Docs
+Update README "Works with any agent" table + `docs/debugging-capture.md`: scheduled
+import is the universal/default mechanism; hooks are a CLI-only real-time add-on; global
+ledger for project-less use. Bump `__version__`, CHANGELOG, README "What's new", test
+count (CLAUDE.md release rule).
+
+## Acceptance
+
+- `tests/`: scheduler install/remove is idempotent and writes the correct unit for the
+  detected OS (test the generator for each of macOS/Linux/Windows, not live install);
+  global-ledger resolution precedence (`--ledger` > project `.cage` > global) is unit-
+  tested; `cage import --agent all --ledger <global>` captures with **no project `.cage`
+  in cwd** (the no-project user works); hook-triggered import still honors the cwd guard;
+  re-running the sweep is a no-op (idempotent); doctor renders scheduler status + the
+  per-agent method matrix incl. the VS-Code-extension warning. `just test` green; no
+  existing plan-number assertion changes.
+- Manual check in PR: with **no hooks at all** and only the scheduler, using any one
+  agent (e.g. Copilot only) results in `cage report` showing that agent's spend.
+
+## Working agreement
+
+Plan before code — the scheduler abstraction (per-OS backends behind one interface), the
+ledger-resolution change, the doctor honesty changes, and the test list — and stop for my
+review. Verify each OS scheduler format from primary sources; don't guess unit/plist/
+schtasks syntax.
+
+## Out of scope
+
+The org gateway/proxy; a VS Code extension; filesystem-watch dependencies (poll only).
+Don't remove hooks — demote them to optional real-time, never the guaranteed path.

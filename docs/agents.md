@@ -102,6 +102,24 @@ the two questions decouple:
   alternative. Orff's `LLMGateway` calls it fail-open when it closes a task, so the
   ledger carries *agent vs human* ($ and time saved) alongside tool-vs-tool savings.
 
+## Debugging capture (`CAGE_DEBUG`)
+
+Capture is fail-open by design: a hook that doesn't fire, a `.cage` cwd-guard skip, or
+a parser that raises all fail *silently*. When spend isn't landing and you can't tell
+why, turn on the observability layer — strictly observational ($0, metadata-only), it
+**never changes capture** (the ledger is byte-identical with it on or off):
+
+```bash
+export CAGE_DEBUG=1          # or set [debug] enabled = true in .cage/policy.toml
+# …run your agent / commit…
+cage debug --tail 50         # recent capture events (entries, results, skips, errors)
+cage doctor                  # the `trace` row: per-agent last hook fired + last error
+```
+
+Full walkthrough — the three failure modes (hook fires? guards pass? log parses?), how
+to read the events, and what it never logs — in
+[debugging-capture.md](debugging-capture.md).
+
 ## Tool-savings receipts — two integration strategies
 
 A *savings receipt* is what makes `cage attrib` / `cage matrix` / `cage roi` show

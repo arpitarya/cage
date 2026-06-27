@@ -24,7 +24,7 @@ ORIGINS = ("human", "agent", "agent-autonomous", "unknown")
 
 CALL_FIELDS = ("id", "ts", "session", "task", "agent", "route", "provider", "model",
                "tokens_in", "tokens_out", "cached_in", "est_cost_usd",
-               "latency_ms", "ok", "retries", "scope")
+               "latency_ms", "ok", "retries", "scope", "project")
 RECEIPT_FIELDS = ("id", "ts", "call", "task", "tool", "unit", "raw_alternative",
                   "actual", "saved", "method", "confidence", "meta", "scope")
 PROVENANCE_FIELDS = ("schema_ver", "id", "ts", "sha", "agent", "files",
@@ -40,7 +40,8 @@ def make_call(*, route: str, provider: str, model: str, tokens_in: int = 0,
               tokens_out: int = 0, cached_in: int = 0, est_cost_usd: float = 0.0,
               session: str = "", task: str = "", agent: str = "lib",
               latency_ms: int = 0, ok: bool = True, retries: int = 0,
-              scope: str = "", ts: str | None = None, call_id: str | None = None) -> dict:
+              scope: str = "", project: str = "", ts: str | None = None,
+              call_id: str | None = None) -> dict:
     """One ground-truth call row. `cached_in` ⊆ `tokens_in` (billed at discount).
 
     `call_id` may be supplied for idempotent sources (a transcript turn's uuid) so
@@ -50,13 +51,19 @@ def make_call(*, route: str, provider: str, model: str, tokens_in: int = 0,
     coarse, counts-safe key `tasks.jsonl` carries (top-level dir only, never sub-paths
     or filenames). Empty string is the default and the non-monorepo case; an empty
     `scope` makes a row byte-identical to the pre-§3.6 contract.
+
+    `project` is the optional working-dir **basename** the call ran under — a *derived
+    attribution axis* (`cage report --project`, plan §3.7), deliberately separate from
+    `scope` (the monorepo top-level dir). Basename only, never a full path (the same PII
+    guard as `scope`/tasks). Only logs that carry the cwd can set it (Claude transcripts
+    do; Copilot/Kiro/Codex leave it empty), so an empty `project` is the legacy contract.
     """
     return {"id": call_id or ids.new_id("c"), "ts": ts or _now(), "session": session, "task": task,
             "agent": agent, "route": route, "provider": provider, "model": model,
             "tokens_in": int(tokens_in), "tokens_out": int(tokens_out),
             "cached_in": int(cached_in), "est_cost_usd": round(float(est_cost_usd), 6),
             "latency_ms": int(latency_ms), "ok": bool(ok), "retries": int(retries),
-            "scope": str(scope)}
+            "scope": str(scope), "project": str(project)}
 
 
 def make_receipt(*, tool: str, raw_alternative: float, actual: float,

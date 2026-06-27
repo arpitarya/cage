@@ -53,6 +53,46 @@ def find_project_root(start: Path | None = None) -> Path | None:
     return None
 
 
+def global_home() -> Path:
+    """The dir that *contains* the machine-wide global ``.cage`` — ``$CAGE_HOME`` if set,
+    else ``~``. ``CAGE_HOME`` keeps the global ledger relocatable (and lets tests redirect
+    it off the real home)."""
+    return Path(os.environ.get("CAGE_HOME", Path.home()))
+
+
+def global_base() -> Path:
+    """The machine-wide global cage base (``$CAGE_HOME/.cage``, default ``~/.cage``) — the
+    capture sink for the no-project user (no `.cage/` in cwd and no ``--ledger``/``CAGE_BASE``
+    override). Mirrors a project ``.cage/`` so the same readers/writers work over it (§3.7)."""
+    return global_home() / ".cage"
+
+
+def resolve_root(start: Path | None = None) -> Path:
+    """The root whose :class:`Footprint` is the **active** ledger, per the capture
+    precedence (plan §3.7): ``--ledger``/``CAGE_BASE`` → nearest project ``.cage/`` from
+    cwd → global ``~/.cage``. One active sink per run — never a double-write.
+
+    A ``CAGE_BASE`` override (what ``--ledger`` sets) re-bases every ``Footprint``, so the
+    root returned then only co-locates paths; the project walk and the home fallback cover
+    the other two tiers. The legacy ``CAGE_LEDGER`` (a *ledger-dir* override, e.g. Orff's
+    elgar store) is honored independently by ``Footprint.ledger`` and is unchanged.
+    ``Footprint(global_home()).base`` is exactly ``global_base()``."""
+    if os.environ.get("CAGE_BASE"):
+        return (start or Path.cwd())
+    proj = find_project_root(start)
+    return proj if proj is not None else global_home()
+
+
+def active_ledger_source(start: Path | None = None) -> str:
+    """Which precedence tier the active ledger came from — for ``cage doctor`` to print
+    *which* sink is live when both a project and the global ledger exist."""
+    if os.environ.get("CAGE_BASE"):
+        return "override (--ledger/CAGE_BASE)"
+    if find_project_root(start) is not None:
+        return "project (.cage/)"
+    return "global (~/.cage)"
+
+
 def bundled_data_dir() -> Path:
     """Seed data shipped with the cage package (default policy + skill assets)."""
     return Path(__file__).parent / "data"
@@ -116,9 +156,14 @@ class Footprint:
     counts live in the private store.
     """
 
-    def __init__(self, root: Path):
+    def __init__(self, root: Path, base: Path | None = None):
         self.root = root
-        self.base = root / ".cage"
+        # ``CAGE_BASE`` (set by the ``--ledger`` flag) re-bases the whole footprint —
+        # ledger, state and policy all move together to one active sink (plan §3.7).
+        # An explicit ``base`` arg wins (callers that target a specific store); else the
+        # env override; else the legacy per-project ``<root>/.cage``.
+        override = os.environ.get("CAGE_BASE")
+        self.base = base or (Path(override).expanduser() if override else root / ".cage")
 
     @property
     def ledger(self) -> Path:
@@ -177,6 +222,27 @@ class Footprint:
     @property
     def state(self) -> Path:
         return self.base / "state"
+
+    @property
+    def cursors(self) -> Path:
+        """Per-agent incremental-import high-water cursors (plan §3.7). Maps each
+        scanned source file to its last-seen ``(size, mtime)`` so a re-import skips
+        unchanged files instead of re-parsing the whole world (the ledger is 22k+ rows);
+        `hooks.append_new`'s id-dedupe stays the correctness backstop. Machine-local
+        state, never a derived view — never read by any table."""
+        return self.state / "cursors.json"
+
+    @property
+    def debug_log(self) -> Path:
+        """Capture-path debug log (`cage/debuglog.py`) — metadata-only, written only
+        when `CAGE_DEBUG=1` / `[debug] enabled`. Override the path with `CAGE_DEBUG_LOG`."""
+        return Path(os.environ.get("CAGE_DEBUG_LOG", self.state / "debug.log"))
+
+    @property
+    def hooks_seen(self) -> Path:
+        """Per-(agent,event) hook heartbeat — append-only, last-write-wins on read.
+        Gated by the same debug switch, so it is absent unless debug is enabled."""
+        return self.state / "hooks-seen.jsonl"
 
     def pending_edits(self, session_id: str) -> Path:
         """Per-session buffer of uncommitted `PostToolUse` edits (plan §3.5) — a

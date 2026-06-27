@@ -63,12 +63,13 @@ def _nonhuman_savings(all_calls: list[dict], receipts: list[dict], pol: dict,
 
 
 def summarize(root: Path, pol: dict, dim: str = "route", since: str | None = None,
-              scope: str | None = None, team: bool = False) -> dict:
+              scope: str | None = None, project: str | None = None,
+              team: bool = False) -> dict:
     tc, tr = _team_rows(root, team)
-    all_calls = tc if tc is not None else ledger.calls(root)
+    all_calls = ledger.by_project(tc if tc is not None else ledger.calls(root), project)
     windowed_receipts = (ledger.since(tr, since) if tr is not None
                          else ledger.since(ledger.receipts(root, since=since), since))
-    calls = ledger.by_scope(_grouping_calls(root, since, tc), scope)
+    calls = ledger.by_project(ledger.by_scope(_grouping_calls(root, since, tc), scope), project)
     groups: dict[str, dict] = {}
     unpriced: set[str] = set()       # provider/model that billed $0 with no price row
     family: dict[str, str] = {}      # model → matched key (approximate, no exact row)
@@ -100,8 +101,19 @@ def summarize(root: Path, pol: dict, dim: str = "route", since: str | None = Non
             g["net_usd"] = g["saved_usd"] - g["usd"]
         total["saved_usd"] = total_saved
         total["net_usd"] = total_saved - total["usd"]
-    return {"dim": dim, "since": since, "groups": groups, "total": total,
-            "unpriced": sorted(unpriced), "family": family}
+    return {"dim": dim, "since": since, "project": project, "groups": groups,
+            "total": total, "unpriced": sorted(unpriced), "family": family}
+
+
+def _last_import_line(last_import: str | None) -> str:
+    """The pull-based capture staleness nudge (plan §3.7). Capture only happens on
+    `cage import`/`cage watch`/your own cron — nothing runs in the background — so surface
+    when the ledger was last refreshed and nudge if it never has been."""
+    if not last_import:
+        return ("· no import recorded yet — capture is pull-based: run `cage import` "
+                "(or `cage watch`) to meter your agents.")
+    rel = render.ago(last_import)
+    return f"· last import: {rel} — `cage import` to refresh." if rel else ""
 
 
 def overview(root: Path, pol: dict, since: str | None = None) -> dict:
@@ -124,9 +136,11 @@ def _row(name: str, g: dict, savings: bool) -> list[str]:
     return cells
 
 
-def render_report(rep: dict) -> str:
+def render_report(rep: dict, last_import: str | None = None) -> str:
     if not rep["groups"]:
-        return "cage: no calls recorded yet — meter some traffic first."
+        nudge = _last_import_line(last_import)
+        base = "cage: no calls recorded yet — meter some traffic first."
+        return f"{base}\n{nudge}" if nudge else base
     savings = "saved_usd" in rep["total"]  # only task/agent attribute receipts (§3.1)
     rows = [_row(name, g, savings)
             for name, g in sorted(rep["groups"].items(), key=lambda kv: -kv[1]["usd"])]
@@ -136,20 +150,32 @@ def render_report(rep: dict) -> str:
     if savings:
         head += ["saved", "net"]
         rights |= {5, 6}
-    title = f"Ledger by {rep['dim']}" + (f" (since {rep['since']})" if rep["since"] else "")
+    title = f"Ledger by {rep['dim']}"
+    if rep.get("project"):
+        title += f" · project {rep['project']}"
+    if rep["since"]:
+        title += f" (since {rep['since']})"
     out = f"{title}\n\n" + render.table(head, rows, rights=rights)
+    if rep.get("project"):
+        out += ("\n\n· project view is exact for Claude only — Copilot/Kiro/Codex logs "
+                "carry no project, so their spend is excluded from this filter.")
     if rep.get("family"):
         approx = ", ".join(f"{m} → {k}" for m, k in sorted(rep["family"].items()))
         out += f"\n\n≈ priced by family (approximate — no exact price row): {approx}"
     if rep.get("unpriced"):
         out += ("\n\n⚠ UNPRICED — counted as $0; add a price row to policy.toml: "
                 + ", ".join(rep["unpriced"]))
+    line = _last_import_line(last_import)
+    if line:
+        out += f"\n\n{line}"
     return out
 
 
-def render_overview(o: dict) -> str:
+def render_overview(o: dict, last_import: str | None = None) -> str:
     if o["empty"]:
-        return "cage: no calls recorded yet — meter some traffic first."
+        nudge = _last_import_line(last_import)
+        base = "cage: no calls recorded yet — meter some traffic first."
+        return f"{base}\n{nudge}" if nudge else base
     win = f"({o['since']})" if o["since"] else "(all time)"
     head = (f"spent {render.usd(o['spent_usd'])}  ·  saved {render.usd(o['saved_usd'])}"
             f"  ·  net {render.signed_usd(o['net_usd'])}  ·  {render.tok(o['tokens'])} tokens"

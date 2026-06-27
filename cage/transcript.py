@@ -17,7 +17,8 @@ from pathlib import Path
 from cage import schema
 
 
-def _usage_to_row(msg: dict, session: str, uuid: str, ts: str | None) -> dict | None:
+def _usage_to_row(msg: dict, session: str, uuid: str, ts: str | None,
+                  project: str = "") -> dict | None:
     usage = msg.get("usage") or {}
     out = int(usage.get("output_tokens", 0) or 0)
     inp = int(usage.get("input_tokens", 0) or 0)
@@ -29,7 +30,7 @@ def _usage_to_row(msg: dict, session: str, uuid: str, ts: str | None) -> dict | 
     return schema.make_call(
         route="chat", provider="anthropic", model=msg.get("model", "") or "",
         tokens_in=tokens_in, tokens_out=out, cached_in=cache_read,
-        session=session, agent="claude-code", ts=ts,
+        session=session, agent="claude-code", ts=ts, project=project,
         call_id="c_" + uuid.replace("-", "")[:15] if uuid else None)
 
 
@@ -49,8 +50,13 @@ def parse_calls(transcript_path: Path, session: str = "") -> list[dict]:
             continue
         if rec.get("type") != "assistant":
             continue
+        # `project` is the working-dir basename Claude stamps on each record (`cwd`) —
+        # a derived attribution axis (plan §3.7). Basename only (counts-never-content
+        # PII guard); absent on records without a cwd ⇒ "" (legacy contract).
+        cwd = rec.get("cwd") or ""
+        project = Path(cwd).name if cwd else ""
         row = _usage_to_row(rec.get("message") or {}, session,
-                            rec.get("uuid", ""), rec.get("timestamp"))
+                            rec.get("uuid", ""), rec.get("timestamp"), project=project)
         if row:
             rows.append(row)
     return rows

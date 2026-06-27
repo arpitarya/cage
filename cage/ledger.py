@@ -158,6 +158,14 @@ def by_scope(rows: list[dict], scope: str | None) -> list[dict]:
     return [r for r in rows if r.get("scope") == scope] if scope else rows
 
 
+def by_project(rows: list[dict], project: str | None) -> list[dict]:
+    """Filter to one `project` (working-dir basename, plan §3.7) — a *derived*
+    attribution axis distinct from `scope`. `None`/"" ⇒ unfiltered. Only logs that carry
+    the cwd stamp it (Claude today; Copilot/Kiro/Codex leave it empty), so a project view
+    is exact for Claude and silently drops the projectless rows of the other agents."""
+    return [r for r in rows if r.get("project") == project] if project else rows
+
+
 _SINCE = re.compile(r"^(\d+)([dhw])$")
 _UNIT = SINCE_WINDOW_DAYS
 

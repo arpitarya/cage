@@ -68,6 +68,14 @@ cache_read = 0.30
 [capture]
 enabled = true
 
+# Capture-path observability (off by default, $0, metadata-only — never prompt bodies).
+# When on, hooks/imports write a structured debug log + per-hook heartbeat to
+# .cage/state/ so you can tell whether a hook fired, was guard-skipped, or raised. It is
+# strictly observational: the ledger is byte-identical with it on or off. Env CAGE_DEBUG
+# (0/1) overrides; CAGE_DEBUG_LOG sets the log path. Read it with `cage debug`.
+[debug]
+enabled = false
+
 # Canonical pipeline order. Marginal attribution walks this once; each tool's
 # receipt is the delta it produced *given the tools upstream of it* (plan §4.2).
 [tools]

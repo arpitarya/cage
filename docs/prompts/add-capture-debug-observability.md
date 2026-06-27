@@ -60,12 +60,18 @@ files. Bake that observability into cage permanently. Read `cage/hooks.py`,
 
 ## Acceptance
 
+- **Four-agent coverage is provable, not implied.** For **each** of claude, codex,
+  copilot, kiro, a test drives that agent's import adapter (and, where applicable, its
+  hook entrypoint) with `CAGE_DEBUG=1` and asserts a structured debug event is written
+  for it (agent name, src scanned, files, parsed/appended/deduped or skip reason). Drive
+  the agent list from `agents.SURFACES` so a newly added surface fails the test until it
+  also logs. The `cage doctor` heartbeat test asserts a row for **all four** agents
+  (each either a last-fired time or an explicit "never").
 - `tests/`: with `CAGE_DEBUG=1`, a simulated hook payload writes the expected structured
   event line(s); a parser that raises produces a `debuglog.exception` entry **and** the
   hook still returns 0 (fail-open preserved); the heartbeat updates per (agent,event);
-  `cage doctor` shows per-agent last-fired incl. "never"; the debug log is asserted to
-  contain **no** prompt/body fields; with debug **off**, no debug file is created and the
-  ledger output is byte-identical to a debug-on run.
+  the debug log is asserted to contain **no** prompt/body fields; with debug **off**, no
+  debug file is created and the ledger output is byte-identical to a debug-on run.
 - `just test` green; no existing plan-number assertion changes. Bump `__version__`, add
   a README "What's new" line, refresh the test count (CLAUDE.md release-hygiene rule).
 

@@ -20,9 +20,10 @@ counted once. Fail-open per file, idempotent on re-import, $0/stdlib, counts-nev
 from __future__ import annotations
 
 import datetime as _dt
+import json
 from pathlib import Path
 
-from cage import agents, hooks, ledger, paths, policy, transcript
+from cage import agents, debuglog, hooks, ledger, paths, policy, transcript
 
 # Agents that persist a usage log to disk (everything else → proxy fallback).
 LOG_BEARING = ("claude", "codex", "copilot", "kiro")
@@ -35,25 +36,105 @@ def _mtime_utc(f: Path):
         return None
 
 
-def _scan(src: Path, pattern: str, since) -> list[Path]:
-    files = sorted(src.glob(pattern)) if src.is_dir() else [src]
+# ── incremental high-water cursors (plan §3.7) ──────────────────────────────
+# The ledger is 22k+ rows and the no-daemon model means manual `cage import`,
+# `export`'s import-first refresh, and the `cage watch` loop all re-run the scan
+# repeatedly. Re-parsing every transcript + reloading the whole ledger per file each
+# run is O(all logs × ledger). The cursor records each source file's last-seen
+# (size, mtime) so an unchanged file is skipped *before* parsing; `append_new`'s
+# id-dedupe stays the correctness backstop for grown/new files, never the throughput
+# plan. Machine-local state, never a derived view.
+
+def _load_cursors(foot: paths.Footprint) -> dict:
+    try:
+        return json.loads(foot.cursors.read_text(encoding="utf-8")) if foot.cursors.exists() else {}
+    except (ValueError, OSError):
+        return {}
+
+
+def _save_cursors(foot: paths.Footprint, cur: dict) -> None:
+    try:
+        foot.cursors.parent.mkdir(parents=True, exist_ok=True)
+        foot.cursors.write_text(json.dumps(cur), encoding="utf-8")
+    except OSError:  # fail-open: a cursor that can't persist just means a fuller re-scan next run
+        pass
+
+
+def _file_sig(f: Path):
+    try:
+        st = f.stat()
+        return [st.st_size, st.st_mtime]
+    except OSError:
+        return None
+
+
+def _now_iso() -> str:
+    return _dt.datetime.now(_dt.timezone.utc).isoformat()
+
+
+def last_import(root: Path) -> str | None:
+    """ISO timestamp of the last `cage import` run over this ledger, or ``None`` if it has
+    never run. Capture is pull-based (no daemon), so `cage doctor`/`cage report` surface
+    this as "last import: N ago" and nudge when stale (plan §3.7)."""
+    return _load_cursors(paths.Footprint(root)).get("_last_import")
+
+
+def _scan(root: Path, agent: str, src: Path, pattern: str, since,
+          *, pol: dict | None = None, agent_cursor: dict | None = None) -> list[Path]:
+    """The files to ingest, honoring ``--since`` and the incremental cursor. Files whose
+    (size, mtime) match the cursor are dropped — already fully ingested, nothing new to
+    parse. Records observational ``skip=since-filtered`` / ``skip=cursor-unchanged`` debug
+    events when files existed but were all dropped (a common "why nothing captured?" cause).
+    ``agent_cursor=None`` (the standalone import-claude/-codex commands) ⇒ no skip."""
+    raw = sorted(src.glob(pattern)) if src.is_dir() else [src]
     cut = ledger.since_cutoff(since)  # reuses constants.SINCE_WINDOW_DAYS — no new literal
-    if cut is not None:
-        files = [f for f in files if _mtime_utc(f) is not None and _mtime_utc(f) >= cut]
+    if cut is None:
+        files = raw
+    else:
+        files = [f for f in raw if _mtime_utc(f) is not None and _mtime_utc(f) >= cut]
+        if raw and not files:
+            debuglog.event(root, pol=pol, event="import", agent=agent, skip="since-filtered",
+                           src=str(src), candidates=len(raw))
+    if agent_cursor is not None and files:
+        fresh = [f for f in files if _file_sig(f) != agent_cursor.get(str(f))]
+        if not fresh:
+            debuglog.event(root, pol=pol, event="import", agent=agent, skip="cursor-unchanged",
+                           src=str(src), candidates=len(files))
+        files = fresh
     return files
 
 
-def _ingest(root: Path, files: list[Path], parse) -> int:
-    total = 0
+def _ingest(root: Path, agent: str, src: Path, files: list[Path], parse,
+            *, pol: dict | None = None, seen: set | None = None,
+            agent_cursor: dict | None = None) -> int:
+    """Parse + dedupe-append each file; returns #appended. Records a metadata-only
+    import-detail event (src, #files, #parsed, #appended, #deduped) and turns the
+    previously-silent per-file `except` into a recorded `debuglog.exception` — still
+    fail-open (a broken transcript never aborts the scan), but the traceback survives.
+
+    ``seen`` (the run-shared, already-known call-id set) is threaded into `append_new`
+    so the 22k-row ledger is read once per run, not once per file. After a file ingests
+    cleanly its (size, mtime) is written to ``agent_cursor`` so the next run skips it."""
+    total = parsed = 0
     for f in files:
         try:
-            total += hooks.append_new(root, parse(f))
-        except Exception:  # fail-open: a broken/unreadable transcript never aborts the scan
+            rows = parse(f)
+            parsed += len(rows)
+            total += hooks.append_new(root, rows, seen)
+            if agent_cursor is not None:
+                sig = _file_sig(f)
+                if sig is not None:
+                    agent_cursor[str(f)] = sig
+        except Exception as e:  # fail-open: a broken/unreadable transcript never aborts the scan
+            debuglog.exception(root, "import.ingest", e, pol=pol, agent=agent, file=str(f))
             continue
+    debuglog.event(root, pol=pol, event="import", agent=agent, result="ok", src=str(src),
+                   files=len(files), parsed=parsed, appended=total, deduped=parsed - total)
     return total
 
 
-def import_claude(root: Path, args) -> tuple[int, int]:
+def import_claude(root: Path, args, *, pol: dict | None = None, seen: set | None = None,
+                  agent_cursor: dict | None = None) -> tuple[int, int]:
     """Meter Claude Code from the transcripts it already writes to ~/.claude/projects."""
     if getattr(args, "path", None):
         src = Path(args.path)
@@ -61,35 +142,46 @@ def import_claude(root: Path, args) -> tuple[int, int]:
         src = paths.claude_home() / "projects" / paths.claude_project_slug(Path(args.project))
     else:
         src = paths.claude_home() / "projects"
-    files = _scan(src, "**/*.jsonl", getattr(args, "since", None))
-    n = _ingest(root, files, lambda f: transcript.parse_calls(f, session=f.stem))
+    files = _scan(root, "claude", src, "**/*.jsonl", getattr(args, "since", None), pol=pol,
+                  agent_cursor=agent_cursor)
+    n = _ingest(root, "claude", src, files, lambda f: transcript.parse_calls(f, session=f.stem),
+                pol=pol, seen=seen, agent_cursor=agent_cursor)
     return n, len(files)
 
 
-def import_codex(root: Path, args) -> tuple[int, int]:
+def import_codex(root: Path, args, *, pol: dict | None = None, seen: set | None = None,
+                 agent_cursor: dict | None = None) -> tuple[int, int]:
     """Meter Codex from its on-disk rollouts (~/.codex/sessions/**/rollout-*.jsonl)."""
     src = Path(args.path) if getattr(args, "path", None) else paths.codex_home() / "sessions"
-    files = _scan(src, "**/rollout-*.jsonl", getattr(args, "since", None))
-    n = _ingest(root, files, lambda f: transcript.parse_codex_calls(f, session=f.stem))
+    files = _scan(root, "codex", src, "**/rollout-*.jsonl", getattr(args, "since", None), pol=pol,
+                  agent_cursor=agent_cursor)
+    n = _ingest(root, "codex", src, files, lambda f: transcript.parse_codex_calls(f, session=f.stem),
+                pol=pol, seen=seen, agent_cursor=agent_cursor)
     return n, len(files)
 
 
-def import_copilot(root: Path, args) -> tuple[int, int]:
+def import_copilot(root: Path, args, *, pol: dict | None = None, seen: set | None = None,
+                   agent_cursor: dict | None = None) -> tuple[int, int]:
     """Meter Copilot CLI from its per-session usage log
     (~/.copilot/session-state/*/events.jsonl). The session dir name is the session id,
     so usage is recorded under that even though the file itself is always `events.jsonl`."""
     src = Path(args.path) if getattr(args, "path", None) else paths.copilot_home() / "session-state"
-    files = _scan(src, "*/events.jsonl", getattr(args, "since", None))
-    n = _ingest(root, files, lambda f: transcript.parse_copilot_calls(f, session=f.parent.name))
+    files = _scan(root, "copilot", src, "*/events.jsonl", getattr(args, "since", None), pol=pol,
+                  agent_cursor=agent_cursor)
+    n = _ingest(root, "copilot", src, files, lambda f: transcript.parse_copilot_calls(f, session=f.parent.name),
+                pol=pol, seen=seen, agent_cursor=agent_cursor)
     return n, len(files)
 
 
-def import_kiro(root: Path, args) -> tuple[int, int]:
+def import_kiro(root: Path, args, *, pol: dict | None = None, seen: set | None = None,
+                agent_cursor: dict | None = None) -> tuple[int, int]:
     """Meter Kiro from its append-only usage log (kiro.kiroagent/dev_data/
     tokens_generated.jsonl) — a single file, not a glob. Best-effort and idempotent."""
     src = Path(args.path) if getattr(args, "path", None) else paths.kiro_token_log()
-    files = _scan(src, "*", getattr(args, "since", None))
-    n = _ingest(root, files, lambda f: transcript.parse_kiro_calls(f))
+    files = _scan(root, "kiro", src, "*", getattr(args, "since", None), pol=pol,
+                  agent_cursor=agent_cursor)
+    n = _ingest(root, "kiro", src, files, lambda f: transcript.parse_kiro_calls(f),
+                pol=pol, seen=seen, agent_cursor=agent_cursor)
     return n, len(files)
 
 
@@ -102,24 +194,52 @@ def proxy_line(agent: str) -> str:
     return f"· {agent}: no on-disk usage log — meter via the proxy: cage meter -- <cmd>"
 
 
-def run_agent(root: Path, agent: str, args) -> str:
+def run_agent(root: Path, agent: str, args, *, pol: dict | None = None,
+              seen: set | None = None, agent_cursor: dict | None = None) -> str:
     if agent in _ADAPTERS:
-        n, m = _ADAPTERS[agent](root, args)
+        n, m = _ADAPTERS[agent](root, args, pol=pol, seen=seen, agent_cursor=agent_cursor)
         return f"✔ {agent}: imported {n} call(s) from {m} file(s)."
+    debuglog.event(root, pol=pol, event="import", agent=agent, result="proxy",
+                   note="no on-disk usage log")
     return proxy_line(agent)
+
+
+def _load_policy(root: Path) -> dict:
+    """Load policy fail-open: a malformed `policy.toml` (e.g. a duplicate `[debug]` table
+    that makes `tomllib` raise) must degrade to the bundled default + a recorded debug
+    event, never traceback out of the capture path (plan §3.7)."""
+    try:
+        return policy.load(paths.Footprint(root).policy)
+    except Exception as e:  # fail-open: a broken project policy never aborts capture
+        debuglog.exception(root, "import.policy", e)
+        return {}
 
 
 def run(root: Path, agent: str, args) -> list[str]:
     """Dispatch to one agent or, for ``all`` (the default), every surface in order.
 
-    No-ops outside a cage project (no `.cage/`): the user-level Copilot hook is global
-    and fires in every repo, so this guard keeps it from scattering stray ledgers — it
-    captures only where `cage init`/`cage setup` has run, scoped to cwd. Also honors the
-    consumer's capture switch (`[capture] enabled` / `CAGE_CAPTURE`): when off, hooks
-    still fire but this becomes a no-op, pausing metering without unwiring anything."""
-    if not (root / ".cage").is_dir():
-        return ["· no .cage here — run `cage init` first; import skipped"]
-    if not policy.capture_enabled(policy.load(paths.Footprint(root).policy)):
+    Capture is global by default (plan §3.7): ``root`` is the resolved active sink
+    (``--ledger``/``CAGE_BASE`` → project ``.cage/`` → global ``~/.cage``), so an import
+    fired anywhere — including a user-level Copilot hook in a repo with no ``.cage/`` —
+    lands in the one resolved ledger and never scatters a stray local footprint. Honors the
+    consumer's capture switch (`[capture] enabled` / `CAGE_CAPTURE`): when off, hooks still
+    fire but this no-ops, pausing metering without unwiring anything. The ledger ``seen``
+    set and the per-agent cursors are built once and shared across every agent (one ledger
+    read per run, unchanged files skipped). Fail-open on a malformed policy."""
+    pol = _load_policy(root)
+    debuglog.heartbeat(root, agent, "import", str(root), pol=pol)
+    debuglog.event(root, pol=pol, event="import", agent=agent, resolved_root=str(root),
+                   capture_enabled=policy.capture_enabled(pol))
+    if not policy.capture_enabled(pol):
+        debuglog.event(root, pol=pol, event="import", agent=agent, skip="capture-disabled",
+                       resolved_root=str(root))
         return ["· capture disabled ([capture] enabled=false or CAGE_CAPTURE=0) — import skipped"]
     targets = agents.SURFACES if agent == "all" else (agent,)
-    return [run_agent(root, a, args) for a in targets]
+    foot = paths.Footprint(root)
+    cursors = _load_cursors(foot)
+    seen = {c.get("id") for c in ledger.calls(root)}  # one ledger read shared across agents
+    lines = [run_agent(root, a, args, pol=pol, seen=seen,
+                       agent_cursor=cursors.setdefault(a, {})) for a in targets]
+    cursors["_last_import"] = _now_iso()  # pull-based staleness signal for doctor/report
+    _save_cursors(foot, cursors)
+    return lines

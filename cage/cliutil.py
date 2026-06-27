@@ -8,8 +8,19 @@ from cage import paths
 
 
 def root() -> Path:
-    """The project root (nearest `.cage/`) or the cwd if none has been init'd yet."""
+    """The **project** root (nearest `.cage/`) or the cwd — for scaffold/wiring/git
+    commands (`init`, `setup`, `doctor`, `origin`, `notes-sync`, `verify`, `ledger-sync`)
+    that act on *this directory's* project, never the global ledger."""
     return paths.find_project_root() or Path.cwd()
+
+
+def ledger_root() -> Path:
+    """The root whose `.cage/` is the **active ledger**, per the capture precedence
+    (`--ledger`/`CAGE_BASE` → nearest project `.cage/` → global `~/.cage`, plan §3.7) —
+    for every read/emit/capture command (`report`, `import`, `export`, `watch`, …). Capture
+    is global by default: a no-project user reads/writes the global ledger rather than
+    scattering a footprint into the cwd."""
+    return paths.resolve_root()
 
 
 def emit(args, payload: dict, text: str) -> int:

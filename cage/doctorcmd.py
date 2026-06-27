@@ -14,7 +14,9 @@ import shutil
 import tempfile
 from pathlib import Path
 
-from cage import agents, importcmd, ledger, paths, policy, prices, schema
+import datetime as _dt
+
+from cage import agents, debuglog, importcmd, ledger, paths, policy, prices, render, schema
 
 _OK, _WARN, _FAIL = "ok", "warn", "fail"
 _RANK = {_OK: 0, _WARN: 1, _FAIL: 2}
@@ -27,10 +29,15 @@ def _tool() -> tuple[str, str]:
     return _OK, f"cage {__version__} on PATH"
 
 
-def _footprint(root: Path) -> tuple[str, str]:
-    if not (root / ".cage").is_dir():
-        return _FAIL, "no .cage/ — run `cage setup` (or `cage init`)"
-    return _OK, f".cage/ present at {root / '.cage'}"
+def _footprint(active: Path, source: str) -> tuple[str, str]:
+    """The active ledger sink, per the capture precedence (plan §3.7). Names *which* sink
+    is live (project vs global vs --ledger override) so a user with both a project `.cage/`
+    and a global `~/.cage` knows where capture lands — one sink per run, never both."""
+    base = paths.Footprint(active).base
+    if not base.is_dir():
+        return _FAIL, ("no ledger yet — `cage init` for this project, or "
+                       "`cage setup --global` for project-less capture into ~/.cage")
+    return _OK, f"active ledger: {source} → {base}"
 
 
 def _policy(root: Path) -> tuple[str, str]:
@@ -42,46 +49,49 @@ def _policy(root: Path) -> tuple[str, str]:
 
 
 def _hooks(root: Path) -> tuple[str, str]:
+    """Hooks are an *optional* real-time add-on, not the capture contract: they fire only
+    under a CLI client — a VS Code extension of Codex/Kiro/Copilot never runs them. So a
+    missing/wired hook is informational, never a failure; the universal path is `cage
+    import`/`cage export`."""
     wired = [s for s, on in agents.status(root).items() if on]
     if not wired:
-        return _WARN, ("no agent hooks wired — `cage setup` (wizard) or `cage setup --wire-only --<agent>`. "
-                       "Hooks blocked by your org? See the metering matrix below for each agent's "
-                       "hookless path (`cage import` / `cage proxy`)")
-    return _OK, f"metering hooks wired: {', '.join(wired)}"
+        return _OK, ("no agent hooks wired (optional) — capture via `cage import` / "
+                     "`cage export`; wire real-time CLI hooks with `cage setup --wire-only --<agent>`")
+    return _OK, (f"real-time hooks wired (CLI-only, optional): {', '.join(wired)} — "
+                 "they don't fire under a VS Code extension; `cage import` is the universal path")
 
 
-def _metering(root: Path) -> tuple[str, str]:
-    """Four-agent metering matrix — every surface in ``agents.SURFACES`` gets a row with
-    the capture mechanism actually wired. The two log-bearing agents capture in real time
-    via a turn-scoped **Stop** hook, backed by a **SessionStart-backfill** safety net;
-    copilot/kiro have no transcript, so the proxy is their reliable path. A log-bearing
-    agent with no reliable trigger and no recorded calls is a `warn` nudge."""
-    wired = agents.status(root)
-    backfill = agents.backfill_status(root)
-    realtime = agents.realtime_status(root)
-    have_calls = bool(ledger.calls(root))
-    rows, worst = [], _OK
+def _metering(active: Path) -> tuple[str, str]:
+    """Honest four-agent capture matrix (plan §3.7). Capture is **pull-based**: explicit
+    `cage import` / `cage export` (and the optional foreground `cage watch`) is the universal,
+    client-independent path for every surface in ``agents.SURFACES``. Hooks are an optional
+    real-time add-on that fire only under a CLI client — never under a VS Code extension —
+    so a *wired* hook is not the same as a *firing* one. When capture-debug is on, the
+    per-agent heartbeat shows whether a hook has actually fired (and when); otherwise the
+    row honestly says the hook is wired but may not fire. No hook is ever labelled
+    'capture wired'. Surfaces the pull-based **last import: N ago** staleness signal."""
+    wired = agents.status(active)
+    seen = debuglog.last_seen(active)  # only populated when CAGE_DEBUG is on
+    rows = []
     for a in agents.SURFACES:
-        if a in importcmd.LOG_BEARING:
-            if realtime.get(a, False):
-                mech = ("real-time Stop + backfill ✔" if backfill.get(a, False)
-                        else "real-time Stop ✔")
-            elif backfill.get(a, False):
-                mech = "SessionStart-backfill ✔"
-            elif wired.get(a, False):
-                mech = "SessionEnd only (best-effort)"
-                if not have_calls:
-                    worst = _WARN
-            else:
-                mech = "no reliable trigger"
-                if not have_calls:
-                    worst = _WARN
-            path = f"reliable: cage import --agent {a}"
+        recs = [r for (ag, _ev), r in seen.items() if ag == a]
+        if recs:
+            latest = max(recs, key=lambda r: r.get("ts", ""))
+            state = f"hook fired {render.ago(latest.get('ts', ''))} (real-time)"
+        elif wired.get(a, False):
+            state = "hook wired — CLI-only, may not fire (e.g. a VS Code extension)"
         else:
-            mech = "proxy (no transcript)"
-            path = "reliable: cage meter -- <cmd>"
-        rows.append(f"\n      · {a:<8} {mech:<30} | {path}")
-    return worst, "capture mechanism per agent (real-time Stop hook, SessionStart-backfill safety net):" + "".join(rows)
+            state = "no hook (capture via import)"
+        rows.append(f"\n      · {a:<8} {state:<48} | universal: cage import --agent {a}")
+    li = importcmd.last_import(active)
+    rel = render.ago(li) if li else ""
+    foot = (f"\n      last import: {rel}" if rel
+            else "\n      last import: never — run `cage import` (or `cage watch`)")
+    foot += "\n      (automate with your own cron calling `cage import`; cage installs no scheduler.)"
+    head = ("capture is pull-based — `cage import`/`cage export` is the universal path; "
+            "hooks are an optional CLI-only real-time add-on (they don't fire under a VS "
+            "Code extension):")
+    return _OK, head + "".join(rows) + foot
 
 
 def _pricing(root: Path) -> tuple[str, str]:
@@ -120,6 +130,61 @@ def _interceptor(root: Path) -> tuple[str, str]:
     return _OK, "graphify interceptor installed and on PATH"
 
 
+def _ago(ts: str) -> str:
+    """Human "(3m ago)" for an ISO timestamp; fail-open to ''. Health-check only —
+    uses a clock, but doctor is never a derived-from-ledger view, so determinism holds."""
+    try:
+        when = _dt.datetime.fromisoformat(ts)
+        now = _dt.datetime.now(when.tzinfo)
+        secs = max(0, int((now - when).total_seconds()))
+        if secs < 90:
+            return f"({secs}s ago)"
+        if secs < 5400:
+            return f"({secs // 60}m ago)"
+        if secs < 172800:
+            return f"({secs // 3600}h ago)"
+        return f"({secs // 86400}d ago)"
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def _last_problem(root: Path) -> str:
+    """The most recent exception/skip in the debug log, as a short one-liner."""
+    for ev in reversed(debuglog.tail(root, 200)):
+        if ev.get("event") == "exception":
+            return f"{ev.get('agent', '?')}/{ev.get('context', '?')}: {ev.get('error', '?')} {_ago(ev.get('ts', ''))}"
+        if ev.get("skip"):
+            return f"{ev.get('agent', '?')} skipped: {ev.get('skip')} {_ago(ev.get('ts', ''))}"
+    return ""
+
+
+def _capture_trace(root: Path) -> tuple[str, str]:
+    """Per-agent capture heartbeat + last error, from the metadata-only debug log.
+    Off by default: when debug is disabled this row just says how to turn it on; it
+    never writes anything (the heartbeat/log only exist under `CAGE_DEBUG=1`)."""
+    try:
+        pol = policy.load(paths.Footprint(root).policy)
+    except Exception:  # noqa: BLE001
+        pol = {}
+    if not policy.debug_enabled(pol):
+        return _OK, ("capture debug off — set CAGE_DEBUG=1 (or [debug] enabled=true) to record a "
+                     "metadata-only per-hook heartbeat + errors to .cage/state/debug.log; "
+                     "then `cage debug` to read them")
+    seen = debuglog.last_seen(root)
+    rows = []
+    for a in agents.SURFACES:
+        recs = [r for (ag, _ev), r in seen.items() if ag == a]
+        if recs:
+            latest = max(recs, key=lambda r: r.get("ts", ""))
+            rows.append(f"\n      · {a:<8} last fired: {latest.get('event', '?'):<14} {_ago(latest.get('ts', ''))}")
+        else:
+            rows.append(f"\n      · {a:<8} never fired (no hook heartbeat seen)")
+    problem = _last_problem(root)
+    if problem:
+        rows.append(f"\n      ⚠ last issue: {problem}")
+    return _OK, "capture debug ON — per-agent last hook fired (`cage debug` for full events):" + "".join(rows)
+
+
 def _ledger_roundtrip() -> tuple[str, str]:
     """Write + read a receipt in a throwaway ledger — proves the write path works."""
     try:
@@ -137,14 +202,21 @@ def _ledger_roundtrip() -> tuple[str, str]:
 
 
 def run(root: Path) -> dict:
-    """Run every check; return {status, checks:[{name, level, detail}]}."""
+    """Run every check; return {status, checks:[{name, level, detail}]}.
+
+    Ledger checks run against the **active** sink (``--ledger``/``CAGE_BASE`` → project
+    ``.cage/`` → global ``~/.cage``), so the project-less user's global ledger is the one
+    inspected; wiring/interceptor checks stay cwd-oriented (they're about *this* project)."""
+    active = paths.resolve_root(root)
+    source = paths.active_ledger_source(root)
     checks = [
         ("tool", *_tool()),
-        ("footprint", *_footprint(root)),
-        ("policy", *_policy(root)),
-        ("pricing", *_pricing(root)),
+        ("footprint", *_footprint(active, source)),
+        ("policy", *_policy(active)),
+        ("pricing", *_pricing(active)),
         ("hooks", *_hooks(root)),
-        ("metering", *_metering(root)),
+        ("metering", *_metering(active)),
+        ("trace", *_capture_trace(active)),
         ("interceptor", *_interceptor(root)),
         ("ledger", *_ledger_roundtrip()),
     ]

@@ -1,5 +1,26 @@
-"""Tiny monospaced-table + number formatting helpers (stdlib, ≤50 lines)."""
+"""Tiny monospaced-table + number formatting helpers (stdlib)."""
 from __future__ import annotations
+
+import datetime as _dt
+
+
+def ago(ts: str) -> str:
+    """Human "3m ago" for an ISO timestamp; fail-open to "". Used by `cage doctor`/`cage
+    report` to surface "last import: N ago" (capture is pull-based, plan §3.7). A clock
+    is read, but never inside a derived-from-ledger table — determinism holds."""
+    try:
+        when = _dt.datetime.fromisoformat(ts)
+        now = _dt.datetime.now(when.tzinfo)
+        secs = max(0, int((now - when).total_seconds()))
+        if secs < 90:
+            return f"{secs}s ago"
+        if secs < 5400:
+            return f"{secs // 60}m ago"
+        if secs < 172800:
+            return f"{secs // 3600}h ago"
+        return f"{secs // 86400}d ago"
+    except Exception:  # noqa: BLE001 — display-only, never raise
+        return ""
 
 
 def usd(x: float) -> str:

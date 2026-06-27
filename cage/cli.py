@@ -21,8 +21,9 @@ commands by category:
   human axis    human · human-record · trend     agent-vs-human $ and hours saved
   authorship    origin · notes-sync · verify     who wrote which files (§3.5)
   ops           quality · regression · recommend · forecast · outcome
-  setup         init · doctor · setup · proxy · meter · mcp · serve
-  meta          query · demo · graphify · import (· import-claude · import-codex)
+  capture       import · export · watch          universal pull-based metering (§3.7)
+  setup         init · doctor · debug · setup · proxy · meter · mcp · serve
+  meta          query · demo · graphify (· import-claude · import-codex)
 
 examples:
   cage report --by model --since 7d        # where the spend went, last 7 days
@@ -49,6 +50,9 @@ def build_parser() -> argparse.ArgumentParser:
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--version", action="version", version=f"cage {__version__}")
     p.add_argument("--json", action="store_true", help="machine-readable output (bare cage: the headline dict)")
+    p.add_argument("--ledger", metavar="DIR", help="use this cage base dir as the active "
+                   "ledger (overrides the project/global resolution; the .cage-equivalent "
+                   "holding ledger/, state/ and policy.toml)")
     # required=False: bare `cage` (no subcommand) prints the headline banner via main().
     sub = p.add_subparsers(dest="cmd", required=False, metavar="<command>")
 
@@ -58,6 +62,9 @@ def build_parser() -> argparse.ArgumentParser:
     rep.add_argument("--by", choices=DIMENSIONS, default="route", help="group dimension")
     rep.add_argument("--since", metavar="WINDOW", help="window like 7d / 24h / 2w")
     rep.add_argument("--scope", metavar="DIR", help="filter to one monorepo top-level dir (§3.6.2)")
+    rep.add_argument("--project", nargs="?", const=".", metavar="NAME",
+                     help="filter to one project (working-dir basename; '.' or bare flag = "
+                          "current dir). Exact for Claude only (§3.7)")
     rep.add_argument("--team", action="store_true", help="read the merged refs/notes/cage-ledger team view (§3.6.3)")
     _json_flag(rep)
     rep.set_defaults(fn=clicmds.cmd_report)
@@ -206,6 +213,8 @@ def build_parser() -> argparse.ArgumentParser:
     st.add_argument("--project-only", action="store_true", help="scaffold .cage/ + graphify + PATH only; skip the global skill")
     st.add_argument("--wire-only", action="store_true", help="wire agent(s) only; skip scaffold and graphify")
     st.add_argument("--status", action="store_true", help="report which agents are wired (no changes)")
+    st.add_argument("--global", dest="global_ledger", action="store_true",
+                    help="initialize the global ledger (~/.cage) for project-less capture, then exit")
     st.add_argument("--no-skill", dest="skill", action="store_false", help="skip installing the /cage skill")
     st.add_argument("--repo-skill", dest="repo_skill", action="store_true", help="install the /cage skill into this repo (committed, team-shared) instead of the machine-wide home")
     st.add_argument("--no-project", dest="project", action="store_false", help="skip per-project .cage/ scaffold + hook wiring")
@@ -216,12 +225,19 @@ def build_parser() -> argparse.ArgumentParser:
     dr.add_argument("--json", action="store_true", help="machine-readable output")
     dr.set_defaults(fn=clicmds.cmd_doctor)
 
-    im = sub.add_parser("import", help="hookless metering for all four agents (claude/codex import · copilot/kiro proxy)",
+    dbg = sub.add_parser("debug", help="print recent capture-path debug events ($0, metadata-only; needs CAGE_DEBUG=1)")
+    dbg.add_argument("--tail", type=int, default=20, metavar="N", help="show the last N events (default: 20)")
+    dbg.add_argument("--json", action="store_true", help="one JSON event per line")
+    dbg.set_defaults(fn=clicmds.cmd_debug)
+
+    im = sub.add_parser("import", help="capture every agent's on-disk usage into the active ledger (the universal path)",
                         epilog="examples:\n"
                                "  cage import                              # every agent (default --agent all)\n"
                                "  cage import --agent claude --project .    # only this repo's Claude sessions\n"
                                "  cage import --agent codex --since 7d      # Codex rollouts touched in 7d\n"
-                               "  cage import --agent copilot               # prints the proxy fallback (no usage log)",
+                               "  cage --ledger ~/.cage import              # capture into a specific ledger\n"
+                               "Captures into the resolved ledger (--ledger/CAGE_BASE → project .cage/ → global ~/.cage);\n"
+                               "works with no hooks and no project. Idempotent + incremental (per-agent cursor).",
                         formatter_class=argparse.RawDescriptionHelpFormatter)
     im.add_argument("--agent", choices=[*SURFACES, "all"], default="all",
                     help="which agent to meter (default: all)")
@@ -229,6 +245,36 @@ def build_parser() -> argparse.ArgumentParser:
     im.add_argument("--project", help="restrict to one repo's sessions (Claude only)")
     im.add_argument("--since", metavar="WINDOW", help="only transcripts modified within a window like 7d / 24h / 2w")
     im.set_defaults(fn=clicmds.cmd_import)
+
+    ex = sub.add_parser("export", help="import (refresh) then emit the ledger as jsonl/csv/json",
+                        epilog="examples:\n"
+                               "  cage export                              # refresh, then raw jsonl to stdout\n"
+                               "  cage export --format csv -o spend.csv     # flat csv for a spreadsheet\n"
+                               "  cage export --format json --since 30d     # structured summary (matches `cage report`)\n"
+                               "  cage export --no-import --format jsonl    # emit the ledger as-is, no refresh\n"
+                               "  cage export --project . --agent claude    # one project's Claude rows",
+                        formatter_class=argparse.RawDescriptionHelpFormatter)
+    ex.add_argument("--format", choices=["jsonl", "csv", "json"], default="jsonl",
+                    help="jsonl=raw rows (re-ingestable) · csv=flat · json=summary (default: jsonl)")
+    ex.add_argument("--since", metavar="WINDOW", help="window like 7d / 24h / 2w")
+    ex.add_argument("--project", nargs="?", const=".", metavar="NAME",
+                    help="filter to one project (basename; '.' = current dir). Claude-exact (§3.7)")
+    ex.add_argument("--agent", choices=[*SURFACES], help="filter to one agent")
+    ex.add_argument("--no-import", dest="do_import", action="store_false",
+                    help="skip the import-first refresh; emit the ledger exactly as-is")
+    ex.add_argument("-o", "--output", metavar="FILE", help="write to FILE (default: stdout)")
+    ex.set_defaults(fn=clicmds.cmd_export)
+
+    wt = sub.add_parser("watch", help="foreground poll loop: import every interval until Ctrl-C (no OS job)",
+                        epilog="example:\n"
+                               "  cage watch                  # import all agents every 60s\n"
+                               "  cage watch --interval 300   # every 5 minutes\n"
+                               "Registers nothing and stops with the terminal — cage installs no scheduler.",
+                        formatter_class=argparse.RawDescriptionHelpFormatter)
+    wt.add_argument("--agent", choices=[*SURFACES, "all"], default="all", help="which agent to meter (default: all)")
+    wt.add_argument("--interval", type=int, default=60, metavar="SECONDS", help="seconds between imports (default: 60)")
+    wt.add_argument("--since", metavar="WINDOW", help="only transcripts modified within a window like 7d / 24h / 2w")
+    wt.set_defaults(fn=clicmds.cmd_watch)
 
     ic = sub.add_parser("import-codex", help="best-effort meter a Codex rollout JSONL (file or dir)")
     ic.add_argument("path", help="a rollout-*.jsonl file or ~/.codex/sessions dir")
@@ -292,7 +338,15 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    import os
+
     args = build_parser().parse_args(argv)
-    if getattr(args, "fn", None) is None:  # no subcommand → the bare-`cage` headline (§4)
-        return clicmds.cmd_overview(args)
-    return args.fn(args)
+    if getattr(args, "ledger", None):  # --ledger re-bases every Footprint to one sink (§3.7)
+        os.environ["CAGE_BASE"] = str(args.ledger)
+    try:
+        if getattr(args, "fn", None) is None:  # no subcommand → the bare-`cage` headline (§4)
+            return clicmds.cmd_overview(args)
+        return args.fn(args)
+    except KeyboardInterrupt:  # Ctrl-C (e.g. aborting the `cage setup` wizard) — exit clean, no traceback
+        print("\naborted.")
+        return 130

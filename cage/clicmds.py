@@ -1,16 +1,27 @@
 """Command handlers — load policy, derive a view, print it (plan §7, §8)."""
 from __future__ import annotations
 
+from pathlib import Path
+
 from cage import (agents, attribution, budget, demo, doctorcmd,
-                  explain, forecast, graphifymeter, humanview, importcmd, initcmd,
+                  explain, exportcmd, forecast, graphifymeter, humanview, importcmd, initcmd,
                   ledger, ledgersync, matrix, mcpserver, metercmd, metering, notessync,
                   origin, paths, policy, provenance, proxy, quality, recommend, regression,
-                  report, roi, serve, tasks, trend, verifycmd, wizard)
-from cage.cliutil import emit, root
+                  report, roi, serve, tasks, trend, verifycmd, watchcmd, wizard)
+from cage.cliutil import emit, ledger_root, root
 
 
-def _policy():
-    return policy.load(paths.Footprint(root()).policy)
+def _project_filter(args):
+    """The `--project` value, resolving the `.` (or bare-flag) shorthand to the current
+    directory's basename — a project view of the global ledger (plan §3.7)."""
+    p = getattr(args, "project", None)
+    return Path.cwd().name if p == "." else p
+
+
+def _policy(r=None):
+    """Policy for ``r`` (the active root). Defaults to the project root; ledger/read
+    commands pass ``ledger_root()`` so a no-project user reads the global ledger's policy."""
+    return policy.load(paths.Footprint(r or root()).policy)
 
 
 def _latest_task(r) -> str | None:
@@ -29,30 +40,33 @@ def cmd_init(_args) -> int:
 
 
 def cmd_report(args) -> int:
-    rep = report.summarize(root(), _policy(), dim=args.by, since=args.since,
+    r = ledger_root()
+    rep = report.summarize(r, _policy(r), dim=args.by, since=args.since,
                            scope=getattr(args, "scope", None),
+                           project=_project_filter(args),
                            team=getattr(args, "team", False))
-    return emit(args, rep, report.render_report(rep))
+    return emit(args, rep, report.render_report(rep, last_import=importcmd.last_import(r)))
 
 
 def cmd_overview(args) -> int:
     """Bare `cage` — the one-look spent/saved/net headline (§4). No subcommand."""
-    o = report.overview(root(), _policy())
-    return emit(args, o, report.render_overview(o))
+    r = ledger_root()
+    o = report.overview(r, _policy(r))
+    return emit(args, o, report.render_overview(o, last_import=importcmd.last_import(r)))
 
 
 def cmd_attrib(args) -> int:
-    r = root()
+    r = ledger_root()
     task = args.task or _latest_task(r)
-    data = attribution.attribute(r, task, _policy(), scope=getattr(args, "scope", None),
+    data = attribution.attribute(r, task, _policy(r), scope=getattr(args, "scope", None),
                                  team=getattr(args, "team", False))
     return emit(args, data, attribution.render_attrib(data))
 
 
 def cmd_matrix(args) -> int:
-    r = root()
+    r = ledger_root()
     task = args.task or _latest_task(r)
-    data = matrix.matrix(r, task, _policy(), human=getattr(args, "human", False),
+    data = matrix.matrix(r, task, _policy(r), human=getattr(args, "human", False),
                          scope=getattr(args, "scope", None))
     text = matrix.render_matrix(data)
     if getattr(args, "html", None):
@@ -63,8 +77,8 @@ def cmd_matrix(args) -> int:
 
 
 def cmd_human(args) -> int:
-    r = root()
-    data = humanview.rollup(r, _policy(), since=args.since, agent=args.agent, task=args.task)
+    r = ledger_root()
+    data = humanview.rollup(r, _policy(r), since=args.since, agent=args.agent, task=args.task)
     text = humanview.render_human(data)
     if getattr(args, "html", None):
         serve.write_html(args.html, "Agent vs human", {"Agent vs human": text})
@@ -77,14 +91,15 @@ def cmd_human_record(args) -> int:
     rid = metering.record_human(task=args.task, minutes=args.minutes, usd=args.usd,
                                 task_type=args.task_type or "", rate_usd_per_hr=args.rate,
                                 call=args.call, agent=args.agent, measured=args.measured,
-                                root=root())
+                                root=ledger_root())
     print(f"✔ recorded human alternative for {args.task!r}." if rid
           else f"· {args.task!r} already has a human receipt for that call (no double count).")
     return 0
 
 
 def cmd_trend(args) -> int:
-    data = trend.series(root(), _policy(), by=args.by, since=args.since)
+    r = ledger_root()
+    data = trend.series(r, _policy(r), by=args.by, since=args.since)
     text = trend.render_trend(data, metric=args.metric)
     if getattr(args, "html", None):
         serve.write_html(args.html, "Savings trend", {"Savings trend": text})
@@ -94,23 +109,25 @@ def cmd_trend(args) -> int:
 
 
 def cmd_budget(args) -> int:
-    verdict = budget.check(root(), _policy(), session=args.session,
+    r = ledger_root()
+    verdict = budget.check(r, _policy(r), session=args.session,
                            scope=getattr(args, "scope", None))
     return emit(args, verdict, budget.render_budget(verdict))
 
 
 def cmd_roi(args) -> int:
-    data = roi.by_tool(root(), _policy(), since=args.since)
+    r = ledger_root()
+    data = roi.by_tool(r, _policy(r), since=args.since)
     return emit(args, data, roi.render_roi(data))
 
 
 def cmd_why(args) -> int:
-    data = provenance.explain(root(), args.call_id)
+    data = provenance.explain(ledger_root(), args.call_id)
     return emit(args, data, provenance.render_why(data, args.call_id))
 
 
 def cmd_serve(args) -> int:
-    return serve.serve(root(), port=args.port)
+    return serve.serve(ledger_root(), port=args.port)
 
 
 def cmd_query(args) -> int:
@@ -144,7 +161,7 @@ def cmd_query(args) -> int:
 
 
 def cmd_demo(_args) -> int:
-    call_id = demo.seed(root())
+    call_id = demo.seed(ledger_root())
     print(f"✔ Seeded the §4.4 worked example (task {demo.TASK!r}, call {call_id}).")
     print("  Now run:  cage attrib   ·   cage matrix   ·   cage report")
     return 0
@@ -153,12 +170,12 @@ def cmd_demo(_args) -> int:
 # ── §8 ledger features ───────────────────────────────────────────────────────
 
 def cmd_quality(args) -> int:
-    s = quality.summarize(root())
+    s = quality.summarize(ledger_root())
     return emit(args, s, quality.render_quality(s))
 
 
 def cmd_outcome(args) -> int:
-    r = root()
+    r = ledger_root()
     quality.record_outcome(r, args.task, ok=not args.redo)
     tasks.record(r, args.task, outcome="ok" if not args.redo else "redo")
     print(f"✔ recorded {args.task!r} as {'redo' if args.redo else 'ok'}.")
@@ -166,17 +183,19 @@ def cmd_outcome(args) -> int:
 
 
 def cmd_regression(args) -> int:
-    r = regression.detect(root(), since=args.since, tolerance=args.tolerance)
+    r = regression.detect(ledger_root(), since=args.since, tolerance=args.tolerance)
     return emit(args, r, regression.render_regression(r))
 
 
 def cmd_recommend(args) -> int:
-    r = recommend.recommend(root(), _policy(), since=args.since)
+    lr = ledger_root()
+    r = recommend.recommend(lr, _policy(lr), since=args.since)
     return emit(args, r, recommend.render_recommend(r))
 
 
 def cmd_forecast(args) -> int:
-    f = forecast.project(root(), _policy())
+    lr = ledger_root()
+    f = forecast.project(lr, _policy(lr))
     return emit(args, f, forecast.render_forecast(f))
 
 
@@ -202,6 +221,17 @@ def cmd_setup(args) -> int:
     import sys
 
     here = root()
+
+    # Handle --global: initialize the machine-wide global ledger (~/.cage) and exit. This
+    # is the project-less capture sink (plan §3.7) — `cage import`/`cage export` from any
+    # dir without a project `.cage/` land here.
+    if getattr(args, "global_ledger", False):
+        info = initcmd.run(paths.global_home(), pointer=False)
+        print(f"✔ Global ledger initialised at {info['footprint']}")
+        print(f"  policy   → {info['policy']}")
+        print(f"  ledger   → {info['ledger']}/  (append-only)")
+        print("Capture into it from anywhere: `cage import` · read it: `cage report`.")
+        return 0
 
     # Handle --status: report current wiring and exit
     if getattr(args, "status", False):
@@ -278,6 +308,36 @@ def cmd_doctor(args) -> int:
 
 
 
+def cmd_debug(args) -> int:
+    """Print recent capture-path debug events ($0, metadata-only). When debug is off the
+    log won't exist — say how to turn it on rather than printing nothing."""
+    from cage import debuglog
+    r = ledger_root()
+    if not policy.debug_enabled(_policy(r)) and not paths.Footprint(r).debug_log.exists():
+        print("· capture debug is off — set CAGE_DEBUG=1 (or [debug] enabled=true in policy.toml),")
+        print("  re-run your agent, then `cage debug` to see per-hook events + errors.")
+        return 0
+    events = debuglog.tail(r, getattr(args, "tail", 20))
+    if not events:
+        print("· no debug events recorded yet (debug log is empty).")
+        return 0
+    import json
+    if getattr(args, "json", False):
+        for ev in events:
+            print(json.dumps(ev))
+        return 0
+    for ev in events:
+        ts = ev.get("ts", "").replace("T", " ")[:19]  # 'YYYY-MM-DD HH:MM:SS' — drop micros/tz
+        agent = ev.get("agent", "?")
+        name = ev.get("event", "?")
+        rest = {k: v for k, v in ev.items() if k not in ("ts", "agent", "event")}
+        detail = " ".join(f"{k}={v}" for k, v in rest.items() if k != "traceback")
+        print(f"  {ts}  {agent}/{name}  {detail}".rstrip())
+        if "traceback" in rest:
+            print("    " + rest["traceback"].rstrip().replace("\n", "\n    "))
+    return 0
+
+
 def cmd_notes_sync(args) -> int:
     res = notessync.sync(root(), write=True if args.write else None)
     if getattr(args, "json", False):
@@ -334,16 +394,18 @@ def cmd_verify(_args) -> int:
 
 
 def cmd_import(args) -> int:
-    """Umbrella hookless import across all four agents (default ``--agent all``).
-    Each agent prints its own line: an import count for log-bearing agents, the proxy
-    fallback for those with no on-disk usage log. Always exits 0 (fail-open)."""
-    for line in importcmd.run(root(), args.agent, args):
+    """Umbrella hookless import across all four agents (default ``--agent all``) — the
+    canonical explicit capture verb. Captures into the active ledger (``--ledger``/
+    ``CAGE_BASE`` → project ``.cage/`` → global ``~/.cage``), so it works with no hooks
+    and no project. Each agent prints its own count line; the proxy fallback for those
+    with no on-disk usage log. Always exits 0 (fail-open)."""
+    for line in importcmd.run(ledger_root(), args.agent, args):
         print(line)
     return 0
 
 
 def cmd_import_codex(args) -> int:
-    n, m = importcmd.import_codex(root(), args)
+    n, m = importcmd.import_codex(ledger_root(), args)
     print(f"✔ imported {n} Codex call(s) from {m} rollout file(s).")
     return 0
 
@@ -352,6 +414,19 @@ def cmd_import_claude(args) -> int:
     """Meter Claude Code with no hooks/MCP — pull the transcripts it already writes
     to disk. Idempotent (append_new dedupes on the per-turn call id), fail-open per
     file (an unreadable transcript is skipped, never raised), $0/offline."""
-    n, m = importcmd.import_claude(root(), args)
+    n, m = importcmd.import_claude(ledger_root(), args)
     print(f"✔ imported {n} Claude call(s) from {m} transcript(s).")
     return 0
+
+
+def cmd_export(args) -> int:
+    """Import-first (unless ``--no-import``) then emit the active ledger as jsonl/csv/json
+    (counts-never-content, deterministic). The universal pull-based export path."""
+    r = ledger_root()
+    args.project = _project_filter(args)
+    return exportcmd.run(r, args, pol=_policy(r))
+
+
+def cmd_watch(args) -> int:
+    """Foreground poll loop — import every interval until Ctrl-C. Registers no OS job."""
+    return watchcmd.run(ledger_root(), args)
