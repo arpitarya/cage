@@ -6,8 +6,8 @@ description: Show LLM spend, per-tool savings attribution, and budget from the C
 # /cage — read the LLM cost & savings ledger
 
 Cage is a *flux*: a deterministic, $0 ledger of LLM token traffic and the savings
-each tool in the stack produced. Use the `cage` CLI (or the `cage` MCP tools if
-wired) to answer cost / savings / budget questions from real recorded data.
+each tool in the stack produced. Use the `cage` MCP tools (or the `cage` CLI) to
+answer cost / savings / budget questions from real recorded data.
 
 Run the command that matches the ask and show its output **verbatim** — it is a
 pre-formatted table. Never invent a number.
@@ -22,8 +22,8 @@ pre-formatted table. Never invent a number.
 
 Every command takes `--json` for machine-readable output.
 
-If the ledger has no data, metering isn't recording yet — point the user at
-`cage setup --wire-only` (Claude Code / Codex) or `cage meter -- <cmd>` (any agent).
+To meter this agent, run it under `cage proxy` (point its base URL at the proxy),
+or `cage meter -- <cmd>` for a one-shot.
 
 The ledger stores token **counts** only — never prompt bodies (PII-safe by
 construction). If `cage report` returns nothing, say so rather than guessing.

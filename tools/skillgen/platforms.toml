@@ -1,0 +1,71 @@
+# skillgen platform manifest (cage) — build-time only.
+#
+# This file and everything under tools/skillgen/ is NOT shipped in the wheel and
+# is never imported by the cage package at runtime. It drives the render of the
+# committed cage skill/prompt/steering assets under cage/data/. Run
+# `python -m tools.skillgen` from the repo root to regenerate, `--check` to fail
+# on drift, `--bless` to refresh expected/. Edit fragments here — never hand-edit
+# the rendered files.
+#
+# Each [platform.<key>] declares how that host's asset is assembled from the
+# shared core (fragments/core/core.md) plus a few per-host slots.
+#
+# Keys:
+#   kind         skill | prompt | steering. Drives the frontmatter shape:
+#                skill    = name + description (Claude/Codex/agents Agent Skills),
+#                prompt   = description only   (Copilot reusable prompt),
+#                steering = inclusion: always  (Kiro always-on doc).
+#   skill_dst    rendered file path, relative to the repo root.
+#   name         frontmatter `name:` (skill kind only; default "cage").
+#   description  frontmatter `description:`, PRESERVED VERBATIM. Required for
+#                skill/prompt; omitted for steering.
+#   header       the H1 line of the rendered body.
+#   intro        intro-framing fragment basename under fragments/intro/.
+#   meter        metering-note fragment basename under fragments/meter/.
+#
+# Four-agents invariant: claude/codex/copilot/kiro are all first-class and must
+# all render. claude and codex deliberately share data/skills/cage/SKILL.md
+# (cage setup copies that one dir to both ~/.claude and ~/.codex), so their slots
+# must stay byte-identical — render_all asserts it.
+
+[platform.claude]
+kind = "skill"
+skill_dst = "cage/data/skills/cage/SKILL.md"
+name = "cage"
+description = "Show LLM spend, per-tool savings attribution, and budget from the Cage ledger ($0, deterministic). Trigger when the user asks what a session/project cost, what saved money, or whether they are over budget."
+header = "# /cage — read the LLM cost & savings ledger"
+intro = "skill"
+meter = "skill"
+
+[platform.codex]
+kind = "skill"
+skill_dst = "cage/data/skills/cage/SKILL.md"
+name = "cage"
+description = "Show LLM spend, per-tool savings attribution, and budget from the Cage ledger ($0, deterministic). Trigger when the user asks what a session/project cost, what saved money, or whether they are over budget."
+header = "# /cage — read the LLM cost & savings ledger"
+intro = "skill"
+meter = "skill"
+
+[platform.copilot]
+kind = "prompt"
+skill_dst = "cage/data/prompts/cage.prompt.md"
+description = "Read LLM spend & per-tool savings from the Cage ledger ($0, deterministic)"
+header = "# Cage — LLM cost & savings"
+intro = "copilot"
+meter = "copilot"
+
+[platform.kiro]
+kind = "steering"
+skill_dst = "cage/data/steering/cage.md"
+header = "# Cage — LLM cost & savings ledger"
+intro = "kiro"
+meter = "kiro"
+
+[platform.agents]
+kind = "skill"
+skill_dst = "cage/data/skills/agents/cage/SKILL.md"
+name = "cage"
+description = "Show LLM spend, per-tool savings attribution, and budget from the Cage ledger ($0, deterministic). Trigger when the user asks what a session/project cost, what saved money, or whether they are over budget."
+header = "# /cage — read the LLM cost & savings ledger"
+intro = "agents"
+meter = "agents"

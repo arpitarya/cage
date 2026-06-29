@@ -559,6 +559,28 @@ backlog with no ledger rewrite. The full design is `docs/human-baseline.design.m
   (Claude Code). Targets the *protocol*, so it is not "wrap claude" — any
   OpenAI/Anthropic-compatible client is metered, none is named.
 
+### 5.1 Build-time assets — `tools/skillgen` (renders the per-host skill, $0)
+
+The flagship `cage` skill ships four ways for the four agents — a Claude/Codex
+slash-command `SKILL.md`, a Copilot `.prompt.md`, and a Kiro steering doc (plus a
+generic `agents` Agent-Skills target). The *content* is the same pitch; only the
+host wrapper (frontmatter shape, header, trigger framing, metering note) differs.
+Hand-maintaining four files lets the wording drift. `tools/skillgen/` single-
+sources them: one shared `fragments/core/core.md` body with a few `@@SLOT@@`s
+filled per host from `platforms.toml`, rendered to the existing
+`cage/data/skills|prompts|steering/` paths (so `cage setup` / `<agent>wire.py` are
+unchanged). `python -m tools.skillgen --check` byte-diffs the render against the
+committed files **and** a tracked `expected/` snapshot and is wired into CI +
+pre-commit; `--bless` refreshes the snapshot.
+
+This is **build-time only** and holds the same constitution as the engine:
+stdlib-only (`tomllib`/`re`/`pathlib`/`argparse`), no runtime dependency, no
+LLM/network, deterministic (same fragments ⇒ byte-identical render, LF-normalized).
+Nothing under `tools/skillgen/` is imported by the `cage` package at runtime or
+shipped in the wheel (the `include=["cage*"]` packaging filter excludes it). The
+four-agents invariant is preserved and test-asserted — every host renders, none is
+dropped. Design of record: [skillgen.md](skillgen.md).
+
 ---
 
 ## 6. Tiers — `$0` core, AI strictly optional

@@ -2,6 +2,20 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
+## v0.13.0 — skillgen: the flagship `cage` skill is rendered from one source
+
+cage shipped the same flagship `cage` pitch four ways — a Claude/Codex slash-command `SKILL.md`, a Copilot `.prompt.md`, and a Kiro steering doc — hand-authored and free to drift. This release single-sources them.
+
+- **`tools/skillgen/` (build-time, stdlib-only, never shipped).** A ~250-line renderer (`tomllib`/`re`/`pathlib`/`argparse` only — no runtime dependency, no LLM, no network) reads `fragments/core/core.md` plus a handful of per-host slots (frontmatter, header, intro framing, metering note) declared in `platforms.toml`, and renders every host's committed asset. `python -m tools.skillgen` renders, `--check` byte-diffs the render against both the committed files and `expected/` (exit 1 on drift), `--bless` refreshes `expected/`. Nothing under `tools/skillgen/` is imported by the `cage` package at runtime or packaged in the wheel (`[tool.setuptools.packages.find] include=["cage*"]` already excludes it; a test asserts it).
+
+- **Five hosts, four sacred agents preserved.** Renders to the existing source paths so `cage setup` / `<agent>wire.py` keep working unchanged: `cage/data/skills/cage/SKILL.md` (Claude **and** Codex — they share one file, rendered byte-identical and asserted), `cage/data/prompts/cage.prompt.md` (Copilot), `cage/data/steering/cage.md` (Kiro), plus a **new** generic `cage/data/skills/agents/cage/SKILL.md` (Agent Skills) target to prove breadth. The four-agents invariant is test-asserted; editing one shared line in `core.md` updates every host in a single `--bless`.
+
+- **Normalized shared body.** The three structurally-different wrappers (the Claude numbered runbook vs. the Copilot/Kiro bullet lists) now share one command block (`report`/`attrib`/`roi`/`matrix`/`budget`/`why`, `--json`) and one counts-never-content / PII-safe clause; only the frontmatter shape, header, intro framing, and metering note differ per host. Each host's `description` (its firing trigger) is preserved **verbatim** from `platforms.toml`.
+
+- **Drift guard wired in.** `python -m tools.skillgen --check` runs in the `Python package` CI job and as a local `pre-commit` hook (`.pre-commit-config.yaml`). New tests (`tests/test_skillgen.py`) cover byte-determinism, all five hosts + the four sacred agents, per-host anchor lines, no surviving `@@` slot, `--check` clean/drift, the shared-path byte-identity guard, and wheel exclusion — 284 tests pass (was 262).
+
+No schema/contract, MCP, metering/ledger/attribution/provenance, or `cage setup` behavior changed — only the *source* of the (reviewed-at-the-bless-gate) skill assets, plus the new generic `agents` asset. Design of record: [docs/skillgen.md](docs/skillgen.md).
+
 ## v0.12.1 — green CI: tests no longer depend on ambient git identity or pathlib internals
 
 A bug-fix release: the `Python package` workflow was red on `main` (the publish workflow was unaffected — releases still shipped). Three `tests/test_ledger_scale.py` cases passed locally but failed on the CI matrix because they leaned on the developer's environment rather than asserting the contract:

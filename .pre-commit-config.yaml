@@ -1,0 +1,15 @@
+# Pre-commit hooks for cage. $0 / stdlib-only constitution: the only hook is a
+# local, dependency-free guard that the rendered skill/prompt/steering assets
+# match their fragments (tools/skillgen). Edit fragments, then
+# `python -m tools.skillgen` + `--bless`; never hand-edit the rendered files.
+#
+# Enable once with: pre-commit install
+repos:
+  - repo: local
+    hooks:
+      - id: skillgen-check
+        name: skillgen --check (rendered skill assets up to date)
+        entry: python -m tools.skillgen --check
+        language: system
+        pass_filenames: false
+        files: ^(tools/skillgen/|cage/data/(skills|prompts|steering)/)
