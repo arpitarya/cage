@@ -51,5 +51,11 @@ include = ["cage*"]
 [tool.setuptools.package-data]
 cage = ["data/policy.toml", "data/skills/**/*", "data/prompts/*", "data/steering/*", "data/shims/*", "data/assets/*"]
 
+[tool.pytest.ini_options]
+# Put the repo root on sys.path so tests can import the build-time `tools.skillgen`
+# package (which is intentionally not installed/shipped). Invocation-independent:
+# works under bare `pytest` (CI) and `python -m pytest` (justfile) alike.
+pythonpath = ["."]
+
 [tool.ruff]
 line-length = 100

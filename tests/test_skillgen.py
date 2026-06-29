@@ -168,7 +168,7 @@ def test_wheel_excludes_skillgen():
     (deterministic; the full `python -m build` content inspection is the manual
     §9 verify step). The rendered agents asset, by contrast, IS shipped — it lives
     under cage/data and is covered by the `data/skills/**/*` package-data glob."""
-    from setuptools import find_packages
+    find_packages = pytest.importorskip("setuptools").find_packages
 
     discovered = find_packages(where=str(REPO_ROOT), include=["cage*"])
     assert not any(p == "tools" or p.startswith("tools.") for p in discovered), \
