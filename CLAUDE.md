@@ -1,8 +1,8 @@
 # CLAUDE.md — Context for Claude Code
 
 **Cage** — a *flux*: a deterministic attribution ledger for LLM token traffic and
-tool savings. Third in the family after **graphify** (code→graph) and **fux**
-(decisions→rules). `$0`, stdlib-only, deterministic, independent of any AI tool.
+tool savings. In the family alongside **fux** (decisions→rules). `$0`, stdlib-only,
+deterministic, independent of any AI tool.
 
 Design of record: [docs/cage-plan.md](docs/cage-plan.md). Read it before changing
 the substrate contract or the attribution engine.
