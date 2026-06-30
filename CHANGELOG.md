@@ -2,7 +2,7 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
-## Unreleased — typed CLI errors + a documented exit-code contract (fail-open preserved)
+## v0.14.0 — typed CLI errors + a documented exit-code contract (fail-open preserved)
 
 cage's error handling was already mature — ~64 fail-open markers on write paths, every broad `except` carrying a `# noqa: BLE001 — <reason>`, hooks all `try/except → exit 0`, and `main()` already mapping `KeyboardInterrupt → 130`. The one real gap: `main()` had no typed/expected-error path, so an expected failure (a malformed `policy.toml`) or any unexpected exception dumped a raw traceback. This release closes that gap — **additive and boundary-only; not one fail-open block was rewritten.**
 
@@ -16,7 +16,7 @@ cage's error handling was already mature — ~64 fail-open markers on write path
 
 - **Fail-open verified, not rewritten.** New tests prove a forced internal error in `ledger.append` / `metering.meter` / the Stop hook never propagates, and that the swallow is reachable via `debuglog` (not truly silent). The audit found exactly one genuinely-silent broad swallow — `meter`'s cleanup — and it gets an **ADD-only** `CAGE_DEBUG` trace (the same pattern `hooks.py` already uses), fully guarded so the metered call's no-raise guarantee stays absolute. The MCP boundary was already crash-proof (`isError` on any tool error, malformed JSON lines skipped); tests now lock that in. 299 tests pass (was 284).
 
-No version bump or publish in this change (cage releases only via GitHub release); fold the bump into the next tagged release. No schema/contract, MCP tool contract, metering/ledger/attribution/provenance engine logic, policy/constants layers, or four-agents wiring changed — only error *surfacing* at the boundary. MCP contract docs: N/A (behavior on malformed input is clarified, not changed).
+No schema/contract, MCP tool contract, metering/ledger/attribution/provenance engine logic, policy/constants layers, or four-agents wiring changed — only error *surfacing* at the boundary. MCP contract docs: N/A (behavior on malformed input is clarified, not changed). (This release also folds in the docs-only scrub of graphify from cage's marketing/lineage prose — code, the graphify meter/shim, and the worked example are unchanged.)
 
 ## v0.13.0 — skillgen: the flagship `cage` skill is rendered from one source
 
