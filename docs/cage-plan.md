@@ -581,6 +581,22 @@ shipped in the wheel (the `include=["cage*"]` packaging filter excludes it). The
 four-agents invariant is preserved and test-asserted — every host renders, none is
 dropped. Design of record: [skillgen.md](skillgen.md).
 
+### 5.2 Error surfacing — typed CLI error + exit-code contract (fail-open preserved)
+
+Two error regimes, kept strictly separate. **Write paths are fail-open** (constitutional,
+§5/§9): `ledger.append` returns `False`, `meter()` swallows cleanup errors, hooks
+`try/except → exit 0` — a metering failure never propagates into a request/turn, and the
+swallow is reachable under `CAGE_DEBUG` (no truly silent swallow). **The read/CLI boundary
+is typed**: an expected, user-facing failure raises the single `CageError` ([errors.py](../cage/errors.py)),
+which `cli.main` renders as a clean `error: <msg>` line. There is exactly one error type —
+no hierarchy, no logging framework, no retries (stdlib-only).
+
+The exit-code contract: **`0`** ok · **`1`** error (`CageError` or an unexpected exception —
+full traceback only under `CAGE_DEBUG=1`) · **`2`** argparse usage error (stdlib default, e.g.
+an unknown subcommand) · **`130`** interrupted (`KeyboardInterrupt`). `cage verify` is
+report-only and always exits `0` — visibility, never a build gate. This is additive and
+boundary-only: the fail-open internals are verified by tests, never rewritten.
+
 ---
 
 ## 6. Tiers — `$0` core, AI strictly optional

@@ -9,6 +9,7 @@ from cage import (agents, attribution, budget, demo, doctorcmd,
                   origin, paths, policy, provenance, proxy, quality, recommend, regression,
                   report, roi, serve, tasks, trend, verifycmd, watchcmd, wizard)
 from cage.cliutil import emit, ledger_root, root
+from cage.errors import CageError
 
 
 def _project_filter(args):
@@ -20,8 +21,17 @@ def _project_filter(args):
 
 def _policy(r=None):
     """Policy for ``r`` (the active root). Defaults to the project root; ledger/read
-    commands pass ``ledger_root()`` so a no-project user reads the global ledger's policy."""
-    return policy.load(paths.Footprint(r or root()).policy)
+    commands pass ``ledger_root()`` so a no-project user reads the global ledger's policy.
+
+    A malformed project ``policy.toml`` is a user-facing failure, so surface it as a
+    clean ``CageError`` (``cli.main`` → ``error: …`` + exit 1) instead of leaking a raw
+    ``TOMLDecodeError`` traceback at the read boundary. Write paths call ``policy.load``
+    directly and stay fail-open; only this CLI read chokepoint converts."""
+    path = paths.Footprint(r or root()).policy
+    try:
+        return policy.load(path)
+    except Exception as e:  # noqa: BLE001 — malformed policy.toml → clean CLI error, not a traceback
+        raise CageError(f"{path.name}: {e}") from e
 
 
 def _latest_task(r) -> str | None:

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import argparse
 
-from cage import __version__, clicmds, hooks
+from cage import __version__, clicmds, errors, hooks
 from cage.agents import SURFACES
 from cage.report import DIMENSIONS
 
@@ -339,7 +339,9 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     import os
+    import sys
 
+    # argparse renders its own usage error + exits 2 here, before the try (stdlib).
     args = build_parser().parse_args(argv)
     if getattr(args, "ledger", None):  # --ledger re-bases every Footprint to one sink (§3.7)
         os.environ["CAGE_BASE"] = str(args.ledger)
@@ -350,3 +352,12 @@ def main(argv: list[str] | None = None) -> int:
     except KeyboardInterrupt:  # Ctrl-C (e.g. aborting the `cage setup` wizard) — exit clean, no traceback
         print("\naborted.")
         return 130
+    except errors.CageError as e:  # an expected, user-facing failure → clean line, no traceback
+        print(f"error: {e}", file=sys.stderr)
+        return 1
+    except Exception as e:  # noqa: BLE001 — last-resort boundary: terse error; full traceback only under CAGE_DEBUG
+        print(f"error: {e}", file=sys.stderr)
+        if errors.debug_enabled():
+            import traceback
+            traceback.print_exc()
+        return 1

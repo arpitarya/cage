@@ -141,5 +141,12 @@ def meter(route: str, *, task: str = "", session: str = "", agent: str = "lib",
                     agent=rec.agent, latency_ms=latency_ms, ok=rec.ok,
                     retries=rec.retries, scope=_scope_for(str(_resolve_root(rec.root))),
                     root=rec.root)
-        except Exception:
-            pass
+        except Exception as e:  # noqa: BLE001 — fail-open: metering must never raise out of cleanup
+            # ADD-only (not a rewrite): make the swallow reachable under CAGE_DEBUG
+            # instead of truly silent. The trace is itself fully guarded so it can
+            # never break the metered call — the no-raise guarantee stays absolute.
+            try:
+                from cage import debuglog  # local import keeps the hot path import-light
+                debuglog.exception(_resolve_root(rec.root), "meter.record", e)
+            except Exception:  # noqa: BLE001 — even tracing must never break a metered call
+                pass
