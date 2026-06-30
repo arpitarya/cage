@@ -62,6 +62,19 @@ input = 3.00
 output = 15.00
 cache_read = 0.30
 
+# Estimated AI-credit multipliers (`cage limits`). Post-2026 GitHub/Codex plans consume
+# credits as a function of tokens, so credits = tokens × per_mtok (per MILLION tokens).
+# These are OFF by default — cage ships no active rows because a wrong credit number is
+# worse than none, and the precise per-token rates aren't published. Uncomment + set
+# per_mtok from your provider's usage dashboard to turn on the estimate; it is always
+# labelled `estimated` and matched on the EXACT model id (no family fallback — an estimate
+# borrowed across models would be a different wrong number). Token-based providers only:
+# never add a [credits.kiro] row — Kiro spends units-of-work, not token multiples.
+# [credits.anthropic."claude-opus-4-8"]
+# per_mtok = 30   # illustrative — replace with your dashboard's figure
+# [credits.openai."gpt-5"]
+# per_mtok = 12   # illustrative
+
 # Auto-capture switch. Each agent's hook runs `cage import --agent <itself>` to meter
 # its own on-disk usage log; set enabled=false to pause that without unwiring any hooks
 # (the hooks still fire, the import is a no-op). Env CAGE_CAPTURE (0/1) overrides.

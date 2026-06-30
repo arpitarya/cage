@@ -21,7 +21,7 @@ commands by category:
   human axis    human · human-record · trend     agent-vs-human $ and hours saved
   authorship    origin · notes-sync · verify     who wrote which files (§3.5)
   ops           quality · regression · recommend · forecast · outcome
-  capture       import · export · watch          universal pull-based metering (§3.7)
+  capture       import · export · watch · limits  universal pull-based metering + quota (§3.7)
   setup         init · doctor · debug · setup · proxy · meter · mcp · serve
   meta          query · demo · graphify (· import-claude · import-codex)
 
@@ -91,6 +91,10 @@ def build_parser() -> argparse.ArgumentParser:
     bd.add_argument("--scope", metavar="DIR", help="filter to one monorepo top-level dir (§3.6.2)")
     _json_flag(bd)
     bd.set_defaults(fn=clicmds.cmd_budget)
+
+    lm = sub.add_parser("limits", help="provider quota windows + estimated AI-credit use")
+    _json_flag(lm)
+    lm.set_defaults(fn=clicmds.cmd_limits)
 
     ro = sub.add_parser("roi", help="saved $ per tool vs its own cost + latency")
     ro.add_argument("--since", metavar="WINDOW", help="window like 30d / 2w")

@@ -168,12 +168,26 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   `1` error (full traceback only under `CAGE_DEBUG=1`) · `2` argparse usage · `130`
   interrupt; `cage verify` stays exit 0. Don't add an exception hierarchy or convert a
   write path into a raising one.
+- **Quota & credits are `estimated` and live outside the ledger.** `cage limits`
+  ([limits.py](cage/limits.py), plan §3.8) reads Codex `rate_limits` (a *sibling* of
+  `payload.info`, via `transcript._codex_rate_limits`) into a latest-only, overwrite-only
+  machine-local `.cage/state/limits.json` (`Footprint.limits`) — **never** a `limits.jsonl`
+  row, never partitioned, never synced to refs/notes. Credit numbers are tokens × a
+  `[credits.<provider>."<model>"] per_mtok` policy multiplier ([credits.py](cage/credits.py),
+  the `convert.saved_usd` analogue) — token-based providers only, **exact model-id match**,
+  **off by default** (no active rows ship); an unknown multiplier ⇒ no number (a wrong
+  number is worse than none), and Kiro/Copilot credits are never derived from tokens.
+  `cage limits --json` uses the `cage.v1` envelope (`render.envelope`).
+- **Transcript call ids are deterministic.** A usage row with no stable source id (a Claude
+  turn lacking `uuid`) derives its `call_id` from `(agent, session, model, tokens_in,
+  tokens_out, cached_in, ts)` (`transcript._composite_id`) so re-imports dedupe in
+  `hooks.append_new` — never a random id. uuid-present rows stay byte-identical.
 - Keep modules small and single-purpose (fux spirit). Tests live in `tests/`.
 
 ## Dev
 
 ```bash
-just test          # python -m pytest -q   (299 passing)
+just test          # python -m pytest -q   (312 passing)
 just demo          # seed §4.4 + print attrib/matrix
 cage --version
 ```

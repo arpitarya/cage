@@ -412,6 +412,56 @@ project-local `.cage/` ledger all unchanged); four agents always.
 
 ---
 
+## 3.8 Provider quota + estimated credits — `cage limits` (a state snapshot, NOT a ledger)
+
+cage meters tokens; it has no view of provider **quota/credits**. Two things are
+recoverable from data cage already touches: Codex's rollout JSONL carries a `rate_limits`
+block (remaining-% windows), and post-2026 GitHub/Codex plans consume credits as a function
+of tokens, so a credit estimate is derivable. `cage limits` surfaces both — under a hard
+**a wrong number is worse than no number** rule. (Debated devil's-advocate + pre-mortem;
+see the ADR — the substrate-vs-snapshot and credits-scope verdicts below were forced there.)
+
+**Quota is a decaying live gauge, not durable truth — so it is deliberately *not* a ledger
+substrate.** There is **no `limits.jsonl`**, no partitioning, no `refs/notes` sync. The
+**latest** snapshot per `(agent, window)` is written to a machine-local
+`.cage/state/limits.json` (`Footprint.limits`) — **overwritten, never appended**. The
+write side, `limits.snapshot_codex`, is called **fail-open** from `import_codex` and reads
+`transcript._codex_rate_limits(rec)`: the `rate_limits` block is a *sibling* of
+`payload.info` (probed against a real rollout — `primary`/`secondary` windows; observed
+`window_minutes` 10080=weekly and 43200=monthly, labels derived from the size, not assumed).
+A renamed/missing/non-numeric block yields **no snapshot and no error**.
+
+**Credits are `estimated`, never measured, token-based providers only.** A per-model
+`[credits.<provider>."<model>"] per_mtok` multiplier (policy — the economics layer) drives
+a single tokens→credits dispatch (`credits.py`, the `convert.saved_usd` analogue):
+credits = tokens × per_mtok ÷ 1e6. **No active rows ship** — only a commented example —
+because the precise per-token rates aren't published and a wrong number is worse than none;
+the operator opts in from their provider dashboard. Match is **exact model-id only** (no
+family fallback — a borrowed estimate is a *different* wrong number); an unknown multiplier
+⇒ tokens shown, no credit number. **Kiro/Copilot credits are never fabricated from tokens**
+(units-of-work ≠ token multiples) — they show "—". Every figure is tagged `estimated`,
+names its source, and the view ends with a "reconcile against your provider dashboard" note.
+
+**`cage.v1` JSON envelope.** `cage limits --json` debuts a versioned envelope —
+`{"schemaVersion":"cage.v1","generatedAt":…,"command":…,"data":…}` (`render.envelope`).
+`generatedAt` is wall-clock metadata; the `data` payload stays deterministic (same ledger +
+policy ⇒ same `data`). Introduced for `limits` only; a wider rollout is a separate packet.
+
+**Dedup correctness (related, additive).** `transcript._usage_to_row` no longer passes
+`call_id=None` for a Claude turn with no `uuid`; it derives a deterministic id from
+`(agent, session, model, tokens_in, tokens_out, cached_in, ts)` so a re-import dedupes in
+`hooks.append_new` instead of minting a random id. Reproduce-first finding: **0 of 29,714**
+usage-bearing real Claude turns lacked a `uuid`, so this is a defensive close of the one
+random-id path — uuid-present rows render **byte-identical**. No `CALL_FIELDS`/`make_call`
+change; old random-id duplicates are not healed (a `--dedupe` compaction is a follow-on).
+
+**Invariants:** `$0`/stdlib, no network, no LLM; counts-never-content (percentages + reset
+epoch only); deterministic `data` payload + reproducible ids; quota/credits live **outside**
+the ledger (a state file + an on-read derive), never a row; fail-open capture; four agents
+always (only Codex reports quota locally today; the others show "—").
+
+---
+
 ## 4. The attribution engine (the part that's actually novel)
 
 The question Cage answers is not "what did I spend" (any meter does that). It's
@@ -621,6 +671,7 @@ cage report [--since 7d]      # ledger: spend by agent / route / model / day
 cage attrib [--task ID]       # per-tool marginal savings (the §4.2 table)
 cage matrix [--task ID] [--human]  # counterfactual permutation table; --human = anchor (§4.4/§4.6)
 cage budget                   # current session/day spend vs. policy ceilings
+cage limits [--json]          # provider quota windows (Codex) + estimated AI-credits (§3.8); --json = cage.v1
 cage roi [--since 30d]        # saved $ vs. each tool's own cost + latency (tool-only)
 cage human [--task|--agent|--since] [--html]   # Tier-1 agent-vs-human: $ and hours saved (§4.6)
 cage human-record --task ID (--type T | --minutes N | --usd N)  # record a human alternative

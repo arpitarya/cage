@@ -2,6 +2,22 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
+## v0.15.0 — meter dedup correctness + `cage limits` (Codex quota + estimated AI-credits)
+
+Two gaps closed, scoped tightly per a devil's-advocate/pre-mortem debate: a meter dedup correctness fix, and a new `cage limits` view for provider quota + token-derived **estimated** credits. Every credit/quota figure is labelled `estimated`, sourced, and reconcilable — a shape-mismatch yields *nothing*, never a wrong number. **Additive: no `CALL_FIELDS`/`make_call` change, no ledger rewrite, no new ledger substrate.**
+
+- **Dedup correctness (defensive — disproven in practice, still landed).** `transcript._usage_to_row` no longer passes `call_id=None` for a Claude turn with no `uuid`; it derives a *deterministic* id from `(agent, session, model, tokens_in, tokens_out, cached_in, ts)` so a re-import dedupes in `hooks.append_new` instead of minting a random id each run. **Reproduce-first finding:** across 29,714 usage-bearing Claude turns in real transcripts, **zero** lacked a `uuid` — so this is a defensive close of the one random-id path, not a corrective fix. **uuid-present rows render byte-identical to before** (test-asserted). Old random-id duplicates already in a ledger are not healed by this change (a `--dedupe` compaction is a possible follow-on).
+
+- **`cage limits` — provider quota + estimated AI-credits.** A new read view showing, per agent: Codex rate-limit windows (`remaining_pct` + reset time + snapshot age) and **estimated** AI-credit consumption (tokens × a per-model multiplier) for token-based providers only. Every figure is tagged `estimated`, names its source, and ends with a "reconcile against your provider dashboard" note. Kiro/Copilot credit numbers are **not** fabricated from tokens (units-of-work ≠ token multiples) — they show "—".
+
+- **Codex quota is a latest-only state snapshot, NOT a ledger substrate.** `transcript._codex_rate_limits` reads the `rate_limits` block Codex already writes (probed against a real rollout: it's a *sibling* of `payload.info`, with `primary`/`secondary` windows — observed `10080`=weekly and `43200`=monthly, labels derived from `window_minutes`, not assumed). `limits.snapshot_codex` (called fail-open from `import_codex`) persists only the **latest** snapshot per `(agent, window)` to a machine-local `.cage/state/limits.json` — overwritten not appended, **never synced to refs/notes**. A renamed/missing block writes nothing, no error.
+
+- **Credits multipliers ship OFF by default.** `[credits.<provider>."<model>"] per_mtok = N` in `policy.toml` (economics layer) drives a single tokens→credits dispatch (`credits.py`, mirroring `convert.saved_usd`). No active rows ship — only a commented example — because a wrong credit number is worse than none and the precise per-token rates aren't published; turn it on by setting `per_mtok` from your provider dashboard. Exact model-id match only (no family fallback — a borrowed estimate is a different wrong number); unknown multiplier ⇒ tokens only.
+
+- **`cage.v1` JSON envelope.** `cage limits --json` emits a versioned `{"schemaVersion":"cage.v1","generatedAt":…,"command":…,"data":…}` envelope (one helper in `render.py`); `generatedAt` is wall-clock metadata, the `data` payload stays deterministic. Introduced here for `limits` only — a wider rollout is a separate packet.
+
+No schema/contract (`CALL_FIELDS`/`make_call`), MCP tool contract, attribution/provenance engine, or `cage verify` exit-0 behavior changed. The dedup change is additive (id derivation only); quota/credits live outside the ledger entirely. 312 tests pass (was 299).
+
 ## v0.14.0 — typed CLI errors + a documented exit-code contract (fail-open preserved)
 
 cage's error handling was already mature — ~64 fail-open markers on write paths, every broad `except` carrying a `# noqa: BLE001 — <reason>`, hooks all `try/except → exit 0`, and `main()` already mapping `KeyboardInterrupt → 130`. The one real gap: `main()` had no typed/expected-error path, so an expected failure (a malformed `policy.toml`) or any unexpected exception dumped a raw traceback. This release closes that gap — **additive and boundary-only; not one fail-open block was rewritten.**

@@ -23,7 +23,7 @@ import datetime as _dt
 import json
 from pathlib import Path
 
-from cage import agents, debuglog, hooks, ledger, paths, policy, transcript
+from cage import agents, debuglog, hooks, ledger, limits, paths, policy, transcript
 
 # Agents that persist a usage log to disk (everything else → proxy fallback).
 LOG_BEARING = ("claude", "codex", "copilot", "kiro")
@@ -157,6 +157,9 @@ def import_codex(root: Path, args, *, pol: dict | None = None, seen: set | None 
                   agent_cursor=agent_cursor)
     n = _ingest(root, "codex", src, files, lambda f: transcript.parse_codex_calls(f, session=f.stem),
                 pol=pol, seen=seen, agent_cursor=agent_cursor)
+    # Latest-only Codex quota snapshot — a machine-local state file, NOT a ledger row
+    # (plan §3.8). Fail-open: never blocks the import; a renamed/absent block writes nothing.
+    limits.snapshot_codex(root, files)
     return n, len(files)
 
 

@@ -23,6 +23,15 @@ def ago(ts: str) -> str:
         return ""
 
 
+def envelope(command: str, data) -> dict:
+    """The versioned ``cage.v1`` machine envelope (introduced for ``cage limits --json``;
+    a wider rollout is a separate packet). ``generatedAt`` is wall-clock *metadata*, never
+    a derived-from-ledger figure, so the ``data`` payload stays deterministic (same ledger
+    + policy ⇒ same ``data``)."""
+    now = _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+    return {"schemaVersion": "cage.v1", "generatedAt": now, "command": command, "data": data}
+
+
 def usd(x: float) -> str:
     return f"${x:,.4f}"
 

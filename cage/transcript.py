@@ -17,6 +17,21 @@ from pathlib import Path
 from cage import schema
 
 
+def _composite_id(agent: str, session: str, model: str, tokens_in: int,
+                  tokens_out: int, cached_in: int, ts: str | None) -> str:
+    """A *deterministic* call id for a usage row that carries no stable source id
+    (a Claude turn with no `uuid`). Folded into `call_id` so `make_call`/`CALL_FIELDS`
+    are unchanged; same `(agent, session, model, tokens_in, tokens_out, cached_in, ts)`
+    ⇒ same id, so re-parsing the same transcript dedupes in `hooks.append_new` instead
+    of minting a fresh random id each run. Same `c_`+15-char shape as the uuid path.
+
+    Empirically defensive: no usage-bearing Claude turn observed lacks a `uuid`; this
+    closes the one path where `make_call` would otherwise fall back to a random id."""
+    key = "|".join(str(x) for x in (agent, session, model, tokens_in, tokens_out,
+                                    cached_in, ts or ""))
+    return "c_" + hashlib.sha1(key.encode("utf-8")).hexdigest()[:15]
+
+
 def _usage_to_row(msg: dict, session: str, uuid: str, ts: str | None,
                   project: str = "") -> dict | None:
     usage = msg.get("usage") or {}
@@ -27,11 +42,18 @@ def _usage_to_row(msg: dict, session: str, uuid: str, ts: str | None,
     if not (out or inp or cache_read or cache_make):
         return None
     tokens_in = inp + cache_read + cache_make
+    model = msg.get("model", "") or ""
+    # uuid-present rows render byte-identical to the pre-change contract; only the
+    # no-uuid path changes (random id → deterministic composite id), so re-imports
+    # of a uuid-less turn no longer double-record.
+    call_id = ("c_" + uuid.replace("-", "")[:15] if uuid
+               else _composite_id("claude-code", session, model, tokens_in, out,
+                                  cache_read, ts))
     return schema.make_call(
-        route="chat", provider="anthropic", model=msg.get("model", "") or "",
+        route="chat", provider="anthropic", model=model,
         tokens_in=tokens_in, tokens_out=out, cached_in=cache_read,
         session=session, agent="claude-code", ts=ts, project=project,
-        call_id="c_" + uuid.replace("-", "")[:15] if uuid else None)
+        call_id=call_id)
 
 
 def parse_calls(transcript_path: Path, session: str = "") -> list[dict]:
@@ -131,6 +153,36 @@ def _codex_usage(rec: dict) -> dict | None:
             if isinstance(info.get(k), dict):
                 return info[k]
     return _find_usage(rec)
+
+
+def _codex_rate_limits(rec: dict) -> list[dict]:
+    """Quota snapshots from a Codex `token_count` event's `rate_limits` block — a
+    *sibling* of `payload.info` (NOT nested under it), verified against a real rollout
+    (Codex CLis 0.5x):
+
+        payload.rate_limits.primary = {used_percent, window_minutes, resets_at}
+
+    Returns one normalized dict per populated window slot (`primary`/`secondary`) —
+    ``{window_minutes, used_percent, resets_at, observed_ts}`` — or ``[]`` for an
+    unknown / renamed / missing shape (a wrong number is worse than no number). Both
+    `window_minutes` and `used_percent` must be real numbers or the slot is dropped.
+    Counts-never-content: percentages + a reset epoch only, never any prompt/response."""
+    payload = rec.get("payload")
+    rl = payload.get("rate_limits") if isinstance(payload, dict) else None
+    if not isinstance(rl, dict):
+        return []
+    observed = rec.get("timestamp") or ""
+    out: list[dict] = []
+    for slot in ("primary", "secondary"):
+        blk = rl.get(slot)
+        if not isinstance(blk, dict):
+            continue
+        wm, up = blk.get("window_minutes"), blk.get("used_percent")
+        if not isinstance(wm, (int, float)) or not isinstance(up, (int, float)):
+            continue  # need both as real numbers — else emit nothing for this slot
+        out.append({"window_minutes": int(wm), "used_percent": float(up),
+                    "resets_at": blk.get("resets_at"), "observed_ts": observed})
+    return out
 
 
 def _codex_model(rec: dict) -> str:

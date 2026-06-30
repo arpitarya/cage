@@ -241,30 +241,15 @@ Hooks are an **optional** real-time add-on — they fire only under a CLI client
 
 ## The `$0` guarantee
 
-Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 299 tests passing; `cage demo` reproduces the worked attribution example against a real ledger.
+Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 312 tests passing; `cage demo` reproduces the worked attribution example against a real ledger.
 
 **Honest limits.** Cage doesn't decide your human rate — it prices minutes at a blended rate you set, and labels the result `estimated` so it never pretends to be a timesheet. Marginal-by-fixed-order is defensible and `$0`, but it is an *ordering convention*, not a Shapley value (that's a deferred audit mode). And a counterfactual cell is an honest reconstruction, never an invoice — the `method` column says so on every row, on purpose.
 
 ## What's new
 
-Latest releases below — full notes in [CHANGELOG.md](CHANGELOG.md).
+Latest release below — full history and detail in [CHANGELOG.md](CHANGELOG.md).
 
-- **v0.14.0 — typed CLI errors + a documented exit-code contract.** An expected failure (a malformed `policy.toml`) or any unexpected exception now renders a clean `error: <msg>` line instead of a raw traceback; the full traceback shows only under `CAGE_DEBUG=1`. Exit codes: `0` ok · `1` error · `2` usage (argparse) · `130` interrupted. Additive and boundary-only — the constitutional fail-open write paths are verified (and tested), never rewritten.
-- **v0.13.0 — skill assets are rendered, not hand-edited.** The flagship `cage` skill is single-sourced: `tools/skillgen` (build-time, stdlib-only, never shipped) renders the Claude/Codex SKILL.md, the Copilot prompt, the Kiro steering doc, and a new generic `agents` target from one fragment set, drift-guarded by `python -m tools.skillgen --check` in CI. **Contributors:** edit `tools/skillgen/fragments/`, then `python -m tools.skillgen && python -m tools.skillgen --bless` — never hand-edit `cage/data/skills/cage/`, `cage/data/prompts/cage.prompt.md`, or `cage/data/steering/cage.md`. See [docs/skillgen.md](docs/skillgen.md).
-- **v0.12.1 — green CI.** Bug-fix only: three ledger-scale tests passed locally but failed on the CI matrix (3.11–3.13) because they leaned on a global git identity and on `pathlib.Path.stat` internals. The tests now pin identity on the repo and target a discrete `ledger._shard_bytes` helper — no shipped behavior change.
-- **v0.12.0 — universal capture: global ledger + explicit `import`/`export`.** Capture is now pull-based and works for any agent, any client, and the no-project user: `cage import` captures into a resolved ledger (`--ledger`/`CAGE_BASE` → project `.cage/` → global `~/.cage`), `cage export` emits jsonl/csv/json, `cage watch` is an optional foreground loop. A new additive `project` field gives `cage report --project` (Claude-exact); incremental file-stat cursors keep import cheap; `cage doctor` is honest about hooks (CLI-only) and shows "last import: N ago". cage installs **no** OS scheduler.
-- **v0.11.0 — observable capture (`CAGE_DEBUG`).** The fail-open capture path now records a metadata-only per-hook heartbeat + previously-swallowed tracebacks to `.cage/state/debug.log`; `cage doctor` shows per-agent last-fired, `cage debug` tails events. Off by default, $0, counts-never-content, ledger byte-identical on/off. See [Debugging capture](docs/debugging-capture.md).
-- **v0.10.2 — Kiro hook format fixed (it never fired before).** Kiro hooks are one-hook-per-file (`when`/`then`); Cage now writes a single `agentStop` hook in the correct shape (the old container shape + a nonexistent `SessionStart` trigger meant it silently never ran).
-- **v0.10.1 — release process codified.** GitHub release is the publish trigger (OIDC trusted publishing); never publish from a laptop. CI is the sole publisher.
-- **v0.10.0 — real-time per-turn capture + four log-bearing agents.** Stop-hook capture for Claude/Codex (spend lands as each turn ends); Copilot and Kiro now metered too; resolved-absolute `cage` path fixes silent GUI-launch failures; refreshed pricing; repo-level `/cage` skill.
-- **v0.9.0 — ledger scale.** Month-partitioned shards, optional `scope` slicing, `--team` aggregation over `refs/notes/cage-ledger`, and SessionStart-backfill as the default reliable hookless path.
-- **v0.8.0 — one hookless front door.** `cage import [--agent …]` unifies hookless metering across all four agents; `cage doctor` renders a four-agent metering matrix.
-- **v0.7.x — one setup front door + the four-agents invariant.** `cage setup` absorbs `adopt`/`hooks`; Cage keeps Claude Code · Codex · Copilot · Kiro first-class on every surface.
-- **v0.6.0 — authorship attribution.** `cage origin <sha>` answers *who wrote which files in which commit*, distributed over `refs/notes/cage-provenance` (CI sole writer); `cage verify` never gates the build.
-- **v0.5.0 — DX + concept explainers.** `cage query` concept topics: ask *how cage works*, not just *how a number is computed*.
-- **v0.3.0 — the Tier-1 human axis.** `cage human` / `cage trend` price agent-vs-human in dollars and hours.
-- **v0.2.0 — attribution + the counterfactual matrix.** Marginal-by-fixed-order attribution, the 2ⁿ permutation table, ROI per tool, and the `measured`/`modeled`/`estimated` discipline.
-- **v0.1.0 — substrate + meter.** The call/receipt contract, the append-only ledger, `policy.toml`, and `cage report`.
+- **v0.15.0 — meter dedup correctness + `cage limits`.** A new `cage limits` view surfaces Codex rate-limit windows (latest local snapshot — `remaining_pct` + reset + age) and **estimated** AI-credit consumption (tokens × a per-model `[credits]` multiplier) for token-based providers only — every figure labelled `estimated` + reconcilable, Kiro never fabricated; `cage limits --json` debuts the `cage.v1` envelope. Quota is a machine-local `.cage/state/limits.json` snapshot, **not** a ledger substrate. Plus a defensive meter dedup fix (deterministic id when a Claude turn lacks a `uuid` — empirically 0/29,714, uuid-present rows byte-identical). Additive: no `CALL_FIELDS`/`make_call` change, no ledger rewrite.
 
 ## The name
 
