@@ -1,0 +1,48 @@
+# Claude Code prompt: cage meter — dedup + Codex quota + `cage limits`
+
+You are improving the **cage** meter. The full spec is in `cage-handoff-meter-quota-credits.md` — read it first and treat its Definition of Done, Scope, and Non-negotiables as binding. This is a debated, deliberately narrow slice: **do not** build the dropped/deferred items.
+
+## Context to load first
+- Read: `cage/transcript.py` (`_usage_to_row`, `parse_calls`, `parse_codex_calls`, `_codex_usage`), `cage/hooks.py` (`append_new`), `cage/schema.py` (`make_call`, `CALL_FIELDS`, `ids`), `cage/importcmd.py` (`_ingest`, `import_codex`), `cage/prices.py` (`call_usd_match`), `cage/convert.py`, `cage/budget.py` + `cage/report.py` (view patterns), `cage/cli.py` (parser registration, `_json_flag`), `cage/clicmds.py`, `cage/paths.py` (`Footprint.state`, `codex_home`), `cage/policy.toml`, `docs/cage-plan.md`, `CLAUDE.md`, `CHANGELOG.md`.
+- Respect: `$0`/stdlib-only/`dependencies = []`, determinism, counts-never-content, four-agents-always, three-audit-layers, fail-open capture, no local publish.
+
+## Task
+1. **Reproduce-or-disprove first:** determine whether a usage-bearing Claude assistant turn can have no `uuid` (→ random `call_id` → re-import duplicate). Report the finding before fixing.
+2. **Composite-key dedup (additive, backward-safe):** in `transcript._usage_to_row`, when `uuid` is absent, derive a *deterministic* id from `(agent, session, model, tokens_in, tokens_out, cached_in, ts)` instead of passing `call_id=None`. uuid-present rows must render **byte-identical** to today. No `CALL_FIELDS`/`make_call` contract change; no ledger rewrite.
+3. **Codex rate-limits (latest-only, no substrate):** add `_codex_rate_limits(rec)` extracting the `rate_limits` block from the same `token_count` event `_codex_usage` reads; persist **only the latest snapshot per (agent, window)** to a small machine-local state file under `Footprint.state` (overwrite, not append; never synced to refs/notes). Unknown/renamed shape ⇒ write nothing, no error.
+4. **`cage limits` view:** new `limits.py` (derive) + `cmd_limits` (`clicmds.py`) + `cli.py` `add_parser("limits", …)` with `_json_flag`, following the `budget`/`report` pattern. Show per agent: Codex quota windows (`remaining_pct` + `resets_at` + snapshot age) and **estimated** AI-credit consumption = tokens × per-model multiplier **for token-based providers only**. Every estimate labelled `estimated` + source + a "reconcile against your provider dashboard" note. Do NOT fabricate Kiro credit numbers from tokens.
+5. **Credits multipliers + dispatch:** add `[credits.<provider>."<model>"] per_mtok = N` to `policy.toml`; one tokens→credits dispatch mirroring `convert.saved_usd`. Unknown multiplier ⇒ tokens only, no credit number.
+6. **`cage.v1` JSON envelope:** one helper in `render.py` (`{"schemaVersion":"cage.v1",...}`); use it for `cage limits --json` only.
+
+## Required workflow
+1. **Explore** the parsers, dedup, and view patterns. Probe a real Codex rollout for the exact `rate_limits` shape — build against what you observe, not an assumption. Confirm the no-uuid finding.
+2. **Plan** — show files, the deterministic-id derivation, the state-file location/shape, the `policy.toml` additions, the view layout, and the test list. **Pause for my confirmation**, especially the probed `rate_limits` shape and the multiplier defaults.
+3. **Implement incrementally** — dedup fix + tests first (land independently, green), then Codex snapshot, then the view + credits, then the JSON envelope. Keep the build green and `just demo` numbers unchanged at every step.
+4. **Update docs to match** — CHANGELOG (newest first), README ("What's new" + `cage limits` usage + test count), `docs/cage-plan.md` (view + state-file-not-substrate + estimated credits). For `CLAUDE.md`: PROPOSE the rule (quota/credits are `estimated`, live in a state file not the ledger; ids are deterministic) as a diff for my review — do NOT auto-write. MCP/contract docs N/A — say so. Recommend capturing the debate verdict as a cage `.fux` ADR.
+5. **Verify** — `just test` (update count), `just demo` (numbers unchanged), `cage limits`, `cage limits --json`, `CAGE_DEBUG=1 cage import --agent codex`. Don't report done until green.
+
+## Constraints (hard)
+- **A wrong number is worse than no number** — any uncertain parse/derive emits nothing (fail-open), never a guess. Every credit/quota figure is `estimated` + sourced + reconcilable.
+- Use: stdlib only. Do NOT use: any dependency, network (this packet), LLM.
+- Determinism: ids + views reproducible; `just demo` §4.4 numbers byte-unchanged.
+- **Do NOT** add a `limits.jsonl` ledger substrate / partitioning / refs-notes sync. Quota is a latest-only state file or on-read derive.
+- **Do NOT** estimate Kiro (or any non-token-based) credits from tokens.
+- **Do NOT** change `CALL_FIELDS`/`make_call` shape, rewrite the ledger, touch the attribution/provenance engine, or change `cage verify`'s exit-0 contract.
+- **Do NOT** build the Copilot OTEL parser, Kiro SQLite parser, fetch-plan refactor, GitHub billing API, or `--dedupe` compaction — all out of scope.
+- Keep all four agents first-class. Don't bump `__version__` or publish — ask.
+- Every broad `except` keeps/gets a `# noqa: BLE001 — <reason>` comment.
+
+## Acceptance criteria (self-check before finishing)
+- [ ] No-uuid finding reported; deterministic id stable across re-parse and dedupes on re-import; uuid-present rows byte-identical (tests).
+- [ ] Codex `rate_limits` → correct latest snapshot from a real-shaped fixture; missing/renamed block ⇒ no snapshot, no error (tests).
+- [ ] `cage limits` human + `cage.v1` JSON; quota windows + estimated credits for token-based providers only; Kiro shows no fabricated credit (tests).
+- [ ] `just demo` numbers unchanged; no `CALL_FIELDS` change; no new ledger file.
+- [ ] CHANGELOG + README + cage-plan updated; CLAUDE.md rule proposed for review; ADR recommended.
+
+## Tests
+Cover: no-uuid repro; deterministic-id dedupe + byte-identical uuid rows; Codex rate_limits parse (good + malformed); `cage limits` human/JSON; credits token-based-only; demo numbers unchanged. Run via `just test`.
+
+## Guardrails
+- Ask before: changing id derivation for the uuid-present path, choosing the state-file location/format, finalizing multiplier defaults, or anything touching the ledger contract.
+- Do not auto-edit `CLAUDE.md` — propose the diff.
+- If the probed `rate_limits` shape differs from the handoff's assumption, or anything is ambiguous, STOP and ask rather than guessing — emitting nothing is always preferable to a wrong number.

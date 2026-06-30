@@ -1,0 +1,80 @@
+# Handoff: cage meter — dedup correctness + Codex quota + `cage limits` view
+
+**One-liner:** Fix the meter's id-dedup so re-imports can't double-count, then add a `cage limits` view that surfaces Codex's local rate-limit windows (latest snapshot, no new ledger substrate) plus token-derived **estimated** AI-credit consumption — every estimate labelled and reconcilable, a shape-mismatch yielding nothing rather than a wrong number.
+**Owner / executor:** Claude Code
+**Status:** Ready to build
+**Stress-tested:** Debated (devils-advocate + pre-mortem). Changes forced: (1) **dropped the `limits.jsonl` ledger substrate** — rate-limit % is a decaying live gauge, not durable truth, so it's surfaced via a latest-only state file / on-read derive, not a partitioned synced ledger; (2) **credits narrowed** to token-based providers only — Kiro credits are "units of work", not token multiples, so cage never fabricates them from tokens; (3) **dedup scoped additive-only** (uuid-present ids byte-identical) and **gated on reproducing the bug first**; (4) pre-mortem mitigation: every estimate tagged + "reconcile against your provider dashboard", parser shape-mismatch ⇒ emit nothing (fail-open). Residual risk: estimated credits drift from provider dashboards → mitigated by labelling, not precision claims.
+
+## 1. Context & background
+cage meters tokens from each agent's on-disk logs. Two gaps: (a) `hooks.append_new` dedupes only on `row["id"]`, and the Claude parser passes `call_id=None` for a turn with no `uuid`, so `make_call` mints a **random** id → such a turn re-imports as a duplicate every run (the cursor only skips *unchanged* files). (b) cage tracks tokens but has no view of provider **quota/credits**. Codex's rollout JSONL already carries a `rate_limits` block (5h + weekly remaining %) cage doesn't read; and post-June-2026 GitHub AI Credits are consumed as a function of tokens, so an estimate is derivable from data cage already has. This packet lands the correctness fix and a `cage limits` view, scoped tightly per the debate. Background: `cage-meter-modification-plan.md`, `cage-meter-competitive-lessons.md`.
+
+## 2. Definition of done
+- [ ] **Bug reproduced or disproven first:** a test/probe establishes whether a usage-bearing Claude assistant turn with no `uuid` actually occurs. If yes → fix (below). If provably never → the dedup change is defensive-only; still land it but note the finding.
+- [ ] **Composite-key dedup:** parsed calls get a deterministic id even with no stable source id. `transcript._usage_to_row` no longer passes `call_id=None`; instead derives a deterministic id from `(agent, session, model, tokens_in, tokens_out, cached_in, ts)` when `uuid` is absent. `hooks.append_new` dedupes correctly. **uuid-present Claude rows render byte-identical to today** (test-asserted).
+- [ ] **No ledger rewrite, no new substrate:** existing rows untouched; no `limits.jsonl`; no change to `CALL_FIELDS`/`make_call` contract beyond deterministic id derivation.
+- [ ] **Codex rate-limits captured (latest-only):** a `parse`/derive path reads the `rate_limits` block from the newest Codex rollout and stores **only the latest snapshot per (agent, window)** in a small machine-local state file (e.g. under `Footprint.state`), overwritten not appended, never synced to refs/notes. A shape-mismatch (missing/renamed fields) ⇒ store nothing, no error.
+- [ ] **`cage limits` view:** new read view showing, per agent: local quota windows (Codex now) with `remaining_pct` + `resets_at`, and **estimated** AI-credit consumption = tokens × per-model multiplier, for **token-based providers only**. Every figure labelled `estimated`, shows its source, and ends with a "reconcile against your provider dashboard" note. Kiro/Copilot credit numbers are **not** fabricated from tokens — show "—" or only what their logs report.
+- [ ] **`--json` parity:** `cage limits --json` emits a versioned `{"schemaVersion":"cage.v1",...}` envelope (introduce the envelope here; wider rollout is a separate packet).
+- [ ] `just test` green (update the "N passing" count in README + the CLAUDE.md `just test` comment); `just demo` §4.4 numbers unchanged; CHANGELOG entry added.
+- [ ] Docs updated (see §9.5).
+
+## 3. Scope
+**In scope:** the dedup fix (gated on repro); reading Codex `rate_limits` into a latest-only state snapshot; `cage limits` view + `cmd_limits` + `cli.py` registration; `[credits.<provider>."<model>"]` multipliers in `policy.toml`; a `credits.py`/`convert.py`-style single tokens→credits dispatch; the `cage.v1` JSON envelope helper (used by `limits` only here); tests + docs.
+
+**Out of scope (explicit) — do NOT build:**
+- A `limits.jsonl` ledger substrate, partitioning, or refs/notes sync for quota data. (Debate killed it.)
+- Credit estimation for Kiro (units-of-work, not tokens) or any non-token-based provider. Don't invent those numbers.
+- The Copilot OTEL parser, the Kiro SQLite parser, the fetch-plan refactor, the GitHub billing API path (items 5–8 of the plan) — all separate, probe-gated/opt-in packets.
+- A `--dedupe` compaction of pre-existing duplicate rows — note it as a known follow-on; do not rewrite the ledger here.
+- Rolling the `cage.v1` envelope across all other views — `limits` only in this packet.
+
+## 4. Current state
+- Repo: `/Users/arpitarya/my_programs/cage`
+- Read first: `cage/transcript.py` (`_usage_to_row`, `parse_calls`, `parse_codex_calls`, `_codex_usage`), `cage/hooks.py` (`append_new`), `cage/schema.py` (`make_call`, `CALL_FIELDS`, `ids`), `cage/importcmd.py` (`_ingest`, `import_codex`), `cage/prices.py` (`call_usd_match`), `cage/convert.py`, `cage/budget.py` + `cage/report.py` (view patterns), `cage/cli.py` (parser registration + `_json_flag`), `cage/clicmds.py`, `cage/paths.py` (`Footprint.state`, `codex_home`), `cage/policy.toml`, `docs/cage-plan.md`, `CLAUDE.md`, `CHANGELOG.md`.
+- Today: `$0`, stdlib-only (`dependencies = []`), deterministic, fail-open capture, four agents always, three-audit-layers (schema=contract / policy=economics / constants=heuristics).
+
+## 5. Technical approach (decided)
+- **Dedup:** deterministic id in the no-stable-id path only. Prefer folding the deterministic hash into the `call_id` passed to `make_call` (keeps `CALL_FIELDS` unchanged). uuid-present path is untouched. `append_new`'s set-membership logic is unchanged; it just now never sees a random id.
+- **Codex quota:** `_codex_rate_limits(rec)` extracts the `rate_limits` block from the same `token_count` event `_codex_usage` reads. `cage limits` (or `import_codex`) writes only the **latest** snapshot per (agent, window) to a state file under `Footprint.state` — overwrite semantics, machine-local, not a ledger, not synced. Defensive: unknown shape ⇒ write nothing.
+- **Derived credits:** `[credits.<provider>."<model>"] per_mtok = N` in `policy.toml` (economics layer); a single dispatch (mirroring `convert.saved_usd`) computes tokens→credits at derive time, tagged `estimated`. Unpriced/unknown-multiplier ⇒ shown as tokens only, no credit number.
+- **View:** `limits.py` (derive) + `cmd_limits` (`clicmds.py`) + `cli.py` `add_parser("limits", …)` + `_json_flag`, following the exact `budget`/`report` pattern. Human output + `cage.v1` JSON.
+- **JSON envelope:** one helper in `render.py` returning `{"schemaVersion":"cage.v1","generatedAt":…,"command":…,"data":…}`.
+
+## 6. Non-negotiables / constraints
+- **A wrong number is worse than no number.** Any parser/derive that can't confidently produce a value emits nothing (fail-open), never a guess. Every credit/quota figure is tagged `estimated`, names its source, and carries a reconcile-with-provider note.
+- **$0 / stdlib only** — no new dependency; no network in this packet; no LLM on any path.
+- **Determinism** — ids + derived views reproducible; `just demo` §4.4 numbers byte-unchanged; tests assert exact figures.
+- **Counts-never-content** — quota snapshots carry percentages + reset timestamps only.
+- **Method honesty** — credits/quota are `estimated`, never `measured`; never place an estimated number next to a measured token total without the tag.
+- **Four agents always** — additive; don't break claude/codex/copilot/kiro.
+- **Three audit layers** — enums/shapes → `schema.py`; multipliers → `policy.toml`; any default-multiplier fallback heuristic → `constants.py`. Never mix.
+- **Do not touch:** the ledger contract (`CALL_FIELDS`/`make_call` shape), existing rows, the attribution/provenance engine, `cage verify`'s exit-0 contract, the four-agents wiring. No ledger rewrite. No release/publish (ask before bumping `__version__`).
+
+## 7. Dependencies & prerequisites
+- Python ≥3.11, stdlib only. No env vars, services, or secrets for this packet.
+- A real Codex rollout with a `rate_limits` block to probe its exact shape (see §10).
+
+## 8. Edge cases & risks
+- **uuid-present rows must not change** — regression test on a real Claude transcript fixture.
+- **No `rate_limits` in the rollout / renamed fields** ⇒ `cage limits` shows "no quota data for codex", not an error or a zero.
+- **Stale snapshot** — the state file holds the last seen %; `cage limits` shows its timestamp so the user knows how fresh it is.
+- **Unknown/blended model** (e.g. Kiro's `kiro`/`agent`) ⇒ no credit estimate, tokens only.
+- **Old random-id duplicates already in the ledger** ⇒ not healed by this change; documented limitation + a possible follow-on `--dedupe`.
+- **`just demo` drift** — the new code must not change any existing view's numbers; assert.
+
+## 9. Testing & validation
+- **Must test:** (a) repro/disprove the no-uuid Claude turn; (b) deterministic id is stable across two parses of the same fixture and dedupes on re-import; (c) uuid-present rows byte-identical to pre-change; (d) Codex `rate_limits` parsed from a real-shaped fixture → correct latest snapshot; missing/renamed block ⇒ no snapshot, no error; (e) `cage limits` human + `cage.v1` JSON output for a seeded ledger; (f) credits estimated only for token-based providers, Kiro shows no fabricated credit; (g) `just demo` numbers unchanged.
+- **Verify locally:** `just test` (update count) · `just demo` · `cage limits` · `cage limits --json` · `CAGE_DEBUG=1 cage import --agent codex` to see the snapshot write.
+
+## 9.5 Documentation impact
+- [x] **CHANGELOG.md** — required (constitution): dedup fix + `cage limits` entry, newest first.
+- [x] **README** — required: "What's new" line + `cage limits` usage; update "N tests passing".
+- [x] **docs/cage-plan.md** — required: the `cage limits` view + the latest-only quota-snapshot state file (explicitly NOT a ledger substrate) + the derived-credits estimate (§6/§8 area). Note the dedup correctness fix.
+- [x] **AI agent files (CLAUDE.md)** — required, ⚠️ PROPOSE for review (do not auto-write): add a note that quota/credits are `estimated` and live in a state file, not the ledger; and that ids are deterministic. Surface the diff.
+- [ ] **MCP/contract docs** — N/A: call contract unchanged (state explicitly).
+- [ ] **ADR** — recommended: capture the debate verdict ("quota is a state snapshot, not a ledger substrate; credits estimated for token-based providers only") as a cage `.fux` ADR. (Per Arpit's capture-debates-to-stores rule.)
+
+## 10. Open questions
+- OPEN QUESTION: exact field names + window labels in the Codex `rate_limits` block under the current CLI — **probe a real rollout before finalizing** the snapshot shape and the window set (session/5h/weekly). Build the parser against the observed shape, not an assumed one.
+- OPEN QUESTION: per-model AI-credit multipliers for `policy.toml` — source GitHub's published usage-based rates; until confirmed, ship illustrative blended defaults (like the existing `[prices]`/`[human]` comments) and label them.
+- OPEN QUESTION: confirm whether any usage-bearing Claude turn lacks a `uuid` in practice (drives whether the dedup fix is corrective or defensive).
