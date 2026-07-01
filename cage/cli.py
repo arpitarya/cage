@@ -260,6 +260,8 @@ def build_parser() -> argparse.ArgumentParser:
                         formatter_class=argparse.RawDescriptionHelpFormatter)
     ex.add_argument("--format", choices=["jsonl", "csv", "json"], default="jsonl",
                     help="jsonl=raw rows (re-ingestable) · csv=flat · json=summary (default: jsonl)")
+    ex.add_argument("--json", action="store_const", dest="format", const="json",
+                    help="alias for --format json (the structured summary)")
     ex.add_argument("--since", metavar="WINDOW", help="window like 7d / 24h / 2w")
     ex.add_argument("--project", nargs="?", const=".", metavar="NAME",
                     help="filter to one project (basename; '.' = current dir). Claude-exact (§3.7)")

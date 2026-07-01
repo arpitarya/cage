@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from cage import metering
+from cage import ledger, metering
 
 TASK = "fix-handover-bug"
 # (tool, slice without it, slice with it, how the alternative is known)
@@ -23,6 +23,13 @@ _OUT = 1500    # output held constant
 
 
 def seed(root: Path) -> str:
+    # Idempotent: `cage demo` is the "prove the thesis" seeder — re-running it must not
+    # stack a second worked example onto the same ledger (that doubled `cage attrib`'s
+    # §4.4 totals). If the demo task is already present, return its call id and append
+    # nothing, so the tables keep reproducing §4.4 exactly however many times it runs.
+    existing = [c for c in ledger.calls(root) if c.get("task") == TASK]
+    if existing:
+        return existing[0].get("id", "")
     actual_in = _BASE + sum(w for _, _, w, _ in _SLICES)
     # Sonnet ($3/M in, $15/M out) — the rates the plan §4.4 numbers were computed at.
     call_id = metering.record_call(

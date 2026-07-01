@@ -19,14 +19,52 @@ counted once. Fail-open per file, idempotent on re-import, $0/stdlib, counts-nev
 """
 from __future__ import annotations
 
+import contextlib
 import datetime as _dt
 import json
 from pathlib import Path
 
 from cage import agents, debuglog, hooks, ledger, limits, paths, policy, transcript
 
+try:  # POSIX advisory locking; absent on Windows → the lock degrades to a no-op (fail-open)
+    import fcntl as _fcntl
+except ImportError:  # pragma: no cover
+    _fcntl = None
+
 # Agents that persist a usage log to disk (everything else → proxy fallback).
 LOG_BEARING = ("claude", "codex", "copilot", "kiro")
+
+
+@contextlib.contextmanager
+def _import_lock(foot: paths.Footprint):
+    """Serialize concurrent import sweeps so two of them can't both snapshot the
+    ledger's ``seen`` set *before* either appends — the window that let a single turn
+    land twice under two racing hooks (a Stop hook + a SessionStart sweep firing at
+    once). Holding an exclusive lock across the read-check-append section means the
+    second sweep rebuilds ``seen`` only after the first has committed, so id-dedupe
+    catches it. **Fail-open**: if the lock can't be taken (no ``fcntl``, unwritable
+    state dir), proceed unlocked — `hooks.append_new`'s id-dedupe stays the backstop,
+    exactly as before this lock existed. Never raises into the capture path."""
+    fh = None
+    try:
+        foot.state.mkdir(parents=True, exist_ok=True)
+        fh = open(foot.state / "import.lock", "w")  # noqa: SIM115 — released in finally
+        if _fcntl is not None:
+            _fcntl.flock(fh.fileno(), _fcntl.LOCK_EX)
+    except OSError:
+        if fh is not None:
+            fh.close()
+        fh = None
+    try:
+        yield
+    finally:
+        if fh is not None:
+            try:
+                if _fcntl is not None:
+                    _fcntl.flock(fh.fileno(), _fcntl.LOCK_UN)
+            except OSError:
+                pass
+            fh.close()
 
 
 def _mtime_utc(f: Path):
@@ -239,10 +277,15 @@ def run(root: Path, agent: str, args) -> list[str]:
         return ["· capture disabled ([capture] enabled=false or CAGE_CAPTURE=0) — import skipped"]
     targets = agents.SURFACES if agent == "all" else (agent,)
     foot = paths.Footprint(root)
-    cursors = _load_cursors(foot)
-    seen = {c.get("id") for c in ledger.calls(root)}  # one ledger read shared across agents
-    lines = [run_agent(root, a, args, pol=pol, seen=seen,
-                       agent_cursor=cursors.setdefault(a, {})) for a in targets]
-    cursors["_last_import"] = _now_iso()  # pull-based staleness signal for doctor/report
-    _save_cursors(foot, cursors)
+    # Serialize the read-check-append section: two sweeps racing here (two hooks, or a
+    # hook + a manual import) must not both build `seen` before either commits, or the
+    # same turn lands twice. Fail-open — an untakeable lock just falls back to the
+    # id-dedupe backstop (see `_import_lock`).
+    with _import_lock(foot):
+        cursors = _load_cursors(foot)
+        seen = {c.get("id") for c in ledger.calls(root)}  # one ledger read shared across agents
+        lines = [run_agent(root, a, args, pol=pol, seen=seen,
+                           agent_cursor=cursors.setdefault(a, {})) for a in targets]
+        cursors["_last_import"] = _now_iso()  # pull-based staleness signal for doctor/report
+        _save_cursors(foot, cursors)
     return lines
