@@ -172,8 +172,8 @@ cage ledger-sync                  # team-view aggregation (dry-run expectations 
 cage limits                       # Codex quota if present; off-by-default credits stay empty
 cage forecast; cage recommend; cage quality; cage regression --since 7d
 cage demo                         # MUST reproduce the plan §4.4 attrib/matrix tables exactly
-cage export --json                # cage.v1 envelope; also cage report --json / --html PATH
-cage mcp / cage serve             # MCP + HTTP read surface boot (smoke)
+cage export --json                # structured summary (alias for --format json); also cage report --json
+cage mcp / cage serve             # MCP + HTTP read surface boot (smoke; serve renders the HTML dashboard)
 ```
 
 Checks:

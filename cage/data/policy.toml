@@ -6,6 +6,19 @@
 # (`claude-sonnet-4-5-20250929`) which resolve to the matching family row by
 # longest shared prefix (policy.price_match) — opus never borrows a sonnet price.
 # Anthropic — Claude Code / Kiro (both run Claude models). Per-MTok, current rates.
+# Fable 5 / Mythos 5 are the most-capable tier — priced above Opus. `claude-fable-5`
+# shares only `claude` with the opus/sonnet/haiku rows (< 2 segments), so it needs its
+# own exact row or it prices at $0; Mythos 5 has identical pricing.
+[prices.anthropic."claude-fable-5"]
+input = 10.00
+output = 50.00
+cache_read = 1.00
+
+[prices.anthropic."claude-mythos-5"]
+input = 10.00
+output = 50.00
+cache_read = 1.00
+
 [prices.anthropic."claude-opus-4-8"]
 input = 5.00
 output = 25.00
