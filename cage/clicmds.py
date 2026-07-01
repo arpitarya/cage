@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from cage import (agents, attribution, budget, demo, doctorcmd,
+from cage import (adoptcmd, agents, attribution, budget, demo, doctorcmd,
                   explain, exportcmd, forecast, graphifymeter, humanview, importcmd, initcmd,
                   ledger, ledgersync, limits, matrix, mcpserver, metercmd, metering, notessync,
                   origin, paths, policy, provenance, proxy, quality, recommend, regression,
@@ -185,8 +185,11 @@ def cmd_query(args) -> int:
 
 
 def cmd_demo(_args) -> int:
-    call_id = demo.seed(ledger_root())
-    print(f"✔ Seeded the §4.4 worked example (task {demo.TASK!r}, call {call_id}).")
+    root = ledger_root()
+    already = any(c.get("task") == demo.TASK for c in ledger.calls(root))
+    call_id = demo.seed(root)
+    verb = "already seeded" if already else "Seeded"
+    print(f"✔ {verb} the §4.4 worked example (task {demo.TASK!r}, call {call_id}).")
     print("  Now run:  cage attrib   ·   cage matrix   ·   cage report")
     return 0
 
@@ -286,6 +289,23 @@ def cmd_setup(args) -> int:
         args.skill = False
         args.project = True
         args.graphify = getattr(args, "graphify", True)
+        # `--project-only` is agent-independent scaffolding (its --help: "scaffold
+        # .cage/ + graphify + PATH only"). With no agent flag, scaffold and stop —
+        # don't fall through to the "pick an agent" wiring path and no-op. Wiring an
+        # agent stays a separate, explicit step (`cage setup --wire-only --<agent>`).
+        if not all_agents and not any(getattr(args, s, False) for s in agents.SURFACES):
+            res = adoptcmd.run(here, graphify=args.graphify, surfaces=None)
+            print("\n▸ cage setup — project scaffold")
+            print(f"  ✔ .cage/ ready → {res['init']}")
+            if "shim" in res:
+                print(f"  ✔ graphify interceptor → {res['shim']}")
+                if res.get("path"):
+                    print(f"  ✔ bin/ added to PATH in {res['path']} — open a new shell")
+            elif args.graphify:
+                print("  · graphify not installed — interceptor skipped")
+            print("\nDone. Verify with `cage doctor`; wire an agent with "
+                  "`cage setup --wire-only --<agent>`.")
+            return 0
 
     # Standard setup: interactive wizard, --all, or per-agent flags
     flagged = tuple(s for s in agents.SURFACES if getattr(args, s, False))

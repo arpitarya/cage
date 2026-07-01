@@ -241,7 +241,7 @@ Hooks are an **optional** real-time add-on — they fire only under a CLI client
 
 ## The `$0` guarantee
 
-Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 312 tests passing; `cage demo` reproduces the worked attribution example against a real ledger.
+Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 317 tests passing; `cage demo` reproduces the worked attribution example against a real ledger.
 
 **Honest limits.** Cage doesn't decide your human rate — it prices minutes at a blended rate you set, and labels the result `estimated` so it never pretends to be a timesheet. Marginal-by-fixed-order is defensible and `$0`, but it is an *ordering convention*, not a Shapley value (that's a deferred audit mode). And a counterfactual cell is an honest reconstruction, never an invoice — the `method` column says so on every row, on purpose.
 
@@ -249,6 +249,7 @@ Every derived view is parse / arithmetic over the log — **no LLM call, ever, o
 
 Latest release below — full history and detail in [CHANGELOG.md](CHANGELOG.md).
 
+- **v0.15.1 — validation-pass fixes.** Closes a concurrent-import double-count (two capture sweeps racing on the same ledger could land one turn twice — `importcmd` now holds an exclusive `flock` across the read-check-append section, fail-open when `fcntl` is absent), makes `cage demo` idempotent (re-running no longer doubles the §4.4 tables), lets `cage setup --project-only` scaffold with no agent flag, and adds `cage export --json` as an alias for `--format json`. Additive, fail-open preserved; +6 regression tests.
 - **v0.15.0 — meter dedup correctness + `cage limits`.** A new `cage limits` view surfaces Codex rate-limit windows (latest local snapshot — `remaining_pct` + reset + age) and **estimated** AI-credit consumption (tokens × a per-model `[credits]` multiplier) for token-based providers only — every figure labelled `estimated` + reconcilable, Kiro never fabricated; `cage limits --json` debuts the `cage.v1` envelope. Quota is a machine-local `.cage/state/limits.json` snapshot, **not** a ledger substrate. Plus a defensive meter dedup fix (deterministic id when a Claude turn lacks a `uuid` — empirically 0/29,714, uuid-present rows byte-identical). Additive: no `CALL_FIELDS`/`make_call` change, no ledger rewrite.
 
 ## The name

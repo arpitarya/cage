@@ -2,6 +2,18 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
+## v0.15.1 — validation-pass fixes (concurrent-import dedup + three CLI/setup papercuts)
+
+Fixes surfaced by an end-to-end validation pass on a disposable repo. All additive: no `CALL_FIELDS`/`make_call` change, no ledger rewrite, fail-open contract preserved. +6 regression tests (`tests/test_validation_fixes.py`), one per finding.
+
+- **Concurrent-import double-count closed (the one real correctness bug).** Two capture sweeps racing on the same ledger — a Stop hook and a SessionStart sweep firing at once — could *both* snapshot the `seen` id-set before either appended, landing one turn twice (observed: an identical `call_id` written twice, doubling that call in `cage report`). `importcmd.run` now holds an exclusive `flock` on `.cage/state/import.lock` across the read-check-append section, so the second sweep rebuilds `seen` only after the first commits and `hooks.append_new`'s id-dedupe catches it. **Fail-open**: no `fcntl` (Windows) or an unwritable state dir ⇒ the lock is a no-op and the id-dedupe stays the backstop, exactly as before. Sequential re-import was already idempotent; this closes the concurrent window.
+
+- **`cage demo` is now idempotent.** Re-running `cage demo` used to append a *second* §4.4 worked example onto the same ledger, doubling `cage attrib`/`cage matrix` totals (82,800 tok vs the canonical 41,400). `demo.seed` now returns the existing call id and appends nothing when the demo task is already present — the tables reproduce §4.4 exactly however many times it runs.
+
+- **`cage setup --project-only` scaffolds standalone.** Its `--help` promises "scaffold `.cage/` + graphify + PATH only", but with no agent flag it fell through to the "pick an agent" wiring path and no-op'd (scaffolding nothing). It now runs the agent-independent scaffold (`adoptcmd.run(..., surfaces=None)`) and stops; wiring an agent stays the separate, explicit `cage setup --wire-only --<agent>` step.
+
+- **`cage export --json` added as an alias for `--format json`.** `cage report --json` worked but `cage export --json` errored with `unrecognized arguments`; the export summary is now reachable by the same flag both commands share.
+
 ## v0.15.0 — meter dedup correctness + `cage limits` (Codex quota + estimated AI-credits)
 
 Two gaps closed, scoped tightly per a devil's-advocate/pre-mortem debate: a meter dedup correctness fix, and a new `cage limits` view for provider quota + token-derived **estimated** credits. Every credit/quota figure is labelled `estimated`, sourced, and reconcilable — a shape-mismatch yields *nothing*, never a wrong number. **Additive: no `CALL_FIELDS`/`make_call` change, no ledger rewrite, no new ledger substrate.**
