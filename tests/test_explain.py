@@ -149,8 +149,10 @@ def test_data_flow_prints_live_ledger_paths(proj, monkeypatch, capsys):
     assert cli.main(["query", "data-flow"]) == 0
     out = capsys.readouterr().out
     foot = paths.Footprint(proj)
-    assert str(foot.calls) in out
-    assert str(foot.receipts) in out
+    # calls/receipts show the month-partitioned shard glob (calls-*.jsonl), not the
+    # legacy unpartitioned filename which no longer exists on a fresh ledger.
+    assert str(foot.ledger / "calls-*.jsonl") in out
+    assert str(foot.ledger / "receipts-*.jsonl") in out
     assert str(foot.tasks) in out
 
 

@@ -43,7 +43,11 @@ def _live(pol: dict) -> dict:
         "c_type": conf.get("type_table"), "c_default": conf.get("default"),
         "trust": " · ".join(f"{m} {n}" for m, n in constants.METHOD_TRUST.items()),
         "methods": " | ".join(schema.METHODS),
-        "calls_path": str(foot.calls), "receipts_path": str(foot.receipts),
+        # Show the month-partitioned shard glob (calls-YYYY-MM.jsonl), not the legacy
+        # unpartitioned `calls.jsonl` — that single file no longer exists on a fresh
+        # ledger, so interpolating it into the concept text misdescribed on-disk layout.
+        "calls_path": str(foot.ledger / "calls-*.jsonl"),
+        "receipts_path": str(foot.ledger / "receipts-*.jsonl"),
         "tasks_path": str(foot.tasks),
         "agent_surfaces": " · ".join(agents.SURFACES),
         "partition": constants.PARTITION_GRANULARITY,

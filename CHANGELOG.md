@@ -2,6 +2,16 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
+## v0.15.2 — Fable 5 / Mythos 5 pricing + two doc/interpolation papercuts
+
+A second validation-pass batch, found by re-testing v0.15.1 against a real cross-project ledger. Additive; fail-open preserved; +1 regression test (suite 317→318).
+
+- **`claude-fable-5` and `claude-mythos-5` now priced.** Real Fable 5 usage was costing out at **$0** with an `⚠ UNPRICED` warning: `claude-fable-5` shares only the `claude` segment with the opus/sonnet/haiku rows (< 2 segments), so `policy.price_match`'s family fallback can't reach it — it needs its own exact row. Added `[prices.anthropic."claude-fable-5"]` and `[prices.anthropic."claude-mythos-5"]` at **$10 / $50 per MTok, $1 cache-read** (Anthropic's published Fable/Mythos tier). A regression test pins that the bundled policy prices both exactly.
+
+- **`cage query overview` / `data-flow` show the real on-disk paths.** The concept text interpolated the legacy unpartitioned `calls.jsonl` / `receipts.jsonl`, but the ledger is month-partitioned — that single file doesn't exist on a fresh ledger. It now shows the shard glob `calls-*.jsonl` / `receipts-*.jsonl`, matching what's actually on disk.
+
+- **Test-plan doc drift corrected.** `docs/dummy-repo-test-plan.md` §5 listed `cage report --html PATH` (no such flag — the HTML surface is `cage serve`) and `cage export --json` as a stand-in for the summary; both lines now match the real CLI (`cage export --json` is a first-class alias as of v0.15.1).
+
 ## v0.15.1 — validation-pass fixes (concurrent-import dedup + three CLI/setup papercuts)
 
 Fixes surfaced by an end-to-end validation pass on a disposable repo. All additive: no `CALL_FIELDS`/`make_call` change, no ledger rewrite, fail-open contract preserved. +6 regression tests (`tests/test_validation_fixes.py`), one per finding.

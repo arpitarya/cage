@@ -21,6 +21,16 @@ def test_exact_match_still_wins():
     assert row["input"] == 3.0
 
 
+def test_bundled_policy_prices_fable_and_mythos():
+    # claude-fable-5 shares only `claude` with opus/sonnet/haiku (< 2 segments), so
+    # without its own row it would price at $0. The bundled policy must carry it.
+    pol = policy.load(None)  # bundled data/policy.toml
+    for model in ("claude-fable-5", "claude-mythos-5"):
+        row, match, key = policy.price_match(pol, "anthropic", model)
+        assert match == "exact" and key == model, f"{model} not priced exactly"
+        assert (row["input"], row["output"]) == (10.0, 50.0)
+
+
 def test_dated_id_resolves_to_family_row():
     # A full dated Claude Code id with no exact row → its family row's numbers.
     row, match, key = policy.price_match(POL, "anthropic", "claude-sonnet-4-5-20250929")
