@@ -92,6 +92,7 @@ def test_unverified_stand_ins_are_flagged_not_silent():
         if not spec["format_verified"]:
             assert fixture.parts[1] == "vscode"  # only extension formats may be stand-ins
             assert "UNVERIFIED-FORMAT" in readme
-    verified = {str(f) for f in FIXTURES if _load(f)["format_verified"]}
-    # Every CLI format is pinned against a real client log.
+    verified = {f.as_posix() for f in FIXTURES if _load(f)["format_verified"]}
+    # Every CLI format is pinned against a real client log. (as_posix: `str(Path)`
+    # renders `claude\cli` on Windows and the comparison keys must be OS-independent.)
     assert {f"{a}/cli" for a in agents.SURFACES} <= verified

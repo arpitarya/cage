@@ -86,8 +86,11 @@ def test_metering_matrix_is_honest_about_wired_hooks(proj):
 
 def test_doctor_has_no_scheduler_row(proj):
     # cage installs no OS scheduler — there must be no scheduler check anywhere, and no
-    # check should claim one is registered (the doctor may only *mention* a user cron).
+    # check should claim one is registered. The doctor may only *mention* the user's own
+    # line (the OS-aware hint prints a cron example on POSIX, a schtasks example on
+    # Windows — so those words legitimately appear inside the disclaimer).
     res = doctorcmd.run(proj)
     assert not any(c["name"] == "scheduler" for c in res["checks"])
     blob = " ".join(c["detail"] for c in res["checks"]).lower()
-    assert "launchd" not in blob and "systemd" not in blob and "schtasks" not in blob
+    assert "launchd" not in blob and "systemd" not in blob  # cage never touches these
+    assert "installs no scheduler" in blob                  # the disclaimer, every OS
