@@ -33,8 +33,30 @@ def append_row(root: Path, kind: str, row: dict) -> bool:
 
     The shard is chosen from the row's own ``ts`` (`paths.Footprint.shard`), so writes
     are deterministic and the append-only past is never rewritten — new writes simply
-    target dated files. Fail-open like `append`."""
-    return append(paths.Footprint(root).shard(kind, row.get("ts", "")), row)
+    target dated files. Fail-open like `append` — but never *silent*: a failed append
+    (the unwritable-ledger case, the one capture failure that loses a row) leaves an
+    attributable line in the debug log under ``CAGE_DEBUG=1``. Local import + row
+    metadata only (kind, shard path, row id) — the trace is itself fail-open.
+
+    Fleet studies (plan §4.9): when this ledger is *enrolled* (an opaque machine id
+    exists in state), the row gains an additive ``machine`` field here — the one write
+    chokepoint every calls/receipts/tasks writer already goes through. Unenrolled
+    ledgers stamp nothing: byte-identical to the legacy contract."""
+    try:
+        from cage import machine  # local: keeps the hot path import-light, no cycle
+        machine.stamp(root, row)
+    except Exception:  # noqa: BLE001 — stamping is additive, never blocks a write
+        pass
+    shard = paths.Footprint(root).shard(kind, row.get("ts", ""))
+    ok = append(shard, row)
+    if not ok:
+        try:
+            from cage import debuglog  # local import keeps the write hot path light
+            debuglog.event(root, event="ledger.append", result="write-failed",
+                           kind=kind, shard=str(shard), row_id=row.get("id", ""))
+        except Exception:  # noqa: BLE001 — tracing must never break the write path
+            pass
+    return ok
 
 
 def read(path: Path) -> list[dict]:
@@ -175,6 +197,14 @@ def by_project(rows: list[dict], project: str | None) -> list[dict]:
 
 _SINCE = re.compile(r"^(\d+)([dhw])$")
 _UNIT = SINCE_WINDOW_DAYS
+
+
+def valid_since(spec: str | None) -> bool:
+    """Whether a ``--since`` spec parses (``7d`` / ``24h`` / ``2w`` forms). ``None``/""
+    (flag absent) is valid. The CLI boundary rejects an invalid spec with a typed
+    error; `since_cutoff` itself stays lenient (fail-open capture callers pass
+    through it and must never raise)."""
+    return not spec or _SINCE.match(spec.strip()) is not None
 
 
 def since_cutoff(spec: str | None) -> _dt.datetime | None:

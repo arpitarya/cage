@@ -7,13 +7,15 @@ import datetime as _dt
 def ago(ts: str) -> str:
     """Human "3m ago" for an ISO timestamp; fail-open to "". Used by `cage doctor`/`cage
     report` to surface "last import: N ago" (capture is pull-based, plan §3.7). A clock
-    is read, but never inside a derived-from-ledger table — determinism holds."""
+    is read, but never inside a derived-from-ledger table — determinism holds. The floor
+    is "just now", never per-second ("0s ago" → "2s ago" made back-to-back runs of the
+    same view byte-different, which is exactly what the determinism sweeps compare)."""
     try:
         when = _dt.datetime.fromisoformat(ts)
         now = _dt.datetime.now(when.tzinfo)
         secs = max(0, int((now - when).total_seconds()))
         if secs < 90:
-            return f"{secs}s ago"
+            return "just now"
         if secs < 5400:
             return f"{secs // 60}m ago"
         if secs < 172800:

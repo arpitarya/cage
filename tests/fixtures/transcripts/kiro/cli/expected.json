@@ -1,0 +1,47 @@
+{
+  "log": "tokens_generated.jsonl",
+  "env": "KIRO_DATA_DIR",
+  "plant": "dev_data/tokens_generated.jsonl",
+  "format_verified": true,
+  "volatile": [
+    "ts"
+  ],
+  "rows": [
+    {
+      "id": "c_kiro00000236e27eb",
+      "session": "kiro",
+      "task": "",
+      "agent": "kiro",
+      "route": "chat",
+      "provider": "kiro",
+      "model": "agent",
+      "tokens_in": 5400,
+      "tokens_out": 320,
+      "cached_in": 0,
+      "est_cost_usd": 0.0,
+      "latency_ms": 0,
+      "ok": true,
+      "retries": 0,
+      "scope": "",
+      "project": ""
+    },
+    {
+      "id": "c_kiro000013a9a2e5e",
+      "session": "kiro",
+      "task": "",
+      "agent": "kiro",
+      "route": "chat",
+      "provider": "kiro",
+      "model": "agent",
+      "tokens_in": 78,
+      "tokens_out": 0,
+      "cached_in": 0,
+      "est_cost_usd": 0.0,
+      "latency_ms": 0,
+      "ok": true,
+      "retries": 0,
+      "scope": "",
+      "project": ""
+    }
+  ]
+}

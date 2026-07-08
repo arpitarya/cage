@@ -73,3 +73,19 @@ MODEL_FAMILY_MIN_SEGMENTS = 2
 # two provenance rows disagree on the same (sha, file) during notes union.
 PROVENANCE_METHOD_TRUST = {"hooked": 2, "transcript": 1, "heuristic": 0}
 PROVENANCE_CORROBORATION_BONUS = 0.2  # confidence bump when 2 independent paths agree
+
+# `cage compare` min-n gate (roadmap P2). Below this many closed tasks a group
+# renders "insufficient data (n=X < N)" and is excluded from every delta — the
+# command explains, it never numbers. NOT a vibes number: with n<5 a single
+# outlier task moves the median itself, and the IQR (quartiles) degenerates —
+# so any smaller group reads as signal when it is noise. A blocking gate rather
+# than a footnote because a wrong comparison is worse than none (the same rule
+# credits/limits follow). Heuristic, not user economics ⇒ constants, not policy.
+MIN_COMPARE_N = 5
+
+# `cage estimate` min-n gate (roadmap P3) — same statistical rationale as
+# MIN_COMPARE_N (a median/IQR band over fewer closed tasks is noise wearing a
+# band), and the same blocking rule: below it the command explains, never
+# numbers. Kept as its own name (not an alias) so the two gates can diverge if
+# estimation proves to need deeper history than comparison.
+MIN_ESTIMATE_N = 5

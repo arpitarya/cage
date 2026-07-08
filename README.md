@@ -191,6 +191,13 @@ cage attrib --task ID          # per-tool marginal savings (sum of marginals = t
 cage matrix --task ID          # the counterfactual permutation table (2ⁿ on/off)
 cage matrix --task ID --human  # …with a human anchor row + vs-human columns
 cage roi --since 30d           # saved $ per tool vs its own cost + added latency
+cage compare [--by label]      # measured: closed tasks by observed stack (n·median·IQR; delta estimated)
+cage estimate [--label W] [--record TASK]  # modeled pre-task band from matching history (refuses thin n)
+cage calibration               # measured: do recorded estimates land in-band? (the confidence level)
+cage verdict graphify          # one line: SAVING / COSTING / INSUFFICIENT DATA (pure composer, tagged inputs)
+cage study join baseline       # fleet study: enroll this laptop (opaque id) + wire + start phase
+cage export --study            # one bundle per machine → analyst: cage import bundle*.zip
+cage study report              # coverage (gaps flagged) first, then the paired-by-machine delta
 cage human [--agent claude]    # agent-vs-human: $ AND hours saved, per agent
 cage human-record --task ID --type feature   # record a Tier-1 human alternative
 cage trend --by week --metric both           # cost + time savings as a time-series
@@ -198,7 +205,7 @@ cage why <call-id>             # full provenance: a call + every receipt against
 cage origin <sha> [--attest human]   # who wrote which files in a commit (authorship)
 cage notes-sync [--write]      # distribute authorship → refs/notes/cage-provenance (CI writes)
 cage verify                    # report-only consistency pass over the ledger (always exits 0)
-cage quality / cage outcome ID # cost per *successful* task (cost is honest with outcome)
+cage quality / cage outcome ID [--label WORD]  # cost per *successful* task (+ compare grouping tag)
 cage regression                # alert when cost-per-call drifts up
 cage recommend                 # cheapest-path: which tools to enable / skip
 cage forecast                  # project monthly spend vs the budget
@@ -241,7 +248,7 @@ Hooks are an **optional** real-time add-on — they fire only under a CLI client
 
 ## The `$0` guarantee
 
-Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 318 tests passing; `cage demo` reproduces the worked attribution example against a real ledger.
+Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 401 tests passing; `cage demo` reproduces the worked attribution example against a real ledger.
 
 **Honest limits.** Cage doesn't decide your human rate — it prices minutes at a blended rate you set, and labels the result `estimated` so it never pretends to be a timesheet. Marginal-by-fixed-order is defensible and `$0`, but it is an *ordering convention*, not a Shapley value (that's a deferred audit mode). And a counterfactual cell is an honest reconstruction, never an invoice — the `method` column says so on every row, on purpose.
 
@@ -249,6 +256,7 @@ Every derived view is parse / arithmetic over the log — **no LLM call, ever, o
 
 Latest release below — full history and detail in [CHANGELOG.md](CHANGELOG.md).
 
+- **v0.16.0 — roadmap P0–P5 complete: validate · diagnose · compare · estimate · verdict · fleet study.** P0: a sanitized fixture corpus (all four agents × CLI/VS Code) with exact-row parse tests pinning every log format `cage import` reads, plus `python -m tools.dummyrepo` — a scenario runner proving capture, idempotent re-import, PII discipline, and determinism end-to-end. P1: `cage doctor --bundle` writes one redacted, counts-never-content diagnostics archive, and every capture-path swallow-site now leaves an attributable `debug.log` line under `CAGE_DEBUG=1` — audited by test. P2: `cage compare` groups closed tasks by *observed* stack and prints measured `n · median · IQR` per group — the delta vs agent-only is tagged `estimated` with an explicit not-a-controlled-experiment caveat, groups under n=5 are refused, and `cage outcome --label` adds a single-token grouping key. P3: `cage estimate` prints a `modeled` median+IQR band from matching closed tasks (refusing thin history), `--record` stamps it on the open task, and `cage calibration` measures the in-band hit-rate afterwards — the estimator's confidence is measured, never self-reported. P4: `cage verdict <tool>` gives the one-line answer (SAVING / COSTING / INSUFFICIENT DATA) as a pure composer over attrib/roi/trend/regression/quality — every input method-tagged, nothing new computed, refusals over approximations. P5: `cage study` runs the fleet version across N laptops — opaque machine ids (never hostnames), recorded phase markers, one-file bundles (`cage export --study` → `cage import bundle*.zip`), and a report that prints per-machine coverage (gaps flagged) before the paired-by-machine delta, tagged `estimated`. The manual real-extension validation pass then fixed the capture bugs it was designed to catch: cross-session Codex call-id collisions (41% of real calls silently dropped), import-time Codex timestamps (wrong month shards), stored-`est_cost_usd` reads in six views that must reprice (tokens × policy), a provenance write race, resolver holes that routed `CAGE_HOME`-redirected runs into the real global ledger and grew stray `.cage/` footprints from no-project hooks, plus `cage watch` exiting 0 instead of 130 and usernames in doctor bundles — and closed **all three** `UNVERIFIED-FORMAT` fixture cells with real sanitized extension logs, including new Copilot VS Code-extension capture from VS Code's chat-session store.
 - **v0.15.2 — Fable 5 / Mythos 5 pricing + doc papercuts.** Prices `claude-fable-5` and `claude-mythos-5` ($10/$50 per MTok, $1 cache-read) — real Fable 5 usage was costing out at $0 because it shares only the `claude` segment with the opus/sonnet/haiku rows and can't reach them by family fallback. Also fixes `cage query overview`/`data-flow` to show the month-partitioned shard glob (`calls-*.jsonl`) instead of the legacy `calls.jsonl`, and corrects test-plan doc drift.
 - **v0.15.1 — validation-pass fixes.** Closes a concurrent-import double-count (two capture sweeps racing on the same ledger could land one turn twice — `importcmd` now holds an exclusive `flock` across the read-check-append section, fail-open when `fcntl` is absent), makes `cage demo` idempotent (re-running no longer doubles the §4.4 tables), lets `cage setup --project-only` scaffold with no agent flag, and adds `cage export --json` as an alias for `--format json`. Additive, fail-open preserved; +6 regression tests.
 - **v0.15.0 — meter dedup correctness + `cage limits`.** A new `cage limits` view surfaces Codex rate-limit windows (latest local snapshot — `remaining_pct` + reset + age) and **estimated** AI-credit consumption (tokens × a per-model `[credits]` multiplier) for token-based providers only — every figure labelled `estimated` + reconcilable, Kiro never fabricated; `cage limits --json` debuts the `cage.v1` envelope. Quota is a machine-local `.cage/state/limits.json` snapshot, **not** a ledger substrate. Plus a defensive meter dedup fix (deterministic id when a Claude turn lacks a `uuid` — empirically 0/29,714, uuid-present rows byte-identical). Additive: no `CALL_FIELDS`/`make_call` change, no ledger rewrite.

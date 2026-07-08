@@ -1,0 +1,47 @@
+{
+  "log": "rollout-2026-06-14T10-00-00-abc123.jsonl",
+  "env": "CODEX_HOME",
+  "plant": "sessions/2026/06/14/rollout-2026-06-14T10-00-00-abc123.jsonl",
+  "format_verified": true,
+  "volatile": [],
+  "rows": [
+    {
+      "id": "c_codex6fab992c00002",
+      "ts": "2026-06-14T10:00:05Z",
+      "session": "rollout-2026-06-14T10-00-00-abc123",
+      "task": "",
+      "agent": "codex",
+      "route": "chat",
+      "provider": "openai",
+      "model": "gpt-5.1-codex",
+      "tokens_in": 3100,
+      "tokens_out": 140,
+      "cached_in": 2000,
+      "est_cost_usd": 0.0,
+      "latency_ms": 0,
+      "ok": true,
+      "retries": 0,
+      "scope": "",
+      "project": ""
+    },
+    {
+      "id": "c_codex6fab992c00003",
+      "ts": "2026-06-14T10:03:20Z",
+      "session": "rollout-2026-06-14T10-00-00-abc123",
+      "task": "",
+      "agent": "codex",
+      "route": "chat",
+      "provider": "openai",
+      "model": "gpt-5.1-codex",
+      "tokens_in": 500,
+      "tokens_out": 900,
+      "cached_in": 0,
+      "est_cost_usd": 0.0,
+      "latency_ms": 0,
+      "ok": true,
+      "retries": 0,
+      "scope": "",
+      "project": ""
+    }
+  ]
+}

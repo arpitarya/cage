@@ -1,9 +1,10 @@
 """Command handlers — load policy, derive a view, print it (plan §7, §8)."""
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
-from cage import (adoptcmd, agents, attribution, budget, demo, doctorcmd,
+from cage import (adoptcmd, agents, attribution, budget, compare, demo, doctorcmd,
                   explain, exportcmd, forecast, graphifymeter, humanview, importcmd, initcmd,
                   ledger, ledgersync, limits, matrix, mcpserver, metercmd, metering, notessync,
                   origin, paths, policy, provenance, proxy, quality, recommend, regression,
@@ -146,7 +147,8 @@ def cmd_roi(args) -> int:
 
 
 def cmd_why(args) -> int:
-    data = provenance.explain(ledger_root(), args.call_id)
+    lr = ledger_root()
+    data = provenance.explain(lr, args.call_id, pol=_policy(lr))
     return emit(args, data, provenance.render_why(data, args.call_id))
 
 
@@ -197,20 +199,121 @@ def cmd_demo(_args) -> int:
 # ── §8 ledger features ───────────────────────────────────────────────────────
 
 def cmd_quality(args) -> int:
-    s = quality.summarize(ledger_root())
+    lr = ledger_root()
+    s = quality.summarize(lr, pol=_policy(lr))
     return emit(args, s, quality.render_quality(s))
+
+
+_LABEL = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,31}\Z")
 
 
 def cmd_outcome(args) -> int:
     r = ledger_root()
+    label = getattr(args, "label", None) or ""
+    if label and not _LABEL.match(label):
+        # Single-token PII guard (roadmap P2): a label is a grouping key for
+        # `cage compare --by label`, never free text, a path, or a message.
+        raise CageError("label must be one short token (letters/digits/._-, ≤32 chars) "
+                        "— no spaces, slashes, or paths")
     quality.record_outcome(r, args.task, ok=not args.redo)
-    tasks.record(r, args.task, outcome="ok" if not args.redo else "redo")
-    print(f"✔ recorded {args.task!r} as {'redo' if args.redo else 'ok'}.")
+    tasks.record(r, args.task, outcome="ok" if not args.redo else "redo", label=label)
+    tag = f" (label: {label})" if label else ""
+    print(f"✔ recorded {args.task!r} as {'redo' if args.redo else 'ok'}{tag}.")
     return 0
 
 
+def cmd_compare(args) -> int:
+    r = ledger_root()
+    by = tuple(k.strip() for k in (args.by or "stack").split(",") if k.strip())
+    bad = [k for k in by if k not in ("stack", "scope", "label")]
+    if bad:
+        raise CageError(f"unknown --by key(s) {bad}; choose from stack, scope, label")
+    d = compare.summarize(r, _policy(r), by=by, scope=args.scope, label=args.label)
+    return emit(args, render.envelope("compare", d) if args.json else d,
+                compare.render_compare(d))
+
+
+def cmd_estimate(args) -> int:
+    from cage import estimate
+    r = ledger_root()
+    d = estimate.band(r, _policy(r), scope=args.scope, label=args.label, agent=args.agent)
+    recorded = ""
+    if args.record:
+        if not d["ok"]:
+            raise CageError(f"cannot record: {d['reason']}")
+        if tasks.read(r).get(args.record, {}).get("outcome"):
+            # A retroactive estimate is exactly what calibration must never count.
+            raise CageError(f"task {args.record!r} is already closed — "
+                            "record estimates before the task runs")
+        if not estimate.record(r, args.record, d):  # fail-open write; surface at CLI
+            raise CageError("estimate could not be written (ledger not writable?)")
+        recorded = args.record
+    payload = {**d, **({"recorded": recorded} if recorded else {})}
+    return emit(args, render.envelope("estimate", payload) if args.json else payload,
+                estimate.render_estimate(d, recorded))
+
+
+def cmd_calibration(args) -> int:
+    from cage import calibration
+    r = ledger_root()
+    d = calibration.summarize(r, _policy(r))
+    return emit(args, render.envelope("calibration", d) if args.json else d,
+                calibration.render_calibration(d))
+
+
+def cmd_verdict(args) -> int:
+    from cage import verdict
+    r = ledger_root()
+    d = verdict.compose(r, _policy(r), args.tool, since=args.since)
+    return emit(args, render.envelope("verdict", d) if args.json else d,
+                verdict.render_verdict(d))
+
+
+def cmd_study(args) -> int:
+    """Fleet-study verbs (plan §4.9). Markers/report act on the *active* ledger
+    (capture lands there); `join` additionally wires this project's agents."""
+    from cage import machine, study
+    r = ledger_root()
+    if args.action == "id":
+        mid = machine.machine_id(r)
+        print(mid if mid else "not enrolled — `cage study join <phase>` (or `start`) "
+                              "generates the opaque machine id")
+        return 0
+    if args.action == "start":
+        if not args.phase:
+            raise CageError("cage study start needs a phase label (one short token)")
+        mid = study.start(r, args.phase)
+        print(f"✔ phase {args.phase!r} started (machine {mid}) — rows from now on are "
+              "assigned to it by their own timestamps")
+        return 0
+    if args.action == "stop":
+        study.stop(r)
+        print("✔ phase stopped — rows after this marker are unphased until the next start")
+        return 0
+    if args.action == "report":
+        d = study.summarize(r, _policy(r))
+        return emit(args, render.envelope("study", d) if args.json else d,
+                    study.render_study(d))
+    # join — one-command enrollment: scaffold → wire all four → start → doctor
+    if not args.phase:
+        raise CageError("cage study join needs the starting phase label (e.g. baseline)")
+    initcmd.run(paths.resolve_root(), pointer=False)
+    wired = agents.install(root())
+    mid = study.start(r, args.phase)
+    print(f"✔ enrolled: machine {mid} · phase {args.phase!r} started · wired: "
+          + ", ".join(sorted(wired)))
+    res = doctorcmd.run(root())
+    glyph = {"ok": "✔", "warn": "·", "fail": "✗"}
+    for c in res["checks"]:
+        print(f"  {glyph[c['level']]} {c['name']:<12} {c['detail']}")
+    print(f"\n{glyph[res['status']]} doctor: {res['status']} — automate capture with your "
+          "own cron line, e.g.:  0 * * * * cage import   (cage installs no scheduler)")
+    return 1 if res["status"] == "fail" else 0
+
+
 def cmd_regression(args) -> int:
-    r = regression.detect(ledger_root(), since=args.since, tolerance=args.tolerance)
+    lr = ledger_root()
+    r = regression.detect(lr, since=args.since, tolerance=args.tolerance, pol=_policy(lr))
     return emit(args, r, regression.render_regression(r))
 
 
@@ -347,6 +450,10 @@ def cmd_doctor(args) -> int:
                    "warn": "Cage works; some optional wiring is missing (see ·).",
                    "fail": "Cage setup is broken (see ✗) — run `cage setup`."}
         print(f"\n{glyph[res['status']]} {verdict[res['status']]}")
+    if getattr(args, "bundle", None):
+        from cage import doctorbundle
+        out = doctorbundle.run(root(), args.bundle)
+        print(f"✔ diagnostics bundle written: {out} (redacted — counts-never-content)")
     return 1 if res["status"] == "fail" else 0
 
 
@@ -442,7 +549,15 @@ def cmd_import(args) -> int:
     canonical explicit capture verb. Captures into the active ledger (``--ledger``/
     ``CAGE_BASE`` → project ``.cage/`` → global ``~/.cage``), so it works with no hooks
     and no project. Each agent prints its own count line; the proxy fallback for those
-    with no on-disk usage log. Always exits 0 (fail-open)."""
+    with no on-disk usage log. Always exits 0 (fail-open).
+
+    With positional BUNDLE args (fleet path, plan §4.9), merges study bundles by row
+    identity instead — the analyst's verb; idempotent, a bad bundle is a typed error."""
+    if getattr(args, "bundles", None):
+        from cage import study
+        for line in study.import_bundles(ledger_root(), args.bundles):
+            print(line)
+        return 0
     for line in importcmd.run(ledger_root(), args.agent, args):
         print(line)
     return 0
@@ -465,8 +580,17 @@ def cmd_import_claude(args) -> int:
 
 def cmd_export(args) -> int:
     """Import-first (unless ``--no-import``) then emit the active ledger as jsonl/csv/json
-    (counts-never-content, deterministic). The universal pull-based export path."""
+    (counts-never-content, deterministic). The universal pull-based export path.
+    ``--study`` writes the one-file fleet bundle instead (plan §4.9)."""
     r = ledger_root()
+    if getattr(args, "study", None) is not None:
+        from cage import study
+        if getattr(args, "do_import", True):
+            for line in importcmd.run(r, "all", args):
+                print(line)
+        out = study.export_bundle(r, args.study or None)
+        print(f"✔ study bundle written: {out} (rows + phase markers + counts-only manifest)")
+        return 0
     args.project = _project_filter(args)
     return exportcmd.run(r, args, pol=_policy(r))
 

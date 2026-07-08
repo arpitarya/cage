@@ -58,7 +58,11 @@ def _stdin_json() -> dict:
 def _root(payload: dict) -> Path:
     cwd = payload.get("cwd")
     start = Path(cwd) if cwd else Path.cwd()
-    return paths.find_project_root(start) or start
+    # Full §3.7 precedence, not `find_project_root or start`: a hook firing in a
+    # no-project dir must land in the global ~/.cage — the old cwd fallback grew a
+    # stray .cage/ footprint in whatever dir the session ran from and split the
+    # ledger (2026-07 manual validation, resolver-precedence check).
+    return paths.resolve_root(start)
 
 
 def append_new(root: Path, rows: list[dict], seen: set | None = None) -> int:
@@ -194,8 +198,10 @@ def post_tool_use() -> int:
                 if fname == f:
                     added, removed = a, r
                     break
-            ledger.append(buf, {"file": f, "added": added, "removed": removed,
-                                "agent": "claude-code"})
+            if not ledger.append(buf, {"file": f, "added": added, "removed": removed,
+                                       "agent": "claude-code"}):
+                debuglog.event(root, pol=pol, agent=_AGENT, event="post_tool_use",
+                               skip="buffer-write-failed", file=f)
     except Exception as e:  # fail-open
         debuglog.exception(root, "hook.post_tool_use", e, pol=pol)
     return 0
@@ -204,7 +210,7 @@ def post_tool_use() -> int:
 def post_commit() -> int:
     """Git `post-commit` hook — resolve this session's pending-edit buffer to the
     just-made commit's sha, write the hooked provenance row, clear the buffer."""
-    root = paths.find_project_root() or Path.cwd()
+    root = paths.resolve_root()  # same tier as _root(): no-cage repo ⇒ global, no stray footprint
     pol = _pol(root)
     debuglog.heartbeat(root, "git", "post_commit", str(Path.cwd()), pol=pol)
     try:
@@ -246,8 +252,8 @@ def prepare_commit_msg(msg_path: str) -> int:
     `Agent-Session` trailers from this session's pending-edit buffers. Ergonomics
     only: a record-keeping convenience, never the provenance ledger's source of
     truth (that's `post_commit`). Bypassable via `git commit --no-verify`."""
+    root = paths.resolve_root()  # same tier as _root() / post_commit()
     try:
-        root = paths.find_project_root() or Path.cwd()
         state_dir = paths.Footprint(root).state
         if not state_dir.is_dir():
             return 0
@@ -269,8 +275,8 @@ def prepare_commit_msg(msg_path: str) -> int:
         if "Agent-Session:" in text:  # already stamped (e.g. a retried hook) — no dup
             return 0
         path.write_text(text.rstrip("\n") + "\n\n" + "\n".join(trailers) + "\n", encoding="utf-8")
-    except Exception:  # pragma: no cover — best-effort
-        pass
+    except Exception as e:  # best-effort — but never silent (traceable under CAGE_DEBUG)
+        debuglog.exception(root, "hook.prepare_commit_msg", e)
     return 0
 
 

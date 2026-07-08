@@ -1,0 +1,28 @@
+{
+  "log": "session-vsc9d8e7.jsonl",
+  "env": "CLAUDE_CONFIG_DIR",
+  "plant": "projects/-tmp-cage-testbed/session-vsc9d8e7.jsonl",
+  "format_verified": true,
+  "volatile": [],
+  "rows": [
+    {
+      "id": "c_cccccccc9999aaa",
+      "ts": "2026-06-15T08:30:00Z",
+      "session": "session-vsc9d8e7",
+      "task": "",
+      "agent": "claude-code",
+      "route": "chat",
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-6",
+      "tokens_in": 5240,
+      "tokens_out": 220,
+      "cached_in": 5200,
+      "est_cost_usd": 0.0,
+      "latency_ms": 0,
+      "ok": true,
+      "retries": 0,
+      "scope": "",
+      "project": "cage-testbed"
+    }
+  ]
+}

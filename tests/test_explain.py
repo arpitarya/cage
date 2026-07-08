@@ -109,7 +109,8 @@ def test_every_concept_entry_has_code_refs_and_plan_ref():
 def test_calculation_entries_unchanged_kind():
     calc_ids = {"cost", "saved", "marginal-attribution", "matrix", "human-cost",
                 "time-saved", "roi", "token-heuristic", "confidence", "method-tags",
-                "trend", "budget"}
+                "trend", "budget", "compare-delta", "estimate-band", "calibration-hit-rate",
+                "verdict-composition", "study-pairing"}
     for e in explain.REGISTRY:
         if e.id in calc_ids:
             assert e.kind == "calculation"

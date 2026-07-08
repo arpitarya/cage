@@ -1,0 +1,2 @@
+{"kind": 0, "v": {"version": 3, "creationDate": 1783447744978, "sessionId": "20236884-4f14-453d-a016-aa37c72f819d"}}
+{"kind": 2, "k": ["requests"], "v": [{"requestId": "request_2eef5bcc-63ba-4e6f-98e5-86c5aa18a6df", "timestamp": 1783447814720, "modelId": "copilot/auto", "agent": {"extensionId": {"value": "github.copilot-chat"}}, "promptTokens": 25343, "completionTokens": 95, "result": {"metadata": {"promptTokens": 25343, "outputTokens": 24}}}]}

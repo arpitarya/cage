@@ -168,6 +168,30 @@ numeric diff counts, and top-level changed dirs only** — never the commit *mes
 author name/email, or file contents. It absorbs the existing `outcome` signal and
 powers `cage trend` and the diff-informed confidence bump.
 
+Additive optional field (roadmap P2): **`label`** — one short user-chosen token
+(letters/digits/`._-`, ≤32 chars, validated at the CLI boundary) set via
+`cage outcome <task> --label <word>`, a grouping key for `cage compare --by label`
+(§4.7). Same PII spirit as `scope`: a single token, never a path, message, or free
+text; absent/empty = the legacy contract.
+
+Additive optional fields (roadmap P3): **`est_tokens` / `est_usd` / `est_n`** plus
+the token band bounds **`est_tokens_q1` / `est_tokens_q3`** — a pre-task estimate
+stamped by `cage estimate --record <task>` onto the *open* task row (fail-open,
+last-write-wins like every task field). The band bounds exist so `cage calibration`
+scores in-band hits against the band *as recorded at estimate time* — recomputing
+over grown history would score a different band. Numbers only (token/dollar
+counts), PII-free by construction; absent = the legacy contract (§4.8).
+
+Additive optional field (roadmap P5): **`machine`** on calls/receipts/tasks — an
+**opaque random id** (never hostname/username/anything derivable; the analyst
+keeps the name↔id mapping offline) stamped at the one write chokepoint
+(`ledger.append_row`) **only once the ledger is enrolled** in a fleet study
+(`cage study join`/`start` creates `.cage/state/machine.json`). Unenrolled
+ledgers stamp nothing — byte-identical to the legacy contract (§4.9). The study
+phase markers live in a fifth small append-only file, `ledger/study.jsonl`
+(unpartitioned, like provenance — a study is weeks, not years), which travels
+inside `cage export --study` bundles.
+
 ### 3.5 The provenance record — `provenance.jsonl` (fourth append-only file, v1)
 
 A fourth, separate substrate answering a different question than §3.1–3.4: not
@@ -579,6 +603,94 @@ backlog with no ledger rewrite. The full design is `docs/human-baseline.design.m
   tagged `estimated`. It can go **negative** (agent thrashed) — the metric must be
   able to embarrass the agent. `cage trend` turns `ts` into a cost+time time-series.
 
+### 4.7 Measured stack comparison — `cage compare` (roadmap P2)
+
+§4.2–§4.4 model counterfactuals from receipts; `cage compare` answers the *other*
+half of "is this tool reducing my cost": **did tasks that ran with the tool
+measurably cost less than tasks that didn't** — observed group totals, not modeled
+reconstruction. Derive-time only, no schema change beyond the optional task `label`
+(§3.4).
+
+- **Stack signature** (`taskgroup.py`) — per *closed* task (an `outcome` recorded),
+  the sorted set of `tool`s on its joined receipts; `human` excluded (the Tier-1
+  anchor is an alternative-cost axis, not a pipeline tool); empty ⇒ `agent-only`.
+  Join precedence: task-id first; then a **session-window fallback** — a row with an
+  empty `task` joins when its `session` is one of the task's sessions and its `ts`
+  falls inside the task's call span (transcript-imported calls carry session but no
+  task id). Overlaps resolve to the lexicographically smallest task id (stable).
+- **Group totals are measured** — recorded `tokens_in + tokens_out`, USD recomputed
+  per call via `prices.call_usd` (the same authoritative path as `report`). Groups
+  key on `(stack, scope?, label?)`; per group `n · median · IQR`
+  (inclusive-quartile, stdlib `statistics`).
+- **The delta is `estimated`, never `measured`** — median(stack) − median(agent-only
+  baseline sharing every non-stack key). Different tasks, nothing randomized: an
+  observed difference, not a controlled experiment — the caveat renders on every
+  output. No causal language.
+- **Min-n gate is blocking** — a group below `constants.MIN_COMPARE_N` (default 5)
+  renders `insufficient data (n=X < 5)` and joins no delta; the command explains,
+  it never numbers.
+
+### 4.8 Pre-task estimation + calibration — `cage estimate` / `cage calibration` (roadmap P3)
+
+Estimate **before**, measure **after**, and let the measured gap be the confidence
+level. Distinct from `forecast.py` (monthly projection) — this is per-task.
+
+- **`cage estimate [--scope] [--label] [--agent]`** (`estimate.py`) — a band
+  (median + IQR of measured totals) over closed tasks matching the **exact keys**;
+  no similarity scoring, no ML (cage law). Tagged **`modeled`** — history applied
+  to an unrun task is a reconstruction, never an invoice. Below
+  `constants.MIN_ESTIMATE_N` (default 5) it refuses with the reason. Deterministic:
+  same ledger ⇒ same band, no clocks in the math.
+- **`--record <task>`** stamps the estimate onto the *open* task row (additive
+  `est_*` fields, §3.4) — fail-open write; recording onto an already-closed task
+  is refused at the CLI boundary (a retroactive estimate is exactly what
+  calibration must never count).
+- **`cage calibration`** (`calibration.py`) — over closed tasks with recorded
+  estimates: the actual/estimate **ratio distribution** and the **in-band
+  hit-rate** against the band as recorded. Both **`measured`** — an observed
+  frequency of recorded estimates vs recorded actuals. Open / zero-actual /
+  band-less tasks are skipped with a visible count. The estimator never
+  self-reports confidence; this measured hit-rate *is* the confidence level
+  ("estimates landed in-band 78% of the time, n=41").
+
+### 4.9 Fleet study — `cage study` (roadmap P5)
+
+The multi-laptop question: *N machines capture a week agent-only, then a week
+with a plugin — did the plugin pay off?* One analyst, one number, no backend.
+
+- **Opaque machine id** (`machine.py`) — random, generated once into
+  `.cage/state/`, stamped as the additive `machine` field (§3.4) at
+  `ledger.append_row` once enrolled. Never a hostname; the name↔id mapping
+  stays offline with the analyst.
+- **Recorded phases, not remembered dates** (`study.py`) — `cage study start
+  <phase>` / `stop` append marker rows (phase = one validated token, the
+  `label` PII guard) to `ledger/study.jsonl`. Derive assigns each row by its
+  own `ts` against **that machine's own markers** — deterministic, no derive
+  clocks, and cross-machine clock skew cannot cross-assign (row and marker
+  share one clock). Last marker wins forward; rows before any marker are
+  *unphased* — excluded from deltas, counted in coverage. Phase intent ≠
+  observed stack: `cage compare` (§4.7) remains the within-phase truth of what
+  actually ran.
+- **One-file collection** — `cage export --study` writes one zip (raw
+  calls/receipts/tasks rows + markers + a counts-only manifest: version,
+  machine id, span, row counts). `cage import bundle1 bundle2 …` merges into a
+  fresh analysis ledger by row identity (calls/receipts by id; tasks/markers by
+  whole-row content, so task *updates* survive) — idempotent. The refs/notes
+  team path (§3.6) stays for git-fluent teams; bundles are the low-friction
+  fleet path.
+- **Coverage before conclusions** — `cage study report` opens with per-machine
+  days-with-rows per phase and **flags gap days** (a laptop that went silent
+  mid-week is the #1 study-killer). Then the number: the sample unit is the
+  **machine-day** (capture-only fleets never close tasks, and a study's
+  question is what a week costs); per-machine-day totals are **measured**;
+  the **paired-by-machine delta** — median over machines of (phase-B median
+  daily − phase-A median daily), controlling between-machine variance — is
+  **`estimated`** with the different-work-mix caveat. Below `MIN_COMPARE_N`
+  machines with both phases the delta refuses (coverage still prints).
+- **One-command enrollment** — `cage study join <phase>` = scaffold → wire all
+  four agents → start the phase → `cage doctor` + the cron hint for
+  `cage import` (cage installs no scheduler).
+
 ---
 
 ## 5. Architecture
@@ -739,6 +851,13 @@ Beyond track-and-attribute, the substrate unlocks:
    USD for `ms` (latency) or `gco2` (carbon) and every view works unchanged.
 7. **Per-feature cost (Orff).** Roll up by `route`/`query_type` to see which
    Orff intents cost the most — the input to where compression/caching pays off.
+8. **Verdict (shipped, roadmap P4).** `cage verdict <tool>` — the one-line
+   answer (*SAVING / COSTING / INSUFFICIENT DATA*) as a **pure composer** over
+   items 2–3 plus attribution/roi/trend: it computes no new statistics, prints
+   every input with its own method tag, adds a break-even line derived from roi,
+   and refuses (per input and overall) rather than approximate. The headline is
+   `modeled` — it inherits the receipts' modeled savings; `cage compare` (§4.7)
+   is the observational counterpart.
 
 ---
 

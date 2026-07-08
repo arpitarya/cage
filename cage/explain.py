@@ -37,6 +37,8 @@ def _live(pol: dict) -> dict:
         "chars_per_token": constants.CHARS_PER_TOKEN,
         "per_million": f"{constants.TOKENS_PER_MILLION:,}",
         "max_tools": constants.MAX_MATRIX_TOOLS,
+        "min_compare_n": constants.MIN_COMPARE_N,
+        "min_estimate_n": constants.MIN_ESTIMATE_N,
         "default_minutes": policy.human_rates(pol).get("default_minutes", 60),
         "order": " → ".join(policy.tool_order(pol)),
         "c_measured": conf.get("measured"), "c_estimated": conf.get("estimated"),

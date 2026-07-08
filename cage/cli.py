@@ -17,10 +17,10 @@ graphify (code→graph) and fux (decisions→rules)."""
 _EPILOG = """\
 commands by category:
   ledger        report · budget · why · ledger-sync   spend, per-call provenance, team view (§3.6)
-  attribution   attrib · matrix · roi            per-tool savings (the differentiator)
+  attribution   attrib · matrix · roi · compare · verdict  per-tool savings (the differentiator)
   human axis    human · human-record · trend     agent-vs-human $ and hours saved
   authorship    origin · notes-sync · verify     who wrote which files (§3.5)
-  ops           quality · regression · recommend · forecast · outcome
+  ops           quality · regression · recommend · forecast · outcome · estimate · calibration
   capture       import · export · watch · limits  universal pull-based metering + quota (§3.7)
   setup         init · doctor · debug · setup · proxy · meter · mcp · serve
   meta          query · demo · graphify (· import-claude · import-codex)
@@ -101,6 +101,60 @@ def build_parser() -> argparse.ArgumentParser:
     _json_flag(ro)
     ro.set_defaults(fn=clicmds.cmd_roi)
 
+    cp = sub.add_parser("compare",
+                        help="measured comparison of closed tasks grouped by stack "
+                             "(n · median · IQR; the delta is estimated, observational)")
+    cp.add_argument("--scope", metavar="DIR", help="filter to one monorepo top-level dir")
+    cp.add_argument("--label", metavar="WORD", help="filter to tasks labelled via `cage outcome --label`")
+    cp.add_argument("--by", default="stack", metavar="KEYS",
+                    help="comma-separated grouping keys from stack,scope,label (stack always included)")
+    _json_flag(cp)
+    cp.set_defaults(fn=clicmds.cmd_compare)
+
+    es = sub.add_parser("estimate",
+                        help="pre-task cost band (median + IQR) from matching closed "
+                             "tasks — modeled, refuses thin history")
+    es.add_argument("--scope", metavar="DIR", help="match tasks in one monorepo top-level dir")
+    es.add_argument("--label", metavar="WORD", help="match tasks labelled via `cage outcome --label`")
+    es.add_argument("--agent", metavar="NAME", help="match tasks a given agent worked")
+    es.add_argument("--record", metavar="TASK",
+                    help="stamp the band onto this OPEN task row (est_tokens/est_usd/est_n "
+                         "+ band bounds) so `cage calibration` can score it at close")
+    _json_flag(es)
+    es.set_defaults(fn=clicmds.cmd_estimate)
+
+    cb = sub.add_parser("calibration",
+                        help="measured hit-rate of recorded estimates vs actuals — the "
+                             "estimator's empirical confidence level")
+    _json_flag(cb)
+    cb.set_defaults(fn=clicmds.cmd_calibration)
+
+    vd = sub.add_parser("verdict",
+                        help="one-line answer: is this tool saving or costing? "
+                             "(pure composer over attrib/roi/trend/regression/quality)")
+    vd.add_argument("tool", help="tool name as it appears on receipts (e.g. graphify)")
+    vd.add_argument("--since", metavar="WINDOW", help="window like 30d / 2w (default: all history)")
+    _json_flag(vd)
+    vd.set_defaults(fn=clicmds.cmd_verdict)
+
+    st2 = sub.add_parser("study",
+                         help="fleet study: recorded phases + paired-by-machine deltas "
+                              "across laptops (plan §4.9)",
+                         epilog="examples:\n"
+                                "  cage study join baseline      # enroll this machine: wire + start + doctor\n"
+                                "  cage study start plugin       # switch phase (opaque machine id, no hostname)\n"
+                                "  cage study stop               # end the current phase\n"
+                                "  cage export --study           # one bundle for the analyst\n"
+                                "  cage import bundle*.zip       # analyst: merge bundles (idempotent)\n"
+                                "  cage study report             # coverage first, then the paired delta",
+                         formatter_class=argparse.RawDescriptionHelpFormatter)
+    st2.add_argument("action", choices=["join", "start", "stop", "report", "id"],
+                     help="join=enroll+wire+start · start/stop=phase markers · "
+                          "report=coverage+paired delta · id=print the opaque machine id")
+    st2.add_argument("phase", nargs="?", help="phase label for join/start (one short token)")
+    _json_flag(st2)
+    st2.set_defaults(fn=clicmds.cmd_study)
+
     hu = sub.add_parser("human", help="agent-vs-human savings: $ and hours saved (§4.1)")
     hu.add_argument("--since", metavar="WINDOW", help="window like 30d / 2w")
     hu.add_argument("--task", help="single task id")
@@ -167,6 +221,9 @@ def build_parser() -> argparse.ArgumentParser:
     oc = sub.add_parser("outcome", help="record a task's outcome (ok / redo) for quality cost")
     oc.add_argument("task")
     oc.add_argument("--redo", action="store_true", help="mark the task as needing a human redo")
+    oc.add_argument("--label", metavar="WORD",
+                    help="tag the task with one short token (letters/digits/._-, ≤32 chars) "
+                         "for `cage compare --by label` grouping — never a path or free text")
     oc.set_defaults(fn=clicmds.cmd_outcome)
 
     rg = sub.add_parser("regression", help="alert when cost-per-call drifts up (§8.3)")
@@ -227,6 +284,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     dr = sub.add_parser("doctor", help="verify this project's Cage setup is correct and working")
     dr.add_argument("--json", action="store_true", help="machine-readable output")
+    dr.add_argument("--bundle", nargs="?", const="cage-doctor-bundle.zip", metavar="PATH",
+                    help="also write one redacted diagnostics archive (counts-never-content): "
+                         "doctor output, debug log + heartbeats, version/platform, footprint "
+                         "paths + row counts, policy provenance, cursor state")
     dr.set_defaults(fn=clicmds.cmd_doctor)
 
     dbg = sub.add_parser("debug", help="print recent capture-path debug events ($0, metadata-only; needs CAGE_DEBUG=1)")
@@ -243,6 +304,9 @@ def build_parser() -> argparse.ArgumentParser:
                                "Captures into the resolved ledger (--ledger/CAGE_BASE → project .cage/ → global ~/.cage);\n"
                                "works with no hooks and no project. Idempotent + incremental (per-agent cursor).",
                         formatter_class=argparse.RawDescriptionHelpFormatter)
+    im.add_argument("bundles", nargs="*", metavar="BUNDLE",
+                    help="study bundle zip(s) from `cage export --study` — merged by row "
+                         "identity, idempotent (fleet path, plan §4.9)")
     im.add_argument("--agent", choices=[*SURFACES, "all"], default="all",
                     help="which agent to meter (default: all)")
     im.add_argument("--path", help="a transcript file or dir to scan (log-bearing agents only)")
@@ -269,6 +333,9 @@ def build_parser() -> argparse.ArgumentParser:
     ex.add_argument("--no-import", dest="do_import", action="store_false",
                     help="skip the import-first refresh; emit the ledger exactly as-is")
     ex.add_argument("-o", "--output", metavar="FILE", help="write to FILE (default: stdout)")
+    ex.add_argument("--study", nargs="?", const="", metavar="PATH", dest="study",
+                    help="write one fleet-study bundle instead (rows + phase markers + "
+                         "counts-only manifest; default name cage-study-<machine>.zip)")
     ex.set_defaults(fn=clicmds.cmd_export)
 
     wt = sub.add_parser("watch", help="foreground poll loop: import every interval until Ctrl-C (no OS job)",
@@ -352,6 +419,14 @@ def main(argv: list[str] | None = None) -> int:
     if getattr(args, "ledger", None):  # --ledger re-bases every Footprint to one sink (§3.7)
         os.environ["CAGE_BASE"] = str(args.ledger)
     try:
+        # A malformed --since used to be *silently ignored* (an unfiltered table that
+        # claims a window is a wrong number). One CLI-boundary check; capture hooks
+        # call importcmd directly and stay fail-open (full-test-plan finding #2).
+        from cage import ledger as _ledger
+        since = getattr(args, "since", None)
+        if since and not _ledger.valid_since(since):
+            raise errors.CageError(
+                f"invalid --since {since!r} — use a window like 7d, 24h, or 2w")
         if getattr(args, "fn", None) is None:  # no subcommand → the bare-`cage` headline (§4)
             return clicmds.cmd_overview(args)
         return args.fn(args)

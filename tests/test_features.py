@@ -10,9 +10,45 @@ from cage import (compress, forecast, metering, policy, quality, recommend,
 
 
 def _call(root, task, cost, ts):
-    metering.record_call(route="r", provider="anthropic", model="claude-opus-4-8",
+    # Unpriced (provider, model) on purpose: these tests pin the *self-costing*
+    # path, where the stored est_cost_usd is the figure (prices.call_usd falls back
+    # to it only when no exact/family price row matches). A priced model would be
+    # repriced from tokens × policy at derive time, like report/budget.
+    metering.record_call(route="r", provider="selfbill", model="custom",
                          tokens_in=1000, tokens_out=100, est_cost_usd=cost, task=task,
                          ts=ts, root=root)
+
+
+def _token_only_call(root, task, ts):
+    # The transcript-meter shape: counts, no est_cost_usd — must reprice, not read $0.
+    metering.record_call(route="r", provider="anthropic", model="claude-opus-4-8",
+                         tokens_in=1_000_000, tokens_out=0, task=task, ts=ts, root=root)
+
+
+def test_token_only_calls_reprice_in_quality_regression_forecast(proj):
+    # The 2026-07 manual validation found quality/regression/forecast (and the human
+    # axis, below) summing the stored est_cost_usd (0.0 for every transcript-sourced
+    # call) — a $3,800 ledger rendered as $0 drift / "no spend". All must route
+    # through prices.call_usd.
+    pol = policy.load(None)
+    _token_only_call(proj, "t1", "2000-01-01T00:00:00Z")
+    _token_only_call(proj, "t2", "2099-01-01T00:00:00Z")
+    quality.record_outcome(proj, "t1", ok=True)
+    assert quality.summarize(proj, pol=pol)["total_usd"] > 0
+    r = regression.detect(proj, since="7d", tolerance=0.2, pol=pol)
+    assert r["recent_mean"] > 0 and r["base_mean"] > 0
+    assert forecast.project(proj, pol)["total_usd"] > 0
+
+
+def test_token_only_calls_reprice_on_the_human_axis(proj):
+    from cage import humanview, trend
+    pol = policy.load(None)
+    _token_only_call(proj, "t1", "2026-06-14T00:00:00Z")
+    metering.record_human(task="t1", minutes=30, root=proj)
+    agents = humanview.rollup(proj, pol)["agents"]
+    assert sum(a["agent_usd"] for a in agents.values()) > 0
+    buckets = trend.series(proj, pol, by="week")["buckets"]
+    assert sum(b["agent_usd"] for b in buckets.values()) > 0
 
 
 def test_quality_cost_per_successful_task(proj):

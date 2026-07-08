@@ -45,6 +45,67 @@ REGISTRY: tuple[Explanation, ...] = (
         "only the configuration actually run is measured; every other cell is modeled\n"
         "  (estimated if it leans on an estimated receipt) — no projection is an invoice."),
     Explanation(
+        "compare-delta", ("compare", "comparison", "delta", "group", "grouped",
+                          "median", "iqr", "observational", "a/b", "ab",
+                          "baseline", "agent-only", "cheaper"),
+        "how `cage compare` contrasts closed-task groups by observed stack",
+        "group closed tasks by stack signature (joined receipt tools; task-id join,\n"
+        "  session-window fallback); per group report n · median · IQR of measured\n"
+        "  tokens + USD; delta = median(stack) − median(agent-only), same non-stack\n"
+        "  keys. Groups below n = {min_compare_n} render a refusal, never a number.",
+        ("cage/compare.py", "cage/taskgroup.py", "cage/constants.py"),
+        "group totals are measured (recorded tokens, derive-time repricing); the delta\n"
+        "  is estimated — different tasks, nothing randomized, an observed difference\n"
+        "  and never a causal claim (the caveat renders on every output)."),
+    Explanation(
+        "estimate-band", ("estimate", "estimated-cost", "band", "predict", "forecast-task",
+                          "pre-task", "upfront", "before", "how-much-will"),
+        "how `cage estimate` bands an unrun task's cost",
+        "band = median + IQR of measured totals over closed tasks matching the exact\n"
+        "  keys (scope / label / agent) — no similarity scoring, no ML. Below\n"
+        "  n = {min_estimate_n} matching tasks the command refuses. --record stamps\n"
+        "  est_tokens/est_usd/est_n + the token band bounds onto the open task row.",
+        ("cage/estimate.py", "cage/taskgroup.py", "cage/constants.py"),
+        "modeled — history applied to a task that hasn't run is a reconstruction,\n"
+        "  never an invoice; its empirical confidence is `cage calibration`'s hit-rate."),
+    Explanation(
+        "calibration-hit-rate", ("calibration", "calibrate", "hit-rate", "hit", "landed",
+                                 "accuracy", "ratio", "in-band", "reliable"),
+        "how estimate reliability is measured after the fact",
+        "over closed tasks with recorded estimates: ratio = actual_tokens / est_tokens\n"
+        "  (median + IQR), and hit-rate = share of actuals inside the est band recorded\n"
+        "  at estimate time. Open / zero-actual / band-less tasks are skipped with a\n"
+        "  visible count.",
+        ("cage/calibration.py", "cage/estimate.py", "cage/taskgroup.py"),
+        "measured — an observed frequency of recorded estimates vs recorded actuals;\n"
+        "  this rate *is* the estimator's confidence level (it never self-reports one)."),
+    Explanation(
+        "verdict-composition", ("verdict", "saving-or-costing", "worth-it", "keep",
+                                "drop", "net", "break-even", "breakeven", "compose"),
+        "how `cage verdict <tool>` reaches SAVING / COSTING / INSUFFICIENT DATA",
+        "a pure composer — no new statistics: net = roi.saved − roi.own_cost over the\n"
+        "  window (verdict = its sign); marginal saving from attribution's latest task;\n"
+        "  direction from trend; drift from regression; redo-rate from quality;\n"
+        "  break-even = net / receipts. ≈$/mo scales net by the receipts' own time-span\n"
+        "  (≥7 days, no clock). Missing input ⇒ INSUFFICIENT DATA, never an approximation.",
+        ("cage/verdict.py", "cage/roi.py", "cage/attribution.py", "cage/regression.py"),
+        "the headline is modeled (it inherits the receipts' modeled savings); every\n"
+        "  input line renders its own tag — measured drift/redo, estimated trend."),
+    Explanation(
+        "study-pairing", ("study", "fleet", "machines", "laptops", "paired", "pairing",
+                          "phase", "enrollment", "bundle", "week-over-week"),
+        "how the fleet study pairs machines and computes its delta",
+        "phases are recorded markers (`cage study start/stop`), resolved per machine\n"
+        "  against that machine's own clock; the sample unit is the machine-day.\n"
+        "  paired delta = median over machines of (phase-B median daily − phase-A\n"
+        "  median daily), controlling between-machine variance; below\n"
+        "  {min_compare_n} machines with both phases the delta refuses. Coverage\n"
+        "  (days + gaps) always prints first. Machine ids are opaque random tokens —\n"
+        "  never a hostname.",
+        ("cage/study.py", "cage/machine.py", "cage/constants.py"),
+        "per-machine-day totals are measured; the paired delta is estimated —\n"
+        "  recorded phase intent across different weeks, never a randomized experiment."),
+    Explanation(
         "human-cost", ("human", "person", "salary", "labor", "wage", "people",
                        "engineer", "manually", "cost-a-human", "alternative"),
         "how a human alternative is priced",

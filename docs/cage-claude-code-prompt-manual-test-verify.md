@@ -1,0 +1,117 @@
+# Claude Code prompt: verify the manual sessions + finish the test plan
+
+The prep session (`docs/cage-claude-code-prompt-manual-test-prep.md`) is done:
+Part A green (391 tests, S1–S9 9/9, two bugs fixed uncommitted in paths.py/cli.py),
+testbed at `../cage-testbed` (init commit only), aids in `cage-testbed/manual/`.
+I have now done the manual agent sessions. Your job: verify what they captured,
+harvest the fixture deliverables, then run everything left in
+`docs/full-test-plan-sibling-repo.md` (Parts C-tail, D, E, F, G) to completion.
+Read that plan and `cage-testbed/manual/checklist.md` + `manual/findings.md`
+first; record every result as a findings row. **Do not commit, tag, push, or
+publish anything, anywhere.** New/changed files (fixtures included) stay in the
+working tree for my review.
+
+## What I did (the manual cells)
+
+All sessions ran in `../cage-testbed`, one small file-creation task each:
+
+| Cell | What I typed | Notes for verification |
+|---|---|---|
+| Claude Code × **VS Code ext** | "create a file to print hello claude" | Claude's extension honors hooks — check whether rows landed **live** (before any `cage import`); if not, `debug.log` must say why the hook missed. |
+| Codex × **VS Code ext** (`openai.chatgpt`) | "create a file to print hello codex" | Codex CLI is NOT on PATH — any codex rows are from the extension. Hunt the log: `~/.codex/sessions/**/rollout-*.jsonl` first, else the extension's globalStorage. **Fixture deliverable.** |
+| Copilot × **VS Code ext** | "create a file to print hello copilot" | Prep marked this N/A — I installed it since. Extension log ≠ CLI `session-state`; hunt globalStorage / output channels. **Fixture deliverable.** |
+| Kiro **IDE** | "create a file to print hello claude" *(yes — same phrase as the Claude cell; distinguish by which file each session actually created)* | Log: `~/Library/Application Support/Kiro/User/globalStorage/kiro.kiroagent/dev_data/tokens_generated.jsonl`. **Fixture deliverable.** |
+
+Not exercised: claude×CLI, copilot×CLI, codex×CLI, kiro×CLI — mark N/A (not
+exercised this run) in findings; don't fake them.
+
+## Task, in order
+
+**1. Per-cell verification (plan Part C checks 1–4) for the four cells above:**
+- First, `cage report` BEFORE any import → snapshot which rows already landed
+  live (that's the claude-hooks question answered). Then `CAGE_DEBUG=1 cage
+  import`, then `cage report` again → attribute each new row to its cell by
+  agent + ts.
+- Each cell: right `agent`, non-zero tokens, priced USD (a $0 row = the exact-
+  match `(provider, model)` policy bug class — findings row with the model id).
+- PII grep over `.cage/` AND `~/.cage`: `hello claude`, `hello codex`,
+  `hello copilot`, `PELICAN-BASSOON-42`, plus each created filename → nothing.
+- Row sanity: pretty-print one call row per cell; `scope`/`project` sensible.
+- `cage doctor` → per-agent capture state matches reality; diff vs
+  `manual/doctor-0.txt`.
+- If a cell captured **nothing**: that's a finding, not a dead end — locate the
+  session log yourself, confirm `debug.log` explains the miss (silent = its own
+  bug), try `cage import --path <log>`, and record the failure mode precisely.
+
+**2. Fixture deliverables (the three `UNVERIFIED-FORMAT` cells):**
+- For codex/vscode, copilot/vscode, kiro/vscode: run
+  `manual/sanitize_log.py` on the real log; eyeball its strip-summary; if the
+  format is recognized and clean, place the sanitized sample under
+  `tests/fixtures/transcripts/<agent>/vscode/`, update the fixtures README
+  (remove `UNVERIFIED-FORMAT` for that cell, note source date + client
+  version), and extend the parametrized parse test with exact expected rows.
+- If sanitize_log.py refuses (unrecognized format): do NOT guess — the refusal
+  is the finding. Capture the format's shape (keys only, no content) in the
+  findings row so we can extend the parser deliberately.
+- If codex×vscode turns out to write standard `~/.codex/sessions` rollouts:
+  that *verifies* the existing stand-in — update the README to say so
+  (verified-same-format), keep one real sanitized sample anyway.
+- Kiro dedupe check needs a second session — PAUSE and ask me to run one more
+  Kiro task, then confirm re-import adds no duplicate rows.
+
+**3. Part C tail:** report-totals spot-check; `CAGE_CAPTURE=0` switch test;
+the resolver-precedence test (delete project `.cage/`, needs one more agent
+session — PAUSE and ask me, combine with the Kiro rerun; restore after).
+
+**4. Parts D + E:** every read command against the now-real ledger per the
+plan's checklists (budget tweak, human-rate provenance, label rejection on a
+path, refusals below min-n, query live-values, bundle PII, exit codes). The
+MCP check runs from your own session (`.mcp.json` is wired): call the cage MCP
+tools and cross-check against `cage report`. Part E: the estimate→outcome→
+calibration→compare→verdict loop using label `docfix` (history `seed-docfix-1..5`
+is pre-seeded; my real tasks are the unstamped-vs-stamped distinction — keep
+seeded ids out of any claim about real capture).
+
+**5. Part F:** the fleet mini-study exactly as written (simulate machine 2 via
+`CAGE_BASE=/tmp/machine2`; real phases on the testbed can be short — minutes,
+not days; hostname/username grep on both bundles; double-import idempotence;
+coverage flags the deliberate gap; refusal below MIN_COMPARE_N complete
+machines). The seeded docfix tasks double as the unenrolled/legacy-rows check.
+
+**6. Part G:** all invariants (determinism double-runs, fail-open chmod test,
+truncated-tail, corrupt policy.toml → `CageError`, offline sweep, PII sweep,
+no-scheduler check, version/docs consistency — note README says 389 but suite
+is now 391 with the prep fixes: that's a real finding, fix the README count in
+the tree).
+
+**7. Final report:** complete `manual/findings.md` (every row resolved:
+pass / bug-fixed-in-tree / open / N-A), tick the plan doc's remaining boxes,
+and print a closing summary: cells verified, fixtures closed vs still open,
+bugs found (fixed vs deferred), and exactly what awaits my review before any
+commit.
+
+## Constraints (hard)
+
+- No commits/pushes anywhere; all changes (fixes, fixtures, README/CHANGELOG
+  edits) left uncommitted for my review.
+- Sanitized fixtures only — run the leak-scan yourself before placing; a
+  fixture with any prompt/content text is worse than no fixture.
+- Fixes stay within cage law: $0/stdlib, determinism, fail-open write path,
+  typed `CageError` read path, four agents, additive-only schema.
+- Never run a publish command; don't touch `.github/workflows/publish.yml`.
+- PAUSE points (Kiro rerun, resolver-precedence session) — actually stop and
+  ask; don't simulate a manual session and pass it off as real capture.
+- If a requirement conflicts with what the logs actually show, report the
+  discrepancy — don't bend the check to make it pass.
+
+## Acceptance criteria (self-check before finishing)
+
+- [ ] All four exercised cells verified end-to-end or precisely diagnosed.
+- [ ] Three fixture cells closed (real sanitized sample + README + parse test)
+      or the blocking format documented keys-only in findings.
+- [ ] Parts C-tail, D, E, F, G fully executed; every plan checkbox ticked or
+      N-A'd with reason.
+- [ ] `just test` green including new fixture tests; determinism double-runs
+      byte-identical; README test count corrected.
+- [ ] `manual/findings.md` complete; closing summary printed; working tree
+      review-ready, zero commits.

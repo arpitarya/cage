@@ -36,7 +36,7 @@ LOG_BEARING = ("claude", "codex", "copilot", "kiro")
 
 
 @contextlib.contextmanager
-def _import_lock(foot: paths.Footprint):
+def _import_lock(foot: paths.Footprint, pol: dict | None = None):
     """Serialize concurrent import sweeps so two of them can't both snapshot the
     ledger's ``seen`` set *before* either appends — the window that let a single turn
     land twice under two racing hooks (a Stop hook + a SessionStart sweep firing at
@@ -51,10 +51,13 @@ def _import_lock(foot: paths.Footprint):
         fh = open(foot.state / "import.lock", "w")  # noqa: SIM115 — released in finally
         if _fcntl is not None:
             _fcntl.flock(fh.fileno(), _fcntl.LOCK_EX)
-    except OSError:
+    except OSError as e:
         if fh is not None:
             fh.close()
         fh = None
+        # Fail-open but never silent: an untakeable lock means the id-dedupe backstop
+        # is carrying dedupe alone — attributable under CAGE_DEBUG=1.
+        debuglog.exception(foot.root, "import.lock", e, pol=pol)
     try:
         yield
     finally:
@@ -86,7 +89,8 @@ def _mtime_utc(f: Path):
 def _load_cursors(foot: paths.Footprint) -> dict:
     try:
         return json.loads(foot.cursors.read_text(encoding="utf-8")) if foot.cursors.exists() else {}
-    except (ValueError, OSError):
+    except (ValueError, OSError) as e:  # fail-open: a corrupt cursor file ⇒ full re-scan
+        debuglog.exception(foot.root, "import.cursors-load", e)
         return {}
 
 
@@ -94,8 +98,8 @@ def _save_cursors(foot: paths.Footprint, cur: dict) -> None:
     try:
         foot.cursors.parent.mkdir(parents=True, exist_ok=True)
         foot.cursors.write_text(json.dumps(cur), encoding="utf-8")
-    except OSError:  # fail-open: a cursor that can't persist just means a fuller re-scan next run
-        pass
+    except OSError as e:  # fail-open: a cursor that can't persist just means a fuller re-scan next run
+        debuglog.exception(foot.root, "import.cursors-save", e)
 
 
 def _file_sig(f: Path):
@@ -157,6 +161,11 @@ def _ingest(root: Path, agent: str, src: Path, files: list[Path], parse,
     for f in files:
         try:
             rows = parse(f)
+            if not rows and f.is_file() and f.stat().st_size > 0:
+                # A non-empty log parsing to 0 rows is the format-drift signature
+                # (handoff §8) — recorded so "why nothing captured?" is answerable.
+                debuglog.event(root, pol=pol, event="import", agent=agent,
+                               skip="parsed-zero-rows", file=str(f), bytes=f.stat().st_size)
             parsed += len(rows)
             total += hooks.append_new(root, rows, seen)
             if agent_cursor is not None:
@@ -201,17 +210,40 @@ def import_codex(root: Path, args, *, pol: dict | None = None, seen: set | None 
     return n, len(files)
 
 
+def _parse_copilot_any(f: Path) -> list[dict]:
+    """Dispatch on the on-disk store: VS Code chat-session files (extension) parse via
+    `parse_copilot_vscode_calls`; everything else is the CLI `events.jsonl` format."""
+    if f.parent.name == "chatSessions":
+        return transcript.parse_copilot_vscode_calls(f, session=f.stem)
+    return transcript.parse_copilot_calls(f, session=f.parent.name)
+
+
 def import_copilot(root: Path, args, *, pol: dict | None = None, seen: set | None = None,
                    agent_cursor: dict | None = None) -> tuple[int, int]:
-    """Meter Copilot CLI from its per-session usage log
-    (~/.copilot/session-state/*/events.jsonl). The session dir name is the session id,
-    so usage is recorded under that even though the file itself is always `events.jsonl`."""
-    src = Path(args.path) if getattr(args, "path", None) else paths.copilot_home() / "session-state"
-    files = _scan(root, "copilot", src, "*/events.jsonl", getattr(args, "since", None), pol=pol,
-                  agent_cursor=agent_cursor)
-    n = _ingest(root, "copilot", src, files, lambda f: transcript.parse_copilot_calls(f, session=f.parent.name),
-                pol=pol, seen=seen, agent_cursor=agent_cursor)
-    return n, len(files)
+    """Meter Copilot from both stores it actually writes:
+
+    - CLI: `~/.copilot/session-state/*/events.jsonl` (usage in `session.shutdown`;
+      the session dir name is the session id);
+    - VS Code extension: `<vscode-user>/workspaceStorage/*/chatSessions/*.jsonl` —
+      the extension's own transcripts dir carries no usage event, so the per-request
+      counts come from VS Code's chat-session store (plan §3.7; `CAGE_VSCODE_USER`
+      overrides the user dir for tests)."""
+    if getattr(args, "path", None):
+        src = Path(args.path)
+        files = _scan(root, "copilot", src, "*/events.jsonl", getattr(args, "since", None),
+                      pol=pol, agent_cursor=agent_cursor)
+        n = _ingest(root, "copilot", src, files, _parse_copilot_any,
+                    pol=pol, seen=seen, agent_cursor=agent_cursor)
+        return n, len(files)
+    total_rows = total_files = 0
+    for src, pattern in ((paths.copilot_home() / "session-state", "*/events.jsonl"),
+                         (paths.vscode_user_dir() / "workspaceStorage", "*/chatSessions/*.jsonl")):
+        files = _scan(root, "copilot", src, pattern, getattr(args, "since", None), pol=pol,
+                      agent_cursor=agent_cursor)
+        total_rows += _ingest(root, "copilot", src, files, _parse_copilot_any,
+                              pol=pol, seen=seen, agent_cursor=agent_cursor)
+        total_files += len(files)
+    return total_rows, total_files
 
 
 def import_kiro(root: Path, args, *, pol: dict | None = None, seen: set | None = None,
@@ -281,7 +313,7 @@ def run(root: Path, agent: str, args) -> list[str]:
     # hook + a manual import) must not both build `seen` before either commits, or the
     # same turn lands twice. Fail-open — an untakeable lock just falls back to the
     # id-dedupe backstop (see `_import_lock`).
-    with _import_lock(foot):
+    with _import_lock(foot, pol):
         cursors = _load_cursors(foot)
         seen = {c.get("id") for c in ledger.calls(root)}  # one ledger read shared across agents
         lines = [run_agent(root, a, args, pol=pol, seen=seen,

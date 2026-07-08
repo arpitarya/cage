@@ -152,3 +152,25 @@ def test_record_hooked_idempotent_on_repeat(proj):
                                         session_id="s1")
     assert first is True and second is False
     assert len(originrecord.for_sha(proj, sha)) == 1
+
+
+def test_record_dedupes_repeated_files_within_a_row(proj):
+    # parse_provenance yields one entry per Edit/Write event, so the same file can
+    # arrive many times (observed in the 2026-07 manual run: two Write events →
+    # ["src/hello.py", "src/hello.py"] in one row). The row keeps each file once.
+    _git_init(proj)
+    sha = originrecord.current_sha(proj)
+    assert originrecord.record_transcript(proj, sha=sha, files=["a.py", "a.py", "b.py"],
+                                          agent="claude-code", session_id="s2")
+    (row,) = [r for r in originrecord.for_sha(proj, sha) if r["session_id"] == "s2"]
+    assert row["files"] == ["a.py", "b.py"]
+
+
+def test_record_lock_is_fail_open_without_a_state_dir(proj, monkeypatch):
+    # The race-closing lock (two SessionEnd hooks at once) must never turn the write
+    # path into a raising one: an untakeable lock file proceeds unlocked.
+    _git_init(proj)
+    sha = originrecord.current_sha(proj)
+    monkeypatch.setattr(originrecord, "_fcntl", None)
+    assert originrecord.record_transcript(proj, sha=sha, files=["a.py"],
+                                          agent="claude-code", session_id="s3")

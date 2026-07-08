@@ -45,10 +45,25 @@ def reresolve_cage_command(command: str) -> str | None:
 
 
 def find_project_root(start: Path | None = None) -> Path | None:
-    """Walk up from ``start`` to the dir containing a ``.cage/`` footprint."""
+    """Walk up from ``start`` to the dir containing a *project* ``.cage/`` footprint.
+
+    The machine-wide **global** base (``$CAGE_HOME/.cage``, default ``~/.cage``,
+    plan §3.7) is deliberately *not* a project: it is the fallback capture sink,
+    a separate tier of the resolution precedence (override → project → global).
+    Without this exclusion, any dir under ``$HOME`` on a machine with a global
+    ledger resolves to ``~`` as its "project" — `cage init` then re-inits the
+    global instead of scaffolding the new project's own ``.cage/``, and doctor
+    mislabels the global sink as ``project (.cage/)``."""
     cur = (start or Path.cwd()).resolve()
+    # Exclude the *active* global sink AND the default `~/.cage`: when CAGE_HOME
+    # redirects the global elsewhere (tests, the dummyrepo runner), the real home's
+    # `.cage` is still a global sink — treating it as a project made $HOME the
+    # "project root" of every dir under it and routed sandbox writes into the real
+    # global ledger (2026-07 manual validation).
+    excluded = {global_base().resolve(), (Path.home() / ".cage").resolve()}
     for parent in [cur, *cur.parents]:
-        if (parent / ".cage").is_dir():
+        base = parent / ".cage"
+        if base.is_dir() and base.resolve() not in excluded:
             return parent
     return None
 
@@ -206,6 +221,14 @@ class Footprint:
             out.append(legacy)
         out.extend(sorted(base.glob(f"{kind}-*.jsonl")))
         return out
+
+    @property
+    def study(self) -> Path:
+        """Fleet-study phase markers (`cage study start/stop`, plan §4.9) — a small
+        append-only jsonl beside the ledger files (it travels inside `cage export
+        --study` bundles). Unpartitioned by design, like `provenance.jsonl`: a study
+        is weeks, not years."""
+        return self.ledger / "study.jsonl"
 
     @property
     def policy(self) -> Path:

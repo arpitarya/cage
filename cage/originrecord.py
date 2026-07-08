@@ -10,12 +10,18 @@ stronger method than the signal that actually produced it.
 """
 from __future__ import annotations
 
+import contextlib
 import re
 import subprocess
 from pathlib import Path
 
 from cage import ledger, paths, schema
 from cage.constants import PROVENANCE_CORROBORATION_BONUS, PROVENANCE_METHOD_TRUST
+
+try:  # POSIX-only; fail-open elsewhere (same guard as importcmd)
+    import fcntl as _fcntl
+except ImportError:  # pragma: no cover
+    _fcntl = None
 
 _NUMSTAT = re.compile(r"^(\d+|-)\t(\d+|-)\t(.+)$")
 
@@ -107,6 +113,36 @@ def _corroborated_by_other_method(root: Path, *, sha: str, files: list[str],
               for r in read_all(root))
 
 
+@contextlib.contextmanager
+def _record_lock(root: Path):
+    """Serialize the `_already_recorded` check against the append, so two hook
+    processes firing at once (e.g. SessionEnd delivered to two windows) can't both
+    pass the idempotency read before either writes — the same race `importcmd.
+    _import_lock` closes for call rows. **Fail-open**: no `fcntl` / unwritable state
+    dir ⇒ proceed unlocked, exactly the pre-lock behavior. Never raises."""
+    fh = None
+    try:
+        state = paths.Footprint(root).state
+        state.mkdir(parents=True, exist_ok=True)
+        fh = open(state / "provenance.lock", "w")  # noqa: SIM115 — released in finally
+        if _fcntl is not None:
+            _fcntl.flock(fh.fileno(), _fcntl.LOCK_EX)
+    except OSError:
+        if fh is not None:
+            fh.close()
+        fh = None
+    try:
+        yield
+    finally:
+        if fh is not None:
+            try:
+                if _fcntl is not None:
+                    _fcntl.flock(fh.fileno(), _fcntl.LOCK_UN)
+            except OSError:
+                pass
+            fh.close()
+
+
 def record(root: Path, *, sha: str, files: list[str], agent: str = "",
           lines_added: int = 0, lines_removed: int = 0, method: str = "heuristic",
           origin: str = "agent", session_id: str = "", confidence: float | None = None) -> bool:
@@ -116,16 +152,18 @@ def record(root: Path, *, sha: str, files: list[str], agent: str = "",
     try:
         if not sha or not files:
             return False
-        if _already_recorded(root, sha=sha, agent=agent, session_id=session_id, method=method):
-            return False
-        corroborated = _corroborated_by_other_method(root, sha=sha, files=files,
-                                                      session_id=session_id, method=method)
-        conf = confidence_for(method, corroborated=corroborated) if confidence is None else confidence
-        row = schema.make_provenance(sha=sha, files=files, agent=agent,
-                                     lines_added=lines_added, lines_removed=lines_removed,
-                                     method=method, origin=origin, confidence=conf,
-                                     session_id=session_id)
-        return ledger.append(paths.Footprint(root).provenance, row)
+        files = list(dict.fromkeys(files))  # one edit signal per file, however many events
+        with _record_lock(root):
+            if _already_recorded(root, sha=sha, agent=agent, session_id=session_id, method=method):
+                return False
+            corroborated = _corroborated_by_other_method(root, sha=sha, files=files,
+                                                          session_id=session_id, method=method)
+            conf = confidence_for(method, corroborated=corroborated) if confidence is None else confidence
+            row = schema.make_provenance(sha=sha, files=files, agent=agent,
+                                         lines_added=lines_added, lines_removed=lines_removed,
+                                         method=method, origin=origin, confidence=conf,
+                                         session_id=session_id)
+            return ledger.append(paths.Footprint(root).provenance, row)
     except Exception:  # noqa: BLE001 — write-path discipline: never raise
         return False
 

@@ -122,6 +122,37 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   repo-relative file *paths* (vs. `tasks.jsonl`'s top-level-dirs-only) — justified
   in plan §3.5 — but counts-never-content still holds: no diff bodies, no commit
   messages, paths validated repo-relative at construction time.
+- **Cost-impact surface** ([taskgroup.py](cage/taskgroup.py), [compare.py](cage/compare.py),
+  [estimate.py](cage/estimate.py), [calibration.py](cage/calibration.py),
+  [verdict.py](cage/verdict.py) — plan §4.7–§4.8, §8.8) — the closed-task join
+  (task-id first, session-window fallback; overlaps → smallest task id) yields
+  *observed* stack signatures (`human` excluded; empty ⇒ `agent-only`). `cage
+  compare`: **measured** group totals (`prices.call_usd` repriced), the delta always
+  `estimated` + the observational caveat. `cage estimate`: a `modeled` median+IQR
+  band from exact-key history; `--record` stamps additive `est_*` fields **plus the
+  token band bounds** on the *open* task row (plan §3.4) so `cage calibration` can
+  score in-band hits against the band as recorded — that **measured hit-rate is the
+  only confidence source; the estimator never self-reports**. `cage verdict <tool>`:
+  a pure composer over attrib/roi/trend/regression/quality + break-even — computes
+  no new statistics, refuses (`INSUFFICIENT DATA`) over approximating. The min-n
+  gates `MIN_COMPARE_N`/`MIN_ESTIMATE_N` live in `constants.py` and **block** —
+  below them the command explains, never numbers. Task `label` (via `cage outcome
+  --label`) is one validated token, never a path or free text. Diagnostics: `cage
+  doctor --bundle` ([doctorbundle.py](cage/doctorbundle.py)) writes one redacted,
+  counts-never-content archive; every capture-path swallow-site logs under
+  `CAGE_DEBUG=1` — audited by `tests/test_debug_coverage.py` ("fail-open but never
+  silent" is tested, not aspirational). Validation harness: the fixture corpus
+  `tests/fixtures/transcripts/` (4 agents × cli/vscode, exact expected rows,
+  VS Code stand-ins flagged `UNVERIFIED-FORMAT`) + `python -m tools.dummyrepo`
+  (S1–S9 scenario runner; build-time only, skillgen rules, never in the wheel).
+  P5 fleet study ([machine.py](cage/machine.py), [study.py](cage/study.py), plan
+  §4.9): opaque random machine id (**opt-in by enrollment** — unenrolled ledgers
+  stamp nothing, byte-identical legacy), recorded phase markers in
+  `ledger/study.jsonl` (resolved per machine against its own clock), one-file
+  bundles (`cage export --study` → `cage import bundle*.zip`; merge by row
+  identity — calls/receipts by id, tasks/markers by whole-row so task updates
+  survive), the **machine-day** as sample unit, paired delta `estimated` with the
+  work-mix caveat, gate = `MIN_COMPARE_N` machines-with-both-phases (blocking).
 
 ## Must-Know Rules
 
@@ -187,7 +218,7 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
 ## Dev
 
 ```bash
-just test          # python -m pytest -q   (318 passing)
+just test          # python -m pytest -q   (401 passing)
 just demo          # seed §4.4 + print attrib/matrix
 cage --version
 ```

@@ -5,7 +5,15 @@ derive, and safety surface works **both** under a CLI client and under a VS Code
 extension — then produce a ranked list of what needs fixing.
 
 **Scope:** all four agents (`claude`, `codex`, `copilot`, `kiro`), the four-agent
-invariant. Version under test: `cage 0.15.0`.
+invariant. Version under test: `cage 0.16.0`.
+
+**Automated companion:** `python -m tools.dummyrepo` (build-time only, stdlib,
+never in the wheel) scaffolds the disposable sibling repo and runs every
+*automatable* step of this plan against the sanitized fixture corpus
+(`tests/fixtures/transcripts/` — all four agents × CLI/VS Code, exact expected
+rows). Steps that need a live agent print as a `MANUAL` checklist; scenario
+slots whose cage feature hasn't shipped yet print `PENDING` with their phase.
+Run it first; spend your manual time only on what it can't reach.
 
 ---
 
@@ -234,7 +242,24 @@ The happy path won't break these. Feed bad input on purpose.
 - [ ] `cage notes-sync` on this dev machine → **dry-run print only**, does not write
       `refs/notes/cage-provenance` (CI is the sole writer; needs `CAGE_NOTES_WRITE=1`).
 
-## 8. Findings template (the deliverable)
+## 8. Scenario matrix (S1–S8 — what `tools/dummyrepo` runs)
+
+The runner's scenario ids, mapped to this plan's sections and the roadmap phase
+that ships each (`docs/cage-handoff-cost-impact-roadmap.md` §9):
+
+| Scenario | What it proves | Plan § | Ships with |
+|---|---|---|---|
+| S1 per agent × CLI | all four agents wire; planted CLI-format logs → `cage import` → exact rows; doctor ok (hook-fires-live half is manual §3) | §2–§3 | P0 ✅ |
+| S2 per agent × VS Code | hooks stay unwired; planted extension-format logs → exact rows; re-import byte-identical (cursor); stand-in formats flagged `UNVERIFIED` | §4 | P0 ✅ |
+| S3 broken setups (bad policy, unwritable ledger, truncated shard, empty log) | fail-open + a `debug.log` line + doctor flags each | §6 | P1 ✅ |
+| S4 bundle | `doctor --bundle` produced; PII grep of the archive clean | §6 | P1 ✅ |
+| S5 seeded tasks: 5 agent-only vs 5 agent+graphify (+ cross-month pair, + an n=2 group) | `cage compare` exact medians; delta tagged `estimated` + caveat; n=2 refused; byte-identical re-run | — | P2 ✅ |
+| S6 estimate → run → close ×N | `cage estimate` band exact; refusal on thin history; `--record` lands; `cage calibration` exact hit-rate; byte-identical | — | P3 ✅ |
+| S7 verdict on seeded net-positive / net-negative tool | correct SAVING/COSTING verdict, inputs + method tags printed, insufficient-data path, byte-identical | — | P4 ✅ |
+| S8 determinism sweep | every derived view byte-identical across two runs; `CAGE_DEBUG=1` doesn't change derived output; PII grep of the ledger clean | §6 | P0 ✅ |
+| S9 fleet study: 7 simulated machines (5 complete, 1 mid-week gap, 1 missing phase 2 — 3-machine sketch predates the min-n gate) | bundles → import-merge → exact coverage, gap flagged, pairs only complete machines (6), exact paired delta; double-import idempotent; PII grep clean | — | P5 ✅ |
+
+## 9. Findings template (the deliverable)
 
 Record every step's outcome in this shape so "what needs fixing" is ranked and
 actionable, not a wall of prose:

@@ -90,6 +90,16 @@ cage doctor             # per-agent heartbeat: last-fired time or "never"
 cat .cage/state/debug.log
 ```
 
+### 6. Share it (bug reports)
+```bash
+cage doctor --bundle    # one redacted archive: doctor output, debug.log,
+                        # versions, footprint row counts, policy provenance
+```
+Counts-never-content — safe to attach as-is; never attach raw ledger shards or
+agent transcripts instead. `skip=parsed-zero-rows` in the debug log is the
+format-drift signature (a non-empty log the parser recovered nothing from) —
+exactly what the bundle exists to report.
+
 ## Reading the results
 
 `cage debug` prints one line per event, e.g.:
@@ -113,6 +123,8 @@ Interpretation, per agent:
 | `skip=capture-disabled` | Fired but capture is switched off | re-enable (`[capture] enabled=true` / `CAGE_CAPTURE=1`) |
 | `skip=since-filtered` / `skip=cursor-unchanged` | Fired but `--since` dropped every file / the cursor saw no new data | widen `--since`; `cursor-unchanged` is normal (nothing new to import) |
 | `error=…` + traceback | Fired but the parser choked on that agent's log format | file the traceback — it's a parser bug for that agent/version |
+| `skip=parsed-zero-rows` | Log has bytes but the parser recovered no rows — the format-drift signature (agent update changed its log shape) | file it with a `cage doctor --bundle` |
+| `ledger.append` `result=write-failed` | The row was parsed but could not be written (unwritable ledger dir / disk) | fix permissions on the shard path in the event |
 | Agent **absent** from `cage debug` / **"never"** in `cage doctor` | The hook isn't firing (e.g. a VS Code extension) | this is expected — capture that agent with `cage import` / `cage watch` / your own cron |
 
 ## What it never logs

@@ -1,0 +1,28 @@
+{
+  "log": "20236884-4f14-453d-a016-aa37c72f819d.jsonl",
+  "env": "CAGE_VSCODE_USER",
+  "plant": "workspaceStorage/8896643500c164bd504dad986e3dcf48/chatSessions/20236884-4f14-453d-a016-aa37c72f819d.jsonl",
+  "format_verified": true,
+  "volatile": [],
+  "rows": [
+    {
+      "id": "c_cope67cf8298668",
+      "ts": "2026-07-07T18:10:14.720Z",
+      "session": "20236884-4f14-453d-a016-aa37c72f819d",
+      "task": "",
+      "agent": "copilot",
+      "route": "chat",
+      "provider": "",
+      "model": "copilot/auto",
+      "tokens_in": 25343,
+      "tokens_out": 95,
+      "cached_in": 0,
+      "est_cost_usd": 0.0,
+      "latency_ms": 0,
+      "ok": true,
+      "retries": 0,
+      "scope": "",
+      "project": ""
+    }
+  ]
+}

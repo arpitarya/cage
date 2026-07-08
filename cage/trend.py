@@ -9,7 +9,7 @@ from __future__ import annotations
 import datetime as _dt
 from pathlib import Path
 
-from cage import human, humanview, ledger, policy, render
+from cage import human, humanview, ledger, policy, prices, render
 
 
 def _bucket(ts: str, by: str) -> str:
@@ -35,7 +35,9 @@ def series(root: Path, pol: dict, by: str = "week", since: str | None = None) ->
         usd, _, _ = human.human_alternative_usd(r, pol)
         b["tasks"] += 1
         b["human_usd"] += usd
-        b["agent_usd"] += sum(c.get("est_cost_usd", 0.0) for c in runs)
+        # Repriced from tokens × policy like report/budget — the stored est_cost_usd
+        # is 0.0 for transcript-sourced calls (the agent side read as free without it).
+        b["agent_usd"] += sum(prices.call_usd(pol, c) for c in runs)
         b["human_min"] += human.human_minutes(r, pol)
         b["agent_min"] += humanview._active_minutes(runs)
     for b in buckets.values():

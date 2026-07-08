@@ -17,6 +17,9 @@ confirm the setup with the built-in health check — never eyeball files yoursel
    - `interceptor · bin/ not on PATH` → open a new shell.
    - `policy ✗` / `ledger ✗` → surface the exact error in the detail.
 4. All `✔`/`·` → Cage is working; point at `cage report` / `cage matrix`.
+5. For a shareable bug report: `cage doctor --bundle` writes one **redacted** archive
+   (counts-never-content — doctor output, debug log, versions, footprint row counts,
+   policy provenance). Never attach raw ledger/transcript files instead.
 
 Don't guess from raw files (`cage doctor` is the source of truth and writes nothing).
 Don't claim Cage works if any check is `✗`.

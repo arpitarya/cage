@@ -91,3 +91,71 @@ def test_setup_project_only_scaffolds_without_agent(proj, monkeypatch, capsys):
     assert (proj / ".cage").is_dir()
     out = capsys.readouterr().out
     assert ".cage/ ready" in out
+
+
+# ── E. the global ~/.cage is never a *project* root (full-test-plan finding #1) ──
+def test_global_cage_is_not_a_project_root(tmp_path, monkeypatch):
+    """With a global ledger at $CAGE_HOME/.cage, a fresh dir under it must NOT
+    resolve to the home as its project — `cage init` there was re-initialising the
+    global instead of scaffolding the project's own `.cage/` (§3.7 precedence:
+    override → project → global; the global is a fallback tier, not a project)."""
+    home = tmp_path / "home"
+    (home / ".cage").mkdir(parents=True)          # the machine-wide global sink
+    monkeypatch.setenv("CAGE_HOME", str(home))
+    project = home / "my_programs" / "newproj"
+    project.mkdir(parents=True)
+    assert paths.find_project_root(project) is None            # global ≠ project
+    assert paths.resolve_root(project) == home                 # …but stays the sink
+    assert "global" in paths.active_ledger_source(project)     # labelled honestly
+    (project / ".cage").mkdir()                                # now a real project
+    assert paths.find_project_root(project) == project
+    assert "project" in paths.active_ledger_source(project)
+
+
+def test_real_home_cage_is_not_a_project_root_under_cage_home(tmp_path, monkeypatch):
+    """With CAGE_HOME redirected (tests, the dummyrepo runner), the *real* `~/.cage`
+    is still a global sink — never a project. Without this, any sandbox under $HOME
+    resolved its "project" to the home dir and wrote fixture/study rows into the
+    user's real global ledger (2026-07 manual validation, S1/S2/S3/S9 fallout)."""
+    real_home = tmp_path / "realhome"
+    (real_home / ".cage").mkdir(parents=True)                  # the user's real global
+    monkeypatch.setattr(paths.Path, "home", staticmethod(lambda: real_home))
+    monkeypatch.setenv("CAGE_HOME", str(tmp_path / "iso"))     # redirected global
+    sandbox = real_home / "my_programs" / "sandbox-repo"
+    sandbox.mkdir(parents=True)
+    assert paths.find_project_root(sandbox) is None            # home ≠ project
+    assert paths.resolve_root(sandbox) == tmp_path / "iso"     # the redirect wins
+
+
+def test_hook_in_no_project_dir_writes_global_not_a_stray_footprint(tmp_path, monkeypatch):
+    """A hook firing in a dir with no project `.cage/` must capture into the global
+    ledger — the old `find_project_root or cwd` fallback scaffolded a stray `.cage/`
+    in the session's cwd and split the ledger (2026-07 manual validation: a Claude
+    session in a fresh dir left `.cage/ledger/` there and 0 rows in `~/.cage`)."""
+    import json
+    from cage import hooks
+    home = tmp_path / "home"
+    (home / ".cage").mkdir(parents=True)
+    monkeypatch.setenv("CAGE_HOME", str(home))
+    monkeypatch.delenv("CAGE_BASE", raising=False)
+    nowhere = tmp_path / "no-project-session-dir"
+    nowhere.mkdir()
+    assert hooks._root({"cwd": str(nowhere)}) == home          # global, not cwd
+    # And metering's library default follows the same precedence.
+    from cage import ledger, metering
+    monkeypatch.chdir(nowhere)
+    assert metering.record_call(route="chat", provider="anthropic",
+                                model="claude-opus-4-8", tokens_in=10)
+    assert not (nowhere / ".cage").exists()                    # no stray footprint
+    assert len(ledger.calls(home)) == 1                        # landed globally
+
+
+# ── F. malformed --since is a typed error, not a silent no-filter (finding #2) ──
+def test_since_garbage_is_typed_error(proj, monkeypatch, capsys):
+    monkeypatch.chdir(proj)
+    assert cli.main(["report", "--since", "garbage"]) == 1
+    err = capsys.readouterr().err
+    assert "invalid --since 'garbage'" in err and "7d" in err
+    assert cli.main(["report", "--since", "7d"]) == 0  # valid forms untouched
+    assert ledger.valid_since(None) and ledger.valid_since("2w")
+    assert not ledger.valid_since("next tuesday")

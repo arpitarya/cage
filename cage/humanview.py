@@ -10,7 +10,7 @@ from __future__ import annotations
 import datetime as _dt
 from pathlib import Path
 
-from cage import human, ledger, policy, quality, render, tasks
+from cage import human, ledger, policy, prices, quality, render, tasks
 
 
 def _active_minutes(runs: list[dict]) -> float:
@@ -51,7 +51,9 @@ def rollup(root: Path, pol: dict, since: str | None = None,
                                      "human_min": 0.0, "agent_min": 0.0, "conf_sum": 0.0})
         a["tasks"] += 1
         a["human_usd"] += usd
-        a["agent_usd"] += sum(c.get("est_cost_usd", 0.0) for c in runs)
+        # Repriced from tokens × policy like report/budget — the stored est_cost_usd
+        # is 0.0 for transcript-sourced calls (the agent side read as free without it).
+        a["agent_usd"] += sum(prices.call_usd(pol, c) for c in runs)
         a["human_min"] += human.human_minutes(r, pol)
         a["agent_min"] += _active_minutes(runs)
         a["conf_sum"] += conf

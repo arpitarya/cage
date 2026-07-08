@@ -9,7 +9,7 @@ from __future__ import annotations
 import datetime as _dt
 from pathlib import Path
 
-from cage import ledger, policy, render
+from cage import ledger, policy, prices, render
 
 _MONTH = 30
 
@@ -28,7 +28,9 @@ def _span_days(calls: list[dict]) -> int:
 
 def project(root: Path, pol: dict) -> dict:
     calls = ledger.calls(root)
-    total = sum(c.get("est_cost_usd", 0.0) for c in calls)
+    # Derive-time repricing (tokens × policy): the stored est_cost_usd is 0.0 for
+    # transcript-sourced calls, which read as "no spend" here before this repriced.
+    total = sum(prices.call_usd(pol, c) for c in calls)
     span = _span_days(calls)
     per_day = total / span
     cap = policy.budgets(pol).get("daily_usd")

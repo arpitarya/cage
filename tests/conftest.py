@@ -17,6 +17,9 @@ def _bare_cage_in_hooks(monkeypatch, tmp_path):
     global ledger — tests stay hermetic and deterministic."""
     monkeypatch.setattr("cage.paths.cage_bin", lambda: "cage")
     monkeypatch.setenv("CAGE_HOME", str(tmp_path / "global-home"))
+    # The copilot import also scans VS Code's chat-session store — point it at a
+    # throwaway dir so a pathless sweep never reads the developer's real sessions.
+    monkeypatch.setenv("CAGE_VSCODE_USER", str(tmp_path / "vscode-user"))
     # `cage --ledger` sets `CAGE_BASE` via os.environ (process-scoped in production); clear
     # it per test so a `--ledger` test can't re-base a later test's Footprint.
     monkeypatch.delenv("CAGE_BASE", raising=False)

@@ -283,7 +283,7 @@ def test_watch_runs_one_cycle_then_clean_exit(tmp_path, monkeypatch, capsys):
 
     monkeypatch.setattr(watchcmd.time, "sleep", _interrupt)
     rc = watchcmd.run(root, SimpleNamespace(agent="all", interval=1, since=None))
-    assert rc == 0                         # Ctrl-C → clean exit, no traceback
+    assert rc == 130                       # Ctrl-C → the CLI interrupt code, no traceback
     assert cycles == ["all"]               # exactly one import cycle before the interrupt
     out = capsys.readouterr().out
     assert "stopped" in out and "No OS job" in out

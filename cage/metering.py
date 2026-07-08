@@ -17,7 +17,9 @@ from cage import ledger, paths, policy, prices, schema
 
 
 def _resolve_root(root: Path | None) -> Path:
-    return root or paths.find_project_root() or Path.cwd()
+    # Capture is global by default (§3.7): a no-project caller writes the global
+    # ledger, never a stray .cage/ in whatever dir the process happens to run from.
+    return root or paths.resolve_root()
 
 
 @lru_cache(maxsize=8)

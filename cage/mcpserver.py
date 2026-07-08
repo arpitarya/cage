@@ -44,7 +44,9 @@ TOOLS = [
 
 
 def _root() -> Path:
-    return paths.find_project_root() or Path.cwd()
+    # Read the *active* ledger like the CLI (`cliutil.ledger_root`): a no-project
+    # MCP server answers from the global ~/.cage, not an empty cwd footprint.
+    return paths.resolve_root()
 
 
 def _pol(root: Path) -> dict:

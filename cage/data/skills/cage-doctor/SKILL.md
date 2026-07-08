@@ -28,6 +28,10 @@ setup with the built-in health check — never eyeball files yourself.
    - `policy ✗` / `ledger ✗` → surface the exact error string from the detail.
 4. If everything is `✔`/`·`, say Cage is working and point at `cage report` /
    `cage matrix` / `cage doctor` for ongoing use.
+5. For a shareable bug report, run `cage doctor --bundle` — it writes one **redacted**
+   diagnostics archive (counts-never-content: doctor output, the metadata-only debug
+   log + heartbeats, version/platform, footprint paths with row *counts*, policy
+   provenance, cursor state). Never attach raw ledger or transcript files instead.
 
 ## Don't
 

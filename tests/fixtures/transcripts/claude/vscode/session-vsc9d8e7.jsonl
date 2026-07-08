@@ -1,0 +1,2 @@
+{"type":"user","cwd":"/tmp/cage-testbed","timestamp":"2026-06-15T08:29:58Z","message":{"role":"user","content":"[content stripped — counts only]"}}
+{"type":"assistant","uuid":"cccccccc-9999-aaaa-bbbb-dddddddddddd","timestamp":"2026-06-15T08:30:00Z","cwd":"/tmp/cage-testbed","message":{"role":"assistant","model":"claude-sonnet-4-6","content":[{"type":"text","text":"[content stripped — counts only]"}],"usage":{"input_tokens":40,"output_tokens":220,"cache_read_input_tokens":5200,"cache_creation_input_tokens":0}}}

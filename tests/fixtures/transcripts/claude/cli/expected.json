@@ -1,0 +1,47 @@
+{
+  "log": "session-c1a2b3.jsonl",
+  "env": "CLAUDE_CONFIG_DIR",
+  "plant": "projects/-tmp-cage-testbed/session-c1a2b3.jsonl",
+  "format_verified": true,
+  "volatile": [],
+  "rows": [
+    {
+      "id": "c_aaaaaaaa1111222",
+      "ts": "2026-06-14T10:00:01Z",
+      "session": "session-c1a2b3",
+      "task": "",
+      "agent": "claude-code",
+      "route": "chat",
+      "provider": "anthropic",
+      "model": "claude-opus-4-8",
+      "tokens_in": 2412,
+      "tokens_out": 450,
+      "cached_in": 1800,
+      "est_cost_usd": 0.0,
+      "latency_ms": 0,
+      "ok": true,
+      "retries": 0,
+      "scope": "",
+      "project": "cage-testbed"
+    },
+    {
+      "id": "c_bbbbbbbb5555666",
+      "ts": "2026-06-14T10:02:17Z",
+      "session": "session-c1a2b3",
+      "task": "",
+      "agent": "claude-code",
+      "route": "chat",
+      "provider": "anthropic",
+      "model": "claude-opus-4-8",
+      "tokens_in": 9000,
+      "tokens_out": 1500,
+      "cached_in": 0,
+      "est_cost_usd": 0.0,
+      "latency_ms": 0,
+      "ok": true,
+      "retries": 0,
+      "scope": "",
+      "project": "cage-testbed"
+    }
+  ]
+}

@@ -10,6 +10,7 @@ later SessionEnd never double-records (idempotent — see hooks.session_end).
 """
 from __future__ import annotations
 
+import datetime as _dt
 import hashlib
 import json
 from pathlib import Path
@@ -197,7 +198,10 @@ def _codex_model(rec: dict) -> str:
 
 def parse_codex_calls(rollout_path: Path, session: str = "") -> list[dict]:
     """Best-effort metering of a Codex CLI rollout JSONL (provider=openai). The model is
-    declared once in a `turn_context` record and carried forward to the usage events."""
+    declared once in a `turn_context` record and carried forward to the usage events.
+    The row `ts` is the `token_count` event's own timestamp — an import-time stamp would
+    file a May rollout in the import month's shard and break `--since`; a rollout line
+    with no timestamp (older/synthetic shapes) still falls back to the write-time stamp."""
     if not rollout_path.exists():
         return []
     session = session or rollout_path.stem
@@ -218,10 +222,17 @@ def parse_codex_calls(rollout_path: Path, session: str = "") -> list[dict]:
         cached = int(u.get("cached_input_tokens", u.get("cache_read_input_tokens", 0)) or 0)
         if not (inp or out):
             continue
+        ts = rec.get("timestamp")
+        # Id carries a *hash* of the session, never a prefix: every Codex rollout stem
+        # starts with "rollout-", so `session[:8]` was one shared namespace across all
+        # sessions and `hooks.append_new` silently dropped colliding line indexes
+        # (41% of real calls in the wild). sha1 keeps it deterministic per (session, line).
+        sid = hashlib.sha1(session.encode("utf-8")).hexdigest()[:8]
         rows.append(schema.make_call(
             route="chat", provider="openai", model=model, tokens_in=inp,
             tokens_out=out, cached_in=cached, session=session, agent="codex",
-            call_id=f"c_codex{session[:8]}{i:05d}"))
+            ts=ts if isinstance(ts, str) and ts else None,
+            call_id=f"c_codex{sid}{i:05d}"))
     return rows
 
 
@@ -308,6 +319,76 @@ def parse_copilot_calls(events_path: Path, session: str = "") -> list[dict]:
                 tokens_in=inp, tokens_out=out, cached_in=cached,
                 session=session, agent="copilot", ts=ts,
                 call_id=f"c_cop{sid[:12]}{i:03d}"))
+    return rows
+
+
+def _copilot_chat_extension(req: dict) -> bool:
+    """True when a chat-session request was answered by the Copilot Chat extension —
+    other chat providers sharing VS Code's store must never be attributed to copilot."""
+    ext = (req.get("agent") or {}).get("extensionId")
+    if isinstance(ext, dict):
+        ext = ext.get("_lower") or ext.get("value") or ""
+    return "copilot" in str(ext).lower()
+
+
+def _epoch_ms_iso(ms) -> str | None:
+    try:
+        dt = _dt.datetime.fromtimestamp(int(ms) / 1000.0, tz=_dt.timezone.utc)
+        return dt.strftime("%Y-%m-%dT%H:%M:%S.") + f"{dt.microsecond // 1000:03d}Z"
+    except (TypeError, ValueError, OSError, OverflowError):
+        return None
+
+
+def parse_copilot_vscode_calls(chat_session_path: Path, session: str = "") -> list[dict]:
+    """Meter the Copilot VS Code *extension* from VS Code's own chat-session store
+    (`<vscode-user>/workspaceStorage/<hash>/chatSessions/<session>.jsonl`).
+
+    The extension's `GitHub.copilot-chat/transcripts/` event stream never carries a
+    usage event (no `session.shutdown`, even after quitting VS Code — pinned against
+    copilot-chat 0.54.0 / VS Code 1.126, 2026-07); the per-request token counts live
+    here instead: `kind:2, k:["requests"]` lines whose `v` items carry `requestId`,
+    `timestamp` (epoch ms), `modelId`, `promptTokens`, `completionTokens`. The store
+    rewrites the requests array as the session grows, so requests are merged
+    last-write-wins by `requestId` — re-imports and rewrites never double-record
+    (the call id is derived from the requestId). Counts-never-content: titles,
+    prompts, and response bodies in the same file are never read into a row.
+    `modelId` is often the virtual `copilot/auto`, which no price row matches — such
+    rows cost $0 and `cage doctor` flags them UNPRICED (a wrong number is worse)."""
+    if not chat_session_path.exists():
+        return []
+    session = session or chat_session_path.stem
+    reqs: dict[str, dict] = {}
+    for line in chat_session_path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            rec = json.loads(line)
+        except ValueError:
+            continue
+        if rec.get("kind") == 0 and isinstance(rec.get("v"), dict):
+            session = rec["v"].get("sessionId") or session
+        if rec.get("kind") != 2 or rec.get("k") != ["requests"]:
+            continue
+        for req in rec.get("v") or []:
+            if isinstance(req, dict) and req.get("requestId"):
+                reqs[req["requestId"]] = req  # last write wins
+    rows: list[dict] = []
+    for rid, req in reqs.items():
+        if not _copilot_chat_extension(req):
+            continue
+        md = (req.get("result") or {}).get("metadata") or {}
+        inp = _first_int(req, _COPILOT_IN_KEYS) or _first_int(md, _COPILOT_IN_KEYS)
+        out = _first_int(req, _COPILOT_OUT_KEYS) or _first_int(md, _COPILOT_OUT_KEYS)
+        if not (inp or out):
+            continue
+        model = req.get("modelId") or ""
+        rid_hash = hashlib.sha1(rid.encode("utf-8")).hexdigest()[:12]
+        rows.append(schema.make_call(
+            route="chat", provider=_copilot_provider(model), model=model,
+            tokens_in=inp, tokens_out=out, session=session, agent="copilot",
+            ts=_epoch_ms_iso(req.get("timestamp")),
+            call_id=f"c_cop{rid_hash}"))
     return rows
 
 

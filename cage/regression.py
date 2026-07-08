@@ -9,10 +9,20 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from cage import ledger, render
+from cage import ledger, paths, policy, prices, render
 
 
-def detect(root: Path, since: str = "7d", tolerance: float = 0.2) -> dict:
+def detect(root: Path, since: str = "7d", tolerance: float = 0.2,
+           pol: dict | None = None) -> dict:
+    # Costs are repriced from tokens × policy at derive time (`prices.call_usd`) —
+    # transcript-sourced calls store est_cost_usd=0.0, so summing the stored field
+    # reads a token-only ledger as $0 drift. A failed policy load degrades to the
+    # stored figures (call_usd's own fallback), never raises off the read path.
+    if pol is None:
+        try:
+            pol = policy.load(paths.Footprint(root).policy)
+        except Exception:  # noqa: BLE001 — library default; CLI passes a checked pol
+            pol = {}
     calls = ledger.calls(root)
     cut = ledger.since_cutoff(since)
     recent, base = [], []
@@ -21,7 +31,7 @@ def detect(root: Path, since: str = "7d", tolerance: float = 0.2) -> dict:
         (recent if (t and cut and t >= cut) else base).append(c)
 
     def mean(rows: list[dict]) -> float:
-        return sum(r.get("est_cost_usd", 0.0) for r in rows) / len(rows) if rows else 0.0
+        return sum(prices.call_usd(pol, r) for r in rows) / len(rows) if rows else 0.0
 
     rm, bm = mean(recent), mean(base)
     drift = (rm - bm) / bm if bm else 0.0

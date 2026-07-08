@@ -30,6 +30,6 @@ def run(root: Path, args) -> int:
             for line in _cycle(root, agent, args):
                 print(line)
             time.sleep(interval)
-    except KeyboardInterrupt:  # clean exit — leaves nothing registered
+    except KeyboardInterrupt:  # leaves nothing registered; 130 per the CLI exit-code contract
         print("\ncage watch: stopped.")
-        return 0
+        return 130
