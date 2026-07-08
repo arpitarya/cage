@@ -87,7 +87,8 @@ def _metering(active: Path) -> tuple[str, str]:
     rel = render.ago(li) if li else ""
     foot = (f"\n      last import: {rel}" if rel
             else "\n      last import: never — run `cage import` (or `cage watch`)")
-    foot += "\n      (automate with your own cron calling `cage import`; cage installs no scheduler.)"
+    foot += (f"\n      (automate with your own scheduler line, e.g. `{render.scheduler_hint()}`; "
+             "cage installs no scheduler.)")
     head = ("capture is pull-based — `cage import`/`cage export` is the universal path; "
             "hooks are an optional CLI-only real-time add-on (they don't fire under a VS "
             "Code extension):")

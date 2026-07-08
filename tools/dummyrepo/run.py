@@ -63,7 +63,11 @@ class Fail(Exception):
 # ── sandbox ──────────────────────────────────────────────────────────────────
 
 def _sh(cmd: list[str], cwd: Path, env: dict | None = None) -> subprocess.CompletedProcess:
-    return subprocess.run(cmd, cwd=cwd, env=env, capture_output=True, text=True)
+    # encoding pinned: text=True alone decodes with the locale codec (cp1252 on
+    # Windows), which chokes on cage's ✔/·/⚠ glyphs — utf-8 + replace keeps the
+    # runner OS-independent without masking real output differences.
+    return subprocess.run(cmd, cwd=cwd, env=env, capture_output=True,
+                          encoding="utf-8", errors="replace")
 
 
 def make_sandbox(base: Path, name: str) -> tuple[Path, dict]:
@@ -82,6 +86,7 @@ def make_sandbox(base: Path, name: str) -> tuple[Path, dict]:
         if r.returncode != 0:
             raise Fail(f"sandbox git scaffold failed: {' '.join(cmd)}: {r.stderr.strip()}")
     env = {k: v for k, v in os.environ.items() if k not in STRIP_ENVS}
+    env["PYTHONUTF8"] = "1"  # child `python -m cage` pipes stay UTF-8 on Windows (glyph asserts)
     env["CAGE_HOME"] = str(homes / "global-home")
     env["PYTHONPATH"] = str(REPO_ROOT) + os.pathsep + env.get("PYTHONPATH", "")
     for e in HOME_ENVS:

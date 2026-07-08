@@ -4,6 +4,15 @@ from __future__ import annotations
 import datetime as _dt
 
 
+def scheduler_hint() -> str:
+    """The OS-appropriate example line for user-owned capture automation — printed,
+    never installed (cage law: no launchd/systemd/cron/schtasks registration)."""
+    import os as _os
+    if _os.name == "nt":
+        return ('schtasks /create /tn cage-import /tr "cage import" /sc hourly')
+    return "0 * * * * cage import"
+
+
 def ago(ts: str) -> str:
     """Human "3m ago" for an ISO timestamp; fail-open to "". Used by `cage doctor`/`cage
     report` to surface "last import: N ago" (capture is pull-based, plan §3.7). A clock

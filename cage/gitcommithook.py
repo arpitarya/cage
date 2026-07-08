@@ -24,7 +24,7 @@ _MARKER = "# cage-managed-hook"
 def _files() -> dict:
     # Resolved cage path — a GUI git client (IDE commit button) runs hooks with a
     # minimal PATH that omits ~/.local/bin, so a bare `cage` would not be found.
-    c = paths.cage_bin()
+    c = paths.quoted_cage_bin()
     return {
         "post-commit": f"#!/bin/sh\n{_MARKER}\n{c} hook-post-commit\n",
         "prepare-commit-msg": f'#!/bin/sh\n{_MARKER}\n{c} hook-prepare-commit-msg "$1"\n',

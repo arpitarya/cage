@@ -32,6 +32,10 @@ pre-formatted table. Never invent a number.
   join <phase>` per machine → `cage export --study` → analyst runs `cage import
   bundle*.zip` + `cage study report` (coverage first, then a paired-by-machine
   delta tagged `estimated`; opaque machine ids, never hostnames).
+- **nothing captured?** — `cage doctor --paths` (read-only probe of every
+  candidate log location per agent on this OS, with a why-line per miss), then
+  `CAGE_DEBUG=1 cage import` + `cage debug`; `cage doctor --bundle` exports the
+  whole diagnosis as one redacted archive.
 
 Every command takes `--json` for machine-readable output.
 

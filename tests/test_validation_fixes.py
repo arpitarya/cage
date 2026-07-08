@@ -13,12 +13,13 @@ import threading
 
 import pytest
 
-from cage import cli, demo, importcmd, ledger, paths, schema
+from cage import cli, demo, importcmd, ledger, lockutil, paths, schema
 from cage import metering as meter
 
 
 # ── A. import lock: concurrent sweeps dedupe one turn ───────────────────────────
-@pytest.mark.skipif(importcmd._fcntl is None, reason="POSIX flock unavailable")
+@pytest.mark.skipif(lockutil._fcntl is None and lockutil._msvcrt is None,
+                    reason="no lock primitive on this platform (documented fail-open)")
 def test_import_lock_serializes_concurrent_appends(proj):
     """Two sweeps racing on the read-check-append section must land the row once.
     Mirrors the fixed critical section in `importcmd.run` (build `seen`, then append)."""

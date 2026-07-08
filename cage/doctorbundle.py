@@ -26,7 +26,7 @@ import sys
 import zipfile
 from pathlib import Path
 
-from cage import doctorcmd, ledger, paths, policy
+from cage import doctorcmd, ledger, pathprobe, paths, policy
 from cage.errors import CageError
 
 DEFAULT_NAME = "cage-doctor-bundle.zip"
@@ -143,6 +143,9 @@ def run(root: Path, out: str | None = None) -> Path:
     add("doctor.txt", lambda: _doctor_text(doctor_res()))
     add("doctor.json", lambda: json.dumps(doctor_res(), ensure_ascii=False, indent=2) + "\n")
     add("version.txt", _version_text)
+    # The path probe: which log locations were checked, which missed, and why — the
+    # exportable half of `cage doctor --paths` (read-only; home-redacted like all members).
+    add("paths.txt", lambda: pathprobe.run(root))
     add("footprint.txt", lambda: _footprint_text(root, active, source))
     add("policy-provenance.txt", lambda: _policy_provenance_text(active))
     for name, path in (("state/debug.log", foot.debug_log),

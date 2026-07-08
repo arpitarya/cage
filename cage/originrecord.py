@@ -15,13 +15,8 @@ import re
 import subprocess
 from pathlib import Path
 
-from cage import ledger, paths, schema
+from cage import ledger, lockutil, paths, schema
 from cage.constants import PROVENANCE_CORROBORATION_BONUS, PROVENANCE_METHOD_TRUST
-
-try:  # POSIX-only; fail-open elsewhere (same guard as importcmd)
-    import fcntl as _fcntl
-except ImportError:  # pragma: no cover
-    _fcntl = None
 
 _NUMSTAT = re.compile(r"^(\d+|-)\t(\d+|-)\t(.+)$")
 
@@ -118,29 +113,11 @@ def _record_lock(root: Path):
     """Serialize the `_already_recorded` check against the append, so two hook
     processes firing at once (e.g. SessionEnd delivered to two windows) can't both
     pass the idempotency read before either writes — the same race `importcmd.
-    _import_lock` closes for call rows. **Fail-open**: no `fcntl` / unwritable state
-    dir ⇒ proceed unlocked, exactly the pre-lock behavior. Never raises."""
-    fh = None
-    try:
-        state = paths.Footprint(root).state
-        state.mkdir(parents=True, exist_ok=True)
-        fh = open(state / "provenance.lock", "w")  # noqa: SIM115 — released in finally
-        if _fcntl is not None:
-            _fcntl.flock(fh.fileno(), _fcntl.LOCK_EX)
-    except OSError:
-        if fh is not None:
-            fh.close()
-        fh = None
-    try:
+    _import_lock` closes for call rows. **Fail-open** via `lockutil.locked`
+    (fcntl → msvcrt → unlocked): an untakeable lock ⇒ proceed, exactly the
+    pre-lock behavior. Never raises."""
+    with lockutil.locked(paths.Footprint(root).state / "provenance.lock"):
         yield
-    finally:
-        if fh is not None:
-            try:
-                if _fcntl is not None:
-                    _fcntl.flock(fh.fileno(), _fcntl.LOCK_UN)
-            except OSError:
-                pass
-            fh.close()
 
 
 def record(root: Path, *, sha: str, files: list[str], agent: str = "",

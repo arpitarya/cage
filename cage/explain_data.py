@@ -167,6 +167,26 @@ REGISTRY: tuple[Explanation, ...] = (
 
     # ── concept entries — how cage itself works, not how a value is computed ───
     Explanation(
+        "capture-troubleshooting",
+        ("capture", "captured", "capturing", "nothing", "missing", "empty",
+         "troubleshoot", "troubleshooting", "why-no-rows", "probe",
+         "windows", "location", "log-location"),
+        "why is nothing being captured — the three-step diagnosis",
+        "1. `cage doctor --paths` — read-only probe of every candidate log location\n"
+        "     per agent on this OS: found/missing, files matched, parseable rows,\n"
+        "     cursor state, and a why-line per miss (wrong layout, cursor already\n"
+        "     imported, unparseable format). Env overrides and any UNVERIFIED-LAYOUT\n"
+        "     candidates are labeled.\n"
+        "  2. `CAGE_DEBUG=1 cage import` — the same probes stream to debug.log as\n"
+        "     metadata-only events, plus per-file parse/append/dedupe detail\n"
+        "     (`cage debug` to read them).\n"
+        "  3. `cage doctor --bundle` — exports both (plus cursors, versions, policy\n"
+        "     provenance) as one redacted archive to attach to a bug report; the\n"
+        "     home prefix is rendered as `~`, contents are counts-never-content.",
+        ("cage/pathprobe.py", "cage/debuglog.py", "cage/doctorbundle.py"),
+        "n/a — a diagnostic runbook, not a number.",
+        kind="concept", plan_ref="§3.7"),
+    Explanation(
         "overview", ("overview", "works", "introduction", "explain", "how-cage-works"),
         "the front door: cage's one-way data flow + its laws",
         "record_call / record_receipt → append-only {calls_path} / {receipts_path} →\n"

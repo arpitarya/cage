@@ -33,7 +33,7 @@ _TRIGGER = "agentStop"  # Kiro's only fit-for-purpose trigger; no session-start 
 
 
 def _import_cmd() -> str:
-    return f"{paths.cage_bin()} import --agent kiro"  # Kiro only — no cross-agent sweep
+    return f"{paths.quoted_cage_bin()} import --agent kiro"  # Kiro only — no cross-agent sweep
 
 
 def _hook_spec() -> dict:

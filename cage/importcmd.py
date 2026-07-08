@@ -24,12 +24,7 @@ import datetime as _dt
 import json
 from pathlib import Path
 
-from cage import agents, debuglog, hooks, ledger, limits, paths, policy, transcript
-
-try:  # POSIX advisory locking; absent on Windows → the lock degrades to a no-op (fail-open)
-    import fcntl as _fcntl
-except ImportError:  # pragma: no cover
-    _fcntl = None
+from cage import agents, debuglog, hooks, ledger, limits, lockutil, paths, policy, transcript
 
 # Agents that persist a usage log to disk (everything else → proxy fallback).
 LOG_BEARING = ("claude", "codex", "copilot", "kiro")
@@ -42,32 +37,21 @@ def _import_lock(foot: paths.Footprint, pol: dict | None = None):
     land twice under two racing hooks (a Stop hook + a SessionStart sweep firing at
     once). Holding an exclusive lock across the read-check-append section means the
     second sweep rebuilds ``seen`` only after the first has committed, so id-dedupe
-    catches it. **Fail-open**: if the lock can't be taken (no ``fcntl``, unwritable
-    state dir), proceed unlocked — `hooks.append_new`'s id-dedupe stays the backstop,
-    exactly as before this lock existed. Never raises into the capture path."""
-    fh = None
-    try:
-        foot.state.mkdir(parents=True, exist_ok=True)
-        fh = open(foot.state / "import.lock", "w")  # noqa: SIM115 — released in finally
-        if _fcntl is not None:
-            _fcntl.flock(fh.fileno(), _fcntl.LOCK_EX)
-    except OSError as e:
-        if fh is not None:
-            fh.close()
-        fh = None
+    catches it. **Fail-open** via `lockutil.locked` (fcntl → msvcrt → unlocked): if
+    the lock can't be taken, proceed — `hooks.append_new`'s id-dedupe stays the
+    backstop, exactly as before this lock existed. Never raises into capture."""
+
+    def _miss(exc):
         # Fail-open but never silent: an untakeable lock means the id-dedupe backstop
         # is carrying dedupe alone — attributable under CAGE_DEBUG=1.
-        debuglog.exception(foot.root, "import.lock", e, pol=pol)
-    try:
+        if exc is None:
+            debuglog.event(foot.root, pol=pol, event="import",
+                           skip="no-lock-primitive-on-platform")
+        else:
+            debuglog.exception(foot.root, "import.lock", exc, pol=pol)
+
+    with lockutil.locked(foot.state / "import.lock", on_miss=_miss):
         yield
-    finally:
-        if fh is not None:
-            try:
-                if _fcntl is not None:
-                    _fcntl.flock(fh.fileno(), _fcntl.LOCK_UN)
-            except OSError:
-                pass
-            fh.close()
 
 
 def _mtime_utc(f: Path):
@@ -127,8 +111,18 @@ def _scan(root: Path, agent: str, src: Path, pattern: str, since,
     (size, mtime) match the cursor are dropped — already fully ingested, nothing new to
     parse. Records observational ``skip=since-filtered`` / ``skip=cursor-unchanged`` debug
     events when files existed but were all dropped (a common "why nothing captured?" cause).
-    ``agent_cursor=None`` (the standalone import-claude/-codex commands) ⇒ no skip."""
-    raw = sorted(src.glob(pattern)) if src.is_dir() else [src]
+    ``agent_cursor=None`` (the standalone import-claude/-codex commands) ⇒ no skip.
+    Every candidate source gets a metadata-only ``probe`` event (path, exists, files
+    matched) so `CAGE_DEBUG=1` answers "which locations did cage look at, and which
+    missed" — the raw feed behind `cage doctor --paths`."""
+    if src.is_dir():
+        raw = sorted(src.glob(pattern))
+    elif src.is_file():
+        raw = [src]  # a file source (kiro's token log, an explicit --path file)
+    else:
+        raw = []  # absent location — a normal miss, recorded by the probe event
+    debuglog.event(root, pol=pol, event="probe", agent=agent, src=str(src),
+                   pattern=pattern, exists=src.exists(), files_matched=len(raw))
     cut = ledger.since_cutoff(since)  # reuses constants.SINCE_WINDOW_DAYS — no new literal
     if cut is None:
         files = raw
@@ -184,30 +178,40 @@ def import_claude(root: Path, args, *, pol: dict | None = None, seen: set | None
                   agent_cursor: dict | None = None) -> tuple[int, int]:
     """Meter Claude Code from the transcripts it already writes to ~/.claude/projects."""
     if getattr(args, "path", None):
-        src = Path(args.path)
+        sources = [(Path(args.path), "**/*.jsonl")]
     elif getattr(args, "project", None):
-        src = paths.claude_home() / "projects" / paths.claude_project_slug(Path(args.project))
+        sources = [(paths.claude_home() / "projects"
+                    / paths.claude_project_slug(Path(args.project)), "**/*.jsonl")]
     else:
-        src = paths.claude_home() / "projects"
-    files = _scan(root, "claude", src, "**/*.jsonl", getattr(args, "since", None), pol=pol,
-                  agent_cursor=agent_cursor)
-    n = _ingest(root, "claude", src, files, lambda f: transcript.parse_calls(f, session=f.stem),
-                pol=pol, seen=seen, agent_cursor=agent_cursor)
-    return n, len(files)
+        sources = paths.agent_log_sources("claude")
+    total_rows = total_files = 0
+    for src, pattern in sources:
+        files = _scan(root, "claude", src, pattern, getattr(args, "since", None), pol=pol,
+                      agent_cursor=agent_cursor)
+        total_rows += _ingest(root, "claude", src, files,
+                              lambda f: transcript.parse_calls(f, session=f.stem),
+                              pol=pol, seen=seen, agent_cursor=agent_cursor)
+        total_files += len(files)
+    return total_rows, total_files
 
 
 def import_codex(root: Path, args, *, pol: dict | None = None, seen: set | None = None,
                  agent_cursor: dict | None = None) -> tuple[int, int]:
     """Meter Codex from its on-disk rollouts (~/.codex/sessions/**/rollout-*.jsonl)."""
-    src = Path(args.path) if getattr(args, "path", None) else paths.codex_home() / "sessions"
-    files = _scan(root, "codex", src, "**/rollout-*.jsonl", getattr(args, "since", None), pol=pol,
-                  agent_cursor=agent_cursor)
-    n = _ingest(root, "codex", src, files, lambda f: transcript.parse_codex_calls(f, session=f.stem),
-                pol=pol, seen=seen, agent_cursor=agent_cursor)
-    # Latest-only Codex quota snapshot — a machine-local state file, NOT a ledger row
-    # (plan §3.8). Fail-open: never blocks the import; a renamed/absent block writes nothing.
-    limits.snapshot_codex(root, files)
-    return n, len(files)
+    sources = ([(Path(args.path), "**/rollout-*.jsonl")] if getattr(args, "path", None)
+               else paths.agent_log_sources("codex"))
+    total_rows = total_files = 0
+    for src, pattern in sources:
+        files = _scan(root, "codex", src, pattern, getattr(args, "since", None), pol=pol,
+                      agent_cursor=agent_cursor)
+        total_rows += _ingest(root, "codex", src, files,
+                              lambda f: transcript.parse_codex_calls(f, session=f.stem),
+                              pol=pol, seen=seen, agent_cursor=agent_cursor)
+        total_files += len(files)
+        # Latest-only Codex quota snapshot — a machine-local state file, NOT a ledger row
+        # (plan §3.8). Fail-open: never blocks the import; a renamed/absent block writes nothing.
+        limits.snapshot_codex(root, files)
+    return total_rows, total_files
 
 
 def _parse_copilot_any(f: Path) -> list[dict]:
@@ -228,16 +232,10 @@ def import_copilot(root: Path, args, *, pol: dict | None = None, seen: set | Non
       the extension's own transcripts dir carries no usage event, so the per-request
       counts come from VS Code's chat-session store (plan §3.7; `CAGE_VSCODE_USER`
       overrides the user dir for tests)."""
-    if getattr(args, "path", None):
-        src = Path(args.path)
-        files = _scan(root, "copilot", src, "*/events.jsonl", getattr(args, "since", None),
-                      pol=pol, agent_cursor=agent_cursor)
-        n = _ingest(root, "copilot", src, files, _parse_copilot_any,
-                    pol=pol, seen=seen, agent_cursor=agent_cursor)
-        return n, len(files)
+    sources = ([(Path(args.path), "*/events.jsonl")] if getattr(args, "path", None)
+               else paths.agent_log_sources("copilot"))
     total_rows = total_files = 0
-    for src, pattern in ((paths.copilot_home() / "session-state", "*/events.jsonl"),
-                         (paths.vscode_user_dir() / "workspaceStorage", "*/chatSessions/*.jsonl")):
+    for src, pattern in sources:
         files = _scan(root, "copilot", src, pattern, getattr(args, "since", None), pol=pol,
                       agent_cursor=agent_cursor)
         total_rows += _ingest(root, "copilot", src, files, _parse_copilot_any,
@@ -250,12 +248,16 @@ def import_kiro(root: Path, args, *, pol: dict | None = None, seen: set | None =
                 agent_cursor: dict | None = None) -> tuple[int, int]:
     """Meter Kiro from its append-only usage log (kiro.kiroagent/dev_data/
     tokens_generated.jsonl) — a single file, not a glob. Best-effort and idempotent."""
-    src = Path(args.path) if getattr(args, "path", None) else paths.kiro_token_log()
-    files = _scan(root, "kiro", src, "*", getattr(args, "since", None), pol=pol,
-                  agent_cursor=agent_cursor)
-    n = _ingest(root, "kiro", src, files, lambda f: transcript.parse_kiro_calls(f),
-                pol=pol, seen=seen, agent_cursor=agent_cursor)
-    return n, len(files)
+    sources = ([(Path(args.path), "*")] if getattr(args, "path", None)
+               else paths.agent_log_sources("kiro"))
+    total_rows = total_files = 0
+    for src, pattern in sources:
+        files = _scan(root, "kiro", src, pattern, getattr(args, "since", None), pol=pol,
+                      agent_cursor=agent_cursor)
+        total_rows += _ingest(root, "kiro", src, files, lambda f: transcript.parse_kiro_calls(f),
+                              pol=pol, seen=seen, agent_cursor=agent_cursor)
+        total_files += len(files)
+    return total_rows, total_files
 
 
 _ADAPTERS = {"claude": import_claude, "codex": import_codex,

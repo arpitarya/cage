@@ -1,4 +1,7 @@
-# Install the package, run the test suite across supported Python versions.
+# Install the package, run the test suite + the S1–S9 scenario runner across the
+# supported Python versions AND all three OSes — Windows/macOS parity is a CI gate
+# (macOS is field-validated; Windows is CI-tested until a manual run upgrades it,
+# see docs/windows-manual-checklist.md).
 # See: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
 
 name: Python package
@@ -9,13 +12,20 @@ on:
   pull_request:
     branches: [ "main" ]
 
+env:
+  # cage prints ✔/·/⚠ glyphs; Windows runners default to cp1252 consoles. The CLI
+  # degrades glyphs on non-UTF consoles, but tests/the runner compare exact output —
+  # run everything UTF-8 like a real modern terminal.
+  PYTHONUTF8: "1"
+
 jobs:
   build:
 
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
         python-version: ["3.11", "3.12", "3.13"]
 
     steps:
@@ -31,3 +41,5 @@ jobs:
       run: python -m tools.skillgen --check
     - name: Test with pytest
       run: pytest -q
+    - name: Scenario runner S1–S9 (real-CLI capture, PII, determinism, fleet)
+      run: python -m tools.dummyrepo

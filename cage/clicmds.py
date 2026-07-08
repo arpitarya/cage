@@ -307,7 +307,7 @@ def cmd_study(args) -> int:
     for c in res["checks"]:
         print(f"  {glyph[c['level']]} {c['name']:<12} {c['detail']}")
     print(f"\n{glyph[res['status']]} doctor: {res['status']} — automate capture with your "
-          "own cron line, e.g.:  0 * * * * cage import   (cage installs no scheduler)")
+          f"own scheduler line, e.g.:  {render.scheduler_hint()}   (cage installs no scheduler)")
     return 1 if res["status"] == "fail" else 0
 
 
@@ -438,6 +438,10 @@ def cmd_setup(args) -> int:
 
 
 def cmd_doctor(args) -> int:
+    if getattr(args, "paths", False):
+        from cage import pathprobe
+        print(pathprobe.run(root()))
+        return 0
     res = doctorcmd.run(root())
     if getattr(args, "json", False):
         import json

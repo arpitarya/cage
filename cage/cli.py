@@ -286,8 +286,12 @@ def build_parser() -> argparse.ArgumentParser:
     dr.add_argument("--json", action="store_true", help="machine-readable output")
     dr.add_argument("--bundle", nargs="?", const="cage-doctor-bundle.zip", metavar="PATH",
                     help="also write one redacted diagnostics archive (counts-never-content): "
-                         "doctor output, debug log + heartbeats, version/platform, footprint "
-                         "paths + row counts, policy provenance, cursor state")
+                         "doctor output, path probe, debug log + heartbeats, version/platform, "
+                         "footprint paths + row counts, policy provenance, cursor state")
+    dr.add_argument("--paths", action="store_true",
+                    help="read-only path probe: every candidate log location per agent on "
+                         "this OS — found/missing, files matched, parseable rows, cursor "
+                         "state, and why a location missed (writes nothing)")
     dr.set_defaults(fn=clicmds.cmd_doctor)
 
     dbg = sub.add_parser("debug", help="print recent capture-path debug events ($0, metadata-only; needs CAGE_DEBUG=1)")
@@ -413,6 +417,16 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     import os
     import sys
+
+    # A non-UTF console (Windows cp1252) would raise UnicodeEncodeError on the first
+    # ✔/·/⚠ glyph and kill the command. Degrade the glyph, never the command — the
+    # tables and numbers are ASCII; only decorations are at stake. Fail-open.
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            if "utf" not in (getattr(stream, "encoding", "") or "").lower():
+                stream.reconfigure(errors="replace")
+        except Exception:  # noqa: BLE001 — cosmetic only, never block the CLI
+            pass
 
     # argparse renders its own usage error + exits 2 here, before the try (stdlib).
     args = build_parser().parse_args(argv)

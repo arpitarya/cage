@@ -14,12 +14,36 @@ def cage_bin() -> str:
     run hooks with a minimal PATH that omits `~/.local/bin`, so a bare `cage` in a hook
     fails silently with 'command not found' and nothing is captured — the #1 reason a
     wired hook doesn't fire. Resolve it at wire time; fall back to the package's own
-    console-script dir, then to bare `cage`."""
+    console-script dir (`Scripts\\cage.exe` beside a Windows interpreter), then bare."""
     resolved = shutil.which("cage")
     if resolved:
         return resolved
-    candidate = Path(sys.executable).parent / "cage"  # same venv as the running interpreter
-    return str(candidate) if candidate.exists() else "cage"
+    exe_dir = Path(sys.executable).parent  # same venv as the running interpreter
+    for candidate in (exe_dir / "cage", exe_dir / "cage.exe",
+                      exe_dir / "Scripts" / "cage.exe"):
+        if candidate.exists():
+            return str(candidate)
+    return "cage"
+
+
+def quoted_cage_bin() -> str:
+    """`cage_bin()` quoted for use inside a shell-ish hook command line — a resolved
+    Windows path (`C:\\Users\\Foo Bar\\...\\cage.exe`) or any install dir with spaces
+    would otherwise split at the space and the hook dies with 'command not found'."""
+    c = cage_bin()
+    return f'"{c}"' if " " in c else c
+
+
+def _split_bin(command: str) -> tuple[str, str]:
+    """(executable, rest) for a hook command whose executable may be quoted —
+    `shlex` is POSIX-only and mangles Windows backslashes, so split by hand."""
+    command = command or ""
+    if command.startswith('"'):
+        end = command.find('"', 1)
+        if end > 0:
+            return command[1:end], command[end + 1:].strip()
+    parts = command.split(None, 1)
+    return (parts[0] if parts else ""), (parts[1] if len(parts) == 2 else "")
 
 
 def is_cage_import_command(command: str) -> bool:
@@ -30,18 +54,18 @@ def is_cage_import_command(command: str) -> bool:
 
 
 def reresolve_cage_command(command: str) -> str | None:
-    """If ``command`` is a cage hook command (`cage …` or `/abs/path/cage …`), return it
-    rewritten to the currently-resolved cage path, preserving the subcommand; else None.
-    Lets `cage setup` *heal* a stale bare-`cage` (or moved-binary) hook on re-run — the
-    reason a previously-wired hook silently stopped firing under a GUI agent's PATH."""
-    parts = command.split(None, 1) if command else []
-    if not parts:
+    """If ``command`` is a cage hook command (`cage …`, `/abs/path/cage …`, quoted, or
+    the Windows `…\\cage.exe` forms), return it rewritten to the currently-resolved
+    (quoted-if-needed) cage path, preserving the subcommand; else None. Lets `cage
+    setup` *heal* a stale bare-`cage` (or moved-binary) hook on re-run — the reason a
+    previously-wired hook silently stopped firing under a GUI agent's PATH."""
+    bin0, sub = _split_bin(command)
+    if not bin0:
         return None
-    bin0 = parts[0]
-    if bin0 != "cage" and not bin0.endswith("/cage"):
+    name = bin0.replace("\\", "/").rsplit("/", 1)[-1].lower()
+    if name not in ("cage", "cage.exe"):
         return None  # a foreign (non-cage) hook — never touch it
-    sub = parts[1] if len(parts) == 2 else ""
-    return f"{cage_bin()} {sub}".rstrip()
+    return f"{quoted_cage_bin()} {sub}".rstrip()
 
 
 def find_project_root(start: Path | None = None) -> Path | None:
@@ -134,17 +158,55 @@ def copilot_home() -> Path:
     return Path(os.environ.get("COPILOT_HOME", Path.home() / ".copilot"))
 
 
-def vscode_user_dir() -> Path:
-    """VS Code user dir where Copilot user prompt files live. Override CAGE_VSCODE_USER."""
+def _first_existing(candidates: list[Path]) -> Path:
+    """The first candidate that exists on disk, else the first candidate (the
+    platform-preferred default — a missing dir is a normal `_scan` no-op, and
+    `cage doctor --paths` reports every candidate with a why-line)."""
+    return next((c for c in candidates if c.exists()), candidates[0])
+
+
+def vscode_user_candidates() -> list[Path]:
+    """Every VS Code user-dir location cage will consider, in probe order:
+    ``CAGE_VSCODE_USER`` override → macOS (field-validated) → Linux → Windows
+    ``%APPDATA%\\Code\\User`` (the documented VS Code location; CI-tested)."""
     env = os.environ.get("CAGE_VSCODE_USER")
     if env:
-        return Path(env)
-    mac = Path.home() / "Library" / "Application Support" / "Code" / "User"
-    return mac if mac.exists() else Path.home() / ".config" / "Code" / "User"
+        return [Path(env)]
+    cands = [Path.home() / "Library" / "Application Support" / "Code" / "User",
+             Path.home() / ".config" / "Code" / "User"]
+    appdata = os.environ.get("APPDATA")
+    if appdata:
+        cands.append(Path(appdata) / "Code" / "User")
+    return cands
+
+
+def vscode_user_dir() -> Path:
+    """VS Code user dir (Copilot chat-session store lives under it). Override
+    CAGE_VSCODE_USER; else the first existing of `vscode_user_candidates()`."""
+    return _first_existing(vscode_user_candidates())
 
 
 def kiro_home() -> Path:
     return Path(os.environ.get("KIRO_HOME", Path.home() / ".kiro"))
+
+
+def kiro_data_candidates() -> list[Path]:
+    """Kiro user-data (`kiro.kiroagent` globalStorage) candidates, in probe order:
+    ``KIRO_DATA_DIR`` override → macOS (field-validated) → Linux → Windows
+    ``%APPDATA%\\Kiro\\User\\globalStorage\\kiro.kiroagent`` — **UNVERIFIED-LAYOUT**:
+    inferred from Kiro being VS Code-family (VS Code uses %APPDATA%/<app>/User),
+    not yet pinned against a real Windows Kiro install; the probe report carries
+    the same label so a Windows user knows to confirm it."""
+    env = os.environ.get("KIRO_DATA_DIR")
+    if env:
+        return [Path(env)]
+    tail = Path("User") / "globalStorage" / "kiro.kiroagent"
+    cands = [Path.home() / "Library" / "Application Support" / "Kiro" / tail,
+             Path.home() / ".config" / "Kiro" / tail]
+    appdata = os.environ.get("APPDATA")
+    if appdata:
+        cands.append(Path(appdata) / "Kiro" / tail)
+    return cands
 
 
 def kiro_token_log() -> Path:
@@ -152,15 +214,25 @@ def kiro_token_log() -> Path:
     one JSON object per LLM call, `{model, provider, promptTokens, generatedTokens}`.
     Coarse — Kiro reports prompt tokens reliably, output tokens often 0. Override the
     containing user-data dir with KIRO_DATA_DIR (the rest of the path is appended)."""
-    env = os.environ.get("KIRO_DATA_DIR")
-    if env:
-        base = Path(env)
-    else:
-        mac = (Path.home() / "Library" / "Application Support" / "Kiro" / "User"
-               / "globalStorage" / "kiro.kiroagent")
-        base = mac if mac.exists() else (Path.home() / ".config" / "Kiro" / "User"
-                                         / "globalStorage" / "kiro.kiroagent")
-    return base / "dev_data" / "tokens_generated.jsonl"
+    return _first_existing(kiro_data_candidates()) / "dev_data" / "tokens_generated.jsonl"
+
+
+def agent_log_sources(agent: str) -> list[tuple[Path, str]]:
+    """The single registry of candidate ``(source, glob)`` log locations per agent —
+    what `importcmd` scans and `cage doctor --paths` probes. One list per agent so a
+    new location (like Copilot's VS Code chat-session store) is added exactly once.
+    For claude/codex/copilot the source is a directory + glob; for kiro it is the
+    token log file itself (glob ``*`` — `_scan` treats a file source as itself)."""
+    if agent == "claude":
+        return [(claude_home() / "projects", "**/*.jsonl")]
+    if agent == "codex":
+        return [(codex_home() / "sessions", "**/rollout-*.jsonl")]
+    if agent == "copilot":
+        return [(copilot_home() / "session-state", "*/events.jsonl"),
+                (vscode_user_dir() / "workspaceStorage", "*/chatSessions/*.jsonl")]
+    if agent == "kiro":
+        return [(kiro_token_log(), "*")]
+    return []
 
 
 class Footprint:

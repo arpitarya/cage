@@ -38,7 +38,7 @@ HOOK_EVENTS = (REALTIME_EVENT, "sessionStart", "sessionEnd")
 
 
 def _import_cmd() -> str:
-    return f"{paths.cage_bin()} import --agent copilot --since 7d"  # Copilot only — no sweep
+    return f"{paths.quoted_cage_bin()} import --agent copilot --since 7d"  # Copilot only — no sweep
 
 
 def _hook_path(root: Path | None = None) -> Path:

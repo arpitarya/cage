@@ -27,11 +27,17 @@ _MARKER = "[mcp_servers.cage]"
 # Codex's hooks import Codex only — each agent captures its own data; no cross-agent
 # sweep. Resolved cage path (a bare `cage` fails under a GUI-launched Codex app).
 def BACKFILL() -> str:  # noqa: N802 — callable-named for the wiring it feeds
-    return f"{paths.cage_bin()} import --agent codex --since 7d"
+    return f"{paths.quoted_cage_bin()} import --agent codex --since 7d"
+
+
+def _toml_safe_bin() -> str:
+    """`cage_bin()` for a TOML basic string — backslashes are escapes there, so a
+    Windows path is written with forward slashes (Windows execs both forms)."""
+    return paths.cage_bin().replace("\\", "/")
 
 
 def _mcp_block() -> str:
-    return f'\n[mcp_servers.cage]\ncommand = "{paths.cage_bin()}"\nargs = ["mcp"]\n'
+    return f'\n[mcp_servers.cage]\ncommand = "{_toml_safe_bin()}"\nargs = ["mcp"]\n'
 
 
 # Stop = real-time per-turn capture; SessionStart = startup backfill safety net.
@@ -62,7 +68,7 @@ def _install_mcp(root: Path | None) -> str:
                        encoding="utf-8")
     elif '\ncommand = "cage"\n' in text:  # heal a stale bare-`cage` MCP command
         cfg.write_text(text.replace('\ncommand = "cage"\n',
-                                    f'\ncommand = "{paths.cage_bin()}"\n'), encoding="utf-8")
+                                    f'\ncommand = "{_toml_safe_bin()}"\n'), encoding="utf-8")
     return str(cfg)
 
 

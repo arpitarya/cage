@@ -26,17 +26,17 @@ from cage import paths
 # fails in GUI-launched agents whose PATH omits ~/.local/bin. SessionStart runs in
 # order: backfill the previous Claude session, *then* print the banner.
 def BACKFILL() -> str:  # noqa: N802 — kept callable-named for the wiring it feeds
-    return f"{paths.cage_bin()} import-claude --project ."
+    return f"{paths.quoted_cage_bin()} import-claude --project ."
 
 
 def BANNER() -> str:  # noqa: N802
-    return f"{paths.cage_bin()} hook-session-start"
+    return f"{paths.quoted_cage_bin()} hook-session-start"
 
 
 # Stop = real-time per-turn capture; SessionEnd = clean-exit backstop; PostToolUse =
 # provenance edit buffer. All additive and idempotent (deduped by command/uuid).
 def _simple() -> dict:
-    c = paths.cage_bin()
+    c = paths.quoted_cage_bin()
     return {"Stop": f"{c} hook-stop",
             "SessionEnd": f"{c} hook-session-end",
             "PostToolUse": f"{c} hook-post-tool-use"}

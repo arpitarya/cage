@@ -170,8 +170,9 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   surface work fans out to all four. This is a product invariant, not a default.
 - **Every release updates the changelog** — bump `__version__`, add the full release
   notes to `CHANGELOG.md` (newest first, don't skip versions) and a **1–2 line**
-  summary to the README "What's new" list (the README points at `CHANGELOG.md` for
-  detail — keep README terse, full prose lives in the changelog), and refresh the
+  summary to the README "What's new" section — which keeps **only the latest
+  version's entry** (replace, don't append; the README points at `CHANGELOG.md` for
+  history — full prose lives in the changelog), and refresh the
   "N tests passing" count in the README `$0` section + this file's `just test`
   comment. A shipped version with no changelog entry is a release bug.
 - **Never publish from local. Every release ships a GitHub release, and the GitHub
@@ -218,7 +219,7 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
 ## Dev
 
 ```bash
-just test          # python -m pytest -q   (401 passing)
+just test          # python -m pytest -q   (417 passing)
 just demo          # seed §4.4 + print attrib/matrix
 cage --version
 ```
@@ -243,8 +244,16 @@ each agent only needs thin idiomatic wiring (`agents.py` orchestrates):
   footprints), and a per-agent high-water cursor (`state/cursors.json`, last-seen
   `(size, mtime)`) keeps re-imports incremental (the shared `seen` set bounds the ledger
   read to once per run). **cage installs no OS scheduler** — no launchd/systemd/cron/
-  schtasks, no `cage scheduler`; hands-off automation is the user's own cron line calling
-  `cage import`, and `cage watch` is an optional foreground `sleep` loop they Ctrl-C.
+  schtasks, no `cage scheduler`; hands-off automation is the user's own cron/schtasks
+  line calling `cage import` (the hint `render.scheduler_hint()` prints is OS-aware,
+  never installed), and `cage watch` is an optional foreground `sleep` loop they
+  Ctrl-C (exit 130). Per-agent log locations live in **one registry**,
+  `paths.agent_log_sources()` — per-OS candidates behind it (env overrides always
+  win; the Windows Kiro layout is labeled UNVERIFIED-LAYOUT until pinned on a real
+  install), probed read-only by `cage doctor --paths` ([pathprobe.py](cage/pathprobe.py),
+  exported in the doctor bundle as `paths.txt`). Cross-process locking is the single
+  fail-open helper [lockutil.py](cage/lockutil.py) (fcntl → msvcrt → proceed-unlocked,
+  debug-logged) — never hand-roll another `fcntl` block.
 - **Read:** `mcpserver.py` (MCP, every agent), `report/attrib/matrix/budget/roi`,
   plus the Tier-1 human axis (`human`/`trend`, `matrix --human`), authorship
   (`origin`/`notes-sync`/`verify`, plan §3.5), and the ledger-scale surface
