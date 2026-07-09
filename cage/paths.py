@@ -310,10 +310,6 @@ class Footprint:
     def out(self) -> Path:
         return self.base / "out"
 
-    def out_file(self, name: str) -> Path:
-        self.out.mkdir(parents=True, exist_ok=True)
-        return self.out / name
-
     @property
     def state(self) -> Path:
         return self.base / "state"

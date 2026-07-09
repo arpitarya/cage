@@ -10,7 +10,7 @@ from __future__ import annotations
 import datetime as _dt
 from pathlib import Path
 
-from cage import human, ledger, policy, prices, quality, render, tasks
+from cage import human, ledger, policy, prices, render, tasks
 
 
 def _active_minutes(runs: list[dict]) -> float:

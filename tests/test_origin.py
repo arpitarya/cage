@@ -26,6 +26,15 @@ def _git_init(root):
 
 
 # ── substrate: closed enums + the human/heuristic pairing + path guard
+def test_provenance_row_shape_matches_the_contract():
+    # PROVENANCE_FIELDS is the documented substrate contract (plan §3.5), the same
+    # family as CALL_FIELDS/RECEIPT_FIELDS — a row must carry exactly those keys,
+    # in that order (additive-only schema: new fields append, never reorder).
+    row = schema.make_provenance(sha="abc1234", files=["a.py"], agent="claude-code",
+                                 method="hooked", origin="agent", confidence=0.9)
+    assert tuple(row) == schema.PROVENANCE_FIELDS
+
+
 def test_make_provenance_rejects_bad_method_and_origin():
     with pytest.raises(ValueError):
         schema.make_provenance(sha="abc", files=["a.py"], method="measured")

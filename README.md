@@ -250,7 +250,7 @@ Hooks are an **optional** real-time add-on — they fire only under a CLI client
 
 ## The `$0` guarantee
 
-Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 417 tests passing; `cage demo` reproduces the worked attribution example against a real ledger.
+Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 418 tests passing; `cage demo` reproduces the worked attribution example against a real ledger.
 
 **Honest limits.** Cage doesn't decide your human rate — it prices minutes at a blended rate you set, and labels the result `estimated` so it never pretends to be a timesheet. Marginal-by-fixed-order is defensible and `$0`, but it is an *ordering convention*, not a Shapley value (that's a deferred audit mode). And a counterfactual cell is an honest reconstruction, never an invoice — the `method` column says so on every row, on purpose.
 
@@ -258,7 +258,7 @@ Every derived view is parse / arithmetic over the log — **no LLM call, ever, o
 
 Latest release below — full history and detail in [CHANGELOG.md](CHANGELOG.md).
 
-- **v0.17.0 — Windows/mac parity + the exportable path probe.** Three-OS CI (suite + S1–S9 runner on ubuntu/macos/windows), one fail-open lock helper (fcntl → msvcrt → unlocked), per-OS log-location candidates behind a single registry (env overrides win; Kiro's Windows layout honestly labeled UNVERIFIED-LAYOUT), Windows-safe hook wiring (quoted resolved paths, TOML-safe MCP command), and `cage doctor --paths` — a read-only probe of every candidate log location per agent with a why-line per miss, exported in the doctor bundle as `paths.txt`.
+- **v0.17.1 — dead-code cleanup.** A systematic AST sweep after the parity release: two genuinely dead spots removed (an unused import, an unreferenced helper), and the `PROVENANCE_FIELDS` substrate contract pinned by a new shape test instead of being deleted. No behavior change.
 
 ## The name
 

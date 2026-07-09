@@ -2,6 +2,14 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
+## v0.17.1 (2026-07-09) — dead-code cleanup
+
+A systematic AST sweep (unused imports, unreferenced functions/methods/constants, tracked junk, wheel-content audit) after the parity release:
+
+- Removed `humanview`'s unused `quality` import (leftover from when the redo-guard moved to `tasks.read`) and the unreferenced `Footprint.out_file()` helper (`serve` uses the `out` property directly, which stays).
+- `schema.PROVENANCE_FIELDS` was unreferenced but is the documented substrate contract (plan §3.5) — instead of deleting a contract constant, a new shape test pins `make_provenance` rows to exactly those keys in that order (additive-only schema, enforced). +1 test (417→418).
+- Everything else suspected came back wired and in use (`serve`/`adoptcmd`/`metercmd`/`usageparse`/`wizard`/`cfgio`/`pointers`, the legacy `import-claude`/`import-codex` subcommands, `data/shims/`); no tracked junk, no orphaned fixtures. The brand images stay bundled (`data/assets/*` in package-data) by choice.
+
 ## v0.17.0 (2026-07-08) — Windows/mac parity + the path probe
 
 - **Three-OS CI gate** — the workflow matrix is now `ubuntu/macos/windows-latest` × Python 3.11–3.13, running the suite, the skillgen drift check, **and** the S1–S9 scenario runner (`PYTHONUTF8=1`; the runner pins subprocess decoding to UTF-8 so cp1252 consoles can't corrupt output). macOS stays field-validated; **Windows is CI-tested** — the honest wording until someone runs `docs/windows-manual-checklist.md` (new) on a real Windows machine.
