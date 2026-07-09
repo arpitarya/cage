@@ -62,6 +62,22 @@ class Fail(Exception):
 
 # ── sandbox ──────────────────────────────────────────────────────────────────
 
+def _rmtree(path: Path) -> None:
+    """`shutil.rmtree` that survives Windows: git object files are read-only there and
+    plain rmtree dies with WinError 5 — clear the read-only bit and retry the delete.
+    (`onexc` is the 3.12+ spelling; `onerror` covers 3.11.)"""
+    import stat
+
+    def _force(func, p, _exc):
+        os.chmod(p, stat.S_IWRITE)
+        func(p)
+
+    if sys.version_info >= (3, 12):
+        shutil.rmtree(path, onexc=_force)
+    else:  # pragma: no cover — 3.11 CI lane
+        shutil.rmtree(path, onerror=lambda f, p, e: _force(f, p, e))
+
+
 def _sh(cmd: list[str], cwd: Path, env: dict | None = None) -> subprocess.CompletedProcess:
     # encoding pinned: text=True alone decodes with the locale codec (cp1252 on
     # Windows), which chokes on cage's ✔/·/⚠ glyphs — utf-8 + replace keeps the
@@ -614,6 +630,6 @@ def main(argv: list[str] | None = None) -> int:
     if failed or args.keep:
         print(f"\nsandbox kept for inspection: {base}")
     else:
-        shutil.rmtree(base)
+        _rmtree(base)
         print("\nsandbox removed (use --keep to retain).")
     return 1 if failed else 0
