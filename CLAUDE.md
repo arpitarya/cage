@@ -32,14 +32,18 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   guard as tasks; empty = the legacy contract, plan §3.6.2); calls additionally carry an
   additive optional `project` (working-dir basename, same PII guard; empty = legacy) — a
   *derived* `cage report --project` view, deliberately distinct from `scope`'s monorepo
-  axis (plan §3.7). The long-lived logs are month-partitioned behind
+  axis (plan §3.7). Calls also carry an additive optional `gap_ms` (turn gap →
+  derived human attention, plan §4.10; absent = legacy contract, never part of an
+  id). The long-lived logs are month-partitioned behind
   `ledger.append_row`/`read_kind` (plan §3.6.1).
 - **Constants** ([constants.py](cage/constants.py)) — the *third audit layer*. Cage
   keeps its numbers in three places, never mixed: **contract** = the enums in
   `schema.py`; **policy** = user-economics in `policy.toml`; **constants** = code
   heuristics not meant as config but that must be reviewable (`CHARS_PER_TOKEN`,
   `TOKENS_PER_MILLION`, `MAX_MATRIX_TOOLS`, `METHOD_TRUST`, `DEFAULT_CONFIDENCE`,
-  `GRAPHIFY_RECEIPT_CONFIDENCE`, `SINCE_WINDOW_DAYS`, `PARTITION_GRANULARITY`, and the
+  `GRAPHIFY_RECEIPT_CONFIDENCE`, `SINCE_WINDOW_DAYS`, `IDLE_CAP_MINUTES` (a
+  policy-preferred fallback like `DEFAULT_CONFIDENCE` — `policy.toml [human]
+  idle_cap_minutes` wins), `PARTITION_GRANULARITY`, and the
   ledger-size threshold `LEDGER_WARN_BYTES` — derived from `LEDGER_ROW_BYTES` ×
   `LEDGER_HEAVY_ROWS_PER_DAY` × `LEDGER_WARN_MONTHS`, a policy-preferred fallback like
   `DEFAULT_CONFIDENCE` (`policy.toml [ledger] warn_mb` wins)). `compress`/`prices`/
@@ -92,6 +96,19 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   provenance prints in the `cage human` header. `matrix --human` adds the anchor row
   behind the flag (no flag ⇒ byte-identical). `cage human`/`cage trend` show **saved
   $ and saved hrs** (time can go negative — the metric can embarrass the agent).
+  The passive side of the axis (plan §4.10): call rows carry an additive
+  optional `gap_ms` (previous assistant end → the human turn that led to the
+  call), stamped at import only where the log has per-turn timestamps (claude
+  yes; codex/copilot/kiro no — absence explicit, never fabricated; never in an
+  id). [attention.py](cage/attention.py) is the ONE place gap math lives —
+  derived minutes = Σ min(gap_ms, idle cap), always `estimated`, labelled
+  `derived (turn-gaps, capped)`; the cap is policy `[human] idle_cap_minutes`
+  with the `constants.IDLE_CAP_MINUTES` fallback. Attested minutes
+  (`human-record`, `cage outcome --minutes N`) beat derived per task — never
+  summed. `compare`/`verdict`/`study report` print a total-cost line (agent $ +
+  human minutes × rate, `--agent-only` suppresses); `cage calibration --human`
+  is the measured accuracy of the heuristic (refuses below `MIN_ESTIMATE_N`).
+  No watcher-shaped capture, ever: transcript timestamps only.
 - **Task record** ([tasks.py](cage/tasks.py)) — `tasks.jsonl`, one row per task
   (last-write-wins by `id`), git-snapshotted at task close (SessionEnd / `cage
   outcome`). **Shelled out to git, never imported; fail-open** (non-repo/detached ⇒
@@ -219,7 +236,7 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
 ## Dev
 
 ```bash
-just test          # python -m pytest -q   (418 passing)
+just test          # python -m pytest -q   (441 passing)
 just demo          # seed §4.4 + print attrib/matrix
 cage --version
 ```

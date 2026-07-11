@@ -116,6 +116,23 @@ REGISTRY: tuple[Explanation, ...] = (
         ("cage/human.py", "cage/convert.py", "policy.toml [human]"),
         "estimated — a labor guess; never 'measured' unless a real timesheet/quote."),
     Explanation(
+        "attention-minutes", ("attention", "gap", "gaps", "turn-gap", "gap_ms", "idle",
+                              "supervision", "derived-minutes", "babysit", "watching",
+                              "human-minutes", "how-are-human-minutes-derived"),
+        "how human-attention minutes are derived from turn gaps",
+        "minutes = Σ min(gap_ms, idle cap) / 60000    (cap = {idle_cap} min; policy\n"
+        "  [human] idle_cap_minutes wins, constants.IDLE_CAP_MINUTES is the fallback)\n"
+        "  gap_ms = wall-clock between the previous assistant turn's end and the human\n"
+        "  turn that led to the call — stamped at import only where the log carries\n"
+        "  per-turn timestamps (claude today; codex/copilot/kiro lack the signal ⇒ no\n"
+        "  field, never fabricated). Read-time derive: changing the cap re-prices the\n"
+        "  backlog, the ledger is never rewritten. Attested minutes (`human-record`,\n"
+        "  `cage outcome --minutes`) beat derived for a task — never summed;\n"
+        "  `cage calibration --human` measures the heuristic's derived/attested ratio.",
+        ("cage/attention.py", "cage/transcript.py", "policy.toml [human]"),
+        "estimated, always — labelled 'derived (turn-gaps, capped)'; only attested\n"
+        "  minutes can ever read differently, and only as a real timesheet ('measured')."),
+    Explanation(
         "time-saved", ("time", "hours", "minutes", "time-saved", "hours-saved", "clock"),
         "the hours an agent saved a human (can go negative)",
         "saved_minutes = human_minutes − agent_active_minutes\n"
@@ -268,15 +285,22 @@ REGISTRY: tuple[Explanation, ...] = (
         "n/a — describes two receipt-filing strategies, not a number.",
         kind="concept", plan_ref="§4.5"),
     Explanation(
-        "human-axis", ("tier-1", "tier-2", "agent-vs-human", "tool-vs-tool", "whole-task"),
+        "human-axis", ("tier-1", "tier-2", "agent-vs-human", "tool-vs-tool", "whole-task",
+                       "attested", "derived-attention"),
         "the two axes cage measures savings on",
         "Tier-1 (human.py, matrix --human): agent vs human, the whole task — what\n"
         "  would a person have cost, in $ and hours, vs what the agent actually cost.\n"
         "  Tier-2 (attribution.py, matrix): tool vs tool, inside one agent run — what\n"
-        "  did each tool in the pipeline save vs that tool being off.",
-        ("cage/human.py", "cage/matrix.py"),
+        "  did each tool in the pipeline save vs that tool being off.\n"
+        "  The Tier-1 axis also tracks what the agent COSTS in human time (plan §4.10):\n"
+        "  attested minutes (`human-record`, `cage outcome --minutes N`) are ground\n"
+        "  truth; derived minutes (turn-gaps capped at {idle_cap} min, attention.py)\n"
+        "  are the passive estimate. Attested beats derived per task — never summed;\n"
+        "  `cage calibration --human` measures the heuristic against the attested\n"
+        "  ground truth (see `attention-minutes` for the formula).",
+        ("cage/human.py", "cage/matrix.py", "cage/attention.py"),
         "n/a — describes two measurement axes, not a number.",
-        kind="concept", plan_ref="§4.6"),
+        kind="concept", plan_ref="§4.6, §4.10"),
     Explanation(
         "determinism", ("reproducible", "byte-identical", "same-ledger", "offline"),
         "why the same ledger always renders the same tables",

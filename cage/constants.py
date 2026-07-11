@@ -89,3 +89,16 @@ MIN_COMPARE_N = 5
 # numbers. Kept as its own name (not an alias) so the two gates can diverge if
 # estimation proves to need deeper history than comparison.
 MIN_ESTIMATE_N = 5
+
+# Derived human-attention idle cap (plan §4.10, `cage/attention.py`). A turn-gap
+# (previous assistant end → next human turn) is supervision time only up to a
+# point: past it the user has plainly walked away (meeting, lunch, overnight),
+# and summing raw gaps would bill idle hours as attention — the exact
+# time-from-timestamps fallacy the human-baseline design bans for commit history
+# (design §9 `cage calibrate`). 10 minutes is a deliberately conservative ceiling:
+# long enough to cover reading a diff and composing the next prompt, short enough
+# that an abandoned session contributes at most one cap per turn. Policy-preferred
+# fallback (the DEFAULT_CONFIDENCE pattern): `policy.toml [human] idle_cap_minutes`
+# wins; this constant covers an unset key. Changing either re-derives the minutes
+# at read time — the ledger stores raw `gap_ms` and is never rewritten.
+IDLE_CAP_MINUTES = 10

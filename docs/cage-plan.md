@@ -87,7 +87,8 @@ This is the invoice-grade truth; provider `usage` fields are authoritative.
   "est_cost_usd": 0.0483,
   "latency_ms": 5120, "ok": true, "retries": 0,
   "scope": "",                  // optional monorepo top-level dir (§3.6.2)
-  "project": "cage"             // optional working-dir basename — derived attribution axis (§3.7)
+  "project": "cage",            // optional working-dir basename — derived attribution axis (§3.7)
+  "gap_ms": 42000               // optional turn gap → derived human attention (§4.10)
 }
 ```
 
@@ -97,6 +98,13 @@ monorepo top-level changed dir (§3.6.2); `project` is the working directory a c
 under (§3.7), a derived `cage report --project` view of the global ledger. Only logs that
 expose the cwd populate `project` (Claude transcripts do; Copilot/Kiro/Codex leave it
 empty).
+
+`gap_ms` (§4.10) is likewise additive and optional: the wall-clock between the previous
+assistant turn's end and the human turn that led to this call, stamped at import only
+where the log carries real per-turn timestamps (Claude today — codex/copilot/kiro logs
+lack the signal, so their rows simply omit the field; nothing is fabricated). Timestamp
+arithmetic only, counts-never-content holds; the field never enters any id derivation,
+and an unstamped row is byte-identical to the legacy contract.
 
 ### 3.2 The savings receipt — what a tool claims it saved
 
@@ -690,6 +698,48 @@ with a plugin — did the plugin pay off?* One analyst, one number, no backend.
 - **One-command enrollment** — `cage study join <phase>` = scaffold → wire all
   four agents → start the phase → `cage doctor` + the cron hint for
   `cage import` (cage installs no scheduler).
+
+### 4.10 Derived human attention — passive minutes from turn gaps
+
+§4.6's Tier-1 axis prices what a human *would have* cost; this closes the other
+half of total cost: what the agent **costs in human time** — the minutes a
+person spends reading output and composing the next prompt. Captured passively
+from data cage already imports; the manual axis stays the ground truth that
+calibrates it. Extends `docs/human-baseline.design.md` (§5c there), never
+bypasses its ladder.
+
+- **Capture** — at import, where a transcript carries per-turn timestamps, each
+  call row gains the additive optional `gap_ms` (§3.1): previous assistant end →
+  the human turn that led to this call. Per-agent availability is a documented
+  fact, not a promise: **claude yes; codex/copilot/kiro no** (their pinned log
+  formats lack a usable pair of timestamps — see `transcript.py` and the fixture
+  README). No signal ⇒ no field, **never fabricated**. Tool-result / meta /
+  sidechain records never count as human turns. Composite ids unchanged.
+- **Derivation is read-time only** (`attention.py`, the one module every view
+  calls — no view computes gaps itself): `minutes = Σ min(gap_ms, idle cap)`.
+  The cap (policy `[human] idle_cap_minutes`, `constants.IDLE_CAP_MINUTES`
+  fallback, default 10) exists because a long gap is walked-away time, not
+  supervision — the same time-from-timestamps fallacy the human-baseline design
+  bans for commit history. Changing the cap re-derives; the ledger is never
+  rewritten. Deterministic: same ledger + policy ⇒ same minutes.
+- **Method honesty** — derived minutes are always **`estimated`**, labelled
+  `derived (turn-gaps, capped)`. **Attested** minutes (`human-record`, or the
+  friction-drop `cage outcome <task> --minutes N` — same fail-open, idempotent
+  receipt path) rank above derived: for a given task **attested wins and derived
+  is shown as reference — the two are never summed.**
+- **Views** — `cage human` / `cage trend` render attested and derived as
+  separate blocks (never blended; absence of gap data is an explicit line).
+  `cage compare`, `cage verdict`, `cage study report` gain one **total-cost
+  line** — agent $ + human minutes × rate, tagged with the human component's
+  method — suppressed by `--agent-only`. `matrix --human` is unchanged
+  (baseline receipts answer a different question).
+- **Calibration** — `cage calibration --human`: over tasks with BOTH attested
+  and derived minutes, the derived/attested **ratio distribution** (median +
+  IQR) is the heuristic's measured accuracy. Below `MIN_ESTIMATE_N` it refuses.
+  The heuristic never self-reports confidence.
+- **What is deliberately NOT built** (the watcher guard): no editor plugins,
+  activity trackers, keystroke or focus monitoring. Transcript timestamps only —
+  this is a product line, not a default posture to relax later.
 
 ---
 

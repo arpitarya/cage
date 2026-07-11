@@ -219,6 +219,14 @@ def cmd_outcome(args) -> int:
     tasks.record(r, args.task, outcome="ok" if not args.redo else "redo", label=label)
     tag = f" (label: {label})" if label else ""
     print(f"✔ recorded {args.task!r} as {'redo' if args.redo else 'ok'}{tag}.")
+    minutes = getattr(args, "minutes", None)
+    if minutes is not None:
+        # The §6 attestation friction-drop: same fail-open, idempotent receipt path
+        # as `cage human-record --minutes` — attested minutes outrank derived
+        # turn-gap minutes for this task (never summed).
+        rid = metering.record_human(task=args.task, minutes=minutes, root=r)
+        print(f"✔ attested {minutes:g} human minute(s) for {args.task!r}." if rid
+              else f"· {args.task!r} already has a human receipt (no double count).")
     return 0
 
 
@@ -228,7 +236,8 @@ def cmd_compare(args) -> int:
     bad = [k for k in by if k not in ("stack", "scope", "label")]
     if bad:
         raise CageError(f"unknown --by key(s) {bad}; choose from stack, scope, label")
-    d = compare.summarize(r, _policy(r), by=by, scope=args.scope, label=args.label)
+    d = compare.summarize(r, _policy(r), by=by, scope=args.scope, label=args.label,
+                          agent_only=getattr(args, "agent_only", False))
     return emit(args, render.envelope("compare", d) if args.json else d,
                 compare.render_compare(d))
 
@@ -256,6 +265,10 @@ def cmd_estimate(args) -> int:
 def cmd_calibration(args) -> int:
     from cage import calibration
     r = ledger_root()
+    if getattr(args, "human", False):  # plan §4.10 — score the turn-gap heuristic
+        d = calibration.summarize_human(r, _policy(r))
+        return emit(args, render.envelope("calibration", d) if args.json else d,
+                    calibration.render_calibration_human(d))
     d = calibration.summarize(r, _policy(r))
     return emit(args, render.envelope("calibration", d) if args.json else d,
                 calibration.render_calibration(d))
@@ -264,7 +277,8 @@ def cmd_calibration(args) -> int:
 def cmd_verdict(args) -> int:
     from cage import verdict
     r = ledger_root()
-    d = verdict.compose(r, _policy(r), args.tool, since=args.since)
+    d = verdict.compose(r, _policy(r), args.tool, since=args.since,
+                        agent_only=getattr(args, "agent_only", False))
     return emit(args, render.envelope("verdict", d) if args.json else d,
                 verdict.render_verdict(d))
 
@@ -291,7 +305,7 @@ def cmd_study(args) -> int:
         print("✔ phase stopped — rows after this marker are unphased until the next start")
         return 0
     if args.action == "report":
-        d = study.summarize(r, _policy(r))
+        d = study.summarize(r, _policy(r), agent_only=getattr(args, "agent_only", False))
         return emit(args, render.envelope("study", d) if args.json else d,
                     study.render_study(d))
     # join — one-command enrollment: scaffold → wire all four → start → doctor

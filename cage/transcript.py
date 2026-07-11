@@ -7,6 +7,24 @@ deterministic, and it works for the API and subscription paths alike (no proxy).
 
 Each turn's `uuid` becomes the call id, so re-parsing the same transcript on a
 later SessionEnd never double-records (idempotent — see hooks.session_end).
+
+**`gap_ms` availability per agent (plan §4.10 — the derived human-attention axis).**
+Where a log carries real per-turn timestamps for both the human turn and the
+preceding assistant turn, the parser stamps an additive optional `gap_ms` on the
+call row (the wall-clock between the previous assistant turn's end and the human
+user turn that led to this call). Where it doesn't, the field is **absent — never
+fabricated** (an absent `gap_ms` is the legacy row contract):
+
+- **claude** (`parse_calls`) — YES. Every transcript record carries `timestamp`;
+  human user turns are distinguishable from tool-result / meta records.
+- **codex** (`parse_codex_calls`) — NO. The pinned rollout format timestamps
+  `token_count` usage events but carries no user-turn marker, so an event-to-event
+  gap would mix agent compute time into human attention. No field.
+- **copilot** (`parse_copilot_calls` / `parse_copilot_vscode_calls`) — NO. The CLI
+  log aggregates usage once at `session.shutdown`; the VS Code store stamps one
+  epoch-ms per *request* with no assistant-end timestamp to gap against. No field.
+- **kiro** (`parse_kiro_calls`) — NO. `tokens_generated.jsonl` carries no
+  timestamps at all. No field.
 """
 from __future__ import annotations
 
@@ -34,7 +52,7 @@ def _composite_id(agent: str, session: str, model: str, tokens_in: int,
 
 
 def _usage_to_row(msg: dict, session: str, uuid: str, ts: str | None,
-                  project: str = "") -> dict | None:
+                  project: str = "", gap_ms: int | None = None) -> dict | None:
     usage = msg.get("usage") or {}
     out = int(usage.get("output_tokens", 0) or 0)
     inp = int(usage.get("input_tokens", 0) or 0)
@@ -46,7 +64,7 @@ def _usage_to_row(msg: dict, session: str, uuid: str, ts: str | None,
     model = msg.get("model", "") or ""
     # uuid-present rows render byte-identical to the pre-change contract; only the
     # no-uuid path changes (random id → deterministic composite id), so re-imports
-    # of a uuid-less turn no longer double-record.
+    # of a uuid-less turn no longer double-record. `gap_ms` never enters either id.
     call_id = ("c_" + uuid.replace("-", "")[:15] if uuid
                else _composite_id("claude-code", session, model, tokens_in, out,
                                   cache_read, ts))
@@ -54,15 +72,46 @@ def _usage_to_row(msg: dict, session: str, uuid: str, ts: str | None,
         route="chat", provider="anthropic", model=model,
         tokens_in=tokens_in, tokens_out=out, cached_in=cache_read,
         session=session, agent="claude-code", ts=ts, project=project,
-        call_id=call_id)
+        gap_ms=gap_ms, call_id=call_id)
+
+
+def _parse_ts(ts) -> _dt.datetime | None:
+    try:
+        return _dt.datetime.fromisoformat((ts or "").replace("Z", "+00:00"))
+    except (ValueError, AttributeError, TypeError):
+        return None
+
+
+def _human_user_turn(rec: dict) -> bool:
+    """True for a transcript record that is a *human* user turn — the attention
+    signal behind `gap_ms`. Tool results also arrive as `type: "user"` records
+    (their content is a list of `tool_result` blocks), and meta/sidechain records
+    are machine turns; counting any of those as human attention would fabricate
+    minutes, so all are excluded. Content is inspected for its block *types* only —
+    counts-never-content holds (nothing readable is retained)."""
+    if rec.get("type") != "user" or rec.get("isMeta") or rec.get("isSidechain"):
+        return False
+    content = (rec.get("message") or {}).get("content")
+    if isinstance(content, list):
+        return not any(isinstance(b, dict) and b.get("type") == "tool_result"
+                       for b in content)
+    return True
 
 
 def parse_calls(transcript_path: Path, session: str = "") -> list[dict]:
-    """One call row per assistant turn that carries usage. Tolerant of bad lines."""
+    """One call row per assistant turn that carries usage. Tolerant of bad lines.
+
+    `gap_ms` (plan §4.10): the first call row after each human user turn carries the
+    wall-clock gap between the previous assistant turn's timestamp and that user
+    turn's timestamp — the passive human-attention signal. Stamped only when both
+    timestamps exist and parse and the gap is non-negative (an out-of-order clock is
+    dropped, never clamped into fake attention); every other row omits the field."""
     if not transcript_path.exists():
         return []
     session = session or transcript_path.stem
     rows = []
+    prev_asst_ts: _dt.datetime | None = None   # end of the last assistant turn seen
+    pending_gap_ms: int | None = None          # computed at the human turn, spent on the next call
     for line in transcript_path.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line:
@@ -70,6 +119,13 @@ def parse_calls(transcript_path: Path, session: str = "") -> list[dict]:
         try:
             rec = json.loads(line)
         except ValueError:
+            continue
+        if _human_user_turn(rec):
+            user_ts = _parse_ts(rec.get("timestamp"))
+            if user_ts is not None and prev_asst_ts is not None:
+                gap = int((user_ts - prev_asst_ts).total_seconds() * 1000)
+                if gap >= 0:
+                    pending_gap_ms = gap
             continue
         if rec.get("type") != "assistant":
             continue
@@ -79,8 +135,11 @@ def parse_calls(transcript_path: Path, session: str = "") -> list[dict]:
         cwd = rec.get("cwd") or ""
         project = Path(cwd).name if cwd else ""
         row = _usage_to_row(rec.get("message") or {}, session,
-                            rec.get("uuid", ""), rec.get("timestamp"), project=project)
+                            rec.get("uuid", ""), rec.get("timestamp"), project=project,
+                            gap_ms=pending_gap_ms)
+        prev_asst_ts = _parse_ts(rec.get("timestamp")) or prev_asst_ts
         if row:
+            pending_gap_ms = None  # spent on this call — one gap, one row
             rows.append(row)
     return rows
 

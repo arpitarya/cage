@@ -134,6 +134,11 @@ signal = "task_ok"
 rate_usd_per_hr = 80        # blended default rate
 default_minutes = 60        # fallback when a task has no type and no minutes
 currency = "USD"
+# Derived-attention idle cap (plan §4.10): a turn-gap (assistant end → next human
+# turn) counts as attention only up to this many minutes — longer gaps are walked-
+# away time, not supervision. Uncomment to override the constants.IDLE_CAP_MINUTES
+# fallback (10); changing it re-derives at read time, the ledger is never rewritten.
+# idle_cap_minutes = 10
 
 # Per-task-type lookup (mode 3 — the recommended default path). One subtable per
 # type; the resolver reads minutes + rate_usd_per_hr.

@@ -4,13 +4,18 @@ Joins human receipts (the avoided-labor alternative, priced by `human.py`) with 
 agent's measured call cost + active time per task. Reports saved **$ and hours** as
 co-equal metrics; saved-time can go negative when the agent ran longer than the human
 estimate (§5b.1 honesty check). Quality-honest: a redone task is not a saving.
+
+Below the attested table, a separate **derived attention** block (plan §4.10)
+shows the passive turn-gap minutes per agent — `attention.py` math, always
+`estimated`, labelled `derived (turn-gaps, capped)`. The two sources render on
+separate lines and are **never blended into one number**.
 """
 from __future__ import annotations
 
 import datetime as _dt
 from pathlib import Path
 
-from cage import human, ledger, policy, prices, render, tasks
+from cage import attention, human, ledger, policy, prices, render, tasks
 
 
 def _active_minutes(runs: list[dict]) -> float:
@@ -57,8 +62,17 @@ def rollup(root: Path, pol: dict, since: str | None = None,
         a["human_min"] += human.human_minutes(r, pol)
         a["agent_min"] += _active_minutes(runs)
         a["conf_sum"] += conf
+    # Derived attention (plan §4.10) — the passive turn-gap axis, a separate block
+    # from the attested table above: never blended, attention.py owns the math.
+    gap_calls = ledger.since(calls, since)
+    if task:
+        gap_calls = [c for c in gap_calls if c.get("task") == task]
+    if agent:
+        gap_calls = [c for c in gap_calls if (c.get("agent") or "lib") == agent]
     return {"since": since, "task": task, "rate": rate, "source": source,
-            "agents": _finalize(agents)}
+            "agents": _finalize(agents),
+            "derived": attention.by_agent(gap_calls, pol),
+            "idle_cap": attention.idle_cap_minutes(pol)}
 
 
 def _finalize(agents: dict) -> dict:
@@ -71,9 +85,27 @@ def _finalize(agents: dict) -> dict:
     return agents
 
 
+def _render_derived(data: dict) -> str:
+    """The derived-attention block — a separate section under the attested table
+    (never blended into it). Absent gap data renders as an explicit absence line:
+    only logs with per-turn timestamps carry `gap_ms` (Claude today)."""
+    derived = data.get("derived") or {}
+    if not derived:
+        return ("derived attention: no turn-gap data (gap_ms) in scope — only logs "
+                "with per-turn timestamps carry it (claude today; codex/copilot/kiro "
+                "logs lack the signal).")
+    head = ["agent", "sessions", "calls", "attn min", "attn hrs"]
+    rows = [[name, str(a["sessions"]), str(a["calls"]), f"{a['minutes']:g}",
+             f"{a['minutes'] / 60:.1f}"] for name, a in derived.items()]
+    title = (f"derived attention · {attention.LABEL} · cap {data['idle_cap']:g} min "
+             f"· {attention.METHOD} — reference only, never summed with attested")
+    return f"{title}\n\n" + render.table(head, rows, rights={1, 2, 3, 4})
+
+
 def render_human(data: dict) -> str:
     if not data["agents"]:
-        return "cage: no human receipts yet — record one with `cage human-record`."
+        return ("cage: no human receipts yet — record one with `cage human-record` "
+                "(or `cage outcome <task> --minutes N`).\n\n" + _render_derived(data))
     rows, tot = [], {"tasks": 0, "human_usd": 0.0, "agent_usd": 0.0, "saved_usd": 0.0,
                      "saved_min": 0.0, "conf_sum": 0.0}
     for name, a in sorted(data["agents"].items(), key=lambda kv: -kv[1]["saved_usd"]):
@@ -91,4 +123,5 @@ def render_human(data: dict) -> str:
     win = f" · since {data['since']}" if data["since"] else ""
     title = (f"Agent vs human · {n} tasks{win} · "
              f"rate source: {data['source']} (${data['rate']:.0f}/hr)")
-    return f"{title}\n\n" + render.table(head, rows, rights={1, 2, 3, 4, 5, 6})
+    return (f"{title}\n\n" + render.table(head, rows, rights={1, 2, 3, 4, 5, 6})
+            + "\n\n" + _render_derived(data))

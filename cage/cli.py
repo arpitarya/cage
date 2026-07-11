@@ -108,6 +108,8 @@ def build_parser() -> argparse.ArgumentParser:
     cp.add_argument("--label", metavar="WORD", help="filter to tasks labelled via `cage outcome --label`")
     cp.add_argument("--by", default="stack", metavar="KEYS",
                     help="comma-separated grouping keys from stack,scope,label (stack always included)")
+    cp.add_argument("--agent-only", action="store_true",
+                    help="suppress the total-cost line (agent $ + human attention minutes × rate)")
     _json_flag(cp)
     cp.set_defaults(fn=clicmds.cmd_compare)
 
@@ -126,6 +128,9 @@ def build_parser() -> argparse.ArgumentParser:
     cb = sub.add_parser("calibration",
                         help="measured hit-rate of recorded estimates vs actuals — the "
                              "estimator's empirical confidence level")
+    cb.add_argument("--human", action="store_true",
+                    help="score the derived-attention heuristic instead: derived/attested "
+                         "minute ratio over tasks carrying both (refuses thin data)")
     _json_flag(cb)
     cb.set_defaults(fn=clicmds.cmd_calibration)
 
@@ -134,6 +139,8 @@ def build_parser() -> argparse.ArgumentParser:
                              "(pure composer over attrib/roi/trend/regression/quality)")
     vd.add_argument("tool", help="tool name as it appears on receipts (e.g. graphify)")
     vd.add_argument("--since", metavar="WINDOW", help="window like 30d / 2w (default: all history)")
+    vd.add_argument("--agent-only", action="store_true",
+                    help="suppress the total-cost line (agent $ + human attention minutes × rate)")
     _json_flag(vd)
     vd.set_defaults(fn=clicmds.cmd_verdict)
 
@@ -152,6 +159,9 @@ def build_parser() -> argparse.ArgumentParser:
                      help="join=enroll+wire+start · start/stop=phase markers · "
                           "report=coverage+paired delta · id=print the opaque machine id")
     st2.add_argument("phase", nargs="?", help="phase label for join/start (one short token)")
+    st2.add_argument("--agent-only", action="store_true",
+                     help="report: suppress the total-cost line (agent $ + human "
+                          "attention minutes × rate)")
     _json_flag(st2)
     st2.set_defaults(fn=clicmds.cmd_study)
 
@@ -224,6 +234,10 @@ def build_parser() -> argparse.ArgumentParser:
     oc.add_argument("--label", metavar="WORD",
                     help="tag the task with one short token (letters/digits/._-, ≤32 chars) "
                          "for `cage compare --by label` grouping — never a path or free text")
+    oc.add_argument("--minutes", type=float, metavar="N",
+                    help="attest the human minutes this task actually took (writes the same "
+                         "tool=\"human\" receipt as `cage human-record --minutes`; attested "
+                         "beats derived turn-gap minutes, never summed)")
     oc.set_defaults(fn=clicmds.cmd_outcome)
 
     rg = sub.add_parser("regression", help="alert when cost-per-call drifts up (§8.3)")

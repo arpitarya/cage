@@ -23,6 +23,12 @@ pre-formatted table. Never invent a number.
   `cage compare` (closed tasks grouped by observed stack; n · median · IQR, delta
   tagged `estimated` — observational, refuses tiny groups).
 - **budget** ("am I over budget") — `cage budget`.
+- **human attention** ("how much of my time did the agent eat") — `cage human`
+  (attested minutes vs `derived (turn-gaps, capped)` minutes on separate lines,
+  never summed; both `estimated`). Attest the real figure with `cage outcome
+  <task> --minutes N`; `cage calibration --human` measures the heuristic's
+  accuracy. `compare`/`verdict`/`study report` print a total-cost line (agent $
+  + human minutes × rate) — suppress with `--agent-only`.
 - **pre-task estimate** ("what will this cost") — `cage estimate [--label W]` (a
   `modeled` median+IQR band from matching closed tasks; refuses thin history;
   `--record <task>` stamps it so `cage calibration` can measure the hit-rate later).

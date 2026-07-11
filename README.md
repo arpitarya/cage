@@ -250,7 +250,7 @@ Hooks are an **optional** real-time add-on — they fire only under a CLI client
 
 ## The `$0` guarantee
 
-Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 418 tests passing; `cage demo` reproduces the worked attribution example against a real ledger.
+Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 441 tests passing; `cage demo` reproduces the worked attribution example against a real ledger.
 
 **Honest limits.** Cage doesn't decide your human rate — it prices minutes at a blended rate you set, and labels the result `estimated` so it never pretends to be a timesheet. Marginal-by-fixed-order is defensible and `$0`, but it is an *ordering convention*, not a Shapley value (that's a deferred audit mode). And a counterfactual cell is an honest reconstruction, never an invoice — the `method` column says so on every row, on purpose.
 
@@ -258,7 +258,7 @@ Every derived view is parse / arithmetic over the log — **no LLM call, ever, o
 
 Latest release below — full history and detail in [CHANGELOG.md](CHANGELOG.md).
 
-- **v0.17.1 — dead-code cleanup.** A systematic AST sweep after the parity release: two genuinely dead spots removed (an unused import, an unreferenced helper), and the `PROVENANCE_FIELDS` substrate contract pinned by a new shape test instead of being deleted. No behavior change.
+- **v0.18.0 — derived human attention.** Cage now derives estimated human-attention minutes from the turn-timestamp gaps in the session logs it already imports (`gap_ms`, Claude transcripts today — absence explicit for the other agents, never fabricated) and folds them into total-cost lines on `compare`/`verdict`/`study report` (`--agent-only` to suppress). Attested minutes (`cage outcome --minutes N`) beat derived and are never summed; `cage calibration --human` measures the heuristic's accuracy.
 
 ## The name
 

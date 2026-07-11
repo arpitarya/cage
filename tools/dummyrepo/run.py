@@ -4,7 +4,7 @@
 Scaffolds a disposable repo *beside* the cage checkout, sandboxes every agent
 home (env overrides — nothing touches the real machine), plants the sanitized
 fixture corpus (`tests/fixtures/transcripts/`) in each agent's real log
-location, and runs the scenario matrix S1–S8, printing a pass/fail table.
+location, and runs the scenario matrix S1–S10, printing a pass/fail table.
 
 Same rules as `tools/skillgen`: **stdlib-only, never imported by cage at
 runtime, never in the wheel** (`pyproject` packages only `cage*`). It shells
@@ -535,6 +535,106 @@ def s9_fleet(base: Path) -> str:
     return "7 machines · gap flagged · pairs 6 · exact −7,000 tok/day delta · re-import idempotent"
 
 
+# Seeder for S10 — 5 closed tasks whose calls carry known gap_ms (2 derived
+# minutes each at the default 10-min cap) + a graphify receipt per task so
+# verdict has a tool to judge. Library-seeded like S5 (historic timestamps);
+# the transcript-capture half goes through the real `cage import`.
+_S10_SEED = """
+import sys
+from pathlib import Path
+from cage import ledger, schema, tasks
+root = Path(sys.argv[1])
+M = dict(route="chat", provider="anthropic", model="claude-opus-4-8", agent="claude-code")
+for i in range(5):
+    tid = f"attn-{i}"
+    call = schema.make_call(
+        tokens_in=1000, tokens_out=100, task=tid, session=f"s-{tid}",
+        ts=f"2026-06-1{i}T10:00:00Z", gap_ms=120000, **M)
+    ledger.append_row(root, "calls", call)
+    ledger.append_row(root, "receipts", schema.make_receipt(
+        tool="graphify", raw_alternative=1000, actual=100, task=tid,
+        call=call["id"], ts=f"2026-06-1{i}T10:00:00Z"))
+    tasks.record(root, tid, outcome="ok", ts=f"2026-06-1{i}T18:00:00Z", snapshot=False)
+"""
+
+# A synthetic Claude transcript with one known 90 s turn gap (user replies 90 s
+# after the previous assistant turn ends) — 1.5 derived minutes once imported.
+_S10_TRANSCRIPT = "\n".join((
+    '{"type":"user","cwd":"/tmp/cage-testbed","timestamp":"2026-06-20T10:00:00Z","message":{"role":"user","content":"[content stripped — counts only]"}}',
+    '{"type":"assistant","uuid":"f1a2b3c4-d5e6-0001-0000-000000000001","timestamp":"2026-06-20T10:00:05Z","cwd":"/tmp/cage-testbed","message":{"role":"assistant","model":"claude-opus-4-8","content":[{"type":"text","text":"[content stripped — counts only]"}],"usage":{"input_tokens":100,"output_tokens":10}}}',
+    '{"type":"user","cwd":"/tmp/cage-testbed","timestamp":"2026-06-20T10:01:35Z","message":{"role":"user","content":"[content stripped — counts only]"}}',
+    '{"type":"assistant","uuid":"e9d8c7b6-a5f4-0002-0000-000000000002","timestamp":"2026-06-20T10:01:40Z","cwd":"/tmp/cage-testbed","message":{"role":"assistant","model":"claude-opus-4-8","content":[{"type":"text","text":"[content stripped — counts only]"}],"usage":{"input_tokens":200,"output_tokens":20}}}',
+)) + "\n"
+
+
+def s10_attention(base: Path) -> str:
+    """S10 — derived human attention (plan §4.10): a seeded transcript with a known
+    turn gap imports to exact derived minutes; seeded gap_ms tasks show exact minutes
+    in human/compare/verdict (with --agent-only suppression); attesting a task proves
+    the attested-beats-derived precedence; calibration --human scores the heuristic
+    exactly; the derived view is byte-identical across runs."""
+    repo, env = make_sandbox(base, "s10-attention")
+    expect_ok(repo, env, "init")
+    # transcript capture through the real import path (90 s gap → 1.5 min)
+    tdir = Path(env["CLAUDE_CONFIG_DIR"]) / "projects" / "-tmp-cage-testbed"
+    tdir.mkdir(parents=True, exist_ok=True)
+    (tdir / "session-s10gap.jsonl").write_text(_S10_TRANSCRIPT, encoding="utf-8")
+    expect_ok(repo, env, "import")
+    r = _sh([sys.executable, "-c", _S10_SEED, str(repo)], cwd=repo, env=env)
+    if r.returncode != 0:
+        raise Fail(f"S10 seeding failed: {r.stderr.strip()[:300]}")
+
+    # derived minutes exact in cage human: 5 tasks × 2 min + 1.5 min transcript
+    hum = expect_ok(repo, env, "human")
+    for needle in ("derived attention", "derived (turn-gaps, capped)", "cap 10 min",
+                   "11.5", "never summed"):
+        if needle not in hum:
+            raise Fail(f"cage human missing {needle!r}")
+    if expect_ok(repo, env, "human") != hum:
+        raise Fail("cage human not byte-identical across two runs")
+
+    # compare: total-cost line over the 5 closed tasks (10 derived min @ $80/hr)
+    cmp_out = expect_ok(repo, env, "compare")
+    for needle in ("total cost: agent", "human 10 min × $80/hr",
+                   "derived (turn-gaps, capped) 10 min"):
+        if needle not in cmp_out:
+            raise Fail(f"cage compare missing {needle!r}")
+    if "total cost" in expect_ok(repo, env, "compare", "--agent-only"):
+        raise Fail("--agent-only did not suppress the compare total-cost line")
+
+    # verdict: composes the same axis ledger-wide (10 + 1.5 loose transcript minutes)
+    vd = expect_ok(repo, env, "verdict", "graphify")
+    for needle in ("graphify is SAVING", "human 11.5 min × $80/hr"):
+        if needle not in vd:
+            raise Fail(f"cage verdict missing {needle!r}")
+    if "total cost" in expect_ok(repo, env, "verdict", "graphify", "--agent-only"):
+        raise Fail("--agent-only did not suppress the verdict total-cost line")
+
+    # attest one task → attested (4 min) beats derived (2 min), reference kept
+    expect_ok(repo, env, "outcome", "attn-0", "--minutes", "4")
+    cmp2 = expect_ok(repo, env, "compare")
+    for needle in ("human 12 min × $80/hr",       # 4 attested + 4×2 derived
+                   "attested 4 min", "never summed",
+                   "derived ref on attested tasks: 2 min (not summed)"):
+        if needle not in cmp2:
+            raise Fail(f"post-attest compare missing {needle!r}")
+
+    # attest the rest → calibration --human scores derived/attested = 2/4 exactly
+    for i in range(1, 5):
+        expect_ok(repo, env, "outcome", f"attn-{i}", "--minutes", "4")
+    cal = expect_ok(repo, env, "calibration", "--human")
+    for needle in ("n = 5 tasks with both", "derived/attested ratio: median 0.5",
+                   "IQR 0.5–0.5", "measured"):
+        if needle not in cal:
+            raise Fail(f"calibration --human missing {needle!r}")
+    below = expect_ok(repo, env, "calibration", "--human")
+    if below != cal:
+        raise Fail("calibration --human not byte-identical across two runs")
+    assert_pii_clean(repo)
+    return ("transcript gap → 1.5 min · tasks exact 10 min · attested beats derived · "
+            "ratio 0.5 exact · --agent-only clean")
+
+
 def s8_determinism(base: Path) -> str:
     """S8 — determinism sweep: derived views byte-identical across runs, and
     CAGE_DEBUG=1 does not change any derived output."""
@@ -568,6 +668,7 @@ SCENARIOS: dict[str, tuple[str, object]] = {
     "S7": ("P4", s7_verdict),
     "S8": ("P0", s8_determinism),
     "S9": ("P5", s9_fleet),
+    "S10": ("attention", s10_attention),
 }
 
 MANUAL_CHECKLIST = """\

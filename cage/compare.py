@@ -21,7 +21,7 @@ from __future__ import annotations
 import statistics
 from pathlib import Path
 
-from cage import render, taskgroup
+from cage import attention, render, taskgroup
 from cage.constants import MIN_COMPARE_N
 
 CAVEAT = ("observed difference across different tasks — not a controlled experiment; "
@@ -36,9 +36,19 @@ def _dist(vals: list[float]) -> dict:
 
 
 def summarize(root: Path, pol: dict, *, by: tuple[str, ...] = ("stack",),
-              scope: str | None = None, label: str | None = None) -> dict:
-    """The deterministic data payload behind the table (and ``--json``)."""
-    grouped = taskgroup.group(taskgroup.stats(root, pol), by, scope=scope, label=label)
+              scope: str | None = None, label: str | None = None,
+              agent_only: bool = False) -> dict:
+    """The deterministic data payload behind the table (and ``--json``).
+
+    Unless ``agent_only``, a ``total_cost`` block (plan §4.10) totals the filtered
+    task set as agent $ + human attention minutes × rate — attested beats derived
+    per task (never summed), tagged with the human component's method."""
+    rows = taskgroup.stats(root, pol)
+    if scope:
+        rows = [r for r in rows if r["scope"] == scope]
+    if label:
+        rows = [r for r in rows if r["label"] == label]
+    grouped = taskgroup.group(rows, by)
     keys = tuple(k for k in taskgroup.GROUP_KEYS if k in by or k == "stack")
     groups = []
     for gkey, rows in grouped.items():
@@ -70,8 +80,12 @@ def summarize(root: Path, pol: dict, *, by: tuple[str, ...] = ("stack",),
                        "d_median_tokens": g["tokens"]["median"] - base["tokens"]["median"],
                        "d_median_usd": round(g["usd"]["median"] - base["usd"]["median"], 6),
                        "method": "estimated"})
-    return {"by": list(keys), "min_n": MIN_COMPARE_N, "groups": groups,
-            "deltas": deltas, "caveat": CAVEAT}
+    d = {"by": list(keys), "min_n": MIN_COMPARE_N, "groups": groups,
+         "deltas": deltas, "caveat": CAVEAT}
+    if not agent_only and rows:
+        att = attention.resolve(root, pol, task_ids=[r["task"] for r in rows])
+        d["total_cost"] = attention.total_cost(sum(r["usd"] for r in rows), att, pol)
+    return d
 
 
 def _tok(x: float) -> str:
@@ -114,4 +128,6 @@ def render_compare(d: dict) -> str:
                else "no eligible non-baseline group")
         out.append("")
         out.append(f"no delta: {why} (each side needs n ≥ {d['min_n']}).")
+    if "total_cost" in d:  # plan §4.10 — suppressed by --agent-only
+        out += ["", attention.render_total_cost(d["total_cost"])]
     return "\n".join(out)

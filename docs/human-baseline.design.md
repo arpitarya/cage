@@ -454,6 +454,72 @@ it — not on spec. This keeps the substrate small and auditable.
 
 ---
 
+## 5c. Passive attention minutes (derived) — plan §4.10 extension
+
+**Status: implemented (2026-07-11).** The axis above prices what a human *would
+have* cost; this section closes total cost's other half: what the agent **costs
+in human time** — supervision minutes, derived passively from the session logs
+cage already imports. It *extends* the §3 ladder (a new lowest rung under the
+attested modes), never bypasses it.
+
+### 5c.1 Capture — `gap_ms` on the call row
+
+At import, where a transcript carries per-turn timestamps, each call row gains an
+additive optional `gap_ms`: the wall-clock between the previous assistant turn's
+end and the human turn that led to this call. Timestamps/counts only; the field
+never enters an id; absence is the legacy contract. Per-agent availability is a
+documented fact (`transcript.py`, fixtures README): **claude yes;
+codex/copilot/kiro no** — their pinned formats lack a usable timestamp pair, so
+their rows omit the field. **Never fabricate.** Tool-result / meta / sidechain
+records are machine turns and never gap.
+
+### 5c.2 Derivation — read-time only, one module
+
+`attention.py` is the single place gap math lives (no view computes gaps
+itself): `minutes = Σ min(gap_ms, idle_cap)`. The idle cap (policy
+`[human] idle_cap_minutes`, `constants.IDLE_CAP_MINUTES` fallback, default 10)
+guards against the same time-from-timestamps fallacy §9's `cage calibrate`
+bans for commit history: a long gap is walked-away time, not supervision.
+Changing the cap re-derives; the ledger is never rewritten.
+
+### 5c.3 Method honesty — attested beats derived, never summed
+
+Derived minutes are always **`estimated`**, labelled `derived (turn-gaps,
+capped)`. Attested minutes — `cage human-record --minutes`, or the friction-drop
+`cage outcome <task> --minutes N` (same fail-open, idempotent receipt path) —
+rank above derived in the precedence ladder; for a given task **attested wins
+and derived renders as reference — the two are never summed.** The extended
+confidence intuition: attested modes keep their §3 rungs; the derived heuristic
+sits below them all and *never self-reports confidence* — its accuracy is
+measured (§5c.4).
+
+### 5c.4 Calibration — the manual axis grades the heuristic
+
+`cage calibration --human`: over tasks with BOTH attested and derived minutes,
+report the derived/attested ratio distribution (median + IQR) — the measured
+accuracy of the heuristic, `method: measured` (an observed frequency of recorded
+signals). Below `MIN_ESTIMATE_N` such tasks it refuses. This mirrors the
+estimate/calibration pattern (plan §4.8): estimate passively, attest the truth,
+let the measured gap be the confidence.
+
+### 5c.5 Views
+
+`cage human` / `cage trend` show attested and derived as **separate blocks**
+(absence of gap data is an explicit line, not silence). `cage compare`,
+`cage verdict`, `cage study report` gain one total-cost line — agent $ + human
+minutes × rate, tagged with the human component's method — suppressed by
+`--agent-only`. `matrix --human` is unchanged: baseline receipts answer "what
+would a person instead have cost", a different question from "what did this
+agent run cost in my time".
+
+### 5c.6 The watcher guard (deliberately NOT built)
+
+No editor plugins, activity trackers, keystroke or focus monitoring — transcript
+timestamps only. This is a product line in the §5b.5 spirit: anything
+watcher-shaped is a different (surveillance) product, not a cage feature.
+
+---
+
 ## 6. Acceptance criteria (how we'll know it's done)
 
 A change is done only when all of these hold and the docs in §8 are updated.

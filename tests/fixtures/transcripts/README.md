@@ -52,6 +52,20 @@ Rule for the stand-ins: **do not invent formats.** When a real extension log
 sample lands, sanitize it to counts, replace the stand-in, flip
 `format_verified` to `true`, and update this table.
 
+## `gap_ms` availability (derived human attention, plan §4.10)
+
+Where a log carries per-turn timestamps for both the human turn and the
+preceding assistant turn, the parser stamps an additive `gap_ms` on the call
+row (previous assistant end → human turn that led to the call). Where it
+doesn't, the field is **absent — never fabricated**:
+
+| Agent | `gap_ms` | Why |
+|---|---|---|
+| claude | **yes** | every transcript record is timestamped; human turns are distinguishable from `tool_result` / meta records (the claude/cli fixture pins a 37 000 ms gap; its `tool_result` user record is correctly ignored) |
+| codex | no | `token_count` events are timestamped but the pinned rollout carries no user-turn marker — an event-to-event gap would mix agent compute into human attention |
+| copilot | no | CLI log aggregates once at `session.shutdown`; the VS Code store has one epoch-ms per request, no assistant-end timestamp to gap against |
+| kiro | no | `tokens_generated.jsonl` carries no timestamps at all |
+
 ## Regenerating expected.json
 
 `expected.json` is frozen output of the current parsers, reviewed by hand

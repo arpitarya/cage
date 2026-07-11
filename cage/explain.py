@@ -19,7 +19,7 @@ import re
 from dataclasses import asdict
 from pathlib import Path
 
-from cage import agents, constants, paths, policy, schema
+from cage import agents, attention, constants, paths, policy, schema
 from cage.explain_data import REGISTRY
 from cage.explain_types import Explanation
 
@@ -40,6 +40,7 @@ def _live(pol: dict) -> dict:
         "min_compare_n": constants.MIN_COMPARE_N,
         "min_estimate_n": constants.MIN_ESTIMATE_N,
         "default_minutes": policy.human_rates(pol).get("default_minutes", 60),
+        "idle_cap": f"{attention.idle_cap_minutes(pol):g}",
         "order": " → ".join(policy.tool_order(pol)),
         "c_measured": conf.get("measured"), "c_estimated": conf.get("estimated"),
         "c_type": conf.get("type_table"), "c_default": conf.get("default"),

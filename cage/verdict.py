@@ -22,7 +22,7 @@ from __future__ import annotations
 import datetime as _dt
 from pathlib import Path
 
-from cage import ledger, quality, regression, render, roi, trend
+from cage import attention, ledger, prices, quality, regression, render, roi, trend
 from cage.constants import METHOD_TRUST
 
 _MIN_SPAN_DAYS = 7  # below this the $/mo projection line refuses (noise, not signal)
@@ -47,13 +47,24 @@ def _span_days(rcpts: list[dict]) -> float:
         return 0.0
 
 
-def compose(root: Path, pol: dict, tool: str, since: str | None = None) -> dict:
-    """Pull each existing view once; return the verdict + its tagged inputs."""
+def compose(root: Path, pol: dict, tool: str, since: str | None = None,
+            agent_only: bool = False) -> dict:
+    """Pull each existing view once; return the verdict + its tagged inputs.
+
+    Unless ``agent_only``, a ``total_cost`` block (plan §4.10) adds the
+    ledger-wide window total: agent $ + human attention minutes × rate — pulled
+    from `attention.py` (attested beats derived per task, never summed), tagged
+    with the human component's method. Composition only, no new statistics."""
     from cage import attribution  # local: avoids importing the whole chain at module load
 
     rcpts = [r for r in ledger.since(ledger.receipts(root, since=since), since)
              if r.get("tool") == tool]
     d: dict = {"tool": tool, "since": since, "inputs": {}}
+    if not agent_only:
+        window = ledger.since(ledger.calls(root, since=since), since)
+        agent_usd = sum(prices.call_usd(pol, c) for c in window)
+        d["total_cost"] = attention.total_cost(
+            agent_usd, attention.resolve(root, pol, since=since), pol)
 
     # roi — the core input: saved vs own cost (net decides the verdict)
     t = roi.by_tool(root, pol, since)["tools"].get(tool)
@@ -142,6 +153,8 @@ def render_verdict(d: dict) -> str:
                 + (f" since {d['since']}" if d["since"] else "")
                 + ".\n\nA verdict composes recorded receipts; teach the tool to emit them"
                   " (`cage query receipts`), then re-run.")
+        if "total_cost" in d:  # plan §4.10 — suppressed by --agent-only
+            head += "\n\n" + attention.render_total_cost(d["total_cost"])
         return head
     if "net_per_month" in d:
         amount = f"≈ {render.usd(abs(d['net_per_month']))}/mo net"
@@ -181,6 +194,8 @@ def render_verdict(d: dict) -> str:
                  + ("net-positive from the first receipt (derived from roi)" if per > 0
                     else "no receipt volume reaches break-even at current costs "
                          "(derived from roi)"))
+    if "total_cost" in d:  # plan §4.10 — suppressed by --agent-only
+        lines += ["", attention.render_total_cost(d["total_cost"])]
     lines += ["", "verdict composes existing views only — it computes no new statistics;",
               "a missing input reads INSUFFICIENT DATA, never an approximation."]
     return "\n".join(lines)

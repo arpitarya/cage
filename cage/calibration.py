@@ -16,13 +16,21 @@ Both figures are **measured** — recorded estimates against recorded actuals,
 an observed frequency, no reconstruction. Open tasks are not scored (no error);
 zero-actual tasks (no calls joined) and legacy estimates missing band bounds
 are skipped with a visible count, never silently dropped.
+
+`--human` (plan §4.10) applies the same measured-hit-rate pattern to the
+turn-gap heuristic: over tasks carrying BOTH attested minutes (`human-record` /
+`cage outcome --minutes`) and derived turn-gap minutes, report the
+derived/attested ratio distribution — the measured accuracy of the derivation.
+Below `MIN_ESTIMATE_N` such tasks the view refuses; the heuristic never
+self-reports confidence.
 """
 from __future__ import annotations
 
 import statistics
 from pathlib import Path
 
-from cage import taskgroup
+from cage import attention, taskgroup
+from cage.constants import MIN_ESTIMATE_N
 
 
 def summarize(root: Path, pol: dict) -> dict:
@@ -66,6 +74,59 @@ def tasks_open_with_estimates(root: Path):
     for tid, trow in sorted(tasks.read(root).items()):
         if not trow.get("outcome") and trow.get("est_tokens") is not None:
             yield tid, trow
+
+
+def summarize_human(root: Path, pol: dict) -> dict:
+    """`cage calibration --human` — measured accuracy of the turn-gap heuristic.
+
+    Scores every task with BOTH attested and derived minutes: ratio =
+    derived / attested (1.0 ⇒ the heuristic matches what a person attested; >1 ⇒
+    it over-counts). Ratios are read-time derives of recorded signals — the same
+    ledger + policy always scores the same. Below `MIN_ESTIMATE_N` such tasks the
+    view refuses (a ratio distribution over noise is worse than none)."""
+    attested = attention.attested_by_task(root, pol)
+    derived = attention.derived_by_task(root, pol)
+    scored = [{"task": t, "attested_min": attested[t]["minutes"], "derived_min": derived[t],
+               "ratio": round(derived[t] / attested[t]["minutes"], 4)}
+              for t in sorted(attested)
+              if attested[t]["minutes"] > 0 and t in derived]
+    n = len(scored)
+    d = {"n": n, "min_n": MIN_ESTIMATE_N, "tasks": scored, "method": "measured",
+         "cap_minutes": attention.idle_cap_minutes(pol), "label": attention.LABEL}
+    if n < MIN_ESTIMATE_N:
+        d["ok"] = False
+        d["reason"] = (f"insufficient data (n={n} < {MIN_ESTIMATE_N} tasks with both "
+                       "attested and derived minutes) — refusing to score the "
+                       "heuristic over noise")
+        return d
+    d["ok"] = True
+    ratios = [s["ratio"] for s in scored]
+    q = statistics.quantiles(ratios, n=4, method="inclusive") if n >= 2 else None
+    d["ratio"] = {"median": round(statistics.median(ratios), 4),
+                  "q1": round(q[0] if q else min(ratios), 4),
+                  "q3": round(q[2] if q else max(ratios), 4)}
+    return d
+
+
+def render_calibration_human(d: dict) -> str:
+    if not d["ok"]:
+        return ("Calibration · derived attention vs attested minutes\n\n"
+                f"{d['reason']}\n"
+                "attest more tasks (`cage outcome <task> --minutes N` or "
+                "`cage human-record --task T --minutes N`) on work whose calls carry "
+                "turn-gap data (gap_ms), then re-run.")
+    r = d["ratio"]
+    return "\n".join([
+        "Calibration · derived attention vs attested minutes",
+        "",
+        f"  n = {d['n']} tasks with both attested and derived minutes",
+        f"  derived/attested ratio: median {r['median']:g} · IQR {r['q1']:g}–{r['q3']:g}",
+        f"  heuristic: {d['label']} · cap {d['cap_minutes']:g} min",
+        f"  method: {d['method']} — observed accuracy of recorded gaps vs attested minutes",
+        "",
+        "1.0 means the turn-gap derivation matches what people attested; the heuristic",
+        "never self-reports confidence — this measured ratio is its accuracy.",
+    ])
 
 
 def render_calibration(d: dict) -> str:

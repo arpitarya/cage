@@ -2,6 +2,19 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
+## v0.18.0 (2026-07-11) — derived human attention (passive minutes from turn gaps)
+
+Total cost's missing half: what the agent costs in **human time**, derived passively from the session logs cage already imports — with the manual axis as the ground truth that calibrates the heuristic (plan §4.10; `docs/human-baseline.design.md` §5c).
+
+- **`gap_ms` on the call row (additive, optional)** — at import, where a transcript carries per-turn timestamps, each call row gains the wall-clock gap between the previous assistant turn's end and the human turn that led to this call. Per-agent availability is documented, never guessed: **claude yes** (every record timestamped; tool-result / meta / sidechain records correctly never count as human turns); **codex / copilot / kiro no** — their pinned log formats lack a usable timestamp pair, so their rows omit the field (**no signal ⇒ no field, never fabricated**). Composite ids unchanged (`gap_ms` never enters an id); an unstamped row is byte-identical to the legacy contract; re-imports stay idempotent.
+- **Read-time derivation, one module** (`cage/attention.py`) — derived attention minutes = `Σ min(gap_ms, idle cap)`; every consuming view calls in here, none computes gaps itself. The idle cap guards against billing walked-away time as supervision: policy `[human] idle_cap_minutes` wins, `constants.IDLE_CAP_MINUTES` (10, rationale in the file) is the fallback — changing it re-derives, the ledger is never rewritten. Deterministic: same ledger + policy ⇒ same minutes.
+- **Method honesty** — derived minutes are always `estimated`, labelled `derived (turn-gaps, capped)`. **Attested** minutes (`cage human-record`, or the new friction-drop `cage outcome <task> --minutes N` — the same fail-open, idempotent receipt path) rank above derived: per task **attested wins, derived renders as reference, the two are never summed**.
+- **Views** — `cage human` and `cage trend` show attested vs derived as separate blocks (absence of gap data is an explicit line). `cage compare`, `cage verdict`, and `cage study report` gain one **total-cost line** — agent $ + human minutes × rate, tagged with the human component's method — suppressed by `--agent-only`. `matrix --human` is byte-identical (a different question).
+- **`cage calibration --human`** — over tasks with BOTH attested and derived minutes, the derived/attested ratio distribution (median + IQR) is the heuristic's **measured** accuracy; below `MIN_ESTIMATE_N` it refuses. The heuristic never self-reports confidence.
+- **Explainers** — new `cage query` calculation entry `attention-minutes` ("how are human minutes derived", live cap value) and an extended `human-axis` concept entry.
+- **The watcher guard** — deliberately NOT built: no editor plugins, activity trackers, keystroke or focus monitoring. Transcript timestamps only; PII surface unchanged (timestamp arithmetic, counts-never-content).
+- Validation: dummyrepo scenario **S10** (seeded transcript gap → exact derived minutes across human/compare/verdict; attest → precedence + exact calibration ratio; `--agent-only` clean; byte-identical re-runs). +23 tests (418→441).
+
 ## v0.17.1 (2026-07-09) — dead-code cleanup
 
 A systematic AST sweep (unused imports, unreferenced functions/methods/constants, tracked junk, wheel-content audit) after the parity release:

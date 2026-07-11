@@ -41,7 +41,8 @@
       "ok": true,
       "retries": 0,
       "scope": "",
-      "project": "cage-testbed"
+      "project": "cage-testbed",
+      "gap_ms": 37000
     }
   ]
 }

@@ -200,8 +200,12 @@ def _dist(vals: list[float]) -> dict:
     return {"median": med, "q1": q1, "q3": q3}
 
 
-def summarize(root: Path, pol: dict) -> dict:
-    """Coverage + paired-by-machine phase deltas over the merged ledger."""
+def summarize(root: Path, pol: dict, agent_only: bool = False) -> dict:
+    """Coverage + paired-by-machine phase deltas over the merged ledger.
+
+    Unless ``agent_only``, a ``total_cost`` block (plan §4.10) totals the merged
+    ledger as agent $ + human attention minutes × rate (attested beats derived per
+    task, never summed; gap_ms rows survive the bundle round-trip verbatim)."""
     marks = markers(root)
     timelines = _timelines(marks)
     order = phase_order(marks)
@@ -277,6 +281,10 @@ def summarize(root: Path, pol: dict) -> dict:
             pooled[phase] = ({"n_days": len(days), "tokens": _dist(sorted(days)),
                               "usd": _dist(sorted(usd))} if days else {"n_days": 0})
         d["pooled"] = pooled
+    if not agent_only:
+        from cage import attention  # local: keeps the module import graph light
+        agent_usd = sum(prices.call_usd(pol, c) for c in calls)
+        d["total_cost"] = attention.total_cost(agent_usd, attention.resolve(root, pol), pol)
     return d
 
 
@@ -303,6 +311,9 @@ def render_study(d: dict) -> str:
                    "or unenrolled machines; excluded from deltas)")
     if "pair" not in d:
         out += ["", "only one phase recorded — nothing to pair yet."]
+        if "total_cost" in d:  # plan §4.10 — suppressed by --agent-only
+            from cage import attention
+            out += ["", attention.render_total_cost(d["total_cost"])]
         return "\n".join(out)
     a, b = d["pair"]
     out.append("")
@@ -326,4 +337,7 @@ def render_study(d: dict) -> str:
         out.append(f"  {phase:<12} n={p['n_days']} days · median "
                    f"{p['tokens']['median']:,.0f} tok · {render.usd(p['usd']['median'])} "
                    f"(IQR {render.usd(p['usd']['q1'])}–{render.usd(p['usd']['q3'])})")
+    if "total_cost" in d:  # plan §4.10 — suppressed by --agent-only
+        from cage import attention
+        out += ["", attention.render_total_cost(d["total_cost"])]
     return "\n".join(out)

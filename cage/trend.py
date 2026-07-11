@@ -3,13 +3,17 @@
 Pure derive over `ts` (no new entropy): bucket human receipts by ISO week or month,
 join each to its agent calls, and report agent $ / human $ / saved $ / time saved per
 bucket. Same two-clock model as `cage human` — saved time can go negative.
+
+Derived attention (plan §4.10) renders as its own section below the table —
+per-bucket turn-gap minutes via `attention.py`, always `estimated`, never
+blended with the attested rows above it.
 """
 from __future__ import annotations
 
 import datetime as _dt
 from pathlib import Path
 
-from cage import human, humanview, ledger, policy, prices, render
+from cage import attention, human, humanview, ledger, policy, prices, render
 
 
 def _bucket(ts: str, by: str) -> str:
@@ -45,12 +49,35 @@ def series(root: Path, pol: dict, by: str = "week", since: str | None = None) ->
         b["saved_min"] = round(b["human_min"] - b["agent_min"], 4)
         b["agent_usd"] = round(b["agent_usd"], 6)
         b["human_usd"] = round(b["human_usd"], 6)
-    return {"by": by, "since": since, "buckets": buckets}
+    # Derived attention per bucket (plan §4.10) — a separate series, never folded
+    # into the attested buckets above; attention.py owns the cap math.
+    attn: dict[str, float] = {}
+    for c in ledger.since(calls, since):
+        m = attention.minutes_of(c, pol)
+        if m > 0:
+            k = _bucket(c.get("ts", ""), by)
+            attn[k] = round(attn.get(k, 0.0) + m, 4)
+    return {"by": by, "since": since, "buckets": buckets, "attention": attn,
+            "idle_cap": attention.idle_cap_minutes(pol)}
+
+
+def _render_attention(data: dict) -> str:
+    """The derived-attention series — its own section, never a column blended into
+    the attested table (the two sources must stay visually distinct)."""
+    attn = data.get("attention") or {}
+    if not attn:
+        return ""
+    lines = [f"derived attention · {attention.LABEL} · cap {data['idle_cap']:g} min "
+             f"· {attention.METHOD} — never summed with the attested rows above:"]
+    lines += [f"  {k}  {attn[k]:g} min ({attn[k] / 60:.1f} h)" for k in sorted(attn)]
+    return "\n".join(lines)
 
 
 def render_trend(data: dict, metric: str = "both") -> str:
     if not data["buckets"]:
-        return "cage: no human receipts yet — nothing to trend."
+        attn = _render_attention(data)
+        return ("cage: no human receipts yet — nothing to trend."
+                + (f"\n\n{attn}" if attn else ""))
     head = [data["by"]]
     if metric in ("cost", "both"):
         head += ["agent $", "human $", "$ saved"]
@@ -69,5 +96,7 @@ def render_trend(data: dict, metric: str = "both") -> str:
         rows.append(row)
     rights = set(range(1, len(head)))
     win = f" · since {data['since']}" if data["since"] else ""
-    return (f"Savings trend · by {data['by']}{win}\n\n"
-            + render.table(head, rows, rights=rights))
+    out = (f"Savings trend · by {data['by']}{win}\n\n"
+           + render.table(head, rows, rights=rights))
+    attn = _render_attention(data)
+    return out + (f"\n\n{attn}" if attn else "")
