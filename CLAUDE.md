@@ -261,7 +261,7 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
 ## Dev
 
 ```bash
-just test          # python -m pytest -q   (496 passing)
+just test          # python -m pytest -q   (509 passing)
 just demo          # seed §4.4 + print attrib/matrix
 cage --version
 ```
@@ -308,7 +308,26 @@ each agent only needs thin idiomatic wiring (`agents.py` orchestrates):
   not a `hooks[]` container, and Kiro has no session-start trigger so the single
   `agentStop` hook self-backfills by re-importing the whole log each turn). Each exposes `install`/`status`/
   `backfill_status`/`realtime_status`; `agents.py` dispatches via the `_WIRE` map (add a
-  row + a `SURFACES` entry for a new agent). `pointers.py` is now just the shared steering
+  row + a `SURFACES` entry for a new agent).
+  **Committed wiring is portable (plan §5.3):** every project-committed wired
+  file (`.claude/settings.json`, `.mcp.json`, `.vscode/mcp.json`,
+  `.codex/hooks.json`, `.kiro/hooks/*.kiro.hook`) references the committed
+  runtime-resolving shim `.cage/bin/cage-run` ([runshim.py](cage/runshim.py) —
+  written by `agents.install`, identical bytes on every machine, resolution:
+  PATH → ~/.local/bin/pipx/$VIRTUAL_ENV → `python3 -m cage` → exit 0 silently,
+  fail-open) — **never** `paths.cage_bin()`'s absolute path. Per-host reference
+  mechanism is documented in each wire module's docstring (Claude:
+  `$CLAUDE_PROJECT_DIR` / `${CLAUDE_PROJECT_DIR:-.}`; VS Code:
+  `${workspaceFolder}`; codex/kiro hooks: the `runshim.selflocating_command`
+  git-root one-liner). User-level configs (~/.copilot/hooks, ~/.codex
+  config.toml MCP, .git/hooks) stay absolute — per-machine by nature. The ONE
+  exception: `.kiro/settings/mcp.json` stays absolute (Kiro spawns MCP servers
+  from its install dir, no workspace variable) — gitignore-advised via doctor.
+  Re-running setup migrates legacy absolute entries (idempotent, printed).
+  `cage doctor` has a `portability` check; `cage query portable-wiring`
+  explains the design. A new committed file must never embed a machine path —
+  `tests/test_portable_wiring.py` greps for this and must stay green.
+  `pointers.py` is now just the shared steering
   *pointer text* both copilot/kiro embed. Plus `setupcmd.py` (`/cage` skill) and
   `gitcommithook.py` (local `post-commit`/`prepare-commit-msg` git hooks, riding along
   with `claudewire.py` inside `agents.install`). All idempotent. Every agent's hook runs

@@ -27,34 +27,42 @@ def test_every_surface_has_a_wire_module():
 
 
 def test_install_all_surfaces(homes):
+    from cage import runshim
     proj = homes / "proj"
     proj.mkdir()
     agents.install(proj)
     assert agents.status(proj) == {"claude": True, "codex": True,
                                    "copilot": True, "kiro": True}
-    # Claude hooks + MCP
+    # The committed shim is written alongside the wiring (both twins, plan §5).
+    assert (proj / ".cage" / "bin" / "cage-run").exists()
+    assert (proj / ".cage" / "bin" / "cage-run.cmd").exists()
+    # Claude hooks + MCP — committed files reference the shim, never a binary path.
     settings = cfgio.load_json(proj / ".claude" / "settings.json")
     cmds = [h["command"] for e in settings["hooks"]["SessionEnd"] for h in e["hooks"]]
-    assert "cage hook-session-end" in cmds
+    assert f'"$CLAUDE_PROJECT_DIR/{runshim.SHIM_REL}" hook-session-end' in cmds
     # Stop = the real-time per-turn capture path
     stop = [h["command"] for e in settings["hooks"]["Stop"] for h in e["hooks"]]
-    assert "cage hook-stop" in stop
-    assert cfgio.load_json(proj / ".mcp.json")["mcpServers"]["cage"]["command"] == "cage"
+    assert f'"$CLAUDE_PROJECT_DIR/{runshim.SHIM_REL}" hook-stop' in stop
+    assert (cfgio.load_json(proj / ".mcp.json")["mcpServers"]["cage"]["command"]
+            == f"${{CLAUDE_PROJECT_DIR:-.}}/{runshim.SHIM_REL}")
     # Kiro + Copilot MCP configs
     assert "cage" in cfgio.load_json(proj / ".kiro" / "settings" / "mcp.json")["mcpServers"]
-    assert "cage" in cfgio.load_json(proj / ".vscode" / "mcp.json")["servers"]
+    vs = cfgio.load_json(proj / ".vscode" / "mcp.json")["servers"]
+    assert vs["cage"]["command"] == f"${{workspaceFolder}}/{runshim.SHIM_REL}"
     # Each agent's hook imports ONLY its own log — no cross-agent sweep.
     # Copilot CLI hooks live at the USER level (~/.copilot/hooks), the only location the
-    # local CLI fires from — agentStop (real-time) + sessionStart backfill.
+    # local CLI fires from — agentStop (real-time) + sessionStart backfill. User-level
+    # = per-machine, so the resolved (here: bare) cage path is correct there.
     cop_hooks = cfgio.load_json(homes / "copilot_home" / "hooks" / "cage.json")["hooks"]
     for ev in ("agentStop", "sessionStart"):
         assert any(h["bash"] == "cage import --agent copilot --since 7d" for h in cop_hooks[ev])
     # Kiro Agent Hook: one hook per file (when/then), agentStop trigger, Kiro only.
     # Kiro has no session-start trigger; the single agentStop hook self-backfills.
+    # Command = the self-locating shim one-liner (no repo variable, no reliable cwd).
     kiro_hook = cfgio.load_json(proj / ".kiro" / "hooks" / "cage.kiro.hook")
     assert kiro_hook["when"]["type"] == "agentStop"
     assert kiro_hook["then"]["type"] == "runCommand"
-    assert kiro_hook["then"]["command"] == "cage import --agent kiro"
+    assert kiro_hook["then"]["command"] == runshim.selflocating_command("import --agent kiro")
     # All four now have BOTH real-time and backfill capture wired
     assert agents.realtime_status(proj) == {a: True for a in agents.SURFACES}
     assert agents.backfill_status(proj) == {a: True for a in agents.SURFACES}
@@ -95,37 +103,65 @@ def test_copilot_migration_preserves_foreign_repo_hooks(homes):
     assert [h["bash"] for h in kept] == ["npm run lint"]
 
 
-def test_hooks_use_resolved_cage_path(homes, monkeypatch):
-    # Hooks must carry the *resolved* cage path so GUI-launched agents (whose PATH omits
-    # ~/.local/bin) can find it — a bare `cage` is the #1 reason a wired hook never fires.
+def test_committed_wiring_never_carries_resolved_path(homes, monkeypatch):
+    # Even when cage resolves to an absolute path on THIS machine, committed files must
+    # reference the shim (portable) — only user-level, per-machine files may carry the
+    # resolved path. The Kiro MCP config is the ONE documented exception (Kiro spawns
+    # MCP servers from its install dir; no workspace variable exists).
+    from cage import runshim
     monkeypatch.setattr("cage.paths.cage_bin", lambda: "/opt/cage/bin/cage")
     proj = homes / "proj"
     proj.mkdir()
     agents.install(proj)
     s = cfgio.load_json(proj / ".claude" / "settings.json")["hooks"]
-    assert s["Stop"][0]["hooks"][0]["command"] == "/opt/cage/bin/cage hook-stop"
+    assert s["Stop"][0]["hooks"][0]["command"] == \
+        f'"$CLAUDE_PROJECT_DIR/{runshim.SHIM_REL}" hook-stop'
     cx = cfgio.load_json(proj / ".codex" / "hooks.json")["hooks"]
-    assert cx["Stop"][0]["hooks"][0]["command"] == "/opt/cage/bin/cage import --agent codex --since 7d"
+    assert cx["Stop"][0]["hooks"][0]["command"] == \
+        runshim.selflocating_command("import --agent codex --since 7d")
     k = cfgio.load_json(proj / ".kiro" / "hooks" / "cage.kiro.hook")
-    assert k["then"]["command"] == "/opt/cage/bin/cage import --agent kiro"
-    assert cfgio.load_json(proj / ".mcp.json")["mcpServers"]["cage"]["command"] == "/opt/cage/bin/cage"
+    assert "/opt/cage" not in k["then"]["command"]
+    assert (cfgio.load_json(proj / ".mcp.json")["mcpServers"]["cage"]["command"]
+            == f"${{CLAUDE_PROJECT_DIR:-.}}/{runshim.SHIM_REL}")
+    # user-level files DO carry the resolved path (per-machine by nature)
+    cop = cfgio.load_json(homes / "copilot_home" / "hooks" / "cage.json")["hooks"]
+    assert any("/opt/cage/bin/cage" in h["bash"] for h in cop["agentStop"])
+    assert "/opt/cage/bin/cage" in (homes / "codex_home" / "config.toml").read_text()
+    # the ONE exception: Kiro's MCP config stays absolute by necessity
+    kiro_mcp = cfgio.load_json(proj / ".kiro" / "settings" / "mcp.json")
+    assert kiro_mcp["mcpServers"]["cage"]["command"] == "/opt/cage/bin/cage"
 
 
-def test_reinstall_heals_bare_cage_hook_without_duplicating(homes, monkeypatch):
-    # An old install wired a bare `cage`; re-running setup must upgrade it to the
-    # resolved path (so it fires under a GUI PATH) and not accumulate duplicates.
+def test_reinstall_migrates_legacy_absolute_hook_without_duplicating(homes, monkeypatch):
+    # An old install wired the machine's absolute cage path into committed files;
+    # re-running setup must migrate those entries to the shim reference (portable)
+    # without accumulating duplicates — and report what it migrated.
+    from cage import runshim
     proj = homes / "proj"
     proj.mkdir()
-    monkeypatch.setattr("cage.paths.cage_bin", lambda: "cage")   # legacy bare install
-    agents.install(proj, ("claude", "codex", "kiro"))
-    monkeypatch.setattr("cage.paths.cage_bin", lambda: "/opt/cage/bin/cage")  # cage now resolves
-    agents.install(proj, ("claude", "codex", "kiro"))            # re-run setup heals
+    # plant the legacy form directly (what a pre-shim install wrote)
+    legacy = proj / ".claude" / "settings.json"
+    legacy.parent.mkdir(parents=True)
+    legacy.write_text(json.dumps({"hooks": {
+        "Stop": [{"hooks": [{"type": "command", "command": "/opt/cage/bin/cage hook-stop"}]}],
+        "SessionStart": [{"hooks": [{"type": "command",
+                                     "command": "/opt/cage/bin/cage import-claude --project ."}]}],
+    }}), encoding="utf-8")
+    out = agents.install(proj, ("claude", "codex", "kiro"))
     s = cfgio.load_json(proj / ".claude" / "settings.json")["hooks"]
-    assert len(s["Stop"]) == 1 and len(s["SessionStart"]) == 2   # healed, not duplicated
-    assert s["Stop"][0]["hooks"][0]["command"] == "/opt/cage/bin/cage hook-stop"
+    assert len(s["Stop"]) == 1 and len(s["SessionStart"]) == 2   # migrated, not duplicated
+    assert s["Stop"][0]["hooks"][0]["command"] == \
+        f'"$CLAUDE_PROJECT_DIR/{runshim.SHIM_REL}" hook-stop'
+    assert "migrated" in out["claude"]                            # migration is reported
     cx = cfgio.load_json(proj / ".codex" / "hooks.json")["hooks"]
     assert len(cx["Stop"]) == 1
-    assert cx["Stop"][0]["hooks"][0]["command"] == "/opt/cage/bin/cage import --agent codex --since 7d"
+    assert cx["Stop"][0]["hooks"][0]["command"] == \
+        runshim.selflocating_command("import --agent codex --since 7d")
+    # second run: already portable — nothing further migrates, files byte-identical
+    before = legacy.read_bytes(), (proj / ".codex" / "hooks.json").read_bytes()
+    out2 = agents.install(proj, ("claude", "codex", "kiro"))
+    assert "migrated" not in out2["claude"] and "migrated" not in out2["codex"]
+    assert (legacy.read_bytes(), (proj / ".codex" / "hooks.json").read_bytes()) == before
 
 
 def test_reresolve_cage_command_leaves_foreign_hooks_alone():
@@ -170,7 +206,8 @@ def _start_cmds(settings: dict) -> list[str]:
     return [h["command"] for e in settings["hooks"]["SessionStart"] for h in e["hooks"]]
 
 
-_CLAUDE_BACKFILL = "cage import-claude --project ."  # Claude only — no cross-agent sweep
+_CLAUDE_BACKFILL = ('"$CLAUDE_PROJECT_DIR/.cage/bin/cage-run" '
+                    "import-claude --project .")  # Claude only — no cross-agent sweep
 
 
 def test_claude_sessionstart_backfill_before_banner(homes):
@@ -178,11 +215,12 @@ def test_claude_sessionstart_backfill_before_banner(homes):
     proj = homes / "proj"
     proj.mkdir()
     agents.install(proj, ("claude",))
+    banner = '"$CLAUDE_PROJECT_DIR/.cage/bin/cage-run" hook-session-start'
     cmds = _start_cmds(cfgio.load_json(proj / ".claude" / "settings.json"))
     assert _CLAUDE_BACKFILL in cmds  # Claude's own log only
-    assert "cage hook-session-start" in cmds
+    assert banner in cmds
     # the backfill runs before the banner so the banner reflects the just-imported spend
-    assert cmds.index(_CLAUDE_BACKFILL) < cmds.index("cage hook-session-start")
+    assert cmds.index(_CLAUDE_BACKFILL) < cmds.index(banner)
     assert agents.backfill_status(proj)["claude"] is True
 
 
@@ -193,7 +231,7 @@ def test_claude_sessionstart_backfill_no_duplicate_on_reinstall(homes):
     agents.install(proj, ("claude",))
     cmds = _start_cmds(cfgio.load_json(proj / ".claude" / "settings.json"))
     assert cmds.count(_CLAUDE_BACKFILL) == 1
-    assert cmds.count("cage hook-session-start") == 1
+    assert cmds.count('"$CLAUDE_PROJECT_DIR/.cage/bin/cage-run" hook-session-start') == 1
 
 
 def test_codex_capture_hooks_wired_and_idempotent(homes):
@@ -203,8 +241,10 @@ def test_codex_capture_hooks_wired_and_idempotent(homes):
     proj.mkdir()
     agents.install(proj, ("codex",))
     agents.install(proj, ("codex",))  # idempotent
+    from cage import runshim
     hooks = cfgio.load_json(proj / ".codex" / "hooks.json")["hooks"]
-    imp = "cage import --agent codex --since 7d"  # Codex only — no cross-agent sweep
+    # Codex only — no cross-agent sweep; self-locating shim form (committed file)
+    imp = runshim.selflocating_command("import --agent codex --since 7d")
     for event in ("Stop", "SessionStart"):
         cmds = [h["command"] for e in hooks[event] for h in e["hooks"]]
         assert cmds == [imp]  # wired into each event exactly once

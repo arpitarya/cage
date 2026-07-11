@@ -19,8 +19,15 @@ every hook fires — so a session's own tokens aren't on disk when its hooks run
 captures them on the **next** session (the `sessionStart`/`agentStop` import picks up the
 prior session's shutdown) — the standard backfill pattern, no cross-agent sweep needed.
 The MCP read server goes in `.vscode/mcp.json` and a "consult Cage for spend" pointer in
-`.github/copilot-instructions.md` (shared text in `pointers.py`). Commands use the
-*resolved* cage path (a bare `cage` fails under the extension's PATH). All idempotent.
+`.github/copilot-instructions.md` (shared text in `pointers.py`). All idempotent.
+
+**Portability (plan §5):** `.vscode/mcp.json` is project-committed, so it references
+the committed shim via `${workspaceFolder}/.cage/bin/cage-run` — VS Code documents
+predefined-variable substitution in MCP server config, and documents stdio-server cwd
+as defaulting to the workspace folder (code.visualstudio.com MCP config reference).
+The user-level `~/.copilot/hooks/cage.json` stays on the *resolved* absolute cage path
+(a bare `cage` fails under the extension's PATH — that constraint is unchanged): it is
+per-machine by nature and never cloned, so absolute is the robust choice there.
 
 One wire file per agent (mirrors claudewire/codexwire/kirowire) — a new agent gets its
 own `<agent>wire.py`.
@@ -29,7 +36,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from cage import cfgio, paths, pointers
+from cage import cfgio, paths, pointers, runshim
 
 # Copilot CLI hooks: {"version":1,"hooks":{<event>:[{"type":"command","bash":…}]}};
 # each entry carries both bash + powershell for cross-OS.
@@ -90,11 +97,17 @@ def install(root: Path) -> dict:
                        default="# Copilot instructions\n")
     mcp = root / ".vscode" / "mcp.json"
     data = cfgio.load_json(mcp)
-    data.setdefault("servers", {})["cage"] = {"type": "stdio", "command": paths.cage_bin(),
+    # Documented VS Code variable substitution — committed file, no absolute path.
+    portable = f"${{workspaceFolder}}/{runshim.SHIM_REL}"
+    old = data.get("servers", {}).get("cage", {}).get("command")
+    data.setdefault("servers", {})["cage"] = {"type": "stdio", "command": portable,
                                               "args": ["mcp"]}
     cfgio.save_json(mcp, data)
     _migrate_repo_hook(root)
-    return {"instructions": str(instr), "mcp": str(mcp), "hooks": _wire_hooks(root)}
+    out = {"instructions": str(instr), "mcp": str(mcp), "hooks": _wire_hooks(root)}
+    if old is not None and old != portable:
+        out["migrated"] = "migrated 1 legacy entry → shim"
+    return out
 
 
 def _event_wired(root: Path, event: str) -> bool:

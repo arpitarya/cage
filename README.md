@@ -66,6 +66,8 @@ cage query "how is human cost calculated"   # explain any number — live formul
 ```
 
 > **Adopting into a project** — `cage setup` is the single front door: it offers Claude Code / Codex / Copilot / Kiro and **defaults to wiring all of them** (any agent's hook captures the whole stack, so there's no reason to pick just one). Drive it non-interactively with `cage setup --all` — or `cage setup --claude` for a single agent (`--no-skill` / `--no-project` / `--no-graphify` to skip parts). For finer control: `cage setup --project-only` scaffolds `.cage/` + the `bin/graphify` interceptor without the global skill (agent wiring opt-in via `--<agent>`), `cage setup --wire-only --claude` wires just one agent's hooks + MCP, and `cage setup --status` reports what's already wired.
+>
+> **What gets committed vs what stays local.** The project-wired files (`.claude/settings.json`, `.mcp.json`, `.vscode/mcp.json`, `.codex/hooks.json`, `.kiro/hooks/`) are committed with the repo and contain **no absolute paths** — they reference the committed shim `.cage/bin/cage-run` (identical bytes on every machine), which resolves cage at runtime and **exits 0 silently when cage isn't installed** (a teammate's clone gets working agents, no noise, no capture). Commit `.cage/` as-is: its own `.gitignore` already excludes the machine-local parts (`ledger/`, `out/`, `state/`). Per-machine configs stay absolute and are never cloned: `~/.copilot/hooks/`, `~/.codex/config.toml`, `.git/hooks/` — plus the one committed exception, `.kiro/settings/mcp.json` (Kiro can't launch MCP servers portably; add it to your `.gitignore` — `cage doctor` reminds you). Re-running `cage setup` migrates any pre-0.20 absolute entries and prints what moved; `cage doctor` has a portability check. Design and rationale: [Portable wiring](docs/portable-wiring.md).
 
 Metering from your own code is the library adapter — it targets the *protocol*, not any named client, and is fail-open (a metering error never breaks your call):
 
@@ -264,11 +266,13 @@ The ledger resolves **`--ledger`/`CAGE_BASE` → project `.cage/` → global `~/
 
 Hooks are an **optional** real-time add-on — they fire only under a CLI client, never under a VS Code extension — so `cage import`/`cage export` is the path that always works. `cage report --project <name>` slices the global ledger by working dir (exact for Claude; Copilot/Kiro/Codex logs carry no project, so they're excluded from that filter).
 
+Wired files that get **committed** (`.mcp.json`, `.vscode/mcp.json`, `.kiro/hooks/*`) never embed a machine's absolute cage path — they reference a small repo-local launcher, `.cage/bin/cage-run`, that resolves cage at run time on whatever machine it's on and exits silently if cage isn't installed, so teammates' clones just work. Design and rationale: [Portable wiring](docs/portable-wiring.md).
+
 **An agent's spend isn't showing up?** `cage doctor` shows the active ledger, each agent's real capture state, and "last import: N ago"; the metadata-only debug log says per agent whether a hook fired or raised — see [Debugging capture](docs/debugging-capture.md).
 
 ## The `$0` guarantee
 
-Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 496 tests passing; `cage demo` reproduces the worked attribution example against a real ledger.
+Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 509 tests passing; `cage demo` reproduces the worked attribution example against a real ledger.
 
 **Honest limits.** Cage doesn't decide your human rate — it prices minutes at a blended rate you set, and labels the result `estimated` so it never pretends to be a timesheet. Marginal-by-fixed-order is defensible and `$0`, but it is an *ordering convention*, not a Shapley value (that's a deferred audit mode). And a counterfactual cell is an honest reconstruction, never an invoice — the `method` column says so on every row, on purpose.
 
@@ -276,7 +280,7 @@ Every derived view is parse / arithmetic over the log — **no LLM call, ever, o
 
 Latest release below — full history and detail in [CHANGELOG.md](CHANGELOG.md).
 
-- **v0.19.0 — pricing management.** New `cage prices` group (`unpriced`/`set`/`alias`/`list`/`sync`) turns silent $0 models into a paste-one-line fix; family matching now normalizes Copilot's dotted, route-prefixed ids and effort-tier suffixes; the bundled price table is refreshed with cited 2026-07 rates and versioned (`[meta]` + a sync recommendation in `doctor`). Every publishing surface warns when UNPRICED calls understate totals, `cage export` imports everything first (`--no-import` to snapshot), and a closed-allowlist `cage cleanup` keeps `.cage/state/` from growing unbounded.
+- **v0.20.0 — portable wiring.** Committed wired files (`.mcp.json`, `.vscode/mcp.json`, hook configs) no longer embed the wiring machine's absolute cage path — they reference a committed runtime-resolving shim, `.cage/bin/cage-run`, so a teammate's clone gets working wiring (and silent, fail-open no-ops if cage isn't installed). Re-running `cage setup` migrates legacy entries; `cage doctor` gains a portability check; `cage query portable-wiring` explains the design, including the one documented exception (Kiro's MCP config).
 
 ## The name
 

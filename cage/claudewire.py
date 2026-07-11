@@ -14,32 +14,65 @@ double-counts:
   Claude Code only fires it on certain clean terminations, never on a kill/crash/idle.
 
 The MCP read server goes in the project `.mcp.json`. All edits are idempotent.
+
+**Portability (plan §5):** both files this module writes are committed to git, so
+neither may carry the wiring machine's absolute cage path — commands reference the
+committed shim `.cage/bin/cage-run` (`cage/runshim.py`) instead. Per-host mechanism,
+verified against the Claude Code docs (hooks.md / mcp.md, 2026-07):
+
+- hooks: `"$CLAUDE_PROJECT_DIR/.cage/bin/cage-run"` — `${CLAUDE_PROJECT_DIR}` is a
+  documented hook path placeholder (hook cwd is only "Claude Code's working
+  directory", NOT guaranteed to be the project root — the placeholder is the
+  reliable form). Shell-form commands run via `sh`, so the quoting is POSIX.
+- `.mcp.json`: `${CLAUDE_PROJECT_DIR:-.}/.cage/bin/cage-run` — env expansion in
+  `command` is documented, and the docs *require* the `:-.` default here because
+  the variable is set in the spawned server's env, not the config parser's.
+
+A bare `cage` (the pre-shim reason for absolute paths) still fails in GUI-launched
+agents whose PATH omits ~/.local/bin — the shim carries that resolution at runtime
+now, identically on every clone. `_heal` migrates legacy absolute/bare entries to
+the shim form on re-setup and reports the count.
 """
 from __future__ import annotations
 
 import json
 from pathlib import Path
 
-from cage import paths
+from cage import paths, runshim
 
-# Commands are built with the *resolved* cage path (paths.cage_bin) — a bare `cage`
-# fails in GUI-launched agents whose PATH omits ~/.local/bin. SessionStart runs in
-# order: backfill the previous Claude session, *then* print the banner.
+
+def _shim() -> str:
+    # Quoted whole: $CLAUDE_PROJECT_DIR may expand to a path with spaces.
+    return f'"$CLAUDE_PROJECT_DIR/{runshim.SHIM_REL}"'
+
+
+# SessionStart runs in order: backfill the previous Claude session, *then* print
+# the banner.
 def BACKFILL() -> str:  # noqa: N802 — kept callable-named for the wiring it feeds
-    return f"{paths.quoted_cage_bin()} import-claude --project ."
+    return f"{_shim()} import-claude --project ."
 
 
 def BANNER() -> str:  # noqa: N802
-    return f"{paths.quoted_cage_bin()} hook-session-start"
+    return f"{_shim()} hook-session-start"
 
 
 # Stop = real-time per-turn capture; SessionEnd = clean-exit backstop; PostToolUse =
 # provenance edit buffer. All additive and idempotent (deduped by command/uuid).
 def _simple() -> dict:
-    c = paths.quoted_cage_bin()
+    c = _shim()
     return {"Stop": f"{c} hook-stop",
             "SessionEnd": f"{c} hook-session-end",
             "PostToolUse": f"{c} hook-post-tool-use"}
+
+
+def _reref(command: str) -> str | None:
+    """A cage command (binary or shim form) rewritten to the current shim reference,
+    preserving the subcommand; None for a foreign hook. Idempotent on the current
+    form — healing a healed file changes nothing."""
+    tail = paths.cage_command_tail(command)
+    if tail is None:
+        return None
+    return f"{_shim()} {tail}".rstrip()
 
 
 def _load(path: Path) -> dict:
@@ -66,10 +99,11 @@ def _entry(command: str) -> dict:
 
 
 def _is_stale_import(command: str, current: str) -> bool:
-    """A superseded cage import-backfill command (e.g. the old `import-claude --project .`
-    before the all-agent heartbeat) — a cage command containing `import` that isn't the
-    current backfill. Dropped on re-wire so the slot doesn't accumulate stale forms."""
-    return (paths.reresolve_cage_command(command) is not None
+    """A superseded cage import-backfill command (an absolute-path legacy form, or the
+    old `import-claude --project .` before the all-agent heartbeat) — a cage command
+    containing `import` that isn't the current backfill. Dropped on re-wire so the
+    slot doesn't accumulate stale forms."""
+    return (paths.cage_command_tail(command) is not None
             and " import" in command and command != current)
 
 
@@ -87,33 +121,40 @@ def _wire_session_start(entries: list) -> None:
         entries.append(_entry(BANNER()))
 
 
-def _heal(hooks: dict) -> None:
-    """Rewrite any stale cage hook command (bare `cage …`) to the resolved path, and
-    drop duplicate cage entries so re-running setup never accumulates them."""
+def _heal(hooks: dict) -> int:
+    """Rewrite any legacy cage hook command (bare `cage …` or a machine-absolute
+    path) to the committed shim reference, and drop duplicate cage entries so
+    re-running setup never accumulates them. Returns how many commands were
+    migrated (0 on an already-portable file — setup twice stays byte-identical).
+    Foreign (non-cage) hooks are never touched."""
+    migrated = 0
     for event, entries in hooks.items():
         seen: set[str] = set()
         kept = []
         for e in entries:
             new = []
             for h in e.get("hooks", []):
-                fixed = paths.reresolve_cage_command(h.get("command", ""))
+                fixed = _reref(h.get("command", ""))
                 if fixed is not None:
                     if fixed in seen:
                         continue
                     seen.add(fixed)
+                    if fixed != h.get("command"):
+                        migrated += 1
                     h["command"] = fixed
                 new.append(h)
             if new or not e.get("hooks"):
                 e["hooks"] = new
                 kept.append(e)
         hooks[event] = kept
+    return migrated
 
 
 def install(root: Path) -> dict:
     settings = root / ".claude" / "settings.json"
     data = _load(settings)
     hooks = data.setdefault("hooks", {})
-    _heal(hooks)
+    migrated = _heal(hooks)
     _wire_session_start(hooks.setdefault("SessionStart", []))
     for event, command in _simple().items():
         entries = hooks.setdefault(event, [])
@@ -123,9 +164,18 @@ def install(root: Path) -> dict:
 
     mcp = root / ".mcp.json"
     mdata = _load(mcp)
-    mdata.setdefault("mcpServers", {})["cage"] = {"command": paths.cage_bin(), "args": ["mcp"]}
+    # Documented `.mcp.json` env expansion; the `:-.` default is required (the var is
+    # set in the *server's* env, not the config parser's — see the module docstring).
+    portable = f"${{CLAUDE_PROJECT_DIR:-.}}/{runshim.SHIM_REL}"
+    old = mdata.get("mcpServers", {}).get("cage", {}).get("command")
+    if old is not None and old != portable:
+        migrated += 1
+    mdata.setdefault("mcpServers", {})["cage"] = {"command": portable, "args": ["mcp"]}
     _save(mcp, mdata)
-    return {"settings": str(settings), "mcp": str(mcp)}
+    out = {"settings": str(settings), "mcp": str(mcp)}
+    if migrated:
+        out["migrated"] = f"migrated {migrated} legacy entr{'y' if migrated == 1 else 'ies'} → shim"
+    return out
 
 
 def _session_start(root: Path) -> list:

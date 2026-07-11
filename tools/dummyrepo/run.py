@@ -187,7 +187,8 @@ def shard_bytes(repo: Path) -> bytes:
 
 def s1_cli(base: Path) -> str:
     """S1 — per agent × CLI: wiring reports all four; planted CLI logs import to exact
-    rows; doctor exits 0. (The hook-fires-live half is manual — see the checklist.)"""
+    rows; doctor exits 0; a simulated teammate clone gets portable wiring (no absolute
+    paths, the committed shim resolves). (The hook-fires-live half is manual.)"""
     repo, env = make_sandbox(base, "s1-cli")
     expect_ok(repo, env, "init")
     for agent in AGENTS:
@@ -202,7 +203,35 @@ def s1_cli(base: Path) -> str:
     assert_exact_rows(repo, specs)
     assert_pii_clean(repo)
     expect_ok(repo, env, "doctor")
-    return "wired 4/4 · CLI fixtures → exact rows · doctor ok"
+    clone_note = _clone_simulation(base, repo, env)
+    return f"wired 4/4 · CLI fixtures → exact rows · doctor ok · {clone_note}"
+
+
+def _clone_simulation(base: Path, repo: Path, env: dict) -> str:
+    """Portable-wiring acceptance (plan §5): copy the wired testbed to a new path the
+    way a `git clone` would land it — no `.git`, none of the `.cage/.gitignore`d dirs
+    (ledger/out/state) — then assert the clone's wiring is portable end-to-end:
+    doctor's portability check is clean and the committed shim actually resolves."""
+    clone = base / f"{repo.name}-clone"
+    shutil.copytree(repo, clone,
+                    ignore=shutil.ignore_patterns(".git", "ledger", "out", "state"))
+    r = cage(clone, env, "doctor")
+    # NB: the exact problem phrase — the kiro-MCP *advice* line legitimately contains
+    # the words "machine-absolute" (the documented exception), and is not a flag.
+    if "machine-absolute cage path in committed file(s)" in r.stdout:
+        raise Fail("clone doctor flags a machine-absolute path — wiring not portable: "
+                   + r.stdout[:300])
+    if "committed wiring is portable" not in r.stdout:
+        raise Fail("clone doctor missing the portability-clean line: " + r.stdout[:300])
+    # run the committed shim directly — must resolve cage on this machine and pass
+    # args through (POSIX twin here; the .cmd twin on Windows)
+    shim = clone / ".cage" / "bin" / "cage-run"
+    argv = [str(shim) + ".cmd"] if os.name == "nt" else ["sh", str(shim)]
+    rs = _sh(argv + ["--version"], cwd=clone, env=env)
+    if rs.returncode != 0 or "cage" not in rs.stdout:
+        raise Fail(f"clone shim did not resolve cage: exit {rs.returncode}, "
+                   f"out={rs.stdout.strip()[:120]!r}")
+    return "clone-sim portable (shim resolves)"
 
 
 def s2_vscode(base: Path) -> str:

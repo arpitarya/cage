@@ -162,6 +162,102 @@ def _state_dir(root: Path) -> tuple[str, str]:
         return _OK, f"state dir present (scan skipped: {exc})"
 
 
+def _committed_commands(root: Path) -> list[tuple[str, str]]:
+    """(file, command-string) pairs from every *project-committed* wired file. The
+    user-level configs (~/.copilot/hooks, ~/.codex/config.toml, .git/hooks) are
+    per-machine by nature and deliberately not scanned."""
+    from cage import cfgio
+    out: list[tuple[str, str]] = []
+
+    def hooks_cmds(rel: str) -> None:
+        for entries in cfgio.load_json(root / rel).get("hooks", {}).values():
+            for e in entries:
+                for h in e.get("hooks", []):
+                    out.append((rel, h.get("command", "")))
+
+    hooks_cmds(".claude/settings.json")
+    hooks_cmds(".codex/hooks.json")
+    for name, srv in cfgio.load_json(root / ".mcp.json").get("mcpServers", {}).items():
+        if name == "cage":
+            out.append((".mcp.json", srv.get("command", "")))
+    for name, srv in cfgio.load_json(root / ".vscode" / "mcp.json").get("servers", {}).items():
+        if name == "cage":
+            out.append((".vscode/mcp.json", srv.get("command", "")))
+    for hook in sorted((root / ".kiro" / "hooks").glob("*.kiro.hook")):
+        cmd = cfgio.load_json(hook).get("then", {}).get("command", "")
+        out.append((f".kiro/hooks/{hook.name}", cmd))
+    return out
+
+
+def _is_machine_absolute_cage(command: str) -> bool:
+    """A cage command whose executable is a machine-absolute path — the sharing bug
+    (plan §5): committed, it ships one dev's filesystem layout to the whole team."""
+    bin0, _ = paths._split_bin(command)
+    if not bin0:
+        return False
+    name = bin0.replace("\\", "/").rsplit("/", 1)[-1].lower()
+    if name not in ("cage", "cage.exe"):
+        return False
+    import re as _re
+    return bin0.startswith(("/", "~")) or bool(_re.match(r"[A-Za-z]:[\\/]", bin0))
+
+
+def _portability(root: Path) -> tuple[str, str]:
+    """No committed wired file may carry a machine-absolute cage path — teammates'
+    clones get broken wiring. Also verifies the committed shim exists, kept its
+    execute bit, and actually resolves cage on THIS machine. The single documented
+    exception (`kirowire.py`): .kiro/settings/mcp.json is absolute by necessity —
+    Kiro spawns MCP servers from its install dir with no workspace variable — so it
+    is reported as gitignore advice, never rewritten to a broken relative path."""
+    from cage import cfgio, runshim
+    cmds = _committed_commands(root)
+    shim = runshim.shim_path(root)
+    wired = bool(cmds)
+    if not wired and not shim.exists():
+        return _OK, "no committed wiring yet — nothing to check"
+
+    problems: list[str] = []
+    stale = sorted({f for f, c in cmds if _is_machine_absolute_cage(c)})
+    if stale:
+        problems.append("machine-absolute cage path in committed file(s): "
+                        + ", ".join(stale)
+                        + " — teammates' clones get broken wiring; re-run `cage setup "
+                          "--wire-only --<agent>` to migrate to the shim")
+    referenced = any("cage-run" in c for _, c in cmds)
+    if referenced and not shim.exists():
+        problems.append("wiring references .cage/bin/cage-run but the shim is missing "
+                        "— re-run `cage setup`")
+    notes: list[str] = []
+    if shim.exists():
+        import os as _os
+        import subprocess
+        if _os.name == "posix" and not _os.access(shim, _os.X_OK):
+            problems.append("shim exists but lost its execute bit (core.fileMode=false "
+                            "clone?) — `chmod +x .cage/bin/cage-run` or re-run `cage setup`")
+        try:  # run via sh so a stripped execute bit doesn't mask the resolution answer
+            argv = ([str(shim) + ".cmd"] if _os.name == "nt" else ["sh", str(shim)])
+            r = subprocess.run(argv + ["--version"], capture_output=True, text=True,
+                               timeout=15)
+            if r.returncode == 0 and r.stdout.strip():
+                notes.append(f"shim resolves → {r.stdout.strip()}")
+            elif r.returncode == 0:
+                problems.append("shim runs but resolves to no cage on this machine "
+                                "(fail-open exit 0) — capture is off here")
+            else:
+                problems.append(f"shim failed to run (exit {r.returncode})")
+        except Exception as exc:  # noqa: BLE001 — diagnosis must not crash doctor
+            problems.append(f"shim run check skipped: {exc}")
+    kiro_mcp = root / ".kiro" / "settings" / "mcp.json"
+    if "cage" in cfgio.load_json(kiro_mcp).get("mcpServers", {}):
+        notes.append("kiro MCP stays machine-absolute by necessity (Kiro spawns MCP "
+                     "servers from its install dir) — add .kiro/settings/mcp.json "
+                     "to .gitignore")
+    if problems:
+        return _WARN, "; ".join(problems + notes)
+    detail = "committed wiring is portable (no absolute cage paths)"
+    return _OK, "; ".join([detail] + notes) if notes else detail
+
+
 def _interceptor(root: Path) -> tuple[str, str]:
     shim = root / "bin" / "graphify"
     if not shim.exists():
@@ -260,6 +356,7 @@ def run(root: Path) -> dict:
         ("prices-meta", *_bundled_prices(active)),
         ("state", *_state_dir(active)),
         ("hooks", *_hooks(root)),
+        ("portability", *_portability(root)),
         ("metering", *_metering(active)),
         ("trace", *_capture_trace(active)),
         ("interceptor", *_interceptor(root)),

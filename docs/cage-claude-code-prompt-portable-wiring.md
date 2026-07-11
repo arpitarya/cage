@@ -73,7 +73,11 @@ reviewed/committed (ask if dirty). **No commits, tags, pushes, publishes.**
    idempotent; doctor flags a planted absolute path. Dummyrepo: extend the
    wiring scenario to clone-simulate (copy the testbed sans `.git` to a new
    path, run doctor there → portability clean, shim resolves).
-5. Docs: README setup section (what gets committed, what stays local),
+5. Docs: **`docs/portable-wiring.md` is the design of record — read it first,
+   implement to match, and update it wherever implementation reality diverges
+   (e.g. the per-host cwd/variable mechanisms, any documented exception).**
+   The README already links to it from the wiring section — verify the claim
+   there matches shipped behavior; extend the setup section if needed.
    CHANGELOG in-tree, plan-doc note, CLAUDE.md edit proposed-not-applied,
    skillgen fragments if CLI text changed (regen + `--bless`).
 

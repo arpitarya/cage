@@ -498,4 +498,33 @@ REGISTRY: tuple[Explanation, ...] = (
         ("cage/exportcmd.py", "cage/study.py", "policy.toml [capture]"),
         "n/a — describes capture freshness, not a number.",
         kind="concept", plan_ref="§3.7"),
+    Explanation(
+        # NB: no "cage-run"/"workspacefolder" keywords — their "cage"/"work" stems
+        # would steal generic "how does cage work"-style queries from `overview`.
+        "portable-wiring", ("portable-wiring", "portable", "shim", "absolute-path",
+                            "clone", "teammate", "committed", "broken-wiring",
+                            "team-share", "gitignore"),
+        "why committed wiring references .cage/bin/cage-run, never an absolute path",
+        "wired files that are committed to git (.claude/settings.json, .mcp.json,\n"
+        "  .vscode/mcp.json, .codex/hooks.json, .kiro/hooks/*.kiro.hook) used to embed\n"
+        "  the wiring machine's absolute cage path — one dev's filesystem shipped to\n"
+        "  the team, breaking every clone. They now reference the committed shim\n"
+        "  .cage/bin/cage-run (identical bytes on every machine), which resolves cage\n"
+        "  at RUNTIME: cage on PATH → ~/.local/bin / pipx / active $VIRTUAL_ENV →\n"
+        "  python3 -m cage → exit 0 silently. cage absent ⇒ working agents, no noise,\n"
+        "  no capture (fail-open extended to wiring; `cage doctor` diagnoses, never\n"
+        "  the hook path). Per host: Claude hooks use the documented\n"
+        "  $CLAUDE_PROJECT_DIR placeholder; .mcp.json uses ${{CLAUDE_PROJECT_DIR:-.}}\n"
+        "  expansion; .vscode/mcp.json uses ${{workspaceFolder}}; codex/kiro hooks\n"
+        "  self-locate via git rev-parse (their hosts guarantee neither variable nor\n"
+        "  cwd). User-level files (~/.copilot/hooks, ~/.codex/config.toml MCP,\n"
+        "  .git/hooks) stay absolute — per-machine by nature, never cloned. The ONE\n"
+        "  exception: .kiro/settings/mcp.json must stay absolute (Kiro spawns MCP\n"
+        "  servers from its install dir, no workspace variable) — gitignore it.\n"
+        "  Re-running `cage setup` migrates legacy absolute entries and prints what\n"
+        "  moved; `cage doctor` has a portability check.",
+        ("cage/runshim.py", "cage/claudewire.py", "cage/codexwire.py",
+         "cage/kirowire.py", "cage/doctorcmd.py"),
+        "n/a — describes the wiring mechanism, not a number.",
+        kind="concept", plan_ref="§5"),
 )

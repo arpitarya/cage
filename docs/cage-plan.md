@@ -860,6 +860,36 @@ an unknown subcommand) · **`130`** interrupted (`KeyboardInterrupt`). `cage ver
 report-only and always exits `0` — visibility, never a build gate. This is additive and
 boundary-only: the fail-open internals are verified by tests, never rewritten.
 
+### 5.3 Portable wiring — the committed `.cage/bin/cage-run` shim (v0.20; design of record: [portable-wiring.md](portable-wiring.md))
+
+Wired hook/MCP entries used to embed the wiring machine's **absolute cage path**
+(`paths.cage_bin()` at setup time — needed because GUI-launched agents run hooks
+with a PATH that omits `~/.local/bin`). But several wired files are committed to
+git (`.claude/settings.json`, `.mcp.json`, `.vscode/mcp.json`, `.codex/hooks.json`,
+`.kiro/hooks/*.kiro.hook`), so one developer's filesystem shipped to the team and
+every clone got broken wiring. The fix moves resolution from setup time to **run
+time**: `cage setup` writes a committed shim, `.cage/bin/cage-run` (POSIX sh) +
+`cage-run.cmd` (Windows twin, UNVERIFIED-on-real-host label), identical bytes on
+every machine, and committed wiring references only the shim
+([runshim.py](../cage/runshim.py)). Resolution order: PATH → `~/.local/bin` / pipx
+/ active `$VIRTUAL_ENV` → `python3 -m cage` → **exit 0 silently** — fail-open
+extended to wiring: a clone without cage has working agents, no noise, no capture;
+`cage doctor`'s `portability` check is where diagnosis lives (flags committed
+absolute paths, a missing/bit-less shim, and runs `cage-run --version`).
+
+Per-host reference mechanism (each verified and documented in its wire module):
+Claude hooks `$CLAUDE_PROJECT_DIR` (documented placeholder), `.mcp.json`
+`${CLAUDE_PROJECT_DIR:-.}` (documented expansion + required default),
+`.vscode/mcp.json` `${workspaceFolder}` (documented), Codex/Kiro hooks a
+self-locating `git rev-parse --show-toplevel` one-liner (neither host guarantees a
+repo cwd or variable; Codex's docs recommend exactly this). User-level configs
+(`~/.copilot/hooks`, `~/.codex/config.toml` MCP, `.git/hooks/*`) stay absolute —
+per-machine by nature. The ONE exception: `.kiro/settings/mcp.json` must stay
+absolute (Kiro spawns MCP servers from its install dir; no variable substitution
+exists) — documented, gitignore-advised, never a silently-broken relative path.
+Migration is opt-in by re-running setup (idempotent, prints what moved); legacy
+absolute entries keep working until then.
+
 ---
 
 ## 6. Tiers — `$0` core, AI strictly optional

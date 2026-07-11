@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from cage import claudewire, codexwire, copilotwire, gitcommithook, kirowire
+from cage import claudewire, codexwire, copilotwire, gitcommithook, kirowire, runshim
 
 SURFACES = ("claude", "codex", "copilot", "kiro")
 
@@ -29,6 +29,9 @@ _WIRE = {"claude": claudewire, "codex": codexwire,
 
 def install(root: Path, surfaces: tuple[str, ...] | None = None) -> dict:
     picked = surfaces or SURFACES
+    # Every surface's committed wiring references the committed shim instead of an
+    # absolute cage path (plan §5) — write it first so the references always resolve.
+    runshim.write(root)
     out: dict[str, dict] = {}
     for name in (s for s in SURFACES if s in picked):
         out[name] = _WIRE[name].install(root)

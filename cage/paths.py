@@ -46,11 +46,33 @@ def _split_bin(command: str) -> tuple[str, str]:
     return (parts[0] if parts else ""), (parts[1] if len(parts) == 2 else "")
 
 
+def cage_command_tail(command: str) -> str | None:
+    """The subcommand tail if ``command`` invokes cage — by binary name (`cage …`,
+    `/abs/path/cage …`, the Windows `…\\cage.exe` forms, quoted) **or via the
+    committed shim** (`cage-run` in any host's reference form, plan §5); else None
+    (a foreign hook — never touch it). The superset detector wiring/migration use;
+    `reresolve_cage_command` deliberately stays binary-only so nothing can ever
+    rewrite a portable shim reference back into an absolute path."""
+    bin0, sub = _split_bin(command)
+    if not bin0:
+        return None
+    name = bin0.replace("\\", "/").rsplit("/", 1)[-1].lower()
+    if name in ("cage", "cage.exe", "cage-run", "cage-run.cmd"):
+        return sub
+    return None
+
+
 def is_cage_import_command(command: str) -> bool:
-    """True if ``command`` is a cage ``import …`` hook command (any agent/flags). Lets the
-    wiring collapse a superseded per-agent import (e.g. `cage import --agent codex`) into
-    the current per-agent import on re-setup, instead of leaving both."""
-    return reresolve_cage_command(command) is not None and " import" in (command or "")
+    """True if ``command`` is a cage ``import …`` hook command (any agent/flags), in
+    binary, shim, or self-locating one-liner form. Lets the wiring collapse a
+    superseded per-agent import (e.g. `cage import --agent codex`) into the current
+    per-agent import on re-setup, instead of leaving both."""
+    cmd = command or ""
+    if " import" not in cmd:
+        return False
+    # the codex/kiro self-locating one-liner doesn't start with an executable name —
+    # its shim path in the middle is the cage marker
+    return cage_command_tail(cmd) is not None or "cage-run" in cmd
 
 
 def reresolve_cage_command(command: str) -> str | None:
