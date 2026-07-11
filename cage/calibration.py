@@ -108,6 +108,48 @@ def summarize_human(root: Path, pol: dict) -> dict:
     return d
 
 
+def render_csv(d: dict) -> str:
+    """CSV over the same `summarize()` payload as the text view (one structure,
+    two renderers): one ``task`` row per scored task, then one ``summary`` row
+    carrying the distribution, the hit-rate, and the visible skip counts. Both
+    are ``measured`` — recorded estimates vs recorded actuals. Column contract in
+    docs/csv-output.md."""
+    from cage import csvout
+    head = ["kind", "task", "est_tokens", "actual_tokens", "ratio", "in_band",
+            "n", "median_ratio", "q1_ratio", "q3_ratio", "hit_rate", "hits",
+            "skipped_open", "skipped_zero_actual", "skipped_no_band", "method"]
+    rows = [["task", s["task"], s["est"], s["actual"], s["ratio"], s["in_band"],
+             None, None, None, None, None, None, None, None, None, d["method"]]
+            for s in d["tasks"]]
+    skip = d["skipped"]
+    r = d.get("ratio") or {}
+    rows.append(["summary", None, None, None, None, None, d["n"],
+                 r.get("median"), r.get("q1"), r.get("q3"),
+                 d.get("hit_rate"), d.get("hits"),
+                 skip["open"], skip["zero-actual"], skip["no-band"], d["method"]])
+    return csvout.table(head, rows)
+
+
+def render_csv_human(d: dict) -> str:
+    """CSV for `cage calibration --human` over the same payload as the text view:
+    ``task`` rows (attested vs derived minutes) + one ``summary`` row. A refused
+    view (below min-n) keeps the refusal in the summary ``note`` and carries no
+    distribution — the command explains, never numbers, in CSV too."""
+    from cage import csvout
+    head = ["kind", "task", "attested_minutes", "derived_minutes", "ratio",
+            "n", "median_ratio", "q1_ratio", "q3_ratio", "cap_minutes",
+            "method", "note"]
+    rows = [["task", s["task"], s["attested_min"], s["derived_min"], s["ratio"],
+             None, None, None, None, None, d["method"], ""]
+            for s in d["tasks"]]
+    r = d.get("ratio") or {}
+    rows.append(["summary", None, None, None, None, d["n"],
+                 r.get("median"), r.get("q1"), r.get("q3"), d["cap_minutes"],
+                 d["method"] if d["ok"] else "",
+                 d["label"] if d["ok"] else d["reason"]])
+    return csvout.table(head, rows)
+
+
 def render_calibration_human(d: dict) -> str:
     if not d["ok"]:
         return ("Calibration · derived attention vs attested minutes\n\n"

@@ -46,6 +46,15 @@ def _html_flag(p: argparse.ArgumentParser) -> None:
     p.add_argument("--html", metavar="PATH", help="write a standalone HTML page (no CDN)")
 
 
+def _csv_flag(p: argparse.ArgumentParser) -> None:
+    # nargs="?": bare `--csv` streams to stdout (pipe-friendly); `--csv PATH` writes
+    # a file. CSV is a one-way REPORTING format for spreadsheets — same numbers as
+    # the text view by construction; never an import source (`cage query csv-output`).
+    p.add_argument("--csv", nargs="?", const="-", metavar="PATH",
+                   help="emit this view as CSV (stdout, or to PATH); method tags "
+                        "stay columns — see `cage query csv-output`")
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="cage", description=_DESCRIPTION, epilog=_EPILOG,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -68,6 +77,7 @@ def build_parser() -> argparse.ArgumentParser:
                           "current dir). Exact for Claude only (§3.7)")
     rep.add_argument("--team", action="store_true", help="read the merged refs/notes/cage-ledger team view (§3.6.3)")
     _json_flag(rep)
+    _csv_flag(rep)
     rep.set_defaults(fn=clicmds.cmd_report)
 
     at = sub.add_parser("attrib", help="per-tool marginal savings for a task (§4.2)")
@@ -75,6 +85,7 @@ def build_parser() -> argparse.ArgumentParser:
     at.add_argument("--scope", metavar="DIR", help="filter to one monorepo top-level dir (§3.6.2)")
     at.add_argument("--team", action="store_true", help="read the merged refs/notes/cage-ledger team view (§3.6.3)")
     _json_flag(at)
+    _csv_flag(at)
     at.set_defaults(fn=clicmds.cmd_attrib)
 
     mx = sub.add_parser("matrix", help="counterfactual permutation table for a task (§4.4)",
@@ -100,6 +111,7 @@ def build_parser() -> argparse.ArgumentParser:
     ro = sub.add_parser("roi", help="saved $ per tool vs its own cost + latency")
     ro.add_argument("--since", metavar="WINDOW", help="window like 30d / 2w")
     _json_flag(ro)
+    _csv_flag(ro)
     ro.set_defaults(fn=clicmds.cmd_roi)
 
     cp = sub.add_parser("compare",
@@ -112,6 +124,7 @@ def build_parser() -> argparse.ArgumentParser:
     cp.add_argument("--agent-only", action="store_true",
                     help="suppress the total-cost line (agent $ + human attention minutes × rate)")
     _json_flag(cp)
+    _csv_flag(cp)
     cp.set_defaults(fn=clicmds.cmd_compare)
 
     es = sub.add_parser("estimate",
@@ -133,6 +146,7 @@ def build_parser() -> argparse.ArgumentParser:
                     help="score the derived-attention heuristic instead: derived/attested "
                          "minute ratio over tasks carrying both (refuses thin data)")
     _json_flag(cb)
+    _csv_flag(cb)
     cb.set_defaults(fn=clicmds.cmd_calibration)
 
     vd = sub.add_parser("verdict",
@@ -164,6 +178,7 @@ def build_parser() -> argparse.ArgumentParser:
                      help="report: suppress the total-cost line (agent $ + human "
                           "attention minutes × rate)")
     _json_flag(st2)
+    _csv_flag(st2)
     st2.set_defaults(fn=clicmds.cmd_study)
 
     pr = sub.add_parser("prices",
@@ -208,6 +223,7 @@ def build_parser() -> argparse.ArgumentParser:
     hu.add_argument("--agent", help="filter to one agent")
     _json_flag(hu)
     _html_flag(hu)
+    _csv_flag(hu)
     hu.set_defaults(fn=clicmds.cmd_human)
 
     hr = sub.add_parser("human-record", help="record a Tier-1 human alternative for a task (§5)",
@@ -232,6 +248,7 @@ def build_parser() -> argparse.ArgumentParser:
     tr.add_argument("--since", metavar="WINDOW")
     _json_flag(tr)
     _html_flag(tr)
+    _csv_flag(tr)
     tr.set_defaults(fn=clicmds.cmd_trend)
 
     wy = sub.add_parser("why", help="full provenance: a call + every receipt against it")
@@ -388,13 +405,23 @@ def build_parser() -> argparse.ArgumentParser:
     ex = sub.add_parser("export", help="import (refresh) then emit the ledger as jsonl/csv/json",
                         epilog="examples:\n"
                                "  cage export                              # refresh, then raw jsonl to stdout\n"
-                               "  cage export --format csv -o spend.csv     # flat csv for a spreadsheet\n"
+                               "  cage export --csv calls -o spend.csv      # flat call rows for a spreadsheet\n"
+                               "  cage export --csv receipts --since 30d    # flat receipt rows (method column kept)\n"
                                "  cage export --format json --since 30d     # structured summary (matches `cage report`)\n"
                                "  cage export --no-import --format jsonl    # emit the ledger as-is, no refresh\n"
-                               "  cage export --project . --agent claude    # one project's Claude rows",
+                               "  cage export --project . --agent claude    # one project's Claude rows\n"
+                               "Two export kinds, never blurred: the fleet bundle (--study, jsonl) is lossless,\n"
+                               "merge-by-id, and re-importable; CSV is a one-way REPORTING format for\n"
+                               "spreadsheets — never an import source (`cage query csv-output`).",
                         formatter_class=argparse.RawDescriptionHelpFormatter)
-    ex.add_argument("--format", choices=["jsonl", "csv", "json"], default="jsonl",
-                    help="jsonl=raw rows (re-ingestable) · csv=flat · json=summary (default: jsonl)")
+    ex.add_argument("--format", choices=["jsonl", "csv", "json"], default=None,
+                    help="jsonl=raw rows (re-ingestable) · csv=flat call rows (same as "
+                         "--csv calls) · json=summary (default: jsonl)")
+    ex.add_argument("--csv", choices=["calls", "receipts", "tasks"], dest="csv_kind",
+                    metavar="KIND",
+                    help="flat one-way CSV of raw ledger rows for pivot-table analysis "
+                         "(calls | receipts | tasks); same PII surface as the ledger — "
+                         "counts and ids, never content")
     ex.add_argument("--json", action="store_const", dest="format", const="json",
                     help="alias for --format json (the structured summary)")
     ex.add_argument("--since", metavar="WINDOW", help="window like 7d / 24h / 2w")

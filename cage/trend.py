@@ -73,6 +73,25 @@ def _render_attention(data: dict) -> str:
     return "\n".join(lines)
 
 
+def render_csv(data: dict) -> str:
+    """CSV over the same `series()` payload as the text view (one structure, two
+    renderers). ``attested`` rows are the receipt-priced buckets; ``derived`` rows
+    are the turn-gap attention series — separate kinds, never blended (the text
+    view's two-sections law), the derived rows labelled in ``note``. Both are
+    ``estimated``. Column contract in docs/csv-output.md."""
+    from cage import attention, csvout
+    head = ["kind", "bucket", "tasks", "agent_usd", "human_usd", "saved_usd",
+            "saved_minutes", "attention_minutes", "method", "note"]
+    rows = [["attested", key, b["tasks"], b["agent_usd"], b["human_usd"],
+             b["saved_usd"], b["saved_min"], None, "estimated", ""]
+            for key, b in sorted(data["buckets"].items())]
+    note = f"{attention.LABEL} · cap {data['idle_cap']:g} min — never summed with attested"
+    attn = data.get("attention") or {}
+    rows += [["derived", key, None, None, None, None, None, attn[key],
+              attention.METHOD, note] for key in sorted(attn)]
+    return csvout.table(head, rows)
+
+
 def render_trend(data: dict, metric: str = "both") -> str:
     if not data["buckets"]:
         attn = _render_attention(data)

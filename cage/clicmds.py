@@ -9,7 +9,7 @@ from cage import (adoptcmd, agents, attribution, budget, compare, demo, doctorcm
                   ledger, ledgersync, limits, matrix, mcpserver, metercmd, metering, notessync,
                   origin, paths, policy, provenance, proxy, quality, recommend, regression,
                   render, report, roi, serve, tasks, trend, verifycmd, watchcmd, wizard)
-from cage.cliutil import emit, ledger_root, root
+from cage.cliutil import csv_dest, emit, ledger_root, root
 from cage.errors import CageError
 
 
@@ -56,6 +56,9 @@ def cmd_report(args) -> int:
                            scope=getattr(args, "scope", None),
                            project=_project_filter(args),
                            team=getattr(args, "team", False))
+    if (dest := csv_dest(args)) is not None:
+        from cage import csvout
+        return csvout.write(report.render_csv(rep), dest)
     return emit(args, rep, report.render_report(rep, last_import=importcmd.last_import(r)))
 
 
@@ -71,6 +74,9 @@ def cmd_attrib(args) -> int:
     task = args.task or _latest_task(r)
     data = attribution.attribute(r, task, _policy(r), scope=getattr(args, "scope", None),
                                  team=getattr(args, "team", False))
+    if (dest := csv_dest(args)) is not None:
+        from cage import csvout
+        return csvout.write(attribution.render_csv(data), dest)
     return emit(args, data, attribution.render_attrib(data))
 
 
@@ -90,6 +96,9 @@ def cmd_matrix(args) -> int:
 def cmd_human(args) -> int:
     r = ledger_root()
     data = humanview.rollup(r, _policy(r), since=args.since, agent=args.agent, task=args.task)
+    if (dest := csv_dest(args)) is not None:
+        from cage import csvout
+        return csvout.write(humanview.render_csv(data), dest)
     text = humanview.render_human(data)
     if getattr(args, "html", None):
         serve.write_html(args.html, "Agent vs human", {"Agent vs human": text})
@@ -111,6 +120,9 @@ def cmd_human_record(args) -> int:
 def cmd_trend(args) -> int:
     r = ledger_root()
     data = trend.series(r, _policy(r), by=args.by, since=args.since)
+    if (dest := csv_dest(args)) is not None:
+        from cage import csvout
+        return csvout.write(trend.render_csv(data), dest)
     text = trend.render_trend(data, metric=args.metric)
     if getattr(args, "html", None):
         serve.write_html(args.html, "Savings trend", {"Savings trend": text})
@@ -143,6 +155,9 @@ def cmd_limits(args) -> int:
 def cmd_roi(args) -> int:
     r = ledger_root()
     data = roi.by_tool(r, _policy(r), since=args.since)
+    if (dest := csv_dest(args)) is not None:
+        from cage import csvout
+        return csvout.write(roi.render_csv(data), dest)
     return emit(args, data, roi.render_roi(data))
 
 
@@ -238,6 +253,9 @@ def cmd_compare(args) -> int:
         raise CageError(f"unknown --by key(s) {bad}; choose from stack, scope, label")
     d = compare.summarize(r, _policy(r), by=by, scope=args.scope, label=args.label,
                           agent_only=getattr(args, "agent_only", False))
+    if (dest := csv_dest(args)) is not None:
+        from cage import csvout
+        return csvout.write(compare.render_csv(d), dest)
     return emit(args, render.envelope("compare", d) if args.json else d,
                 compare.render_compare(d))
 
@@ -267,9 +285,15 @@ def cmd_calibration(args) -> int:
     r = ledger_root()
     if getattr(args, "human", False):  # plan §4.10 — score the turn-gap heuristic
         d = calibration.summarize_human(r, _policy(r))
+        if (dest := csv_dest(args)) is not None:
+            from cage import csvout
+            return csvout.write(calibration.render_csv_human(d), dest)
         return emit(args, render.envelope("calibration", d) if args.json else d,
                     calibration.render_calibration_human(d))
     d = calibration.summarize(r, _policy(r))
+    if (dest := csv_dest(args)) is not None:
+        from cage import csvout
+        return csvout.write(calibration.render_csv(d), dest)
     return emit(args, render.envelope("calibration", d) if args.json else d,
                 calibration.render_calibration(d))
 
@@ -307,6 +331,8 @@ def cmd_study(args) -> int:
     (capture lands there); `join` additionally wires this project's agents."""
     from cage import machine, study
     r = ledger_root()
+    if args.action != "report" and getattr(args, "csv", None) is not None:
+        raise CageError("--csv applies to `cage study report` only")
     if args.action == "id":
         mid = machine.machine_id(r)
         print(mid if mid else "not enrolled — `cage study join <phase>` (or `start`) "
@@ -325,6 +351,9 @@ def cmd_study(args) -> int:
         return 0
     if args.action == "report":
         d = study.summarize(r, _policy(r), agent_only=getattr(args, "agent_only", False))
+        if (dest := csv_dest(args)) is not None:
+            from cage import csvout
+            return csvout.write(study.render_csv(d), dest)
         return emit(args, render.envelope("study", d) if args.json else d,
                     study.render_study(d))
     # join — one-command enrollment: scaffold → wire all four → start → doctor
@@ -622,6 +651,11 @@ def cmd_export(args) -> int:
     r = ledger_root()
     pol = _policy(r)
     if getattr(args, "study", None) is not None:
+        if getattr(args, "csv_kind", None) or getattr(args, "format", None):
+            # Two export kinds, never blurred: the bundle is lossless jsonl by
+            # design; CSV is one-way reporting and never an import source.
+            raise CageError("--study writes the jsonl fleet bundle — it cannot "
+                            "combine with --csv/--format (`cage query csv-output`)")
         from cage import study
         refresh = {"ran": False, "new_calls": 0}
         if getattr(args, "do_import", True) and policy.import_before_export(pol):

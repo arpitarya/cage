@@ -49,6 +49,24 @@ pre-formatted table. Never invent a number.
 
 Every command takes `--json` for machine-readable output.
 
+**Reporting recipes** ("generate my cost report / a CSV / a summary"): the read
+views also emit CSV — `--csv` streams to stdout, `--csv <path>` writes a file
+(save it where the user asked; default `./cage-report-<view>-<since>.csv`).
+
+- weekly spend — `cage report --csv --since 7d` (add `--by model` / `--by day`)
+- per-tool savings — `cage attrib --csv` · ROI — `cage roi --csv`
+- is tool X worth it — `cage verdict <tool>` and quote its verdict line verbatim
+- fleet number — `cage study report --csv`
+- estimate accuracy — `cage calibration --csv`
+
+Summarization rules for any report you write from cage output: quote cage's
+numbers **verbatim**; keep the method tags (`measured`/`modeled`/`estimated`)
+and the ⚠ UNPRICED / observational caveats in the summary — they are columns in
+every CSV, never drop them; never extrapolate or fill gaps — if cage refused
+(INSUFFICIENT DATA / a min-n line), the summary says so instead of a number.
+CSV is one-way reporting for spreadsheets; the re-importable fleet bundle is
+`cage export --study` (jsonl) — never blur the two.
+
 To meter this agent, run it under `cage proxy` (point its base URL at the proxy),
 or `cage meter -- <cmd>` for a one-shot.
 

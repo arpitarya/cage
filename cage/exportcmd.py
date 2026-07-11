@@ -4,25 +4,44 @@ The pull-based companion to `cage import`: it imports first (so the export is fr
 unless ``--no-import``), then serializes the active ledger as one of three formats:
 
 - **jsonl** — the raw call rows, lossless and re-ingestable (the default).
-- **csv**  — a flat row-per-call table for spreadsheets/BI (stdlib `csv`).
+- **csv**  — flat raw rows for spreadsheets/BI (stdlib `csv` via `csvout`):
+  ``--csv calls|receipts|tasks`` picks the row kind (``--format csv`` is the
+  legacy spelling of ``--csv calls``). **Two export kinds, never blurred**: the
+  fleet bundle (``--study``) stays jsonl — lossless, merge-by-id, re-importable —
+  while CSV is a one-way REPORTING format and never an import source.
 - **json** — a structured summary (totals by agent/model/project) whose totals match
   `cage report`.
 
-Counts-never-content: only the call rows (token *counts*) are emitted, never prompt
-bodies. Deterministic: rows are emitted in ledger order, so the same `--since` window
-yields byte-identical output. The "↻ imported N new call(s)" notice goes to **stderr**,
-so a piped jsonl/csv stdout stream stays pure data.
+Counts-never-content: only ledger rows (token *counts*, ids) are emitted, never
+prompt bodies — the CSV carries the exact same PII surface as the ledger itself.
+Deterministic: rows are emitted in ledger order with LF line endings pinned, so the
+same `--since` window yields byte-identical output on any OS. The "↻ imported N new
+call(s)" notice goes to **stderr**, so a piped jsonl/csv stdout stream stays pure data.
 """
 from __future__ import annotations
 
-import csv
-import io
 import json
 import sys
 from pathlib import Path
 
-from cage import importcmd, ledger, prices
-from cage.schema import CALL_FIELDS
+from cage import csvout, importcmd, ledger, prices
+from cage.errors import CageError
+from cage.schema import CALL_FIELDS, RECEIPT_FIELDS
+
+# Closed, deterministic CSV column contracts per row kind (docs/csv-output.md).
+# calls/receipts extend the schema tuples with the additive fleet `machine` stamp;
+# tasks.jsonl has no closed schema tuple, so the export pins one here: identity +
+# outcome + label + the recorded-estimate fields (plan §3.4) + the PII-guarded git
+# snapshot (counts + top-level dirs only). Unknown extras are ignored — the column
+# order never depends on ledger content.
+RAW_CSV_FIELDS = {
+    "calls": (*CALL_FIELDS, "machine"),
+    "receipts": (*RECEIPT_FIELDS, "machine"),
+    "tasks": ("id", "ts", "type", "outcome", "label", "agents",
+              "est_tokens", "est_usd", "est_n", "est_tokens_q1", "est_tokens_q3",
+              "commit", "branch", "files_changed", "insertions", "deletions",
+              "dirs", "machine"),
+}
 
 
 class _ImportArgs:
@@ -69,13 +88,11 @@ def _jsonl(rows: list[dict]) -> str:
     return "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows)
 
 
-def _csv(rows: list[dict]) -> str:
-    buf = io.StringIO()
-    w = csv.DictWriter(buf, fieldnames=list(CALL_FIELDS), extrasaction="ignore")
-    w.writeheader()  # an empty ledger still emits a valid header-only artifact
-    for r in rows:
-        w.writerow(r)
-    return buf.getvalue()
+def _csv(rows: list[dict], kind: str = "calls") -> str:
+    # An empty ledger still emits a valid header-only artifact. LF pinned +
+    # canonical cells via csvout (bool → true/false, lists ";"-joined, dicts as
+    # sorted JSON) — deterministic across OSes.
+    return csvout.dict_rows(RAW_CSV_FIELDS[kind], rows)
 
 
 def _bucket() -> dict:
@@ -118,22 +135,50 @@ def render(rows: list[dict], fmt: str, pol: dict, refresh: dict | None = None) -
     return json.dumps(summary, ensure_ascii=False, indent=2) + "\n"
 
 
+def _raw_rows(root: Path, kind: str, since: str | None) -> list[dict]:
+    """Window-filtered raw rows of one kind for the ``--csv`` reporting export —
+    rows exactly as the ledger stores them (tasks stay raw append-only updates,
+    not the last-write-wins merge: this is the ledger's own PII surface, flat)."""
+    return ledger.since(ledger.read_kind(root, kind, since=since), since)
+
+
 def run(root: Path, args, *, pol: dict) -> int:
     """Import-first (all agents; `--no-import` flag > `[capture] import_before_export`
     policy), then emit. Fail-open: a failed refresh warns and still exports whatever
-    is already in the ledger."""
+    is already in the ledger. Bad flag combinations are typed errors (`CageError`)."""
     from cage import policy as _policy
     agent = getattr(args, "agent", None)
     since = getattr(args, "since", None)
+    project = getattr(args, "project", None)
+    kind = getattr(args, "csv_kind", None)
+    fmt = getattr(args, "format", None)
+    if kind and fmt:
+        raise CageError("--csv and --format are mutually exclusive — --csv calls "
+                        "already is the flat call-row CSV")
+    if kind and kind != "calls" and (agent or project):
+        raise CageError(f"--agent/--project filter call rows only, not {kind} — "
+                        "drop the filter or export --csv calls")
     refresh = {"ran": False, "new_calls": 0}
     if getattr(args, "do_import", True) and _policy.import_before_export(pol):
         ran, added = sweep(root, since)
         refresh = {"ran": ran, "new_calls": added}
-    rows = _filtered(root, since, getattr(args, "project", None), agent)
-    out = render(rows, args.format, pol, refresh=refresh if args.format == "json" else None)
+    fmt = fmt or ("csv" if kind else "jsonl")
+    if kind and kind != "calls":
+        rows = _raw_rows(root, kind, since)
+        out = _csv(rows, kind)
+    else:
+        rows = _filtered(root, since, project, agent)
+        out = render(rows, fmt, pol, refresh=refresh if fmt == "json" else None)
+    unit = kind or "call"
     if getattr(args, "output", None):
-        Path(args.output).write_text(out, encoding="utf-8")
-        print(f"✔ wrote {len(rows)} call(s) → {args.output} ({args.format})", file=sys.stderr)
+        try:
+            # newline="" pins the LF the renderers emit — no CRLF translation on
+            # Windows, so the same window is byte-identical on any OS.
+            Path(args.output).write_text(out, encoding="utf-8", newline="")
+        except OSError as e:
+            raise CageError(f"cannot write export to {args.output}: {e}") from e
+        print(f"✔ wrote {len(rows)} {unit.rstrip('s')}(s) → {args.output} ({fmt})",
+              file=sys.stderr)
     else:
         sys.stdout.write(out)
     return 0

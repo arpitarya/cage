@@ -270,9 +270,21 @@ Wired files that get **committed** (`.mcp.json`, `.vscode/mcp.json`, `.kiro/hook
 
 **An agent's spend isn't showing up?** `cage doctor` shows the active ledger, each agent's real capture state, and "last import: N ago"; the metadata-only debug log says per agent whether a hook fired or raised — see [Debugging capture](docs/debugging-capture.md).
 
+## Reporting — CSV out of every read view
+
+Every read view also renders as CSV for spreadsheets/BI: `--csv` streams to stdout (pipe-friendly), `--csv <path>` writes a file. The same data structure feeds the text table and the CSV, so the numbers can't disagree — and the honesty ships with them: **method tags are columns** (`measured` vs `estimated` survives into the sheet), refusals and the UNPRICED counts stay visible, line endings are LF on every OS (byte-identical, deterministic).
+
+```bash
+cage report --csv --since 7d > weekly-spend.csv   # last week's spend, flat
+cage attrib --csv                                  # per-tool savings, method column kept
+cage export --csv calls --since 30d -o calls.csv   # raw ledger rows for a pivot table
+```
+
+`--csv` works on `report` · `attrib` · `roi` · `compare` · `study report` · `calibration` · `human` · `trend`; raw rows come from `cage export --csv calls|receipts|tasks`. CSV is one-way reporting — never an import source; the re-importable fleet bundle stays jsonl (`cage export --study`). Column contracts: [docs/csv-output.md](docs/csv-output.md); `cage query csv-output` explains the design. The `cage` skill on all four agents knows the recipes — ask your agent for "my weekly cost report as CSV".
+
 ## The `$0` guarantee
 
-Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 509 tests passing; `cage demo` reproduces the worked attribution example against a real ledger.
+Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 543 tests passing; `cage demo` reproduces the worked attribution example against a real ledger.
 
 **Honest limits.** Cage doesn't decide your human rate — it prices minutes at a blended rate you set, and labels the result `estimated` so it never pretends to be a timesheet. Marginal-by-fixed-order is defensible and `$0`, but it is an *ordering convention*, not a Shapley value (that's a deferred audit mode). And a counterfactual cell is an honest reconstruction, never an invoice — the `method` column says so on every row, on purpose.
 
@@ -280,7 +292,7 @@ Every derived view is parse / arithmetic over the log — **no LLM call, ever, o
 
 Latest release below — full history and detail in [CHANGELOG.md](CHANGELOG.md).
 
-- **v0.20.0 — portable wiring.** Committed wired files (`.mcp.json`, `.vscode/mcp.json`, hook configs) no longer embed the wiring machine's absolute cage path — they reference a committed runtime-resolving shim, `.cage/bin/cage-run`, so a teammate's clone gets working wiring (and silent, fail-open no-ops if cage isn't installed). Re-running `cage setup` migrates legacy entries; `cage doctor` gains a portability check; `cage query portable-wiring` explains the design, including the one documented exception (Kiro's MCP config).
+- **v0.21.0 — CSV output + agent reporting recipes.** Every read view (`report` · `attrib` · `roi` · `compare` · `study report` · `calibration` · `human` · `trend`) gains `--csv` (stdout or a file), plus raw rows via `cage export --csv calls|receipts|tasks` — one shared data structure feeds text and CSV so the numbers can't disagree, method tags stay columns, refusals/caveats/UNPRICED survive into the sheet, LF pinned byte-identical on every OS. The `cage` skill on all four agents teaches the recipes; MCP mirrors it (`format: csv`); `cage query csv-output` explains the design.
 
 ## The name
 

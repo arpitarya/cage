@@ -499,6 +499,29 @@ REGISTRY: tuple[Explanation, ...] = (
         "n/a — describes capture freshness, not a number.",
         kind="concept", plan_ref="§3.7"),
     Explanation(
+        "csv-output", ("csv", "csv-output", "spreadsheet", "excel", "pivot",
+                       "pivot-table", "flat-table", "reporting-format",
+                       "report-csv", "one-way"),
+        "the CSV reporting surface: which views, the column law, csv-vs-bundle",
+        "`--csv` on report · attrib · roi · compare · study report · calibration\n"
+        "  (incl. --human) · human · trend — stdout by default (pipe-friendly),\n"
+        "  `--csv <path>` writes a file. Raw rows: `cage export --csv\n"
+        "  calls|receipts|tasks` (flat ledger rows for pivot tables; the ledger's\n"
+        "  own PII surface — counts and ids, never content). MCP mirrors it: a\n"
+        "  `format: csv` param on the report/attrib/roi tools.\n"
+        "  Laws: one shared data structure per view feeds the text table AND the\n"
+        "  CSV — same numbers by construction, never computed twice; method/match\n"
+        "  tags are COLUMNS (a spreadsheet can tell measured from estimated), and\n"
+        "  refusals/caveats/UNPRICED counts survive into the rows; stdlib `csv`,\n"
+        "  RFC-4180 quoting, LF line endings pinned on every OS (deterministic:\n"
+        "  same ledger + policy ⇒ byte-identical CSV). Column contracts:\n"
+        "  docs/csv-output.md. Two export kinds, never blurred: CSV is one-way\n"
+        "  REPORTING and never an import source; the fleet bundle (`cage export\n"
+        "  --study`) stays jsonl — lossless, merge-by-id, re-importable.",
+        ("cage/csvout.py", "cage/exportcmd.py", "cage/report.py", "cage/mcpserver.py"),
+        "n/a — describes an output format; every row still carries its own method tag.",
+        kind="concept", plan_ref="§3.9"),
+    Explanation(
         # NB: no "cage-run"/"workspacefolder" keywords — their "cage"/"work" stems
         # would steal generic "how does cage work"-style queries from `overview`.
         "portable-wiring", ("portable-wiring", "portable", "shim", "absolute-path",

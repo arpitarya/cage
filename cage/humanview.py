@@ -102,6 +102,41 @@ def _render_derived(data: dict) -> str:
     return f"{title}\n\n" + render.table(head, rows, rights={1, 2, 3, 4})
 
 
+def render_csv(data: dict) -> str:
+    """CSV over the same `rollup()` payload as the text view (one structure, two
+    renderers). The two sources stay typed apart by ``kind`` — ``attested`` rows
+    (the receipt-priced table + its TOTAL) vs ``derived`` rows (the turn-gap
+    block) — never blended into one number, exactly like the text sections; the
+    derived rows carry the `derived (turn-gaps, capped)` label in ``note``. Both
+    are ``estimated`` (human cost law). Column contract in docs/csv-output.md."""
+    from cage import attention, csvout
+    head = ["kind", "agent", "tasks", "human_usd", "agent_usd", "saved_usd",
+            "saved_minutes", "confidence", "sessions", "calls",
+            "attention_minutes", "method", "note"]
+    rows = []
+    tot = {"tasks": 0, "human_usd": 0.0, "agent_usd": 0.0, "saved_usd": 0.0,
+           "saved_min": 0.0, "conf_sum": 0.0}
+    for name, a in sorted(data["agents"].items(), key=lambda kv: -kv[1]["saved_usd"]):
+        rows.append(["attested", name, a["tasks"], a["human_usd"], a["agent_usd"],
+                     a["saved_usd"], a["saved_min"], a["conf"], None, None, None,
+                     "estimated", ""])
+        for k in ("tasks", "human_usd", "agent_usd", "saved_usd", "saved_min"):
+            tot[k] += a[k]
+        tot["conf_sum"] += a["conf"] * a["tasks"]
+    if data["agents"]:
+        n = tot["tasks"]
+        rows.append(["attested", "TOTAL", n, round(tot["human_usd"], 6),
+                     round(tot["agent_usd"], 6), round(tot["saved_usd"], 6),
+                     round(tot["saved_min"], 4),
+                     round(tot["conf_sum"] / n, 4) if n else None,
+                     None, None, None, "estimated", ""])
+    note = f"{attention.LABEL} · cap {data['idle_cap']:g} min — never summed with attested"
+    for name, a in (data.get("derived") or {}).items():
+        rows.append(["derived", name, None, None, None, None, None, None,
+                     a["sessions"], a["calls"], a["minutes"], attention.METHOD, note])
+    return csvout.table(head, rows)
+
+
 def render_human(data: dict) -> str:
     if not data["agents"]:
         return ("cage: no human receipts yet — record one with `cage human-record` "

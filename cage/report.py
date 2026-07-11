@@ -20,7 +20,11 @@ def _key(call: dict, dim: str) -> str:
 
 
 def _new_group() -> dict:
-    return {"calls": 0, "tokens_in": 0, "tokens_out": 0, "cached_in": 0, "usd": 0.0}
+    # unpriced_* ride in the same pass as the totals (one structure feeds text AND
+    # csv — plan §3.9): the text view warns from `unpriced_detail`; the CSV shows
+    # the same gap per group so a spreadsheet can't publish an understated total.
+    return {"calls": 0, "tokens_in": 0, "tokens_out": 0, "cached_in": 0, "usd": 0.0,
+            "unpriced_calls": 0, "unpriced_tokens": 0}
 
 
 def _team_rows(root: Path, team: bool):
@@ -87,6 +91,8 @@ def summarize(root: Path, pol: dict, dim: str = "route", since: str | None = Non
                                     {"calls": 0, "tokens": 0})
             u["calls"] += 1
             u["tokens"] += c.get("tokens_in", 0) + c.get("tokens_out", 0)
+            g["unpriced_calls"] += 1
+            g["unpriced_tokens"] += c.get("tokens_in", 0) + c.get("tokens_out", 0)
         elif match == "family":
             family[c.get("model") or "—"] = key or "—"
         elif match == "alias":
@@ -94,7 +100,10 @@ def summarize(root: Path, pol: dict, dim: str = "route", since: str | None = Non
     total = {"calls": sum(g["calls"] for g in groups.values()),
              "usd": sum(g["usd"] for g in groups.values()),
              "tokens_in": sum(g["tokens_in"] for g in groups.values()),
-             "tokens_out": sum(g["tokens_out"] for g in groups.values())}
+             "tokens_out": sum(g["tokens_out"] for g in groups.values()),
+             "cached_in": sum(g["cached_in"] for g in groups.values()),
+             "unpriced_calls": sum(g["unpriced_calls"] for g in groups.values()),
+             "unpriced_tokens": sum(g["unpriced_tokens"] for g in groups.values())}
     if dim in SAVINGS_DIMS:  # second pass over receipts → saved + net (§3.1)
         total_saved = 0.0
         for r, call, saved in _nonhuman_savings(all_calls, windowed_receipts, pol, scope):
@@ -196,6 +205,30 @@ def render_report(rep: dict, last_import: str | None = None) -> str:
     if line:
         out += f"\n\n{line}"
     return out
+
+
+def render_csv(rep: dict) -> str:
+    """CSV over the same `summarize()` payload the text table renders — one
+    structure, two renderers (they cannot disagree). Rows sort like the text view
+    (spend-descending) + a TOTAL row. Raw numbers, not $-formatted strings; the
+    per-group UNPRICED gap keeps the understatement visible in a spreadsheet.
+    `method` column: measured — recorded tokens repriced at derive time (the
+    `repricing` query entry); spend is never a projection. Column contract in
+    docs/csv-output.md."""
+    from cage import csvout
+    savings = "saved_usd" in rep["total"]
+    head = [rep["dim"], "calls", "tokens_in", "tokens_out", "cached_in", "cost_usd",
+            *(("saved_usd", "net_usd") if savings else ()),
+            "unpriced_calls", "unpriced_tokens", "method"]
+    def cells(name, g):
+        return [name, g["calls"], g["tokens_in"], g["tokens_out"], g["cached_in"],
+                round(g["usd"], 6),
+                *((round(g["saved_usd"], 6), round(g["net_usd"], 6)) if savings else ()),
+                g["unpriced_calls"], g["unpriced_tokens"], "measured"]
+    rows = [cells(name, g)
+            for name, g in sorted(rep["groups"].items(), key=lambda kv: -kv[1]["usd"])]
+    rows.append(cells("TOTAL", rep["total"]))
+    return csvout.table(head, rows)
 
 
 def render_overview(o: dict, last_import: str | None = None) -> str:

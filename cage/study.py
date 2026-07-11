@@ -306,6 +306,71 @@ def _unpriced_tail(d: dict) -> list[str]:
     return ["", unpriced_line(d["unpriced_detail"])]
 
 
+def render_csv(d: dict) -> str:
+    """CSV over the same `summarize()` payload as the text report (one structure,
+    two renderers). One flat table typed by ``kind``:
+
+    - ``coverage`` — one row per machine × phase (days, ";"-joined gap days and
+      agents, the measured daily dists); a phase with no rows keeps its MISSING
+      note and no numbers.
+    - ``unphased`` — the excluded-call count, when any.
+    - ``delta`` — the paired-by-machine delta, ``estimated``, caveat in ``note``;
+      a refused delta carries the reason and no numbers (refusal survives to CSV).
+    - ``pooled`` — one row per compared phase (machine-days, measured dists).
+    - ``unpriced`` — mirrors the text ⚠ warning when it renders.
+
+    Column contract in docs/csv-output.md."""
+    from cage import csvout
+    head = ["kind", "machine", "phase", "days", "gap_days", "agents", "n",
+            "median_tokens", "q1_tokens", "q3_tokens", "median_usd", "q1_usd",
+            "q3_usd", "d_tokens_per_day", "d_usd_per_day", "method", "note"]
+    dist_blank = [None] * 6
+    rows = []
+    for m in d["machines"]:
+        for phase, p in m["phases"].items():
+            if not p["days"]:
+                rows.append(["coverage", m["machine"], phase, 0, "", "", None,
+                             *dist_blank, None, None, "",
+                             "MISSING — no rows in this phase"])
+                continue
+            rows.append(["coverage", m["machine"], phase, p["days"], p["gaps"],
+                         p["agents"], None,
+                         p["tokens"]["median"], p["tokens"]["q1"], p["tokens"]["q3"],
+                         round(p["usd"]["median"], 6), round(p["usd"]["q1"], 6),
+                         round(p["usd"]["q3"], 6), None, None, "measured", ""])
+    if d["unphased_calls"]:
+        rows.append(["unphased", None, None, None, "", "", d["unphased_calls"],
+                     *dist_blank, None, None, "",
+                     "before enrollment or unenrolled machines; excluded from deltas"])
+    if "pair" in d:
+        a, b = d["pair"]
+        delta = d["delta"]
+        if delta["ok"]:
+            rows.append(["delta", None, f"{b}-{a}", None, "", "",
+                         d["paired_machines"], *dist_blank,
+                         delta["d_tokens_per_day"], delta["d_usd_per_day"],
+                         delta["method"], d["caveat"]])
+        else:
+            rows.append(["delta", None, f"{b}-{a}", None, "", "",
+                         d["paired_machines"], *dist_blank, None, None, "",
+                         delta["reason"]])
+        for phase in (a, b):
+            p = d["pooled"][phase]
+            if not p["n_days"]:
+                rows.append(["pooled", None, phase, None, "", "", 0, *dist_blank,
+                             None, None, "", "no machine-days"])
+                continue
+            rows.append(["pooled", None, phase, None, "", "", p["n_days"],
+                         p["tokens"]["median"], p["tokens"]["q1"], p["tokens"]["q3"],
+                         round(p["usd"]["median"], 6), round(p["usd"]["q1"], 6),
+                         round(p["usd"]["q3"], 6), None, None, "measured", ""])
+    if d.get("unpriced_detail"):
+        from cage.report import unpriced_line
+        rows.append(["unpriced", None, None, None, "", "", None, *dist_blank,
+                     None, None, "", unpriced_line(d["unpriced_detail"])])
+    return csvout.table(head, rows)
+
+
 def render_study(d: dict) -> str:
     if not d["phases"]:
         return ("Fleet study · no phase markers recorded yet\n\n"

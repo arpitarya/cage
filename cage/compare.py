@@ -109,6 +109,45 @@ def _tok(x: float) -> str:
     return f"{x:,.0f}"
 
 
+def render_csv(d: dict) -> str:
+    """CSV over the same `summarize()` payload as the text view (one structure,
+    two renderers). One flat table, typed by a leading ``kind`` column:
+
+    - ``group`` rows are the measured group totals (a below-min-n group keeps its
+      refusal in ``note`` and carries no numbers — the command explains, never
+      numbers, in CSV too);
+    - ``delta`` rows are tagged ``estimated`` and carry the observational caveat
+      in ``note`` — the caveat survives into the spreadsheet;
+    - one ``unpriced`` row mirrors the text view's ⚠ warning when it renders.
+
+    Column contract in docs/csv-output.md."""
+    from cage import csvout
+    keys = d["by"]
+    head = ["kind", *keys, "baseline", "n", "median_tokens", "iqr_lo_tokens",
+            "iqr_hi_tokens", "median_usd", "iqr_lo_usd", "iqr_hi_usd",
+            "d_median_tokens", "d_median_usd", "method", "note"]
+    blank = [None] * 6
+    rows = []
+    for g in d["groups"]:
+        key_cells = [g[k] or "—" for k in keys]
+        if g["ok"]:
+            rows.append(["group", *key_cells, None, g["n"],
+                         g["tokens"]["median"], g["tokens"]["q1"], g["tokens"]["q3"],
+                         round(g["usd"]["median"], 6), round(g["usd"]["q1"], 6),
+                         round(g["usd"]["q3"], 6), None, None, "measured", ""])
+        else:
+            rows.append(["group", *key_cells, None, g["n"], *blank, None, None,
+                         "", g["reason"]])
+    for dl in d["deltas"]:
+        rows.append(["delta", *[dl.get(k) or "—" for k in keys], dl["baseline"],
+                     None, *blank, dl["d_median_tokens"], dl["d_median_usd"],
+                     dl["method"], d["caveat"]])
+    if d.get("unpriced_detail"):
+        rows.append(["unpriced", *[None] * len(keys), None, None, *blank, None,
+                     None, "", unpriced_line(d["unpriced_detail"])])
+    return csvout.table(head, rows)
+
+
 def render_compare(d: dict) -> str:
     if not d["groups"]:
         return ("No closed tasks to compare — close tasks with `cage outcome <task>` "

@@ -19,14 +19,23 @@ from cage import (__version__, attribution, budget, matrix, paths, policy,
 
 PROTOCOL = "2024-11-05"
 
+# `format: "csv"` on the view tools returns the same CSV the CLI's --csv emits
+# (one shared data structure per view feeds both renderers), so an extension-hosted
+# agent with no shell can still hand the user a spreadsheet-ready artifact.
+_FORMAT = {"type": "string", "enum": ["text", "csv"], "default": "text",
+           "description": "text = the rendered table · csv = the flat reporting "
+                          "CSV (method tags stay columns)"}
+
 TOOLS = [
     {"name": "cage_report",
      "description": "Ledger rollup: LLM spend by route / model / day / agent.",
      "inputSchema": {"type": "object", "properties": {
-         "by": {"type": "string", "default": "route"}, "since": {"type": "string"}}}},
+         "by": {"type": "string", "default": "route"}, "since": {"type": "string"},
+         "format": _FORMAT}}},
     {"name": "cage_attrib",
      "description": "Per-tool marginal token/$ savings for a task (the attribution table).",
-     "inputSchema": {"type": "object", "properties": {"task": {"type": "string"}}}},
+     "inputSchema": {"type": "object", "properties": {"task": {"type": "string"},
+                                                      "format": _FORMAT}}},
     {"name": "cage_matrix",
      "description": "Counterfactual permutation table — what every tool combination would cost.",
      "inputSchema": {"type": "object", "properties": {"task": {"type": "string"}}}},
@@ -35,7 +44,8 @@ TOOLS = [
      "inputSchema": {"type": "object", "properties": {"session": {"type": "string"}}}},
     {"name": "cage_roi",
      "description": "Saved $ per tool vs its own cost + added latency.",
-     "inputSchema": {"type": "object", "properties": {"since": {"type": "string"}}}},
+     "inputSchema": {"type": "object", "properties": {"since": {"type": "string"},
+                                                      "format": _FORMAT}}},
     {"name": "cage_why",
      "description": "Full provenance for one call id: the call + every receipt against it.",
      "inputSchema": {"type": "object", "required": ["call_id"],
@@ -61,20 +71,23 @@ def _latest_task(root: Path) -> str | None:
 
 def _call(name: str, args: dict) -> str:
     root = _root()
+    as_csv = args.get("format") == "csv"  # same structure feeds both renderers
     if name == "cage_report":
-        return report.render_report(report.summarize(root, _pol(root),
-                                                      dim=args.get("by", "route"),
-                                                      since=args.get("since")))
+        rep = report.summarize(root, _pol(root), dim=args.get("by", "route"),
+                               since=args.get("since"))
+        return report.render_csv(rep) if as_csv else report.render_report(rep)
     if name == "cage_attrib":
         task = args.get("task") or _latest_task(root)
-        return attribution.render_attrib(attribution.attribute(root, task, _pol(root)))
+        data = attribution.attribute(root, task, _pol(root))
+        return attribution.render_csv(data) if as_csv else attribution.render_attrib(data)
     if name == "cage_matrix":
         task = args.get("task") or _latest_task(root)
         return matrix.render_matrix(matrix.matrix(root, task, _pol(root)))
     if name == "cage_budget":
         return budget.render_budget(budget.check(root, _pol(root), session=args.get("session")))
     if name == "cage_roi":
-        return roi.render_roi(roi.by_tool(root, _pol(root), since=args.get("since")))
+        data = roi.by_tool(root, _pol(root), since=args.get("since"))
+        return roi.render_csv(data) if as_csv else roi.render_roi(data)
     if name == "cage_why":
         cid = args["call_id"]
         return provenance.render_why(provenance.explain(root, cid), cid)

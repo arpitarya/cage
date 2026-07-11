@@ -816,7 +816,7 @@ def s8_determinism(base: Path) -> str:
     plant(specs, env)
     expect_ok(repo, env, "import")
     views = (("report",), ("report", "--by", "model"), ("attrib",), ("matrix",),
-             ("budget",), ("roi",))
+             ("budget",), ("roi",), ("report", "--csv"), ("attrib", "--csv"))
     first = {v: expect_ok(repo, env, *v) for v in views}
     for v in views:
         if expect_ok(repo, env, *v) != first[v]:

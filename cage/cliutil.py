@@ -30,3 +30,19 @@ def emit(args, payload: dict, text: str) -> int:
     else:
         print(text)
     return 0
+
+
+def csv_dest(args) -> str | None:
+    """The ``--csv`` destination (``"-"`` = stdout), or ``None`` when the flag is
+    absent. One output format per invocation: combining ``--csv`` with ``--json``
+    or ``--html`` is a typed error at the CLI boundary — two formats on one stdout
+    would be neither."""
+    dest = getattr(args, "csv", None)
+    if dest is None:
+        return None
+    from cage.errors import CageError
+    if getattr(args, "json", False):
+        raise CageError("--csv and --json are mutually exclusive — pick one output format")
+    if getattr(args, "html", None):
+        raise CageError("--csv and --html are mutually exclusive — pick one output format")
+    return dest

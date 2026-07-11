@@ -16,6 +16,6 @@ Public library API (the protocol-targeted adapter, plan §5):
 from cage.metering import (Recorder, meter, record_call, record_human,
                            record_receipt)
 
-__version__ = "0.20.0"
+__version__ = "0.21.0"
 __all__ = ["meter", "record_call", "record_receipt", "record_human", "Recorder",
            "__version__"]

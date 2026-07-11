@@ -170,6 +170,17 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   identity — calls/receipts by id, tasks/markers by whole-row so task updates
   survive), the **machine-day** as sample unit, paired delta `estimated` with the
   work-mix caveat, gate = `MIN_COMPARE_N` machines-with-both-phases (blocking).
+- **CSV output (plan §3.9)** ([csvout.py](cage/csvout.py)) — `--csv` on
+  report/attrib/roi/compare/`study report`/calibration (incl. `--human`)/human/
+  trend, plus raw rows via `cage export --csv calls|receipts|tasks`
+  (`exportcmd.RAW_CSV_FIELDS`; `--format csv` = legacy `--csv calls`). One shared
+  data structure per view feeds text AND csv (`render_csv` beside each
+  `render_*`) — never compute twice. LF pinned (`lineterminator="\n"` +
+  `newline=""` writes), RFC-4180, method/match tags are columns, refusals/
+  caveats/UNPRICED survive into rows. CSV is one-way REPORTING — never an import
+  source; the fleet bundle stays jsonl. MCP mirrors it (`format: csv` on
+  report/attrib/roi); the rendered skills teach the recipes (skillgen fragments
+  only). Column contracts: `docs/csv-output.md`; `cage query csv-output`.
 
 ## Must-Know Rules
 
@@ -261,7 +272,7 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
 ## Dev
 
 ```bash
-just test          # python -m pytest -q   (509 passing)
+just test          # python -m pytest -q   (543 passing)
 just demo          # seed §4.4 + print attrib/matrix
 cage --version
 ```

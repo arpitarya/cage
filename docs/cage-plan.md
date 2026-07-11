@@ -543,6 +543,34 @@ epoch only); deterministic `data` payload + reproducible ids; quota/credits live
 the ledger (a state file + an on-read derive), never a row; fail-open capture; four agents
 always (only Codex reports quota locally today; the others show "—").
 
+## 3.9 CSV output — a one-way reporting surface (spreadsheets, not sync)
+
+Two export kinds, never blurred: the fleet bundle (`cage export --study`) stays
+**jsonl** — lossless, merge-by-id, re-importable — while **CSV is a REPORTING
+format**: flat, one-way, for spreadsheets/BI, never an import source.
+
+- **`--csv` on the read views** — `report` · `attrib` · `roi` · `compare` ·
+  `study report` · `calibration` (incl. `--human`) · `human` · `trend`. Stdout by
+  default (pipe-friendly), `--csv <path>` writes a file. One shared data
+  structure per view feeds the text table AND the CSV (`render_csv` beside each
+  `render_*` — the two cannot disagree; no view computes twice).
+- **Raw rows** — `cage export --csv calls|receipts|tasks [--since …]`: flattened
+  ledger rows for pivot-table analysis, the ledger's own PII surface (counts and
+  ids, never content); honors the import-before-export toggle. Closed per-kind
+  column contracts (`exportcmd.RAW_CSV_FIELDS`); `--format csv` stays the legacy
+  spelling of `--csv calls`.
+- **Laws** — stdlib `csv` (`cage/csvout.py`, RFC-4180 quoting); LF line endings
+  pinned on every OS (byte-identical CSVs, the determinism sweep covers them);
+  **method/match tags are columns, never dropped** — `estimated` survives into
+  the spreadsheet; refusals (min-n / INSUFFICIENT DATA), observational caveats,
+  and UNPRICED counts survive as rows/columns, so a published sheet carries the
+  same honesty the terminal did. Labels/scopes/phases are single validated
+  tokens, so a grouping key can never smuggle a comma.
+- **Parity** — the MCP read server exposes `format: csv` on report/attrib/roi;
+  all four hosts' rendered skill assets teach the reporting recipes
+  (skillgen fragments); `cage query csv-output` explains the design. Column
+  contracts per view: [csv-output.md](csv-output.md).
+
 ---
 
 ## 4. The attribution engine (the part that's actually novel)

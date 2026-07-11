@@ -74,6 +74,19 @@ def attribute(root: Path, task: str, pol: dict, scope: str | None = None,
             "total_saved_tokens": tot_tok, "total_saved_usd": round(tot_usd, 6)}
 
 
+def render_csv(data: dict) -> str:
+    """CSV over the same `attribute()` payload as the text table (one structure,
+    two renderers). Per-step method + confidence are columns — the worst-case
+    provenance survives into the spreadsheet. Column contract in docs/csv-output.md."""
+    from cage import csvout
+    head = ["tool", "saved_tokens", "saved_usd", "method", "confidence"]
+    rows = [[s["tool"], s["saved_tokens"], s["saved_usd"], s["method"], s["confidence"]]
+            for s in data["steps"]]
+    if data["steps"]:
+        rows.append(["TOTAL", data["total_saved_tokens"], data["total_saved_usd"], "", ""])
+    return csvout.table(head, rows)
+
+
 def render_attrib(data: dict) -> str:
     if not data["steps"]:
         return f"cage: no receipts for task {data['task']!r}."

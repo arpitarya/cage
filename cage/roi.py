@@ -9,6 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from cage import convert, ledger, render
+from cage.constants import METHOD_TRUST as _TRUST
 
 
 def by_tool(root: Path, pol: dict, since: str | None = None) -> dict:
@@ -19,13 +20,30 @@ def by_tool(root: Path, pol: dict, since: str | None = None) -> dict:
         if r.get("tool") == "human":  # Tier-1 baseline, not a within-agent tool (§4.4)
             continue
         t = tools.setdefault(r["tool"], {"receipts": 0, "saved_usd": 0.0,
-                                         "cost_usd": 0.0, "added_ms": 0})
+                                         "cost_usd": 0.0, "added_ms": 0,
+                                         "method": "measured"})
         t["receipts"] += 1
         t["saved_usd"] += convert.saved_usd(r, calls.get(r.get("call"), {}), pol)
         meta = r.get("meta") or {}
         t["cost_usd"] += float(meta.get("tool_cost_usd", 0.0))
         t["added_ms"] += int(meta.get("added_latency_ms", 0))
+        # least-trusted receipt tags the row (worst-case provenance, like attrib)
+        if _TRUST.get(r.get("method"), 1) < _TRUST.get(t["method"], 1):
+            t["method"] = r.get("method")
     return {"since": since, "tools": tools}
+
+
+def render_csv(data: dict) -> str:
+    """CSV over the same `by_tool()` payload as the text table (one structure, two
+    renderers). `method` = the least-trusted receipt behind the row (worst-case
+    provenance). Column contract in docs/csv-output.md."""
+    from cage import csvout
+    head = ["tool", "receipts", "saved_usd", "own_cost_usd", "net_usd",
+            "added_latency_ms", "method"]
+    rows = [[name, t["receipts"], round(t["saved_usd"], 6), round(t["cost_usd"], 6),
+             round(t["saved_usd"] - t["cost_usd"], 6), t["added_ms"], t["method"]]
+            for name, t in sorted(data["tools"].items(), key=lambda kv: -kv[1]["saved_usd"])]
+    return csvout.table(head, rows)
 
 
 def render_roi(data: dict) -> str:
