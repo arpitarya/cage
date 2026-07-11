@@ -35,8 +35,11 @@ def _seed_state(root):
     (st / "pending-stale.jsonl").write_text("{}\n", encoding="utf-8")
     _age(st / "pending-stale.jsonl")
     (st / "pending-fresh.jsonl").write_text("{}\n", encoding="utf-8")
+    # a real absolute path on THIS OS (ntpath.isabs on Python 3.13+ no longer
+    # treats a drive-less "/x" as absolute on Windows) whose file is gone
+    gone = str((st.parent.parent / "deleted-source-log.jsonl").resolve())
     (st / "cursors.json").write_text(json.dumps(
-        {"claude": {"/nonexistent/source.jsonl": [1, 2]}, "_last_import": OLD_TS}),
+        {"claude": {gone: [1, 2]}, "_last_import": OLD_TS}),
         encoding="utf-8")
     (st / "junk.tmp").write_text("x", encoding="utf-8")
     _age(st / "junk.tmp")
