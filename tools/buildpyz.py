@@ -1,7 +1,7 @@
 """Build ``cage.pyz`` — a single-file stdlib zipapp over the cage package.
 
 The restricted-environments distribution tier (docs/restricted-environments.md,
-handoff docs/cage-handoff-restricted-env.md): endpoints that block unknown exes or
+handoff docs/archive/v0.22-restricted-env.handoff.md): endpoints that block unknown exes or
 have no pip/PyPI access run cage as ``py cage.pyz <cmd>`` through their approved
 Python interpreter. Built by CI on the release trigger and attached to the GitHub
 release next to a SHA256SUMS file — never built-and-attached from a laptop; this

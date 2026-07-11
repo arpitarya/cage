@@ -275,6 +275,18 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   `importcmd.run`/session-end (throttled, fail-open, `cleanup.prune` debug context);
   `cage cleanup` is dry-run until `--apply`. State files are never read by derived
   views — cleanup can't change a reported number (tested byte-identical).
+- **Handoff/prompt docs have a lifecycle — active in `docs/`, archived on ship.**
+  New feature work is specced as a pair: `docs/<feature>.handoff.md` +
+  `docs/<feature>.prompt.md`. While unshipped they live in `docs/` root and are
+  listed under *Active work* in `docs/README.md`. **The release that ships the
+  work must, in the same change: (1) move the pair to
+  `docs/archive/vX.Y-<feature>.{handoff,prompt}.md`, (2) link them from that
+  version's CHANGELOG entry ("Built from: …"), (3) update the `docs/README.md`
+  and `docs/archive/README.md` indexes, and (4) promote any still-true design
+  content into the living design doc or plan section — the archive is history
+  and must never be cited as current spec.** A shipped feature whose
+  handoff/prompt still sits in `docs/` root is a release bug, same as a missing
+  changelog entry.
 - Keep modules small and single-purpose (fux spirit). Tests live in `tests/`.
 
 ## Dev

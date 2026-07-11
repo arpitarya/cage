@@ -1,6 +1,6 @@
 # Restricted environments — running cage where exes are blocked or pip is unavailable
 
-**Status:** design of record (handoff: `docs/cage-handoff-restricted-env.md`).
+**Status:** design of record (handoff: `docs/archive/v0.22-restricted-env.handoff.md`).
 Companion to [portable-wiring.md](portable-wiring.md), which is the design of
 record for the `cage-run` shim this document extends.
 

@@ -2,9 +2,21 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
+## v0.22.1 (2026-07-11) — docs lifecycle: the archive, the storybook spine, the rule
+
+Docs-only release: `docs/` (41 loose files, most of them shipped-work exhaust) is restructured so a future reader — human or agent — can tell live spec from historical build instruction, and the discipline is made durable as a CLAUDE.md rule.
+
+- **`docs/archive/`** — every shipped handoff/prompt/build-prompt (all of the old `docs/prompts/`, now removed, plus the root-level pairs) moved and renamed to sort by the release that shipped the work: `vX.Y-<feature>.{handoff,prompt}.md`, text verbatim plus a one-line "Archived — history, not spec" header. Superseded drafts (the ledger-scale plan amendment, the meter research pair, the dummy-repo trio) archived under the same convention; the applied `claude-md-proposal-*.md` trio deleted (verified applied; git history preserves them). Index: `docs/archive/README.md` (version · feature · handoff · prompt · CHANGELOG anchor, with explicit mapping notes where a version was ambiguous).
+- **The storybook spine** — new `docs/README.md` (Start here → Subsystem design docs → Operations → Active work → Archive); CHANGELOG entries v0.16.0–v0.22.0 each gained a trailing "Built from: …" line linking their archived pair; `docs/full-test-plan-sibling-repo.md` reset to an evergreen template (`<version under test>` placeholder, boxes unticked) with the ticked v0.16.0 run record archived as `docs/archive/v0.16-full-test-run.md`.
+- **The rule (CLAUDE.md, Must-Know Rules)** — handoff/prompt docs have a lifecycle: active in `docs/` root (listed under *Active work*) while unshipped; **the release that ships the work must, in the same change, move the pair to the archive, link it from the CHANGELOG entry, update both indexes, and promote any still-true design content into the living docs.** A shipped feature whose handoff/prompt still sits in `docs/` root is a release bug, same as a missing changelog entry. (This release dogfoods it: its own build prompt is archived below.)
+- **README trimmed (307 → 235 lines), nothing lost** — the pricing wall-of-text became the new design doc `docs/pricing.md` (how a call prices · the unpriced workflow · policy versioning/`cage prices sync` · fleet repricing · the Copilot approximation · credits vs prices); the 44-line command listing, the Authorship section, and a third of Honest attribution now live behind links (`cage --help`, plan §3.5, plan §4). The keep-untouched sections (story, See it, Quickstart, agents table, `$0` guarantee) are byte-identical.
+- Zero behavior change: comment/docstring path updates only (`tests/test_bundled_data.py`, `tools/buildpyz.py`, `tools/dummyrepo/run.py`); every relative link in README/CHANGELOG/CLAUDE.md/docs verified resolving; suite unchanged (569 passing), skillgen `--check` clean.
+
+Built from: [prompt](docs/archive/v0.22.1-docs-lifecycle.prompt.md)
+
 ## v0.22.0 (2026-07-11) — restricted environments: python-launcher mode + cage.pyz (plan §5)
 
-Cage as a first-class citizen on locked-down (finance/enterprise) endpoints where unknown exes are blocked (AppLocker/WDAC) or pip/PyPI is unreachable. Design of record: `docs/restricted-environments.md` (+ `docs/portable-wiring.md`, extended); handoff: `docs/cage-handoff-restricted-env.md`.
+Cage as a first-class citizen on locked-down (finance/enterprise) endpoints where unknown exes are blocked (AppLocker/WDAC) or pip/PyPI is unreachable. Design of record: `docs/restricted-environments.md` (+ `docs/portable-wiring.md`, extended); handoff: `docs/archive/v0.22-restricted-env.handoff.md`.
 
 - **Python-launcher wiring mode (opt-in)** — `cage setup --python-launcher` persists `[wiring] python_launcher = true` in project policy and (re)writes the shim pair + every user-level wired file (copilot hook, codex MCP, kiro MCP, git commit hooks) to resolve cage **through the interpreter only** (`python3 -m cage` / `py -3 -m cage`) — nothing exe-shaped is probed or executed, grep-tested. Committed files are unchanged (they reference the shim; the shim *is* the mode). Same fail-open exit-0 contract; plain `cage setup` re-runs preserve the persisted mode byte-identically; flip the key to `false` + re-run to revert. Mode-switch re-wiring collapses stale entries (`paths.cage_command_tail` now recognizes the interpreter forms); `cage doctor`'s portability check names the active mode and warns on policy↔shim drift.
 - **`CAGE_RUN_PYTHON=1`** — runtime-only override on the **standard** shim: skips the exe probe and goes straight to the interpreter without rewiring (the standard shim texts changed once to carry the branch — behavior with the env unset is test-pinned identical, and the next `cage setup` rewrites the file).
@@ -13,6 +25,8 @@ Cage as a first-class citizen on locked-down (finance/enterprise) endpoints wher
 - **Distribution honesty** — `cage --version` prints `cage X.Y.Z (zipapp)` under the pyz; `cage doctor`'s tool check labels the zipapp run and states the pull-based-capture posture instead of a spurious not-on-PATH warn.
 - **Docs + query** — `docs/restricted-environments.md` (three tiers: launcher mode · pyz · internal mirror; the WDAC script-host caveat stated honestly; a first-endpoint validation checklist), README platforms link, `docs/portable-wiring.md` launcher-mode section, new `cage query restricted-env` concept + `portable-wiring` extended.
 - Validation: launcher-mode grep contract + shim runtime + `CAGE_RUN_PYTHON` precedence + doctor mode/drift tests; bundled-data wheel byte-identity + full pyz asset/determinism suite; dummyrepo **S12** (launcher wiring end-to-end) and **S13** (pyz wheel↔zip report parity, `$CAGE_PYZ` reuses the exact CI artifact). +26 tests (543→569).
+
+Built from: [handoff](docs/archive/v0.22-restricted-env.handoff.md) · [prompt](docs/archive/v0.22-restricted-env.prompt.md)
 
 ## v0.21.0 (2026-07-11) — CSV output + agent reporting recipes (plan §3.9)
 
@@ -26,6 +40,8 @@ CSV as a one-way **reporting** surface — never blurred with the re-importable 
 - **`cage query csv-output`** — new concept entry: which views, the column law, same-numbers guarantee, bundle-vs-CSV distinction; the export help text documents the distinction too.
 - Validation: golden byte-exact CSVs over the seeded §4.4 demo ledger, determinism double-runs, text-vs-CSV same-numbers assertions, method-tag column on every view, PII grep on raw CSVs, RFC-4180 round-trip (and the label/phase single-token guard that keeps commas out of grouping keys), MCP parity vs the goldens; dummyrepo **S8** adds `report --csv`/`attrib --csv` to the byte-identical + CAGE_DEBUG-no-drift sweep. +34 tests (509→543).
 
+Built from: [prompt](docs/archive/v0.21-csv-and-report-skill.prompt.md)
+
 ## v0.20.0 (2026-07-11) — portable wiring (no absolute paths in committed files)
 
 Fixes a sharing bug: wired hook/MCP entries embedded the wiring machine's **absolute cage path**, and several wired files are committed to git (`.claude/settings.json`, `.mcp.json`, `.vscode/mcp.json`, `.codex/hooks.json`, `.kiro/hooks/*.kiro.hook`) — so one developer's filesystem layout shipped to the whole team and every clone got broken wiring. Setup-time path resolution is replaced by a **committed runtime-resolving shim**. Design of record: `docs/portable-wiring.md`.
@@ -37,6 +53,8 @@ Fixes a sharing bug: wired hook/MCP entries embedded the wiring machine's **abso
 - **Doctor `portability` check** — flags any committed wired file carrying a machine-absolute cage path (teammates' clones break — re-run setup), a missing or execute-bit-less shim, and runs `cage-run --version` to verify resolution succeeds on this machine; prints the kiro-MCP gitignore advice.
 - **`cage query portable-wiring`** — new concept entry: why the shim exists, the resolution order, fail-open-when-absent, committed vs user-level, the one-exception host.
 - Validation: dummyrepo **S1** now clone-simulates (copies the wired testbed sans `.git`/gitignored dirs to a new path → doctor portability clean there → the committed shim actually resolves and passes args through). New `tests/test_portable_wiring.py` pins the never-rot invariant (grep every committed wired file for absolute paths), the shim resolution order incl. absent-cage → silent exit 0, cleanup-allowlist unreachability of `.cage/bin/`, migration exactly-once, and the doctor flags. +13 tests (496→509).
+
+Built from: [prompt](docs/archive/v0.20-portable-wiring.prompt.md)
 
 ## v0.19.0 (2026-07-11) — pricing management (the unpriced workflow, `cage prices`, policy versioning)
 
@@ -54,6 +72,8 @@ A ledger is only as honest as its price table. This release makes the price tabl
 - **`cage query` coverage** — nine new entries, all live-interpolated: calculations `pricing-match`, `unpriced`, `repricing`; concepts `prices-cli`, `effort-tiers`, `policy-versioning`, `copilot-pricing` (copilot-served Claude at Anthropic list rates ≈ GitHub's own AI-Credits metering basis since 2026-06-01; `[credits]` stays a separate layer), `cleanup`, `import-before-export`. The UNPRICED report line points at `cage query unpriced`. `cage doctor` gains `prices-meta` and `state` checks.
 - **Validation** — dummyrepo scenario **S11** (seeded unpriced calls → exact `prices unpriced` output → `set`+`alias` → report re-prices to exact expected USD with the ledger untouched → stale `[meta]` → sync recommendation → restamp clears it) and an 8th fleet machine in **S9** that never runs `cage import` — its bundle is complete purely via export's sweep and the analyst's totals stay exact. +55 tests (441→496).
 
+Built from: [prompt](docs/archive/v0.19-pricing-management.prompt.md)
+
 ## v0.18.0 (2026-07-11) — derived human attention (passive minutes from turn gaps)
 
 Total cost's missing half: what the agent costs in **human time**, derived passively from the session logs cage already imports — with the manual axis as the ground truth that calibrates the heuristic (plan §4.10; `docs/human-baseline.design.md` §5c).
@@ -66,6 +86,8 @@ Total cost's missing half: what the agent costs in **human time**, derived passi
 - **Explainers** — new `cage query` calculation entry `attention-minutes` ("how are human minutes derived", live cap value) and an extended `human-axis` concept entry.
 - **The watcher guard** — deliberately NOT built: no editor plugins, activity trackers, keystroke or focus monitoring. Transcript timestamps only; PII surface unchanged (timestamp arithmetic, counts-never-content).
 - Validation: dummyrepo scenario **S10** (seeded transcript gap → exact derived minutes across human/compare/verdict; attest → precedence + exact calibration ratio; `--agent-only` clean; byte-identical re-runs). +23 tests (418→441).
+
+Built from: [prompt](docs/archive/v0.18-human-attention.prompt.md)
 
 ## v0.17.1 (2026-07-09) — dead-code cleanup
 
@@ -84,13 +106,15 @@ A systematic AST sweep (unused imports, unreferenced functions/methods/constants
 - **Console safety** — `cli.main` degrades the ✔/·/⚠ glyphs on non-UTF consoles (`errors="replace"`) instead of dying with UnicodeEncodeError on cp1252; the scheduler hint is OS-aware (cron line on POSIX, a `schtasks /create` example on Windows — printed, never installed).
 - **`cage doctor --paths` + probe events (the exportable path diagnostic)** — `cage/pathprobe.py` renders one read-only screen per agent × candidate location: found/missing, files matched, parseable row count, cursor state, one why-line per miss ("location absent", "no files match <glob>", "cursor: already imported", "parse: 0 rows — see debug.log"), env overrides and UNVERIFIED-LAYOUT candidates labeled, ending with the active sink + precedence chain. It writes nothing. The same facts stream to `debug.log` as metadata-only `probe` events during `CAGE_DEBUG=1 cage import`, and `cage doctor --bundle` now ships the report as `paths.txt` (home-prefix redaction applies). New explain entry: `cage query "why is nothing being captured"`. +16 tests (401→417).
 
+Built from: [prompt](docs/archive/v0.17-windows-and-path-probe.prompt.md)
+
 ## v0.16.0 (2026-07-08) — cost-impact roadmap: validate · diagnose
 
-Accumulating release for the cost-impact roadmap phases (`docs/cage-handoff-cost-impact-roadmap.md`); each phase lands as a subsection below. Suite 318→401 across P0–P5 + the manual validation (roadmap complete).
+Accumulating release for the cost-impact roadmap phases (`docs/archive/v0.16-cost-impact-roadmap.handoff.md`); each phase lands as a subsection below. Suite 318→401 across P0–P5 + the manual validation (roadmap complete).
 
 ### Manual validation (full-test-plan, 2026-07) — real-extension capture bugs
 
-Findings from executing `docs/full-test-plan-sibling-repo.md` against real Claude Code / Codex / Copilot VS Code extensions and the Kiro IDE (`../cage-testbed`):
+Findings from executing `docs/full-test-plan-sibling-repo.md` (run record: `docs/archive/v0.16-full-test-run.md`) against real Claude Code / Codex / Copilot VS Code extensions and the Kiro IDE (`../cage-testbed`):
 
 - **Codex call ids no longer collide across sessions** (`transcript.parse_codex_calls`) — the id carried `session[:8]`, but every rollout stem starts with `rollout-`, so all Codex sessions shared one id namespace and `hooks.append_new` silently dropped colliding line indexes: on the validation machine **150 of 368 real calls (41%, ≈$11) were lost as false "dupes"**. The session component is now `sha1(session)[:8]` — deterministic per (session, line), unique across sessions. Existing ledger rows keep their old ids (append-only); unchanged rollouts are cursor-skipped, so historical undercount persists unless the ledger is rebuilt.
 - **Codex rows carry the event's own timestamp** — `parse_codex_calls` stamped rows at import time, filing a May rollout in the import month's shard and breaking `--since`/month partitioning. The row `ts` is now the `token_count` event's `timestamp` (fallback to write-time when absent). Codex fixtures drop `ts` from `volatile`.
@@ -149,7 +173,9 @@ Before comparing or estimating anything, prove capture actually works on every a
 
 - **Fixture corpus** — `tests/fixtures/transcripts/<agent>/<surface>/` for all four agents (claude / codex / copilot / kiro) × (cli / vscode): sanitized session-log samples in each agent's real on-disk shape (realistic token counts, all content stripped), each with an `expected.json` freezing the exact call rows `cage import` must produce — deterministic ids included, `ts` excluded only for codex/kiro whose logs carry no per-row timestamp (the parser stamps write time). `tests/test_fixture_corpus.py` parametrizes over the corpus, plants each log into an isolated fake agent home at its real relative location, runs the real default (pathless) import scan, and asserts exact rows + idempotent re-import. A structural test fails if any agent × surface directory ever goes missing (the four-agent invariant, enforced).
 - **`UNVERIFIED-FORMAT` stand-ins, never invented formats** — the codex/copilot/kiro VS Code-extension fixtures are CLI-format stand-ins until real extension logs are captured (handoff §10 open question); they are flagged `format_verified: false` in `expected.json` and marked `UNVERIFIED-FORMAT` in the corpus README, and a test asserts the flagging discipline (only vscode fixtures may be stand-ins; every CLI format is pinned against a real client log).
-- **Dummy sibling-repo scenario runner** — `python -m tools.dummyrepo` (build-time only, stdlib-only, never in the wheel — the `tools/skillgen` rules): scaffolds a disposable repo beside the checkout, sandboxes every agent home + `CAGE_HOME` via env overrides (nothing touches real machine data), and runs the automatable scenario matrix from `docs/dummy-repo-test-plan.md` §9: **S1** (all four agents wire, planted CLI logs import to exact rows, doctor exits 0), **S2** (extension-format logs import with hooks unwired, re-import byte-identical via the cursor), **S8** (six derived views byte-identical across runs, and `CAGE_DEBUG=1` changes no derived output), plus a counts-never-content PII grep of everything the ledger wrote. S3–S7 render `PENDING` with the phase that ships them (P1–P4); live-agent steps print as an explicit `MANUAL` checklist, never silently skipped. Exits 1 on any failure and keeps the sandbox for inspection; cleans up on success.
+- **Dummy sibling-repo scenario runner** — `python -m tools.dummyrepo` (build-time only, stdlib-only, never in the wheel — the `tools/skillgen` rules): scaffolds a disposable repo beside the checkout, sandboxes every agent home + `CAGE_HOME` via env overrides (nothing touches real machine data), and runs the automatable scenario matrix from `docs/archive/v0.16-dummy-repo-test.plan.md` §9: **S1** (all four agents wire, planted CLI logs import to exact rows, doctor exits 0), **S2** (extension-format logs import with hooks unwired, re-import byte-identical via the cursor), **S8** (six derived views byte-identical across runs, and `CAGE_DEBUG=1` changes no derived output), plus a counts-never-content PII grep of everything the ledger wrote. S3–S7 render `PENDING` with the phase that ships them (P1–P4); live-agent steps print as an explicit `MANUAL` checklist, never silently skipped. Exits 1 on any failure and keeps the sandbox for inspection; cleans up on success.
+
+Built from: [handoff](docs/archive/v0.16-cost-impact-roadmap.handoff.md) · [prompt](docs/archive/v0.16-cost-impact-roadmap.prompt.md) · validation: [dummy-repo](docs/archive/v0.16-dummy-repo-test.handoff.md) · [test run record](docs/archive/v0.16-full-test-run.md)
 
 ## v0.15.2 — Fable 5 / Mythos 5 pricing + two doc/interpolation papercuts
 
@@ -159,7 +185,7 @@ A second validation-pass batch, found by re-testing v0.15.1 against a real cross
 
 - **`cage query overview` / `data-flow` show the real on-disk paths.** The concept text interpolated the legacy unpartitioned `calls.jsonl` / `receipts.jsonl`, but the ledger is month-partitioned — that single file doesn't exist on a fresh ledger. It now shows the shard glob `calls-*.jsonl` / `receipts-*.jsonl`, matching what's actually on disk.
 
-- **Test-plan doc drift corrected.** `docs/dummy-repo-test-plan.md` §5 listed `cage report --html PATH` (no such flag — the HTML surface is `cage serve`) and `cage export --json` as a stand-in for the summary; both lines now match the real CLI (`cage export --json` is a first-class alias as of v0.15.1).
+- **Test-plan doc drift corrected.** `docs/archive/v0.16-dummy-repo-test.plan.md` §5 listed `cage report --html PATH` (no such flag — the HTML surface is `cage serve`) and `cage export --json` as a stand-in for the summary; both lines now match the real CLI (`cage export --json` is a first-class alias as of v0.15.1).
 
 ## v0.15.1 — validation-pass fixes (concurrent-import dedup + three CLI/setup papercuts)
 

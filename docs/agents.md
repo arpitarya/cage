@@ -124,7 +124,7 @@ to read the events, and what it never logs — in
 
 A *savings receipt* is what makes `cage attrib` / `cage matrix` / `cage roi` show
 real with/without numbers (token contract in
-[tool-receipts.graphify-fux.handoff.md](tool-receipts.graphify-fux.handoff.md)).
+[archive/v0.3-tool-receipts-graphify-fux.handoff.md](archive/v0.3-tool-receipts-graphify-fux.handoff.md)).
 How a tool files one depends on who owns it:
 
 - **In-tool shim (tools you own) — e.g. fux.** fux carries a ~15-line fail-open

@@ -1,7 +1,7 @@
 """Bundled-data access through `paths.bundled_data()` (importlib.resources).
 
 The migration off `Path(__file__).parent / "data"` is the zipapp prerequisite
-(docs/cage-handoff-restricted-env.md): under a wheel/editable install the helper
+(docs/archive/v0.22-restricted-env.handoff.md): under a wheel/editable install the helper
 must behave byte-identically to the old form; the zip side is exercised by
 tests/test_zipapp.py over a real built cage.pyz.
 """

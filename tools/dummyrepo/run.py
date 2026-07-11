@@ -1,5 +1,5 @@
 """Dummy sibling-repo scenario runner — the automatable half of
-`docs/dummy-repo-test-plan.md` (handoff §9), build-time only.
+`docs/archive/v0.16-dummy-repo-test.plan.md` (handoff §9), build-time only.
 
 Scaffolds a disposable repo *beside* the cage checkout, sandboxes every agent
 home (env overrides — nothing touches the real machine), plants the sanitized
@@ -933,7 +933,7 @@ SCENARIOS: dict[str, tuple[str, object]] = {
 }
 
 MANUAL_CHECKLIST = """\
-MANUAL steps (need a live agent — run per docs/dummy-repo-test-plan.md §3/§4/§7):
+MANUAL steps (need a live agent — run per docs/archive/v0.16-dummy-repo-test.plan.md §3/§4/§7):
   [ ] §3 per CLI agent: one real prompt → `cage report` shows the row live (hook fired)
   [ ] §3 same prompt twice → deduped, no double count
   [ ] §4 per VS Code extension: one real prompt → NO row before `cage import`
