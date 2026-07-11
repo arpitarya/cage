@@ -21,8 +21,9 @@ from __future__ import annotations
 import statistics
 from pathlib import Path
 
-from cage import attention, render, taskgroup
+from cage import attention, ledger, prices, render, taskgroup
 from cage.constants import MIN_COMPARE_N
+from cage.report import unpriced_line
 
 CAVEAT = ("observed difference across different tasks — not a controlled experiment; "
           "stacks are per-task observed receipt sets, not configured pipelines")
@@ -81,11 +82,27 @@ def summarize(root: Path, pol: dict, *, by: tuple[str, ...] = ("stack",),
                        "d_median_usd": round(g["usd"]["median"] - base["usd"]["median"], 6),
                        "method": "estimated"})
     d = {"by": list(keys), "min_n": MIN_COMPARE_N, "groups": groups,
-         "deltas": deltas, "caveat": CAVEAT}
+         "deltas": deltas, "caveat": CAVEAT,
+         "unpriced_detail": unpriced_detail(root, pol)}
     if not agent_only and rows:
         att = attention.resolve(root, pol, task_ids=[r["task"] for r in rows])
         d["total_cost"] = attention.total_cost(sum(r["usd"] for r in rows), att, pol)
     return d
+
+
+def unpriced_detail(root: Path, pol: dict) -> dict:
+    """Ledger-wide ``{prov/model: {calls, tokens}}`` of none-match calls — shared by
+    the compare/study UNPRICED warning (an analyst must see the gap before
+    publishing a total; the group numbers themselves stay as computed)."""
+    detail: dict[str, dict] = {}
+    for c in ledger.calls(root):
+        if prices.call_usd_match(pol, c)[1] != "none":
+            continue
+        u = detail.setdefault(f"{c.get('provider') or '—'}/{c.get('model') or '—'}",
+                              {"calls": 0, "tokens": 0})
+        u["calls"] += 1
+        u["tokens"] += c.get("tokens_in", 0) + c.get("tokens_out", 0)
+    return dict(sorted(detail.items()))
 
 
 def _tok(x: float) -> str:
@@ -130,4 +147,6 @@ def render_compare(d: dict) -> str:
         out.append(f"no delta: {why} (each side needs n ≥ {d['min_n']}).")
     if "total_cost" in d:  # plan §4.10 — suppressed by --agent-only
         out += ["", attention.render_total_cost(d["total_cost"])]
+    if d.get("unpriced_detail"):
+        out += ["", unpriced_line(d["unpriced_detail"])]
     return "\n".join(out)

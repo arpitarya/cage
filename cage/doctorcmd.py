@@ -114,10 +114,52 @@ def _pricing(root: Path) -> tuple[str, str]:
         elif match == "family":
             family.add(tag)
     if unpriced:
-        return _WARN, "UNPRICED models billing $0 (add a price row): " + ", ".join(sorted(unpriced))
+        return _WARN, ("UNPRICED models billing $0 (run `cage prices unpriced` for "
+                       "ready-to-run fix lines): " + ", ".join(sorted(unpriced)))
     if family:
         return _OK, "all models priced (some by family approx): " + ", ".join(sorted(family))
     return _OK, "all recorded models have an exact price row"
+
+
+def _bundled_prices(root: Path) -> tuple[str, str]:
+    """Compare the project policy's [meta] against the installed bundle's — a newer
+    bundle means researched price rows this project isn't using yet. Recommendation
+    only, never auto-applied (`cage prices sync` is the user's move)."""
+    try:
+        from cage import pricescmd
+        if not paths.Footprint(root).policy.exists():
+            return _OK, "no project policy.toml — the installed bundle's prices apply directly"
+        project = policy.load_project_raw(paths.Footprint(root).policy)
+    except Exception:  # noqa: BLE001 — a broken policy is reported by the policy check
+        return _OK, "project policy unreadable — see the policy check"
+    bundled_v = str(policy.bundled_raw().get("meta", {}).get("prices_version") or "?")
+    rec = pricescmd.sync_recommendation(project.get("meta", {}))
+    if rec:
+        return _WARN, rec
+    return _OK, f"project prices are current with the bundle ({bundled_v})"
+
+
+def _state_dir(root: Path) -> tuple[str, str]:
+    """State-dir size + prune-candidate visibility (bloat should be visible before
+    it's a problem). Informational — `cage cleanup` is the remedy."""
+    foot = paths.Footprint(root)
+    if not foot.state.exists():
+        return _OK, "no state dir yet"
+    try:
+        from cage import cleanup
+        pol = policy.load(foot.policy)
+        files = [p for p in foot.state.iterdir() if p.is_file()]
+        size = sum(p.stat().st_size for p in files)
+        stale = cleanup.scan(root, pol)
+        status = (f"state/: {len(files)} file(s), {size / 1024:.0f} KB · cleanup "
+                  f"{'on' if policy.cleanup_enabled(pol) else 'OFF'} "
+                  f"({policy.cleanup_days(pol)}d)")
+        if stale:
+            return _OK, status + (f" · {len(stale)} prune candidate(s) — "
+                                  "`cage cleanup` to review")
+        return _OK, status + " · nothing stale"
+    except Exception as exc:  # noqa: BLE001 — informational check, never blocks doctor
+        return _OK, f"state dir present (scan skipped: {exc})"
 
 
 def _interceptor(root: Path) -> tuple[str, str]:
@@ -215,6 +257,8 @@ def run(root: Path) -> dict:
         ("footprint", *_footprint(active, source)),
         ("policy", *_policy(active)),
         ("pricing", *_pricing(active)),
+        ("prices-meta", *_bundled_prices(active)),
+        ("state", *_state_dir(active)),
         ("hooks", *_hooks(root)),
         ("metering", *_metering(active)),
         ("trace", *_capture_trace(active)),

@@ -157,6 +157,24 @@ Set `CAGE_HUMAN_RATE=200` and that printed rate changes — proof it's the code'
 
 `cage query` also explains *how cage itself works*, not just how a value is computed — `cage query "how does cage work"` walks the data flow, fail-open metering, attribution, method tags, receipts, and the rest, with the same live-fact guarantee (the printed ledger paths, pipeline order, and subcommand count are read from the running code, never typed in). `cage query --list --kind concept` lists just those topics.
 
+### Pricing is managed, and $0 is never silent
+
+A call whose model has no price row bills **$0 and says so** — `report`, `compare`, and `study report` all print `⚠ N calls (X tokens) UNPRICED — totals understated` rather than letting an analyst publish an understated number. The fix is a paste, not a hunt (real field example — the VS Code Copilot extension stamps dotted, route-prefixed model ids and an empty-provider router):
+
+```
+$ cage prices unpriced
+  —/copilot/auto   38 calls   412,000 tokens
+    fix: cage prices alias - 'copilot/auto' --to <provider>/<model>   # route the router pseudo-model explicitly
+$ cage prices alias - copilot/auto --to anthropic/claude-sonnet-4-6
+  ✔ —/copilot/auto → anthropic/claude-sonnet-4-6 — .cage/policy.toml
+    renders as an alias footnote (approximate routing), never exact.
+    derived views re-price immediately — the ledger is never rewritten.
+$ cage prices set anthropic claude-sonnet-5 --input 2 --output 10 --cache-read 0.20
+  ✔ [prices.anthropic."claude-sonnet-5"] updated — derived views re-price immediately
+```
+
+Copilot-served Claude ids (`copilot/claude-opus-4.6`) need no fix at all: family matching normalizes the route prefix, `.`↔`-` punctuation, and effort-tier suffixes (`low|medium|high|max` — vendors bill every tier at the same per-token rate), so they price at the Anthropic rows with a footnote — which is also GitHub's own AI-Credits metering basis since June 2026. Only the bare router `copilot/auto` stays loudly unpriced until *you* route it: a router priced silently is a wrong number. Prices are derive-time — fix the table and every historical row (including imported fleet bundles) re-prices retroactively; the ledger stores counts, never conclusions. The bundled table carries `[meta] prices_version` (source URLs cited row by row): when a newer cage ships newer rates, `cage doctor` and `cage prices list` say `bundled prices are newer — run 'cage prices sync'` and never auto-apply. cage itself never fetches a price — no network on any cage code path; the research step is yours (`cage query prices-cli` walks it). And `cage export` now imports everything first, so one command from a hook-less machine still ships a complete bundle (`--no-import` for a frozen snapshot; the manifest records which you did).
+
 ## How it works
 
 One append-only log in, every view derived from it for `$0`:
@@ -250,7 +268,7 @@ Hooks are an **optional** real-time add-on — they fire only under a CLI client
 
 ## The `$0` guarantee
 
-Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 441 tests passing; `cage demo` reproduces the worked attribution example against a real ledger.
+Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 496 tests passing; `cage demo` reproduces the worked attribution example against a real ledger.
 
 **Honest limits.** Cage doesn't decide your human rate — it prices minutes at a blended rate you set, and labels the result `estimated` so it never pretends to be a timesheet. Marginal-by-fixed-order is defensible and `$0`, but it is an *ordering convention*, not a Shapley value (that's a deferred audit mode). And a counterfactual cell is an honest reconstruction, never an invoice — the `method` column says so on every row, on purpose.
 
@@ -258,7 +276,7 @@ Every derived view is parse / arithmetic over the log — **no LLM call, ever, o
 
 Latest release below — full history and detail in [CHANGELOG.md](CHANGELOG.md).
 
-- **v0.18.0 — derived human attention.** Cage now derives estimated human-attention minutes from the turn-timestamp gaps in the session logs it already imports (`gap_ms`, Claude transcripts today — absence explicit for the other agents, never fabricated) and folds them into total-cost lines on `compare`/`verdict`/`study report` (`--agent-only` to suppress). Attested minutes (`cage outcome --minutes N`) beat derived and are never summed; `cage calibration --human` measures the heuristic's accuracy.
+- **v0.19.0 — pricing management.** New `cage prices` group (`unpriced`/`set`/`alias`/`list`/`sync`) turns silent $0 models into a paste-one-line fix; family matching now normalizes Copilot's dotted, route-prefixed ids and effort-tier suffixes; the bundled price table is refreshed with cited 2026-07 rates and versioned (`[meta]` + a sync recommendation in `doctor`). Every publishing surface warns when UNPRICED calls understate totals, `cage export` imports everything first (`--no-import` to snapshot), and a closed-allowlist `cage cleanup` keeps `.cage/state/` from growing unbounded.
 
 ## The name
 

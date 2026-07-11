@@ -283,6 +283,25 @@ def cmd_verdict(args) -> int:
                 verdict.render_verdict(d))
 
 
+def cmd_prices(args) -> int:
+    """`cage prices <list|unpriced|set|alias|sync>` (plan §3.3). Reads and writes
+    both act on the *resolved* ledger root — writes land in that root's project
+    policy.toml; the bundled table is read-only at runtime."""
+    from cage import pricescmd
+    r = ledger_root()
+    payload, text = pricescmd.run(args, r, _policy(r))
+    return emit(args, render.envelope("prices", payload) if args.json else payload, text)
+
+
+def cmd_cleanup(args) -> int:
+    """`cage cleanup` — dry-run print by default (house pattern), --apply prunes."""
+    from cage import cleanup
+    r = ledger_root()
+    payload, text = cleanup.run_cli(r, _policy(r), apply=args.apply,
+                                    days=getattr(args, "days", None))
+    return emit(args, render.envelope("cleanup", payload) if args.json else payload, text)
+
+
 def cmd_study(args) -> int:
     """Fleet-study verbs (plan §4.9). Markers/report act on the *active* ledger
     (capture lands there); `join` additionally wires this project's agents."""
@@ -601,16 +620,21 @@ def cmd_export(args) -> int:
     (counts-never-content, deterministic). The universal pull-based export path.
     ``--study`` writes the one-file fleet bundle instead (plan §4.9)."""
     r = ledger_root()
+    pol = _policy(r)
     if getattr(args, "study", None) is not None:
         from cage import study
-        if getattr(args, "do_import", True):
-            for line in importcmd.run(r, "all", args):
-                print(line)
-        out = study.export_bundle(r, args.study or None)
-        print(f"✔ study bundle written: {out} (rows + phase markers + counts-only manifest)")
+        refresh = {"ran": False, "new_calls": 0}
+        if getattr(args, "do_import", True) and policy.import_before_export(pol):
+            ran, added = exportcmd.sweep(r, getattr(args, "since", None))
+            refresh = {"ran": ran, "new_calls": added}
+        out = study.export_bundle(r, args.study or None, refresh=refresh)
+        tag = (f"self-refreshed: +{refresh['new_calls']} call(s)" if refresh["ran"]
+               else "snapshot only (no sweep)")
+        print(f"✔ study bundle written: {out} (rows + phase markers + counts-only "
+              f"manifest · {tag})")
         return 0
     args.project = _project_filter(args)
-    return exportcmd.run(r, args, pol=_policy(r))
+    return exportcmd.run(r, args, pol=pol)
 
 
 def cmd_watch(args) -> int:

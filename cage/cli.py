@@ -22,7 +22,8 @@ commands by category:
   authorship    origin · notes-sync · verify     who wrote which files (§3.5)
   ops           quality · regression · recommend · forecast · outcome · estimate · calibration
   capture       import · export · watch · limits  universal pull-based metering + quota (§3.7)
-  setup         init · doctor · debug · setup · proxy · meter · mcp · serve
+  pricing       prices (list · unpriced · set · alias · sync)  what the ledger reprices against (§3.3)
+  setup         init · doctor · debug · setup · cleanup · proxy · meter · mcp · serve
   meta          query · demo · graphify (· import-claude · import-codex)
 
 examples:
@@ -164,6 +165,42 @@ def build_parser() -> argparse.ArgumentParser:
                           "attention minutes × rate)")
     _json_flag(st2)
     st2.set_defaults(fn=clicmds.cmd_study)
+
+    pr = sub.add_parser("prices",
+                        help="manage the price tables the ledger reprices against: "
+                             "list · unpriced · set · alias · sync (§3.3)",
+                        epilog="examples:\n"
+                               "  cage prices unpriced                     # what's billing $0, with a fix line each\n"
+                               "  cage prices set anthropic claude-sonnet-5 --input 2 --output 10 --cache-read 0.20\n"
+                               "  cage prices alias - copilot/auto --to anthropic/claude-sonnet-4-6\n"
+                               "  cage prices list                         # every visible row: bundled vs project\n"
+                               "  cage prices sync                         # dry-run diff vs the installed bundle\n"
+                               "Writes land in the project policy.toml (the bundled table is read-only);\n"
+                               "derived views re-price immediately — the ledger is never rewritten.\n"
+                               "cage never fetches a price: research is yours (vendor pricing page).",
+                        formatter_class=argparse.RawDescriptionHelpFormatter)
+    pr.add_argument("action", choices=["list", "unpriced", "set", "alias", "sync"],
+                    help="list=rows+origin+meta · unpriced=$0 models+fix lines · "
+                         "set=insert/update a project row · alias=route a router "
+                         "pseudo-model · sync=diff vs the installed bundle")
+    pr.add_argument("provider", nargs="?", help="set/alias: provider key ('-' = the "
+                    "empty provider some router rows stamp)")
+    pr.add_argument("model", nargs="?", help="set/alias: model id exactly as `cage "
+                    "prices unpriced` printed it")
+    pr.add_argument("--input", type=float, help="set: USD per MTok of input")
+    pr.add_argument("--output", type=float, help="set: USD per MTok of output")
+    pr.add_argument("--cache-read", dest="cache_read", type=float,
+                    help="set: USD per MTok of cached input (default: 0.1× input)")
+    pr.add_argument("--to", help="alias: target price row as <provider>/<model>")
+    pr.add_argument("--update", action="store_true",
+                    help="sync: apply bundled values to rows confirmed via --yes; "
+                         "restamp [meta] (default: dry-run)")
+    pr.add_argument("--yes", action="append", metavar="PROV/MODEL",
+                    help="sync --update: confirm one drifted row (repeatable; 'all' "
+                         "confirms every drifted row)")
+    pr.add_argument("--since", metavar="WINDOW", help="unpriced: window like 7d / 2w")
+    _json_flag(pr)
+    pr.set_defaults(fn=clicmds.cmd_prices)
 
     hu = sub.add_parser("human", help="agent-vs-human savings: $ and hours saved (§4.1)")
     hu.add_argument("--since", metavar="WINDOW", help="window like 30d / 2w")
@@ -307,6 +344,22 @@ def build_parser() -> argparse.ArgumentParser:
                          "this OS — found/missing, files matched, parseable rows, cursor "
                          "state, and why a location missed (writes nothing)")
     dr.set_defaults(fn=clicmds.cmd_doctor)
+
+    cu = sub.add_parser("cleanup", help="prune aged .cage/state/ files (closed allowlist; dry-run by default)",
+                        epilog="examples:\n"
+                               "  cage cleanup                # dry-run: list what would go (file · class · age)\n"
+                               "  cage cleanup --apply        # actually prune\n"
+                               "  cage cleanup --days 7       # tighter window for this run only\n"
+                               "Cleanable (allowlist, by construction): aged debug.log/hooks-seen.jsonl rows,\n"
+                               "stale pending-* provenance buffers, cursors whose source log is gone, *.tmp.\n"
+                               "Never: ledger/, policy.toml, machine.json, study.jsonl, limits.json. State files\n"
+                               "are never read by derived views — cleanup cannot change a reported number.",
+                        formatter_class=argparse.RawDescriptionHelpFormatter)
+    cu.add_argument("--apply", action="store_true", help="execute (default: dry-run print)")
+    cu.add_argument("--days", type=int, metavar="N",
+                    help="retention window for this run (default: [cleanup] days, else 30)")
+    _json_flag(cu)
+    cu.set_defaults(fn=clicmds.cmd_cleanup)
 
     dbg = sub.add_parser("debug", help="print recent capture-path debug events ($0, metadata-only; needs CAGE_DEBUG=1)")
     dbg.add_argument("--tail", type=int, default=20, metavar="N", help="show the last N events (default: 20)")

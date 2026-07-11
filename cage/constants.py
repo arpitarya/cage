@@ -59,12 +59,34 @@ LEDGER_WARN_BYTES = LEDGER_WARN_MONTHS * 30 * LEDGER_HEAVY_ROWS_PER_DAY * LEDGER
 # (`claude-sonnet-4-6`). When an id has no exact price row, fall back to the
 # same-provider row sharing the most leading hyphen-delimited *segments* — so
 # `claude-sonnet-4-5-20250929` prices off a `claude-sonnet-4-…` row, while
-# `claude-opus-*` can never borrow a `claude-sonnet-*` price. A match must share at
-# least this many leading segments (brand + tier, e.g. `claude` + `sonnet`); the
-# longest shared prefix wins, ties break on the lexicographically smallest key
-# (a total, stable order — never dict-insertion order). Heuristic, not contract or
-# economics ⇒ it lives here, not in schema.py or policy.toml.
+# `claude-opus-*` can never borrow a `claude-sonnet-*` price. Before segmenting,
+# both sides normalize: a known router prefix is stripped, `.` becomes `-` (Copilot
+# stamps `claude-sonnet-4.6`, Anthropic ids are dashed), and trailing effort-tier
+# segments drop (vendors bill every effort tier at the same per-token rate —
+# verified against both pricing pages 2026-07-11; a tier billed differently would
+# get its own explicit row instead). A match must share at least this many leading
+# segments (brand + tier, e.g. `claude` + `sonnet`); the longest shared prefix
+# wins, ties break on the lexicographically smallest key (a total, stable order —
+# never dict-insertion order). A normalized match always renders `family`, never
+# `exact` — method law. Heuristic, not contract or economics ⇒ it lives here, not
+# in schema.py or policy.toml.
 MODEL_FAMILY_MIN_SEGMENTS = 2
+MODEL_EFFORT_SUFFIXES = frozenset({"low", "medium", "high", "max"})
+# Router prefixes stripped before family matching — a CLOSED list, never "any
+# `<x>/` prefix" (an unknown router must stay loudly UNPRICED, plan §3.3). Copilot's
+# VS Code store stamps modelId `copilot/claude-opus-4.6`; the bare router id
+# `copilot/auto` strips to `auto` which matches nothing — route it with an explicit
+# `[alias]` row (`cage prices alias`), never a silent default.
+MODEL_ROUTE_PREFIXES = ("copilot/",)
+
+# State-dir cleanup (plan §3.6.4 remedy, `cage/cleanup.py`). Policy-preferred
+# fallbacks (the DEFAULT_CONFIDENCE pattern): `policy.toml [cleanup] days` wins.
+# 30 days comfortably outlives every consumer of the cleanable classes: a stale
+# provenance buffer's transcript fallback already ran at SessionEnd, a deleted
+# source log's cursor can never match again, and debug.log is observational only.
+# The throttle keeps the piggybacked check (one stat per `cage import`) cheap.
+CLEANUP_DEFAULT_DAYS = 30
+CLEANUP_THROTTLE_HOURS = 24
 
 # Authorship-provenance trust ranking (cage/originrecord.py) — a parallel ladder to
 # METHOD_TRUST, for the *different* enum PROV_METHODS (schema.py): hooked (live

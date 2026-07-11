@@ -176,3 +176,24 @@ def test_meter_record_failure_logs(root, monkeypatch):
         m.usage(provider="anthropic", model="claude-opus-4-8", tokens_in=1, tokens_out=1)
     # the metered block itself never raised (fail-open), and the swallow is attributable
     assert "meter.record" in _contexts(root)
+
+
+# ── cleanup.py ----------------------------------------------------------------
+
+def test_cleanup_prune_failure_logs(root, monkeypatch):
+    from cage import cleanup, policy
+    st = root / ".cage" / "state"
+    st.mkdir(parents=True, exist_ok=True)
+    stale = st / "pending-x.jsonl"
+    stale.write_text("{}\n", encoding="utf-8")
+    import os as _os
+    import time as _time
+    old = _time.time() - 90 * 86400
+    _os.utime(stale, (old, old))
+    monkeypatch.setattr(cleanup, "_apply_item", _boom)
+    cleanup.prune(root, policy.load(None))          # per-item fail-open
+    assert "cleanup.prune" in _contexts(root)
+    monkeypatch.setattr(cleanup, "scan", _boom)
+    (st / "cleanup.stamp").unlink(missing_ok=True)
+    cleanup.maybe_run(root, policy.load(None))      # whole-body fail-open
+    assert "cleanup.prune" in _contexts(root)

@@ -25,16 +25,19 @@ def input_cost_usd(pol: dict, provider: str, model: str, tokens_in: int) -> floa
 
 
 def call_usd_match(pol: dict, call: dict) -> tuple[float, str, str | None]:
-    """Per-call cost plus *how* the model priced: ``exact | family | self | none``.
+    """Per-call cost plus *how* the model priced:
+    ``exact | alias | family | self | none``.
 
-    Recompute from tokens × policy when the model has an exact or family price row
-    (transcript-sourced calls carry counts but no `est_cost_usd`); else fall back to
-    the stored `est_cost_usd` for a provider cage can't tokenize (a search API that
-    self-reports its cost) → ``self``. No price *and* no self-cost ⇒ a genuine $0
-    that must surface as ``none`` (UNPRICED), never hide in the totals.
+    Recompute from tokens × policy when the model has an exact, alias-routed, or
+    family price row (transcript-sourced calls carry counts but no `est_cost_usd`);
+    else fall back to the stored `est_cost_usd` for a provider cage can't tokenize
+    (a search API that self-reports its cost) → ``self``. No price *and* no
+    self-cost ⇒ a genuine $0 that must surface as ``none`` (UNPRICED), never hide
+    in the totals.
 
-    Returns ``(usd, match, matched_key)``; ``matched_key`` is the price row used for
-    a ``family`` match (so the read surface can show "≈ priced by family"), else None.
+    Returns ``(usd, match, matched_key)``; ``matched_key`` is the price row used
+    for a ``family`` match (so the read surface can show "≈ priced by family") or
+    the ``prov/model`` target for an ``alias`` route, else None.
     """
     provider, model = call.get("provider", ""), call.get("model", "")
     _, match, key = policy.price_match(pol, provider, model)

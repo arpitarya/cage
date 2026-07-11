@@ -1,11 +1,30 @@
 # Cage policy — the only place numbers live. Versioned, deterministic (plan §3.3).
 
+# Bundled price-table provenance. `cage init` copies this file verbatim, so a
+# project policy carries the [meta] it derived from; `cage doctor` / `cage prices
+# list` compare the two and recommend `cage prices sync` when the bundle is newer
+# (never auto-applied). prices_version is the date the rows were researched.
+[meta]
+prices_version = "2026-07-11"
+prices_date = "2026-07-11"
+cage_version = "0.19.0"
+
 # Prices in USD per million tokens. `cache_read` is the discounted rate the
 # provider bills for prefix-cache *reads* (makes cache-alignment measurable).
 # Keys are short aliases; Claude Code stamps full dated ids
 # (`claude-sonnet-4-5-20250929`) which resolve to the matching family row by
-# longest shared prefix (policy.price_match) — opus never borrows a sonnet price.
-# Anthropic — Claude Code / Kiro (both run Claude models). Per-MTok, current rates.
+# longest shared prefix over normalized ids (policy.price_match: known router
+# prefixes strip, `.` folds to `-`, trailing effort tiers low/medium/high/max
+# drop — both vendors bill every effort tier at the same per-token rate, verified
+# 2026-07-11) — opus never borrows a sonnet price, and a normalized match always
+# renders `family`, never `exact`. Update workflow: `cage prices unpriced` lists
+# what's billing $0 with a ready-to-run fix line; cage itself never fetches a
+# price (no network on any cage code path) — check the vendor's pricing page.
+
+# Anthropic — Claude Code / Kiro (both run Claude models), and Copilot-served
+# Claude (see the GitHub Copilot note below). Per-MTok list rates.
+# source: https://platform.claude.com/docs/en/about-claude/pricing (retrieved 2026-07-11)
+# Cache reads bill at 0.1× input across the current lineup.
 # Fable 5 / Mythos 5 are the most-capable tier — priced above Opus. `claude-fable-5`
 # shares only `claude` with the opus/sonnet/haiku rows (< 2 segments), so it needs its
 # own exact row or it prices at $0; Mythos 5 has identical pricing.
@@ -19,12 +38,58 @@ input = 10.00
 output = 50.00
 cache_read = 1.00
 
+# Opus 4.5–4.8 all bill 5/25/0.50. The explicit `claude-opus-4-5` row is
+# load-bearing, not redundant: without it a `claude-opus-4-5` id ties at three
+# shared segments across every opus row and the deterministic tie-break lands on
+# `claude-opus-4` — the retired 15/75 rate. Same source/date as above.
 [prices.anthropic."claude-opus-4-8"]
 input = 5.00
 output = 25.00
 cache_read = 0.50
 
+[prices.anthropic."claude-opus-4-7"]
+input = 5.00
+output = 25.00
+cache_read = 0.50
+
+[prices.anthropic."claude-opus-4-6"]
+input = 5.00
+output = 25.00
+cache_read = 0.50
+
+[prices.anthropic."claude-opus-4-5"]
+input = 5.00
+output = 25.00
+cache_read = 0.50
+
+# Deprecated/retired Opus rows — kept so *historical* ledger rows keep repricing
+# at what they actually billed (the ledger stores counts, never conclusions).
+[prices.anthropic."claude-opus-4-1"]
+input = 15.00
+output = 75.00
+cache_read = 1.50
+
+[prices.anthropic."claude-opus-4"]
+input = 15.00
+output = 75.00
+cache_read = 1.50
+
+# Sonnet 5 ships at the standard rate (3/15/0.30, effective 2026-09-01). Through
+# 2026-08-31 Anthropic bills an introductory 2/10/0.20 — cage has no clocks in
+# derived views, so the bundle ships ONE honest static number (the standard rate,
+# a conservative over-estimate during the intro window). If you want intro-window
+# accuracy: cage prices set anthropic claude-sonnet-5 --input 2 --output 10 --cache-read 0.20
+[prices.anthropic."claude-sonnet-5"]
+input = 3.00
+output = 15.00
+cache_read = 0.30
+
 [prices.anthropic."claude-sonnet-4-6"]
+input = 3.00
+output = 15.00
+cache_read = 0.30
+
+[prices.anthropic."claude-sonnet-4-5"]
 input = 3.00
 output = 15.00
 cache_read = 0.30
@@ -34,9 +99,72 @@ input = 1.00
 output = 5.00
 cache_read = 0.10
 
-# OpenAI — Codex CLI + Copilot (both emit gpt-5-family ids). A dotted minor like
-# `gpt-5.5` is its own family (only `gpt` is shared with `gpt-5`, < 2 segments), so
-# each minor needs its own row; `gpt-5-codex`/`gpt-5-mini` fall back to `gpt-5`/exact.
+# Retired; legacy order ids (`claude-3-5-haiku-*`) share only one leading segment
+# with this key, so they stay UNPRICED unless you add an exact row for them.
+[prices.anthropic."claude-haiku-3-5"]
+input = 0.80
+output = 4.00
+cache_read = 0.08
+
+# OpenAI — Codex CLI + Copilot (both emit gpt-family ids).
+# source: https://developers.openai.com/api/docs/pricing (retrieved 2026-07-11)
+# With `.`→`-` normalization a dotted minor (`gpt-5.5`) family-matches `gpt-5`
+# when its own row is missing — so current minors each get an exact row here.
+# Long-context tiers (~2× above ~270k input) are not modeled — cage prices the
+# short-context list rate. A bare `gpt-5.6` id would family-price at the
+# lexicographically smallest variant row — add an exact row if your logs stamp it.
+[prices.openai."gpt-5.6-sol"]
+input = 5.00
+output = 30.00
+cache_read = 0.50
+
+[prices.openai."gpt-5.6-terra"]
+input = 2.50
+output = 15.00
+cache_read = 0.25
+
+[prices.openai."gpt-5.6-luna"]
+input = 1.00
+output = 6.00
+cache_read = 0.10
+
+[prices.openai."gpt-5.5"]
+input = 5.00
+output = 30.00
+cache_read = 0.50
+
+# No cached-input discount published for the pro tiers — cache_read = input
+# (no discount, deliberately conservative rather than invented).
+[prices.openai."gpt-5.5-pro"]
+input = 30.00
+output = 180.00
+cache_read = 30.00
+
+[prices.openai."gpt-5.4"]
+input = 2.50
+output = 15.00
+cache_read = 0.25
+
+[prices.openai."gpt-5.4-mini"]
+input = 0.75
+output = 4.50
+cache_read = 0.075
+
+[prices.openai."gpt-5.4-nano"]
+input = 0.20
+output = 1.25
+cache_read = 0.02
+
+[prices.openai."gpt-5.4-pro"]
+input = 30.00
+output = 180.00
+cache_read = 30.00
+
+[prices.openai."gpt-5.3-codex"]
+input = 1.75
+output = 14.00
+cache_read = 0.175
+
 [prices.openai."gpt-5"]
 input = 1.25
 output = 10.00
@@ -47,25 +175,32 @@ input = 0.25
 output = 2.00
 cache_read = 0.025
 
-[prices.openai."gpt-5.5"]
-input = 5.00
-output = 30.00
-cache_read = 1.25
-
-[prices.openai."gpt-5.4"]
-input = 2.50
-output = 15.00
-cache_read = 0.625
-
-[prices.openai."gpt-5.3-codex"]
-input = 1.75
-output = 14.00
-cache_read = 0.175
-
+# Legacy; cached-input rate not re-verified 2026-07-11, retained from the prior bundle.
 [prices.openai."gpt-4o"]
 input = 2.50
 output = 10.00
 cache_read = 1.25
+
+# GitHub Copilot — no [prices.copilot] rows, by design. Copilot's VS Code store
+# stamps modelIds like `copilot/claude-opus-4.6` with provider inferred from the
+# name (→ anthropic), so Copilot-served Claude family-prices at the Anthropic rows
+# above after route-prefix normalization. That is an approximation of seat/
+# subscription billing — but it is also GitHub's own metering basis: since
+# 2026-06-01 Copilot bills usage-based AI Credits "calculated based on token
+# consumption, including input, output, and cached tokens, using the listed API
+# rates for each model".
+# source: https://github.blog/news-insights/company-news/github-copilot-is-moving-to-usage-based-billing/ (retrieved 2026-07-11)
+# The [credits] layer below is a SEPARATE axis (plan-quota multipliers, off by
+# default) — never blur a credit multiplier into a per-token price, and never
+# derive Kiro/Copilot credits from tokens.
+#
+# The bare router id `copilot/auto` strips to `auto` and matches nothing — it
+# stays loudly UNPRICED until you route it explicitly (a router priced silently
+# is a wrong number). Route it to the model your Copilot plan actually serves:
+#   cage prices alias - copilot/auto --to anthropic/claude-sonnet-4-6
+# or uncomment (the empty-string table is the empty provider Copilot stamps):
+# [alias.""."copilot/auto"]
+# to = "anthropic/claude-sonnet-4-6"
 
 # Kiro — its usage log stamps a generic provider/model (`kiro`/`agent`), not the real
 # Claude model it runs underneath, so this is a blended *estimate* (Sonnet-tier rates).
@@ -91,8 +226,25 @@ cache_read = 0.30
 # Auto-capture switch. Each agent's hook runs `cage import --agent <itself>` to meter
 # its own on-disk usage log; set enabled=false to pause that without unwiring any hooks
 # (the hooks still fire, the import is a no-op). Env CAGE_CAPTURE (0/1) overrides.
+# import_before_export: `cage export` (plain and --study) runs the all-agent import
+# sweep first, so a capture-only machine (hooks don't fire under a VS Code extension)
+# still ships a complete bundle. Set false for as-is snapshots; the `--no-import`
+# flag wins per invocation (precedence: flag > env CAGE_CAPTURE > policy).
 [capture]
 enabled = true
+import_before_export = true
+
+# State-dir maintenance (.cage/state/ only — a CLOSED allowlist: aged debug.log and
+# hooks-seen.jsonl rows, stale pending-* provenance buffers, cursors whose source log
+# is gone, *.tmp). Never touches ledger/, policy.toml, machine.json, study.jsonl, or
+# limits.json — fleet pairing and the audit trail are not cleanup's to lose. Runs
+# piggybacked on `cage import` (throttled, fail-open; cage installs no scheduler) or
+# manually via `cage cleanup` (dry-run by default, --apply to execute). State files
+# are never read by derived views, so cleanup can't change a single reported number.
+# Env CAGE_CLEANUP (0/1) overrides enabled.
+[cleanup]
+enabled = true
+days = 30
 
 # Capture-path observability (off by default, $0, metadata-only — never prompt bodies).
 # When on, hooks/imports write a structured debug log + per-hook heartbeat to

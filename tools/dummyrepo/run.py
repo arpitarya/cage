@@ -498,10 +498,26 @@ if kind != "missing":
 """
 
 
+# Machine 8's markers only — its *calls* are never pre-imported: they exist solely
+# as an on-disk Claude transcript, so the bundle's completeness rests entirely on
+# export's own sweep (the capture-only / VS-Code-extension fleet participant).
+_S9_SWEEP_SEED = """
+import sys
+from pathlib import Path
+from cage import machine, study
+root = Path(sys.argv[1])
+(root / ".cage").mkdir(parents=True, exist_ok=True)
+machine.ensure(root)
+study.start(root, "baseline", ts="2026-06-01T00:00:00Z")
+study.stop(root, ts="2026-06-20T23:59:59Z")
+"""
+
+
 def s9_fleet(base: Path) -> str:
-    """S9 — 7 simulated machines (5 complete, 1 mid-week gap, 1 missing phase 2):
-    bundles → import-merge → exact coverage + gap flag + paired delta; double-import
-    idempotent."""
+    """S9 — 8 simulated machines (5 complete, 1 mid-week gap, 1 missing phase 2,
+    1 import-never machine that relies solely on export's all-agent sweep):
+    bundles → import-merge → exact coverage + gap flag + paired delta;
+    double-import idempotent."""
     repo, env = make_sandbox(base, "s9-fleet")
     expect_ok(repo, env, "init")
     bundles = []
@@ -515,9 +531,31 @@ def s9_fleet(base: Path) -> str:
         menv = {**env, "CAGE_BASE": str(mroot / ".cage")}
         expect_ok(mroot, menv, "export", "--study", out, "--no-import")
         bundles.append(out)
+    # machine 8: no prior `cage import` ever ran — its two calls live only in a
+    # planted Claude transcript, and `export --study` (no --no-import) must sweep
+    # them into the bundle itself, recording the sweep in the manifest.
+    mroot8 = base / "s9-machine-8"
+    r = _sh([sys.executable, "-c", _S9_SWEEP_SEED, str(mroot8)], cwd=base, env=env)
+    if r.returncode != 0:
+        raise Fail(f"S9 machine-8 seed failed: {r.stderr.strip()[:300]}")
+    claude8 = base / "s9-machine-8-claude-home"
+    spec = next(s for s in fixture_specs("cli") if s["agent"] == "claude")
+    dst = claude8 / spec["plant"]
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(spec["dir"] / spec["log"], dst)
+    out8 = str(base / "s9-bundle-8.zip")
+    menv8 = {**env, "CAGE_BASE": str(mroot8 / ".cage"),
+             "CLAUDE_CONFIG_DIR": str(claude8)}
+    swept = expect_ok(mroot8, menv8, "export", "--study", out8)
+    if "self-refreshed: +2 call(s)" not in swept:
+        raise Fail(f"machine-8 export did not self-refresh: {swept.strip()[:200]}")
+    bundles.append(out8)
     merged = expect_ok(repo, env, "import", *bundles)
-    if merged.count("✔") != 7:
-        raise Fail(f"expected 7 bundle merge lines, got: {merged.strip()[:200]}")
+    if merged.count("✔") != 8:
+        raise Fail(f"expected 8 bundle merge lines, got: {merged.strip()[:200]}")
+    if "merged 2 calls" not in merged or "swept +2 at export" not in merged:
+        raise Fail("machine-8 bundle did not carry its sweep record into the "
+                   f"analyst's import: {merged.strip()[:300]}")
     report = expect_ok(repo, env, "study", "report")
     for needle in ("⚠ gap days: 2026-06-09", "MISSING — no rows in this phase",
                    "n=6 machines",
@@ -532,7 +570,8 @@ def s9_fleet(base: Path) -> str:
     if expect_ok(repo, env, "study", "report") != report:
         raise Fail("study report not byte-identical across two runs")
     assert_pii_clean(repo)
-    return "7 machines · gap flagged · pairs 6 · exact −7,000 tok/day delta · re-import idempotent"
+    return ("8 machines · gap flagged · pairs 6 · exact −7,000 tok/day delta · "
+            "import-never machine self-refreshed via export sweep · re-import idempotent")
 
 
 # Seeder for S10 — 5 closed tasks whose calls carry known gap_ms (2 derived
@@ -635,6 +674,110 @@ def s10_attention(base: Path) -> str:
             "ratio 0.5 exact · --agent-only clean")
 
 
+# Seeder for S11 — the field-report shape: an empty-provider router key
+# (`copilot/auto`, what the VS Code Copilot store stamps) and an unknown-vendor
+# model, both genuinely UNPRICED (no est_cost_usd — transcript calls carry none).
+_S11_SEED = """
+import sys
+from pathlib import Path
+from cage import ledger, schema
+root = Path(sys.argv[1])
+for i in range(3):
+    ledger.append_row(root, "calls", schema.make_call(
+        route="chat", provider="", model="copilot/auto", tokens_in=15000,
+        tokens_out=2000, agent="copilot", ts=f"2026-07-0{i+1}T10:00:00Z",
+        call_id=f"c_auto{i}"))
+ledger.append_row(root, "calls", schema.make_call(
+    route="chat", provider="mistral", model="mistral-large-3", tokens_in=1000000,
+    tokens_out=200000, agent="codex", ts="2026-07-02T10:00:00Z", call_id="c_m1"))
+"""
+
+_S11_BACKDATE = """
+import sys
+from pathlib import Path
+from cage import pricestoml
+pricestoml.update_meta(Path(sys.argv[1]), {"prices_version": "2020-01-01"})
+"""
+
+
+def s11_prices(base: Path) -> str:
+    """S11 — pricing management (plan §3.3): seeded unpriced calls surface with
+    exact counts + fix lines; `prices set`/`alias` reprice the report to exact
+    expected USD (idempotent, ledger untouched); a backdated [meta] triggers the
+    sync recommendation in list/doctor; `sync --update` restamps; byte-identical."""
+    repo, env = make_sandbox(base, "s11-prices")
+    expect_ok(repo, env, "init")
+    r = _sh([sys.executable, "-c", _S11_SEED, str(repo)], cwd=repo, env=env)
+    if r.returncode != 0:
+        raise Fail(f"S11 seeding failed: {r.stderr.strip()[:300]}")
+
+    # 1. unpriced: exact grouping, exact fix lines, deterministic
+    unp = expect_ok(repo, env, "prices", "unpriced")
+    for needle in ("—/copilot/auto   3 calls   51,000 tokens",
+                   "mistral/mistral-large-3   1 calls   1,200,000 tokens",
+                   "cage prices alias - 'copilot/auto' --to <provider>/<model>",
+                   "cage prices set mistral 'mistral-large-3' --input <IN> --output <OUT>",
+                   "4 calls (1,251,000 tokens) billing $0",
+                   "cage never fetches prices"):
+        if needle not in unp:
+            raise Fail(f"prices unpriced missing {needle!r}")
+    if expect_ok(repo, env, "prices", "unpriced") != unp:
+        raise Fail("prices unpriced not byte-identical across two runs")
+
+    # 2. set (validated, idempotent) + alias (target must be an exact row)
+    shards = shard_bytes(repo)
+    set_out = expect_ok(repo, env, "prices", "set", "mistral", "mistral-large-3",
+                        "--input", "2", "--output", "6", "--cache-read", "0.2")
+    if "before: (none)" not in set_out or "re-price immediately" not in set_out:
+        raise Fail(f"prices set output unexpected: {set_out[:200]}")
+    again = expect_ok(repo, env, "prices", "set", "mistral", "mistral-large-3",
+                      "--input", "2", "--output", "6", "--cache-read", "0.2")
+    if "no change" not in again:
+        raise Fail("prices set is not idempotent")
+    expect_ok(repo, env, "prices", "alias", "-", "copilot/auto",
+              "--to", "anthropic/claude-sonnet-4-6")
+
+    # 3. report re-prices to exact expected USD; the ledger was never rewritten
+    rep = expect_ok(repo, env, "report", "--by", "model")
+    for needle in ("$3.2000",     # mistral: 1M×$2 + 200k×$6 per MTok
+                   "$0.2250",     # auto→sonnet-4-6: 45k×$3 + 6k×$15 per MTok
+                   "$3.4250",     # total
+                   "priced by alias (explicit routing — policy [alias]): "
+                   "copilot/auto → anthropic/claude-sonnet-4-6"):
+        if needle not in rep:
+            raise Fail(f"repriced report missing {needle!r}")
+    if "UNPRICED" in rep:
+        raise Fail("report still shows UNPRICED after set+alias")
+    if shard_bytes(repo) != shards:
+        raise Fail("repricing rewrote the ledger — it must be derive-time only")
+    if "every recorded call prices" not in expect_ok(repo, env, "prices", "unpriced"):
+        raise Fail("prices unpriced did not come up clean after set+alias")
+
+    # 4. backdated [meta] → the sync recommendation in list and doctor; --update restamps
+    r = _sh([sys.executable, "-c", _S11_BACKDATE, str(repo)], cwd=repo, env=env)
+    if r.returncode != 0:
+        raise Fail(f"S11 meta backdate failed: {r.stderr.strip()[:300]}")
+    lst = expect_ok(repo, env, "prices", "list")
+    if "bundled prices are newer (" not in lst or "cage prices sync" not in lst:
+        raise Fail("prices list did not recommend sync for a stale [meta]")
+    if "bundled prices are newer (" not in expect_ok(repo, env, "doctor"):
+        raise Fail("doctor did not recommend sync for a stale [meta]")
+    if "bundled prices are newer (" not in expect_ok(repo, env, "prices", "sync"):
+        raise Fail("prices sync dry-run did not carry the recommendation")
+    if "[meta] restamped" not in expect_ok(repo, env, "prices", "sync", "--update"):
+        raise Fail("prices sync --update did not restamp [meta]")
+    lst2 = expect_ok(repo, env, "prices", "list")
+    if "bundled prices are newer (" in lst2:
+        raise Fail("recommendation survived the restamp")
+    if expect_ok(repo, env, "prices", "list") != lst2:
+        raise Fail("prices list not byte-identical across two runs")
+    if expect_ok(repo, env, "report", "--by", "model") != rep:
+        raise Fail("report not byte-identical across two runs")
+    assert_pii_clean(repo)
+    return ("unpriced exact + fix lines · set/alias reprice to $3.4250 exact · "
+            "ledger untouched · stale meta → sync rec · restamp clears it")
+
+
 def s8_determinism(base: Path) -> str:
     """S8 — determinism sweep: derived views byte-identical across runs, and
     CAGE_DEBUG=1 does not change any derived output."""
@@ -667,6 +810,7 @@ SCENARIOS: dict[str, tuple[str, object]] = {
     "S6": ("P3", s6_estimate),
     "S7": ("P4", s7_verdict),
     "S8": ("P0", s8_determinism),
+    "S11": ("pricing", s11_prices),
     "S9": ("P5", s9_fleet),
     "S10": ("attention", s10_attention),
 }

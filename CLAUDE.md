@@ -231,12 +231,37 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   turn lacking `uuid`) derives its `call_id` from `(agent, session, model, tokens_in,
   tokens_out, cached_in, ts)` (`transcript._composite_id`) so re-imports dedupe in
   `hooks.append_new` — never a random id. uuid-present rows stay byte-identical.
+- **Pricing is managed** ([pricescmd.py](cage/pricescmd.py), [pricestoml.py](cage/pricestoml.py),
+  plan §3.3) — `cage prices list|unpriced|set|alias|sync` manages the project
+  `[prices]`/`[alias]` tables; writes are text surgery (in-place value edits marked
+  `# cage:custom`, or a deterministic cage-managed block) — never a whole-file rewrite,
+  and the bundled `data/policy.toml` is read-only at runtime. `policy.price_match`
+  resolves exact → alias → family over *normalized* ids (`copilot/` route-prefix strip —
+  a closed list; `.`↔`-` folding; effort suffixes low/medium/high/max drop); a normalized
+  match renders `family`, an alias renders `alias`, **never `exact`** (method law), and a
+  dangling alias is `none` — a router is never silently defaulted. `policy.load` merges
+  `prices`/`credits`/`alias` two levels deep (per provider *and* model). The bundle
+  carries `[meta] prices_version` (source URLs cited per row); `doctor`/`prices list`
+  recommend `cage prices sync` when the bundle is newer — never auto-applied. Repricing
+  is derive-time; UNPRICED prints a ⚠ summary on report/overview/compare/study report.
+  cage never fetches a price — research is build-time/user work, not a code path.
+- **Export imports everything first** (plan §3.7) — `cage export` (plain and `--study`)
+  runs the full all-agent sweep before emitting (`--agent` filters output only);
+  `--no-import` flag > `CAGE_CAPTURE` env > `[capture] import_before_export` policy;
+  fail-open; the study manifest records `refresh: {ran, new_calls}`.
+- **State cleanup is a closed allowlist** ([cleanup.py](cage/cleanup.py), plan §3.6.4) —
+  aged debug.log/hooks-seen rows, stale `pending-*` buffers, orphan cursors, `*.tmp`;
+  never ledger/, policy.toml, machine.json, study.jsonl, limits.json (by construction).
+  `[cleanup] enabled/days` (`CAGE_CLEANUP` overrides); auto path piggybacks on
+  `importcmd.run`/session-end (throttled, fail-open, `cleanup.prune` debug context);
+  `cage cleanup` is dry-run until `--apply`. State files are never read by derived
+  views — cleanup can't change a reported number (tested byte-identical).
 - Keep modules small and single-purpose (fux spirit). Tests live in `tests/`.
 
 ## Dev
 
 ```bash
-just test          # python -m pytest -q   (441 passing)
+just test          # python -m pytest -q   (496 passing)
 just demo          # seed §4.4 + print attrib/matrix
 cage --version
 ```

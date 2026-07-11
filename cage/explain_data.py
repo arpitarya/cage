@@ -349,4 +349,153 @@ REGISTRY: tuple[Explanation, ...] = (
         ("cage/ledger.py", "cage/ledgersync.py", "cage/mergeutil.py", "cage/constants.py"),
         "n/a — describes the on-disk layout + aggregation, not a number.",
         kind="concept", plan_ref="§3.6"),
+    Explanation(
+        "pricing-match", ("pricing-match", "match-kind", "exact", "family", "alias",
+                          "self", "resolve", "price-row", "matched", "footnote"),
+        "how a call's model resolves to a price row (exact → alias → family → self → none)",
+        "resolution order over this policy's {n_price_rows} price rows:\n"
+        "  exact — the raw (provider, model) key has its own row: an invoice.\n"
+        "  alias — an explicit [alias] route (router pseudo-models like copilot/auto);\n"
+        "    explicit routing beats every heuristic, and a dangling alias is none,\n"
+        "    never a fallback guess.\n"
+        "  family — the same-provider row sharing the most leading segments after\n"
+        "    normalization (route prefixes {route_prefixes} strip · '.' folds to '-' ·\n"
+        "    effort tiers {effort_suffixes} drop); needs ≥ {family_min_segments} shared\n"
+        "    segments, so opus never borrows a sonnet price. Renders with a footnote —\n"
+        "    a normalized match is never allowed to read as exact (method law).\n"
+        "  self — no row, but the provider self-reported est_cost_usd at record time.\n"
+        "  none — UNPRICED: a genuine $0 that must surface, never hide in a total.",
+        ("cage/policy.py", "cage/prices.py", "cage/constants.py"),
+        "measured for exact; alias/family are approximations and carry their footnote."),
+    Explanation(
+        "unpriced", ("unpriced", "zero", "0", "billing", "missing-price",
+                     "counted-as-0", "understated", "no-price-row"),
+        "what an UNPRICED $0 means and how to fix it",
+        "a call whose model matched none bills $0 — the totals are understated and\n"
+        "  every read surface says so out loud rather than hiding it (a wrong number\n"
+        "  is worse than none). Fix workflow: `cage prices unpriced` lists each\n"
+        "  offending (provider, model) with call count, token volume, and a\n"
+        "  ready-to-run fix line; find the real rate on the vendor's pricing page\n"
+        "  (cage never fetches — no network on any cage code path), then\n"
+        "  `cage prices set <provider> <model> --input … --output …` or, for a\n"
+        "  router pseudo-model, `cage prices alias`. Caveat: self-costed rows\n"
+        "  (stored est_cost_usd) and receipts keep their recorded values.",
+        ("cage/pricescmd.py", "cage/report.py", "cage/prices.py"),
+        "n/a — the $0 is the absence of a number; fixing it makes the totals honest."),
+    Explanation(
+        "repricing", ("repricing", "reprice", "retroactive", "derive-time",
+                      "recompute", "price-change", "fleet-reprice", "back-price"),
+        "why fixing a price re-prices history without touching the ledger",
+        "pricing is derive-time: report/budget/compare/study recompute every call\n"
+        "  as tokens × the *current* policy row on each run — the ledger stores\n"
+        "  counts, not conclusions, and is never rewritten. So an analyst fixing\n"
+        "  policy.toml re-prices every imported bundle row retroactively: same\n"
+        "  ledger + same policy ⇒ same tables; new policy ⇒ honestly new tables.\n"
+        "  Exceptions that do NOT re-derive: self-costed calls (their stored\n"
+        "  est_cost_usd was the provider's own figure) and receipts' recorded values.",
+        ("cage/prices.py", "cage/convert.py", "cage/ledger.py"),
+        "measured — recomputed from each call's recorded tokens at today's policy."),
+    Explanation(
+        "prices-cli", ("prices-cli", "prices", "price-command", "set-price",
+                       "alias-command", "sync", "price-research", "vendor-page"),
+        "the `cage prices` verbs and the research workflow behind them",
+        "cage prices unpriced — what's billing $0, with a ready-to-run fix line each.\n"
+        "  cage prices set <provider> <model> --input <$/Mtok> --output <$/Mtok>\n"
+        "    [--cache-read <$/Mtok>] — idempotent insert-or-update of a project row.\n"
+        "  cage prices alias - copilot/auto --to anthropic/claude-sonnet-4-6 — route a\n"
+        "    router pseudo-model ('-' is the empty provider such rows stamp).\n"
+        "  cage prices list — every visible row, bundled vs project, which wins.\n"
+        "  cage prices sync — diff vs the installed bundle (dry-run; --update + --yes).\n"
+        "  Research: cage never fetches a price — check the vendor's pricing page (or\n"
+        "  search \"<vendor> <model> API pricing\"), then paste the fix line. Writes land\n"
+        "  in the project policy.toml ({prices_version_project}); the bundled table\n"
+        "  ({prices_version_bundled}) is read-only at runtime. Derived views re-price\n"
+        "  immediately — the ledger is never rewritten.",
+        ("cage/pricescmd.py", "cage/pricestoml.py", "policy.toml [prices]"),
+        "n/a — describes the command surface, not a number.",
+        kind="concept", plan_ref="§3.3"),
+    Explanation(
+        "effort-tiers", ("effort-tiers", "effort", "reasoning-effort", "high", "tier",
+                         "suffix", "punctuation", "dotted", "normalization"),
+        "why claude-sonnet-4.6 and …-high price at the base row",
+        "reasoning-effort tiers change token *consumption* (already measured per\n"
+        "  call), not the per-token unit price — verified against both vendors'\n"
+        "  pricing pages 2026-07-11. So family matching normalizes before comparing:\n"
+        "  route prefixes ({route_prefixes}) strip, '.' folds to '-' (Copilot stamps\n"
+        "  claude-sonnet-4.6; Anthropic rows are dashed), and trailing effort\n"
+        "  segments ({effort_suffixes}) drop. A tier variant prices at its base row\n"
+        "  with the family footnote — never rendered exact. If a vendor ever bills a\n"
+        "  tier at a genuinely different per-token rate, that tier gets its own\n"
+        "  explicit row instead — normalization must never erase a real price.",
+        ("cage/policy.py", "cage/constants.py"),
+        "n/a — describes name normalization, not a number.",
+        kind="concept", plan_ref="§3.3"),
+    Explanation(
+        "policy-versioning", ("policy-versioning", "meta", "prices-version",
+                              "stale-prices", "bundle-newer", "sync-recommendation"),
+        "how cage knows your price table is stale ([meta] + prices sync)",
+        "the bundled policy carries [meta] prices_version {prices_version_bundled};\n"
+        "  `cage init` (and the first `cage prices set`) stamp the project copy with\n"
+        "  the bundle it derived from (this project: {prices_version_project}).\n"
+        "  `cage doctor` and `cage prices list` compare the two — a newer bundle\n"
+        "  prints one recommendation line to run `cage prices sync`, never\n"
+        "  auto-applied. sync classifies each row: in-sync (equal), customized\n"
+        "  (cage-managed/marked — never clobbered), or drift (provenance unknown —\n"
+        "  cage can't reconstruct which old bundle a row came from, so it lists the\n"
+        "  diff and applies only rows you confirm per --yes).",
+        ("cage/pricescmd.py", "cage/data/policy.toml [meta]", "cage/doctorcmd.py"),
+        "n/a — describes version bookkeeping, not a number.",
+        kind="concept", plan_ref="§3.3"),
+    Explanation(
+        "copilot-pricing", ("copilot-pricing", "copilot", "premium-request", "credits",
+                            "subscription", "seat", "auto", "router"),
+        "how Copilot-served models price (and why copilot/auto stays unpriced)",
+        "Copilot's VS Code store stamps modelIds like copilot/claude-opus-4.6 with\n"
+        "  the provider inferred from the name (→ anthropic), so Copilot-served\n"
+        "  Claude family-prices at the Anthropic API rows after route-prefix\n"
+        "  normalization. That approximates seat/subscription billing — but it is\n"
+        "  also GitHub's own metering basis: since 2026-06-01 Copilot bills\n"
+        "  usage-based AI Credits from token consumption at listed API rates\n"
+        "  (github.blog, retrieved 2026-07-11). The [credits] layer is a separate\n"
+        "  axis (plan-quota multipliers, estimated, off by default) — never blurred\n"
+        "  into per-token prices, and Kiro/Copilot credits are never derived from\n"
+        "  tokens. The bare router id copilot/auto matches nothing by design: route\n"
+        "  it explicitly (`cage prices alias - copilot/auto --to …`) — a router\n"
+        "  priced silently would be a wrong number.",
+        ("cage/transcript.py", "cage/credits.py", "cage/data/policy.toml"),
+        "n/a — describes a billing approximation and its provenance.",
+        kind="concept", plan_ref="§3.3, §3.8"),
+    Explanation(
+        "cleanup", ("cleanup", "state-dir", "prune", "stale", "retention",
+                    "debug-log-growth", "cursors", "pending-buffers"),
+        "what `cage cleanup` may touch — and what it never may",
+        "a CLOSED allowlist over .cage/state/ only: aged debug.log / hooks-seen.jsonl\n"
+        "  rows, stale pending-* provenance buffers, cursors whose source log is gone\n"
+        "  (safe: the next import re-reads and id-dedupe absorbs it), *.tmp. Never —\n"
+        "  by construction, not convention: ledger/, policy.toml, the machine id\n"
+        "  (fleet pairing breaks without it), study.jsonl, limits.json. Window:\n"
+        "  [cleanup] days = {cleanup_days} (currently {cleanup_on}; env CAGE_CLEANUP\n"
+        "  overrides). Auto path piggybacks on `cage import`/hook sweeps, throttled\n"
+        "  and fail-open (cage installs no scheduler); manual `cage cleanup` is a\n"
+        "  dry-run until --apply. State files are never read by derived views, so\n"
+        "  cleanup cannot change a single reported number.",
+        ("cage/cleanup.py", "cage/policy.py", "policy.toml [cleanup]"),
+        "n/a — describes state maintenance, not a number.",
+        kind="concept", plan_ref="§3.6.4"),
+    Explanation(
+        "import-before-export", ("import-before-export", "export-sweep", "no-import",
+                                 "self-refreshing", "snapshot", "bundle-freshness"),
+        "why `cage export` imports first (and how to get a frozen snapshot)",
+        "export runs the all-agent import sweep before emitting/bundling, so a\n"
+        "  capture-only machine (hooks don't fire under a VS Code extension) still\n"
+        "  ships a complete bundle — one `cage export --study` is enough. Currently\n"
+        "  {import_before_export}. Precedence: the --no-import flag wins per\n"
+        "  invocation > env CAGE_CAPTURE=0 (pauses all capture, sweep included) >\n"
+        "  policy [capture] import_before_export. The sweep is fail-open — a broken\n"
+        "  parser warns and export proceeds with the pre-sweep ledger — and the\n"
+        "  study bundle's manifest records whether it ran and how many rows it added\n"
+        "  (counts only), so the analyst can tell self-refreshed from snapshot.",
+        ("cage/exportcmd.py", "cage/study.py", "policy.toml [capture]"),
+        "n/a — describes capture freshness, not a number.",
+        kind="concept", plan_ref="§3.7"),
 )

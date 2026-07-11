@@ -71,8 +71,9 @@ def summarize(root: Path, pol: dict, dim: str = "route", since: str | None = Non
                          else ledger.since(ledger.receipts(root, since=since), since))
     calls = ledger.by_project(ledger.by_scope(_grouping_calls(root, since, tc), scope), project)
     groups: dict[str, dict] = {}
-    unpriced: set[str] = set()       # provider/model that billed $0 with no price row
+    unpriced: dict[str, dict] = {}   # provider/model that billed $0 → calls/tokens
     family: dict[str, str] = {}      # model → matched key (approximate, no exact row)
+    alias: dict[str, str] = {}       # model → routed prov/model (explicit [alias] row)
     for c in calls:
         g = groups.setdefault(_key(c, dim), _new_group())
         g["calls"] += 1
@@ -82,9 +83,14 @@ def summarize(root: Path, pol: dict, dim: str = "route", since: str | None = Non
         usd, match, key = prices.call_usd_match(pol, c)
         g["usd"] += usd
         if match == "none":
-            unpriced.add(f"{c.get('provider') or '—'}/{c.get('model') or '—'}")
+            u = unpriced.setdefault(f"{c.get('provider') or '—'}/{c.get('model') or '—'}",
+                                    {"calls": 0, "tokens": 0})
+            u["calls"] += 1
+            u["tokens"] += c.get("tokens_in", 0) + c.get("tokens_out", 0)
         elif match == "family":
             family[c.get("model") or "—"] = key or "—"
+        elif match == "alias":
+            alias[c.get("model") or "—"] = key or "—"
     total = {"calls": sum(g["calls"] for g in groups.values()),
              "usd": sum(g["usd"] for g in groups.values()),
              "tokens_in": sum(g["tokens_in"] for g in groups.values()),
@@ -102,7 +108,18 @@ def summarize(root: Path, pol: dict, dim: str = "route", since: str | None = Non
         total["saved_usd"] = total_saved
         total["net_usd"] = total_saved - total["usd"]
     return {"dim": dim, "since": since, "project": project, "groups": groups,
-            "total": total, "unpriced": sorted(unpriced), "family": family}
+            "total": total, "unpriced": sorted(unpriced), "family": family,
+            "alias": alias, "unpriced_detail": dict(sorted(unpriced.items()))}
+
+
+def unpriced_line(detail: dict) -> str:
+    """The one-line UNPRICED warning every read surface prints the same way
+    (report/compare/study): a fleet analyst must see the gap before publishing a
+    total. ``detail`` is ``{key: {"calls": n, "tokens": n}}``."""
+    calls = sum(d["calls"] for d in detail.values())
+    tokens = sum(d["tokens"] for d in detail.values())
+    return (f"⚠ {calls} calls ({render.tok(tokens)} tokens) UNPRICED — totals "
+            f"understated; run 'cage prices unpriced' (`cage query unpriced` explains)")
 
 
 def _last_import_line(last_import: str | None) -> str:
@@ -119,13 +136,20 @@ def _last_import_line(last_import: str | None) -> str:
 def overview(root: Path, pol: dict, since: str | None = None) -> dict:
     """The bare-`cage` headline: spent / saved / net / tokens over the window (§4)."""
     calls = ledger.since(ledger.calls(root, since=since), since)
-    spent = sum(prices.call_usd(pol, c) for c in calls)
+    spent, unpriced_calls, unpriced_tokens = 0.0, 0, 0
+    for c in calls:
+        usd, match, _ = prices.call_usd_match(pol, c)
+        spent += usd
+        if match == "none":
+            unpriced_calls += 1
+            unpriced_tokens += c.get("tokens_in", 0) + c.get("tokens_out", 0)
     tokens = sum(c.get("tokens_in", 0) + c.get("tokens_out", 0) for c in calls)
     saved = sum(s for _, _, s in _nonhuman_savings(
         ledger.calls(root), ledger.since(ledger.receipts(root, since=since), since), pol))
     return {"since": since, "empty": not calls, "calls": len(calls),
             "spent_usd": spent, "saved_usd": saved, "net_usd": saved - spent,
-            "tokens": tokens}
+            "tokens": tokens, "unpriced_calls": unpriced_calls,
+            "unpriced_tokens": unpriced_tokens}
 
 
 def _row(name: str, g: dict, savings: bool) -> list[str]:
@@ -162,9 +186,12 @@ def render_report(rep: dict, last_import: str | None = None) -> str:
     if rep.get("family"):
         approx = ", ".join(f"{m} → {k}" for m, k in sorted(rep["family"].items()))
         out += f"\n\n≈ priced by family (approximate — no exact price row): {approx}"
+    if rep.get("alias"):
+        routed = ", ".join(f"{m} → {k}" for m, k in sorted(rep["alias"].items()))
+        out += f"\n\n≈ priced by alias (explicit routing — policy [alias]): {routed}"
     if rep.get("unpriced"):
-        out += ("\n\n⚠ UNPRICED — counted as $0; add a price row to policy.toml: "
-                + ", ".join(rep["unpriced"]))
+        out += ("\n\n" + unpriced_line(rep["unpriced_detail"])
+                + "\n  " + ", ".join(rep["unpriced"]))
     line = _last_import_line(last_import)
     if line:
         out += f"\n\n{line}"
@@ -182,4 +209,8 @@ def render_overview(o: dict, last_import: str | None = None) -> str:
             f"   {win}")
     drill = ("  drill:  cage report --by agent   ·   cage why <call>"
              "   ·   cage attrib --task <t>")
-    return f"{head}\n{drill}"
+    out = f"{head}\n{drill}"
+    if o.get("unpriced_calls"):
+        out += ("\n" + unpriced_line({"_": {"calls": o["unpriced_calls"],
+                                            "tokens": o["unpriced_tokens"]}}))
+    return out

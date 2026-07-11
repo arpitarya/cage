@@ -36,6 +36,27 @@ class _ImportArgs:
         self.since = since
 
 
+def sweep(root: Path, since: str | None) -> tuple[bool, int]:
+    """The all-agent import refresh export runs before emitting/bundling, so a
+    capture-only machine (hooks don't fire under a VS Code extension) still ships a
+    complete artifact. Always ``"all"`` — an ``--agent`` filter narrows the *output*,
+    never the capture. Fail-open: ``(ran, new_calls)``; a failed sweep is warned to
+    stderr and export proceeds with the pre-sweep ledger — a broken parser must
+    never block a fleet participant from sending their bundle. (`importcmd.run`
+    itself honors the capture switch: `CAGE_CAPTURE=0` / `[capture] enabled=false`
+    ⇒ the sweep is a no-op.)"""
+    try:
+        before = len(ledger.calls(root))
+        importcmd.run(root, "all", _ImportArgs("all", since))
+        added = len(ledger.calls(root)) - before
+        print(f"↻ imported {added} new call(s)", file=sys.stderr)
+        return True, added
+    except Exception:  # fail-open: still export what the ledger already holds
+        print("cage export: import refresh failed — emitting the ledger as-is.",
+              file=sys.stderr)
+        return False, 0
+
+
 def _filtered(root: Path, since: str | None, project: str | None, agent: str | None) -> list[dict]:
     rows = ledger.since(ledger.calls(root, since=since), since)
     rows = ledger.by_project(rows, project)
@@ -86,30 +107,30 @@ def _summary(rows: list[dict], pol: dict) -> dict:
     return {"total": total, "by_agent": by_agent, "by_model": by_model, "by_project": by_project}
 
 
-def render(rows: list[dict], fmt: str, pol: dict) -> str:
+def render(rows: list[dict], fmt: str, pol: dict, refresh: dict | None = None) -> str:
     if fmt == "jsonl":
         return _jsonl(rows)
     if fmt == "csv":
         return _csv(rows)
-    return json.dumps(_summary(rows, pol), ensure_ascii=False, indent=2) + "\n"
+    summary = _summary(rows, pol)
+    if refresh is not None:
+        summary = {"refresh": refresh, **summary}
+    return json.dumps(summary, ensure_ascii=False, indent=2) + "\n"
 
 
 def run(root: Path, args, *, pol: dict) -> int:
-    """Import-first (unless ``--no-import``), then emit. Fail-open: a failed refresh warns
-    and still exports whatever is already in the ledger."""
+    """Import-first (all agents; `--no-import` flag > `[capture] import_before_export`
+    policy), then emit. Fail-open: a failed refresh warns and still exports whatever
+    is already in the ledger."""
+    from cage import policy as _policy
     agent = getattr(args, "agent", None)
     since = getattr(args, "since", None)
-    if getattr(args, "do_import", True):
-        imported = 0
-        try:
-            before = len(ledger.calls(root))
-            importcmd.run(root, agent or "all", _ImportArgs(agent or "all", since))
-            imported = len(ledger.calls(root)) - before
-        except Exception:  # fail-open: still export what the ledger already holds
-            print("cage export: import refresh failed — emitting the ledger as-is.", file=sys.stderr)
-        print(f"↻ imported {imported} new call(s)", file=sys.stderr)
+    refresh = {"ran": False, "new_calls": 0}
+    if getattr(args, "do_import", True) and _policy.import_before_export(pol):
+        ran, added = sweep(root, since)
+        refresh = {"ran": ran, "new_calls": added}
     rows = _filtered(root, since, getattr(args, "project", None), agent)
-    out = render(rows, args.format, pol)
+    out = render(rows, args.format, pol, refresh=refresh if args.format == "json" else None)
     if getattr(args, "output", None):
         Path(args.output).write_text(out, encoding="utf-8")
         print(f"✔ wrote {len(rows)} call(s) → {args.output} ({args.format})", file=sys.stderr)

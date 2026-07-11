@@ -322,4 +322,9 @@ def run(root: Path, agent: str, args) -> list[str]:
                            agent_cursor=cursors.setdefault(a, {})) for a in targets]
         cursors["_last_import"] = _now_iso()  # pull-based staleness signal for doctor/report
         _save_cursors(foot, cursors)
+    # Piggybacked state maintenance (plan §3.6.4): every hook/watch/export sweep
+    # converges here — the one chokepoint. Throttled + fail-open inside; cage
+    # installs no scheduler, so this is the only auto path cleanup ever gets.
+    from cage import cleanup
+    cleanup.maybe_run(root, pol)
     return lines

@@ -33,6 +33,12 @@ pre-formatted table. Never invent a number.
   `modeled` median+IQR band from matching closed tasks; refuses thin history;
   `--record <task>` stamps it so `cage calibration` can measure the hit-rate later).
 - **explain a call** — `cage why <call-id>`.
+- **unpriced models / price upkeep** ("why is this $0" / a ⚠ UNPRICED line) —
+  `cage prices unpriced` prints a ready-to-run fix line per model; find the real
+  rate on the vendor's pricing page (cage never fetches), then paste the
+  `cage prices set …` / `cage prices alias …` line. `cage prices sync` when
+  `doctor` says the bundled prices are newer. Derived views re-price
+  immediately — the ledger is never rewritten.
 - **fleet study** ("does the plugin pay off across our laptops") — `cage study
   join <phase>` per machine → `cage export --study` → analyst runs `cage import
   bundle*.zip` + `cage study report` (coverage first, then a paired-by-machine

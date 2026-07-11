@@ -130,6 +130,10 @@ def session_end() -> int:
                            appended=added)
         except Exception as e:  # fail-open
             debuglog.exception(root, "hook.session_end", e, pol=pol)
+    # Claude's real-time hooks bypass `importcmd.run`, so session close is this
+    # surface's cleanup chokepoint (throttled + fail-open inside — plan §3.6.4).
+    from cage import cleanup
+    cleanup.maybe_run(root, pol)
     return 0
 
 

@@ -10,7 +10,8 @@ except ModuleNotFoundError:  # pragma: no cover  (Python <3.11)
     tomllib = None
 
 from cage import paths
-from cage.constants import MODEL_FAMILY_MIN_SEGMENTS
+from cage.constants import (MODEL_EFFORT_SUFFIXES, MODEL_FAMILY_MIN_SEGMENTS,
+                            MODEL_ROUTE_PREFIXES)
 
 DEFAULT_ORDER = ["graphify", "fux", "router", "compressor", "cache", "response-cache"]
 _ZERO_PRICE = {"input": 0.0, "output": 0.0, "cache_read": 0.0}
@@ -24,18 +25,54 @@ def _bundled() -> dict:
         return tomllib.load(fh)
 
 
+# Sections whose values are per-provider tables of rows: merge one level deeper so
+# a project `[prices.anthropic."x"]` row shadows that one key without wiping the
+# provider's bundled siblings. (Shallow provider-level replace was the pre-0.19
+# behavior — a partial project table silently dropped every bundled row for that
+# provider. Nothing legitimate relied on it: removing a row only ever meant falling
+# back to family/none, and `cage init` copies carry the full table anyway.)
+_TWO_LEVEL = ("prices", "credits", "alias")
+_SECTIONS = ("prices", "tools", "budgets", "quality", "human", "ledger",
+             "capture", "debug", "credits", "alias", "meta", "cleanup")
+
+
 def load(policy_path: Path | None = None) -> dict:
     """Project policy merged over the bundled default. Tolerant of a missing file."""
     pol = _bundled()
     if policy_path and policy_path.exists() and tomllib is not None:
         with policy_path.open("rb") as fh:
             data = tomllib.load(fh)
-        for section in ("prices", "tools", "budgets", "quality", "human", "ledger",
-                        "capture", "debug", "credits"):
-            if section in data:
-                merged = {**pol.get(section, {}), **data[section]}
+        for section in _SECTIONS:
+            if section not in data:
+                continue
+            if section in _TWO_LEVEL:
+                merged = dict(pol.get(section, {}))
+                for prov, table in data[section].items():
+                    base = merged.get(prov)
+                    if isinstance(table, dict) and isinstance(base, dict):
+                        merged[prov] = {**base, **table}
+                    else:
+                        merged[prov] = table
                 pol[section] = merged
+            else:
+                pol[section] = {**pol.get(section, {}), **data[section]}
     return pol
+
+
+def bundled_raw() -> dict:
+    """The bundled policy alone (no project merge) — origin attribution for
+    `cage prices list`/`sync`/`doctor`, which need to know which side a row
+    came from; :func:`load` deliberately erases that."""
+    return _bundled()
+
+
+def load_project_raw(policy_path: Path | None) -> dict:
+    """The project policy.toml alone, un-merged; ``{}`` when absent. Parse errors
+    propagate — the caller chooses fail-open (capture path) vs CageError (CLI)."""
+    if not policy_path or not policy_path.exists() or tomllib is None:
+        return {}
+    with policy_path.open("rb") as fh:
+        return tomllib.load(fh)
 
 
 def tool_order(pol: dict) -> list[str]:
@@ -52,25 +89,67 @@ def _common_prefix_segments(a: list[str], b: list[str]) -> int:
     return n
 
 
+def normalize_model(model: str) -> str:
+    """Canonical form for family matching: strip a known router prefix
+    (`copilot/claude-opus-4.6` → `claude-opus-4.6`), fold `.` to `-` (Copilot's
+    dotted ids vs Anthropic's dashed rows), drop trailing effort-tier segments
+    (`…-codex-high` → `…-codex` — vendors bill every tier at the same rate).
+    The route-prefix list is closed: an unknown `<x>/` prefix stays as-is so an
+    unrecognized router surfaces UNPRICED, never silently priced."""
+    m = model
+    for pre in MODEL_ROUTE_PREFIXES:
+        if m.startswith(pre):
+            m = m[len(pre):]
+            break
+    segs = m.replace(".", "-").split("-")
+    while len(segs) > 1 and segs[-1] in MODEL_EFFORT_SUFFIXES:
+        segs.pop()
+    return "-".join(segs)
+
+
+def _alias_target(pol: dict, provider: str, model: str) -> str | None:
+    """The `[alias.<provider>."<model>"] to = "prov/model"` route, if configured."""
+    entry = pol.get("alias", {}).get(provider, {}).get(model)
+    if isinstance(entry, dict):
+        entry = entry.get("to")
+    return entry if isinstance(entry, str) and entry else None
+
+
 def price_match(pol: dict, provider: str, model: str) -> tuple[dict, str, str | None]:
-    """Resolve a price row *and how it matched*: ``("exact" | "family" | "none")``.
+    """Resolve a price row *and how it matched*:
+    ``("exact" | "alias" | "family" | "none")``.
 
-    Exact key wins. On a miss, fall back to the same-provider row sharing the most
-    leading hyphen-segments with ``model`` (≥ ``MODEL_FAMILY_MIN_SEGMENTS``, so
-    brand + tier must agree — an ``opus`` id never borrows a ``sonnet`` price). The
-    longest shared prefix wins; ties break on the lexicographically smallest key, so
-    the result is independent of dict-insertion order — deterministic and stable.
+    A raw exact key wins. Next an explicit ``[alias]`` route (router pseudo-models
+    like ``copilot/auto``) — explicit routing beats every heuristic; a dangling
+    alias (target row missing) is ``none``, an explicit-but-broken route must
+    surface UNPRICED rather than fall through to a guess. Then the family
+    fallback over :func:`normalize_model`-canonical ids: the same-provider row
+    sharing the most leading segments (≥ ``MODEL_FAMILY_MIN_SEGMENTS``, so brand +
+    tier must agree — an ``opus`` id never borrows a ``sonnet`` price). The longest
+    shared prefix wins; ties break on the lexicographically smallest key, so the
+    result is independent of dict-insertion order — deterministic and stable.
+    Method law: a match through normalization renders ``family`` even when the
+    canonical forms are identical — only a byte-equal key is ``exact``.
 
-    Returns ``(row, match, matched_key)``. Never raises; a totally unknown model is
-    ``(zeros, "none", None)`` so the caller can flag it UNPRICED rather than bill $0.
+    Returns ``(row, match, matched_key)`` — ``matched_key`` is the winning price-row
+    key (for ``alias``, the ``prov/model`` target string). Never raises; a totally
+    unknown model is ``(zeros, "none", None)`` so the caller can flag it UNPRICED
+    rather than bill $0.
     """
     rows = pol.get("prices", {}).get(provider, {})
     if model in rows:
         return rows[model], "exact", model
-    want = model.split("-")
+    target = _alias_target(pol, provider, model)
+    if target is not None:
+        tprov, _, tmodel = target.partition("/")
+        trow = pol.get("prices", {}).get(tprov, {}).get(tmodel)
+        if trow is not None:
+            return trow, "alias", target
+        return dict(_ZERO_PRICE), "none", None
+    want = normalize_model(model).split("-")
     best_key, best_n = None, 0
     for key in rows:
-        n = _common_prefix_segments(want, key.split("-"))
+        n = _common_prefix_segments(want, normalize_model(key).split("-"))
         if n < MODEL_FAMILY_MIN_SEGMENTS:
             continue
         if n > best_n or (n == best_n and (best_key is None or key < best_key)):
@@ -140,6 +219,34 @@ def debug_enabled(pol: dict) -> bool:
     (`cage/debuglog.py`). Env `CAGE_DEBUG` overrides policy `[debug] enabled`; default
     **off** — observability is opt-in, never on by default ($0, no file written)."""
     return _flag("CAGE_DEBUG", pol, "debug", "enabled", False)
+
+
+def cleanup_enabled(pol: dict) -> bool:
+    """Whether the state-dir maintenance sweep (`cage/cleanup.py`) may run — auto
+    (piggybacked on import) and manual `cage cleanup --apply` both honor it. Env
+    `CAGE_CLEANUP` overrides policy `[cleanup] enabled`; default on. Cleanup only
+    ever touches the closed state/ allowlist — never the ledger or policy."""
+    return _flag("CAGE_CLEANUP", pol, "cleanup", "enabled", True)
+
+
+def cleanup_days(pol: dict) -> int:
+    """Retention window for the cleanable state/ classes. Policy `[cleanup] days`
+    wins; `constants.CLEANUP_DEFAULT_DAYS` covers an unset key (the
+    DEFAULT_CONFIDENCE policy-preferred pattern)."""
+    from cage.constants import CLEANUP_DEFAULT_DAYS
+    try:
+        return int(pol.get("cleanup", {}).get("days", CLEANUP_DEFAULT_DAYS))
+    except (TypeError, ValueError):
+        return CLEANUP_DEFAULT_DAYS
+
+
+def import_before_export(pol: dict) -> bool:
+    """Whether `cage export` runs the all-agent import sweep before bundling, so a
+    capture-only machine (hooks never fire under a VS Code extension) still ships a
+    complete bundle. Policy `[capture] import_before_export`; the `--no-import`
+    flag wins per invocation, and `CAGE_CAPTURE=0` / `[capture] enabled=false`
+    already skip the sweep inside `importcmd.run` (precedence: flag > env > policy)."""
+    return bool(pol.get("capture", {}).get("import_before_export", True))
 
 
 def default_toml() -> str:

@@ -163,6 +163,34 @@ minutes = 120
 rate_usd_per_hr = 90
 ```
 
+**Pricing management (v0.19).** The price table is a *managed* surface, not a file the
+user is left alone with:
+
+- **Resolution order** (`policy.price_match`): raw **exact** key → explicit **alias**
+  (`[alias.<provider>."<model>"] to = "prov/model"` — router pseudo-models like
+  `copilot/auto`; a dangling alias is `none`, never a fallback guess) → **family** over
+  normalized ids (known route prefixes strip — a closed list; `.` folds to `-`; trailing
+  effort tiers `low|medium|high|max` drop, since vendors bill every tier at the same
+  per-token rate) → **none** (UNPRICED, loud on every publishing surface). Method law: a
+  normalized match renders `family`, an alias renders `alias` — never `exact`.
+- **`cage prices`** — `unpriced` (ledger scan + a ready-to-run fix line per key) ·
+  `set`/`alias` (idempotent writes into the *project* policy.toml via
+  `cage/pricestoml.py`: in-place value edits for hand tables, marked `# cage:custom`, or
+  a deterministic cage-managed block; the bundled file is read-only at runtime; every
+  mutation re-parses before an atomic replace) · `list` (bundled-vs-project origin,
+  which wins) · `sync` (dry-run diff vs the installed bundle; `--update --yes` per
+  confirmed row — customized rows are never clobbered).
+- **`[meta]` versioning** — the bundle stamps `prices_version`/`prices_date`/
+  `cage_version` (source URLs cited row by row); `cage init` copies it; `doctor` and
+  `prices list` recommend `cage prices sync` when the bundle is newer, never auto-apply.
+- **Merge** — `policy.load` merges `prices`/`credits`/`alias` two levels deep
+  (per provider *and* per model), so a partial project table shadows one row without
+  wiping the provider's bundled siblings.
+- **Repricing is derive-time** — every view recomputes calls as tokens × the current
+  row; fixing the table re-prices all history (fleet bundles included) retroactively;
+  self-costed rows and receipts keep their stored figures; the ledger is never
+  rewritten. cage never fetches a price — no network on any cage code path.
+
 ### 3.4 The task record — `tasks.jsonl` (third append-only file)
 
 A `task` was only a foreign-key string; nothing described the task itself. A third
@@ -377,6 +405,19 @@ mode is deliberately absent on the read/derive path** — a derive never refuses
 invariant); a write-path block (cf. `[budgets] on_exceed = warn|block`, the CI
 disk-quota case) is a separate, un-taken decision (see ADR).
 
+**State-dir cleanup (v0.19, `cage/cleanup.py`).** The ledger is never pruned by cage,
+but `.cage/state/` is maintenance territory — a **closed allowlist** ages out: old
+`debug.log`/`hooks-seen.jsonl` rows, stale `pending-*` provenance buffers (their
+transcript fallback already ran at SessionEnd), cursors whose source log no longer
+exists (safe: the next import re-reads, id-dedupe absorbs it), and `*.tmp`. Never — by
+construction, `scan` doesn't look at them: `ledger/`, `policy.toml`, `machine.json`
+(fleet pairing), `study.jsonl`, `limits.json`. Policy `[cleanup] enabled/days`
+(default on/30; env `CAGE_CLEANUP` overrides — the capture-switch pattern). The auto
+path piggybacks on `cage import`/hook sweeps (throttled to one real check per day,
+fail-open, debug-logged under `cleanup.prune`) — cage installs no scheduler; the manual
+path `cage cleanup` is dry-run until `--apply`. State files are never read by derived
+views, so cleanup cannot change a reported number.
+
 ### 3.6.5 Invariants this amendment must not break
 
 `$0`/stdlib-only (glob, datetime, git shell-out — never `import git`); determinism
@@ -434,6 +475,16 @@ heartbeat (fired recently ⇒ real-time active; never ⇒ a hook that's *wired* 
 that *fires*, e.g. under a VS Code extension); it never labels an unfireable hook "capture
 wired," names the active ledger sink, shows last-import staleness, and points at
 `cage import`/`cage export` as the universal path. No scheduler row (cage installs none).
+
+**Export imports everything first (v0.19).** On a machine where hooks don't fire (any
+VS Code extension), `cage export`'s import-first refresh is the *only* capture — so the
+refresh is always the full all-agent sweep (`--agent` filters the output, never the
+capture), gated by `[capture] import_before_export` (default on; precedence:
+`--no-import` flag > `CAGE_CAPTURE` env > policy) and fail-open (a broken parser warns
+on stderr and export proceeds with the pre-sweep ledger — a fleet participant is never
+blocked from sending a bundle). The `--study` manifest records `refresh: {ran,
+new_calls}` (counts only) so the analyst can tell a self-refreshing export from an
+as-is snapshot; the analyst's `cage import` prints `swept +N at export`.
 
 **Invariants:** `$0`/stdlib (`csv`/`json` only; no fs-watch lib, no network on the
 capture/read path); counts-never-content (no prompt bodies in any export; `project`/`scope`
@@ -841,6 +892,8 @@ cage trend [--by week|month] [--metric cost|time|both]  # savings as a time-seri
 cage serve                    # dashboard (reuse fux's serve/assets pattern)
 cage why <call-id>            # full provenance: call + every receipt against it
 cage query "how is X computed" [--list] [--all] [--json] [--kind calc|concept]  # explain
+cage prices <list|unpriced|set|alias|sync>  # manage the price tables (§3.3, v0.19)
+cage cleanup [--apply] [--days N]           # prune aged .cage/state/ (allowlist, §3.6.4)
 ```
 
 Every command is `$0`, deterministic, and emits JSON with `--json` for the

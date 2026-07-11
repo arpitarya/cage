@@ -107,10 +107,15 @@ def phase_order(rows: list[dict]) -> list[str]:
 
 # ── bundles (one-file collection) ────────────────────────────────────────────
 
-def export_bundle(root: Path, out: str | None = None) -> Path:
+def export_bundle(root: Path, out: str | None = None, refresh: dict | None = None) -> Path:
     """One zip per machine: raw calls/receipts/tasks rows + study markers + a
     counts-only manifest. Counts-never-content holds by construction — ledger rows
-    carry token counts, never bodies. Unwritable target ⇒ `CageError` (CLI boundary)."""
+    carry token counts, never bodies. Unwritable target ⇒ `CageError` (CLI boundary).
+
+    ``refresh`` records whether the pre-bundle all-agent sweep ran and how many
+    rows it added (counts only) — the analyst can tell a self-refreshing export
+    from an as-is snapshot. Additive; byte-determinism holds run-to-run under
+    ``--no-import`` (the object is then a constant)."""
     mid = machine.machine_id(root)
     kinds = {k: ledger.read_kind(root, k) for k in ("calls", "receipts", "tasks")}
     marks = markers(root)
@@ -118,7 +123,8 @@ def export_bundle(root: Path, out: str | None = None) -> Path:
     manifest = {"bundle": "cage-study", "machine": mid,
                 "cage": __import__("cage").__version__,
                 "span": {"first": ts_all[0] if ts_all else "", "last": ts_all[-1] if ts_all else ""},
-                "rows": {**{k: len(v) for k, v in kinds.items()}, "study": len(marks)}}
+                "rows": {**{k: len(v) for k, v in kinds.items()}, "study": len(marks)},
+                "refresh": refresh or {"ran": False, "new_calls": 0}}
     out_path = Path(out) if out else Path(f"cage-study-{mid or 'unenrolled'}.zip")
     try:
         out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -173,8 +179,11 @@ def import_bundles(root: Path, bundles: list[str]) -> list[str]:
                     added[kind] = n
         except (OSError, KeyError, ValueError, zipfile.BadZipFile) as e:
             raise CageError(f"cannot import study bundle {p}: {e}") from e
+        refresh = manifest.get("refresh") or {}
+        tag = (f" · swept +{refresh.get('new_calls', 0)} at export" if refresh.get("ran")
+               else "")
         lines.append(f"✔ {p.name} (machine {manifest.get('machine') or '?'}): merged "
-                     + " · ".join(f"{n} {k}" for k, n in added.items()))
+                     + " · ".join(f"{n} {k}" for k, n in added.items()) + tag)
     return lines
 
 
@@ -249,8 +258,10 @@ def summarize(root: Path, pol: dict, agent_only: bool = False) -> dict:
             }
         machines.append(entry)
 
+    from cage.compare import unpriced_detail  # local: keeps the import graph light
     d = {"phases": order, "machines": machines, "unphased_calls": unphased,
-         "min_n": MIN_COMPARE_N, "caveat": CAVEAT}
+         "min_n": MIN_COMPARE_N, "caveat": CAVEAT,
+         "unpriced_detail": unpriced_detail(root, pol)}
     if len(order) >= 2:
         a, b = order[0], order[1]
         d["pair"] = [a, b]
@@ -288,6 +299,13 @@ def summarize(root: Path, pol: dict, agent_only: bool = False) -> dict:
     return d
 
 
+def _unpriced_tail(d: dict) -> list[str]:
+    if not d.get("unpriced_detail"):
+        return []
+    from cage.report import unpriced_line
+    return ["", unpriced_line(d["unpriced_detail"])]
+
+
 def render_study(d: dict) -> str:
     if not d["phases"]:
         return ("Fleet study · no phase markers recorded yet\n\n"
@@ -314,7 +332,7 @@ def render_study(d: dict) -> str:
         if "total_cost" in d:  # plan §4.10 — suppressed by --agent-only
             from cage import attention
             out += ["", attention.render_total_cost(d["total_cost"])]
-        return "\n".join(out)
+        return "\n".join(out + _unpriced_tail(d))
     a, b = d["pair"]
     out.append("")
     delta = d["delta"]
@@ -340,4 +358,4 @@ def render_study(d: dict) -> str:
     if "total_cost" in d:  # plan §4.10 — suppressed by --agent-only
         from cage import attention
         out += ["", attention.render_total_cost(d["total_cost"])]
-    return "\n".join(out)
+    return "\n".join(out + _unpriced_tail(d))

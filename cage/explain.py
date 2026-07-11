@@ -58,6 +58,21 @@ def _live(pol: dict) -> dict:
         "n_subcommands": len(_subcommand_names()),
         "concept_ids": ", ".join(e.id for e in REGISTRY if e.kind == "concept" and e.id != "overview"),
         "ledger_env": "CAGE_LEDGER",
+        # pricing management (plan §3.3) — live from the resolved policy/bundle
+        "n_price_rows": sum(len(v) for v in pol.get("prices", {}).values()
+                            if isinstance(v, dict)),
+        "prices_version_bundled": str(policy.bundled_raw().get("meta", {})
+                                      .get("prices_version") or "?"),
+        "prices_version_project": str((policy.load_project_raw(foot.policy)
+                                       if foot.policy.exists() else {})
+                                      .get("meta", {}).get("prices_version")
+                                      or "unknown (pre-0.19)"),
+        "effort_suffixes": " · ".join(sorted(constants.MODEL_EFFORT_SUFFIXES)),
+        "route_prefixes": " · ".join(constants.MODEL_ROUTE_PREFIXES),
+        "family_min_segments": constants.MODEL_FAMILY_MIN_SEGMENTS,
+        "cleanup_days": policy.cleanup_days(pol),
+        "cleanup_on": "on" if policy.cleanup_enabled(pol) else "off",
+        "import_before_export": "on" if policy.import_before_export(pol) else "off",
     }
 
 
