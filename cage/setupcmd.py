@@ -20,6 +20,7 @@ Idempotent. Global paths are env-overridable (CAGE_VSCODE_USER, KIRO_HOME, …).
 """
 from __future__ import annotations
 
+import importlib.resources
 import shutil
 from pathlib import Path
 
@@ -27,16 +28,20 @@ from cage import paths
 from cage.agents import SURFACES
 
 
-def _copy_skill(src: Path, dst: Path) -> None:
+# src is a bundled-data Traversable (a plain Path under a wheel, a zip entry under
+# cage.pyz) — as_file materializes each asset so copy2 always sees a real file.
+def _copy_skill(src, dst: Path) -> None:
     dst.mkdir(parents=True, exist_ok=True)
     for f in src.iterdir():
         if f.is_file():
-            shutil.copy2(f, dst / f.name)
+            with importlib.resources.as_file(f) as real:
+                shutil.copy2(real, dst / f.name)
 
 
-def _copy_file(src: Path, dst: Path) -> None:
+def _copy_file(src, dst: Path) -> None:
     dst.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(src, dst)
+    with importlib.resources.as_file(src) as real:
+        shutil.copy2(real, dst)
 
 
 # Each tuple: (skill dir under data/skills, prompt file stem, steering file stem).
@@ -62,7 +67,7 @@ def run(surfaces: tuple[str, ...] | None = None, *, scope: str = "global",
     if project and root is None:
         raise ValueError("project scope needs a root")
     picked = surfaces or SURFACES
-    data = paths.bundled_data_dir()
+    data = paths.bundled_data()
     out: dict[str, str] = {}
 
     for skill, prompt, steer in _ASSETS:

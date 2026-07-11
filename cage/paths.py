@@ -46,19 +46,29 @@ def _split_bin(command: str) -> tuple[str, str]:
     return (parts[0] if parts else ""), (parts[1] if len(parts) == 2 else "")
 
 
+_PY_LAUNCHER = re.compile(r"^(python[0-9.]*|py)(\.exe)?$")
+_PY_CAGE_TAIL = re.compile(r"^(?:-3(?:\.\d+)?\s+)?-m\s+cage(?:\s+(.*))?$")
+
+
 def cage_command_tail(command: str) -> str | None:
     """The subcommand tail if ``command`` invokes cage — by binary name (`cage …`,
-    `/abs/path/cage …`, the Windows `…\\cage.exe` forms, quoted) **or via the
-    committed shim** (`cage-run` in any host's reference form, plan §5); else None
-    (a foreign hook — never touch it). The superset detector wiring/migration use;
+    `/abs/path/cage …`, the Windows `…\\cage.exe` forms, quoted), **via the
+    committed shim** (`cage-run` in any host's reference form, plan §5), or **via
+    the interpreter** (`python3 -m cage …` / `py -3 -m cage …` — python-launcher
+    wiring mode, docs/restricted-environments.md); else None (a foreign hook —
+    never touch it). The superset detector wiring/migration use;
     `reresolve_cage_command` deliberately stays binary-only so nothing can ever
-    rewrite a portable shim reference back into an absolute path."""
+    rewrite a portable shim or interpreter reference back into an absolute path."""
     bin0, sub = _split_bin(command)
     if not bin0:
         return None
     name = bin0.replace("\\", "/").rsplit("/", 1)[-1].lower()
     if name in ("cage", "cage.exe", "cage-run", "cage-run.cmd"):
         return sub
+    if _PY_LAUNCHER.match(name):
+        m = _PY_CAGE_TAIL.match(sub)
+        if m:
+            return m.group(1) or ""
     return None
 
 
@@ -154,9 +164,27 @@ def active_ledger_source(start: Path | None = None) -> str:
     return "global (~/.cage)"
 
 
-def bundled_data_dir() -> Path:
-    """Seed data shipped with the cage package (default policy + skill assets)."""
-    return Path(__file__).parent / "data"
+def bundled_data():
+    """Seed data shipped with the cage package (default policy + skill assets).
+
+    Returns an ``importlib.resources`` Traversable: a real directory ``Path`` under
+    a wheel/editable install (identical behavior to the old ``__file__`` form), a
+    zip entry when cage runs from ``cage.pyz``. Callers that need a real filesystem
+    path (copying assets out) wrap items in ``importlib.resources.as_file``."""
+    import importlib.resources
+    return importlib.resources.files("cage") / "data"
+
+
+def distribution() -> str:
+    """``"zipapp"`` when cage runs from a ``.pyz`` (zipimport), else ``"wheel"``
+    (which covers editable/sdist installs too — the label only ever surfaces as a
+    ``(zipapp)`` suffix, never as a "(wheel)" claim)."""
+    import zipimport
+
+    import cage
+    loader = getattr(getattr(cage, "__spec__", None), "loader", None) \
+        or getattr(cage, "__loader__", None)
+    return "zipapp" if isinstance(loader, zipimport.zipimporter) else "wheel"
 
 
 def claude_home() -> Path:

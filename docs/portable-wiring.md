@@ -46,6 +46,11 @@ The shim resolves cage fresh on each invocation, on whatever machine it runs:
 3. `python3 -m cage` (Windows: `py -m cage`) if the package is importable
 4. **Nothing found → exit 0, silently.**
 
+Before step 1, the shim honors one runtime override: `CAGE_RUN_PYTHON=1` in the
+invoking environment skips the exe probe entirely and goes straight to step 3
+(then exit 0) — the no-rewire escape hatch for endpoints that block unknown
+executables (see [restricted-environments.md](restricted-environments.md)).
+
 Step 4 is the contract that makes the shim safe to commit: a teammate who has
 never installed cage clones the repo and gets fully working agents — no error
 noise in their hooks, no broken MCP server, simply no capture on their
@@ -72,6 +77,27 @@ regression-tested by grepping setup's written files
 above, which is gitignore-advised rather than silently shipped broken.
 Anything that never leaves the machine may — and should — use the most robust
 local reference.
+
+## Python-launcher mode (opt-in, restricted endpoints)
+
+`cage setup --python-launcher` persists `[wiring] python_launcher = true` in the
+project policy and switches the *whole* wiring story to interpreter-only
+resolution: the shim pair is rewritten to a variant that runs
+`python3 -m cage` / `py -3 -m cage` directly (no PATH probe, no install-dir
+probe, nothing exe-shaped in the file), and every user-level file in the table
+above that would carry a resolved absolute cage path carries an interpreter
+command instead (`python3 -m cage import …`, MCP `command = "python3"`,
+`args = ["-m", "cage", "mcp"]`). Committed files are untouched — they reference
+the shim either way; **the shim is the mode**.
+
+The mode is project policy, so plain re-runs of `cage setup` preserve it
+(byte-identical), and setting the key to `false` + re-running setup reverts
+cleanly. The fail-open contract is identical in both modes. `cage doctor`'s
+portability check names the active mode (`mode: standard` /
+`mode: python-launcher`) and warns when the policy and the on-disk shim
+disagree. Full rationale and the other restricted-environment tiers:
+[restricted-environments.md](restricted-environments.md);
+`cage query restricted-env`.
 
 ## Migration and diagnostics
 

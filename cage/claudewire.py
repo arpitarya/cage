@@ -150,7 +150,11 @@ def _heal(hooks: dict) -> int:
     return migrated
 
 
-def install(root: Path) -> dict:
+def install(root: Path, *, python_launcher: bool = False) -> dict:
+    # python_launcher is accepted for the uniform wire-module contract but unused:
+    # every Claude file here is committed and references the committed shim — the
+    # shim variant (written by agents.install) *is* the mode.
+    del python_launcher
     settings = root / ".claude" / "settings.json"
     data = _load(settings)
     hooks = data.setdefault("hooks", {})

@@ -4,7 +4,7 @@
 Scaffolds a disposable repo *beside* the cage checkout, sandboxes every agent
 home (env overrides — nothing touches the real machine), plants the sanitized
 fixture corpus (`tests/fixtures/transcripts/`) in each agent's real log
-location, and runs the scenario matrix S1–S10, printing a pass/fail table.
+location, and runs the scenario matrix S1–S13, printing a pass/fail table.
 
 Same rules as `tools/skillgen`: **stdlib-only, never imported by cage at
 runtime, never in the wheel** (`pyproject` packages only `cage*`). It shells
@@ -829,6 +829,92 @@ def s8_determinism(base: Path) -> str:
     return f"{len(views)} views byte-identical · CAGE_DEBUG=1 no-drift"
 
 
+def s12_launcher(base: Path) -> str:
+    """S12 — python-launcher wiring mode (docs/restricted-environments.md): the flag
+    persists to policy; nothing exe-shaped in any wired file; a flagless re-run
+    preserves the mode byte-identically; the shim resolves via the interpreter;
+    doctor names the mode."""
+    repo, env = make_sandbox(base, "s12-launcher")
+    expect_ok(repo, env, "init")
+    expect_ok(repo, env, "setup", "--wire-only", "--all", "--python-launcher")
+    pol = (repo / ".cage" / "policy.toml").read_text(encoding="utf-8")
+    if "python_launcher = true" not in pol:
+        raise Fail("[wiring] python_launcher = true not persisted in policy.toml")
+    wired = [repo / ".cage" / "bin" / "cage-run",
+             repo / ".cage" / "bin" / "cage-run.cmd",
+             repo / ".kiro" / "settings" / "mcp.json",
+             repo / ".git" / "hooks" / "post-commit",
+             Path(env["COPILOT_HOME"]) / "hooks" / "cage.json",
+             Path(env["CODEX_HOME"]) / "config.toml"]
+    for f in wired:
+        text = f.read_text(encoding="utf-8")
+        for shape in ("cage.exe", "command -v cage", "where cage", ".local/bin/cage"):
+            if shape in text:
+                raise Fail(f"exe shape {shape!r} in launcher-mode file {f.name}")
+    if "-m cage" not in (repo / ".cage" / "bin" / "cage-run").read_text(encoding="utf-8"):
+        raise Fail("launcher shim lost the interpreter form")
+    before = b"".join(f.read_bytes() for f in wired)
+    expect_ok(repo, env, "setup", "--wire-only", "--all")  # no flag — mode must persist
+    if b"".join(f.read_bytes() for f in wired) != before:
+        raise Fail("flagless setup re-run changed launcher-mode wiring")
+    shim = repo / ".cage" / "bin" / "cage-run"
+    argv = [str(shim) + ".cmd"] if os.name == "nt" else ["sh", str(shim)]
+    rs = _sh(argv + ["--version"], cwd=repo, env=env)  # env carries PYTHONPATH → repo cage
+    if rs.returncode != 0 or "cage" not in rs.stdout:
+        raise Fail(f"launcher shim did not resolve via the interpreter: exit "
+                   f"{rs.returncode}, out={rs.stdout.strip()[:120]!r}")
+    doc = expect_ok(repo, env, "doctor")
+    if "mode: python-launcher" not in doc:
+        raise Fail("doctor does not name the python-launcher mode")
+    return "policy persisted · wired files exe-free · flagless re-run identical · shim → interpreter · doctor names mode"
+
+
+def s13_pyz(base: Path) -> str:
+    """S13 — cage.pyz distribution parity (docs/restricted-environments.md): the
+    zipapp labels itself, reads bundled data from inside the zip, imports the
+    fixture corpus, and derives byte-identically to the repo-module run over the
+    SAME ledger. $CAGE_PYZ (CI passes the exact release artifact) beats a local
+    build."""
+    pyz_env = os.environ.get("CAGE_PYZ")
+    if pyz_env:
+        pyz_path = Path(pyz_env)
+        built = "CI artifact"
+    else:
+        from tools import buildpyz
+        pyz_path = buildpyz.build(base / "cage.pyz")
+        built = "local build"
+    repo, env = make_sandbox(base, "s13-pyz")
+    # The zip's cage must win — the archive is sys.path[0], but strip PYTHONPATH
+    # anyway so nothing about the parity claim depends on the checkout.
+    penv = {k: v for k, v in env.items() if k != "PYTHONPATH"}
+
+    def pyz(*args: str) -> subprocess.CompletedProcess:
+        return _sh([sys.executable, str(pyz_path), *args], cwd=repo, env=penv)
+
+    r = pyz("--version")
+    if r.returncode != 0 or not r.stdout.strip().endswith("(zipapp)"):
+        raise Fail(f"pyz --version missing the zipapp label: {r.stdout.strip()!r} "
+                   f"{r.stderr.strip()[:200]!r}")
+    if pyz("init").returncode != 0:
+        raise Fail("pyz init failed")
+    if pyz("demo").returncode != 0:
+        raise Fail("pyz demo failed (bundled policy unreadable from the zip?)")
+    specs = fixture_specs("cli")
+    plant(specs, env)
+    if pyz("import").returncode != 0:
+        raise Fail("pyz import failed")
+    rep1, rep2 = pyz("report"), pyz("report")
+    if rep1.returncode != 0 or not rep1.stdout:
+        raise Fail(f"pyz report failed: {rep1.stderr.strip()[:200]}")
+    if rep1.stdout != rep2.stdout:
+        raise Fail("pyz report not byte-identical across two runs")
+    module_rep = expect_ok(repo, env, "report")  # repo checkout over the SAME ledger
+    if module_rep != rep1.stdout:
+        raise Fail("pyz report differs from the wheel/module report over the same ledger")
+    assert_pii_clean(repo)
+    return f"zipapp labelled · demo+import ok · report deterministic · wheel↔pyz parity ({built})"
+
+
 # id → (phase that ships it, callable or None-if-pending)
 SCENARIOS: dict[str, tuple[str, object]] = {
     "S1": ("P0", s1_cli),
@@ -842,6 +928,8 @@ SCENARIOS: dict[str, tuple[str, object]] = {
     "S11": ("pricing", s11_prices),
     "S9": ("P5", s9_fleet),
     "S10": ("attention", s10_attention),
+    "S12": ("restricted", s12_launcher),
+    "S13": ("restricted", s13_pyz),
 }
 
 MANUAL_CHECKLIST = """\

@@ -28,11 +28,16 @@ resolved absolute path stays the robust choice there (unchanged).
 from __future__ import annotations
 
 import json
+import os
+import re
 from pathlib import Path
 
 from cage import paths, runshim
 
 _MARKER = "[mcp_servers.cage]"
+# The whole cage-written MCP block, for in-place mode/path healing — cage always
+# writes exactly this shape, so the match never spans a foreign table.
+_BLOCK_RE = re.compile(r'\[mcp_servers\.cage\]\ncommand = "[^"\n]*"\nargs = \[[^\]\n]*\]\n')
 
 # Codex's hooks import Codex only — each agent captures its own data; no cross-agent
 # sweep. Self-locating shim form: portable across clones (see the module docstring).
@@ -46,7 +51,14 @@ def _toml_safe_bin() -> str:
     return paths.cage_bin().replace("\\", "/")
 
 
-def _mcp_block() -> str:
+def _mcp_block(python_launcher: bool = False) -> str:
+    if python_launcher:
+        # Interpreter-only (docs/restricted-environments.md). This file is
+        # user-level (~/.codex) — per-machine by nature, so the OS at write time
+        # picks the right launcher name.
+        cmd, args = (("py", '"-3", "-m", "cage", "mcp"') if os.name == "nt"
+                     else ("python3", '"-m", "cage", "mcp"'))
+        return f'\n[mcp_servers.cage]\ncommand = "{cmd}"\nargs = [{args}]\n'
     return f'\n[mcp_servers.cage]\ncommand = "{_toml_safe_bin()}"\nargs = ["mcp"]\n'
 
 
@@ -68,17 +80,20 @@ def _has(entries: list, command: str) -> bool:
               for e in entries for h in e.get("hooks", []))
 
 
-def _install_mcp(root: Path | None) -> str:
+def _install_mcp(root: Path | None, python_launcher: bool = False) -> str:
     cfg = _config(root)
     cfg.parent.mkdir(parents=True, exist_ok=True)
     text = cfg.read_text(encoding="utf-8") if cfg.exists() else ""
+    block = _mcp_block(python_launcher)
     if _MARKER not in text:
-        block = _mcp_block()
         cfg.write_text(text.rstrip() + "\n" + block if text else block.lstrip(),
                        encoding="utf-8")
-    elif '\ncommand = "cage"\n' in text:  # heal a stale bare-`cage` MCP command
-        cfg.write_text(text.replace('\ncommand = "cage"\n',
-                                    f'\ncommand = "{_toml_safe_bin()}"\n'), encoding="utf-8")
+    elif block.lstrip("\n") not in text:
+        # Heal in place: a stale bare-`cage`, a moved binary, or the other wiring
+        # mode's block — replace just the cage-written block, foreign tables kept.
+        healed, n = _BLOCK_RE.subn(lambda _m: block.lstrip("\n"), text, count=1)
+        if n:
+            cfg.write_text(healed, encoding="utf-8")
     return str(cfg)
 
 
@@ -108,8 +123,8 @@ def _install_hook(root: Path | None) -> tuple[str | None, int]:
     return str(path), migrated
 
 
-def install(root: Path | None = None) -> dict:
-    out = {"config": _install_mcp(root)}
+def install(root: Path | None = None, *, python_launcher: bool = False) -> dict:
+    out = {"config": _install_mcp(root, python_launcher)}
     hook, migrated = _install_hook(root)
     if hook:
         out["hooks"] = hook

@@ -22,3 +22,7 @@ demo:
 # Install the engine (editable) so repo edits live-reflect in the `cage` binary.
 install:
     ./install.sh
+
+# Build cage.pyz locally (a smoke build — the release asset is CI-built only).
+pyz:
+    {{python}} -m tools.buildpyz --out dist-pyz/cage.pyz

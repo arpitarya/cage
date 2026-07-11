@@ -58,7 +58,9 @@ def _csv_flag(p: argparse.ArgumentParser) -> None:
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="cage", description=_DESCRIPTION, epilog=_EPILOG,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--version", action="version", version=f"cage {__version__}")
+    from cage import paths as _paths
+    _dist = " (zipapp)" if _paths.distribution() == "zipapp" else ""
+    p.add_argument("--version", action="version", version=f"cage {__version__}{_dist}")
     p.add_argument("--json", action="store_true", help="machine-readable output (bare cage: the headline dict)")
     p.add_argument("--ledger", metavar="DIR", help="use this cage base dir as the active "
                    "ledger (overrides the project/global resolution; the .cage-equivalent "
@@ -334,7 +336,8 @@ def build_parser() -> argparse.ArgumentParser:
                                "  cage setup --claude             # non-interactive: all steps for claude\n"
                                "  cage setup --project-only --claude  # scaffold + graphify only, no global skill\n"
                                "  cage setup --wire-only --claude     # agent wiring only, no scaffold\n"
-                               "  cage setup --status             # show which agents are wired",
+                               "  cage setup --status             # show which agents are wired\n"
+                               "  cage setup --python-launcher --all  # no-exe wiring for locked-down endpoints",
                         formatter_class=argparse.RawDescriptionHelpFormatter)
     for _s in SURFACES:
         st.add_argument(f"--{_s}", action="store_true", help=f"set up the {_s} agent non-interactively (skips the wizard)")
@@ -348,6 +351,10 @@ def build_parser() -> argparse.ArgumentParser:
     st.add_argument("--repo-skill", dest="repo_skill", action="store_true", help="install the /cage skill into this repo (committed, team-shared) instead of the machine-wide home")
     st.add_argument("--no-project", dest="project", action="store_false", help="skip per-project .cage/ scaffold + hook wiring")
     st.add_argument("--no-graphify", dest="graphify", action="store_false", help="skip the graphify interceptor")
+    st.add_argument("--python-launcher", action="store_true",
+                    help="persist [wiring] python_launcher=true and wire everything "
+                         "via `python3 -m cage` / `py -3 -m cage` — no exe probed or "
+                         "executed (restricted endpoints; `cage query restricted-env`)")
     st.set_defaults(fn=clicmds.cmd_setup)
 
     dr = sub.add_parser("doctor", help="verify this project's Cage setup is correct and working")

@@ -431,6 +431,18 @@ def cmd_setup(args) -> int:
             print(f"  {'✔' if on else '·'} {surface:<8} {'wired' if on else 'not wired'}")
         return 0
 
+    # Persist the wiring mode FIRST (docs/restricted-environments.md): the flag is a
+    # project-policy setting (`[wiring] python_launcher`), so it must land before any
+    # wiring path below — agents.install re-reads it from policy on every run, which
+    # is also why a later plain `cage setup` preserves the mode with no flag repeated.
+    if getattr(args, "python_launcher", False):
+        from cage import pricestoml
+        if not paths.Footprint(here).policy.exists():
+            initcmd.run(here)  # the mode needs a project policy file to live in
+            print("✔ .cage/ scaffolded (needed to persist the wiring mode)")
+        res = pricestoml.set_wiring(here, {"python_launcher": True})
+        print(f"✔ wiring mode → python-launcher ({res['mode']}, {res['path']})")
+
     all_agents = getattr(args, "all_agents", False)
 
     # Handle --wire-only: agent wiring only, no scaffold/graphify

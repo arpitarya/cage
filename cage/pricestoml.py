@@ -310,3 +310,9 @@ def set_alias(root: Path, provider: str, model: str, target: str) -> dict:
 def update_meta(root: Path, meta: dict) -> dict:
     """Stamp ``[meta]`` in the project policy (in-place when it exists)."""
     return _write_table(root, ("meta",), dict(meta))
+
+
+def set_wiring(root: Path, values: dict) -> dict:
+    """Persist ``[wiring]`` keys (e.g. ``python_launcher = true``) in the project
+    policy — same locked, atomic text surgery as the price writes."""
+    return _write_table(root, ("wiring",), dict(values))

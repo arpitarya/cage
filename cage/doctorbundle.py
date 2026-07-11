@@ -77,7 +77,7 @@ def _policy_provenance_text(active: Path) -> str:
     foot = paths.Footprint(active)
     project = foot.policy
     lines = ["policy resolution (project merged over bundled default):",
-             f"  bundled default: {paths.bundled_data_dir() / 'policy.toml'}",
+             f"  bundled default: {paths.bundled_data() / 'policy.toml'}",
              f"  project policy:  {project} ({'present' if project.exists() else 'absent'})"]
     try:
         pol = policy.load(project)

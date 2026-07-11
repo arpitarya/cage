@@ -21,10 +21,17 @@ from cage import paths
 _MARKER = "# cage-managed-hook"
 
 
-def _files() -> dict:
+def _files(python_launcher: bool = False) -> dict:
     # Resolved cage path — a GUI git client (IDE commit button) runs hooks with a
     # minimal PATH that omits ~/.local/bin, so a bare `cage` would not be found.
-    c = paths.quoted_cage_bin()
+    # Launcher mode (docs/restricted-environments.md): interpreter only, nothing
+    # exe-shaped. Git hooks run under sh even on Windows (git-for-windows), but
+    # `python3` usually doesn't exist there — the OS at write time picks the
+    # launcher name (.git/hooks is per-clone, never shared).
+    if python_launcher:
+        c = "py -3 -m cage" if os.name == "nt" else "python3 -m cage"
+    else:
+        c = paths.quoted_cage_bin()
     return {
         "post-commit": f"#!/bin/sh\n{_MARKER}\n{c} hook-post-commit\n",
         "prepare-commit-msg": f'#!/bin/sh\n{_MARKER}\n{c} hook-prepare-commit-msg "$1"\n',
@@ -36,7 +43,7 @@ def _git_dir(root: Path) -> Path | None:
     return d if d.is_dir() else None  # worktrees/submodules (a `.git` file) skipped, fail-open
 
 
-def install(root: Path) -> dict:
+def install(root: Path, *, python_launcher: bool = False) -> dict:
     """Write any of the two hook files that are absent or already cage-managed.
     A foreign (non-cage) hook at the same path is left untouched. Fail-open."""
     installed: list[str] = []
@@ -47,7 +54,7 @@ def install(root: Path) -> dict:
     hooks_dir = git_dir / "hooks"
     try:
         hooks_dir.mkdir(parents=True, exist_ok=True)
-        for name, content in _files().items():
+        for name, content in _files(python_launcher).items():
             path = hooks_dir / name
             if path.exists() and _MARKER not in path.read_text(encoding="utf-8", errors="ignore"):
                 skipped.append(name)  # a real, non-cage hook already lives here

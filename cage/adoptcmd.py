@@ -29,11 +29,13 @@ def _install_shim(root: Path) -> str | None:
     """Copy the bundled graphify interceptor into <root>/bin; return its path."""
     if not shutil.which("graphify"):
         return None
-    src = paths.bundled_data_dir() / "shims" / "graphify"
+    import importlib.resources
+    src = paths.bundled_data() / "shims" / "graphify"
     bin_dir = root / "bin"
     bin_dir.mkdir(parents=True, exist_ok=True)
     dst = bin_dir / "graphify"
-    shutil.copy2(src, dst)
+    with importlib.resources.as_file(src) as real:
+        shutil.copy2(real, dst)
     dst.chmod(dst.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
     return str(dst)
 

@@ -28,15 +28,20 @@ _WIRE = {"claude": claudewire, "codex": codexwire,
 
 
 def install(root: Path, surfaces: tuple[str, ...] | None = None) -> dict:
+    from cage import paths, policy
     picked = surfaces or SURFACES
+    # The wiring mode is project policy (`[wiring] python_launcher`, docs/
+    # restricted-environments.md) — re-read on every install so a plain re-run of
+    # `cage setup` preserves the persisted mode with no flag repeated.
+    launcher = policy.python_launcher(policy.load(paths.Footprint(root).policy))
     # Every surface's committed wiring references the committed shim instead of an
     # absolute cage path (plan §5) — write it first so the references always resolve.
-    runshim.write(root)
+    runshim.write(root, python_launcher=launcher)
     out: dict[str, dict] = {}
     for name in (s for s in SURFACES if s in picked):
-        out[name] = _WIRE[name].install(root)
+        out[name] = _WIRE[name].install(root, python_launcher=launcher)
     if "claude" in out:
-        gh = gitcommithook.install(root)  # PostToolUse capture buffer → sha resolution (plan §3.5)
+        gh = gitcommithook.install(root, python_launcher=launcher)  # PostToolUse capture buffer → sha resolution (plan §3.5)
         if gh["installed"]:
             out["claude"]["git-hooks"] = ", ".join(gh["installed"])
     return out

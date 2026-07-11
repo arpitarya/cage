@@ -49,3 +49,83 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           skip-existing: true
+
+  # ── cage.pyz release asset (docs/restricted-environments.md) ────────────────
+  # Sibling jobs on the same release trigger, deliberately INDEPENDENT of the
+  # PyPI publish chain above (no `needs` in either direction): a pyz failure can
+  # never block the publish. The attached bytes are the smoked bytes — one build,
+  # one artifact through build → smoke → attach. Job-level permissions override
+  # the workflow-level `id-token: write`, so none of these gets an OIDC token.
+  build-pyz:
+    name: Build cage.pyz
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build zipapp (stdlib only)
+        run: python -m tools.buildpyz --out dist-pyz/cage.pyz
+
+      - name: Checksums
+        run: cd dist-pyz && sha256sum cage.pyz > SHA256SUMS && cat SHA256SUMS
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pyz
+          path: dist-pyz/
+
+  smoke-pyz:
+    name: Smoke cage.pyz (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    needs: build-pyz
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    env:
+      PYTHONUTF8: "1"
+
+    steps:
+      - uses: actions/checkout@v4  # fixtures + tools/dummyrepo for the smoke scenario
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: pyz
+          path: dist-pyz/
+
+      - name: Smoke the exact release artifact (S13 — version/demo/import/report parity)
+        env:
+          CAGE_PYZ: ${{ github.workspace }}/dist-pyz/cage.pyz
+        run: python -m tools.dummyrepo --scenarios S13
+
+  release-pyz:
+    name: Attach cage.pyz to the release
+    runs-on: ubuntu-latest
+    needs: smoke-pyz
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4  # gh needs a repo context
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: pyz
+          path: dist-pyz/
+
+      - name: Upload release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" dist-pyz/cage.pyz dist-pyz/SHA256SUMS --clobber

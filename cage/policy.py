@@ -18,8 +18,10 @@ _ZERO_PRICE = {"input": 0.0, "output": 0.0, "cache_read": 0.0}
 
 
 def _bundled() -> dict:
-    src = paths.bundled_data_dir() / "policy.toml"
-    if tomllib is None or not src.exists():
+    # is_file(), not exists(): bundled_data() is a Traversable (no .exists() in the
+    # ABC) so the bundled prices keep loading when cage runs from cage.pyz.
+    src = paths.bundled_data() / "policy.toml"
+    if tomllib is None or not src.is_file():
         return {}
     with src.open("rb") as fh:
         return tomllib.load(fh)
@@ -33,7 +35,7 @@ def _bundled() -> dict:
 # back to family/none, and `cage init` copies carry the full table anyway.)
 _TWO_LEVEL = ("prices", "credits", "alias")
 _SECTIONS = ("prices", "tools", "budgets", "quality", "human", "ledger",
-             "capture", "debug", "credits", "alias", "meta", "cleanup")
+             "capture", "debug", "credits", "alias", "meta", "cleanup", "wiring")
 
 
 def load(policy_path: Path | None = None) -> dict:
@@ -207,6 +209,17 @@ def _flag(env_name: str, pol: dict, section: str, key: str, default: bool) -> bo
     return bool(pol.get(section, {}).get(key, default))
 
 
+def python_launcher(pol: dict) -> bool:
+    """Persisted wiring mode (docs/restricted-environments.md): shims + user-level
+    wiring resolve cage through the interpreter only (`python3 -m cage` /
+    `py -3 -m cage`), never probing or executing a `cage`/`cage.exe` binary — for
+    endpoints where unknown exes are blocked. Policy ``[wiring] python_launcher``;
+    default off (standard mode). Deliberately NOT env-overridable: `CAGE_RUN_PYTHON`
+    is the *shim-runtime* no-rewire escape hatch, never a write-time mode switch —
+    `cage setup`'s output must not depend on the caller's environment."""
+    return bool(pol.get("wiring", {}).get("python_launcher", False))
+
+
 def capture_enabled(pol: dict) -> bool:
     """Whether hook-driven `cage import` actually runs — the consumer's on/off switch
     for auto-metering, without unwiring any hooks. Env `CAGE_CAPTURE` overrides policy
@@ -251,5 +264,5 @@ def import_before_export(pol: dict) -> bool:
 
 def default_toml() -> str:
     """The policy.toml `cage init` writes — a copy of the bundled default."""
-    src = paths.bundled_data_dir() / "policy.toml"
+    src = paths.bundled_data() / "policy.toml"
     return src.read_text(encoding="utf-8")

@@ -44,8 +44,15 @@ REALTIME_EVENT = "agentStop"
 HOOK_EVENTS = (REALTIME_EVENT, "sessionStart", "sessionEnd")
 
 
-def _import_cmd() -> str:
-    return f"{paths.quoted_cage_bin()} import --agent copilot --since 7d"  # Copilot only — no sweep
+def _import_cmd(python_launcher: bool = False) -> tuple[str, str]:
+    """(bash, powershell) hook commands — Copilot only, no sweep. Launcher mode
+    (docs/restricted-environments.md) goes straight to the interpreter, nothing
+    exe-shaped; the hook entry carries both shells so each gets its own form."""
+    if python_launcher:
+        tail = "-m cage import --agent copilot --since 7d"
+        return f"python3 {tail}", f"py -3 {tail}"
+    cmd = f"{paths.quoted_cage_bin()} import --agent copilot --since 7d"
+    return cmd, cmd
 
 
 def _hook_path(root: Path | None = None) -> Path:
@@ -53,14 +60,14 @@ def _hook_path(root: Path | None = None) -> Path:
     return paths.copilot_home() / "hooks" / "cage.json"
 
 
-def _wire_hooks(root: Path) -> str:
+def _wire_hooks(root: Path, python_launcher: bool = False) -> str:
     """Wire the Copilot self-import into its agentStop/sessionStart/sessionEnd hooks."""
     path = _hook_path(root)
     data = cfgio.load_json(path) if path.exists() else {}
     data.setdefault("version", 1)
     hooks = data.setdefault("hooks", {})
-    cmd = _import_cmd()
-    entry = {"type": "command", "bash": cmd, "powershell": cmd, "cwd": ".", "timeoutSec": 30}
+    bash, ps = _import_cmd(python_launcher)
+    entry = {"type": "command", "bash": bash, "powershell": ps, "cwd": ".", "timeoutSec": 30}
     for event in HOOK_EVENTS:
         arr = hooks.setdefault(event, [])
         # drop any cage-import entry (stale form / prior all-agent sweep), keep foreign
@@ -91,7 +98,7 @@ def _migrate_repo_hook(root: Path) -> None:
         legacy.unlink(missing_ok=True)
 
 
-def install(root: Path) -> dict:
+def install(root: Path, *, python_launcher: bool = False) -> dict:
     instr = root / ".github" / "copilot-instructions.md"
     cfgio.upsert_block(instr, pointers.START, pointers.END, pointers.POINTER,
                        default="# Copilot instructions\n")
@@ -104,7 +111,8 @@ def install(root: Path) -> dict:
                                               "args": ["mcp"]}
     cfgio.save_json(mcp, data)
     _migrate_repo_hook(root)
-    out = {"instructions": str(instr), "mcp": str(mcp), "hooks": _wire_hooks(root)}
+    out = {"instructions": str(instr), "mcp": str(mcp),
+           "hooks": _wire_hooks(root, python_launcher)}
     if old is not None and old != portable:
         out["migrated"] = "migrated 1 legacy entry → shim"
     return out
@@ -115,7 +123,11 @@ def _event_wired(root: Path, event: str) -> bool:
     if not path.exists():
         return False
     arr = cfgio.load_json(path).get("hooks", {}).get(event, [])
-    return any(h.get("bash") == _import_cmd() for h in arr)
+    # Mode-aware: status reads this project's persisted wiring mode so a
+    # launcher-mode hook reports wired (and a stale other-mode one doesn't).
+    from cage import policy
+    launcher = policy.python_launcher(policy.load(paths.Footprint(root).policy))
+    return any(h.get("bash") == _import_cmd(launcher)[0] for h in arr)
 
 
 def backfill_status(root: Path) -> bool:

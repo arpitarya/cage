@@ -23,9 +23,14 @@ _RANK = {_OK: 0, _WARN: 1, _FAIL: 2}
 
 
 def _tool() -> tuple[str, str]:
+    from cage import __version__
+    if paths.distribution() == "zipapp":
+        # A pyz has no `cage` on PATH by design — pull-based capture is the story
+        # (docs/restricted-environments.md); a PATH warn here would always fire.
+        return _OK, (f"cage {__version__} (zipapp) — pull-based capture "
+                     "(`import`/`export`/`report`); hooks need an importable install")
     if not shutil.which("cage"):
         return _WARN, "`cage` not on PATH (running, but not globally callable)"
-    from cage import __version__
     return _OK, f"cage {__version__} on PATH"
 
 
@@ -252,9 +257,20 @@ def _portability(root: Path) -> tuple[str, str]:
         notes.append("kiro MCP stays machine-absolute by necessity (Kiro spawns MCP "
                      "servers from its install dir) — add .kiro/settings/mcp.json "
                      "to .gitignore")
+    # Wiring mode (docs/restricted-environments.md): the mode lives in project policy;
+    # the on-disk shim carries a marker in its launcher variant. Report which is
+    # active, and warn on drift (policy flipped but `cage setup` not re-run).
+    launcher_pol = policy.python_launcher(policy.load(paths.Footprint(root).policy))
+    mode = "python-launcher" if launcher_pol else "standard"
+    if shim.exists():
+        shim_is_py = runshim._PY_MARKER in shim.read_text(encoding="utf-8")
+        if shim_is_py != launcher_pol:
+            problems.append(f"wiring mode is {mode} in policy but the shim is "
+                            f"{'python-launcher' if shim_is_py else 'standard'} — "
+                            "re-run `cage setup` to rewrite the wiring")
     if problems:
         return _WARN, "; ".join(problems + notes)
-    detail = "committed wiring is portable (no absolute cage paths)"
+    detail = f"mode: {mode} · committed wiring is portable (no absolute cage paths)"
     return _OK, "; ".join([detail] + notes) if notes else detail
 
 

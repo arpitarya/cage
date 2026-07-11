@@ -83,7 +83,8 @@ def _wire_hooks(root: Path) -> tuple[str, bool]:
     return str(path), old is not None and old != _import_cmd()
 
 
-def install(root: Path) -> dict:
+def install(root: Path, *, python_launcher: bool = False) -> dict:
+    import os
     steering = root / ".kiro" / "steering" / "cage.md"
     cfgio.upsert_block(steering, pointers.START, pointers.END, pointers.POINTER,
                        default="# Cage\n")
@@ -91,8 +92,16 @@ def install(root: Path) -> dict:
     data = cfgio.load_json(mcp)
     # The ONE portability exception — absolute by necessity (module docstring):
     # Kiro spawns MCP servers from its install dir with no workspace variable.
-    data.setdefault("mcpServers", {})["cage"] = {"command": paths.cage_bin(), "args": ["mcp"],
-                                                 "disabled": False}
+    # Launcher mode (docs/restricted-environments.md) swaps the exe for the
+    # interpreter; the file stays per-machine (gitignore-advised), so the OS at
+    # write time picks the launcher name.
+    if python_launcher:
+        server = ({"command": "py", "args": ["-3", "-m", "cage", "mcp"], "disabled": False}
+                  if os.name == "nt" else
+                  {"command": "python3", "args": ["-m", "cage", "mcp"], "disabled": False})
+    else:
+        server = {"command": paths.cage_bin(), "args": ["mcp"], "disabled": False}
+    data.setdefault("mcpServers", {})["cage"] = server
     cfgio.save_json(mcp, data)
     hooks, migrated = _wire_hooks(root)
     out = {"steering": str(steering), "mcp": str(mcp), "hooks": hooks}

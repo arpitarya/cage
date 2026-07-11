@@ -545,9 +545,44 @@ REGISTRY: tuple[Explanation, ...] = (
         "  exception: .kiro/settings/mcp.json must stay absolute (Kiro spawns MCP\n"
         "  servers from its install dir, no workspace variable) — gitignore it.\n"
         "  Re-running `cage setup` migrates legacy absolute entries and prints what\n"
-        "  moved; `cage doctor` has a portability check.",
+        "  moved; `cage doctor` has a portability check and names the wiring mode.\n"
+        "  Opt-in python-launcher mode (`cage setup --python-launcher`, persisted as\n"
+        "  [wiring] python_launcher = true) makes the shim + user-level wiring resolve\n"
+        "  through the interpreter only — nothing exe-shaped probed or executed;\n"
+        "  CAGE_RUN_PYTHON=1 is the runtime-only override on the standard shim. See\n"
+        "  `cage query restricted-env`.",
         ("cage/runshim.py", "cage/claudewire.py", "cage/codexwire.py",
          "cage/kirowire.py", "cage/doctorcmd.py"),
         "n/a — describes the wiring mechanism, not a number.",
+        kind="concept", plan_ref="§5"),
+    Explanation(
+        # NB: keywords avoid generic stems ("setup", "wiring") that would steal
+        # queries from `overview`/`portable-wiring` — same discipline as above.
+        "restricted-env", ("restricted-env", "restricted", "locked-down", "lockdown",
+                           "applocker", "wdac", "zipapp", "pyz", "python-launcher",
+                           "no-exe", "blocked", "enterprise", "finance", "mirror",
+                           "airgap", "offline"),
+        "running cage where exes are blocked or pip is unavailable",
+        "three tiers (docs/restricted-environments.md). 1) python-launcher wiring\n"
+        "  mode: `cage setup --python-launcher` persists [wiring] python_launcher =\n"
+        "  true and (re)writes the shim + user-level wiring to resolve cage through\n"
+        "  the interpreter only (python3 -m cage / py -3 -m cage) — nothing\n"
+        "  exe-shaped is probed or executed, for AppLocker/WDAC endpoints that block\n"
+        "  unknown exes; committed files are unchanged (they reference the shim; the\n"
+        "  shim IS the mode); same fail-open exit-0 contract; plain re-runs preserve\n"
+        "  the mode; `cage doctor` names it. CAGE_RUN_PYTHON=1 is the no-rewire\n"
+        "  runtime override on the standard shim. 2) cage.pyz: a CI-built stdlib\n"
+        "  zipapp attached to every GitHub release beside SHA256SUMS — one file, no\n"
+        "  pip, run `py cage.pyz import/export/report` through the approved\n"
+        "  interpreter; `--version`/doctor label the run `(zipapp)`; derived views\n"
+        "  are byte-identical to a wheel install over the same ledger. Shims never\n"
+        "  embed a pyz path (machine-specific) — hooks need an importable install;\n"
+        "  the pyz story is pull-based capture. 3) internal mirror: dependencies =\n"
+        "  [] and OIDC trusted publishing are the review answers. Honest caveat:\n"
+        "  WDAC can also constrain script hosts — check your policy; doctor cannot\n"
+        "  detect a blocked interpreter.",
+        ("cage/runshim.py", "cage/paths.py", "tools/buildpyz.py",
+         ".github/workflows/publish.yml"),
+        "n/a — describes distribution/wiring tiers, not a number.",
         kind="concept", plan_ref="§5"),
 )

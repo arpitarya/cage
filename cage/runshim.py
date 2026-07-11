@@ -26,6 +26,13 @@ The shim's contract is cage's own fail-open law extended to wiring:
 UNVERIFIED on a real Windows agent host, same label discipline as the Kiro
 Windows layout in `paths.py`. Execute bit is set at write time, fail-open for
 `core.fileMode=false` repos / filesystems that reject chmod.
+
+Restricted endpoints (docs/restricted-environments.md): `CAGE_RUN_PYTHON=1` makes
+the standard shim skip the exe probe at runtime (straight to `python3 -m cage` /
+`py -3 -m cage`) without rewiring; `[wiring] python_launcher = true` in project
+policy makes `cage setup` write the `_SH_PY`/`_CMD_PY` variant pair instead —
+interpreter-only, nothing exe-shaped in the file at all. Same fail-open contract
+in both modes.
 """
 from __future__ import annotations
 
@@ -42,7 +49,14 @@ _SH = """\
 # cage-run — cage-managed runtime resolver (committed; identical on every machine).
 # Resolves the cage CLI at run time so no wired file carries an absolute path.
 # cage absent => exit 0 silently (fail-open: agents keep working, no capture).
-# See `cage query portable-wiring`. Regenerate with `cage setup`.
+# CAGE_RUN_PYTHON=1 skips the exe probe (restricted endpoints — `cage query
+# restricted-env`). See `cage query portable-wiring`. Regenerate with `cage setup`.
+if [ "$CAGE_RUN_PYTHON" = "1" ]; then
+  if command -v python3 >/dev/null 2>&1 && python3 -c "import cage" >/dev/null 2>&1; then
+    exec python3 -m cage "$@"
+  fi
+  exit 0
+fi
 if command -v cage >/dev/null 2>&1; then exec cage "$@"; fi
 for c in "$HOME/.local/bin/cage" "$HOME/.local/pipx/venvs/cage/bin/cage"; do
   if [ -x "$c" ]; then exec "$c" "$@"; fi
@@ -60,7 +74,9 @@ _CMD = """\
 @echo off
 rem cage-run.cmd — cage-managed runtime resolver (committed; identical on every machine).
 rem Windows twin of cage-run: same order, same fail-open exit 0 when cage is absent.
+rem CAGE_RUN_PYTHON=1 skips the exe probe (`cage query restricted-env`).
 rem UNVERIFIED on a real Windows agent host (same label discipline as paths.py).
+if "%CAGE_RUN_PYTHON%"=="1" goto pyonly
 where cage >nul 2>nul
 if %errorlevel%==0 (
   cage %*
@@ -80,6 +96,40 @@ if %errorlevel%==0 (
   exit /b %errorlevel%
 )
 exit /b 0
+:pyonly
+py -3 -c "import cage" >nul 2>nul
+if not %errorlevel%==0 exit /b 0
+py -3 -m cage %*
+exit /b %errorlevel%
+"""
+
+# The doctor's on-disk mode sniff — present in both launcher-variant texts below,
+# never in the standard pair above.
+_PY_MARKER = "python-launcher mode"
+
+_SH_PY = f"""\
+#!/bin/sh
+# cage-run — cage-managed runtime resolver (committed; identical on every machine).
+# {_PY_MARKER}: resolves cage through the interpreter only — never probes or
+# executes a `cage` binary (restricted endpoints; see `cage query restricted-env`).
+# cage not importable => exit 0 silently (fail-open: agents keep working, no capture).
+# Regenerate with `cage setup`; back to standard mode: set
+# [wiring] python_launcher = false in .cage/policy.toml and re-run `cage setup`.
+if command -v python3 >/dev/null 2>&1 && python3 -c "import cage" >/dev/null 2>&1; then
+  exec python3 -m cage "$@"
+fi
+exit 0
+"""
+
+_CMD_PY = f"""\
+@echo off
+rem cage-run.cmd — cage-managed runtime resolver (committed; identical on every machine).
+rem {_PY_MARKER}: interpreter only — no executable probed (`cage query restricted-env`).
+rem cage not importable => exit /b 0 silently (fail-open).
+py -3 -c "import cage" >nul 2>nul
+if not %errorlevel%==0 exit /b 0
+py -3 -m cage %*
+exit /b %errorlevel%
 """
 
 
@@ -87,16 +137,19 @@ def shim_path(root: Path) -> Path:
     return root / ".cage" / "bin" / "cage-run"
 
 
-def write(root: Path) -> dict:
+def write(root: Path, *, python_launcher: bool = False) -> dict:
     """Write both shim files under ``root/.cage/bin/`` — byte-identical content on
     every machine, so `cage setup` twice (or on two machines) never produces a diff.
-    Only rewrites when bytes differ (no mtime churn on re-setup). The execute bit is
-    best-effort: a `core.fileMode=false` repo or a chmod-rejecting filesystem must
-    never break setup (fail-open)."""
+    ``python_launcher=True`` writes the interpreter-only variant pair (docs/
+    restricted-environments.md); the byte-compare makes switching modes a single
+    clean rewrite. Only rewrites when bytes differ (no mtime churn on re-setup).
+    The execute bit is best-effort: a `core.fileMode=false` repo or a
+    chmod-rejecting filesystem must never break setup (fail-open)."""
     bin_dir = root / ".cage" / "bin"
     bin_dir.mkdir(parents=True, exist_ok=True)
     written = {}
-    for name, text in (("cage-run", _SH), ("cage-run.cmd", _CMD)):
+    pair = ((_SH_PY, _CMD_PY) if python_launcher else (_SH, _CMD))
+    for name, text in (("cage-run", pair[0]), ("cage-run.cmd", pair[1])):
         path = bin_dir / name
         if not path.exists() or path.read_text(encoding="utf-8") != text:
             path.write_text(text, encoding="utf-8", newline="\n")

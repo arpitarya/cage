@@ -15,7 +15,7 @@ You're paying for an agent, a graph tool, a rules engine, maybe Copilot. At the 
 
 **Named after *John Cage*.** · Python ≥ 3.11 · stdlib only · MIT · sits beside `fux`, `bach`, `wagner`, `orff`.
 
-**Platforms:** macOS is field-validated (real extension sessions, the full manual capture matrix); Linux and Windows are CI-tested across the whole suite + scenario runner. On Windows, run `cage doctor --paths` first — it shows every log location cage probes on your machine and why any missed ([manual checklist](docs/windows-manual-checklist.md) to help upgrade the wording).
+**Platforms:** macOS is field-validated (real extension sessions, the full manual capture matrix); Linux and Windows are CI-tested across the whole suite + scenario runner. On Windows, run `cage doctor --paths` first — it shows every log location cage probes on your machine and why any missed ([manual checklist](docs/windows-manual-checklist.md) to help upgrade the wording). Locked-down endpoint (AppLocker/WDAC blocks the exe, or no pip)? `cage setup --python-launcher` wires everything through the interpreter instead, and every release ships a single-file `cage.pyz` — see [Restricted environments](docs/restricted-environments.md).
 
 <p align="center"><em>▶ Demo GIF coming soon.</em></p>
 
@@ -284,7 +284,7 @@ cage export --csv calls --since 30d -o calls.csv   # raw ledger rows for a pivot
 
 ## The `$0` guarantee
 
-Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 543 tests passing; `cage demo` reproduces the worked attribution example against a real ledger.
+Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 569 tests passing; `cage demo` reproduces the worked attribution example against a real ledger.
 
 **Honest limits.** Cage doesn't decide your human rate — it prices minutes at a blended rate you set, and labels the result `estimated` so it never pretends to be a timesheet. Marginal-by-fixed-order is defensible and `$0`, but it is an *ordering convention*, not a Shapley value (that's a deferred audit mode). And a counterfactual cell is an honest reconstruction, never an invoice — the `method` column says so on every row, on purpose.
 
@@ -292,7 +292,7 @@ Every derived view is parse / arithmetic over the log — **no LLM call, ever, o
 
 Latest release below — full history and detail in [CHANGELOG.md](CHANGELOG.md).
 
-- **v0.21.0 — CSV output + agent reporting recipes.** Every read view (`report` · `attrib` · `roi` · `compare` · `study report` · `calibration` · `human` · `trend`) gains `--csv` (stdout or a file), plus raw rows via `cage export --csv calls|receipts|tasks` — one shared data structure feeds text and CSV so the numbers can't disagree, method tags stay columns, refusals/caveats/UNPRICED survive into the sheet, LF pinned byte-identical on every OS. The `cage` skill on all four agents teaches the recipes; MCP mirrors it (`format: csv`); `cage query csv-output` explains the design.
+- **v0.22.0 — restricted environments: python-launcher mode + cage.pyz.** For locked-down endpoints: `cage setup --python-launcher` wires everything through the interpreter (`python3 -m cage` / `py -3 -m cage`) — nothing exe-shaped probed or executed, persisted in policy, doctor names the mode (`CAGE_RUN_PYTHON=1` is the no-rewire runtime override); every release now also ships a CI-built single-file `cage.pyz` + `SHA256SUMS` for machines without pip (bundled data reads via importlib.resources, `--version` labels the zipapp, derived views byte-identical to a wheel install). See [docs/restricted-environments.md](docs/restricted-environments.md); `cage query restricted-env`.
 
 ## The name
 
