@@ -1,8 +1,8 @@
 # Cage full test plan — sibling repo, everything, including real extensions
 
 **Version under test:** `cage <version under test>`
-**Last executed:** v0.16.0 — results archived at [docs/archive/v0.16-full-test-run.md](archive/v0.16-full-test-run.md)
-**Goal:** exercise *every* cage surface against a fresh sibling repo — automated where the S1–S9 runner covers it, **manual with the real CLI clients and VS Code extensions** where it can't. The manual pass has a second deliverable: sanitized real extension logs that replace the three `UNVERIFIED-FORMAT` fixture stand-ins (`codex/vscode`, `copilot/vscode`, `kiro/vscode` — see `tests/fixtures/transcripts/README.md`).
+**Last executed:** v0.22.1 — run record archived at [docs/archive/v0.22.1-full-test-run.md](archive/v0.22.1-full-test-run.md); prior: [docs/archive/v0.16-full-test-run.md](archive/v0.16-full-test-run.md)
+**Goal:** exercise *every* cage surface against a fresh sibling repo — automated where the S1–S13 runner covers it, **manual with the real CLI clients and VS Code extensions** where it can't. All fixture formats are field-verified as of v0.22; if an agent update changes a log format, the manual pass re-captures a sanitized sample (see `tests/fixtures/transcripts/README.md`).
 **Relation to other docs:** supersedes the manual parts of the dummy-repo test plan (archived: `docs/archive/v0.16-dummy-repo-test.plan.md`); Part A delegates all scripted coverage to `python -m tools.dummyrepo`.
 
 **Result recording:** keep a findings table as you go (template at the end). Every failed step gets a row — don't stop to fix mid-run unless capture itself is broken.
@@ -12,7 +12,7 @@
 ## Part A — Automated baseline (run first, ~minutes)
 
 - [ ] `just test` → all passing, 0 failures. Record the count. If red, stop and fix first.
-- [ ] `python -m tools.dummyrepo` → S1–S9 all PASS (scripted CLI-format capture, adversarial states, bundle PII, compare/estimate/calibration/verdict goldens, fleet merge).
+- [ ] `python -m tools.dummyrepo` → S1–S13 all PASS (scripted capture, adversarial states, bundle PII, compare/estimate/calibration/verdict goldens, fleet merge, attention gaps, pricing/unpriced, launcher mode, pyz parity).
 - [ ] `python -m tools.skillgen --check` → no drift.
 - [ ] `python -c "import cage"` in a venv with **no extras** → succeeds ($0/stdlib path).
 - [ ] `cage demo` → reproduces the plan §4.4 tables.
@@ -59,18 +59,21 @@ For each cell you actually have installed (mark the rest **N/A (not installed)**
 | Kiro **CLI** (if installed) | same token log | Same dedupe check. |
 
 - [ ] After all cells: `cage report` totals = sum of what each agent session added (spot-check arithmetic).
-- [ ] `CAGE_CAPTURE=0 cage import` → no new rows (capture switch); `=1` restores.
+- [ ] **Attention (v0.18):** claude-sourced call rows carry `gap_ms` (codex/copilot/kiro rows don't — absence explicit); `cage human` shows derived minutes labelled `derived (turn-gaps, capped)`.
+- [ ] **Export sweep (v0.19):** run one agent session, do NOT `cage import`, then `cage export` → the fresh rows are in the output (imports-everything-first); `--no-import` → they aren't; manifest records which ("snapshot only (no sweep)").
+- [ ] `CAGE_CAPTURE=0 cage import` → no new rows (capture switch); `=1` restores; `[capture] import_before_export = false` skips the export sweep.
 - [ ] Delete the project `.cage/`, run one more agent session, `cage import` from `$HOME` → rows land in **global** `~/.cage` (resolver precedence); restore project ledger after (`cage init` again). Record which sink `cage doctor` names each time.
+- [ ] `cage doctor --paths` (v0.17): per agent, every candidate log location with found/missing + a `why` per miss; active sink + precedence chain at the end; nothing written.
 
 ## Part D — Every read surface, against the real ledger
 
 Run each against `cage-testbed`'s now-populated ledger. Pass = renders without error, numbers self-consistent, `method` tags visible where they apply, exit code 0 (or documented).
 
-- [ ] `cage report` · `--project` · `--scope <dir>` · `--since <date>` (cutoff respected across month shards)
+- [ ] `cage report` · `--project` · `--scope <dir>` · `--since <window>` (7d/24h/2w; cutoff respected across month shards)
 - [ ] `cage attrib` · `cage matrix` · `cage matrix --human` (flag adds the anchor row; without it, byte-identical to before)
 - [ ] `cage budget` (set a tiny budget in policy.toml → warn/block behavior) · `cage roi` · `cage recommend` · `cage forecast` · `cage regression`
 - [ ] `cage human-record` + `cage human` + `cage trend` (record a human receipt with minutes → USD via `[human]` rates; `CAGE_HUMAN_RATE=200 cage human` → header shows provenance, number changes)
-- [ ] `cage why` · `cage quality` + `cage outcome <task> --ok/--redo --label <word>` (label = single token; try a path → must be rejected)
+- [ ] `cage why` · `cage quality` + `cage outcome <task> [--redo] --label <word>` (success is the default) (label = single token; try a path → must be rejected)
 - [ ] `cage compare` (groups from Part C tasks; n<5 groups → refusal text, never numbers) · `cage estimate --label <word>` (band, `modeled` tag) · `--record` then close → `cage calibration` (hit-rate line)
 - [ ] `cage verdict <tool>` (with graphify/fux receipts if present, else INSUFFICIENT DATA path)
 - [ ] `cage query "how is roi calculated"` + a concept ("how does cage work") + a nonsense query (suggests closest ids, never guesses) · `cage --help` (grouped, points at query)
@@ -80,13 +83,17 @@ Run each against `cage-testbed`'s now-populated ledger. Pass = renders without e
 - [ ] MCP: `cage mcp` server + from Claude Code (`.mcp.json`) ask "what did I spend today" → answer matches `cage report`
 - [ ] `cage proxy` (point any OpenAI-compatible client at it → call rows land) · `cage watch` (foreground loop, Ctrl-C exits 130) · `cage meter` / `cage graphify` receipt paths if wired
 - [ ] Exit codes: bad subcommand → 2; induced user error (e.g. `--since garbage`) → `error: <msg>` + exit 1, full traceback **only** under `CAGE_DEBUG=1`
+- [ ] **Pricing (v0.19):** `cage prices list` (bundled vs project origin, `[meta]` versions) · `cage prices unpriced` (each none-match key + ready-to-run fix line) · `set` a price → `report` re-prices **retroactively** (spot-check one historical row's USD changed) · `alias` a router key · `sync` dry-run prints, recommendation line appears when project meta is older · UNPRICED ⚠ summary on report/compare/study report while any none-match rows exist.
+- [ ] **Human attention (v0.18):** `cage human`/`trend` show attested vs derived on separate lines, never blended · `cage outcome <task> --minutes 7` → attested beats derived for that task (both visible, never summed) · `cage calibration --human` (measured heuristic accuracy, or refusal below min-n) · `compare`/`verdict`/`study report` print the total-cost line (agent $ + human) with the human method tag; `--agent-only` suppresses it.
+- [ ] **CSV (v0.21):** `cage report --csv`, `attrib --csv`, `compare --csv`, `calibration --csv` → RFC-4180, LF endings, method/match tags present as columns, numbers identical to the text view · `cage export --csv calls` (raw rows, PII grep clean) · CSV runs byte-identical twice · one MCP report call with `format: csv` returns the same content.
+- [ ] **Cleanup (v0.19):** `cage cleanup` → dry-run listing (file, age, class), nothing deleted · `--apply` removes only allowlist classes · with `[cleanup] days = 0`: ledger/, policy.toml, machine id, study.jsonl, `.cage/bin/` all survive · derived views byte-identical before/after · `CAGE_CLEANUP=0` disables the auto path.
 
 ## Part E — The cost-impact loop, end-to-end by hand
 
 The product story in one sitting, in `cage-testbed`:
 
 1. `cage estimate --label docfix --record` (needs ≥ MIN_ESTIMATE_N history — Part C tasks with `--label docfix`; below it, verify the refusal first, then seed more)
-2. Do the task with an agent → `cage outcome <task> --ok --label docfix`
+2. Do the task with an agent → `cage outcome <task> --label docfix`
 3. `cage calibration` → the new task scored against the recorded band
 4. `cage compare --label docfix` → agent-only vs agent+tool groups (if graphify wired), delta `estimated`
 5. `cage verdict graphify` → composed verdict, all inputs tagged, break-even line
@@ -109,9 +116,13 @@ Minimum real test = this laptop + one simulated second machine (or a real second
 - [ ] **Fail-open write path:** `chmod -w .cage/ledger/` → run an agent session + `cage import` → exit 0, agent unaffected, `debug.log` says why; restore.
 - [ ] Truncate the last line of a calls shard mid-row → every view still renders (tolerant tail).
 - [ ] Corrupt `policy.toml` (syntax error) → read commands raise `CageError` → `error: …` exit 1; capture still fail-open.
-- [ ] **$0/no-network:** run the full Part D suite with Wi-Fi off → identical behavior.
+- [ ] **$0/no-network:** run the full Part D suite with Wi-Fi off → identical behavior (a network-denied sandbox, e.g. macOS `sandbox-exec -p '(version 1)(allow default)(deny network*)'`, is an accepted equivalent when the run is driven by a network-attached agent).
 - [ ] **PII sweep, whole footprint:** `grep -rE "<a distinctive phrase you typed to an agent>" .cage/ ~/.cage/` → nothing; commit messages absent from tasks/provenance rows.
-- [ ] **No scheduler:** confirm cage installed no launchd/cron entries (`launchctl list | grep -i cage`; `crontab -l`) — the cron line is printed, never installed.
+- [ ] **No scheduler:** confirm cage installed no launchd/cron entries (`launchctl list | grep -i cage`; `crontab -l`) — the scheduler hint is printed, never installed (OS-aware: cron here, schtasks on Windows).
+- [ ] **Portable wiring (v0.20):** grep every committed wired file in the testbed for absolute paths → none (except the documented `.kiro/settings/mcp.json` case, gitignore-advised) · clone-simulate (copy testbed sans `.git/.cage/state` to a new path) → `cage doctor` portability clean, shim resolves · legacy check: plant an absolute entry → doctor flags it, `cage setup` migrates it.
+- [ ] **Launcher mode (v0.22):** `cage setup --python-launcher` → shims + user-level files interpreter-only (grep: nothing exe-shaped), `[wiring] python_launcher = true`, doctor names the mode · flip to `false` + re-setup → clean revert · `CAGE_RUN_PYTHON=1` honored by the standard shim.
+- [ ] **Zipapp (v0.22):** build `cage.pyz` locally per docs/restricted-environments.md → `python3 cage.pyz --version` shows `(zipapp)` · `demo` reproduces §4.4 · `report` over the testbed ledger byte-identical to the installed cage's output.
+- [ ] **Docs hygiene (v0.22.1):** `docs/` root = living docs + active pairs only; every shipped pair archived + linked from its CHANGELOG entry; no broken `docs/…` links in README/CHANGELOG (grep); CLAUDE.md carries the docs-lifecycle rule.
 - [ ] Version/docs: `cage --version` = <version under test> = CHANGELOG top entry; README test count = Part A count.
 
 ## Findings table (fill as you go)
@@ -119,4 +130,4 @@ Minimum real test = this laptop + one simulated second machine (or a real second
 | # | Part/step | Agent×surface | Expected | Actual | Severity (blocker/bug/paper-cut) | debug.log line? |
 |---|---|---|---|---|---|---|
 
-**Done means:** Parts A–G all checked or N/A-with-reason; the three `UNVERIFIED-FORMAT` fixtures replaced with sanitized real samples (or a finding explains why not); findings triaged into fix-now vs backlog. Fixture replacements go through a normal review — **commit nothing during the test run itself.**
+**Done means:** Parts A–G all checked or N/A-with-reason; any fixture whose real log format has drifted since the last run re-captured as a sanitized sample (or a finding explains why not); findings triaged into fix-now vs backlog. Fixture replacements go through a normal review — **commit nothing during the test run itself.**

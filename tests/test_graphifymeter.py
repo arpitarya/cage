@@ -8,6 +8,7 @@ script, so the non-determinism of real graphify never enters the assertion.
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 
 from cage import graphifymeter as gm
 from cage import ledger, paths
@@ -72,6 +73,69 @@ def test_no_emit_for_path_op_citing_no_files(proj):
     answer = "Shortest path (2 hops):\n  a --calls--> b\n"
     gm.run(proj, [*_stub(proj, answer, "", 0), "path", "a", "b"])
     assert ledger.receipts(proj) == []
+
+
+# ── native-shim dedupe (v0.22.1 finding #35) — one saving, one receipt ──────────
+def _self_metering_stub(root, stdout):
+    """A 'graphify' stand-in that files its own cage receipt (like graphify ≥ 0.5.0's
+    native shim) before printing its answer — through the real schema/ledger writers
+    so the fixture can never drift from what the production shim emits."""
+    repo = Path(gm.__file__).resolve().parents[1]
+    script = root / "fake_native_graphify.py"
+    script.write_text(
+        "import sys\n"
+        f"sys.path.insert(0, {str(repo)!r})\n"
+        "from pathlib import Path\n"
+        "from cage import ledger, schema\n"
+        "row = schema.make_receipt(tool='graphify', raw_alternative=1000.0, actual=100.0,\n"
+        "                          task='dirname-task', method='modeled', confidence=0.6,\n"
+        "                          meta={'op': 'query'})\n"
+        f"ledger.append_row(Path({str(root)!r}), 'receipts', row)\n"
+        f"sys.stdout.write({stdout!r})\n",
+        encoding="utf-8")
+    return [sys.executable, str(script)]
+
+
+def test_defers_to_child_native_receipt(proj, capsys):
+    # The child files its own graphify receipt → the wrapper must NOT add a second
+    # one for the same query, even though the answer cites a meterable file.
+    big = proj / "mod.py"
+    big.write_text("z" * 4000, encoding="utf-8")
+    answer = f"NODE foo [src={big} loc=L1 community=1]\nshort\n"
+    rc = gm.run(proj, [*_self_metering_stub(proj, answer), "query", "x"], task="t1")
+    assert rc == 0
+    rcpts = [r for r in ledger.receipts(proj) if r["tool"] == "graphify"]
+    assert len(rcpts) == 1                    # the child's, not doubled
+    assert rcpts[0]["task"] == "dirname-task"
+
+
+def test_pre_existing_native_receipts_dont_suppress(proj, capsys):
+    # Dedupe keys on receipts NEW during this run — an old graphify receipt from a
+    # previous query must not stop the wrapper from metering a non-self-metering child.
+    from cage import schema
+    old = schema.make_receipt(tool="graphify", raw_alternative=10.0, actual=1.0,
+                              task="t0", method="modeled", confidence=0.6,
+                              meta={"op": "query"})
+    assert ledger.append_row(proj, "receipts", old)
+    big = proj / "mod.py"
+    big.write_text("z" * 4000, encoding="utf-8")
+    answer = f"NODE foo [src={big} loc=L1 community=1]\nshort\n"
+    gm.run(proj, [*_stub(proj, answer, "", 0), "query", "x"], task="t1")
+    rcpts = [r for r in ledger.receipts(proj) if r["tool"] == "graphify"]
+    assert len(rcpts) == 2                    # old + the wrapper's new one
+    assert {r["task"] for r in rcpts} == {"t0", "t1"}
+
+
+def test_env_handshake_reaches_child(proj, capsys):
+    # The child must see CAGE_GRAPHIFY_METERED=1 — the forward handshake a native
+    # shim can respect to skip its own receipt (task binding then survives here).
+    script = proj / "fake_env_graphify.py"
+    script.write_text(
+        "import os, sys\n"
+        "sys.stdout.write('METERED=' + os.environ.get('CAGE_GRAPHIFY_METERED', ''))\n",
+        encoding="utf-8")
+    gm.run(proj, [sys.executable, str(script), "query", "x"])
+    assert "METERED=1" in capsys.readouterr().out
 
 
 # ── explain format (Source: <file> Lnn) parses too ──────────────────────────────

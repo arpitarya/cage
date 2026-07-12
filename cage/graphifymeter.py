@@ -10,14 +10,25 @@ Counterfactual (handoff §4): `actual = toks(answer)`; `raw_alternative` = the w
 disk only — never the repo. If no path parses/resolves, emit **nothing** (a parse
 miss is "unmeasurable," not zero saving). `method="modeled"`, confidence from
 `constants.GRAPHIFY_RECEIPT_CONFIDENCE`.
+
+**Native-shim dedupe (v0.22.1 finding #35):** graphify ≥ 0.5.0 carries its own cage
+receipt shim, so a wrapped run would file the same saving twice (once natively, once
+here) — savings must never inflate. The wrapper snapshots the ledger's graphify
+receipt ids before the child runs and, if the child filed one itself, defers to it
+and emits nothing. The child also runs with ``CAGE_GRAPHIFY_METERED=1`` in its
+environment — a forward handshake: a graphify version that respects it skips its
+native receipt, the detection then sees no new row, and the wrapper's task-bound
+receipt wins. Either side deduping is enough; both together converge on one receipt.
 """
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 import sys
 from pathlib import Path
 
+from cage import ledger
 from cage.constants import CHARS_PER_TOKEN, GRAPHIFY_RECEIPT_CONFIDENCE
 
 # Expected graphify output formats (owned by graphify; pinned here so a format
@@ -91,6 +102,17 @@ def _meter(root: Path, answer: str, argv: list[str], task: str) -> None:
         return
 
 
+def _graphify_receipt_ids(root: Path) -> set[str] | None:
+    """Ids of the graphify receipts in the ledger, or ``None`` when the read fails.
+    None (not an empty set) keeps the dedupe symmetric: a failed *before* snapshot
+    must not make every pre-existing receipt look new post-run — the caller only
+    trusts the diff when both reads succeeded, else it meters as pre-dedupe cage did."""
+    try:
+        return {r.get("id", "") for r in ledger.receipts(root) if r.get("tool") == "graphify"}
+    except Exception:
+        return None
+
+
 def run(root: Path, argv: list[str], task: str = "") -> int:
     """Run `graphify <argv>` transparently; meter on the side. Returns its exit code."""
     cmd = list(argv)
@@ -99,13 +121,21 @@ def run(root: Path, argv: list[str], task: str = "") -> int:
     if not cmd:
         print("usage: cage graphify -- graphify <query|path|explain> …", file=sys.stderr)
         return 2
+    # Only a measured read verb can ever file a receipt — skip both snapshot reads
+    # (each a full receipts-shard scan) for install/--help/unknown-verb runs.
+    op = _op_of(cmd)
+    before = _graphify_receipt_ids(root) if op else None
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True)
+        proc = subprocess.run(cmd, capture_output=True, text=True,
+                              env={**os.environ, "CAGE_GRAPHIFY_METERED": "1"})
     except (OSError, ValueError) as exc:
         print(f"cage graphify: could not run {cmd[0]!r}: {exc}", file=sys.stderr)
         return 127
     sys.stdout.write(proc.stdout)         # passthrough — byte-identical to bare graphify
     sys.stderr.write(proc.stderr)
-    if proc.returncode == 0:
+    if proc.returncode == 0 and op:
+        after = _graphify_receipt_ids(root) if before is not None else None
+        if after is not None and after - before:
+            return proc.returncode        # the child self-metered — one saving, one receipt
         _meter(root, proc.stdout, cmd, task or Path.cwd().name)
     return proc.returncode

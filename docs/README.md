@@ -31,7 +31,10 @@ be cited as current spec.
 ## Operations
 
 - [full-test-plan-sibling-repo.md](full-test-plan-sibling-repo.md) — the evergreen
-  manual test plan (last executed: v0.16.0; run record archived).
+  manual test plan (last executed: v0.22.1; run record archived).
+- [cage-claude-code-prompt-full-test-run.md](cage-claude-code-prompt-full-test-run.md) —
+  the reusable Claude Code driver prompt that executes the plan end-to-end
+  (version-agnostic; pairs with the plan above).
 - [windows-manual-checklist.md](windows-manual-checklist.md) — upgrade Windows from
   CI-tested to field-validated.
 

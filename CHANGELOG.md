@@ -2,6 +2,48 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
+## v0.22.2 (2026-07-12) — capture correctness: three bugs from the v0.22.1 full test run
+
+The full sibling-repo test plan (`docs/full-test-plan-sibling-repo.md`) was executed
+end-to-end against v0.22.1 — real Claude Code CLI + VS Code extension, Codex VS Code
+extension, Copilot CLI + VS Code chat, and the Kiro IDE. All seven parts passed; the
+run surfaced three capture-correctness bugs, all fixed here with regression tests.
+
+- **Live-capture duplicate rows (hook race)** — a machine with both user-level
+  (legacy) and project-level Claude hook wiring fires two `cage hook-*` processes per
+  Stop/SessionEnd; both loaded the dedupe `seen` set before either write landed, so
+  **every live turn was double-appended and live Claude spend double-counted**.
+  `lockutil`'s docstring named exactly this scenario but the hook path never took the
+  lock. `hooks._capture_calls` now wraps its read-check-append in
+  `lockutil.locked(state/import.lock)` — the same lock the import path holds — fail-open
+  with a `hook.capture.lock` debug line on a lock miss. Regression test drives a real
+  cross-process interleave (verified fail-before/pass-after). One-shot imports were
+  never affected (single writer under `import.lock`).
+- **graphify double-metering** — graphify ≥ 0.5.0 natively files a cage receipt per
+  query when `.cage/` exists, so `cage graphify -- …` (and the setup-installed
+  `bin/graphify` interceptor) filed a second receipt for the same saving → roi/verdict
+  inflated 2×. The wrapper now snapshots the ledger's graphify receipt ids before the
+  child runs and defers when the child self-metered (one saving, one receipt); the
+  child gets `CAGE_GRAPHIFY_METERED=1`, a forward handshake a graphify version can
+  respect to skip its native receipt (task binding then returns to the wrapper). Old
+  graphify versions keep the wrapper's task-bound receipt exactly as before.
+- **`cage meter -- <cmd>` separator** — argparse REMAINDER keeps the `--`, so the
+  documented form tried to exec `'--'` itself. The separator is now stripped
+  (mirroring `cage graphify`); the child's exit code propagates as before.
+
+Also in this release: the v0.22.1 run record is archived at
+[docs/archive/v0.22.1-full-test-run.md](docs/archive/v0.22.1-full-test-run.md)
+(58 findings rows: capture matrix per agent×surface, PII canary sweep, determinism
+double-runs, offline sweep, portable-wiring clone-sim, launcher-mode round-trip,
+zipapp parity, fleet study); the evergreen test plan gains the run's four drift
+fixes (`--since <window>` not date; `cage outcome` has no `--ok` — success is the
+default; export manifest wording; a network-denied sandbox as the Wi-Fi-off
+equivalent); the reusable driver prompt is indexed under Operations
+(`docs/cage-claude-code-prompt-full-test-run.md`). Suite: **574 tests passing**
+(three new regression tests).
+
+Built from: [test run record](docs/archive/v0.22.1-full-test-run.md) · [driver prompt](docs/cage-claude-code-prompt-full-test-run.md) · plan: [docs/full-test-plan-sibling-repo.md](docs/full-test-plan-sibling-repo.md)
+
 ## v0.22.1 (2026-07-11) — docs lifecycle: the archive, the storybook spine, the rule
 
 Docs-only release: `docs/` (41 loose files, most of them shipped-work exhaust) is restructured so a future reader — human or agent — can tell live spec from historical build instruction, and the discipline is made durable as a CLAUDE.md rule.

@@ -24,6 +24,9 @@ def _free_port() -> int:
 
 
 def run(root: Path, argv: list[str], upstream: str = _DEFAULT_UPSTREAM) -> int:
+    argv = list(argv)
+    if argv and argv[0] == "--":          # tolerate `cage meter -- <cmd> …`
+        argv = argv[1:]
     if not argv:
         print("cage meter: nothing to run (usage: cage meter -- <cmd> [args…])")
         return 2

@@ -66,6 +66,52 @@ def test_no_uuid_id_is_deterministic_and_dedupes(tmp_path):
     assert len(ledger.calls(tmp_path)) == 1
 
 
+def test_capture_calls_serializes_across_processes(tmp_path):
+    """Two hook processes firing on one event (user-level + project-level wiring both
+    exist in the field) must not double-append. `_capture_calls` holds
+    ``state/import.lock`` across its read-check-append, so a peer that loaded its
+    ``seen`` set first (modeled by the parent's stale-seen append below) finishes
+    before the hook's own load happens — the hook then dedupes to 0 (found in the
+    v0.22.1 manual run: every live turn double-appended, spend double-counted)."""
+    import os
+    import subprocess
+    import sys
+    import time
+    from pathlib import Path
+
+    from cage import lockutil, paths
+
+    (tmp_path / ".cage").mkdir()
+    tp = tmp_path / "s.jsonl"
+    tp.write_text(_claude_line("u1", 100, 50) + "\n" + _claude_line("u2", 200, 60) + "\n",
+                  encoding="utf-8")
+    rows = transcript.parse_calls(tp, session="s")
+    stale_seen: set = set()  # loaded before any write — the race's ingredient
+
+    child_code = (
+        "import json, sys\n"
+        "from cage import hooks\n"
+        "payload = json.loads(sys.argv[1])\n"
+        "print(hooks._capture_calls(payload))\n"
+    )
+    payload = json.dumps({"transcript_path": str(tp), "session_id": "s",
+                          "cwd": str(tmp_path)})
+    env = {k: v for k, v in os.environ.items() if not k.startswith("CAGE_")}
+    env["PYTHONPATH"] = str(Path(__file__).resolve().parents[1])
+
+    lock = paths.Footprint(tmp_path).state / "import.lock"
+    with lockutil.locked(lock):
+        child = subprocess.Popen([sys.executable, "-c", child_code, payload],
+                                 cwd=tmp_path, env=env, stdout=subprocess.PIPE)
+        time.sleep(1.0)  # unfixed, the child appends here; fixed, it blocks on the lock
+        assert hooks.append_new(tmp_path, rows, seen=stale_seen) == 2
+    out, _ = child.communicate(timeout=30)
+    assert child.returncode == 0
+    assert out.strip() == b"0"  # the hook re-loaded seen after the lock and deduped
+    calls = ledger.calls(tmp_path)
+    assert len(calls) == 2 and len({c["id"] for c in calls}) == 2  # no duplicate rows
+
+
 def test_no_uuid_id_varies_with_content(tmp_path):
     # Distinct turns get distinct ids (the composite key spans tokens + ts), so two
     # genuinely-different uuid-less turns are not collapsed into one.

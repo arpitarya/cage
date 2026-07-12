@@ -21,7 +21,7 @@ import json
 import sys
 from pathlib import Path
 
-from cage import budget, debuglog, ledger, originrecord, paths, policy, tasks, transcript
+from cage import budget, debuglog, ledger, lockutil, originrecord, paths, policy, tasks, transcript
 
 _EDIT_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit"}
 
@@ -87,13 +87,28 @@ def append_new(root: Path, rows: list[dict], seen: set | None = None) -> int:
 def _capture_calls(payload: dict) -> int:
     """Token capture from the live transcript — shared by Stop and SessionEnd.
     Idempotent on the turn uuid (`append_new`), so firing on every Stop never
-    double-records and stacks safely with the SessionStart-backfill."""
+    double-records and stacks safely with the SessionStart-backfill.
+
+    The read-check-append runs under the same ``state/import.lock`` the import
+    path holds: two hook processes firing on one event (user-level + project-level
+    wiring both exist in the field) would otherwise both load ``seen`` before
+    either write lands and double-append every turn (lockutil's documented
+    scenario). Fail-open — on a lock miss the id-dedupe backstop still runs."""
     tp = payload.get("transcript_path")
     if not tp:
         return 0
     root = _root(payload)
     rows = transcript.parse_calls(Path(tp), session=payload.get("session_id", ""))
-    added = append_new(root, rows)
+
+    def _miss(exc):
+        debuglog.event(root, event="hook.capture.lock", result="unlocked",
+                       error=str(exc) if exc else "no lock primitive")
+
+    with lockutil.locked(paths.Footprint(root).state / "import.lock", on_miss=_miss):
+        added = append_new(root, rows)
+    # Outside the lock on purpose: task rows are last-write-wins by id (no
+    # read-check-append to protect) and tasks.record shells out to git — holding
+    # import.lock across subprocess calls would stall every peer capture process.
     _snapshot_tasks(root, rows)
     return added
 

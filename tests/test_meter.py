@@ -46,3 +46,17 @@ def test_meter_without_usage_records_nothing(proj):
     with meter.meter("code-edit", root=proj):
         pass  # never called .usage → no provider → no row
     assert ledger.calls(proj) == []
+
+
+def test_metercmd_tolerates_dash_dash_separator(proj):
+    # `cage meter -- <cmd>` — argparse REMAINDER keeps the `--`; run() must strip
+    # it like graphifymeter does, and still propagate the child's exit code.
+    import sys
+
+    from cage import metercmd
+
+    ok = [sys.executable, "-c", "raise SystemExit(0)"]
+    fail = [sys.executable, "-c", "raise SystemExit(3)"]
+    assert metercmd.run(proj, ["--", *ok]) == 0
+    assert metercmd.run(proj, ["--", *fail]) == 3
+    assert metercmd.run(proj, ["--"]) == 2  # separator alone = nothing to run

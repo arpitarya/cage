@@ -1,6 +1,7 @@
 # Build / packaging
 *.egg-info/
 dist/
+dist-pyz/
 build/
 __pycache__/
 *.pyc

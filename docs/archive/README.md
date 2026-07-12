@@ -37,6 +37,7 @@ release that shipped the work: `vX.Y-<feature>.{handoff,prompt}.md`.
 | v0.21 | CSV output + reporting recipes | — | [prompt](v0.21-csv-and-report-skill.prompt.md) | [v0.21.0](../../CHANGELOG.md#v0210-2026-07-11--csv-output--agent-reporting-recipes-plan-39) |
 | v0.22 | Restricted environments (launcher mode + pyz) | [handoff](v0.22-restricted-env.handoff.md) | [prompt](v0.22-restricted-env.prompt.md) | [v0.22.0](../../CHANGELOG.md#v0220-2026-07-11--restricted-environments-python-launcher-mode--cagepyz-plan-5) |
 | v0.22.1 | Docs lifecycle (this archive + the rule) | — | [prompt](v0.22.1-docs-lifecycle.prompt.md) | [v0.22.1](../../CHANGELOG.md#v0221-2026-07-11--docs-lifecycle-the-archive-the-storybook-spine-the-rule) |
+| v0.22.1 | Full test run record (58 findings, 3 bugs → v0.22.2) | — | [run record](v0.22.1-full-test-run.md) | [v0.22.2](../../CHANGELOG.md#v0222-2026-07-12--capture-correctness-three-bugs-from-the-v0221-full-test-run) |
 
 ## Superseded drafts & research inputs
 

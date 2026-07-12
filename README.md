@@ -154,6 +154,8 @@ A call whose model has no price row bills **$0 and says so** — `report`, `comp
 
 ## How it works
 
+![Cage architecture — sources → capture → append-only ledger → deterministic derive → read/export surfaces](docs/assets/architecture.svg)
+
 One append-only log in, every view derived from it for `$0`:
 
 ```
@@ -212,7 +214,7 @@ cage export --csv calls --since 30d -o calls.csv   # raw ledger rows for a pivot
 
 ## The `$0` guarantee
 
-Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 569 tests passing; `cage demo` reproduces the worked attribution example against a real ledger.
+Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 574 tests passing; `cage demo` reproduces the worked attribution example against a real ledger.
 
 **Honest limits.** Cage doesn't decide your human rate — it prices minutes at a blended rate you set, and labels the result `estimated` so it never pretends to be a timesheet. Marginal-by-fixed-order is defensible and `$0`, but it is an *ordering convention*, not a Shapley value (that's a deferred audit mode). And a counterfactual cell is an honest reconstruction, never an invoice — the `method` column says so on every row, on purpose.
 
@@ -220,7 +222,7 @@ Every derived view is parse / arithmetic over the log — **no LLM call, ever, o
 
 Latest release below — full history and detail in [CHANGELOG.md](CHANGELOG.md).
 
-- **v0.22.1 — docs lifecycle: the archive, the spine, the rule.** Docs-only: every shipped handoff/prompt moved to [docs/archive/](docs/archive/README.md) (history, not spec), a new [docs/README.md](docs/README.md) doc map + [docs/pricing.md](docs/pricing.md) design doc, the README trimmed behind links, and a durable CLAUDE.md rule — the release that ships a feature archives its handoff/prompt pair in the same change.
+- **v0.22.2 — capture correctness: three bugs from the full test run.** The complete manual test plan ran against v0.22.1 (all four agents, real CLIs + VS Code extensions — [run record](docs/archive/v0.22.1-full-test-run.md)) and caught three capture bugs, all fixed with regression tests: a hook race that double-counted live Claude spend under dual wiring (now serialized under `import.lock`), graphify savings double-metered when graphify self-meters (the wrapper now defers; `CAGE_GRAPHIFY_METERED=1` handshake), and the broken `cage meter -- <cmd>` separator.
 
 ## The name
 
