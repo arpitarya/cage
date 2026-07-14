@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 
 import pytest
 
@@ -256,10 +257,11 @@ def test_corrupt_project_policy_is_a_typed_error(root, capsys):
     assert "error:" in err and "policy.toml" in err
 
 
+@pytest.mark.skipif(os.name == "nt",
+                    reason="chmod cannot make a directory unwritable on Windows")
 def test_readonly_target_errors_cleanly_no_partial_write(v016, capsys):
     """--apply on an unwritable .cage/ → `error: …` + exit 1, file untouched
     (temp-write + atomic replace: there is no half-written state to leave)."""
-    import os
     base = _policy_path(v016).parent
     before = _policy_path(v016).read_bytes()
     os.chmod(base, 0o555)
