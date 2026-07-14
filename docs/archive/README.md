@@ -41,6 +41,7 @@ release that shipped the work: `vX.Y-<feature>.{handoff,prompt}.md`.
 | v0.23 | Tool-receipt pricing ladder (call-less receipts → $) | [handoff](v0.23-tool-receipt-pricing.handoff.md) | [prompt](v0.23-tool-receipt-pricing.prompt.md) | [v0.23.0](../../CHANGELOG.md#v0230-2026-07-14--tool-receipt-pricing-dollars-for-call-less-token-receipts) |
 | v0.24 | Pricing freshness (per-commit note + complete vendor tables) | [handoff](v0.24-pricing-freshness.handoff.md) | [prompt](v0.24-pricing-freshness.prompt.md) | [v0.24.0](../../CHANGELOG.md#v0240-2026-07-14--pricing-freshness-the-per-commit-staleness-note--complete-vendor-tables) |
 | v0.23 | `prices route-tool` managed writer + runnable hint | [handoff](v0.23-prices-route-tool.handoff.md) | [prompt](v0.23-prices-route-tool.prompt.md) | [v0.23.0](../../CHANGELOG.md#v0230-2026-07-14--tool-receipt-pricing-dollars-for-call-less-token-receipts) |
+| v0.25 | Policy sync (project policy.toml → installed bundle) | [handoff](v0.25-policy-sync.handoff.md) | [prompt](v0.25-policy-sync.prompt.md) | [v0.25.0](../../CHANGELOG.md#v0250-2026-07-14--policy-sync-upgrade-a-project-policytoml-to-the-installed-bundle) |
 
 ## Superseded drafts & research inputs
 

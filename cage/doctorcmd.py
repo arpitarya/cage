@@ -150,6 +150,25 @@ def _bundled_prices(root: Path) -> tuple[str, str]:
     return _OK, f"project prices are current with the bundle ({bundled_v})"
 
 
+def _policy_version(root: Path) -> tuple[str, str]:
+    """The non-price sibling of `_bundled_prices` (plan §3.10): a newer bundled
+    ``policy_version`` means tunables/defaults this project hasn't discovered.
+    Recommendation only, never auto-applied (`cage policy sync` is the user's
+    move; pure price drift keeps the `cage prices sync` hint above)."""
+    try:
+        from cage import policysync
+        if not paths.Footprint(root).policy.exists():
+            return _OK, "no project policy.toml — the bundled defaults apply directly"
+        project = policy.load_project_raw(paths.Footprint(root).policy)
+    except Exception:  # noqa: BLE001 — a broken policy is reported by the policy check
+        return _OK, "project policy unreadable — see the policy check"
+    bundled_v = str(policy.bundled_raw().get("meta", {}).get("policy_version") or "?")
+    rec = policysync.sync_recommendation(project.get("meta", {}))
+    if rec:
+        return _WARN, rec
+    return _OK, f"project policy defaults are current with the bundle (v{bundled_v})"
+
+
 def _prices_age(root: Path) -> tuple[str, str]:
     """The bundle's *own* age (plan §3.3) — a project faithfully synced to a
     6-month-old bundle is confidently stale. Doctor is a diagnostic, not a derived
@@ -404,6 +423,7 @@ def run(root: Path) -> dict:
         ("pricing", *_pricing(active)),
         ("prices-meta", *_bundled_prices(active)),
         ("prices-age", *_prices_age(active)),
+        ("policy-version", *_policy_version(active)),
         ("state", *_state_dir(active)),
         ("hooks", *_hooks(root)),
         ("portability", *_portability(root)),

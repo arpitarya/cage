@@ -82,6 +82,13 @@ def _live(pol: dict) -> dict:
         "prices_stale_days": policy.prices_stale_days(pol),
         "prices_date_bundled": str(policy.bundled_raw().get("meta", {})
                                    .get("prices_date") or "?"),
+        # policy sync (plan §3.10) — live version stamps, both sides
+        "policy_version_bundled": str(policy.bundled_raw().get("meta", {})
+                                      .get("policy_version") or "?"),
+        "policy_version_project": str((policy.load_project_raw(foot.policy)
+                                       if foot.policy.exists() else {})
+                                      .get("meta", {}).get("policy_version")
+                                      or "unknown (pre-0.25)"),
     }
 
 

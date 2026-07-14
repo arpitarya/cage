@@ -478,6 +478,28 @@ REGISTRY: tuple[Explanation, ...] = (
         "n/a — describes version bookkeeping, not a number.",
         kind="concept", plan_ref="§3.3"),
     Explanation(
+        "policy-sync", ("policy-sync", "policy-upgrade", "policy-diff", "tunables",
+                        "sync-categories", "neutrality", "policy-defaults",
+                        "add-update-keep-orphan"),
+        "upgrading an old project policy.toml to the installed bundle's defaults",
+        "`cage policy sync` (dry-run; `cage policy diff` is the same view) compares\n"
+        "  the project policy.toml against the installed bundle's non-pricing\n"
+        "  defaults (bundled policy_version {policy_version_bundled}, this project:\n"
+        "  {policy_version_project}) and buckets every key: **add** (in the bundle,\n"
+        "  missing here — --apply writes it with one provenance comment), **update**\n"
+        "  (equal to a recorded *old* default whose bundled value changed — refreshed),\n"
+        "  **keep** (customized — marked/cage-managed, or differing where no default\n"
+        "  ever changed: your edit, never touched), **orphan** (the bundle dropped it\n"
+        "  — warned, never deleted). Not reconstructable (pre-policy_version file +\n"
+        "  a changed default) → listed, applied only per --yes. Neutrality invariant:\n"
+        "  on a zero-customization project, --apply changes no derived view by one\n"
+        "  byte — adds only pin defaults policy.load was already merging in. Pricing\n"
+        "  tables delegate to `cage prices sync` (one merge brain); nothing ever\n"
+        "  auto-applies either sync.",
+        ("cage/policysync.py", "cage/pricestoml.py", "cage/data/policy.toml [meta]"),
+        "n/a — describes the upgrade verb; it never changes a derived number.",
+        kind="concept", plan_ref="§3.10"),
+    Explanation(
         "prices-freshness", ("prices-freshness", "freshness", "stale", "staleness",
                              "stale-days", "prices-date", "age", "outdated",
                              "post-commit-note", "commit-note"),

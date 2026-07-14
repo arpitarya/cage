@@ -108,3 +108,76 @@ def test_every_mutation_leaves_a_parseable_file(root):
     pricestoml.update_meta(root, {"prices_version": "2026-07-11"})
     pricestoml.set_price(root, "a", "m.dotted-1.5", {**ROW, "input": 9.0})
     pricestoml.parse(_policy(root))  # raises on corruption
+
+
+# ── policy-sync writer extensions (add_table / set_table / list values) ──────
+
+def test_add_table_lands_before_block_with_comment_and_no_mark(root):
+    pricestoml.set_price(root, "x", "m", ROW)  # creates the managed block
+    res = pricestoml.add_table(root, ("cleanup",), {"enabled": True, "days": 30},
+                               comment="# added by cage policy sync (v0.25.0)")
+    assert res["mode"] == "added" and res["before"] is None
+    text = _policy(root).read_text()
+    assert text.index("# added by cage policy sync") < text.index(pricestoml.BLOCK_START)
+    assert pricestoml.CUSTOM_MARK not in text.split(pricestoml.BLOCK_START)[0]
+    _, data = pricestoml.parse(_policy(root))
+    assert data["cleanup"] == {"enabled": True, "days": 30}
+
+
+def test_add_table_at_eof_without_block(root):
+    _policy(root).write_text("# mine\n[budgets]\ndaily_usd = 50.0", encoding="utf-8")
+    pricestoml.add_table(root, ("cleanup",), {"enabled": True, "days": 30})
+    text = _policy(root).read_text()
+    assert "\n\n[cleanup]\n" in text  # blank-line separated, plain append
+    _, data = pricestoml.parse(_policy(root))
+    assert data["budgets"]["daily_usd"] == 50.0 and data["cleanup"]["days"] == 30
+
+
+def test_add_table_idempotent_no_write(root):
+    pricestoml.add_table(root, ("cleanup",), {"enabled": True, "days": 30})
+    before = _policy(root).read_bytes()
+    res = pricestoml.add_table(root, ("cleanup",), {"enabled": True, "days": 30})
+    assert res["mode"] == "unchanged"
+    assert _policy(root).read_bytes() == before
+
+
+def test_add_table_existing_edits_in_place_without_mark(root):
+    _policy(root).write_text("# note\n[cleanup]\nenabled = true\ndays = 14\n",
+                             encoding="utf-8")
+    res = pricestoml.add_table(root, ("cleanup",), {"enabled": True, "days": 30})
+    assert res["mode"] == "in-place" and res["before"] == {"enabled": True, "days": 14}
+    text = _policy(root).read_text()
+    assert "# note" in text and pricestoml.CUSTOM_MARK not in text
+    assert "days = 30" in text
+
+
+def test_add_table_refuses_block_owned_table(root):
+    pricestoml.set_tool_route(root, "graphify", "anthropic/claude-x")  # in the block
+    with pytest.raises(CageError, match="cage-managed block"):
+        pricestoml.add_table(root, ("tools", "graphify"), {"price_at": "y/z"})
+
+
+def test_fmt_value_list_roundtrips(root):
+    order = ["graphify", "fux", "router"]
+    pricestoml.add_table(root, ("tools",), {"order": order})
+    _, data = pricestoml.parse(_policy(root))
+    assert data["tools"]["order"] == order
+
+
+def test_set_table_mark_custom_false_leaves_header_unmarked(root):
+    _policy(root).write_text("[human]\nrate_usd_per_hr = 80\n", encoding="utf-8")
+    pricestoml.set_table(root, ("human",), {"rate_usd_per_hr": 95},
+                         mark_custom=False)
+    text = _policy(root).read_text()
+    assert pricestoml.CUSTOM_MARK not in text and "rate_usd_per_hr = 95" in text
+    pricestoml.set_table(root, ("human",), {"rate_usd_per_hr": 99})  # default marks
+    assert pricestoml.CUSTOM_MARK in _policy(root).read_text()
+
+
+def test_update_meta_subset_leaves_sibling_keys(root):
+    """Regression pin: policy sync restamps policy_version only — prices_version
+    must survive an update_meta carrying a subset of keys."""
+    _policy(root).write_text('[meta]\nprices_version = "2026-07-14"\n', encoding="utf-8")
+    pricestoml.update_meta(root, {"policy_version": "0.25.0"})
+    _, data = pricestoml.parse(_policy(root))
+    assert data["meta"] == {"prices_version": "2026-07-14", "policy_version": "0.25.0"}

@@ -571,6 +571,50 @@ format**: flat, one-way, for spreadsheets/BI, never an import source.
   (skillgen fragments); `cage query csv-output` explains the design. Column
   contracts per view: [csv-output.md](csv-output.md).
 
+## 3.10 Policy sync — upgrade a project policy.toml to the installed bundle
+
+`cage prices sync` generalized to the whole file (`cage/policysync.py`,
+v0.25): a project inited long ago is missing tunables the bundle gained since;
+`policy.load` defaults them, so nothing breaks — but nothing is discovered
+either, and a stale un-customized default can drift from the bundle's improved
+one. `cage policy sync` (dry-run default; `cage policy diff` = the same view;
+**never auto-applied by anything**) buckets every non-pricing key:
+
+- **add** — in the bundle, absent in the project → `--apply` writes the
+  bundled default as plain text with one provenance comment, *outside* the
+  managed block and un-marked (a synced default must stay sync-updatable).
+  Behavior-neutral by construction: `policy.load` was already merging exactly
+  these values — the tested invariant is that on a zero-customization project
+  `--apply` changes no derived view by one byte.
+- **update** — the project value equals a recorded *old* bundled default
+  (`policysync.DEFAULT_CHANGES`, resolved against `[meta] policy_version`,
+  compared as a version tuple) whose bundled value changed → refreshed,
+  old→new shown.
+- **keep (customized)** — structurally owned (`# cage:custom` / managed
+  block), or differing where the record shows no default ever changed: the
+  user's edit, never touched. The record ships **empty** — no non-pricing
+  default has ever changed (git history of `data/policy.toml`) — and empty is
+  load-bearing: it is what lets a hand-edited budget classify as *keep*
+  instead of clobber-able drift.
+- **orphan** — the bundle used to ship it (`REMOVED_KEYS`) and no longer does
+  → warned with version context, never deleted. A user's own sections are
+  invisible to sync entirely.
+
+Not reconstructable (a pre-`policy_version` file and a key whose default
+actually changed) → a per-key confirm bucket (`--yes section.key` /
+`--yes all`), the prices-sync honesty. The `policy_version` stamp waits for
+that bucket to be decided — stamping earlier would re-era the file and
+silently reclassify pending rows as customized. One merge brain per family:
+pricing tables (`[prices]`/`[credits]`/`[alias]`/`[tools.<name>]` routes)
+delegate to `prices sync`, whose summary embeds in the output; the scalar
+`[tools] order` pipeline key is policy and syncs here. Hint split: doctor's
+`policy-version` check and the post-commit note recommend `cage policy sync`
+for defaults drift (`freshness.policy_line`, opt-in); the report footer never
+carries it (price drift can make the report's dollars stale; policy drift
+changes no derived number). Writes are the `pricestoml` surgery: comment-
+preserving, lock + re-parse + atomic replace, per-file typed refusal on exotic
+TOML, idempotent (`--apply` twice ⇒ byte-identical no-op).
+
 ---
 
 ## 4. The attribution engine (the part that's actually novel)

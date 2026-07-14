@@ -214,7 +214,7 @@ cage export --csv calls --since 30d -o calls.csv   # raw ledger rows for a pivot
 
 ## The `$0` guarantee
 
-Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 623 tests passing; `cage demo` reproduces the worked attribution example against a real ledger.
+Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 657 tests passing; `cage demo` reproduces the worked attribution example against a real ledger.
 
 **Honest limits.** Cage doesn't decide your human rate — it prices minutes at a blended rate you set, and labels the result `estimated` so it never pretends to be a timesheet. Marginal-by-fixed-order is defensible and `$0`, but it is an *ordering convention*, not a Shapley value (that's a deferred audit mode). And a counterfactual cell is an honest reconstruction, never an invoice — the `method` column says so on every row, on purpose.
 
@@ -222,7 +222,7 @@ Every derived view is parse / arithmetic over the log — **no LLM call, ever, o
 
 Latest release below — full history and detail in [CHANGELOG.md](CHANGELOG.md).
 
-- **v0.24.0 — pricing freshness: the per-commit staleness note + complete vendor tables.** Every commit (plus `cage doctor` and the `cage report` footer) now prints one actionable line when your prices are stale — project meta behind the bundle, the bundle itself older than `[prices] stale_days` (default 45; `0` opts out), or UNPRICED rows — from local evidence only, never a network call; the report footer stays clock-free (data-relative age). The bundled table now covers the full GA + recent-history Anthropic/OpenAI lineups, every row cited, and a weekly CI nag watches the bundle's own age. `cage query prices-freshness` explains.
+- **v0.25.0 — policy sync: upgrade a project policy.toml to the installed bundle.** `cage policy sync` (dry-run; `cage policy diff` alias) buckets every non-pricing key as add / update / keep (customized) / orphan and `--apply` writes the safe ones: customized values are never modified, orphans never deleted, and on a zero-customization project apply changes no derived view by one byte. Pricing tables delegate to `cage prices sync` (its summary embeds); `[meta] policy_version` tracks the defaults era; doctor and the post-commit note recommend it — never auto-applied. `cage query policy-sync` explains.
 
 ## The name
 

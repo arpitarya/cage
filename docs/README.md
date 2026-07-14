@@ -47,11 +47,7 @@ be cited as current spec.
 Unshipped handoff/prompt pairs live here until their release ships them into the
 archive (the lifecycle rule in `CLAUDE.md`).
 
-- [policy-sync.handoff.md](policy-sync.handoff.md) ·
-  [policy-sync.prompt.md](policy-sync.prompt.md) — `cage policy sync` /
-  `policy diff`: upgrade a project policy.toml to the installed bundle
-  (general sections; price tables delegated to `prices sync`). Sequenced
-  after pricing freshness (shipped v0.24).
+- (none right now)
 
 ## Archive
 

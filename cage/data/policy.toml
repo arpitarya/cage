@@ -4,10 +4,13 @@
 # project policy carries the [meta] it derived from; `cage doctor` / `cage prices
 # list` compare the two and recommend `cage prices sync` when the bundle is newer
 # (never auto-applied). prices_version is the date the rows were researched.
+# policy_version tracks the *non-pricing* defaults: it bumps only when a release
+# adds/changes/removes a bundled tunable, and `cage policy sync` compares it.
 [meta]
 prices_version = "2026-07-14"
 prices_date = "2026-07-14"
-cage_version = "0.24.0"
+cage_version = "0.25.0"
+policy_version = "0.25.0"
 
 # Prices in USD per million tokens. `cache_read` is the discounted rate the
 # provider bills for prefix-cache *reads* (makes cache-alignment measurable).

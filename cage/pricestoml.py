@@ -119,6 +119,8 @@ def _fmt_value(v) -> str:
         return "true" if v else "false"
     if isinstance(v, (int, float)):
         return repr(float(v)) if isinstance(v, float) else str(v)
+    if isinstance(v, list):
+        return "[" + ", ".join(_fmt_value(x) for x in v) + "]"
     return '"' + str(v).replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
@@ -199,14 +201,17 @@ def _atomic_write(path: Path, text: str) -> None:
     os.replace(tmp, path)
 
 
-def _inplace_table_edit(text: str, path: tuple[str, ...], values: dict) -> str:
+def _inplace_table_edit(text: str, path: tuple[str, ...], values: dict,
+                        mark_custom: bool = True) -> str:
     """Rewrite ``key = value`` lines inside an existing table span; preserve
-    every other line; mark the header ``# cage:custom``."""
+    every other line; mark the header ``# cage:custom`` (a `policy sync`
+    default-update passes ``mark_custom=False`` — a synced default must not
+    start reading as user-owned)."""
     lines = text.splitlines(keepends=True)
     span = find_table_span(lines, path)
     assert span is not None  # caller checked
     start, end = span
-    if CUSTOM_MARK not in lines[start]:
+    if mark_custom and CUSTOM_MARK not in lines[start]:
         lines[start] = lines[start].rstrip("\n") + f"   {CUSTOM_MARK}\n"
     pending = dict(values)
     for i in range(start + 1, end):
@@ -235,7 +240,8 @@ def _project_policy(root: Path) -> Path:
     return foot.policy
 
 
-def _write_table(root: Path, path: tuple[str, ...], values: dict) -> dict:
+def _write_table(root: Path, path: tuple[str, ...], values: dict,
+                 mark_custom: bool = True) -> dict:
     """Insert-or-update one leaf table; returns
     ``{"mode": "in-place"|"block"|"created"|"unchanged", "before": dict|None, "after": dict}``."""
     pol_path = _project_policy(root)
@@ -257,7 +263,7 @@ def _write_table(root: Path, path: tuple[str, ...], values: dict) -> dict:
             current = _table_values(lines, span)
             if current == values:
                 return {**result, "mode": "unchanged", "before": current, "after": values}
-            new_text = _inplace_table_edit(text, path, values)
+            new_text = _inplace_table_edit(text, path, values, mark_custom=mark_custom)
             _atomic_write(pol_path, new_text)
             return {**result, "mode": "in-place", "before": current, "after": values}
         before_vals = block.get(path)
@@ -354,3 +360,51 @@ def set_wiring(root: Path, values: dict) -> dict:
     """Persist ``[wiring]`` keys (e.g. ``python_launcher = true``) in the project
     policy — same locked, atomic text surgery as the price writes."""
     return _write_table(root, ("wiring",), dict(values))
+
+
+def set_table(root: Path, path: tuple[str, ...], values: dict, *,
+              mark_custom: bool = True) -> dict:
+    """Generic insert-or-update of one leaf table. `cage policy sync`'s update
+    path passes ``mark_custom=False`` — a refreshed bundled default must stay
+    sync-updatable, not start reading as user-owned."""
+    return _write_table(root, tuple(path), dict(values), mark_custom=mark_custom)
+
+
+def add_table(root: Path, path: tuple[str, ...], values: dict,
+              comment: str | None = None) -> dict:
+    """Append one leaf table as *plain text outside the managed block* (before
+    the block when one exists, EOF otherwise), with an optional provenance
+    comment line above the header — `cage policy sync`'s add path. Unlike the
+    managed block, a table written here is not user-owned: no ``# cage:custom``
+    mark, so a later bundle change to it still syncs. Idempotent."""
+    pol_path = _project_policy(root)
+    result = {"path": pol_path}
+    with lockutil.locked(paths.Footprint(root).state / "policy.lock"):
+        text, _ = parse(pol_path)
+        before_txt, body, after_txt = split_block(text)
+        outside_lines = (before_txt + after_txt).splitlines(keepends=True)
+        span = find_table_span(outside_lines, path)
+        if span is not None:  # already present — fall back to a no-mark value edit
+            current = _table_values(outside_lines, span)
+            if current == values:
+                return {**result, "mode": "unchanged", "before": current, "after": values}
+            new_text = _inplace_table_edit(text, path, values, mark_custom=False)
+            _atomic_write(pol_path, new_text)
+            return {**result, "mode": "in-place", "before": current, "after": values}
+        if path in _block_tables(body):
+            raise CageError(f"{table_header(*path)} lives in the cage-managed block of "
+                            f"{pol_path} — that table is user-owned; refusing to add "
+                            f"a duplicate outside it")
+        chunk = ([comment.rstrip("\n") + "\n"] if comment else [])
+        chunk.append(table_header(*path) + "\n")
+        chunk += [f"{k} = {_fmt_value(values[k])}\n" for k in sorted(values)]
+        lines = text.splitlines(keepends=True)
+        idx = next((i for i, ln in enumerate(lines)
+                    if ln.rstrip("\n") == BLOCK_START), len(lines))
+        if idx == len(lines) and lines and not lines[-1].endswith("\n"):
+            lines[-1] += "\n"
+        pre = "" if idx == 0 or lines[idx - 1].strip() == "" else "\n"
+        post = "\n" if idx < len(lines) else ""
+        lines[idx:idx] = [pre + "".join(chunk) + post]
+        _atomic_write(pol_path, "".join(lines))
+        return {**result, "mode": "added", "before": None, "after": values}

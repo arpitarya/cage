@@ -46,6 +46,7 @@ def cmd_init(_args) -> int:
     print(f"  policy   → {info['policy']}")
     print(f"  ledger   → {info['ledger']}/  (gitignored, append-only)")
     print(f"  pointer  → {info['claude_md']}")
+    print("· new tunables ship in future versions — `cage policy sync` shows them")
     print("Next: meter traffic (`cage.meter(...)`), then `cage report`. Try `cage demo`.")
     return 0
 
@@ -315,6 +316,16 @@ def cmd_prices(args) -> int:
     r = ledger_root()
     payload, text = pricescmd.run(args, r, _policy(r))
     return emit(args, render.envelope("prices", payload) if args.json else payload, text)
+
+
+def cmd_policy(args) -> int:
+    """`cage policy <diff|sync>` (plan §3.10) — upgrade the resolved root's
+    project policy.toml to the installed bundle; dry-run by default, never
+    auto-applied by anything."""
+    from cage import policysync
+    r = ledger_root()
+    payload, text = policysync.run(args, r, _policy(r))
+    return emit(args, render.envelope("policy", payload) if args.json else payload, text)
 
 
 def cmd_cleanup(args) -> int:

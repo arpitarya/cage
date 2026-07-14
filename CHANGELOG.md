@@ -2,6 +2,76 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
+## v0.25.0 (2026-07-14) — policy sync: upgrade a project policy.toml to the installed bundle
+
+Built from: [docs/archive/v0.25-policy-sync.handoff.md](docs/archive/v0.25-policy-sync.handoff.md) ·
+[docs/archive/v0.25-policy-sync.prompt.md](docs/archive/v0.25-policy-sync.prompt.md)
+
+A project inited at v0.16 has a policy.toml missing everything the bundle
+gained since (`[meta]`, `[cleanup]`, `capture.import_before_export`).
+`policy.load` defaults them all, so nothing breaks — but the user never
+*discovers* tunables, and a stale un-customized default can drift from the
+bundle's improved one. `cage prices sync` solved exactly this for pricing
+tables; **`cage policy sync` generalizes it to the whole file** (plan §3.10).
+
+- **`cage policy sync`** — dry-run categorized diff (the default surface;
+  `cage policy diff` is the same view by name). Four categories with counts:
+  **add** (in the bundle, missing here → `--apply` writes bundled defaults as
+  plain text with one provenance comment `# added by cage policy sync (vX.Y)`
+  — never into the managed block, never `# cage:custom`-marked, so a synced
+  default stays sync-updatable), **update** (equal to a recorded *old*
+  default whose bundled value changed → refreshed, old→new shown), **keep**
+  (customized — structurally owned, or differing where no default ever
+  changed: the user's edit, never touched), **orphan** (the bundle dropped it
+  → warned with version context, never deleted). A user's own sections are
+  invisible to sync entirely.
+- **The versioned-defaults record** (`policysync.DEFAULT_CHANGES` /
+  `REMOVED_KEYS`) — empty today, and empty is load-bearing: no non-pricing
+  default has ever changed (verified against the git history of
+  `data/policy.toml`), so a differing un-marked value can only be the user's
+  edit — classified *keep*, never clobber-able drift. Where a default *does*
+  change someday and the file predates `policy_version`, the row falls to a
+  per-key confirm bucket (`--yes section.key` / `--yes all`) — honest over
+  clever, the prices-sync stance. Maintenance rule documented in the module:
+  a release changing/removing a bundled non-pricing default appends the old
+  value and bumps `[meta] policy_version`.
+- **`[meta] policy_version`** — new bundled key (compared as a version
+  *tuple*, not a date), stamped by `cage init` (verbatim copy) and restamped
+  on every `--apply` — but only once the confirm bucket is decided: stamping
+  earlier would re-era the file and silently reclassify pending rows as
+  customized. `prices_version` is never touched by policy sync.
+- **Two safety invariants, tested and scenario-verified:**
+  behavior-neutrality (zero-customization project: `--apply` then every
+  derived view — report/attrib/budget/human/trend/matrix — byte-identical:
+  adds only pin defaults `policy.load` was already merging in) and idempotent
+  apply (second `--apply` is a byte-identical no-op, "already in sync").
+- **One merge brain per family:** `[prices]`/`[credits]`/`[alias]` and
+  `[tools.<name>]` routes are never diffed here — the `cage prices sync`
+  summary embeds in the output, and `--apply` never touches a pricing row.
+  The scalar `[tools] order` pipeline key *is* policy and syncs here.
+- **Hints split by drift kind:** doctor gains a `policy-version` check and the
+  post-commit note carries the `cage policy sync` recommendation
+  (`freshness.policy_line`, opt-in) — but the `cage report` footer never
+  does: price drift can make the report's *dollars* stale; policy drift
+  changes no derived number. Pure price drift keeps the `cage prices sync`
+  hint verbatim. Nothing anywhere auto-applies either sync.
+- **Writer extensions, not forks** (`pricestoml`): `add_table` (plain-text
+  append outside the managed block, provenance comment, idempotent),
+  `set_table(..., mark_custom=False)` (a refreshed default must not start
+  reading as user-owned), list values in `_fmt_value` (`[tools] order`).
+  Same lock + re-parse + temp-write/atomic-replace: exotic TOML refuses per
+  file with a typed `CageError`, never a mangled write; git-tracked policies
+  get a "review with git; no .bak files" note.
+- `cage init` prints a one-time pointer (new tunables ship in future versions
+  — `cage policy sync` shows them); `cage query policy-sync` explains the
+  categories + neutrality invariant with live version stamps; dummyrepo
+  **S16** drives the whole arc end-to-end (strip to v0.16 shape → exact
+  categories → neutral apply → no-op second apply → hints flip clean).
+
+New: `cage/policysync.py`, `policy` CLI group, doctor `policy-version`,
+`freshness.policy_line`, `cage query policy-sync`, dummyrepo S16,
+`[meta] policy_version = "0.25.0"`. 34 new tests (657 passing).
+
 ## v0.24.0 (2026-07-14) — pricing freshness: the per-commit staleness note + complete vendor tables
 
 Built from: [docs/archive/v0.24-pricing-freshness.handoff.md](docs/archive/v0.24-pricing-freshness.handoff.md) ·

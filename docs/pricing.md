@@ -69,6 +69,14 @@ per-row confirmation for unmarked drift (cage can't reconstruct which old bundle
 a row came from — honest over clever). cage itself never fetches a price: no
 network on any cage code path; the research step is build-time/user work.
 
+The *non-pricing* sibling is **`cage policy sync`** (plan §3.10, v0.25): it
+upgrades the rest of the project policy.toml — new sections/keys, stale
+un-customized defaults — with the same never-auto-applied, customized-never-
+touched contract, tracked by `[meta] policy_version`. Pricing tables delegate
+to `prices sync` (one merge brain); non-price drift hints say `cage policy
+sync`, pure price drift keeps the hint above. `cage query policy-sync`
+explains.
+
 ## Pricing freshness — the per-commit note (v0.24)
 
 cage never fetches a rate, so "are my prices current?" is answered from **local

@@ -56,7 +56,7 @@ def test_doctor_records_nothing_in_the_project(proj):
 def test_every_check_has_a_known_level(proj):
     res = doctorcmd.run(proj)
     names = {c["name"] for c in res["checks"]}
-    assert names == {"tool", "footprint", "policy", "pricing", "prices-meta", "prices-age",
+    assert names == {"tool", "footprint", "policy", "pricing", "prices-meta", "prices-age", "policy-version",
                      "state", "hooks", "portability", "metering", "trace", "interceptor",
                      "ledger"}
     assert all(c["level"] in {"ok", "warn", "fail"} for c in res["checks"])

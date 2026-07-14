@@ -12,6 +12,11 @@ prices current?" is answered from **local evidence only**, by three signals:
 3. **UNPRICED presence** — calls or call-less token receipts billing $0 → the
    existing runnable fix hints, byte-for-byte.
 
+Plus one *opt-in* non-price sibling: **policy-defaults drift** (the project
+``[meta] policy_version`` is older than the bundle's → the `cage policy sync`
+recommendation, plan §3.10) — printed by the post-commit hook and doctor,
+never by the report footer, because policy drift changes no derived number.
+
 One implementation, three surfaces (the csvout lesson): the git post-commit
 hook, `cage doctor`, and the `cage report` footer all render lines from
 :func:`freshness`. Determinism law: derived views pass ``today=None`` so the
@@ -49,6 +54,22 @@ def sync_line(root: Path) -> str | None:
         return None
     meta = policy.load_project_raw(foot.policy).get("meta", {})
     return pricescmd.sync_recommendation(meta)
+
+
+def policy_line(root: Path) -> str | None:
+    """The non-price sibling of :func:`sync_line` — verbatim
+    :func:`policysync.sync_recommendation` (plan §3.10). Opt-in for callers:
+    price drift can make a report's *dollars* stale so it belongs in the money
+    view, but policy-defaults drift never changes a derived number
+    (`policy.load` already merges the bundled defaults in) — so this line
+    surfaces on diagnostics and write-path events (doctor, post-commit hook),
+    never in the report footer."""
+    from cage import policysync  # deferred: CLI-layer module, keep import light
+    foot = paths.Footprint(root)
+    if not foot.policy.exists():
+        return None
+    meta = policy.load_project_raw(foot.policy).get("meta", {})
+    return policysync.sync_recommendation(meta)
 
 
 def age_line(pol: dict, anchor: _dt.date | None) -> str | None:
@@ -105,15 +126,18 @@ def unpriced_lines(root: Path, pol: dict, calls: list[dict] | None = None,
 
 
 def freshness(root: Path, pol: dict, *, today: _dt.date | None = None,
-              include_unpriced: bool = True,
+              include_unpriced: bool = True, include_policy: bool = False,
               rows: list[dict] | None = None) -> list[str]:
-    """The three-signal check — zero-or-more actionable lines, ``[]`` when clean.
+    """The signal check — zero-or-more actionable lines, ``[]`` when clean.
 
     ``today=None`` ⇒ data-relative anchor (newest ledger ``ts``) for derived
     views; a caller on a clock-allowed path passes today's date. ``rows`` lets
     a view that already loaded the calls (report) skip a second ledger scan.
     ``include_unpriced=False`` is for `render_report`, which prints the same
-    UNPRICED lines natively — one home for the strings, no double-print."""
+    UNPRICED lines natively — one home for the strings, no double-print.
+    ``include_policy=True`` adds the non-price :func:`policy_line` — the
+    post-commit hook opts in; the report footer never does (policy drift
+    changes no derived number)."""
     calls = ledger.calls(root) if rows is None else rows
     if today is not None:
         anchor: _dt.date | None = today
@@ -123,6 +147,8 @@ def freshness(root: Path, pol: dict, *, today: _dt.date | None = None,
     out: list[str] = []
     if (s := sync_line(root)) is not None:
         out.append(s)
+    if include_policy and (p := policy_line(root)) is not None:
+        out.append(p)
     if (a := age_line(pol, anchor)) is not None:
         out.append(a)
     if include_unpriced:

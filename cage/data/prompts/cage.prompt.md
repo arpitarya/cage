@@ -36,7 +36,9 @@ pre-formatted table. Never invent a number.
   `cage prices unpriced` prints a ready-to-run fix line per model; find the real
   rate on the vendor's pricing page (cage never fetches), then paste the
   `cage prices set …` / `cage prices alias …` line. `cage prices sync` when
-  `doctor` says the bundled prices are newer. Derived views re-price
+  `doctor` says the bundled prices are newer; `cage policy sync` when it says
+  the bundled *policy defaults* are newer (new tunables since init — dry-run
+  diff, `--apply` writes; customized values never touched). Derived views re-price
   immediately — the ledger is never rewritten. A ⚠ line about *tool receipts*
   means call-less token savings couldn't resolve a model: run the printed
   `cage prices route-tool <tool> --to <provider>/<model>` fix line (or run the

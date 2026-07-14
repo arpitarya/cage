@@ -234,7 +234,7 @@ def test_doctor_check_names_unchanged(homes):
     from cage import initcmd
     initcmd.run(homes)
     names = [c["name"] for c in doctorcmd.run(homes)["checks"]]
-    assert names == ["tool", "footprint", "policy", "pricing", "prices-meta", "prices-age",
+    assert names == ["tool", "footprint", "policy", "pricing", "prices-meta", "prices-age", "policy-version",
                      "state", "hooks", "portability", "metering", "trace", "interceptor",
                      "ledger"]
 

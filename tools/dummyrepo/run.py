@@ -1063,6 +1063,109 @@ def s15_freshness(base: Path) -> str:
             "data-relative 100-day footer exact + byte-identical · stale_days=0 opt-out")
 
 
+# Seeder for S16 — priced calls so every derived view has real numbers to hold
+# byte-identical across the policy apply.
+_S16_SEED = """
+import sys
+from pathlib import Path
+from cage import ledger, schema
+root = Path(sys.argv[1])
+for i in range(2):
+    ledger.append_row(root, "calls", schema.make_call(
+        route="chat", provider="anthropic", model="claude-sonnet-5",
+        tokens_in=100000, tokens_out=20000, agent="claude",
+        ts=f"2026-07-0{i+1}T10:00:00Z", call_id=f"c_s16_{i}"))
+"""
+
+# Rewrite the inited policy to the v0.16-era shape (no [meta], no [cleanup], no
+# capture.import_before_export — the only non-pricing keys the bundle has gained
+# since, per the git history of data/policy.toml) + one hand edit (daily budget).
+_S16_STRIP = """
+import sys
+from pathlib import Path
+p = Path(sys.argv[1]) / ".cage" / "policy.toml"
+out, skip = [], False
+for ln in p.read_text(encoding="utf-8").splitlines(keepends=True):
+    s = ln.strip()
+    if s in ("[meta]", "[cleanup]"):
+        skip = True
+        continue
+    if skip and s.startswith("["):
+        skip = False
+    if skip or s.startswith("import_before_export"):
+        continue
+    out.append(ln)
+p.write_text("".join(out).replace("daily_usd = 25.00", "daily_usd = 50.00"),
+             encoding="utf-8")
+"""
+
+
+def s16_policy_sync(base: Path) -> str:
+    """S16 — project-policy upgrade (plan §3.10): a v0.16-shaped policy shows
+    exact add/keep categories; `--apply` writes the adds, keeps the hand edit,
+    stamps [meta] policy_version, and changes no derived view by one byte;
+    the second apply is a byte-identical no-op; doctor/hook hints flip clean."""
+    repo, env = make_sandbox(base, "s16-policy-sync")
+    expect_ok(repo, env, "init")
+    r = _sh([sys.executable, "-c", _S16_SEED, str(repo)], cwd=repo, env=env)
+    if r.returncode != 0:
+        raise Fail(f"S16 seeding failed: {r.stderr.strip()[:300]}")
+    r = _sh([sys.executable, "-c", _S16_STRIP, str(repo)], cwd=repo, env=env)
+    if r.returncode != 0:
+        raise Fail(f"S16 policy strip failed: {r.stderr.strip()[:300]}")
+
+    # 1. dry-run: exact categories, deterministic, recommendation on the surfaces
+    diff = expect_ok(repo, env, "policy", "diff")
+    for needle in ("add (3)",
+                   "+ [capture] import_before_export = true",
+                   "+ [cleanup] days = 30",
+                   "+ [cleanup] enabled = true",
+                   "keep (1)",
+                   "[budgets] daily_usd = 50.0 (bundled 25.0)",
+                   "bundled policy defaults are newer",
+                   "pricing tables — delegated to `cage prices sync`"):
+        if needle not in diff:
+            raise Fail(f"policy diff missing {needle!r}")
+    if expect_ok(repo, env, "policy", "diff") != diff:
+        raise Fail("policy diff not byte-identical across two runs")
+    if "bundled policy defaults are newer" not in expect_ok(repo, env, "doctor"):
+        raise Fail("doctor missing the policy-version recommendation")
+    if "cage policy sync" not in expect_ok(repo, env, "hook-post-commit"):
+        raise Fail("post-commit note missing the policy sync hint")
+
+    # 2. behavior-neutrality: --apply changes no derived view by one byte
+    views = [("report",), ("report", "--by", "model"), ("attrib",), ("budget",),
+             ("human",), ("trend",)]
+    before = [expect_ok(repo, env, *v) for v in views]
+    applied = expect_ok(repo, env, "policy", "sync", "--apply")
+    for needle in ("✔ [capture] import_before_export = true added",
+                   "✔ [cleanup] added (days = 30, enabled = true)",
+                   "✔ [meta] policy_version stamped"):
+        if needle not in applied:
+            raise Fail(f"policy sync --apply missing {needle!r}")
+    if [expect_ok(repo, env, *v) for v in views] != before:
+        raise Fail("--apply changed a derived view — neutrality invariant broken")
+
+    # 3. idempotent apply: second run is a byte-identical no-op
+    pol_file = repo / ".cage" / "policy.toml"
+    first = pol_file.read_bytes()
+    if "already in sync" not in expect_ok(repo, env, "policy", "sync", "--apply"):
+        raise Fail("second apply did not report already-in-sync")
+    if pol_file.read_bytes() != first:
+        raise Fail("second apply rewrote the file — idempotency broken")
+    if "daily_usd = 50.00" not in pol_file.read_text(encoding="utf-8"):
+        raise Fail("hand-edited budget was clobbered — customized must be kept")
+
+    # 4. hints flip clean; the hand edit survives in the merged view
+    if "project policy defaults are current" not in expect_ok(repo, env, "doctor"):
+        raise Fail("doctor still stale after apply")
+    if "cage policy sync" in expect_ok(repo, env, "hook-post-commit"):
+        raise Fail("post-commit policy hint survived the apply")
+    assert_pii_clean(repo)
+    return ("v0.16 shape → add(3) exact · hand edit kept · apply neutral to the "
+            "byte · second apply no-op · doctor/hook hints flip clean")
+
+
 # id → (phase that ships it, callable or None-if-pending)
 SCENARIOS: dict[str, tuple[str, object]] = {
     "S1": ("P0", s1_cli),
@@ -1080,6 +1183,7 @@ SCENARIOS: dict[str, tuple[str, object]] = {
     "S13": ("restricted", s13_pyz),
     "S14": ("pricing", s14_receipt_ladder),
     "S15": ("pricing", s15_freshness),
+    "S16": ("pricing", s16_policy_sync),
 }
 
 MANUAL_CHECKLIST = """\

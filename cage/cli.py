@@ -22,7 +22,7 @@ commands by category:
   authorship    origin · notes-sync · verify     who wrote which files (§3.5)
   ops           quality · regression · recommend · forecast · outcome · estimate · calibration
   capture       import · export · watch · limits  universal pull-based metering + quota (§3.7)
-  pricing       prices (list · unpriced · set · alias · sync)  what the ledger reprices against (§3.3)
+  pricing       prices (list · unpriced · set · alias · sync) · policy (diff · sync)  prices + policy upkeep (§3.3, §3.10)
   setup         init · doctor · debug · setup · cleanup · proxy · meter · mcp · serve
   meta          query · demo · graphify (· import-claude · import-codex)
 
@@ -223,6 +223,28 @@ def build_parser() -> argparse.ArgumentParser:
     pr.add_argument("--since", metavar="WINDOW", help="unpriced: window like 7d / 2w")
     _json_flag(pr)
     pr.set_defaults(fn=clicmds.cmd_prices)
+
+    po = sub.add_parser("policy",
+                        help="upgrade the project policy.toml to the installed "
+                             "bundle: diff · sync (§3.10)",
+                        epilog="examples:\n"
+                               "  cage policy diff                         # dry-run: add/update/keep/orphan categories\n"
+                               "  cage policy sync --apply                 # write adds+updates, stamp [meta] policy_version\n"
+                               "  cage policy sync --apply --yes all       # also accept the per-key confirm bucket\n"
+                               "Customized values are never modified, orphans never deleted; pricing\n"
+                               "tables delegate to `cage prices sync` (its summary embeds here).\n"
+                               "Nothing ever auto-applies this — hints recommend, humans run.",
+                        formatter_class=argparse.RawDescriptionHelpFormatter)
+    po.add_argument("action", choices=["diff", "sync"],
+                    help="diff=dry-run categorized view · sync=same view; --apply writes")
+    po.add_argument("--apply", action="store_true",
+                    help="sync: write adds/updates and stamp [meta] policy_version "
+                         "(default: dry-run)")
+    po.add_argument("--yes", action="append", metavar="SECTION.KEY",
+                    help="sync --apply: confirm one non-reconstructable row "
+                         "(repeatable; 'all' confirms every one shown)")
+    _json_flag(po)
+    po.set_defaults(fn=clicmds.cmd_policy)
 
     hu = sub.add_parser("human", help="agent-vs-human savings: $ and hours saved (§4.1)")
     hu.add_argument("--since", metavar="WINDOW", help="window like 30d / 2w")

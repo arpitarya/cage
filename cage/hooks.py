@@ -241,7 +241,8 @@ def post_commit() -> int:
         import datetime as _dt
 
         from cage import freshness
-        notes = freshness.freshness(root, pol, today=_dt.date.today())
+        notes = freshness.freshness(root, pol, today=_dt.date.today(),
+                                    include_policy=True)
         for note in notes:
             first, *rest = note.splitlines()
             # `cage: ` prefixes only the headline (attribution in mixed git
