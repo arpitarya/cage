@@ -225,6 +225,13 @@ def _ts(row: dict) -> _dt.datetime | None:
         return None
 
 
+def newest_ts(rows: list[dict]) -> _dt.datetime | None:
+    """The newest parseable row ``ts`` — the data-relative "now" derived views use
+    instead of the wall clock (freshness age math, plan §3.3). ``None`` when no row
+    carries a timestamp (empty ledger ⇒ the age signal has no anchor)."""
+    return max((t for r in rows if (t := _ts(r)) is not None), default=None)
+
+
 def since(rows: list[dict], spec: str | None) -> list[dict]:
     cut = since_cutoff(spec)
     if cut is None:

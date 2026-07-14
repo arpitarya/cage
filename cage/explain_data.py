@@ -478,6 +478,30 @@ REGISTRY: tuple[Explanation, ...] = (
         "n/a — describes version bookkeeping, not a number.",
         kind="concept", plan_ref="§3.3"),
     Explanation(
+        "prices-freshness", ("prices-freshness", "freshness", "stale", "staleness",
+                             "stale-days", "prices-date", "age", "outdated",
+                             "post-commit-note", "commit-note"),
+        "the three local freshness signals behind the per-commit pricing note",
+        "cage never fetches a price, so \"are my prices current?\" is answered from\n"
+        "  local evidence only — three signals, one implementation (freshness.py):\n"
+        "  1. sync drift — project [meta] older than the installed bundle\n"
+        "     (project {prices_version_project} vs bundled {prices_version_bundled})\n"
+        "     → the `cage prices sync` recommendation, verbatim.\n"
+        "  2. bundle age — the bundle's own prices_date ({prices_date_bundled}) is\n"
+        "     more than stale_days (now: {prices_stale_days}; policy [prices]\n"
+        "     stale_days, 0 disables) old → \"check for a newer cage release\": a\n"
+        "     faithfully synced project can still be confidently stale.\n"
+        "  3. UNPRICED presence — calls or call-less token receipts billing $0 →\n"
+        "     the existing runnable hints ({unpriced_hint}).\n"
+        "  Three surfaces render the same lines: the git post-commit hook (print-\n"
+        "  only, fail-open, silent when clean — never gates a commit), `cage doctor`\n"
+        "  (always shown), and the `cage report` footer (actionable-only). Clocks:\n"
+        "  the report footer anchors age on the newest ledger ts (data-relative —\n"
+        "  derived views stay deterministic); hook and doctor may use today.",
+        ("cage/freshness.py", "cage/hooks.py", "cage/doctorcmd.py"),
+        "n/a — describes the check; the ⚠/· lines it prints are advisory, never a gate.",
+        kind="concept", plan_ref="§3.3"),
+    Explanation(
         "copilot-pricing", ("copilot-pricing", "copilot", "premium-request", "credits",
                             "subscription", "seat", "auto", "router"),
         "how Copilot-served models price (and why copilot/auto stays unpriced)",

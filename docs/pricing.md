@@ -69,6 +69,40 @@ per-row confirmation for unmarked drift (cage can't reconstruct which old bundle
 a row came from — honest over clever). cage itself never fetches a price: no
 network on any cage code path; the research step is build-time/user work.
 
+## Pricing freshness — the per-commit note (v0.24)
+
+cage never fetches a rate, so "are my prices current?" is answered from **local
+evidence only** — three signals, one implementation
+([cage/freshness.py](../cage/freshness.py)), three surfaces:
+
+1. **sync drift** — the project `[meta]` is older than the installed bundle's →
+   the `cage prices sync` recommendation above, verbatim.
+2. **bundle age** — the bundle's own `[meta] prices_date` is more than
+   `stale_days` old → `bundled prices are N days old — check for a newer cage
+   release`. A project faithfully synced to a six-month-old bundle is
+   confidently stale; this signal catches that. Threshold: policy `[prices]
+   stale_days` (the `constants.PRICES_STALE_DAYS` fallback, 45); **`stale_days
+   = 0` disables the age signal** — the documented opt-out.
+3. **UNPRICED presence** — calls or call-less token receipts billing $0 → the
+   existing runnable fix hints, byte-for-byte.
+
+Surfaces: the **git post-commit hook** prints the actionable lines
+(`cage:`-prefixed, print-only, fail-open, exit 0, silent when clean — never
+gates a commit); **`cage doctor`** always shows the age check (`prices-age`,
+beside `prices-meta` and `pricing`); the **`cage report` footer** appends
+actionable lines only (UNPRICED already renders natively there; never in
+`--csv`). Clock law: the report footer is a derived view, so its age math
+anchors on the **newest ledger `ts`** (data-relative — same ledger + policy ⇒
+byte-identical output; an empty ledger has no anchor, so the report stays
+silent and doctor carries the age); the hook and doctor are clock-allowed
+events and use today. `cage query prices-freshness` explains with live values.
+
+Maintainer side: a weekly scheduled workflow
+(`.github/workflows/prices-freshness-nag.yml`) reads the bundled `prices_date`
+and, past `stale_days`, upserts one pinned issue asking a human to re-verify
+the cited sources — it never fetches or parses a vendor page, and the publish
+workflow is untouched.
+
 ## Fleet repricing
 
 Because pricing is derive-time, imported fleet bundles (`cage export --study` →
@@ -147,4 +181,5 @@ provider dashboard" note.
 Ask the tool itself: `cage query prices-cli` · `cage query unpriced` ·
 `cage query pricing-match` · `cage query repricing` · `cage query receipt-pricing` ·
 `cage query effort-tiers` · `cage query policy-versioning` ·
-`cage query copilot-pricing` — all answered deterministically with live values.
+`cage query prices-freshness` · `cage query copilot-pricing` — all answered
+deterministically with live values.

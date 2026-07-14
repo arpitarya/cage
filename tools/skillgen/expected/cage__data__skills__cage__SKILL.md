@@ -43,6 +43,10 @@ pre-formatted table. Never invent a number.
   means call-less token savings couldn't resolve a model: run the printed
   `cage prices route-tool <tool> --to <provider>/<model>` fix line (or run the
   tool in a metered session; `cage query receipt-pricing` explains the ladder).
+  A `bundled prices are N days old` note (post-commit, doctor, or the report
+  footer) means the bundle itself needs a newer cage release — advisory only,
+  never a gate; `[prices] stale_days = 0` in policy opts out
+  (`cage query prices-freshness` explains all three freshness signals).
 - **fleet study** ("does the plugin pay off across our laptops") — `cage study
   join <phase>` per machine → `cage export --study` → analyst runs `cage import
   bundle*.zip` + `cage study report` (coverage first, then a paired-by-machine

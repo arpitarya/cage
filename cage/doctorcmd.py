@@ -150,6 +150,33 @@ def _bundled_prices(root: Path) -> tuple[str, str]:
     return _OK, f"project prices are current with the bundle ({bundled_v})"
 
 
+def _prices_age(root: Path) -> tuple[str, str]:
+    """The bundle's *own* age (plan §3.3) — a project faithfully synced to a
+    6-month-old bundle is confidently stale. Doctor is a diagnostic, not a derived
+    view, so wall-clock today is the right anchor here (and the handoff wants the
+    age visible even on an empty ledger); the report footer stays data-relative.
+    One wording, one home: `freshness.age_line`."""
+    import datetime as _dt
+
+    from cage import freshness
+    try:
+        pol = policy.load(paths.Footprint(root).policy)
+    except Exception:  # noqa: BLE001 — a broken policy is reported by the policy check
+        return _OK, "project policy unreadable — see the policy check"
+    sd = policy.prices_stale_days(pol)
+    if sd <= 0:
+        return _OK, "age check disabled ([prices] stale_days = 0)"
+    line = freshness.age_line(pol, _dt.date.today())
+    if line:
+        return _WARN, line
+    meta = policy.bundled_raw().get("meta", {})
+    stamped = freshness._parse_date(meta.get("prices_date") or meta.get("prices_version"))
+    if stamped is None:
+        return _OK, "bundled [meta] carries no parseable prices_date — nothing to age"
+    n = (_dt.date.today() - stamped).days
+    return _OK, f"bundled prices are {n} days old (stale after {sd})"
+
+
 def _state_dir(root: Path) -> tuple[str, str]:
     """State-dir size + prune-candidate visibility (bloat should be visible before
     it's a problem). Informational — `cage cleanup` is the remedy."""
@@ -376,6 +403,7 @@ def run(root: Path) -> dict:
         ("policy", *_policy(active)),
         ("pricing", *_pricing(active)),
         ("prices-meta", *_bundled_prices(active)),
+        ("prices-age", *_prices_age(active)),
         ("state", *_state_dir(active)),
         ("hooks", *_hooks(root)),
         ("portability", *_portability(root)),

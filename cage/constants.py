@@ -88,6 +88,19 @@ MODEL_ROUTE_PREFIXES = ("copilot/",)
 CLEANUP_DEFAULT_DAYS = 30
 CLEANUP_THROTTLE_HOURS = 24
 
+# Bundled-prices staleness threshold (plan §3.3, `cage/freshness.py`). Vendor
+# list prices historically shift a few times a year, and cage never fetches a
+# rate — the bundle is only as fresh as its last build-time research pass
+# (`[meta] prices_date`). 45 days is deliberately wider than a normal release
+# cadence (a routinely-maintained bundle never nags) but narrow enough that a
+# half-year-stale table can't hide behind silence. Past it, the freshness check
+# prints "bundled prices are N days old — check for a newer cage release" on
+# post-commit / doctor / the report footer. Policy-preferred fallback (the
+# DEFAULT_CONFIDENCE pattern): `policy.toml [prices] stale_days` wins; `0`
+# disables the age signal entirely (documented opt-out). Derived views compare
+# against the newest ledger `ts`, never the wall clock — determinism law.
+PRICES_STALE_DAYS = 45
+
 # Authorship-provenance trust ranking (cage/originrecord.py) — a parallel ladder to
 # METHOD_TRUST, for the *different* enum PROV_METHODS (schema.py): hooked (live
 # PostToolUse capture) outranks transcript (parsed after the fact) outranks heuristic

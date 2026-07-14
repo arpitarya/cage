@@ -78,6 +78,10 @@ def _live(pol: dict) -> dict:
                                   for t, v in receiptprice.routes(pol).items())
                         or "none configured"),
         "unpriced_hint": receiptprice.UNPRICED_HINT,
+        # pricing freshness (plan §3.3) — live threshold + bundle stamp
+        "prices_stale_days": policy.prices_stale_days(pol),
+        "prices_date_bundled": str(policy.bundled_raw().get("meta", {})
+                                   .get("prices_date") or "?"),
     }
 
 

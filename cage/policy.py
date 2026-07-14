@@ -253,6 +253,19 @@ def cleanup_days(pol: dict) -> int:
         return CLEANUP_DEFAULT_DAYS
 
 
+def prices_stale_days(pol: dict) -> int:
+    """Age threshold (days) past which the bundled prices count as stale
+    (`cage/freshness.py`). Policy `[prices] stale_days` wins;
+    `constants.PRICES_STALE_DAYS` covers an unset key (the DEFAULT_CONFIDENCE
+    policy-preferred pattern). `0` disables the age signal — documented opt-out."""
+    from cage.constants import PRICES_STALE_DAYS
+    v = pol.get("prices", {}).get("stale_days", PRICES_STALE_DAYS)
+    try:
+        return int(v)
+    except (TypeError, ValueError):
+        return PRICES_STALE_DAYS
+
+
 def import_before_export(pol: dict) -> bool:
     """Whether `cage export` runs the all-agent import sweep before bundling, so a
     capture-only machine (hooks never fire under a VS Code extension) still ships a

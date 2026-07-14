@@ -39,6 +39,7 @@ release that shipped the work: `vX.Y-<feature>.{handoff,prompt}.md`.
 | v0.22.1 | Docs lifecycle (this archive + the rule) | — | [prompt](v0.22.1-docs-lifecycle.prompt.md) | [v0.22.1](../../CHANGELOG.md#v0221-2026-07-11--docs-lifecycle-the-archive-the-storybook-spine-the-rule) |
 | v0.22.1 | Full test run record (58 findings, 3 bugs → v0.22.2) | — | [run record](v0.22.1-full-test-run.md) | [v0.22.2](../../CHANGELOG.md#v0222-2026-07-12--capture-correctness-three-bugs-from-the-v0221-full-test-run) |
 | v0.23 | Tool-receipt pricing ladder (call-less receipts → $) | [handoff](v0.23-tool-receipt-pricing.handoff.md) | [prompt](v0.23-tool-receipt-pricing.prompt.md) | [v0.23.0](../../CHANGELOG.md#v0230-2026-07-14--tool-receipt-pricing-dollars-for-call-less-token-receipts) |
+| v0.24 | Pricing freshness (per-commit note + complete vendor tables) | [handoff](v0.24-pricing-freshness.handoff.md) | [prompt](v0.24-pricing-freshness.prompt.md) | [v0.24.0](../../CHANGELOG.md#v0240-2026-07-14--pricing-freshness-the-per-commit-staleness-note--complete-vendor-tables) |
 | v0.23 | `prices route-tool` managed writer + runnable hint | [handoff](v0.23-prices-route-tool.handoff.md) | [prompt](v0.23-prices-route-tool.prompt.md) | [v0.23.0](../../CHANGELOG.md#v0230-2026-07-14--tool-receipt-pricing-dollars-for-call-less-token-receipts) |
 
 ## Superseded drafts & research inputs

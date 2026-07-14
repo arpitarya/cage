@@ -232,6 +232,25 @@ def post_commit() -> int:
     root = paths.resolve_root()  # same tier as _root(): no-cage repo ⇒ global, no stray footprint
     pol = _pol(root)
     debuglog.heartbeat(root, "git", "post_commit", str(Path.cwd()), pol=pol)
+    # Pricing-freshness note (plan §3.3) — print-only, silent when clean, its own
+    # fail-open block (and FIRST: the provenance path below early-returns on a
+    # missing sha/state dir, and the note must print regardless). A write-path
+    # event, so wall-clock today is allowed (derived views stay data-relative).
+    # Git surfaces post-commit stdout, so the user sees it inline.
+    try:
+        import datetime as _dt
+
+        from cage import freshness
+        notes = freshness.freshness(root, pol, today=_dt.date.today())
+        for note in notes:
+            first, *rest = note.splitlines()
+            # `cage: ` prefixes only the headline (attribution in mixed git
+            # output); continuation lines (runnable `run:` hints) stay clean.
+            print("\n".join([f"cage: {first}", *rest]))
+        debuglog.event(root, pol=pol, agent="git", event="post_commit_freshness",
+                       notes=len(notes))
+    except Exception as e:  # fail-open — but never silent (traceable under CAGE_DEBUG)
+        debuglog.exception(root, "hook.post_commit.freshness", e, pol=pol)
     try:
         sha = originrecord.current_sha(root)
         if not sha:

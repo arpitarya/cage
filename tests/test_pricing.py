@@ -233,3 +233,26 @@ def test_raw_readers_keep_sides_separate(tmp_path):
     assert list(project["prices"]) == ["x"]
     assert policy.load_project_raw(tmp_path / "absent.toml") == {}
     assert bundled["meta"]["prices_version"]  # the bundle is stamped
+
+
+def test_fixture_corpus_ids_all_price_no_none():
+    # Handoff B (plan §3.3): every anthropic/openai (provider, model) the fixture
+    # corpus stamps must exact- or family-match a bundled row — a missing row is
+    # a silent $0 in someone's history. copilot/auto (router, alias-only) and
+    # kiro/agent (its own table) are out of scope by design.
+    import json
+    from pathlib import Path
+    corpus = Path(__file__).parent / "fixtures" / "transcripts"
+    pol = policy.load(None)
+    seen = set()
+    for expected in sorted(corpus.glob("*/*/expected.json")):
+        for row in json.loads(expected.read_text(encoding="utf-8"))["rows"]:
+            seen.add((row.get("provider", ""), row.get("model", "")))
+    assert seen, "fixture corpus is empty?"
+    for prov, model in sorted(seen):
+        if prov not in ("anthropic", "openai"):
+            continue
+        _, match, key = policy.price_match(pol, prov, model)
+        assert match != "none", f"{prov}/{model} is UNPRICED in the bundled table"
+    # the codex CLI fixture id is load-bearing: exact, never a family guess
+    assert policy.price_match(pol, "openai", "gpt-5.1-codex")[1] == "exact"

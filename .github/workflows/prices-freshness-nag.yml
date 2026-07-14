@@ -1,0 +1,86 @@
+# Maintainer-side pricing-freshness nag (plan §3.3, handoff C). Weekly cron:
+# read the bundled [meta] prices_date, and past constants.PRICES_STALE_DAYS
+# upsert ONE pinned issue asking a human to re-verify the cited sources. It
+# NEVER fetches or parses a vendor pricing page (brittle, and a wrong
+# auto-parsed rate is the worst outcome) and never touches the publish
+# workflow — the nag closes the loop the runtime check can't: the bundle's own
+# age, watched from the repo side so it can't silently drift for everyone.
+
+name: Prices freshness nag
+
+on:
+  schedule:
+    - cron: "0 9 * * 1" # Mondays 09:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  nag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Compute bundled-prices age (stdlib only — no vendor fetch)
+        id: age
+        run: |
+          python - <<'EOF' >> "$GITHUB_OUTPUT"
+          import datetime, tomllib
+          from cage.constants import PRICES_STALE_DAYS
+          with open("cage/data/policy.toml", "rb") as fh:
+              meta = tomllib.load(fh).get("meta", {})
+          stamped = str(meta.get("prices_date") or meta.get("prices_version") or "")
+          days = (datetime.date.today()
+                  - datetime.date.fromisoformat(stamped[:10])).days
+          print(f"days={days}")
+          print(f"stale_days={PRICES_STALE_DAYS}")
+          print(f"stale={'true' if days > PRICES_STALE_DAYS else 'false'}")
+          print(f"prices_date={stamped}")
+          EOF
+      - name: Upsert the single pinned nag issue
+        if: steps.age.outputs.stale == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DAYS: ${{ steps.age.outputs.days }}
+          STALE_DAYS: ${{ steps.age.outputs.stale_days }}
+          PRICES_DATE: ${{ steps.age.outputs.prices_date }}
+        run: |
+          set -euo pipefail
+          MARKER="<!-- cage-prices-freshness-nag -->"
+          LABEL="prices-freshness"
+          TITLE="bundled prices are ${DAYS} days old — re-verify against the cited sources"
+          BODY="${MARKER}
+          The bundled price table (\`cage/data/policy.toml\`) was last researched on **${PRICES_DATE}** — ${DAYS} days ago (threshold: ${STALE_DAYS}).
+
+          Nobody fetches rates automatically (a wrong auto-parsed rate is worse than a stale one) — this issue asks a human to:
+
+          1. Re-verify each row against its cited source URL (see the per-row \`# source:\` comments).
+          2. Add rows for any newly GA or newly retired-but-billable models.
+          3. Bump \`[meta] prices_version\` / \`prices_date\` and release.
+
+          See \`docs/pricing.md\` (freshness section) for the full workflow. This issue is upserted weekly by \`.github/workflows/prices-freshness-nag.yml\` — it updates in place and reopens if closed while still stale."
+          gh label create "$LABEL" --repo "$GITHUB_REPOSITORY" \
+            --description "bundled price table needs a research pass" \
+            --color D93F0B 2>/dev/null || true
+          NUM=$(gh issue list --repo "$GITHUB_REPOSITORY" --label "$LABEL" \
+            --state all --search "cage-prices-freshness-nag" \
+            --json number --jq '.[0].number // empty')
+          if [ -z "$NUM" ]; then
+            NUM=$(gh issue create --repo "$GITHUB_REPOSITORY" --label "$LABEL" \
+              --title "$TITLE" --body "$BODY" | grep -oE '[0-9]+$')
+          else
+            STATE=$(gh issue view "$NUM" --repo "$GITHUB_REPOSITORY" --json state --jq .state)
+            if [ "$STATE" = "CLOSED" ]; then
+              gh issue reopen "$NUM" --repo "$GITHUB_REPOSITORY"
+            fi
+            gh issue edit "$NUM" --repo "$GITHUB_REPOSITORY" \
+              --title "$TITLE" --body "$BODY"
+          fi
+          # Pinning is garnish — best-effort, never fails the nag.
+          ISSUE_ID=$(gh api "repos/$GITHUB_REPOSITORY/issues/$NUM" --jq .node_id)
+          gh api graphql -f query='mutation($id: ID!) { pinIssue(input: {issueId: $id}) { issue { number } } }' \
+            -f id="$ISSUE_ID" 2>/dev/null || true

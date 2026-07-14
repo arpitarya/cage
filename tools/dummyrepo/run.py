@@ -984,6 +984,85 @@ def s14_receipt_ladder(base: Path) -> str:
     return "route via verb · 3 rungs + tie-break priced · UNPRICED hint runnable · byte-identical"
 
 
+# Seeder for S15 — one call stamped 100 days after the *bundled* prices_date, so
+# the report footer's data-relative age math yields an exact, clock-free N=100.
+_S15_SEED = """
+import datetime, sys
+from pathlib import Path
+from cage import ledger, policy, schema
+root = Path(sys.argv[1])
+meta = policy.bundled_raw().get("meta", {})
+stamped = datetime.date.fromisoformat(str(meta.get("prices_date"))[:10])
+ts = (stamped + datetime.timedelta(days=100)).isoformat() + "T10:00:00Z"
+ledger.append_row(root, "calls", schema.make_call(
+    route="chat", provider="mistral", model="mistral-large-3", tokens_in=10000,
+    tokens_out=1000, agent="codex", ts=ts, call_id="c_s15"))
+"""
+
+_S15_OPTOUT = """
+import sys
+from pathlib import Path
+p = Path(sys.argv[1]) / ".cage" / "policy.toml"
+p.write_text(p.read_text(encoding="utf-8") + '\\n[prices]\\nstale_days = 0\\n',
+             encoding="utf-8")
+"""
+
+
+def s15_freshness(base: Path) -> str:
+    """S15 — pricing freshness (plan §3.3): a backdated project [meta] puts the
+    staleness note on the post-commit surface (driven via `cage hook-post-commit`,
+    the exact command the installed git hook runs — S12 covers the hook file
+    itself); `sync --update` silences it; the report footer ages the bundle
+    data-relatively (newest ledger ts, exact N, byte-identical); `stale_days = 0`
+    opts out and, as a scalar under [prices], must never crash provider iteration."""
+    repo, env = make_sandbox(base, "s15-freshness")
+    expect_ok(repo, env, "init")
+
+    # 1. fresh init → no sync signal on the post-commit surface
+    if "bundled prices are newer (" in expect_ok(repo, env, "hook-post-commit"):
+        raise Fail("post-commit shows a sync note on a freshly-initialized project")
+
+    # 2. backdated [meta] → the note appears, cage:-prefixed and runnable
+    r = _sh([sys.executable, "-c", _S11_BACKDATE, str(repo)], cwd=repo, env=env)
+    if r.returncode != 0:
+        raise Fail(f"S15 meta backdate failed: {r.stderr.strip()[:300]}")
+    hook = expect_ok(repo, env, "hook-post-commit")
+    if "cage: bundled prices are newer (" not in hook or "cage prices sync" not in hook:
+        raise Fail(f"post-commit missing the staleness note: {hook[:200]!r}")
+
+    # 3. sync --update restamps → the note disappears (silent when clean)
+    expect_ok(repo, env, "prices", "sync", "--update")
+    if "bundled prices are newer (" in expect_ok(repo, env, "hook-post-commit"):
+        raise Fail("staleness note survived `prices sync --update`")
+
+    # 4. data-relative bundle age in the report footer: a call 100 days past the
+    # bundled prices_date → exact N=100, no wall clock, byte-identical
+    r = _sh([sys.executable, "-c", _S15_SEED, str(repo)], cwd=repo, env=env)
+    if r.returncode != 0:
+        raise Fail(f"S15 seeding failed: {r.stderr.strip()[:300]}")
+    rep = expect_ok(repo, env, "report")
+    if "· bundled prices are 100 days old — check for a newer cage release" not in rep:
+        raise Fail(f"report footer missing the data-relative age line: {rep[-300:]!r}")
+    if expect_ok(repo, env, "report") != rep:
+        raise Fail("report with freshness footer not byte-identical across two runs")
+    # the seeded unpriced call also puts the UNPRICED hint on the hook surface
+    if "UNPRICED" not in expect_ok(repo, env, "hook-post-commit"):
+        raise Fail("post-commit missing the UNPRICED hint for an unpriced call")
+
+    # 5. stale_days = 0 opts the age signal out — and, being a scalar under
+    # [prices], must not crash prices list/sync (the hardened iteration sites)
+    r = _sh([sys.executable, "-c", _S15_OPTOUT, str(repo)], cwd=repo, env=env)
+    if r.returncode != 0:
+        raise Fail(f"S15 opt-out write failed: {r.stderr.strip()[:300]}")
+    if "days old — check for a newer cage release" in expect_ok(repo, env, "report"):
+        raise Fail("stale_days = 0 did not disable the age signal")
+    expect_ok(repo, env, "prices", "list")   # scalar under [prices] must not crash
+    expect_ok(repo, env, "prices", "sync")
+    assert_pii_clean(repo)
+    return ("backdated meta → cage:-prefixed note · sync silences it · "
+            "data-relative 100-day footer exact + byte-identical · stale_days=0 opt-out")
+
+
 # id → (phase that ships it, callable or None-if-pending)
 SCENARIOS: dict[str, tuple[str, object]] = {
     "S1": ("P0", s1_cli),
@@ -1000,6 +1079,7 @@ SCENARIOS: dict[str, tuple[str, object]] = {
     "S12": ("restricted", s12_launcher),
     "S13": ("restricted", s13_pyz),
     "S14": ("pricing", s14_receipt_ladder),
+    "S15": ("pricing", s15_freshness),
 }
 
 MANUAL_CHECKLIST = """\

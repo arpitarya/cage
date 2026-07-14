@@ -130,10 +130,16 @@ def summarize(root: Path, pol: dict, dim: str = "route", since: str | None = Non
         total["saved_usd"] = total_saved
         total["net_usd"] = total_saved - total["usd"]
     unpriced_receipts["tools"] = sorted(unpriced_receipts["tools"])
+    # Pricing-freshness footer lines (plan §3.3): data-relative (today=None ⇒
+    # anchored on the newest ledger ts, never the wall clock — derived views stay
+    # deterministic), over the same team-aware rows the table renders. UNPRICED is
+    # excluded here because render_report prints those exact lines natively.
+    from cage import freshness
+    fresh = freshness.freshness(root, pol, include_unpriced=False, rows=all_calls)
     return {"dim": dim, "since": since, "project": project, "groups": groups,
             "total": total, "unpriced": sorted(unpriced), "family": family,
             "alias": alias, "unpriced_detail": dict(sorted(unpriced.items())),
-            "unpriced_receipts": unpriced_receipts}
+            "unpriced_receipts": unpriced_receipts, "freshness": fresh}
 
 
 def unpriced_line(detail: dict) -> str:
@@ -219,6 +225,8 @@ def render_report(rep: dict, last_import: str | None = None) -> str:
     if rep.get("unpriced_receipts", {}).get("receipts"):
         from cage import receiptprice
         out += "\n\n" + receiptprice.unpriced_receipts_line(rep["unpriced_receipts"])
+    if rep.get("freshness"):  # actionable-only — silent when clean (plan §3.3)
+        out += "\n\n" + "\n".join(f"· {l}" for l in rep["freshness"])
     line = _last_import_line(last_import)
     if line:
         out += f"\n\n{line}"

@@ -286,3 +286,21 @@ def test_route_tool_visible_in_list_and_doctor_unchanged(root, capsys):
     assert cli.main(["prices", "list"]) == 0
     out = capsys.readouterr().out
     assert "ghost → anthropic/mystery-9000" in out and "⚠ dangling" in out
+
+
+def test_sync_picks_up_new_bundle_rows(root, capsys):
+    # Handoff B (plan §3.3): a project stamped from an older bundle sees the
+    # recommendation; `sync --update` restamps, and the newly-researched rows
+    # (here the load-bearing codex fixture id) resolve through the merge.
+    initcmd.run(root)
+    pricestoml.update_meta(root, {"prices_version": "2020-01-01"})
+    assert cli.main(["prices", "sync"]) == 0
+    assert "bundled prices are newer (" in capsys.readouterr().out
+    assert cli.main(["prices", "sync", "--update"]) == 0
+    assert "[meta] restamped" in capsys.readouterr().out
+    assert cli.main(["prices", "sync"]) == 0
+    assert "bundled prices are newer (" not in capsys.readouterr().out
+    from cage import policy
+    pol = policy.load(Footprint(root).policy)
+    row, match, _ = policy.price_match(pol, "openai", "gpt-5.1-codex")
+    assert match == "exact" and row["input"] == 1.25

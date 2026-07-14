@@ -44,6 +44,13 @@ def _meta_version(meta: dict) -> str:
     return str(meta.get("prices_version") or "") or _UNKNOWN_META
 
 
+def _tables(prices: dict) -> dict:
+    """Only the per-provider row tables under ``[prices]`` — scalar keys there
+    (``stale_days``, or a user typo) are settings, not providers, and iterating
+    them as tables is a TypeError waiting to happen."""
+    return {k: v for k, v in (prices or {}).items() if isinstance(v, dict)}
+
+
 def sync_recommendation(project_meta: dict) -> str | None:
     """One line when the installed bundle's prices are newer than the project's —
     never auto-applied; shared by `prices list`, `sync`, and `cage doctor`."""
@@ -86,10 +93,11 @@ def list_view(root: Path) -> dict:
     bundled = policy.bundled_raw()
     project = _project_raw(foot)
     rows = []
-    providers = sorted(set(bundled.get("prices", {})) | set(project.get("prices", {})))
+    b_tables, p_tables = _tables(bundled.get("prices", {})), _tables(project.get("prices", {}))
+    providers = sorted(set(b_tables) | set(p_tables))
     for prov in providers:
-        b_rows = bundled.get("prices", {}).get(prov, {})
-        p_rows = project.get("prices", {}).get(prov, {})
+        b_rows = b_tables.get(prov, {})
+        p_rows = p_tables.get(prov, {})
         for model in sorted(set(b_rows) | set(p_rows)):
             in_b, in_p = model in b_rows, model in p_rows
             win = p_rows.get(model) if in_p else b_rows.get(model)
@@ -339,10 +347,11 @@ def sync_view(root: Path) -> dict:
     text = foot.policy.read_text(encoding="utf-8") if foot.policy.exists() else ""
     owned = _custom_headers(text)
     in_sync, customized, drift, bundled_only, project_only = [], [], [], [], []
-    for prov in sorted(bundled.get("prices", {})):
-        for model in sorted(bundled["prices"][prov]):
-            b_row = bundled["prices"][prov][model]
-            p_row = project.get("prices", {}).get(prov, {}).get(model)
+    b_tables, p_tables = _tables(bundled.get("prices", {})), _tables(project.get("prices", {}))
+    for prov in sorted(b_tables):
+        for model in sorted(b_tables[prov]):
+            b_row = b_tables[prov][model]
+            p_row = p_tables.get(prov, {}).get(model)
             key = _key(prov, model)
             if p_row is None:
                 bundled_only.append(key)
@@ -353,9 +362,9 @@ def sync_view(root: Path) -> dict:
             else:
                 drift.append({"key": key, "provider": prov, "model": model,
                               "project": p_row, "bundled": b_row})
-    for prov in sorted(project.get("prices", {})):
-        for model in sorted(project["prices"][prov]):
-            if model not in bundled.get("prices", {}).get(prov, {}):
+    for prov in sorted(p_tables):
+        for model in sorted(p_tables[prov]):
+            if model not in b_tables.get(prov, {}):
                 project_only.append(_key(prov, model))
     return {"bundled_meta": bundled.get("meta", {}), "project_meta": project.get("meta", {}),
             "in_sync": in_sync, "customized": customized, "drift": drift,

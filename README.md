@@ -214,7 +214,7 @@ cage export --csv calls --since 30d -o calls.csv   # raw ledger rows for a pivot
 
 ## The `$0` guarantee
 
-Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 601 tests passing; `cage demo` reproduces the worked attribution example against a real ledger.
+Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 623 tests passing; `cage demo` reproduces the worked attribution example against a real ledger.
 
 **Honest limits.** Cage doesn't decide your human rate — it prices minutes at a blended rate you set, and labels the result `estimated` so it never pretends to be a timesheet. Marginal-by-fixed-order is defensible and `$0`, but it is an *ordering convention*, not a Shapley value (that's a deferred audit mode). And a counterfactual cell is an honest reconstruction, never an invoice — the `method` column says so on every row, on purpose.
 
@@ -222,7 +222,7 @@ Every derived view is parse / arithmetic over the log — **no LLM call, ever, o
 
 Latest release below — full history and detail in [CHANGELOG.md](CHANGELOG.md).
 
-- **v0.23.0 — tool-receipt pricing: dollars for call-less token receipts.** Graphify/fux-style receipts with a task but no call id now price via a deterministic ladder — `[tools.<tool>] price_at` policy routing → the task's dominant model → loudly UNPRICED — so `roi`/`attrib`/`verdict` show dollars, not just tokens, with the rung footnoted (and a `priced_via` CSV column). Historical derived savings numbers change (tokens now priced); linked receipts and `cage demo` stay byte-identical. `cage query receipt-pricing` explains.
+- **v0.24.0 — pricing freshness: the per-commit staleness note + complete vendor tables.** Every commit (plus `cage doctor` and the `cage report` footer) now prints one actionable line when your prices are stale — project meta behind the bundle, the bundle itself older than `[prices] stale_days` (default 45; `0` opts out), or UNPRICED rows — from local evidence only, never a network call; the report footer stays clock-free (data-relative age). The bundled table now covers the full GA + recent-history Anthropic/OpenAI lineups, every row cited, and a weekly CI nag watches the bundle's own age. `cage query prices-freshness` explains.
 
 ## The name
 

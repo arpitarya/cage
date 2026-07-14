@@ -2,6 +2,69 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
+## v0.24.0 (2026-07-14) — pricing freshness: the per-commit staleness note + complete vendor tables
+
+Built from: [docs/archive/v0.24-pricing-freshness.handoff.md](docs/archive/v0.24-pricing-freshness.handoff.md) ·
+[docs/archive/v0.24-pricing-freshness.prompt.md](docs/archive/v0.24-pricing-freshness.prompt.md)
+
+Pricing is derive-time, so a stale price table quietly mis-prices *all* history —
+and nothing checked freshness at the moment work is committed, or watched the
+bundle's own age (a project faithfully synced to a six-month-old bundle was
+confidently stale). cage never fetches a rate (no network on any cage code
+path), so the answer is **three local signals, one implementation, three
+surfaces** (`cage/freshness.py`):
+
+1. **sync drift** — project `[meta]` older than the installed bundle →
+   the existing `cage prices sync` recommendation, verbatim.
+2. **bundle age** — the bundle's own `[meta] prices_date` more than
+   `stale_days` old → `bundled prices are N days old — check for a newer cage
+   release`. Threshold: policy `[prices] stale_days`
+   (`constants.PRICES_STALE_DAYS` fallback, 45; `0` disables — documented
+   opt-out).
+3. **UNPRICED presence** — calls / call-less token receipts billing $0 → the
+   existing runnable fix hints, byte-for-byte (never re-phrased).
+
+Surfaces: the **git post-commit hook** prints the actionable lines
+(`cage:`-prefixed headline, print-only, fail-open, exit 0, silent when clean —
+never gates a commit; its own swallow-site, `hook.post_commit.freshness`,
+debug-logged and audit-tested); **`cage doctor`** gains a `prices-age` check
+beside `prices-meta`/`pricing` (all three signals now render there); the
+**`cage report` footer** appends actionable lines only — and, determinism law:
+the footer's age math anchors on the **newest ledger `ts`** (data-relative,
+clock-free; byte-identical across runs on the same ledger; empty ledger ⇒
+report silent, doctor carries the age), while hook/doctor use wall-clock
+today. Never in `--csv` (CSV consumers get the UNPRICED columns already).
+`cage query prices-freshness` explains with live values.
+
+**Complete Anthropic + OpenAI tables** (build-time research, every row cited
+`# source: URL (retrieved 2026-07-14)`): 24 new rows — Anthropic recent-history
+(`claude-sonnet-4`, `claude-3-7-sonnet`, `claude-3-5-sonnet`,
+`claude-3-5-haiku` legacy-order twin, `claude-3-opus`, `claude-3-sonnet`,
+`claude-3-haiku`; retired-but-billable in 2025–26 ledgers, so historical rows
+keep repricing at what they actually billed) and OpenAI GA + recent-history
+(`gpt-5.2`, `gpt-5.2-codex`, `gpt-5.1`, `gpt-5.1-codex` — the codex fixture id,
+now exact — `gpt-5.1-codex-max`, `gpt-5.1-codex-mini`, `gpt-5-codex`,
+`gpt-5-nano`, `gpt-5-pro`, `gpt-4.1`, `gpt-4.1-mini`, `gpt-4.1-nano`,
+`gpt-4o-mini`, `o3`, `o3-mini`, `o4-mini`, `codex-mini-latest`). Every
+anthropic/openai id in the fixture corpus now exact- or family-matches
+(tested: zero `none`). `[meta]` bumped to 2026-07-14.
+
+**Maintainer-side CI nag** (`.github/workflows/prices-freshness-nag.yml`, new
+file — publish workflow untouched): weekly cron reads the bundled
+`prices_date` with stdlib and, past `stale_days`, upserts ONE pinned issue
+("bundled prices are N days old — re-verify against the cited sources") —
+reopens if human-closed, never duplicates, never fetches a vendor page (a
+wrong auto-parsed rate is the worst outcome; the workflow nags a human).
+
+Also fixed: a scalar key under `[prices]` (e.g. `stale_days`, or any user
+typo) crashed `prices list`/`prices sync` provider iteration — the sites now
+skip non-table values (regression-tested).
+
+New: `cage/freshness.py` · `ledger.newest_ts` · `policy.prices_stale_days` ·
+doctor `prices-age` · `cage query prices-freshness` · dummyrepo S15 (backdated
+meta → post-commit note; sync silences; data-relative 100-day footer exact +
+byte-identical; `stale_days = 0` opt-out) · 22 new tests (623 passing).
+
 ## v0.23.0 (2026-07-14) — tool-receipt pricing: dollars for call-less token receipts
 
 Built from: [docs/archive/v0.23-tool-receipt-pricing.handoff.md](docs/archive/v0.23-tool-receipt-pricing.handoff.md) ·
