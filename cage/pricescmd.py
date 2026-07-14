@@ -23,6 +23,7 @@ the bundled table is read-only at runtime. Expected failures raise
 """
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from cage import ledger, paths, policy, prices, pricestoml, render
@@ -108,8 +109,15 @@ def list_view(root: Path) -> dict:
             tprov, _, tmodel = target.partition("/")
             aliases.append({"provider": prov, "model": model, "to": target,
                             "broken": tmodel not in merged_prices.get(tprov, {})})
+    # [tools.<tool>] price_at routes (call-less receipt pricing, plan §4.5) — a
+    # dangling route prices nothing (rung 1 refuses, never falls through): warn.
+    from cage import receiptprice
+    merged_pol = policy.load(foot.policy)
+    dangling = receiptprice.dangling_routes(merged_pol)
+    tool_routes = [{"tool": tool, "to": target, "broken": tool in dangling}
+                   for tool, target in receiptprice.routes(merged_pol).items()]
     b_meta, p_meta = bundled.get("meta", {}), project.get("meta", {})
-    return {"rows": rows, "aliases": aliases,
+    return {"rows": rows, "aliases": aliases, "tool_routes": tool_routes,
             "bundled_meta": b_meta, "project_meta": p_meta,
             "project_policy": str(foot.policy) if foot.policy.exists() else None,
             # no project policy at all ⇒ the bundle applies directly — nothing stale
@@ -132,6 +140,12 @@ def render_list(d: dict) -> str:
         for a in d["aliases"]:
             broken = "   ⚠ broken — target row missing" if a["broken"] else ""
             out.append(f"  {_key(a['provider'], a['model'])} → {a['to']}{broken}")
+    if d.get("tool_routes"):
+        out += ["", "tool routes ([tools.<tool>] price_at — prices call-less token receipts):"]
+        for t in d["tool_routes"]:
+            broken = ("   ⚠ dangling — no price row resolves; the tool's receipts stay UNPRICED"
+                      if t["broken"] else "")
+            out.append(f"  {t['tool']} → {t['to']}{broken}")
     if d["recommendation"]:
         out += ["", f"· {d['recommendation']}"]
     return "\n".join(out)
@@ -257,6 +271,65 @@ def set_alias(root: Path, pol: dict, args) -> str:
             f"  {_REPRICE_NOTE}")
 
 
+# Same token rule as task labels (`clicmds._LABEL` — a module import here would be
+# circular): one short identifier, never a path or free text.
+_TOOL = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,31}\Z")
+
+
+def route_tool(root: Path, pol: dict, args) -> str:
+    """`cage prices route-tool <tool> --to <provider>/<model> | --remove` — the
+    managed writer for the rung-1 receipt-pricing route (plan §4.5).
+
+    Unlike `alias` (which refuses a target with no exact row), a dangling target
+    is **written with a warning**: set-route-then-add-price must work, and doctor/
+    `prices list` keep flagging the dangling state until the row exists."""
+    tool = args.provider  # the verb's first free positional carries the tool name
+    if not tool:
+        raise CageError("usage: cage prices route-tool <tool> --to <provider>/<model> "
+                        "(or --remove)")
+    if not _TOOL.match(tool):
+        raise CageError("tool must be one short token (letters/digits/._-, ≤32 chars) "
+                        "— the receipt `tool` field, never a path or free text")
+    hdr = pricestoml.table_header("tools", tool)
+    if getattr(args, "remove", False):
+        res = pricestoml.remove_tool_route(root, tool)
+        if res["mode"] == "absent":
+            return f"· {hdr} has no route — nothing to remove"
+        was = (res["before"] or {}).get("price_at", "?")
+        return (f"✔ {hdr} removed — {res['path']} (was {was})\n"
+                f"  its call-less receipts fall back to the task model, else UNPRICED.\n"
+                f"  {_REPRICE_NOTE}")
+    if not args.to or "/" not in args.to:
+        raise CageError("--to must name a price row as <provider>/<model> "
+                        "(e.g. anthropic/claude-sonnet-4-6)")
+    tprov, _, tmodel = args.to.partition("/")
+    if not tprov or not tmodel:
+        raise CageError("--to must name a price row as <provider>/<model> "
+                        "(e.g. anthropic/claude-sonnet-4-6)")
+    _, match, key = policy.price_match(pol, tprov, tmodel)
+    res = pricestoml.set_tool_route(root, tool, args.to)
+    _stamp_meta_on_create(root, res)
+    lines = []
+    if res["mode"] == "unchanged":
+        lines.append(f"· {hdr} already routes to {args.to} — no change")
+    else:
+        where = {"in-place": "updated in place", "block": "written to the cage-managed block",
+                 "created": "written to a new project policy"}.get(res["mode"], res["mode"])
+        lines.append(f"✔ {hdr} {where} — {res['path']}")
+        lines.append(f"  before: {(res['before'] or {}).get('price_at') or '—'}")
+        lines.append(f"  after:  price_at = \"{args.to}\"")
+        lines.append("  call-less token receipts from this tool now price via rung 1 "
+                     "(`cage query receipt-pricing`).")
+    if match == "none":
+        lines.append(f"  ⚠ {args.to} resolves no price row — the route is dangling and "
+                     f"the tool's receipts stay UNPRICED until you run `cage prices set "
+                     f"{tprov} '{tmodel}' …` (doctor and `prices list` keep flagging it)")
+    elif match != "exact":
+        lines.append(f"  ≈ target resolves by {match} via {key} — priced at that row")
+    lines.append(f"  {_REPRICE_NOTE}")
+    return "\n".join(lines)
+
+
 # ── sync ─────────────────────────────────────────────────────────────────────
 
 def sync_view(root: Path) -> dict:
@@ -365,6 +438,9 @@ def run(args, root: Path, pol: dict) -> tuple[dict, str]:
         return {"result": text.splitlines()}, text
     if args.action == "alias":
         text = set_alias(root, pol, args)
+        return {"result": text.splitlines()}, text
+    if args.action == "route-tool":
+        text = route_tool(root, pol, args)
         return {"result": text.splitlines()}, text
     # sync
     d = sync_view(root)

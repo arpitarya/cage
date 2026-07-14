@@ -38,7 +38,10 @@ pre-formatted table. Never invent a number.
   rate on the vendor's pricing page (cage never fetches), then paste the
   `cage prices set …` / `cage prices alias …` line. `cage prices sync` when
   `doctor` says the bundled prices are newer. Derived views re-price
-  immediately — the ledger is never rewritten.
+  immediately — the ledger is never rewritten. A ⚠ line about *tool receipts*
+  means call-less token savings couldn't resolve a model: run the printed
+  `cage prices route-tool <tool> --to <provider>/<model>` fix line (or run the
+  tool in a metered session; `cage query receipt-pricing` explains the ladder).
 - **fleet study** ("does the plugin pay off across our laptops") — `cage study
   join <phase>` per machine → `cage export --study` → analyst runs `cage import
   bundle*.zip` + `cage study report` (coverage first, then a paired-by-machine

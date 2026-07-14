@@ -49,21 +49,29 @@ def _grouping_calls(root: Path, since: str | None, team_calls):
 
 def _nonhuman_savings(all_calls: list[dict], receipts: list[dict], pol: dict,
                       scope: str | None = None):
-    """Yield ``(receipt, call, saved_usd)`` for each non-human receipt (already window-
-    filtered). ``all_calls`` is the *unfiltered* join table so an in-window receipt can
-    still find its (possibly older) call.
+    """Yield ``(receipt, call, saved_usd, rung)`` for each non-human receipt (already
+    window-filtered). ``all_calls`` is the *unfiltered* join table so an in-window
+    receipt can still find its (possibly older) call.
 
     Tier-1 ``tool="human"`` receipts are a *different axis* (`cage human`); counting
     them here would double-count and mix axes — skip them, matching `roi.by_tool` (§4.4).
-    USD comes only through the one unit→USD dispatch (`convert.saved_usd`). With ``scope``
-    set, only receipts in that top-level dir count (plan §3.6.2).
+    USD comes only through the one unit→USD dispatch (`convert.saved_usd`); a call-less
+    token receipt prices via the resolution ladder (`receiptprice`, plan §4.5) —
+    ``rung`` names its path (``"unpriced"`` when rung 3 refused; ``""`` off-ladder).
+    With ``scope`` set, only receipts in that top-level dir count (plan §3.6.2).
     """
+    from cage import receiptprice
     by_id = {c.get("id"): c for c in all_calls}
+    idx = receiptprice.build(all_calls, receipts)  # once per view, never per receipt
     for r in ledger.by_scope(receipts, scope):
         if r.get("tool") == "human":
             continue
         call = by_id.get(r.get("call"), {})
-        yield r, call, convert.saved_usd(r, call, pol)
+        if receiptprice.eligible(r, by_id):
+            res = receiptprice.resolve(r, idx, pol)
+            yield r, call, (res[0] if res else 0.0), (res[1] if res else "unpriced")
+        else:
+            yield r, call, convert.saved_usd(r, call, pol), ""
 
 
 def summarize(root: Path, pol: dict, dim: str = "route", since: str | None = None,
@@ -104,21 +112,28 @@ def summarize(root: Path, pol: dict, dim: str = "route", since: str | None = Non
              "cached_in": sum(g["cached_in"] for g in groups.values()),
              "unpriced_calls": sum(g["unpriced_calls"] for g in groups.values()),
              "unpriced_tokens": sum(g["unpriced_tokens"] for g in groups.values())}
+    unpriced_receipts = {"receipts": 0, "tokens": 0, "tools": set()}  # rung-3 refusals (§4.5)
     if dim in SAVINGS_DIMS:  # second pass over receipts → saved + net (§3.1)
         total_saved = 0.0
-        for r, call, saved in _nonhuman_savings(all_calls, windowed_receipts, pol, scope):
+        for r, call, saved, rung in _nonhuman_savings(all_calls, windowed_receipts, pol, scope):
             key = str(r.get("task") or "—") if dim == "task" else str(call.get("agent") or "—")
             g = groups.setdefault(key, _new_group())  # receipt-only group (e.g. "—" bucket)
             g["saved_usd"] = g.get("saved_usd", 0.0) + saved
             total_saved += saved
+            if rung == "unpriced":
+                unpriced_receipts["receipts"] += 1
+                unpriced_receipts["tokens"] += int(r.get("saved", 0.0))
+                unpriced_receipts["tools"].add(r.get("tool", ""))
         for g in groups.values():
             g.setdefault("saved_usd", 0.0)
             g["net_usd"] = g["saved_usd"] - g["usd"]
         total["saved_usd"] = total_saved
         total["net_usd"] = total_saved - total["usd"]
+    unpriced_receipts["tools"] = sorted(unpriced_receipts["tools"])
     return {"dim": dim, "since": since, "project": project, "groups": groups,
             "total": total, "unpriced": sorted(unpriced), "family": family,
-            "alias": alias, "unpriced_detail": dict(sorted(unpriced.items()))}
+            "alias": alias, "unpriced_detail": dict(sorted(unpriced.items())),
+            "unpriced_receipts": unpriced_receipts}
 
 
 def unpriced_line(detail: dict) -> str:
@@ -153,7 +168,7 @@ def overview(root: Path, pol: dict, since: str | None = None) -> dict:
             unpriced_calls += 1
             unpriced_tokens += c.get("tokens_in", 0) + c.get("tokens_out", 0)
     tokens = sum(c.get("tokens_in", 0) + c.get("tokens_out", 0) for c in calls)
-    saved = sum(s for _, _, s in _nonhuman_savings(
+    saved = sum(s for _, _, s, _ in _nonhuman_savings(
         ledger.calls(root), ledger.since(ledger.receipts(root, since=since), since), pol))
     return {"since": since, "empty": not calls, "calls": len(calls),
             "spent_usd": spent, "saved_usd": saved, "net_usd": saved - spent,
@@ -201,6 +216,9 @@ def render_report(rep: dict, last_import: str | None = None) -> str:
     if rep.get("unpriced"):
         out += ("\n\n" + unpriced_line(rep["unpriced_detail"])
                 + "\n  " + ", ".join(rep["unpriced"]))
+    if rep.get("unpriced_receipts", {}).get("receipts"):
+        from cage import receiptprice
+        out += "\n\n" + receiptprice.unpriced_receipts_line(rep["unpriced_receipts"])
     line = _last_import_line(last_import)
     if line:
         out += f"\n\n{line}"

@@ -185,30 +185,35 @@ def build_parser() -> argparse.ArgumentParser:
 
     pr = sub.add_parser("prices",
                         help="manage the price tables the ledger reprices against: "
-                             "list · unpriced · set · alias · sync (§3.3)",
+                             "list · unpriced · set · alias · route-tool · sync (§3.3)",
                         epilog="examples:\n"
                                "  cage prices unpriced                     # what's billing $0, with a fix line each\n"
                                "  cage prices set anthropic claude-sonnet-5 --input 2 --output 10 --cache-read 0.20\n"
                                "  cage prices alias - copilot/auto --to anthropic/claude-sonnet-4-6\n"
+                               "  cage prices route-tool graphify --to anthropic/claude-sonnet-4-6\n"
                                "  cage prices list                         # every visible row: bundled vs project\n"
                                "  cage prices sync                         # dry-run diff vs the installed bundle\n"
                                "Writes land in the project policy.toml (the bundled table is read-only);\n"
                                "derived views re-price immediately — the ledger is never rewritten.\n"
                                "cage never fetches a price: research is yours (vendor pricing page).",
                         formatter_class=argparse.RawDescriptionHelpFormatter)
-    pr.add_argument("action", choices=["list", "unpriced", "set", "alias", "sync"],
+    pr.add_argument("action", choices=["list", "unpriced", "set", "alias", "route-tool",
+                                       "sync"],
                     help="list=rows+origin+meta · unpriced=$0 models+fix lines · "
                          "set=insert/update a project row · alias=route a router "
-                         "pseudo-model · sync=diff vs the installed bundle")
+                         "pseudo-model · route-tool=price a tool's call-less receipts "
+                         "(§4.5) · sync=diff vs the installed bundle")
     pr.add_argument("provider", nargs="?", help="set/alias: provider key ('-' = the "
-                    "empty provider some router rows stamp)")
+                    "empty provider some router rows stamp) · route-tool: the tool name")
     pr.add_argument("model", nargs="?", help="set/alias: model id exactly as `cage "
                     "prices unpriced` printed it")
     pr.add_argument("--input", type=float, help="set: USD per MTok of input")
     pr.add_argument("--output", type=float, help="set: USD per MTok of output")
     pr.add_argument("--cache-read", dest="cache_read", type=float,
                     help="set: USD per MTok of cached input (default: 0.1× input)")
-    pr.add_argument("--to", help="alias: target price row as <provider>/<model>")
+    pr.add_argument("--to", help="alias/route-tool: target price row as <provider>/<model>")
+    pr.add_argument("--remove", action="store_true",
+                    help="route-tool: delete the tool's route from the managed block")
     pr.add_argument("--update", action="store_true",
                     help="sync: apply bundled values to rows confirmed via --yes; "
                          "restamp [meta] (default: dry-run)")

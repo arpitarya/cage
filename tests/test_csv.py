@@ -29,17 +29,18 @@ REPORT_TASK_GOLDEN = (
     "TOTAL,1,8600,1500,0,0.0483,0.1242,0.0759,0,0,measured\n")
 
 ATTRIB_GOLDEN = (
-    "tool,saved_tokens,saved_usd,method,confidence\n"
-    "graphify,27000,0.081,modeled,1\n"
-    "fux,6400,0.0192,modeled,1\n"
-    "compressor,8000,0.024,measured,1\n"
-    "TOTAL,41400,0.1242,,\n")
+    "tool,saved_tokens,saved_usd,method,confidence,priced_via\n"
+    "graphify,27000,0.081,modeled,1,\n"
+    "fux,6400,0.0192,modeled,1,\n"
+    "compressor,8000,0.024,measured,1,\n"
+    "TOTAL,41400,0.1242,,,\n")
 
 ROI_GOLDEN = (
-    "tool,receipts,saved_usd,own_cost_usd,net_usd,added_latency_ms,method\n"
-    "graphify,1,0.081,0,0.081,0,modeled\n"
-    "compressor,1,0.024,0,0.024,0,measured\n"
-    "fux,1,0.0192,0,0.0192,0,modeled\n")
+    "tool,receipts,saved_usd,own_cost_usd,net_usd,added_latency_ms,method,"
+    "priced_via\n"
+    "graphify,1,0.081,0,0.081,0,modeled,call\n"
+    "compressor,1,0.024,0,0.024,0,measured,call\n"
+    "fux,1,0.0192,0,0.0192,0,modeled,call\n")
 
 
 def test_report_csv_golden(seeded):
@@ -122,6 +123,15 @@ def test_method_tag_column_on_every_view(seeded):
     ]
     for out in headers:
         assert "method" in out.splitlines()[0].split(",")
+
+
+def test_priced_via_column_where_text_footnotes(seeded):
+    """The receipt-pricing rung is a CSV column wherever the text view footnotes
+    it (roi + attrib, plan §4.5) — the spreadsheet sees the provenance too."""
+    root, _ = seeded
+    for out in (attribution.render_csv(attribution.attribute(root, "fix-handover-bug", POL)),
+                roi.render_csv(roi.by_tool(root, POL))):
+        assert "priced_via" in out.splitlines()[0].split(",")
 
 
 def test_attrib_csv_keeps_estimated_tag(proj):

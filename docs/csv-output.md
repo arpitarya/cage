@@ -44,17 +44,25 @@ text view's ⚠ UNPRICED warning — an understated total stays visible.
 ### `cage attrib --csv`
 
 ```
-tool, saved_tokens, saved_usd, method, confidence     (+ TOTAL row)
+tool, saved_tokens, saved_usd, method, confidence, priced_via     (+ TOTAL row)
 ```
+
+`priced_via` = the ladder rung that priced the step's call-less token receipts
+(`price_at` · `task-model` · `unpriced` — see `cage query receipt-pricing`);
+empty when every receipt is call-linked (the legacy task-model path).
 
 ### `cage roi --csv`
 
 ```
-tool, receipts, saved_usd, own_cost_usd, net_usd, added_latency_ms, method
+tool, receipts, saved_usd, own_cost_usd, net_usd, added_latency_ms, method,
+priced_via
 ```
 
 `method` = the least-trusted receipt behind the row (worst-case provenance,
-same rule as attrib).
+same rule as attrib). `priced_via` = every pricing path the row's token
+receipts took, sorted and `+`-joined (`call` = linked; `price_at`/`task-model`
+= ladder rungs; `unpriced` = rung-3 refusals — those also appear in the text
+view's ⚠ line).
 
 ### `cage compare --csv`
 

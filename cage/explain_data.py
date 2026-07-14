@@ -280,8 +280,11 @@ REGISTRY: tuple[Explanation, ...] = (
         "in-tool shim: the tool itself (e.g. fux) emits a receipt as it runs, so the\n"
         "  claim is first-party. External adapter: cage meters a third-party tool from\n"
         "  the outside (e.g. `cage graphify -- graphify query …`) without that tool\n"
-        "  knowing cage exists — the receipt is filed by cage's wrapper, not the tool.",
-        ("cage/schema.py", "cage/graphifymeter.py"),
+        "  knowing cage exists — the receipt is filed by cage's wrapper, not the tool.\n"
+        "  Dollars: a receipt linked to a call prices at that call's model; a\n"
+        "  call-less token receipt prices via the resolution ladder — see\n"
+        "  `receipt-pricing` (price_at → task-model → UNPRICED).",
+        ("cage/schema.py", "cage/graphifymeter.py", "cage/receiptprice.py"),
         "n/a — describes two receipt-filing strategies, not a number.",
         kind="concept", plan_ref="§4.5"),
     Explanation(
@@ -379,9 +382,34 @@ REGISTRY: tuple[Explanation, ...] = (
         "  (cage never fetches — no network on any cage code path), then\n"
         "  `cage prices set <provider> <model> --input … --output …` or, for a\n"
         "  router pseudo-model, `cage prices alias`. Caveat: self-costed rows\n"
-        "  (stored est_cost_usd) and receipts keep their recorded values.",
+        "  (stored est_cost_usd) and receipts keep their recorded values.\n"
+        "  Tool receipts refuse the same way: a call-less token receipt no ladder\n"
+        "  rung prices prints its own ⚠ line with a runnable fix —\n"
+        "  {unpriced_hint}\n"
+        "  (see `receipt-pricing` for the ladder).",
         ("cage/pricescmd.py", "cage/report.py", "cage/prices.py"),
         "n/a — the $0 is the absence of a number; fixing it makes the totals honest."),
+    Explanation(
+        "receipt-pricing", ("ladder", "call-less", "price_at", "tool-receipt",
+                            "task-model", "dominant", "rung", "graphify-dollars"),
+        "how a call-less token receipt resolves to dollars (the pricing ladder)",
+        "a token receipt with no resolvable call (graphify/fux shims — the saved\n"
+        "  tokens belong to future calls the shim can't know) prices by a\n"
+        "  deterministic ladder, resolved at derive time (never written back):\n"
+        "  1. price_at — explicit routing: [tools.<tool>] price_at = \"provider/model\",\n"
+        "     written by `cage prices route-tool <tool> --to <provider>/<model>`\n"
+        "     (this policy: {tool_routes}). A dangling route is UNPRICED, never a\n"
+        "     fall-through — the dangling-alias rule.\n"
+        "  2. task-model — the dominant model of the calls joined to the receipt's\n"
+        "     task (task-id calls + session-window adoptions): max Σ tokens_in,\n"
+        "     ties → call count → lexicographic provider/model (a total order).\n"
+        "  3. refusal — UNPRICED, loudly: {unpriced_hint}.\n"
+        "  The USD keeps the receipt's own method; the rung is footnoted in\n"
+        "  roi/attrib text and a `priced_via` CSV column. Receipts with a\n"
+        "  resolvable call never enter the ladder (their path is unchanged).",
+        ("cage/receiptprice.py", "cage/convert.py", "cage/roi.py"),
+        "inherits the receipt's method (modeled, never measured); the rung is "
+        "always visible."),
     Explanation(
         "repricing", ("repricing", "reprice", "retroactive", "derive-time",
                       "recompute", "price-change", "fleet-reprice", "back-price"),
@@ -404,6 +432,9 @@ REGISTRY: tuple[Explanation, ...] = (
         "    [--cache-read <$/Mtok>] — idempotent insert-or-update of a project row.\n"
         "  cage prices alias - copilot/auto --to anthropic/claude-sonnet-4-6 — route a\n"
         "    router pseudo-model ('-' is the empty provider such rows stamp).\n"
+        "  cage prices route-tool <tool> --to <provider>/<model> — price a tool's\n"
+        "    call-less token receipts (rung 1 of `receipt-pricing`; --remove deletes;\n"
+        "    a dangling target writes with a warning, unlike alias's refusal).\n"
         "  cage prices list — every visible row, bundled vs project, which wins.\n"
         "  cage prices sync — diff vs the installed bundle (dry-run; --update + --yes).\n"
         "  Research: cage never fetches a price — check the vendor's pricing page (or\n"

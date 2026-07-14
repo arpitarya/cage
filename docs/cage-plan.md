@@ -665,6 +665,15 @@ a total.
   byte-stable across sessions — churn it and you forfeit this receipt.
 - **Eliminated calls (response-cache / skipped).** `actual: 0`, full
   alternative cost saved, `method: "measured"`. The biggest wins are here.
+- **Call-less token receipts (v0.23).** A shim that saves tokens for *future*
+  calls (graphify/fux) files `unit: "tokens"` with a `task` but no `call` — no
+  model to price at. These price at derive time via the resolution ladder in
+  `receiptprice.py`: `[tools.<tool>] price_at` policy routing → the task's
+  dominant model (task-id + session-window calls; ties → call count →
+  lexicographic) → loudly UNPRICED (a wrong number is worse than none). The
+  USD keeps the receipt's own `method`; the rung is footnoted in text views
+  and a `priced_via` CSV column. Design detail: `docs/pricing.md` +
+  `cage query receipt-pricing`.
 
 ### 4.6 Tier-1 — the human baseline (agent vs human)
 

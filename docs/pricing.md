@@ -87,6 +87,50 @@ GitHub's own AI-Credits metering basis since June 2026. Only the bare router
 a router priced silently is a wrong number. (The bundle ships a commented-out
 alias example, never an active one.)
 
+## Tool receipts — the pricing ladder (v0.23)
+
+A savings receipt in `unit="tokens"` normally prices at its **linked call's**
+model. But a shim that saves tokens for *future* calls — graphify's interceptor,
+fux — files a receipt with a `task` and **no call id**: there is no model on the
+row, so pre-0.23 it rendered $0 silently. Call-less token receipts now resolve
+a pricing model at derive time via a deterministic ladder (`receiptprice.py`,
+one implementation for roi / attrib / verdict / report):
+
+1. **`price_at`** — explicit routing, written by the managed verb:
+
+   ```
+   $ cage prices route-tool graphify --to anthropic/claude-sonnet-4-6
+     ✔ [tools.graphify] written to the cage-managed block — .cage/policy.toml
+   $ cage prices route-tool graphify --remove     # idempotent delete
+   ```
+
+   (`[tools.graphify] price_at = "anthropic/claude-sonnet-4-6"` in the project
+   policy — a hand-added table outside the managed block is honored and, on the
+   next `route-tool`, edited in place with a `# cage:custom` mark, exactly like
+   `prices set`.) Validated against `policy.price_match` at use time. A dangling
+   route (no price row resolves) prices **nothing** and never falls through to
+   rung 2 — the same rule as a dangling alias — and is flagged in `cage prices
+   list` and `cage doctor`; unlike `alias`, `route-tool` *writes* a dangling
+   target with a warning, so set-route-then-add-price works.
+2. **task model** — the dominant model of the calls joined to the receipt's
+   task (task-id calls plus session-window adoptions, the `taskgroup` join):
+   max summed `tokens_in`; ties break by call count, then lexicographic
+   `provider/model` — a total order, so the winner never depends on row order.
+3. **refusal** — UNPRICED, loudly: roi and report print the ⚠ headline plus a
+   **runnable** fix per affected tool —
+   `run: cage prices route-tool <tool> --to <provider>/<model>  (or run in a
+   metered session)` — with the real tool name substituted. A wrong number is
+   worse than none.
+
+The resolved USD keeps the receipt's own `method` (`modeled` stays `modeled`,
+never `measured`); the rung is footnoted in text views (`≈ graphify priced at
+task model (anthropic/…)`) and is a `priced_via` column in `roi`/`attrib`
+CSV. Receipts **with** a resolvable call id never enter the ladder — their
+path is byte-identical to before. Derive-time only, like every cage price:
+`route-tool` today re-prices history without touching a ledger row. Routes are
+user intent — the bundled policy ships none, and `prices sync` never touches
+them.
+
 ## Credits vs prices — two layers, never mixed
 
 `[prices]` is dollars per token — the ledger's economics. `[credits.<provider>."<model>"]
@@ -101,6 +145,6 @@ provider dashboard" note.
 ---
 
 Ask the tool itself: `cage query prices-cli` · `cage query unpriced` ·
-`cage query pricing-match` · `cage query repricing` · `cage query effort-tiers` ·
-`cage query policy-versioning` · `cage query copilot-pricing` — all answered
-deterministically with live values.
+`cage query pricing-match` · `cage query repricing` · `cage query receipt-pricing` ·
+`cage query effort-tiers` · `cage query policy-versioning` ·
+`cage query copilot-pricing` — all answered deterministically with live values.

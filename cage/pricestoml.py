@@ -307,6 +307,44 @@ def set_alias(root: Path, provider: str, model: str, target: str) -> dict:
     return _write_table(root, ("alias", provider, model), {"to": target})
 
 
+def set_tool_route(root: Path, tool: str, target: str) -> dict:
+    """Idempotent insert-or-update of ``[tools.<tool>] price_at = ...`` — the
+    rung-1 route for call-less token receipts (plan §4.5)."""
+    return _write_table(root, ("tools", tool), {"price_at": target})
+
+
+def remove_tool_route(root: Path, tool: str) -> dict:
+    """Idempotent delete of ``[tools.<tool>]`` from the managed block."""
+    return remove_table(root, ("tools", tool))
+
+
+def remove_table(root: Path, path: tuple[str, ...]) -> dict:
+    """Delete one leaf table from the *managed block only*; returns
+    ``{"mode": "removed"|"absent", "before": dict|None}``.
+
+    A table living outside the block is user-owned text — cage edits values
+    in place on a write (`_write_table`) but never deletes a user's table:
+    that raises, naming the file, so the person deletes their own lines.
+    Absent everywhere ⇒ ``absent`` (idempotent re-runs are clean no-ops)."""
+    pol_path = _project_policy(root)
+    result = {"path": pol_path}
+    with lockutil.locked(paths.Footprint(root).state / "policy.lock"):
+        text, _ = parse(pol_path)
+        before_txt, body, after_txt = split_block(text)
+        outside_lines = (before_txt + after_txt).splitlines(keepends=True)
+        if find_table_span(outside_lines, path) is not None:
+            raise CageError(f"{table_header(*path)} was hand-added outside the "
+                            f"cage-managed block in {pol_path} — cage never deletes "
+                            f"your own text; remove those lines by hand")
+        block = _block_tables(body)
+        before_vals = block.pop(path, None)
+        if before_vals is None:
+            return {**result, "mode": "absent", "before": None}
+        new_text = _assemble(before_txt, block, after_txt, created=not text)
+        _atomic_write(pol_path, new_text)
+        return {**result, "mode": "removed", "before": before_vals}
+
+
 def update_meta(root: Path, meta: dict) -> dict:
     """Stamp ``[meta]`` in the project policy (in-place when it exists)."""
     return _write_table(root, ("meta",), dict(meta))

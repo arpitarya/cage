@@ -73,7 +73,8 @@ def compose(root: Path, pol: dict, tool: str, since: str | None = None,
         d["inputs"]["roi"] = {"available": True, "saved_usd": round(t["saved_usd"], 6),
                               "cost_usd": round(t["cost_usd"], 6), "net_usd": net,
                               "receipts": t["receipts"], "added_ms": t["added_ms"],
-                              "method": _worst_method(rcpts)}
+                              "method": _worst_method(rcpts),
+                              "priced_via": t.get("priced_via", [])}
     else:
         d["inputs"]["roi"] = {"available": False, "reason": "no receipts for this tool"}
 
@@ -88,7 +89,9 @@ def compose(root: Path, pol: dict, tool: str, since: str | None = None,
         d["inputs"]["attribution"] = {"available": True, "task": latest["task"],
                                       "saved_tokens": step["saved_tokens"],
                                       "saved_usd": step["saved_usd"],
-                                      "method": step["method"]}
+                                      "method": step["method"],
+                                      "priced_via": step.get("priced_via", ""),
+                                      "priced_model": step.get("priced_model", "")}
     else:
         d["inputs"]["attribution"] = {"available": False,
                                       "reason": "no task-linked receipt to attribute"}
@@ -166,16 +169,27 @@ def render_verdict(d: dict) -> str:
              "inputs (each with its own method tag):"]
     i = d["inputs"]
     a = i["attribution"]
-    lines.append(_line("marginal saving (attrib)", a,
-                       f"task {a.get('task', '')!r}: "
+    attrib_body = ""
+    if a["available"]:
+        attrib_body = (f"task {a.get('task', '')!r}: "
                        f"{a.get('saved_tokens', 0):,.0f} tok · "
-                       f"{render.usd(a.get('saved_usd', 0.0))}" if a["available"] else ""))
+                       f"{render.usd(a.get('saved_usd', 0.0))}")
+        if a.get("priced_via"):  # the ladder rung that priced it, named (plan §4.5)
+            attrib_body += f" · priced via {a['priced_via']}"
+            if a.get("priced_model"):
+                attrib_body += f" ({a['priced_model']})"
+    lines.append(_line("marginal saving (attrib)", a, attrib_body))
     r = i["roi"]
-    lines.append(_line("roi", r,
-                       f"saved {render.usd(r.get('saved_usd', 0.0))} − own cost "
-                       f"{render.usd(r.get('cost_usd', 0.0))} = net "
-                       f"{render.signed_usd(r.get('net_usd', 0.0))} over "
-                       f"{r.get('receipts', 0)} receipt(s)" if r["available"] else ""))
+    roi_body = ""
+    if r["available"]:
+        roi_body = (f"saved {render.usd(r.get('saved_usd', 0.0))} − own cost "
+                    f"{render.usd(r.get('cost_usd', 0.0))} = net "
+                    f"{render.signed_usd(r.get('net_usd', 0.0))} over "
+                    f"{r.get('receipts', 0)} receipt(s)")
+        rungs = [v for v in r.get("priced_via", []) if v != "call"]
+        if rungs:  # only ladder paths are worth naming; linked pricing is the norm
+            roi_body += f" · priced via {'+'.join(rungs)}"
+    lines.append(_line("roi", r, roi_body))
     t = i["trend"]
     lines.append(_line("trend (agent-vs-human, ledger-wide)", t,
                        f"saved $ {t.get('direction', '')} week-over-week"

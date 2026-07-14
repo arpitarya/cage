@@ -7,6 +7,12 @@ deterministic, independent of any AI tool.
 Design of record: [docs/cage-plan.md](docs/cage-plan.md). Read it before changing
 the substrate contract or the attribution engine.
 
+Maintainer handoff: [docs/maintainers-interview.md](docs/maintainers-interview.md)
+— the outgoing model's exit interview (intent, scar tissue, how to work with the
+human). **Every agent maintaining this repo reads it after this file; a departing
+maintainer appends its own lessons there.** It is context, never spec — where it
+disagrees with this file or the plan, this file and the plan win.
+
 ## Architecture (the one-way data flow)
 
 ```
@@ -78,7 +84,15 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
 - **Unit→USD** ([convert.py](cage/convert.py)) — the single dispatch for a receipt's
   `saved` in dollars: `usd` passthrough · `tokens` at model price · `minutes` at the
   human rate · `ms`/`gco2` → `$0`. `roi`/`attribution` route through it (one place
-  unit semantics live).
+  unit semantics live). A **call-less token receipt** (graphify/fux shims — a `task`
+  but no `call`) prices via the ladder in [receiptprice.py](cage/receiptprice.py)
+  (plan §4.5): `[tools.<tool>] price_at` (managed by `cage prices route-tool <tool>
+  --to <provider>/<model>`, `--remove` to delete; dangling targets write with a
+  warning, never priced) → dominant task model (ties: tokens_in → call count →
+  lexicographic) → loudly UNPRICED with a **runnable** per-tool fix line. One
+  implementation; roi/report/attrib/verdict thread the once-per-view `build()` join
+  through it; rung footnoted in text, `priced_via` in CSV; USD keeps the receipt's
+  method. Linked receipts never enter the ladder.
 - **Per-call cost** ([prices.py](cage/prices.py) `call_usd`) — `report`/`budget`
   **recompute** each call from `tokens × policy` at derive time, falling back to the
   stored `est_cost_usd` only when the model is unpriced. A token-only meter (the
@@ -292,7 +306,7 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
 ## Dev
 
 ```bash
-just test          # python -m pytest -q   (574 passing)
+just test          # python -m pytest -q   (601 passing)
 just demo          # seed §4.4 + print attrib/matrix
 cage --version
 ```

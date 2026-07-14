@@ -108,6 +108,12 @@ def _pricing(root: Path) -> tuple[str, str]:
         calls = ledger.calls(root)
     except Exception:  # noqa: BLE001 — a broken policy/ledger is reported by other checks
         return _OK, "no priced ledger to check yet"
+    from cage import receiptprice
+    dangling = receiptprice.dangling_routes(pol)
+    if dangling:  # a broken explicit route needs no calls to be wrong (plan §4.5)
+        broken = ", ".join(f"[tools.{t}] price_at = {v!r}" for t, v in dangling.items())
+        return _WARN, ("dangling tool route(s) — no price row resolves, the tool's "
+                       f"receipts stay UNPRICED: {broken}")
     if not calls:
         return _OK, "no calls recorded yet — nothing to price-check"
     unpriced, family = set(), set()

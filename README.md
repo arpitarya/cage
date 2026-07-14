@@ -214,7 +214,7 @@ cage export --csv calls --since 30d -o calls.csv   # raw ledger rows for a pivot
 
 ## The `$0` guarantee
 
-Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 574 tests passing; `cage demo` reproduces the worked attribution example against a real ledger.
+Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 601 tests passing; `cage demo` reproduces the worked attribution example against a real ledger.
 
 **Honest limits.** Cage doesn't decide your human rate — it prices minutes at a blended rate you set, and labels the result `estimated` so it never pretends to be a timesheet. Marginal-by-fixed-order is defensible and `$0`, but it is an *ordering convention*, not a Shapley value (that's a deferred audit mode). And a counterfactual cell is an honest reconstruction, never an invoice — the `method` column says so on every row, on purpose.
 
@@ -222,7 +222,7 @@ Every derived view is parse / arithmetic over the log — **no LLM call, ever, o
 
 Latest release below — full history and detail in [CHANGELOG.md](CHANGELOG.md).
 
-- **v0.22.2 — capture correctness: three bugs from the full test run.** The complete manual test plan ran against v0.22.1 (all four agents, real CLIs + VS Code extensions — [run record](docs/archive/v0.22.1-full-test-run.md)) and caught three capture bugs, all fixed with regression tests: a hook race that double-counted live Claude spend under dual wiring (now serialized under `import.lock`), graphify savings double-metered when graphify self-meters (the wrapper now defers; `CAGE_GRAPHIFY_METERED=1` handshake), and the broken `cage meter -- <cmd>` separator.
+- **v0.23.0 — tool-receipt pricing: dollars for call-less token receipts.** Graphify/fux-style receipts with a task but no call id now price via a deterministic ladder — `[tools.<tool>] price_at` policy routing → the task's dominant model → loudly UNPRICED — so `roi`/`attrib`/`verdict` show dollars, not just tokens, with the rung footnoted (and a `priced_via` CSV column). Historical derived savings numbers change (tokens now priced); linked receipts and `cage demo` stay byte-identical. `cage query receipt-pricing` explains.
 
 ## The name
 

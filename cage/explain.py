@@ -19,7 +19,7 @@ import re
 from dataclasses import asdict
 from pathlib import Path
 
-from cage import agents, attention, constants, paths, policy, schema
+from cage import agents, attention, constants, paths, policy, receiptprice, schema
 from cage.explain_data import REGISTRY
 from cage.explain_types import Explanation
 
@@ -73,6 +73,11 @@ def _live(pol: dict) -> dict:
         "cleanup_days": policy.cleanup_days(pol),
         "cleanup_on": "on" if policy.cleanup_enabled(pol) else "off",
         "import_before_export": "on" if policy.import_before_export(pol) else "off",
+        # tool-receipt pricing ladder (plan §4.5) — live from the resolved policy
+        "tool_routes": (", ".join(f"{t} → {v}"
+                                  for t, v in receiptprice.routes(pol).items())
+                        or "none configured"),
+        "unpriced_hint": receiptprice.UNPRICED_HINT,
     }
 
 

@@ -9,6 +9,10 @@ be cited as current spec.
 
 - [cage-plan.md](cage-plan.md) — the design of record: substrate contract,
   attribution engine, every plan-§ referenced from code and CLAUDE.md.
+- [maintainers-interview.md](maintainers-interview.md) — the maintainer
+  handoff: an outgoing model's exit interview (intent, scar tissue, working
+  with the human). Context for every future maintainer, never spec; departing
+  maintainers append their own lessons.
 
 ## Subsystem design docs
 

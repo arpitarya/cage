@@ -4,7 +4,7 @@
 Scaffolds a disposable repo *beside* the cage checkout, sandboxes every agent
 home (env overrides — nothing touches the real machine), plants the sanitized
 fixture corpus (`tests/fixtures/transcripts/`) in each agent's real log
-location, and runs the scenario matrix S1–S13, printing a pass/fail table.
+location, and runs the scenario matrix S1–S14, printing a pass/fail table.
 
 Same rules as `tools/skillgen`: **stdlib-only, never imported by cage at
 runtime, never in the wheel** (`pyproject` packages only `cage*`). It shells
@@ -915,6 +915,75 @@ def s13_pyz(base: Path) -> str:
     return f"zipapp labelled · demo+import ok · report deterministic · wheel↔pyz parity ({built})"
 
 
+# Seeder for S14 — call-less token receipts against every ladder rung (plan §4.5).
+# Fixed timestamps; the receipts deliberately carry no call id (the graphify-shim
+# shape) so pricing must resolve via the ladder, never the linked-call path.
+_S14_SEED = """
+import sys
+from pathlib import Path
+from cage import ledger, schema
+root = Path(sys.argv[1])
+def call(model, tin, task, ts):
+    ledger.append_row(root, "calls", schema.make_call(
+        route="chat", provider="anthropic", model=model, tokens_in=tin,
+        tokens_out=100, task=task, session=f"s-{task}", ts=ts, agent="claude-code"))
+def receipt(tool, task, ts):
+    ledger.append_row(root, "receipts", schema.make_receipt(
+        tool=tool, raw_alternative=10100, actual=100, task=task, ts=ts))
+# rung 2 plain: opus dominates t-r2 on tokens_in
+call("claude-opus-4-6", 6000, "t-r2", "2026-06-10T10:00:00Z")
+call("claude-sonnet-4-6", 4000, "t-r2", "2026-06-10T10:01:00Z")
+receipt("graphify", "t-r2", "2026-06-10T10:02:00Z")
+# rung 2 tie-break: tokens tied 5000-5000, sonnet wins on call count
+call("claude-opus-4-6", 5000, "t-tie", "2026-06-11T10:00:00Z")
+call("claude-sonnet-4-6", 2500, "t-tie", "2026-06-11T10:01:00Z")
+call("claude-sonnet-4-6", 2500, "t-tie", "2026-06-11T10:02:00Z")
+receipt("tiebreak", "t-tie", "2026-06-11T10:03:00Z")
+# rung 1: an explicit [tools.zed] price_at route (no calls at all on t-r1a)
+receipt("zed", "t-r1a", "2026-06-12T10:00:00Z")
+# rung 3: no route, no calls -> refuses, loudly
+receipt("fux", "t-orphan", "2026-06-13T10:00:00Z")
+"""
+
+
+def s14_receipt_ladder(base: Path) -> str:
+    """S14 — the tool-receipt pricing ladder (plan §4.5): call-less token receipts
+    price via [tools.<tool>] price_at (rung 1), the task's dominant model with
+    deterministic tie-breaks (rung 2), or refuse loudly (rung 3); the rung is
+    footnoted in text and a `priced_via` CSV column; byte-identical runs."""
+    repo, env = make_sandbox(base, "s14-receipt-ladder")
+    expect_ok(repo, env, "init")
+    routed = expect_ok(repo, env, "prices", "route-tool", "zed",
+                       "--to", "anthropic/claude-sonnet-4-6")
+    if "✔ [tools.zed]" not in routed:
+        raise Fail("prices route-tool did not confirm the write")
+    r = _sh([sys.executable, "-c", _S14_SEED, str(repo)], cwd=repo, env=env)
+    if r.returncode != 0:
+        raise Fail(f"S14 seeding failed: {r.stderr.strip()[:300]}")
+    out = expect_ok(repo, env, "roi")
+    for needle in (
+            "≈ zed priced via [tools.zed] price_at (anthropic/claude-sonnet-4-6)",
+            "≈ graphify priced at task model (anthropic/claude-opus-4-6)",
+            "≈ tiebreak priced at task model (anthropic/claude-sonnet-4-6)",
+            "⚠ 1 tool receipt(s) (10,000 tokens saved) UNPRICED — totals understated:",
+            "run: cage prices route-tool fux --to <provider>/<model>"
+            "  (or run in a metered session)"):
+        if needle not in out:
+            raise Fail(f"roi missing {needle!r}")
+    csv = expect_ok(repo, env, "roi", "--csv", "-")
+    header = csv.splitlines()[0]
+    if not header.endswith(",priced_via"):
+        raise Fail(f"roi --csv missing priced_via column: {header!r}")
+    if "zed,1,0.03,0,0.03,0,modeled,price_at" not in csv:
+        raise Fail("rung-1 CSV row wrong (10k tokens at $3/M must be $0.03)")
+    attrib = expect_ok(repo, env, "attrib", "--task", "t-r2")
+    if "≈ graphify priced at task model (anthropic/claude-opus-4-6)" not in attrib:
+        raise Fail("attrib missing the task-model footnote")
+    if expect_ok(repo, env, "roi") != out:
+        raise Fail("cage roi not byte-identical across two runs")
+    return "route via verb · 3 rungs + tie-break priced · UNPRICED hint runnable · byte-identical"
+
+
 # id → (phase that ships it, callable or None-if-pending)
 SCENARIOS: dict[str, tuple[str, object]] = {
     "S1": ("P0", s1_cli),
@@ -930,6 +999,7 @@ SCENARIOS: dict[str, tuple[str, object]] = {
     "S10": ("attention", s10_attention),
     "S12": ("restricted", s12_launcher),
     "S13": ("restricted", s13_pyz),
+    "S14": ("pricing", s14_receipt_ladder),
 }
 
 MANUAL_CHECKLIST = """\

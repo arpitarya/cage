@@ -200,3 +200,89 @@ def test_writes_resolve_to_active_ledger_root(proj, monkeypatch, capsys):
     assert cli.main(["prices", "set", "x", "m", "--input", "1", "--output", "2"]) == 0
     assert (gh / ".cage" / "policy.toml").exists()
     assert not (proj / ".cage").exists()
+
+
+# ── route-tool: the managed writer for [tools.<tool>] price_at (plan §4.5) ──────
+
+def _policy_text(root):
+    return (Footprint(root).policy).read_text(encoding="utf-8")
+
+
+def test_route_tool_write_update_remove_idempotent(root, capsys):
+    assert cli.main(["prices", "route-tool", "graphify",
+                     "--to", "anthropic/claude-sonnet-4-6"]) == 0
+    out = capsys.readouterr().out
+    assert "✔ [tools.graphify]" in out and "before: —" in out
+    assert 'after:  price_at = "anthropic/claude-sonnet-4-6"' in out
+    assert "rung 1" in out
+    text1 = _policy_text(root)
+    assert '[tools.graphify]' in text1 and 'price_at = "anthropic/claude-sonnet-4-6"' in text1
+    # idempotent re-run: "no change" printed, file bytes identical
+    assert cli.main(["prices", "route-tool", "graphify",
+                     "--to", "anthropic/claude-sonnet-4-6"]) == 0
+    assert "already routes to anthropic/claude-sonnet-4-6 — no change" in capsys.readouterr().out
+    assert _policy_text(root) == text1
+    # update to a new target prints before/after
+    assert cli.main(["prices", "route-tool", "graphify",
+                     "--to", "anthropic/claude-opus-4-6"]) == 0
+    out = capsys.readouterr().out
+    assert "before: anthropic/claude-sonnet-4-6" in out
+    assert 'after:  price_at = "anthropic/claude-opus-4-6"' in out
+    # remove, then remove again (idempotent no-op, exit 0)
+    assert cli.main(["prices", "route-tool", "graphify", "--remove"]) == 0
+    out = capsys.readouterr().out
+    assert "✔ [tools.graphify] removed" in out and "anthropic/claude-opus-4-6" in out
+    assert "[tools.graphify]" not in _policy_text(root)
+    assert cli.main(["prices", "route-tool", "graphify", "--remove"]) == 0
+    assert "has no route — nothing to remove" in capsys.readouterr().out
+
+
+def test_route_tool_dangling_target_warns_but_writes(root, capsys):
+    assert cli.main(["prices", "route-tool", "fux", "--to", "anthropic/mystery-9000"]) == 0
+    out = capsys.readouterr().out
+    assert "⚠ anthropic/mystery-9000 resolves no price row" in out
+    assert "stay UNPRICED" in out
+    assert 'price_at = "anthropic/mystery-9000"' in _policy_text(root)  # written anyway
+
+
+def test_route_tool_family_target_notes_match_kind(root, capsys):
+    # dotted id family-matches the dashed row — accepted, match kind named (§8)
+    assert cli.main(["prices", "route-tool", "fux",
+                     "--to", "anthropic/claude-sonnet-4.6"]) == 0
+    out = capsys.readouterr().out
+    assert "≈ target resolves by family via claude-sonnet-4-6" in out
+
+
+def test_route_tool_typed_errors(root, capsys):
+    for argv in (["prices", "route-tool"],                                  # no tool
+                 ["prices", "route-tool", "graphify"],                      # no --to
+                 ["prices", "route-tool", "graphify", "--to", "nomodel"],   # no slash
+                 ["prices", "route-tool", "graphify", "--to", "/m"],        # empty provider
+                 ["prices", "route-tool", "a b", "--to", "x/y"],            # not one token
+                 ["prices", "route-tool", "tools/../etc", "--to", "x/y"]):  # path-shaped
+        assert cli.main(argv) == 1
+        assert capsys.readouterr().err.startswith("error: ")
+
+
+def test_route_tool_hand_added_table_edited_in_place_with_custom_mark(root, capsys):
+    # mirror `prices set`: a user-owned [tools.x] outside the block is edited in
+    # place and marked # cage:custom — never duplicated into the managed block
+    pol = Footprint(root).policy
+    pol.write_text('[tools.zed]\nprice_at = "anthropic/claude-opus-4-6"\n', encoding="utf-8")
+    assert cli.main(["prices", "route-tool", "zed",
+                     "--to", "anthropic/claude-sonnet-4-6"]) == 0
+    assert "updated in place" in capsys.readouterr().out
+    text = _policy_text(root)
+    assert text.count("[tools.zed]") == 1 and pricestoml.CUSTOM_MARK in text
+    assert 'price_at = "anthropic/claude-sonnet-4-6"' in text
+    # --remove refuses to delete the user's own text, with a typed error
+    assert cli.main(["prices", "route-tool", "zed", "--remove"]) == 1
+    assert "hand-added outside" in capsys.readouterr().err
+
+
+def test_route_tool_visible_in_list_and_doctor_unchanged(root, capsys):
+    cli.main(["prices", "route-tool", "ghost", "--to", "anthropic/mystery-9000"])
+    capsys.readouterr()
+    assert cli.main(["prices", "list"]) == 0
+    out = capsys.readouterr().out
+    assert "ghost → anthropic/mystery-9000" in out and "⚠ dangling" in out

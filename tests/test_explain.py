@@ -112,7 +112,7 @@ def test_calculation_entries_unchanged_kind():
                 "confidence", "method-tags",
                 "trend", "budget", "compare-delta", "estimate-band", "calibration-hit-rate",
                 "verdict-composition", "study-pairing",
-                "pricing-match", "unpriced", "repricing"}
+                "pricing-match", "unpriced", "repricing", "receipt-pricing"}
     for e in explain.REGISTRY:
         if e.id in calc_ids:
             assert e.kind == "calculation"

@@ -49,7 +49,12 @@ def _span(rows: list[dict]) -> tuple[str, str] | None:
 
 def join(root: Path) -> dict[str, dict]:
     """``{task_id: {"calls": [...], "receipts": [...]}}`` per the join precedence."""
-    calls, receipts = ledger.calls(root), ledger.receipts(root)
+    return join_rows(ledger.calls(root), ledger.receipts(root))
+
+
+def join_rows(calls: list[dict], receipts: list[dict]) -> dict[str, dict]:
+    """The join over already-read rows — same contract as :func:`join`, for callers
+    that hold the ledger in hand (receipt pricing builds it once per view, §4.5)."""
     out: dict[str, dict] = {}
     for c in calls:
         if c.get("task"):

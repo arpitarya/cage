@@ -2,6 +2,59 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
+## v0.23.0 (2026-07-14) — tool-receipt pricing: dollars for call-less token receipts
+
+Built from: [docs/archive/v0.23-tool-receipt-pricing.handoff.md](docs/archive/v0.23-tool-receipt-pricing.handoff.md) ·
+[docs/archive/v0.23-tool-receipt-pricing.prompt.md](docs/archive/v0.23-tool-receipt-pricing.prompt.md) ·
+[docs/archive/v0.23-prices-route-tool.handoff.md](docs/archive/v0.23-prices-route-tool.handoff.md) ·
+[docs/archive/v0.23-prices-route-tool.prompt.md](docs/archive/v0.23-prices-route-tool.prompt.md)
+
+Graphify's interceptor and fux-style shims file token-savings receipts with a
+`task` but **no call id** — the saved tokens belong to future calls the shim
+can't know. Those receipts rendered tokens but priced $0. They now resolve a
+model at derive time via a deterministic **pricing ladder**
+(`cage/receiptprice.py`, one implementation for every consumer):
+
+1. **`[tools.<tool>] price_at = "provider/model"`** — explicit policy routing,
+   written by the managed verb **`cage prices route-tool <tool> --to
+   <provider>/<model>`** (`--remove` deletes; idempotent, before/after printed,
+   bundled policy untouched — completes the debated spec's rung-1 surface).
+   Validated against `policy.price_match` at use time: a dangling target
+   *writes with a warning* (set-route-then-add-price works; unlike `alias`,
+   which refuses), prices nothing, and never falls through (the dangling-alias
+   rule); `cage prices list` and `cage doctor` flag it.
+2. **task model** — the dominant model of the calls joined to the receipt's
+   task (task-id + session-window calls, the `taskgroup` join): max summed
+   `tokens_in`, ties → call count → lexicographic `provider/model` (a total
+   order, tested).
+3. **refusal** — UNPRICED, loudly: `roi` and `report` print the ⚠ headline
+   plus one **runnable** fix line per affected tool — `run: cage prices
+   route-tool <tool> --to <provider>/<model>  (or run in a metered session)` —
+   with the real tool name substituted (the fix-hint contract, tested
+   literally: copy the line, substitute the target, run it, dollars appear).
+
+Method law holds: the USD keeps the receipt's own `method` (`modeled`, never
+upgraded); the rung is footnoted in `roi`/`attrib` text (`≈ graphify priced at
+task model (anthropic/…)`), named by `cage verdict <tool>`, and is a
+`priced_via` column in `roi`/`attrib` CSV. A receipt whose call id doesn't
+resolve (a fleet bundle missing that call) enters the ladder instead of
+silently pricing $0.
+
+**Historical derived numbers change (that's the feature):** ledgers with
+call-less token receipts now show non-zero dollars in `roi`, `attrib`,
+`verdict`, `report --by task/agent` saved columns, and the bare-`cage`
+overview. Receipts with a resolvable call id — and `cage demo`'s §4.4
+tables — are byte-identical to before. Derive-time only: no ledger row is
+ever written or rewritten, so setting `price_at` re-prices history.
+
+Also: `cage query receipt-pricing` explains the ladder with live policy
+values; `docs/pricing.md` gains the "Tool receipts" section; plan §4.5 notes
+the shape; dummyrepo scenario S14 sets its route via the verb and exercises
+all three rungs + the tie-break end-to-end through the CLI. Routes are user
+intent: the bundled policy ships none (tested) and `prices sync` never
+touches them; a hand-added `[tools.<tool>]` table is edited in place with a
+`# cage:custom` mark, exactly like `prices set`.
+
 ## v0.22.2 (2026-07-12) — capture correctness: three bugs from the v0.22.1 full test run
 
 The full sibling-repo test plan (`docs/full-test-plan-sibling-repo.md`) was executed
