@@ -1188,11 +1188,12 @@ def s17_sources(base: Path) -> str:
     shutil.copyfile(CORPUS / "claude" / "cli" / "session-c1a2b3.jsonl",
                     logs / "session-c1a2b3.jsonl")
 
-    # Append a custom tool + a rejected glob entry to the project policy.
+    # Append a custom tool + a rejected glob entry to the project policy. as_posix()
+    # keeps the path a valid TOML basic string on Windows (a raw `\` is a TOML escape).
     pol = repo / ".cage" / "policy.toml"
     pol.write_text(pol.read_text(encoding="utf-8")
-                   + f'\n[sources.myrouter]\npaths = ["{logs}"]\nformat = "claude"\n'
-                   + f'\n[sources.claude]\npaths = ["{repo}/glob-*.jsonl"]\n',
+                   + f'\n[sources.myrouter]\npaths = ["{logs.as_posix()}"]\nformat = "claude"\n'
+                   + f'\n[sources.claude]\npaths = ["{repo.as_posix()}/glob-*.jsonl"]\n',
                    encoding="utf-8")
 
     expect_ok(repo, env, "import")

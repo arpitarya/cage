@@ -60,6 +60,10 @@ def run(proj, monkeypatch, capsys):
             # normalize to a placeholder so the golden stays byte-stable.
             for raw in {str(proj.resolve()), str(proj)}:
                 out = out.replace(raw, "<project>")
+            # Goldens are OS-independent doc artifacts; a Windows-native path prints
+            # `<project>\.cage\policy.toml`. Fold separators to `/` so the one blessed
+            # golden matches every OS (no golden legitimately contains a backslash).
+            out = out.replace("\\", "/")
             _check(name, argv, out)
             return out
         _go.root = proj

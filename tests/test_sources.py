@@ -170,7 +170,9 @@ def test_custom_tool_imports_and_stamps_agent_name(monkeypatch, tmp_path):
     (logs / "session-r1.jsonl").write_text(_claude_line("cu1", 200, 40) + "\n",
                                            encoding="utf-8")
     root = tmp_path / "proj"
-    _write_policy(root, f'[sources.myrouter]\npaths = ["{logs}"]\nformat = "claude"\n')
+    # as_posix() keeps the path a valid TOML basic string on Windows (a raw `\` is a
+    # TOML escape); Path() accepts forward slashes on every OS.
+    _write_policy(root, f'[sources.myrouter]\npaths = ["{logs.as_posix()}"]\nformat = "claude"\n')
     monkeypatch.chdir(root)
 
     lines = importcmd.run(root, "all", _imp_args())
@@ -189,7 +191,7 @@ def test_custom_tool_cursor_incremental(monkeypatch, tmp_path):
     logs.mkdir()
     (logs / "s.jsonl").write_text(_claude_line("c1", 10, 5) + "\n", encoding="utf-8")
     root = tmp_path / "proj"
-    _write_policy(root, f'[sources.myrouter]\npaths = ["{logs}"]\nformat = "claude"\n')
+    _write_policy(root, f'[sources.myrouter]\npaths = ["{logs.as_posix()}"]\nformat = "claude"\n')
     monkeypatch.chdir(root)
 
     importcmd.run(root, "all", _imp_args())
