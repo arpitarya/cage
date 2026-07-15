@@ -21,13 +21,13 @@ setup with the built-in health check — never eyeball files yourself.
      `bin/` not yet on PATH in this shell). Cage still works.
    - `✗ fail` — broken (no `.cage/`, policy won't parse, ledger not writable).
 3. **Map each finding to the fix**, don't just relay it:
-   - `footprint ✗ no .cage/` → run **`cage setup`** (guided) or `cage init` (scaffold only).
+   - `footprint ✗ no .cage/` → run **`cage setup`** (scaffolds + wires).
    - `hooks · none wired` → `cage setup` (wizard) or `cage setup --wire-only --<agent>` (wiring is opt-in).
    - `interceptor · bin/ not on PATH` → tell the user to open a new shell (the PATH
      line was added to their shell rc).
    - `policy ✗` / `ledger ✗` → surface the exact error string from the detail.
 4. If everything is `✔`/`·`, say Cage is working and point at `cage report` /
-   `cage matrix` / `cage doctor` for ongoing use.
+   `cage insights matrix` / `cage doctor` for ongoing use.
 5. For a shareable bug report, run `cage doctor --bundle` — it writes one **redacted**
    diagnostics archive (counts-never-content: doctor output, the metadata-only debug
    log + heartbeats, version/platform, footprint paths with row *counts*, policy

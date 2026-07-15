@@ -4,6 +4,15 @@ from __future__ import annotations
 import datetime as _dt
 
 
+def cmd(tail: str) -> str:
+    """The canonical ``cage <tail>`` spelling for an emitted hint string. Every
+    runtime hint that names a cage subcommand routes through here (plan Phase 3 §5),
+    so the CLI verb map has one indirection point instead of scattered string
+    literals — and the `cage <old-verb>` grep gate stays meaningful. ``tail`` is the
+    post-`cage ` invocation, e.g. ``cmd("insights attrib")`` → ``"cage insights attrib"``."""
+    return f"cage {tail}"
+
+
 def scheduler_hint() -> str:
     """The OS-appropriate example line for user-owned capture automation — printed,
     never installed (cage law: no launchd/systemd/cron/schtasks registration)."""
@@ -34,8 +43,21 @@ def ago(ts: str) -> str:
         return ""
 
 
+def age_seconds(ts: str) -> int | None:
+    """Whole seconds since an ISO timestamp; fail-open to ``None``. The clock
+    carve-out behind :func:`ago` (advice text, never a derived-from-ledger
+    figure) — used to *gate* the "last import: N ago" advice line the same way
+    `ago` words it (plan Phase 1.6)."""
+    try:
+        when = _dt.datetime.fromisoformat(ts)
+        now = _dt.datetime.now(when.tzinfo)
+        return max(0, int((now - when).total_seconds()))
+    except Exception:  # noqa: BLE001 — display-only, never raise
+        return None
+
+
 def envelope(command: str, data) -> dict:
-    """The versioned ``cage.v1`` machine envelope (introduced for ``cage limits --json``;
+    """The versioned ``cage.v1`` machine envelope (introduced for ``cage data limits --json``;
     a wider rollout is a separate packet). ``generatedAt`` is wall-clock *metadata*, never
     a derived-from-ledger figure, so the ``data`` payload stays deterministic (same ledger
     + policy ⇒ same ``data``)."""

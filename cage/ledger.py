@@ -133,7 +133,7 @@ def _warn_if_large(foot, shards: list[Path]) -> None:
             _warned_dirs.add(key)
             print(f"cage: ledger is {total / 1_000_000:.0f} MB across {len(shards)} "
                   f"shard(s) — derives stay fast but history is unbounded; archive old "
-                  f"*-YYYY-MM.jsonl shards or run `cage ledger-sync` then prune.",
+                  f"*-YYYY-MM.jsonl shards or run `cage authorship ledger-sync` then prune.",
                   file=sys.stderr)
     except Exception:  # noqa: BLE001 — the warning must never perturb a read
         return

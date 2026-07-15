@@ -1,0 +1,11 @@
+$ cage report --by agent
+Ledger by agent
+
+agent   calls   tok in  tok out  saved tok
+------  -----  -------  -------  ---------
+claude      1  912,400   61,200     80,000
+TOTAL       1  912,400   61,200     80,000
+
+· last import: 3d ago — `cage import` to refresh
+· bundled prices are 61 days old — check for a newer cage release
+  (`cage query prices-freshness` explains)

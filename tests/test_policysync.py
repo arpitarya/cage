@@ -53,8 +53,9 @@ def v016(root):
 def test_neutrality_apply_keeps_every_derived_view_byte_identical(v016, seeded, capsys):
     """Zero-customization project: --apply must not change one byte of any
     derived view — adds only pin defaults `policy.load` was already using."""
-    views = [["report"], ["report", "--by", "model"], ["attrib"], ["budget"],
-             ["human"], ["trend"], ["matrix"]]
+    views = [["report"], ["report", "--by", "model"], ["insights", "attrib"],
+             ["insights", "budget"], ["human", "show"], ["insights", "trend"],
+             ["insights", "matrix"]]
 
     def snap():
         outs = []
@@ -247,7 +248,7 @@ def test_already_in_sync_message_on_current_file(root, capsys):
 def test_no_project_policy_points_at_init(root, capsys):
     assert cli.main(["policy", "sync", "--apply"]) == 0
     out = capsys.readouterr().out
-    assert "no project policy.toml" in out and "cage init" in out
+    assert "no project policy.toml" in out and "cage setup" in out
 
 
 def test_corrupt_project_policy_is_a_typed_error(root, capsys):
@@ -338,9 +339,8 @@ def test_freshness_policy_line_is_opt_in_report_footer_stays_clean(v016, seeded,
 
 
 def test_init_stamps_policy_version_and_prints_pointer(root, capsys):
-    assert cli.main(["init"]) == 0
-    out = capsys.readouterr().out
-    assert "`cage policy sync` shows them" in out
+    # init merged into setup (Phase 3): the scaffold half stamps the bundled policy_version.
+    assert cli.main(["setup", "--project-only", "--no-graphify"]) == 0
     assert policy.load_project_raw(_policy_path(root))["meta"]["policy_version"] == \
         policy.bundled_raw()["meta"]["policy_version"]
 

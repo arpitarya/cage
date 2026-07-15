@@ -114,12 +114,18 @@ def render_csv(data: dict) -> str:
 
 def render_attrib(data: dict) -> str:
     from cage import receiptprice
+    from cage.display import DASH
     if not data["steps"]:
         return f"cage: no receipts for task {data['task']!r}."
-    rows = [[s["tool"], render.tok(s["saved_tokens"]), render.usd(s["saved_usd"]),
+    # `—` is the only rendering of "couldn't price" (plan Phase 1.1): a rung-3
+    # refusal keeps its measured tokens but never wears a $0.0000.
+    rows = [[s["tool"], render.tok(s["saved_tokens"]),
+             DASH if s.get("priced_via") == "unpriced" else render.usd(s["saved_usd"]),
              s["method"]] for s in data["steps"]]
-    rows.append(["TOTAL", render.tok(data["total_saved_tokens"]),
-                 render.usd(data["total_saved_usd"]), ""])
+    total_usd = render.usd(data["total_saved_usd"])
+    if any(s.get("priced_via") == "unpriced" for s in data["steps"]):
+        total_usd += " (+ unpriced)"
+    rows.append(["TOTAL", render.tok(data["total_saved_tokens"]), total_usd, ""])
     body = render.table(["tool", "saved tok", "saved $", "method"], rows, rights={1, 2})
     where = f"{data['provider']}/{data['model']}" if data["model"] else "unpriced model"
     out = f"Marginal attribution · task {data['task']!r} · {where}\n\n{body}"

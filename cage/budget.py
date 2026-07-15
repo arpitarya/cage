@@ -1,4 +1,4 @@
-"""`cage budget` + the Cage guard — ceilings per session / day (plan §8.1).
+"""`cage insights budget` + the Cage guard — ceilings per session / day (plan §8.1).
 
 Sums recorded spend against `policy.budgets` and reports headroom. `on_exceed`
 is advisory here (`warn`); the in-path guard (`check`) is the enforcement hook a

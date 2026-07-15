@@ -133,7 +133,7 @@ the agent session itself. Silence is the only safe behavior on the hook path;
 
 **Does this change capture behavior?**
 No. Hooks remain an optional real-time add-on (CLI clients only); `cage
-import`/`cage export` stay the universal path. The shim only changes *how
+import`/`cage data export` stay the universal path. The shim only changes *how
 wired commands find cage*, not what they do.
 
 **What about the ledger numbers?**

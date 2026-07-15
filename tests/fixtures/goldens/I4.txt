@@ -1,0 +1,6 @@
+$ cage insights verdict fux
+VERDICT: INSUFFICIENT DATA — no receipts recorded for 'fux'.
+
+A verdict composes recorded receipts; teach the tool to emit them (`cage query receipts`), then re-run.
+
+total cost: agent $12.4308 + human — (no attested minutes and no turn-gap data in scope; only logs with per-turn timestamps carry gap_ms)

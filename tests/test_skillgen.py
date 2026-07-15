@@ -88,7 +88,7 @@ def test_anchor_lines_per_host(platforms, key):
     """Each host retains cage's non-negotiable lines: the command references and
     the counts-never-content / PII-safe claim."""
     body = gen.render(platforms[key])[0].content
-    for cmd in ("cage report", "cage attrib", "cage budget", "cage matrix", "cage roi"):
+    for cmd in ("cage report", "cage insights attrib", "cage insights budget", "cage insights matrix", "cage insights roi"):
         assert cmd in body, f"{key} dropped command anchor {cmd!r}"
     assert "counts" in body and "never prompt bodies" in body, f"{key} dropped the PII claim"
     assert "PII-safe" in body, f"{key} dropped the PII-safe claim"

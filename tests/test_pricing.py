@@ -58,7 +58,9 @@ def test_unknown_model_reports_unpriced_not_zero_dollars(proj):
     rep = report.summarize(proj, POL, dim="model")
     assert rep["total"]["usd"] == 0.0
     assert "anthropic/claude-mystery-9" in rep["unpriced"]
-    assert "UNPRICED" in report.render_report(rep)
+    from cage import display
+    assert "UNPRICED" in report.render_report(rep, disp=display.Display(usd=True))
+    assert "unpriced — matters when you view $" in report.render_report(rep)
 
 
 def test_family_priced_call_is_flagged_approximate(proj):
@@ -68,7 +70,9 @@ def test_family_priced_call_is_flagged_approximate(proj):
     rep = report.summarize(proj, POL, dim="model")
     assert rep["total"]["usd"] == pytest.approx(3.30, abs=1e-6)  # priced by family
     assert rep["family"].get("claude-sonnet-4-5-20250929") == "claude-sonnet-4-5"
-    assert "priced by family" in report.render_report(rep)
+    from cage import display
+    assert "priced by family" in report.render_report(rep, disp=display.Display(usd=True))
+    assert "priced by family" not in report.render_report(rep)  # $ footnotes live in the $ view
     assert not rep["unpriced"]
 
 

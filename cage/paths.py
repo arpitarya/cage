@@ -6,6 +6,7 @@ import re
 import shutil
 import sys
 from pathlib import Path
+from typing import NamedTuple
 
 
 def cage_bin() -> str:
@@ -107,7 +108,7 @@ def find_project_root(start: Path | None = None) -> Path | None:
     plan §3.7) is deliberately *not* a project: it is the fallback capture sink,
     a separate tier of the resolution precedence (override → project → global).
     Without this exclusion, any dir under ``$HOME`` on a machine with a global
-    ledger resolves to ``~`` as its "project" — `cage init` then re-inits the
+    ledger resolves to ``~`` as its "project" — `cage setup` then re-inits the
     global instead of scaffolding the new project's own ``.cage/``, and doctor
     mislabels the global sink as ``project (.cage/)``."""
     cur = (start or Path.cwd()).resolve()
@@ -267,12 +268,12 @@ def kiro_token_log() -> Path:
     return _first_existing(kiro_data_candidates()) / "dev_data" / "tokens_generated.jsonl"
 
 
-def agent_log_sources(agent: str) -> list[tuple[Path, str]]:
-    """The single registry of candidate ``(source, glob)`` log locations per agent —
-    what `importcmd` scans and `cage doctor --paths` probes. One list per agent so a
-    new location (like Copilot's VS Code chat-session store) is added exactly once.
-    For claude/codex/copilot the source is a directory + glob; for kiro it is the
-    token log file itself (glob ``*`` — `_scan` treats a file source as itself)."""
+def _builtin_log_sources(agent: str) -> list[tuple[Path, str]]:
+    """The hard-coded ``(source, glob)`` candidate log locations per agent — one list
+    per agent so a new location (like Copilot's VS Code chat-session store) is added
+    exactly once. For claude/codex/copilot the source is a directory + glob; for kiro
+    it is the token log file itself (glob ``*`` — `_scan` treats a file source as
+    itself). The policy-aware, provenance-tagged form is :func:`resolve_log_sources`."""
     if agent == "claude":
         return [(claude_home() / "projects", "**/*.jsonl")]
     if agent == "codex":
@@ -283,6 +284,152 @@ def agent_log_sources(agent: str) -> list[tuple[Path, str]]:
     if agent == "kiro":
         return [(kiro_token_log(), "*")]
     return []
+
+
+# ── configurable import paths: the `[sources]` policy table (plan Phase 4) ──────
+# A user can add (or replace) the log locations `cage import` probes — one or more
+# paths per built-in agent, plus *custom tools* that reuse a declared parser format.
+# Resolution happens in ONE place (:func:`resolve_log_sources`); the import sweep and
+# `cage doctor --paths` both consume its provenance-tagged form. Additive: no
+# `[sources]` ⇒ the built-in registry byte-for-byte, so capture is unchanged for
+# everyone who doesn't use it (docs/sources.md).
+
+class LogSource(NamedTuple):
+    """One candidate log location, tagged with where it came from. ``provenance`` is
+    ``built-in`` (the hard-coded registry) · ``env`` (a built-in home an env override
+    redirected, e.g. ``CLAUDE_CONFIG_DIR``) · ``policy`` (a ``[sources]`` addition).
+    ``agent`` is the row stamp — a built-in agent name, or a custom tool's name;
+    ``fmt`` is the parser format ∈ ``agents.SURFACES``. ``raw`` is the original
+    policy string before ``~``/env expansion (``str(path)`` for built-ins) — the
+    portability check reads it to tell a machine-absolute path from a ``~``/``$VAR``
+    one."""
+    path: Path
+    glob: str
+    provenance: str
+    agent: str
+    fmt: str
+    raw: str
+
+
+class SourcesResolution(NamedTuple):
+    """The whole resolved picture: every ``sources`` to scan, any ``problems`` (bad
+    entries — skipped, never raised: the sweep is fail-open), and the ``disabled``
+    agents (a ``replace = true`` table with empty ``paths`` — capture deliberately
+    silenced, shown as such in doctor, handoff §10)."""
+    sources: list  # list[LogSource]
+    problems: list  # list[str]
+    disabled: list  # agent names disabled by replace+empty
+
+
+# One canonical glob per parser format for a *policy-declared* directory (a built-in
+# copilot has two globs; a policy path uses the dominant CLI form). A file source is
+# taken directly (`_scan` ignores the glob for a file).
+_FORMAT_GLOB = {"claude": "**/*.jsonl", "codex": "**/rollout-*.jsonl",
+                "copilot": "*/events.jsonl", "kiro": "*"}
+# Per-agent home env overrides — a built-in candidate is tagged ``env`` when any is set.
+_AGENT_ENV = {"claude": ("CLAUDE_CONFIG_DIR",), "codex": ("CODEX_HOME",),
+              "copilot": ("COPILOT_HOME", "CAGE_VSCODE_USER"),
+              "kiro": ("KIRO_HOME", "KIRO_DATA_DIR")}
+_GLOB_CHARS = frozenset("*?[")
+
+
+def _agent_env_set(agent: str) -> bool:
+    return any(os.environ.get(v) for v in _AGENT_ENV.get(agent, ()))
+
+
+def _expand_source(s: str) -> str:
+    """``~`` + ``$VAR`` expansion for a policy path (local filesystem only — no glob,
+    no remote). Left as-is when not a string caller (validated upstream)."""
+    return os.path.expandvars(os.path.expanduser(s))
+
+
+def resolve_log_sources(pol: dict | None = None) -> SourcesResolution:
+    """THE resolution point for import locations (plan Phase 4). Returns the
+    provenance-tagged candidate list the import sweep and `cage doctor --paths` both
+    consume — no second resolver anywhere.
+
+    Precedence per built-in agent: **env override > policy `[sources]` > built-in**.
+    A ``[sources.<agent>] paths = [...]`` *adds* candidates (tagged ``policy``);
+    ``replace = true`` drops that agent's built-ins first (empty ``paths`` then =
+    disabled). A policy path equal to a built-in path is deduped to the built-in tag.
+    A ``[sources.<name>]`` whose ``<name>`` is not one of the four agents is a custom
+    tool: it must declare ``format = "claude|codex|copilot|kiro"`` (the parser to
+    reuse) and its rows stamp ``agent = <name>``. ``~``/``$VAR`` expand; a glob-shaped
+    entry is rejected into ``problems`` (never raised — the sweep stays fail-open).
+    Fully additive: an empty/absent ``[sources]`` returns exactly the built-in
+    registry."""
+    from cage import agents  # lazy: agents imports paths (avoid the cycle)
+    surfaces = agents.SURFACES
+    src_tables = (pol or {}).get("sources", {}) if isinstance(pol, dict) else {}
+
+    sources: list[LogSource] = []
+    problems: list[str] = []
+    disabled: list[str] = []
+
+    def _policy_paths(key: str, table: dict, fmt: str) -> None:
+        raw_paths = table.get("paths", [])
+        if not isinstance(raw_paths, list) or any(not isinstance(p, str) for p in raw_paths):
+            problems.append(f"[sources.{key}] paths must be a list of strings")
+            return
+        seen = {(s.path, s.glob) for s in sources if s.agent == key}
+        for raw in raw_paths:
+            if _GLOB_CHARS & set(raw):
+                problems.append(f"[sources.{key}] path {raw!r} contains a glob "
+                                "character (*?[) — list concrete files or directories")
+                continue
+            p = Path(_expand_source(raw))
+            key_pair = (p, _FORMAT_GLOB[fmt])
+            if key_pair in seen:  # policy path == a built-in path → keep built-in tag (§8)
+                continue
+            seen.add(key_pair)
+            sources.append(LogSource(p, _FORMAT_GLOB[fmt], "policy", key, fmt, raw))
+
+    # Built-in agents first, in SURFACES order: built-in/env candidates, then adds.
+    for agent in surfaces:
+        table = src_tables.get(agent)
+        replace = bool(isinstance(table, dict) and table.get("replace"))
+        if isinstance(table, dict) and table.get("format") not in (None, agent):
+            problems.append(f"[sources.{agent}] is the {agent} agent table — its "
+                            "format is implicit; drop the `format` key (a custom tool "
+                            "uses a different name)")
+        if not replace:
+            prov = "env" if _agent_env_set(agent) else "built-in"
+            for path, glob in _builtin_log_sources(agent):
+                sources.append(LogSource(path, glob, prov, agent, agent, str(path)))
+        if isinstance(table, dict):
+            _policy_paths(agent, table, agent)
+            if replace and not any(s.agent == agent for s in sources):
+                disabled.append(agent)
+
+    # Custom tools: any `[sources.<name>]` whose name is not one of the four agents.
+    for name in sorted(k for k in src_tables if k not in surfaces):
+        table = src_tables[name]
+        if not isinstance(table, dict):
+            problems.append(f"[sources.{name}] must be a table")
+            continue
+        fmt = table.get("format")
+        if fmt not in _FORMAT_GLOB:
+            problems.append(f"[sources.{name}] is a custom tool — it needs "
+                            "format = \"claude|codex|copilot|kiro\" (the parser to reuse)")
+            continue
+        _policy_paths(name, table, fmt)
+
+    return SourcesResolution(sources, problems, disabled)
+
+
+def agent_log_sources(agent: str, pol: dict | None = None) -> list[LogSource]:
+    """The candidate log locations for one built-in agent — the built-in registry plus
+    any `[sources.<agent>]` policy additions (see :func:`resolve_log_sources`). A thin
+    view over the single resolver so the import sweep and doctor share one resolution.
+    Byte-identical to the legacy built-in list when ``pol`` carries no ``[sources]``."""
+    return [s for s in resolve_log_sources(pol).sources if s.agent == agent]
+
+
+def custom_tool_sources(pol: dict | None = None) -> list[LogSource]:
+    """The `[sources.<name>]` custom-tool sources (name ∉ the four agents) — each
+    reuses a declared parser ``fmt`` and stamps ``agent = <name>`` on imported rows."""
+    from cage import agents
+    return [s for s in resolve_log_sources(pol).sources if s.agent not in agents.SURFACES]
 
 
 class Footprint:
@@ -347,7 +494,7 @@ class Footprint:
     @property
     def study(self) -> Path:
         """Fleet-study phase markers (`cage study start/stop`, plan §4.9) — a small
-        append-only jsonl beside the ledger files (it travels inside `cage export
+        append-only jsonl beside the ledger files (it travels inside `cage data export
         --study` bundles). Unpartitioned by design, like `provenance.jsonl`: a study
         is weeks, not years."""
         return self.ledger / "study.jsonl"

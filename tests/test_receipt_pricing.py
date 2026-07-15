@@ -150,9 +150,11 @@ def test_report_saved_reconciles_and_warns(proj):
     _callless_receipt(proj, task="t-orphan", tool="fux")
     rep = report.summarize(proj, POL, dim="task")
     assert rep["unpriced_receipts"] == {"receipts": 1, "tokens": 10_000, "tools": ["fux"]}
-    text = report.render_report(rep)
+    from cage import display
+    text = report.render_report(rep, disp=display.Display(usd=True))  # ⚠ = $ view
     assert "tokens saved) UNPRICED — totals understated:" in text
     assert "run: cage prices route-tool fux --to <provider>/<model>" in text
+    assert "UNPRICED" not in report.render_report(rep)  # token view: no ⚠ block
 
 
 def test_overview_saved_includes_ladder(proj):

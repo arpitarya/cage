@@ -1,4 +1,4 @@
-"""`cage roi` — saved $ per tool vs the tool's own cost + added latency (plan §7, §8).
+"""`cage insights roi` — saved $ per tool vs the tool's own cost + added latency (plan §7, §8).
 
 ROI per tool, not just a total: a deterministic tool (fux, graphify) saves at $0
 of its own cost; an optional ML tool may save more but adds latency. A tool's own
@@ -82,14 +82,21 @@ def render_csv(data: dict) -> str:
 
 
 def render_roi(data: dict) -> str:
+    from cage.display import DASH
     if not data["tools"]:
         return "cage: no receipts recorded yet — teach your tools to emit them."
     rows = []
     notes = []
     for name, t in sorted(data["tools"].items(), key=lambda kv: -kv[1]["saved_usd"]):
         net = t["saved_usd"] - t["cost_usd"]
-        rows.append([name, render.usd(t["saved_usd"]), render.usd(t["cost_usd"]),
-                     render.usd(net), f"{t['added_ms']:,} ms"])
+        # A tool whose every receipt refused to price (rung 3) has no dollar
+        # measure at all — `—`, never a $0.0000 that reads "saved nothing".
+        if t["priced_via"] == ["unpriced"] and not t["saved_usd"]:
+            saved_cell, net_cell = DASH, DASH
+        else:
+            saved_cell, net_cell = render.usd(t["saved_usd"]), render.usd(net)
+        rows.append([name, saved_cell, render.usd(t["cost_usd"]),
+                     net_cell, f"{t['added_ms']:,} ms"])
         notes += [receiptprice.footnote(rung, name, key) for rung, key in t["rung_models"]]
     title = "ROI by tool" + (f" (since {data['since']})" if data["since"] else "")
     out = f"{title}\n\n" + render.table(

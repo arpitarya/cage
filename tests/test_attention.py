@@ -189,12 +189,12 @@ def test_outcome_minutes_writes_the_attested_receipt(proj, monkeypatch, capsys):
     monkeypatch.chdir(proj)
     metering._policy_for.cache_clear()
     _call(proj, "t1")
-    assert cli.main(["outcome", "t1", "--minutes", "25"]) == 0
+    assert cli.main(["human", "outcome", "t1", "--minutes", "25"]) == 0
     humans = [r for r in ledger.receipts(proj) if r["tool"] == "human"]
     assert len(humans) == 1
     assert humans[0]["unit"] == "minutes" and humans[0]["raw_alternative"] == 25.0
     assert humans[0]["method"] == "estimated"
-    assert cli.main(["outcome", "t1", "--minutes", "25"]) == 0   # replay → no double count
+    assert cli.main(["human", "outcome", "t1", "--minutes", "25"]) == 0   # replay → no double count
     assert len([r for r in ledger.receipts(proj) if r["tool"] == "human"]) == 1
     assert "no double count" in capsys.readouterr().out
 

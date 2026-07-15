@@ -1,4 +1,4 @@
-"""`cage why <call-id>` — full provenance: the call + every receipt against it (plan §7)."""
+"""`cage insights why <call-id>` — full provenance: the call + every receipt against it (plan §7)."""
 from __future__ import annotations
 
 from pathlib import Path

@@ -6,8 +6,8 @@ double-counts:
 
 - **Stop** (`cage hook-stop`) is the **real-time** path: it fires when Claude finishes
   each turn and imports that turn's tokens immediately — no wait for session end.
-- **SessionStart** backfills the previous Claude session (`cage import-claude
-  --project .`), then prints the spend banner (`cage hook-session-start`). Claude only —
+- **SessionStart** backfills the previous Claude session (`cage import --agent
+  claude --project .`), then prints the spend banner (`cage hook-session-start`). Claude only —
   each agent captures its own data via its own wire file; this never imports another
   agent's logs.
 - **SessionEnd** (`cage hook-session-end`) stays wired too, but it is best-effort:
@@ -49,7 +49,7 @@ def _shim() -> str:
 # SessionStart runs in order: backfill the previous Claude session, *then* print
 # the banner.
 def BACKFILL() -> str:  # noqa: N802 — kept callable-named for the wiring it feeds
-    return f"{_shim()} import-claude --project ."
+    return f"{_shim()} import --agent claude --project ."
 
 
 def BANNER() -> str:  # noqa: N802

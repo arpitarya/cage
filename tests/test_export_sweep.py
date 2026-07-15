@@ -29,7 +29,7 @@ def test_export_sweeps_all_agents_even_with_agent_filter(root, monkeypatch, caps
     swept = []
     monkeypatch.setattr(importcmd, "run",
                         lambda r, agent, args: swept.append(agent) or [])
-    assert cli.main(["export", "--agent", "claude", "--format", "jsonl"]) == 0
+    assert cli.main(["data", "export", "--agent", "claude", "--format", "jsonl"]) == 0
     # --agent filters the OUTPUT; the sweep is always the full all-agent pass.
     assert swept == ["all"]
     out = capsys.readouterr().out
@@ -41,11 +41,11 @@ def test_no_import_flag_and_policy_toggle_skip_sweep(root, monkeypatch, capsys):
     swept = []
     monkeypatch.setattr(importcmd, "run",
                         lambda r, agent, args: swept.append(agent) or [])
-    assert cli.main(["export", "--no-import"]) == 0
+    assert cli.main(["data", "export", "--no-import"]) == 0
     assert swept == []
     Footprint(root).policy.write_text("[capture]\nimport_before_export = false\n",
                                       encoding="utf-8")
-    assert cli.main(["export"]) == 0
+    assert cli.main(["data", "export"]) == 0
     assert swept == []
     capsys.readouterr()
 
@@ -53,7 +53,7 @@ def test_no_import_flag_and_policy_toggle_skip_sweep(root, monkeypatch, capsys):
 def test_export_json_carries_refresh_object(root, monkeypatch, capsys):
     _seed(root)
     monkeypatch.setattr(importcmd, "run", lambda r, agent, args: [])
-    assert cli.main(["export", "--format", "json"]) == 0
+    assert cli.main(["data", "export", "--format", "json"]) == 0
     d = json.loads(capsys.readouterr().out)
     assert d["refresh"] == {"ran": True, "new_calls": 0}
     assert d["total"]["calls"] == 1
@@ -64,7 +64,7 @@ def test_sweep_failure_is_fail_open(root, monkeypatch, capsys):
     def boom(r, agent, args):
         raise RuntimeError("broken parser")
     monkeypatch.setattr(importcmd, "run", boom)
-    assert cli.main(["export", "--format", "jsonl"]) == 0
+    assert cli.main(["data", "export", "--format", "jsonl"]) == 0
     cap = capsys.readouterr()
     assert "c_e1" in cap.out                       # export still emitted the ledger
     assert "import refresh failed" in cap.err      # and said why, on stderr
@@ -74,14 +74,14 @@ def test_study_bundle_manifest_records_refresh(root, monkeypatch, capsys):
     _seed(root)
     monkeypatch.setattr(importcmd, "run", lambda r, agent, args: [])
     out = root / "bundle.zip"
-    assert cli.main(["export", "--study", str(out)]) == 0
+    assert cli.main(["data", "export", "--study", str(out)]) == 0
     assert "self-refreshed: +0 call(s)" in capsys.readouterr().out
     with zipfile.ZipFile(out) as zf:
         manifest = json.loads(zf.read("manifest.json"))
     assert manifest["refresh"] == {"ran": True, "new_calls": 0}
     # --no-import → snapshot, and the manifest says so
     out2 = root / "bundle2.zip"
-    assert cli.main(["export", "--study", str(out2), "--no-import"]) == 0
+    assert cli.main(["data", "export", "--study", str(out2), "--no-import"]) == 0
     assert "snapshot only" in capsys.readouterr().out
     with zipfile.ZipFile(out2) as zf:
         manifest = json.loads(zf.read("manifest.json"))

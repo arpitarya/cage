@@ -161,6 +161,17 @@ def render_list(d: dict) -> str:
 
 # ── unpriced ─────────────────────────────────────────────────────────────────
 
+def fix_line(provider: str, model: str) -> str:
+    """The ONE runnable fix line for an unpriced (provider, model) — printed by
+    `cage prices unpriced` and the report's `--usd` ⚠ block (one wording, one
+    home; the fix-hint contract: always copy-paste runnable)."""
+    if provider:
+        return (f"cage prices set {provider} '{model}' --input <IN> --output <OUT>"
+                f"   # per-MTok USD from the vendor's pricing page")
+    return (f"cage prices alias - '{model}' --to <provider>/<model>"
+            f"   # route the router pseudo-model explicitly")
+
+
 def unpriced_view(root: Path, pol: dict, since: str | None = None) -> dict:
     groups: dict[tuple[str, str], dict] = {}
     for c in ledger.calls(root, since=since):
@@ -173,13 +184,8 @@ def unpriced_view(root: Path, pol: dict, since: str | None = None) -> dict:
         g["tokens"] += int(c.get("tokens_in", 0)) + int(c.get("tokens_out", 0))
     items = []
     for (prov, model), g in sorted(groups.items()):
-        if prov:
-            fix = (f"cage prices set {prov} '{model}' --input <IN> --output <OUT>"
-                   f"   # per-MTok USD from the vendor's pricing page")
-        else:
-            fix = (f"cage prices alias - '{model}' --to <provider>/<model>"
-                   f"   # route the router pseudo-model explicitly")
-        items.append({"provider": prov, "model": model, **g, "fix": fix})
+        items.append({"provider": prov, "model": model, **g,
+                      "fix": fix_line(prov, model)})
     return {"unpriced": items,
             "total_calls": sum(i["calls"] for i in items),
             "total_tokens": sum(i["tokens"] for i in items)}
@@ -215,7 +221,7 @@ _REPRICE_NOTE = ("derived views re-price immediately — the ledger is never rew
 
 def _stamp_meta_on_create(root: Path, res: dict) -> None:
     """A freshly-created project policy derives from the installed bundle, so stamp
-    the bundled ``[meta]`` on it (exactly what a `cage init` copy would carry) —
+    the bundled ``[meta]`` on it (exactly what a `cage setup` copy would carry) —
     the sync recommendation then measures real staleness, not a missing stamp."""
     if res.get("mode") == "created":
         meta = policy.bundled_raw().get("meta", {})

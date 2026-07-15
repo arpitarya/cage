@@ -1,6 +1,6 @@
 # Cage policy — the only place numbers live. Versioned, deterministic (plan §3.3).
 
-# Bundled price-table provenance. `cage init` copies this file verbatim, so a
+# Bundled price-table provenance. `cage setup` copies this file verbatim, so a
 # project policy carries the [meta] it derived from; `cage doctor` / `cage prices
 # list` compare the two and recommend `cage prices sync` when the bundle is newer
 # (never auto-applied). prices_version is the date the rows were researched.
@@ -10,7 +10,7 @@
 prices_version = "2026-07-14"
 prices_date = "2026-07-14"
 cage_version = "0.25.0"
-policy_version = "0.25.0"
+policy_version = "0.26.0"
 
 # Prices in USD per million tokens. `cache_read` is the discounted rate the
 # provider bills for prefix-cache *reads* (makes cache-alignment measurable).
@@ -394,7 +394,7 @@ input = 3.00
 output = 15.00
 cache_read = 0.30
 
-# Estimated AI-credit multipliers (`cage limits`). Post-2026 GitHub/Codex plans consume
+# Estimated AI-credit multipliers (`cage data limits`). Post-2026 GitHub/Codex plans consume
 # credits as a function of tokens, so credits = tokens × per_mtok (per MILLION tokens).
 # These are OFF by default — cage ships no active rows because a wrong credit number is
 # worse than none, and the precise per-token rates aren't published. Uncomment + set
@@ -410,20 +410,35 @@ cache_read = 0.30
 # Auto-capture switch. Each agent's hook runs `cage import --agent <itself>` to meter
 # its own on-disk usage log; set enabled=false to pause that without unwiring any hooks
 # (the hooks still fire, the import is a no-op). Env CAGE_CAPTURE (0/1) overrides.
-# import_before_export: `cage export` (plain and --study) runs the all-agent import
+# import_before_export: `cage data export` (plain and --study) runs the all-agent import
 # sweep first, so a capture-only machine (hooks don't fire under a VS Code extension)
 # still ships a complete bundle. Set false for as-is snapshots; the `--no-import`
 # flag wins per invocation (precedence: flag > env CAGE_CAPTURE > policy).
 [capture]
 enabled = true
 import_before_export = true
+# Staleness gate (hours) for the report footer's "last import: N ago" advice line —
+# it renders only when the last import is older than this (it's advice, not a
+# banner). Uncomment to override the constants.IMPORT_STALE_HOURS fallback (24);
+# 0 restores the always-on line.
+# import_stale_hours = 24
+
+# Display defaults (plan Phase 2.5). Tokens are the measurement and the default;
+# dollars are an interpretation you ask for. usd = true makes `cage report`,
+# `cage insights matrix`, and the bare `cage` headline render their dollar columns without
+# the --usd flag (per-invocation flag > env CAGE_USD > this). Display-only:
+# pricing always computes underneath (budget guards, UNPRICED detection), the
+# money-native views (budget/roi/verdict/compare/estimate) always show dollars,
+# and CSV always carries the full column set.
+[display]
+usd = false
 
 # State-dir maintenance (.cage/state/ only — a CLOSED allowlist: aged debug.log and
 # hooks-seen.jsonl rows, stale pending-* provenance buffers, cursors whose source log
 # is gone, *.tmp). Never touches ledger/, policy.toml, machine.json, study.jsonl, or
 # limits.json — fleet pairing and the audit trail are not cleanup's to lose. Runs
 # piggybacked on `cage import` (throttled, fail-open; cage installs no scheduler) or
-# manually via `cage cleanup` (dry-run by default, --apply to execute). State files
+# manually via `cage data cleanup` (dry-run by default, --apply to execute). State files
 # are never read by derived views, so cleanup can't change a single reported number.
 # Env CAGE_CLEANUP (0/1) overrides enabled.
 [cleanup]
@@ -444,6 +459,7 @@ enabled = false
 order = ["graphify", "fux", "router", "compressor", "cache", "response-cache"]
 
 # Budget ceilings (plan §8.1). on_exceed: warn | block.
+# formula: Σ call_usd over the window vs [budgets] session_usd / daily_usd; on_exceed = warn|block.
 [budgets]
 session_usd = 2.00
 daily_usd = 25.00
@@ -452,7 +468,7 @@ on_exceed = "warn"
 # Ledger-size warning (plan §3.6.4). When the partitioned shards together exceed
 # warn_mb (in MB), `cage` prints ONE hint to stderr (never stdout — stdout is the
 # deterministic table surface) pointing at the remedy (archive old *-YYYY-MM.jsonl
-# shards / `cage ledger-sync` then prune). Warn-only, never blocks a read or write.
+# shards / `cage authorship ledger-sync` then prune). Warn-only, never blocks a read or write.
 # Uncomment to override the derived default (constants.LEDGER_WARN_BYTES, ≈418 MB ≈
 # 2 heavy solo-years); the constant is the fallback when this key is absent.
 # [ledger]
@@ -466,6 +482,7 @@ signal = "task_ok"
 # Human-labor baseline (Tier-1 counterfactual, design §3.1). The only place human
 # numbers live. Bundled values are illustrative blended estimates (like the model
 # prices); override per-project, or inject a real rate via CAGE_HUMAN_RATE.
+# formula: usd = minutes / 60 × rate     (rate = $80/hr, source: policy)
 [human]
 rate_usd_per_hr = 80        # blended default rate
 default_minutes = 60        # fallback when a task has no type and no minutes
@@ -500,6 +517,7 @@ rate_usd_per_hr = 100
 
 # Confidence by how the human figure was obtained (design §3 + §5b.3 ladder).
 # Tunable, never hard-coded in code; every read surface shows it.
+# formula: measured 0.9 · estimated 0.7 · type-table 0.5 · default 0.3
 [human.confidence]
 measured = 0.9      # real quote / timesheet
 estimated = 0.7     # explicit usd or minutes, but a guess

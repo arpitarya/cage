@@ -181,7 +181,7 @@ user is left alone with:
   which wins) · `sync` (dry-run diff vs the installed bundle; `--update --yes` per
   confirmed row — customized rows are never clobbered).
 - **`[meta]` versioning** — the bundle stamps `prices_version`/`prices_date`/
-  `cage_version` (source URLs cited row by row); `cage init` copies it; `doctor` and
+  `cage_version` (source URLs cited row by row); `cage setup` copies it; `doctor` and
   `prices list` recommend `cage prices sync` when the bundle is newer, never auto-apply.
 - **Merge** — `policy.load` merges `prices`/`credits`/`alias` two levels deep
   (per provider *and* per model), so a partial project table shadows one row without
@@ -196,24 +196,24 @@ user is left alone with:
 A `task` was only a foreign-key string; nothing described the task itself. A third
 append-only file carries one row per task (last-write-wins by `id` at derive time),
 referenced by the calls/receipts that already carry `task`. It is **auto-collected
-from git at task close** (SessionEnd hook / `cage outcome`) by *shelling out* — never
+from git at task close** (SessionEnd hook / `cage human outcome`) by *shelling out* — never
 importing git — and is **fail-open**: a non-repo / no-git / detached HEAD omits those
 fields and never raises (write-path discipline, like `ledger.append`). PII guard
 (carried from "prompt bodies are never a field"): it stores the **short SHA, branch,
 numeric diff counts, and top-level changed dirs only** — never the commit *message*,
 author name/email, or file contents. It absorbs the existing `outcome` signal and
-powers `cage trend` and the diff-informed confidence bump.
+powers `cage insights trend` and the diff-informed confidence bump.
 
 Additive optional field (roadmap P2): **`label`** — one short user-chosen token
 (letters/digits/`._-`, ≤32 chars, validated at the CLI boundary) set via
-`cage outcome <task> --label <word>`, a grouping key for `cage compare --by label`
+`cage human outcome <task> --label <word>`, a grouping key for `cage insights compare --by label`
 (§4.7). Same PII spirit as `scope`: a single token, never a path, message, or free
 text; absent/empty = the legacy contract.
 
 Additive optional fields (roadmap P3): **`est_tokens` / `est_usd` / `est_n`** plus
 the token band bounds **`est_tokens_q1` / `est_tokens_q3`** — a pre-task estimate
-stamped by `cage estimate --record <task>` onto the *open* task row (fail-open,
-last-write-wins like every task field). The band bounds exist so `cage calibration`
+stamped by `cage insights estimate --record <task>` onto the *open* task row (fail-open,
+last-write-wins like every task field). The band bounds exist so `cage insights calibration`
 scores in-band hits against the band *as recorded at estimate time* — recomputing
 over grown history would score a different band. Numbers only (token/dollar
 counts), PII-free by construction; absent = the legacy contract (§4.8).
@@ -226,14 +226,14 @@ keeps the name↔id mapping offline) stamped at the one write chokepoint
 ledgers stamp nothing — byte-identical to the legacy contract (§4.9). The study
 phase markers live in a fifth small append-only file, `ledger/study.jsonl`
 (unpartitioned, like provenance — a study is weeks, not years), which travels
-inside `cage export --study` bundles.
+inside `cage data export --study` bundles.
 
 ### 3.5 The provenance record — `provenance.jsonl` (fourth append-only file, v1)
 
 A fourth, separate substrate answering a different question than §3.1–3.4: not
 "what did this cost" but **"which agent wrote which files, in which commit, and how
 sure are we?"** — authorship attribution, not spend attribution. It is a new record
-type and read surface (`cage origin`), never a new tool; it reuses the same
+type and read surface (`cage authorship origin`), never a new tool; it reuses the same
 append-only-buffer + git-shell-out + fail-open idioms as `tasks.jsonl`.
 
 ```jsonc
@@ -267,14 +267,14 @@ gets its own vocabulary rather than overloading the existing one:
   as a stronger method than its weakest real input.
 - `origin ∈ {human, agent, agent-autonomous, unknown}` — defaults to `unknown` and
   is **never written as `human` automatically**. The only way `origin="human"`
-  reaches the ledger is through an explicit attestation (`cage origin <sha>
+  reaches the ledger is through an explicit attestation (`cage authorship origin <sha>
   --attest human`), which is always `method="heuristic"` by construction (a person
   looked at it; no automated signal fired) — `schema.make_provenance` enforces
   this pairing at construction time, not just by convention.
 
 **`unknown` is a read-time default, never a written row.** A commit with zero
 cage signal (no hook, no transcript, no attestation) gets **no row at all** —
-`cage origin <sha>` derives `origin="unknown", confidence=0.0` from the *absence*
+`cage authorship origin <sha>` derives `origin="unknown", confidence=0.0` from the *absence*
 of any fragment, computed at read time in `origin.explain`. This keeps the ledger
 sparse (facts only) and avoids materializing a row for cage's entire pre-adoption
 git history. The one way a not-otherwise-signaled commit gets a row is a human
@@ -300,14 +300,14 @@ relaxation of it.
 **Distribution: local buffer → `refs/notes/cage-provenance`.** The local
 `provenance.jsonl` is a buffer only (gitignored, machine-local, exactly like
 `.cage/ledger/`); the canonical record is `refs/notes/cage-provenance`, and **CI is
-the sole writer to it** (`cage notes-sync` defaults to a dry-run print of the
+the sole writer to it** (`cage authorship notes-sync` defaults to a dry-run print of the
 merge plan; it only pushes when `CAGE_NOTES_WRITE=1`, which CI sets). Merge policy
 is **append/merge by row id, never overwrite** — `notessync.merge_rows` unions
 fragments from possibly-multiple CI runs touching the same sha, resolving any
 disagreement on the same file by `PROVENANCE_METHOD_TRUST` rank.
 
-**Read surface.** `cage origin <sha>` (`origin.py`) reports the highest-confidence
-row(s) for a sha, or the derived unknown default. `cage verify` (`verifycmd.py`)
+**Read surface.** `cage authorship origin <sha>` (`origin.py`) reports the highest-confidence
+row(s) for a sha, or the derived unknown default. `cage authorship verify` (`verifycmd.py`)
 is a **report-only** consistency pass (shas exist in git, `origin=human` rows are
 all attestations, methods are in the closed enum) that **always exits 0** — a
 hard constraint, never wired as a CI gate.
@@ -323,7 +323,7 @@ covers agents/edits the live hook missed, tagged `transcript`. A
 convenience — never the ledger's source of truth.
 
 **Out of scope (v1).** Signed notes, hunk-range fingerprinting, build-blocking in
-`cage verify`, and transcript archival are explicitly deferred — each has a
+`cage authorship verify`, and transcript archival are explicitly deferred — each has a
 one-line `# v2:` marker at its natural call site rather than being half-built.
 
 ---
@@ -373,7 +373,7 @@ The ledger stays gitignored and machine-local (committing per-dev per-task cost 
 permanent shared git history is a surveillance surface even counts-only). The team view
 reuses the **exact** §3.5 distribution model rather than an external collector (which
 would break `$0`/stdlib/no-infra): each machine's `.cage/ledger/` is the local buffer;
-`cage ledger-sync` unions local call/receipt rows into a single
+`cage authorship ledger-sync` unions local call/receipt rows into a single
 `refs/notes/cage-ledger` ref **by row id** (`mergeutil.union_by_id`, the pure core
 shared with provenance's `merge_rows` — ledger uses plain first-by-id, no method
 tie-break, since ulids never legitimately collide), written **only by CI**
@@ -415,7 +415,7 @@ construction, `scan` doesn't look at them: `ledger/`, `policy.toml`, `machine.js
 (default on/30; env `CAGE_CLEANUP` overrides — the capture-switch pattern). The auto
 path piggybacks on `cage import`/hook sweeps (throttled to one real check per day,
 fail-open, debug-logged under `cleanup.prune`) — cage installs no scheduler; the manual
-path `cage cleanup` is dry-run until `--apply`. State files are never read by derived
+path `cage data cleanup` is dry-run until `--apply`. State files are never read by derived
 views, so cleanup cannot change a reported number.
 
 ### 3.6.5 Invariants this amendment must not break
@@ -433,14 +433,14 @@ or any mix, in a CLI **or a VS Code extension**. Field-proven: hooks are client-
 and mostly don't fire (a VS Code extension never runs `.codex/hooks.json` /
 `.kiro/hooks/*.hook` / `~/.copilot/hooks`; only Claude Code's extension honors its hooks),
 yet the on-disk import works for all four, always. So capture **leads with explicit
-`cage import` / `cage export`** over a global ledger, and cage installs **nothing in the
+`cage import` / `cage data export`** over a global ledger, and cage installs **nothing in the
 background**.
 
 **Capture is pull-based.** Nothing runs on its own. `cage import` (capture) and
-`cage export` (import-then-emit) are the canonical verbs; hooks are demoted to an optional
+`cage data export` (import-then-emit) are the canonical verbs; hooks are demoted to an optional
 real-time add-on. cage installs **no OS scheduler** — no launchd/systemd/cron/schtasks,
 no `cage scheduler` command. Hands-off automation, if wanted, is the user's own cron line
-calling `cage import` (documented, never installed). `cage watch` is an optional
+calling `cage import` (documented, never installed). `cage data watch` is an optional
 *foreground* `sleep` poll loop the user starts and Ctrl-Cs; it registers nothing.
 
 **Ledger resolution (one active sink per run, never a double-write):**
@@ -462,7 +462,7 @@ the view is exact for Claude and silently excludes the projectless rows of the o
 agents (surfaced in the output). `scope` (§3.6.2) is untouched.
 
 **Incremental import (scale).** With no daemon, the hot paths are manual `cage import`,
-`export`'s import-first refresh, and the `cage watch` loop — each would otherwise re-parse
+`export`'s import-first refresh, and the `cage data watch` loop — each would otherwise re-parse
 every transcript and reload the whole 22k+-row ledger per run. A per-agent high-water
 **cursor** (`.cage/state/cursors.json`, last-seen `(size, mtime)` per source file) skips
 unchanged files before parsing, and the ledger `seen` set is built once per run and shared
@@ -474,10 +474,10 @@ also stamps `_last_import`, surfaced as "last import: N ago" by `cage doctor`/`c
 heartbeat (fired recently ⇒ real-time active; never ⇒ a hook that's *wired* is not one
 that *fires*, e.g. under a VS Code extension); it never labels an unfireable hook "capture
 wired," names the active ledger sink, shows last-import staleness, and points at
-`cage import`/`cage export` as the universal path. No scheduler row (cage installs none).
+`cage import`/`cage data export` as the universal path. No scheduler row (cage installs none).
 
 **Export imports everything first (v0.19).** On a machine where hooks don't fire (any
-VS Code extension), `cage export`'s import-first refresh is the *only* capture — so the
+VS Code extension), `cage data export`'s import-first refresh is the *only* capture — so the
 refresh is always the full all-agent sweep (`--agent` filters the output, never the
 capture), gated by `[capture] import_before_export` (default on; precedence:
 `--no-import` flag > `CAGE_CAPTURE` env > policy) and fail-open (a broken parser warns
@@ -495,12 +495,12 @@ project-local `.cage/` ledger all unchanged); four agents always.
 
 ---
 
-## 3.8 Provider quota + estimated credits — `cage limits` (a state snapshot, NOT a ledger)
+## 3.8 Provider quota + estimated credits — `cage data limits` (a state snapshot, NOT a ledger)
 
 cage meters tokens; it has no view of provider **quota/credits**. Two things are
 recoverable from data cage already touches: Codex's rollout JSONL carries a `rate_limits`
 block (remaining-% windows), and post-2026 GitHub/Codex plans consume credits as a function
-of tokens, so a credit estimate is derivable. `cage limits` surfaces both — under a hard
+of tokens, so a credit estimate is derivable. `cage data limits` surfaces both — under a hard
 **a wrong number is worse than no number** rule. (Debated devil's-advocate + pre-mortem;
 see the ADR — the substrate-vs-snapshot and credits-scope verdicts below were forced there.)
 
@@ -525,7 +525,7 @@ family fallback — a borrowed estimate is a *different* wrong number); an unkno
 (units-of-work ≠ token multiples) — they show "—". Every figure is tagged `estimated`,
 names its source, and the view ends with a "reconcile against your provider dashboard" note.
 
-**`cage.v1` JSON envelope.** `cage limits --json` debuts a versioned envelope —
+**`cage.v1` JSON envelope.** `cage data limits --json` debuts a versioned envelope —
 `{"schemaVersion":"cage.v1","generatedAt":…,"command":…,"data":…}` (`render.envelope`).
 `generatedAt` is wall-clock metadata; the `data` payload stays deterministic (same ledger +
 policy ⇒ same `data`). Introduced for `limits` only; a wider rollout is a separate packet.
@@ -545,7 +545,7 @@ always (only Codex reports quota locally today; the others show "—").
 
 ## 3.9 CSV output — a one-way reporting surface (spreadsheets, not sync)
 
-Two export kinds, never blurred: the fleet bundle (`cage export --study`) stays
+Two export kinds, never blurred: the fleet bundle (`cage data export --study`) stays
 **jsonl** — lossless, merge-by-id, re-importable — while **CSV is a REPORTING
 format**: flat, one-way, for spreadsheets/BI, never an import source.
 
@@ -554,7 +554,7 @@ format**: flat, one-way, for spreadsheets/BI, never an import source.
   default (pipe-friendly), `--csv <path>` writes a file. One shared data
   structure per view feeds the text table AND the CSV (`render_csv` beside each
   `render_*` — the two cannot disagree; no view computes twice).
-- **Raw rows** — `cage export --csv calls|receipts|tasks [--since …]`: flattened
+- **Raw rows** — `cage data export --csv calls|receipts|tasks [--since …]`: flattened
   ledger rows for pivot-table analysis, the ledger's own PII surface (counts and
   ids, never content); honors the import-before-export toggle. Closed per-kind
   column contracts (`exportcmd.RAW_CSV_FIELDS`); `--format csv` stays the legacy
@@ -741,11 +741,11 @@ backlog with no ledger rewrite. The full design is `docs/human-baseline.design.m
   time*: `time_saved = human_minutes − agent_active_minutes`, where
   `agent_active_minutes` = the task's call-span wall-clock floored by `Σ latency_ms`,
   tagged `estimated`. It can go **negative** (agent thrashed) — the metric must be
-  able to embarrass the agent. `cage trend` turns `ts` into a cost+time time-series.
+  able to embarrass the agent. `cage insights trend` turns `ts` into a cost+time time-series.
 
-### 4.7 Measured stack comparison — `cage compare` (roadmap P2)
+### 4.7 Measured stack comparison — `cage insights compare` (roadmap P2)
 
-§4.2–§4.4 model counterfactuals from receipts; `cage compare` answers the *other*
+§4.2–§4.4 model counterfactuals from receipts; `cage insights compare` answers the *other*
 half of "is this tool reducing my cost": **did tasks that ran with the tool
 measurably cost less than tasks that didn't** — observed group totals, not modeled
 reconstruction. Derive-time only, no schema change beyond the optional task `label`
@@ -770,12 +770,12 @@ reconstruction. Derive-time only, no schema change beyond the optional task `lab
   renders `insufficient data (n=X < 5)` and joins no delta; the command explains,
   it never numbers.
 
-### 4.8 Pre-task estimation + calibration — `cage estimate` / `cage calibration` (roadmap P3)
+### 4.8 Pre-task estimation + calibration — `cage insights estimate` / `cage insights calibration` (roadmap P3)
 
 Estimate **before**, measure **after**, and let the measured gap be the confidence
 level. Distinct from `forecast.py` (monthly projection) — this is per-task.
 
-- **`cage estimate [--scope] [--label] [--agent]`** (`estimate.py`) — a band
+- **`cage insights estimate [--scope] [--label] [--agent]`** (`estimate.py`) — a band
   (median + IQR of measured totals) over closed tasks matching the **exact keys**;
   no similarity scoring, no ML (cage law). Tagged **`modeled`** — history applied
   to an unrun task is a reconstruction, never an invoice. Below
@@ -785,7 +785,7 @@ level. Distinct from `forecast.py` (monthly projection) — this is per-task.
   `est_*` fields, §3.4) — fail-open write; recording onto an already-closed task
   is refused at the CLI boundary (a retroactive estimate is exactly what
   calibration must never count).
-- **`cage calibration`** (`calibration.py`) — over closed tasks with recorded
+- **`cage insights calibration`** (`calibration.py`) — over closed tasks with recorded
   estimates: the actual/estimate **ratio distribution** and the **in-band
   hit-rate** against the band as recorded. Both **`measured`** — an observed
   frequency of recorded estimates vs recorded actuals. Open / zero-actual /
@@ -809,9 +809,9 @@ with a plugin — did the plugin pay off?* One analyst, one number, no backend.
   clocks, and cross-machine clock skew cannot cross-assign (row and marker
   share one clock). Last marker wins forward; rows before any marker are
   *unphased* — excluded from deltas, counted in coverage. Phase intent ≠
-  observed stack: `cage compare` (§4.7) remains the within-phase truth of what
+  observed stack: `cage insights compare` (§4.7) remains the within-phase truth of what
   actually ran.
-- **One-file collection** — `cage export --study` writes one zip (raw
+- **One-file collection** — `cage data export --study` writes one zip (raw
   calls/receipts/tasks rows + markers + a counts-only manifest: version,
   machine id, span, row counts). `cage import bundle1 bundle2 …` merges into a
   fresh analysis ledger by row identity (calls/receipts by id; tasks/markers by
@@ -856,16 +856,16 @@ bypasses its ladder.
   rewritten. Deterministic: same ledger + policy ⇒ same minutes.
 - **Method honesty** — derived minutes are always **`estimated`**, labelled
   `derived (turn-gaps, capped)`. **Attested** minutes (`human-record`, or the
-  friction-drop `cage outcome <task> --minutes N` — same fail-open, idempotent
+  friction-drop `cage human outcome <task> --minutes N` — same fail-open, idempotent
   receipt path) rank above derived: for a given task **attested wins and derived
   is shown as reference — the two are never summed.**
-- **Views** — `cage human` / `cage trend` render attested and derived as
+- **Views** — `cage human show` / `cage insights trend` render attested and derived as
   separate blocks (never blended; absence of gap data is an explicit line).
-  `cage compare`, `cage verdict`, `cage study report` gain one **total-cost
+  `cage insights compare`, `cage insights verdict`, `cage study report` gain one **total-cost
   line** — agent $ + human minutes × rate, tagged with the human component's
   method — suppressed by `--agent-only`. `matrix --human` is unchanged
   (baseline receipts answer a different question).
-- **Calibration** — `cage calibration --human`: over tasks with BOTH attested
+- **Calibration** — `cage insights calibration --human`: over tasks with BOTH attested
   and derived minutes, the derived/attested **ratio distribution** (median +
   IQR) is the heuristic's measured accuracy. Below `MIN_ESTIMATE_N` it refuses.
   The heuristic never self-reports confidence.
@@ -899,7 +899,7 @@ bypasses its ladder.
   Orff drops this into the `LLMGateway` (record from `ProviderResponse` right
   where `CostGuard` already computes cost) and into `Handover.prepare` for the
   compressor. Tool-agnostic; you call it, it doesn't wrap you.
-- **OpenAI-compat proxy** — `cage proxy --port 8788` for clients you can't edit
+- **OpenAI-compat proxy** — `cage data proxy --port 8788` for clients you can't edit
   (Claude Code). Targets the *protocol*, so it is not "wrap claude" — any
   OpenAI/Anthropic-compatible client is metered, none is named.
 
@@ -937,7 +937,7 @@ no hierarchy, no logging framework, no retries (stdlib-only).
 
 The exit-code contract: **`0`** ok · **`1`** error (`CageError` or an unexpected exception —
 full traceback only under `CAGE_DEBUG=1`) · **`2`** argparse usage error (stdlib default, e.g.
-an unknown subcommand) · **`130`** interrupted (`KeyboardInterrupt`). `cage verify` is
+an unknown subcommand) · **`130`** interrupted (`KeyboardInterrupt`). `cage authorship verify` is
 report-only and always exits `0` — visibility, never a build gate. This is additive and
 boundary-only: the fail-open internals are verified by tests, never rewritten.
 
@@ -990,21 +990,21 @@ reinvent Kompress** — Tier 2 is a pluggable adapter you may never switch on.
 ## 7. CLI / views
 
 ```
-cage meter -- <cmd>           # run a command through the proxy, record calls
+cage data meter -- <cmd>           # run a command through the proxy, record calls
 cage report [--since 7d]      # ledger: spend by agent / route / model / day
-cage attrib [--task ID]       # per-tool marginal savings (the §4.2 table)
-cage matrix [--task ID] [--human]  # counterfactual permutation table; --human = anchor (§4.4/§4.6)
-cage budget                   # current session/day spend vs. policy ceilings
-cage limits [--json]          # provider quota windows (Codex) + estimated AI-credits (§3.8); --json = cage.v1
-cage roi [--since 30d]        # saved $ vs. each tool's own cost + latency (tool-only)
-cage human [--task|--agent|--since] [--html]   # Tier-1 agent-vs-human: $ and hours saved (§4.6)
-cage human-record --task ID (--type T | --minutes N | --usd N)  # record a human alternative
-cage trend [--by week|month] [--metric cost|time|both]  # savings as a time-series (§4.6)
-cage serve                    # dashboard (reuse fux's serve/assets pattern)
-cage why <call-id>            # full provenance: call + every receipt against it
+cage insights attrib [--task ID]       # per-tool marginal savings (the §4.2 table)
+cage insights matrix [--task ID] [--human]  # counterfactual permutation table; --human = anchor (§4.4/§4.6)
+cage insights budget                   # current session/day spend vs. policy ceilings
+cage data limits [--json]          # provider quota windows (Codex) + estimated AI-credits (§3.8); --json = cage.v1
+cage insights roi [--since 30d]        # saved $ vs. each tool's own cost + latency (tool-only)
+cage human show [--task|--agent|--since] [--html]   # Tier-1 agent-vs-human: $ and hours saved (§4.6)
+cage human record --task ID (--type T | --minutes N | --usd N)  # record a human alternative
+cage insights trend [--by week|month] [--metric cost|time|both]  # savings as a time-series (§4.6)
+cage data serve                    # dashboard (reuse fux's serve/assets pattern)
+cage insights why <call-id>            # full provenance: call + every receipt against it
 cage query "how is X computed" [--list] [--all] [--json] [--kind calc|concept]  # explain
 cage prices <list|unpriced|set|alias|sync>  # manage the price tables (§3.3, v0.19)
-cage cleanup [--apply] [--days N]           # prune aged .cage/state/ (allowlist, §3.6.4)
+cage data cleanup [--apply] [--days N]           # prune aged .cage/state/ (allowlist, §3.6.4)
 ```
 
 Every command is `$0`, deterministic, and emits JSON with `--json` for the
@@ -1065,12 +1065,12 @@ Beyond track-and-attribute, the substrate unlocks:
    USD for `ms` (latency) or `gco2` (carbon) and every view works unchanged.
 7. **Per-feature cost (Orff).** Roll up by `route`/`query_type` to see which
    Orff intents cost the most — the input to where compression/caching pays off.
-8. **Verdict (shipped, roadmap P4).** `cage verdict <tool>` — the one-line
+8. **Verdict (shipped, roadmap P4).** `cage insights verdict <tool>` — the one-line
    answer (*SAVING / COSTING / INSUFFICIENT DATA*) as a **pure composer** over
    items 2–3 plus attribution/roi/trend: it computes no new statistics, prints
    every input with its own method tag, adds a break-even line derived from roi,
    and refuses (per input and overall) rather than approximate. The headline is
-   `modeled` — it inherits the receipts' modeled savings; `cage compare` (§4.7)
+   `modeled` — it inherits the receipts' modeled savings; `cage insights compare` (§4.7)
    is the observational counterpart.
 
 ---
@@ -1087,7 +1087,7 @@ The leverage is in the **spec and the contract**, so lock those first.
 3. **Receipt emitters** — teach fux and graphify to emit receipts (fux:
    generalize `savings.py` from static estimate to per-call modeled receipt;
    graphify: emit the file-reads a query replaced). Now attribution has inputs.
-4. **Attribution + matrix** — `cage attrib` / `cage matrix` over the receipts
+4. **Attribution + matrix** — `cage insights attrib` / `cage insights matrix` over the receipts
    (§4.2). This is the differentiator; ship it early to prove the thesis.
 5. **Adapters** — add the OpenAI-compat proxy for Claude Code; wire the
    SessionEnd hook. Both protocol-targeted.

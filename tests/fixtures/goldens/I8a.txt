@@ -1,0 +1,9 @@
+$ cage insights matrix --task t_9f31 --usd
+Counterfactual matrix · task t_9f31 · base model anthropic/claude-sonnet-4-6
+
+graphify  input tok     cost  source
+--------  ---------  -------  --------
+✗            22,171  $0.0665  modeled
+✓             1,660  $0.0050  measured
+
+full stack vs all-off: ✓ cheaper ($0.0665 → $0.0050)

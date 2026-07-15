@@ -13,6 +13,6 @@ POINTER = """## Cage — LLM cost & savings ledger
 This project meters LLM traffic into `.cage/` (a *flux*: $0, deterministic).
 - For spend / savings questions, prefer the `cage` MCP tools (`cage_report`,
   `cage_attrib`, `cage_budget`) over guessing.
-- To meter this agent's own calls, run it under `cage meter -- <cmd>` or point its
-  base URL at `cage proxy`.
+- To meter this agent's own calls, run it under `cage data meter -- <cmd>` or point its
+  base URL at `cage data proxy`.
 - The ledger stores token *counts* only — never prompt bodies."""

@@ -28,11 +28,15 @@ family** over *normalized* ids, and the match kind is part of the method law:
 
 ## The unpriced workflow
 
-A call whose model has no row bills **$0 and says so**: `report`, the bare-`cage`
-overview, `compare`, and `study report` print
-`⚠ N calls (X tokens) UNPRICED — totals understated; run 'cage prices unpriced'`
-whenever `none`-match calls exist, so an analyst can't publish an understated
-total without seeing the gap. The fix is a paste, not a hunt (real field example —
+A call whose model has no row **says so, and never renders `$0.0000`**: in a
+text table the cost cell is `—` (the only meaning of the dash — `$0.0000` is
+always a real zero), the TOTAL carries `(+ unpriced)`, and the full ⚠ UNPRICED
+block renders in the `--usd` view of `report`/overview (tokens are the default
+now, so the token view carries one muted `· N calls unpriced — matters when you
+view $` pointer instead). `compare` and `study report` — money-native — print
+the ⚠ line unconditionally. So an analyst can't publish an understated total
+without seeing the gap. The report's ⚠ block prints one runnable fix line per
+unpriced model; `cage prices unpriced` is the full list (real field example —
 the VS Code Copilot extension stamps dotted, route-prefixed model ids and an
 empty-provider router):
 
@@ -59,7 +63,7 @@ partial project table never wipes bundled siblings.
 ## Policy versioning and `cage prices sync`
 
 The bundled table carries `[meta] prices_version` / `prices_date` /
-`cage_version`, with source URLs cited row by row. `cage init` copies (and a
+`cage_version`, with source URLs cited row by row. `cage setup` copies (and a
 first `prices set` stamps) it into the project policy. When a newer cage ships
 newer rates, `cage doctor` and `cage prices list` print one recommendation line —
 `bundled prices are newer — run 'cage prices sync'` — and **never auto-apply**.
@@ -113,7 +117,7 @@ workflow is untouched.
 
 ## Fleet repricing
 
-Because pricing is derive-time, imported fleet bundles (`cage export --study` →
+Because pricing is derive-time, imported fleet bundles (`cage data export --study` →
 `cage import bundle*.zip`) reprice under the *analyst's* policy: fix the table
 once on the analysis machine and every historical row — including rows captured
 on machines that never had the fix — costs out correctly. Self-costed rows and
@@ -177,7 +181,7 @@ them.
 
 `[prices]` is dollars per token — the ledger's economics. `[credits.<provider>."<model>"]
 per_mtok` is a *separate* multiplier for provider AI-credit accounting
-(`cage limits`), token-based providers only, **exact model-id match** (no family
+(`cage data limits`), token-based providers only, **exact model-id match** (no family
 fallback — a borrowed estimate is a different wrong number), **off by default**
 (no active rows ship). An unknown multiplier ⇒ no number; Kiro/Copilot credits
 are never derived from tokens (units-of-work ≠ token multiples). Every credit

@@ -1,4 +1,4 @@
-"""`cage init` — scaffold the `.cage/` footprint (policy + gitignored ledger)."""
+"""`cage setup` — scaffold the `.cage/` footprint (policy + gitignored ledger)."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -12,7 +12,7 @@ _POINTER = f"""{POINTER_START}
 
 This project meters LLM traffic into `.cage/` (a *flux*: $0, deterministic).
 
-- Spend so far: `cage report` · per-tool savings: `cage attrib` · budget: `cage budget`
+- Spend so far: `cage report` · per-tool savings: `cage insights attrib` · budget: `cage insights budget`
 - The ledger carries token *counts*, never prompt text — PII-safe by construction.
 - Edit prices / budgets / pipeline order in `.cage/policy.toml`.
 {POINTER_END}"""

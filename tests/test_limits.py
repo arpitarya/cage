@@ -1,4 +1,4 @@
-"""`cage limits` — Codex quota snapshot (latest-only state file) + estimated AI-credits.
+"""`cage data limits` — Codex quota snapshot (latest-only state file) + estimated AI-credits.
 
 Quota is a machine-local snapshot, NOT a ledger substrate (plan §3.8). Credits are
 estimated from tokens × a policy multiplier, token-based providers only — a model with

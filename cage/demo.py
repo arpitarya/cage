@@ -2,7 +2,7 @@
 
 One agent task ("explain why handover does X, then fix it") whose context
 decomposes into three disjoint slices, each shrunk by a different deterministic
-tool. After seeding, `cage attrib` and `cage matrix` reproduce the plan's tables
+tool. After seeding, `cage insights attrib` and `cage insights matrix` reproduce the plan's tables
 against a real ledger — proof the attribution engine works, not just an assertion.
 """
 from __future__ import annotations
@@ -24,7 +24,7 @@ _OUT = 1500    # output held constant
 
 def seed(root: Path) -> str:
     # Idempotent: `cage demo` is the "prove the thesis" seeder — re-running it must not
-    # stack a second worked example onto the same ledger (that doubled `cage attrib`'s
+    # stack a second worked example onto the same ledger (that doubled `cage insights attrib`'s
     # §4.4 totals). If the demo task is already present, return its call id and append
     # nothing, so the tables keep reproducing §4.4 exactly however many times it runs.
     existing = [c for c in ledger.calls(root) if c.get("task") == TASK]

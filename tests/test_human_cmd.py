@@ -80,10 +80,10 @@ def test_cli_human_trend_dispatch(proj, monkeypatch, capsys):
     monkeypatch.chdir(proj)
     metering._policy_for.cache_clear()
     assert cli.main(["demo"]) == 0
-    assert cli.main(["human-record", "--task", demo.TASK, "--type", "feature"]) == 0
-    assert cli.main(["human"]) == 0
-    assert cli.main(["human", "--json"]) == 0
-    assert cli.main(["trend", "--by", "month"]) == 0
-    assert cli.main(["matrix", "--human"]) == 0
+    assert cli.main(["human", "record", "--task", demo.TASK, "--type", "feature"]) == 0
+    assert cli.main(["human", "show"]) == 0
+    assert cli.main(["human", "show", "--json"]) == 0
+    assert cli.main(["insights", "trend", "--by", "month"]) == 0
+    assert cli.main(["insights", "matrix", "--human"]) == 0
     out = capsys.readouterr().out
     assert "rate source" in out

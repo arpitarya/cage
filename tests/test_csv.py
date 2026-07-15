@@ -91,9 +91,10 @@ def test_csv_determinism_double_run(seeded):
 # ── one structure feeds both renderers: text and CSV agree by construction ────
 
 def test_text_and_csv_same_numbers(seeded):
+    from cage import display
     root, _ = seeded
     rep = report.summarize(root, POL, dim="route")
-    text = report.render_report(rep)
+    text = report.render_report(rep, disp=display.Display(usd=True))
     rows = list(_csv.reader(io.StringIO(report.render_csv(rep))))
     head, total = rows[0], rows[-1]
     usd = float(total[head.index("cost_usd")])
@@ -279,6 +280,25 @@ def test_report_csv_unpriced_columns(proj):
     assert total[head.index("unpriced_tokens")] == "1200"
 
 
+def test_csv_never_gates_and_never_dashes(proj):
+    """The output-honesty escape hatch (plan Phase 2.4): CSV always carries the
+    full schema — signal-gating and the `—` glyph are text-view affordances, and
+    the new text-only payload keys (saved_tokens/agents/kiro flag) never leak
+    into a CSV column."""
+    ledger.append_row(proj, "calls", schema.make_call(
+        route="chat", provider="mystery", model="who-knows", tokens_in=1000,
+        tokens_out=200, agent="kiro", task="t1", ts="2026-06-01T10:00:00Z"))
+    rep = report.summarize(proj, POL, dim="task")  # savings dim, zero receipts
+    out = report.render_csv(rep)
+    head = out.splitlines()[0].split(",")
+    assert "saved_usd" in head and "net_usd" in head   # full schema despite gating
+    assert "—" not in out                              # the glyph never enters data
+    assert not {"saved_tokens", "agents", "kiro_input_only"} & set(head)
+    from cage import display
+    assert "—" in report.render_report(rep, disp=display.Display(usd=True,
+                                                                 all_columns=True))
+
+
 def test_compare_csv_unpriced_row(proj):
     _seed_compare(proj)
     ledger.append_row(proj, "calls", schema.make_call(
@@ -309,7 +329,7 @@ def test_rfc4180_quoting_round_trips(proj):
 def test_label_and_phase_commas_rejected(proj, monkeypatch, capsys):
     """Labels/phases are single validated tokens — a comma can't reach a CSV cell."""
     monkeypatch.chdir(proj)
-    assert cli.main(["outcome", "t1", "--label", "a,b"]) == 1
+    assert cli.main(["human", "outcome", "t1", "--label", "a,b"]) == 1
     assert cli.main(["study", "start", "a,b"]) == 1
     err = capsys.readouterr().err
     assert "label must be one short token" in err
@@ -326,7 +346,7 @@ def test_export_raw_csv_all_kinds_pii_clean(seeded, monkeypatch, capsys):
     tasks.record(root, "fix-handover-bug", outcome="ok", snapshot=False)
     monkeypatch.chdir(root)
     for kind in ("calls", "receipts", "tasks"):
-        assert cli.main(["export", "--no-import", "--csv", kind]) == 0
+        assert cli.main(["data", "export", "--no-import", "--csv", kind]) == 0
         out = capsys.readouterr().out
         header = out.splitlines()[0]
         assert header == ",".join(exportcmd.RAW_CSV_FIELDS[kind])
@@ -338,9 +358,9 @@ def test_export_raw_csv_all_kinds_pii_clean(seeded, monkeypatch, capsys):
 def test_export_format_csv_equals_csv_calls(seeded, monkeypatch, capsys):
     root, _ = seeded
     monkeypatch.chdir(root)
-    assert cli.main(["export", "--no-import", "--format", "csv"]) == 0
+    assert cli.main(["data", "export", "--no-import", "--format", "csv"]) == 0
     legacy = capsys.readouterr().out
-    assert cli.main(["export", "--no-import", "--csv", "calls"]) == 0
+    assert cli.main(["data", "export", "--no-import", "--csv", "calls"]) == 0
     assert capsys.readouterr().out == legacy
 
 
@@ -348,7 +368,7 @@ def test_export_csv_file_write_pins_lf(seeded, tmp_path, monkeypatch):
     root, _ = seeded
     monkeypatch.chdir(root)
     out = tmp_path / "calls.csv"
-    assert cli.main(["export", "--no-import", "--csv", "calls", "-o", str(out)]) == 0
+    assert cli.main(["data", "export", "--no-import", "--csv", "calls", "-o", str(out)]) == 0
     raw = out.read_bytes()
     assert b"\r" not in raw and raw.endswith(b"\n")
 
@@ -367,13 +387,13 @@ def test_view_csv_file_write_pins_lf(seeded, tmp_path, monkeypatch):
 
 @pytest.mark.parametrize("argv", [
     ["report", "--csv", "--json"],
-    ["human", "--csv", "--html", "x.html"],
+    ["human", "show", "--csv", "--html", "x.html"],
     ["study", "id", "--csv"],
     ["study", "start", "phase1", "--csv"],
-    ["export", "--no-import", "--csv", "calls", "--format", "json"],
-    ["export", "--no-import", "--csv", "receipts", "--agent", "claude"],
-    ["export", "--no-import", "--csv", "tasks", "--project", "."],
-    ["export", "--study", "--csv", "calls"],
+    ["data", "export", "--no-import", "--csv", "calls", "--format", "json"],
+    ["data", "export", "--no-import", "--csv", "receipts", "--agent", "claude"],
+    ["data", "export", "--no-import", "--csv", "tasks", "--project", "."],
+    ["data", "export", "--study", "--csv", "calls"],
 ])
 def test_bad_flag_combinations_are_typed_errors(proj, monkeypatch, capsys, argv):
     monkeypatch.chdir(proj)
@@ -385,10 +405,10 @@ def test_cli_csv_views_exit_zero_and_match_library(seeded, monkeypatch, capsys):
     root, _ = seeded
     monkeypatch.chdir(root)
     metering._policy_for.cache_clear()
-    for argv in (["report", "--csv"], ["attrib", "--csv"], ["roi", "--csv"],
-                 ["compare", "--csv"], ["calibration", "--csv"],
-                 ["calibration", "--human", "--csv"], ["human", "--csv"],
-                 ["trend", "--csv"], ["study", "report", "--csv"]):
+    for argv in (["report", "--csv"], ["insights", "attrib", "--csv"], ["insights", "roi", "--csv"],
+                 ["insights", "compare", "--csv"], ["insights", "calibration", "--csv"],
+                 ["insights", "calibration", "--human", "--csv"], ["human", "show", "--csv"],
+                 ["insights", "trend", "--csv"], ["study", "report", "--csv"]):
         assert cli.main(argv) == 0, argv
     # stdout is pure CSV data — the last command's output starts with its header
     assert capsys.readouterr().out.startswith("route,calls,")

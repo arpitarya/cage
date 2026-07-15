@@ -235,7 +235,7 @@ def _project_policy(root: Path) -> Path:
     foot = paths.Footprint(root)
     base = foot.policy.parent
     if not base.exists():
-        raise CageError(f"no cage footprint at {base} — run `cage init` first "
+        raise CageError(f"no cage footprint at {base} — run `cage setup` first "
                         f"(or point --ledger/CAGE_BASE at one)")
     return foot.policy
 

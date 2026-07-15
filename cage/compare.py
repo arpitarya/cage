@@ -1,4 +1,4 @@
-"""`cage compare` — measured comparison of closed tasks grouped by stack (roadmap P2).
+"""`cage insights compare` — measured comparison of closed tasks grouped by stack (roadmap P2).
 
 The question attribution can't answer: not "what does graphify *model* as saved"
 but "did tasks that ran with graphify **measurably** cost less than tasks that
@@ -150,8 +150,8 @@ def render_csv(d: dict) -> str:
 
 def render_compare(d: dict) -> str:
     if not d["groups"]:
-        return ("No closed tasks to compare — close tasks with `cage outcome <task>` "
-                "(optionally `--label <word>`), then re-run `cage compare`.")
+        return ("No closed tasks to compare — close tasks with `cage human outcome <task>` "
+                "(optionally `--label <word>`), then re-run `cage insights compare`.")
     keys = d["by"]
     headers = [*keys, "n", "median tok", "IQR tok", "median $", "IQR $"]
     rows = []

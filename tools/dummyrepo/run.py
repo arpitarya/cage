@@ -4,7 +4,7 @@
 Scaffolds a disposable repo *beside* the cage checkout, sandboxes every agent
 home (env overrides — nothing touches the real machine), plants the sanitized
 fixture corpus (`tests/fixtures/transcripts/`) in each agent's real log
-location, and runs the scenario matrix S1–S14, printing a pass/fail table.
+location, and runs the scenario matrix S1–S17, printing a pass/fail table.
 
 Same rules as `tools/skillgen`: **stdlib-only, never imported by cage at
 runtime, never in the wheel** (`pyproject` packages only `cage*`). It shells
@@ -190,7 +190,7 @@ def s1_cli(base: Path) -> str:
     rows; doctor exits 0; a simulated teammate clone gets portable wiring (no absolute
     paths, the committed shim resolves). (The hook-fires-live half is manual.)"""
     repo, env = make_sandbox(base, "s1-cli")
-    expect_ok(repo, env, "init")
+    expect_ok(repo, env, "setup", "--project-only", "--no-graphify")
     for agent in AGENTS:
         expect_ok(repo, env, "setup", "--wire-only", f"--{agent}")
     status = expect_ok(repo, env, "setup", "--status")
@@ -238,7 +238,7 @@ def s2_vscode(base: Path) -> str:
     """S2 — per agent × VS Code: hooks stay unwired (the extension case), planted
     extension-format logs import to exact rows, re-import is byte-identical (cursor)."""
     repo, env = make_sandbox(base, "s2-vscode")
-    expect_ok(repo, env, "init")
+    expect_ok(repo, env, "setup", "--project-only", "--no-graphify")
     specs = fixture_specs("vscode")
     plant(specs, env)
     expect_ok(repo, env, "import")
@@ -268,7 +268,7 @@ def s3_broken_setups(base: Path) -> str:
     #     doctor flags the policy check as FAIL (exit 1).
     repo, env = make_sandbox(base, "s3-bad-policy")
     env["CAGE_DEBUG"] = "1"
-    expect_ok(repo, env, "init")
+    expect_ok(repo, env, "setup", "--project-only", "--no-graphify")
     (repo / ".cage" / "policy.toml").write_text("[debug]\n[debug]\n", encoding="utf-8")
     plant(fixture_specs("cli")[:1], env)  # one claude log is enough
     expect_ok(repo, env, "import")
@@ -281,7 +281,7 @@ def s3_broken_setups(base: Path) -> str:
     # (b) unwritable ledger dir — the append fails open and logs ledger.append.
     repo, env = make_sandbox(base, "s3-unwritable")
     env["CAGE_DEBUG"] = "1"
-    expect_ok(repo, env, "init")
+    expect_ok(repo, env, "setup", "--project-only", "--no-graphify")
     blocker = repo / "blocker"
     blocker.write_text("", encoding="utf-8")
     env["CAGE_LEDGER"] = str(blocker / "ledger")  # parent is a file → every append fails
@@ -294,7 +294,7 @@ def s3_broken_setups(base: Path) -> str:
 
     # (c) truncated shard tail — reads stay tolerant, report exits 0.
     repo, env = make_sandbox(base, "s3-truncated")
-    expect_ok(repo, env, "init")
+    expect_ok(repo, env, "setup", "--project-only", "--no-graphify")
     plant(fixture_specs("cli"), env)
     expect_ok(repo, env, "import")
     shard = next(iter(sorted((repo / ".cage" / "ledger").glob("calls*.jsonl"))))
@@ -305,7 +305,7 @@ def s3_broken_setups(base: Path) -> str:
 
     # (d) empty log — imports 0 rows, no error.
     repo, env = make_sandbox(base, "s3-empty-log")
-    expect_ok(repo, env, "init")
+    expect_ok(repo, env, "setup", "--project-only", "--no-graphify")
     spec = fixture_specs("cli")[0]
     dst = Path(env[spec["env"]]) / spec["plant"]
     dst.parent.mkdir(parents=True, exist_ok=True)
@@ -322,7 +322,7 @@ def s4_bundle(base: Path) -> str:
     """S4 — `cage doctor --bundle` produces one archive; PII grep of every member clean."""
     repo, env = make_sandbox(base, "s4-bundle")
     env["CAGE_DEBUG"] = "1"
-    expect_ok(repo, env, "init")
+    expect_ok(repo, env, "setup", "--project-only", "--no-graphify")
     plant(fixture_specs("cli"), env)
     expect_ok(repo, env, "import")
     expect_ok(repo, env, "doctor", "--bundle", "bundle.zip")
@@ -380,26 +380,26 @@ for i, tin in enumerate((3000, 3200)):
 
 
 def s5_compare(base: Path) -> str:
-    """S5 — seeded task groups: `cage compare` exact medians, delta tagged estimated
+    """S5 — seeded task groups: `cage insights compare` exact medians, delta tagged estimated
     with the observational caveat, n=2 group refused, byte-identical re-run."""
     repo, env = make_sandbox(base, "s5-compare")
-    expect_ok(repo, env, "init")
+    expect_ok(repo, env, "setup", "--project-only", "--no-graphify")
     r = _sh([sys.executable, "-c", _S5_SEED, str(repo)], cwd=repo, env=env)
     if r.returncode != 0:
         raise Fail(f"S5 seeding failed: {r.stderr.strip()[:300]}")
-    out = expect_ok(repo, env, "compare")
+    out = expect_ok(repo, env, "insights", "compare")
     for needle in ("12,500", "5,500", "insufficient data (n=2 < 5)",
                    "-7,000 tok · -$0.0350 per task (median, estimated)",
                    "not a controlled experiment"):
         if needle not in out:
             raise Fail(f"compare output missing {needle!r}")
-    if expect_ok(repo, env, "compare") != out:
-        raise Fail("cage compare not byte-identical across two runs")
+    if expect_ok(repo, env, "insights", "compare") != out:
+        raise Fail("cage insights compare not byte-identical across two runs")
     return "exact medians · delta estimated + caveat · n=2 refused · byte-identical"
 
 
 # Seeder for S6 — history first, then the estimate→record→run→close loop happens
-# through the real CLI (`cage estimate --record`, `cage outcome`), so the scenario
+# through the real CLI (`cage insights estimate --record`, `cage human outcome`), so the scenario
 # proves the shipped verbs, not library internals.
 _S6_SEED = """
 import sys
@@ -424,31 +424,31 @@ else:  # the estimated tasks actually run
 def s6_estimate(base: Path) -> str:
     """S6 — estimate → --record → run → close → calibration exact hit-rate."""
     repo, env = make_sandbox(base, "s6-estimate")
-    expect_ok(repo, env, "init")
+    expect_ok(repo, env, "setup", "--project-only", "--no-graphify")
     r = _sh([sys.executable, "-c", _S6_SEED, str(repo), "history"], cwd=repo, env=env)
     if r.returncode != 0:
         raise Fail(f"S6 seeding failed: {r.stderr.strip()[:300]}")
-    out = expect_ok(repo, env, "estimate", "--label", "bugfix")
+    out = expect_ok(repo, env, "insights", "estimate", "--label", "bugfix")
     for needle in ("n = 5 matching closed tasks", "median 12,500 · IQR 11,500–13,500",
                    "modeled"):
         if needle not in out:
             raise Fail(f"estimate output missing {needle!r}")
-    if cage(repo, env, "estimate", "--label", "nope").stdout.find("insufficient history") < 0:
+    if cage(repo, env, "insights", "estimate", "--label", "nope").stdout.find("insufficient history") < 0:
         raise Fail("estimate did not refuse thin history")
     for tid in ("new-in-band", "new-over"):
-        expect_ok(repo, env, "estimate", "--label", "bugfix", "--record", tid)
+        expect_ok(repo, env, "insights", "estimate", "--label", "bugfix", "--record", tid)
     r = _sh([sys.executable, "-c", _S6_SEED, str(repo), "run"], cwd=repo, env=env)
     if r.returncode != 0:
         raise Fail(f"S6 run-phase seeding failed: {r.stderr.strip()[:300]}")
     for tid in ("new-in-band", "new-over"):
-        expect_ok(repo, env, "outcome", tid, "--label", "bugfix")
-    cal = expect_ok(repo, env, "calibration")
+        expect_ok(repo, env, "human", "outcome", tid, "--label", "bugfix")
+    cal = expect_ok(repo, env, "insights", "calibration")
     for needle in ("n = 2 closed tasks with estimates",
                    "in-band hit-rate: 50% (1/2", "measured"):
         if needle not in cal:
             raise Fail(f"calibration output missing {needle!r}")
-    if expect_ok(repo, env, "calibration") != cal:
-        raise Fail("cage calibration not byte-identical across two runs")
+    if expect_ok(repo, env, "insights", "calibration") != cal:
+        raise Fail("cage insights calibration not byte-identical across two runs")
     return "band exact · refusal · --record→close loop · 50% hit-rate exact"
 
 
@@ -478,23 +478,23 @@ def s7_verdict(base: Path) -> str:
     """S7 — verdict on seeded net-positive / net-negative tools + the honest
     insufficient-data path; inputs render with method tags; byte-identical."""
     repo, env = make_sandbox(base, "s7-verdict")
-    expect_ok(repo, env, "init")
+    expect_ok(repo, env, "setup", "--project-only", "--no-graphify")
     r = _sh([sys.executable, "-c", _S7_SEED, str(repo)], cwd=repo, env=env)
     if r.returncode != 0:
         raise Fail(f"S7 seeding failed: {r.stderr.strip()[:300]}")
-    pos = expect_ok(repo, env, "verdict", "graphify")
+    pos = expect_ok(repo, env, "insights", "verdict", "graphify")
     for needle in ("graphify is SAVING", "/mo net (modeled)", "(modeled)",
                    "computes no new statistics"):
         if needle not in pos:
             raise Fail(f"SAVING verdict missing {needle!r}")
-    neg = expect_ok(repo, env, "verdict", "pricey-ml")
+    neg = expect_ok(repo, env, "insights", "verdict", "pricey-ml")
     if "pricey-ml is COSTING" not in neg or "break-even" not in neg:
         raise Fail("COSTING verdict wrong for the net-negative tool")
-    ghost = expect_ok(repo, env, "verdict", "ghost-tool")
+    ghost = expect_ok(repo, env, "insights", "verdict", "ghost-tool")
     if "INSUFFICIENT DATA" not in ghost:
         raise Fail("missing insufficient-data path for a receipt-less tool")
-    if expect_ok(repo, env, "verdict", "graphify") != pos:
-        raise Fail("cage verdict not byte-identical across two runs")
+    if expect_ok(repo, env, "insights", "verdict", "graphify") != pos:
+        raise Fail("cage insights verdict not byte-identical across two runs")
     return "SAVING + COSTING + INSUFFICIENT DATA · tags rendered · byte-identical"
 
 
@@ -548,7 +548,7 @@ def s9_fleet(base: Path) -> str:
     bundles → import-merge → exact coverage + gap flag + paired delta;
     double-import idempotent."""
     repo, env = make_sandbox(base, "s9-fleet")
-    expect_ok(repo, env, "init")
+    expect_ok(repo, env, "setup", "--project-only", "--no-graphify")
     bundles = []
     for i in range(1, 8):
         kind = "gap" if i == 6 else ("missing" if i == 7 else "full")
@@ -558,7 +558,7 @@ def s9_fleet(base: Path) -> str:
             raise Fail(f"S9 machine seed failed: {r.stderr.strip()[:300]}")
         out = str(base / f"s9-bundle-{i}.zip")
         menv = {**env, "CAGE_BASE": str(mroot / ".cage")}
-        expect_ok(mroot, menv, "export", "--study", out, "--no-import")
+        expect_ok(mroot, menv, "data", "export", "--study", out, "--no-import")
         bundles.append(out)
     # machine 8: no prior `cage import` ever ran — its two calls live only in a
     # planted Claude transcript, and `export --study` (no --no-import) must sweep
@@ -575,7 +575,7 @@ def s9_fleet(base: Path) -> str:
     out8 = str(base / "s9-bundle-8.zip")
     menv8 = {**env, "CAGE_BASE": str(mroot8 / ".cage"),
              "CLAUDE_CONFIG_DIR": str(claude8)}
-    swept = expect_ok(mroot8, menv8, "export", "--study", out8)
+    swept = expect_ok(mroot8, menv8, "data", "export", "--study", out8)
     if "self-refreshed: +2 call(s)" not in swept:
         raise Fail(f"machine-8 export did not self-refresh: {swept.strip()[:200]}")
     bundles.append(out8)
@@ -642,7 +642,7 @@ def s10_attention(base: Path) -> str:
     the attested-beats-derived precedence; calibration --human scores the heuristic
     exactly; the derived view is byte-identical across runs."""
     repo, env = make_sandbox(base, "s10-attention")
-    expect_ok(repo, env, "init")
+    expect_ok(repo, env, "setup", "--project-only", "--no-graphify")
     # transcript capture through the real import path (90 s gap → 1.5 min)
     tdir = Path(env["CLAUDE_CONFIG_DIR"]) / "projects" / "-tmp-cage-testbed"
     tdir.mkdir(parents=True, exist_ok=True)
@@ -653,34 +653,34 @@ def s10_attention(base: Path) -> str:
         raise Fail(f"S10 seeding failed: {r.stderr.strip()[:300]}")
 
     # derived minutes exact in cage human: 5 tasks × 2 min + 1.5 min transcript
-    hum = expect_ok(repo, env, "human")
+    hum = expect_ok(repo, env, "human", "show")
     for needle in ("derived attention", "derived (turn-gaps, capped)", "cap 10 min",
                    "11.5", "never summed"):
         if needle not in hum:
             raise Fail(f"cage human missing {needle!r}")
-    if expect_ok(repo, env, "human") != hum:
+    if expect_ok(repo, env, "human", "show") != hum:
         raise Fail("cage human not byte-identical across two runs")
 
     # compare: total-cost line over the 5 closed tasks (10 derived min @ $80/hr)
-    cmp_out = expect_ok(repo, env, "compare")
+    cmp_out = expect_ok(repo, env, "insights", "compare")
     for needle in ("total cost: agent", "human 10 min × $80/hr",
                    "derived (turn-gaps, capped) 10 min"):
         if needle not in cmp_out:
-            raise Fail(f"cage compare missing {needle!r}")
-    if "total cost" in expect_ok(repo, env, "compare", "--agent-only"):
+            raise Fail(f"cage insights compare missing {needle!r}")
+    if "total cost" in expect_ok(repo, env, "insights", "compare", "--agent-only"):
         raise Fail("--agent-only did not suppress the compare total-cost line")
 
     # verdict: composes the same axis ledger-wide (10 + 1.5 loose transcript minutes)
-    vd = expect_ok(repo, env, "verdict", "graphify")
+    vd = expect_ok(repo, env, "insights", "verdict", "graphify")
     for needle in ("graphify is SAVING", "human 11.5 min × $80/hr"):
         if needle not in vd:
-            raise Fail(f"cage verdict missing {needle!r}")
-    if "total cost" in expect_ok(repo, env, "verdict", "graphify", "--agent-only"):
+            raise Fail(f"cage insights verdict missing {needle!r}")
+    if "total cost" in expect_ok(repo, env, "insights", "verdict", "graphify", "--agent-only"):
         raise Fail("--agent-only did not suppress the verdict total-cost line")
 
     # attest one task → attested (4 min) beats derived (2 min), reference kept
-    expect_ok(repo, env, "outcome", "attn-0", "--minutes", "4")
-    cmp2 = expect_ok(repo, env, "compare")
+    expect_ok(repo, env, "human", "outcome", "attn-0", "--minutes", "4")
+    cmp2 = expect_ok(repo, env, "insights", "compare")
     for needle in ("human 12 min × $80/hr",       # 4 attested + 4×2 derived
                    "attested 4 min", "never summed",
                    "derived ref on attested tasks: 2 min (not summed)"):
@@ -689,13 +689,13 @@ def s10_attention(base: Path) -> str:
 
     # attest the rest → calibration --human scores derived/attested = 2/4 exactly
     for i in range(1, 5):
-        expect_ok(repo, env, "outcome", f"attn-{i}", "--minutes", "4")
-    cal = expect_ok(repo, env, "calibration", "--human")
+        expect_ok(repo, env, "human", "outcome", f"attn-{i}", "--minutes", "4")
+    cal = expect_ok(repo, env, "insights", "calibration", "--human")
     for needle in ("n = 5 tasks with both", "derived/attested ratio: median 0.5",
                    "IQR 0.5–0.5", "measured"):
         if needle not in cal:
             raise Fail(f"calibration --human missing {needle!r}")
-    below = expect_ok(repo, env, "calibration", "--human")
+    below = expect_ok(repo, env, "insights", "calibration", "--human")
     if below != cal:
         raise Fail("calibration --human not byte-identical across two runs")
     assert_pii_clean(repo)
@@ -735,7 +735,7 @@ def s11_prices(base: Path) -> str:
     expected USD (idempotent, ledger untouched); a backdated [meta] triggers the
     sync recommendation in list/doctor; `sync --update` restamps; byte-identical."""
     repo, env = make_sandbox(base, "s11-prices")
-    expect_ok(repo, env, "init")
+    expect_ok(repo, env, "setup", "--project-only", "--no-graphify")
     r = _sh([sys.executable, "-c", _S11_SEED, str(repo)], cwd=repo, env=env)
     if r.returncode != 0:
         raise Fail(f"S11 seeding failed: {r.stderr.strip()[:300]}")
@@ -766,17 +766,22 @@ def s11_prices(base: Path) -> str:
     expect_ok(repo, env, "prices", "alias", "-", "copilot/auto",
               "--to", "anthropic/claude-sonnet-4-6")
 
-    # 3. report re-prices to exact expected USD; the ledger was never rewritten
-    rep = expect_ok(repo, env, "report", "--by", "model")
+    # 3. report re-prices to exact expected USD; the ledger was never rewritten.
+    # Dollars are opt-in now (plan Phase 2.5) — the repricing lives in the --usd view.
+    rep = expect_ok(repo, env, "report", "--by", "model", "--usd")
     for needle in ("$3.2000",     # mistral: 1M×$2 + 200k×$6 per MTok
                    "$0.2250",     # auto→sonnet-4-6: 45k×$3 + 6k×$15 per MTok
                    "$3.4250",     # total
-                   "priced by alias (explicit routing — policy [alias]): "
+                   "priced by alias (explicit routing — policy [alias]):",
                    "copilot/auto → anthropic/claude-sonnet-4-6"):
         if needle not in rep:
             raise Fail(f"repriced report missing {needle!r}")
     if "UNPRICED" in rep:
         raise Fail("report still shows UNPRICED after set+alias")
+    # the token default carries no dollar figures at all
+    tok_rep = expect_ok(repo, env, "report", "--by", "model")
+    if "$" in tok_rep:
+        raise Fail("token-default report leaked a dollar figure")
     if shard_bytes(repo) != shards:
         raise Fail("repricing rewrote the ledger — it must be derive-time only")
     if "every recorded call prices" not in expect_ok(repo, env, "prices", "unpriced"):
@@ -800,7 +805,7 @@ def s11_prices(base: Path) -> str:
         raise Fail("recommendation survived the restamp")
     if expect_ok(repo, env, "prices", "list") != lst2:
         raise Fail("prices list not byte-identical across two runs")
-    if expect_ok(repo, env, "report", "--by", "model") != rep:
+    if expect_ok(repo, env, "report", "--by", "model", "--usd") != rep:
         raise Fail("report not byte-identical across two runs")
     assert_pii_clean(repo)
     return ("unpriced exact + fix lines · set/alias reprice to $3.4250 exact · "
@@ -811,12 +816,13 @@ def s8_determinism(base: Path) -> str:
     """S8 — determinism sweep: derived views byte-identical across runs, and
     CAGE_DEBUG=1 does not change any derived output."""
     repo, env = make_sandbox(base, "s8-det")
-    expect_ok(repo, env, "init")
+    expect_ok(repo, env, "setup", "--project-only", "--no-graphify")
     specs = fixture_specs("cli")
     plant(specs, env)
     expect_ok(repo, env, "import")
-    views = (("report",), ("report", "--by", "model"), ("attrib",), ("matrix",),
-             ("budget",), ("roi",), ("report", "--csv"), ("attrib", "--csv"))
+    views = (("report",), ("report", "--by", "model"), ("insights", "attrib"),
+             ("insights", "matrix"), ("insights", "budget"), ("insights", "roi"),
+             ("report", "--csv"), ("insights", "attrib", "--csv"))
     first = {v: expect_ok(repo, env, *v) for v in views}
     for v in views:
         if expect_ok(repo, env, *v) != first[v]:
@@ -835,7 +841,7 @@ def s12_launcher(base: Path) -> str:
     preserves the mode byte-identically; the shim resolves via the interpreter;
     doctor names the mode."""
     repo, env = make_sandbox(base, "s12-launcher")
-    expect_ok(repo, env, "init")
+    expect_ok(repo, env, "setup", "--project-only", "--no-graphify")
     expect_ok(repo, env, "setup", "--wire-only", "--all", "--python-launcher")
     pol = (repo / ".cage" / "policy.toml").read_text(encoding="utf-8")
     if "python_launcher = true" not in pol:
@@ -895,8 +901,8 @@ def s13_pyz(base: Path) -> str:
     if r.returncode != 0 or not r.stdout.strip().endswith("(zipapp)"):
         raise Fail(f"pyz --version missing the zipapp label: {r.stdout.strip()!r} "
                    f"{r.stderr.strip()[:200]!r}")
-    if pyz("init").returncode != 0:
-        raise Fail("pyz init failed")
+    if pyz("setup", "--project-only", "--no-graphify").returncode != 0:
+        raise Fail("pyz setup (scaffold) failed")
     if pyz("demo").returncode != 0:
         raise Fail("pyz demo failed (bundled policy unreadable from the zip?)")
     specs = fixture_specs("cli")
@@ -952,7 +958,7 @@ def s14_receipt_ladder(base: Path) -> str:
     deterministic tie-breaks (rung 2), or refuse loudly (rung 3); the rung is
     footnoted in text and a `priced_via` CSV column; byte-identical runs."""
     repo, env = make_sandbox(base, "s14-receipt-ladder")
-    expect_ok(repo, env, "init")
+    expect_ok(repo, env, "setup", "--project-only", "--no-graphify")
     routed = expect_ok(repo, env, "prices", "route-tool", "zed",
                        "--to", "anthropic/claude-sonnet-4-6")
     if "✔ [tools.zed]" not in routed:
@@ -960,7 +966,7 @@ def s14_receipt_ladder(base: Path) -> str:
     r = _sh([sys.executable, "-c", _S14_SEED, str(repo)], cwd=repo, env=env)
     if r.returncode != 0:
         raise Fail(f"S14 seeding failed: {r.stderr.strip()[:300]}")
-    out = expect_ok(repo, env, "roi")
+    out = expect_ok(repo, env, "insights", "roi")
     for needle in (
             "≈ zed priced via [tools.zed] price_at (anthropic/claude-sonnet-4-6)",
             "≈ graphify priced at task model (anthropic/claude-opus-4-6)",
@@ -970,17 +976,17 @@ def s14_receipt_ladder(base: Path) -> str:
             "  (or run in a metered session)"):
         if needle not in out:
             raise Fail(f"roi missing {needle!r}")
-    csv = expect_ok(repo, env, "roi", "--csv", "-")
+    csv = expect_ok(repo, env, "insights", "roi", "--csv", "-")
     header = csv.splitlines()[0]
     if not header.endswith(",priced_via"):
         raise Fail(f"roi --csv missing priced_via column: {header!r}")
     if "zed,1,0.03,0,0.03,0,modeled,price_at" not in csv:
         raise Fail("rung-1 CSV row wrong (10k tokens at $3/M must be $0.03)")
-    attrib = expect_ok(repo, env, "attrib", "--task", "t-r2")
+    attrib = expect_ok(repo, env, "insights", "attrib", "--task", "t-r2")
     if "≈ graphify priced at task model (anthropic/claude-opus-4-6)" not in attrib:
         raise Fail("attrib missing the task-model footnote")
-    if expect_ok(repo, env, "roi") != out:
-        raise Fail("cage roi not byte-identical across two runs")
+    if expect_ok(repo, env, "insights", "roi") != out:
+        raise Fail("cage insights roi not byte-identical across two runs")
     return "route via verb · 3 rungs + tie-break priced · UNPRICED hint runnable · byte-identical"
 
 
@@ -1016,7 +1022,7 @@ def s15_freshness(base: Path) -> str:
     data-relatively (newest ledger ts, exact N, byte-identical); `stale_days = 0`
     opts out and, as a scalar under [prices], must never crash provider iteration."""
     repo, env = make_sandbox(base, "s15-freshness")
-    expect_ok(repo, env, "init")
+    expect_ok(repo, env, "setup", "--project-only", "--no-graphify")
 
     # 1. fresh init → no sync signal on the post-commit surface
     if "bundled prices are newer (" in expect_ok(repo, env, "hook-post-commit"):
@@ -1106,7 +1112,7 @@ def s16_policy_sync(base: Path) -> str:
     stamps [meta] policy_version, and changes no derived view by one byte;
     the second apply is a byte-identical no-op; doctor/hook hints flip clean."""
     repo, env = make_sandbox(base, "s16-policy-sync")
-    expect_ok(repo, env, "init")
+    expect_ok(repo, env, "setup", "--project-only", "--no-graphify")
     r = _sh([sys.executable, "-c", _S16_SEED, str(repo)], cwd=repo, env=env)
     if r.returncode != 0:
         raise Fail(f"S16 seeding failed: {r.stderr.strip()[:300]}")
@@ -1134,8 +1140,8 @@ def s16_policy_sync(base: Path) -> str:
         raise Fail("post-commit note missing the policy sync hint")
 
     # 2. behavior-neutrality: --apply changes no derived view by one byte
-    views = [("report",), ("report", "--by", "model"), ("attrib",), ("budget",),
-             ("human",), ("trend",)]
+    views = [("report",), ("report", "--by", "model"), ("insights", "attrib"),
+             ("insights", "budget"), ("human", "show"), ("insights", "trend")]
     before = [expect_ok(repo, env, *v) for v in views]
     applied = expect_ok(repo, env, "policy", "sync", "--apply")
     for needle in ("✔ [capture] import_before_export = true added",
@@ -1167,6 +1173,53 @@ def s16_policy_sync(base: Path) -> str:
 
 
 # id → (phase that ships it, callable or None-if-pending)
+def s17_sources(base: Path) -> str:
+    """S17 — configurable import paths (plan Phase 4): a custom tool declared in
+    `[sources]` imports a claude-format log from a policy-declared path and stamps
+    `agent = <name>` (reports split it out); doctor --paths shows the `policy`
+    provenance + the custom section + a rejected glob entry; a machine-absolute
+    path in an *uncommitted* project policy raises no portability warn."""
+    repo, env = make_sandbox(base, "s17-sources")
+    expect_ok(repo, env, "setup", "--project-only", "--no-graphify")
+
+    # Plant a claude-format log at a non-standard path a custom tool points at.
+    logs = repo / "router-logs"
+    logs.mkdir()
+    shutil.copyfile(CORPUS / "claude" / "cli" / "session-c1a2b3.jsonl",
+                    logs / "session-c1a2b3.jsonl")
+
+    # Append a custom tool + a rejected glob entry to the project policy.
+    pol = repo / ".cage" / "policy.toml"
+    pol.write_text(pol.read_text(encoding="utf-8")
+                   + f'\n[sources.myrouter]\npaths = ["{logs}"]\nformat = "claude"\n'
+                   + f'\n[sources.claude]\npaths = ["{repo}/glob-*.jsonl"]\n',
+                   encoding="utf-8")
+
+    expect_ok(repo, env, "import")
+    rows = ledger_rows(repo)
+    if not rows or any(r["agent"] != "myrouter" for r in rows):
+        raise Fail(f"custom-tool rows not stamped agent=myrouter: "
+                   f"{sorted({r['agent'] for r in rows})}")
+    rep = expect_ok(repo, env, "report", "--by", "agent")
+    if "myrouter" not in rep:
+        raise Fail(f"report --by agent does not split out the custom tool: {rep[:200]!r}")
+
+    paths_out = expect_ok(repo, env, "doctor", "--paths")
+    for needle in ("myrouter  (custom tool, format=claude)", "[policy]",
+                   "⚠ ignored:", "glob character"):
+        if needle not in paths_out:
+            raise Fail(f"doctor --paths missing {needle!r}: {paths_out[:400]!r}")
+    if "machine-absolute path in a committed" in paths_out:
+        raise Fail("portability warned on an uncommitted policy path")
+
+    expect_ok(repo, env, "query", "sources")   # concept entry renders
+    assert_pii_clean(repo)
+    return ("custom tool → rows agent=myrouter · report --by agent splits it · "
+            "doctor --paths shows [policy] + custom section + rejected glob · "
+            "no false portability warn (uncommitted)")
+
+
+# id → (phase that ships it, callable or None-if-pending)
 SCENARIOS: dict[str, tuple[str, object]] = {
     "S1": ("P0", s1_cli),
     "S2": ("P0", s2_vscode),
@@ -1184,6 +1237,7 @@ SCENARIOS: dict[str, tuple[str, object]] = {
     "S14": ("pricing", s14_receipt_ladder),
     "S15": ("pricing", s15_freshness),
     "S16": ("pricing", s16_policy_sync),
+    "S17": ("sources", s17_sources),
 }
 
 MANUAL_CHECKLIST = """\
@@ -1193,7 +1247,7 @@ MANUAL steps (need a live agent — run per docs/archive/v0.16-dummy-repo-test.p
   [ ] §4 per VS Code extension: one real prompt → NO row before `cage import`
       (hooks silent under the extension), row appears after `cage import`
   [ ] §7 agent edit + commit → post-commit resolves a `hooked` provenance row;
-      `cage origin <sha>` names the agent\
+      `cage authorship origin <sha>` names the agent\
 """
 
 

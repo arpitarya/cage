@@ -2,7 +2,7 @@
 
 CSV is a **reporting** format: flat, one-way, for spreadsheets/BI. It is never an
 import source, and it is deliberately distinct from the fleet bundle
-(`cage export --study`, jsonl — lossless, merge-by-id, re-importable). Every view
+(`cage data export --study`, jsonl — lossless, merge-by-id, re-importable). Every view
 that grows `--csv` passes the *same* data structure its text renderer consumes, so
 the two outputs cannot disagree — no view computes twice (the same-numbers-by-
 construction rule).

@@ -19,7 +19,7 @@ Global-asset paths are env-overridable (`CAGE_VSCODE_USER` for Copilot's prompt 
 The granular commands underneath, if you want them directly:
 
 ```bash
-cage init                     # scaffold .cage/ only (no agent touched)
+cage setup                     # scaffold .cage/ only (no agent touched)
 cage adopt [--claude]         # init + graphify shim; agent wiring opt-in via --<agent>
 cage hooks install --claude   # wire just one agent's metering hooks + MCP (errors if no agent)
 ```
@@ -31,7 +31,7 @@ Agent wiring is **opt-in everywhere**: `cage adopt`/`cage hooks install` with no
 
 - **Meter (proxy-free, reliable default):** `cage hooks install --claude` wires a
   **SessionStart** hook that first **backfills the previous session** —
-  `cage import-claude --project .` parses the transcript Claude Code always writes to
+  `cage import --agent claude --project .` parses the transcript Claude Code always writes to
   disk — and then prints the one-line spend banner (`cage hook-session-start`), so the
   banner reflects the just-backfilled spend. This is the reliable trigger: the
   transcript is on disk no matter how the session ended.
@@ -41,8 +41,8 @@ Agent wiring is **opt-in everywhere**: `cage adopt`/`cage hooks install` with no
   not the primary path; running both is safe because `cage import` dedupes by call id.
 - **Read:** the `cage` MCP server is wired in `.mcp.json`; the `/cage` skill answers
   "what did this cost / what saved money" from the ledger.
-- **Alt meter (real-time, for budget blocking):** `export ANTHROPIC_BASE_URL=$(cage proxy)`.
-- **Alt meter (no hooks):** `cage import-claude` parses the transcripts Claude Code
+- **Alt meter (real-time, for budget blocking):** `export ANTHROPIC_BASE_URL=$(cage data proxy)`.
+- **Alt meter (no hooks):** `cage import --agent claude` parses the transcripts Claude Code
   already writes to `~/.claude/projects/` — same rows the SessionEnd hook would
   produce, off the request path. `--project <dir>` scopes it to one repo, `--since 7d`
   to recent sessions. Idempotent (deduped on the per-turn id), so it's safe on a cron.
@@ -54,7 +54,7 @@ Agent wiring is **opt-in everywhere**: `cage adopt`/`cage hooks install` with no
   **SessionStart** backfill — `cage import --agent codex --since 7d` parses the rollouts
   Codex always writes to `~/.codex/sessions`, on the next start. The window only bounds
   the scan (import dedupes by id). Symmetric with Claude's SessionStart-backfill.
-- **Meter (alt):** `cage meter -- codex exec …` runs Codex under the proxy (sets
+- **Meter (alt):** `cage data meter -- codex exec …` runs Codex under the proxy (sets
   `OPENAI_BASE_URL`) for real-time/budget-blocking capture.
 - **Read:** `cage hooks install --codex` registers `[mcp_servers.cage]` in
   `~/.codex/config.toml`; the `/cage` skill is installed to `~/.codex/skills/`.
@@ -62,7 +62,7 @@ Agent wiring is **opt-in everywhere**: `cage adopt`/`cage hooks install` with no
 ## GitHub Copilot
 
 - **Meter (proxy, reliable path):** Copilot writes no usage transcript, so the proxy
-  is its reliable capture path — point Copilot's model endpoint at `cage proxy` where
+  is its reliable capture path — point Copilot's model endpoint at `cage data proxy` where
   your
   setup allows a custom base URL.
 - **Read:** `cage hooks install --copilot` adds the `cage` MCP server to
@@ -71,7 +71,7 @@ Agent wiring is **opt-in everywhere**: `cage adopt`/`cage hooks install` with no
 ## Kiro
 
 - **Meter (proxy, reliable path):** Kiro writes no usage transcript, so the proxy is
-  its reliable capture path (`cage proxy` / `cage meter -- <cmd>`), or a Kiro agent
+  its reliable capture path (`cage data proxy` / `cage data meter -- <cmd>`), or a Kiro agent
   hook that shells `cage report` on save.
 - **Read:** `cage hooks install --kiro` adds the `cage` MCP server to
   `.kiro/settings/mcp.json` and a steering doc at `.kiro/steering/cage.md`.
@@ -82,8 +82,8 @@ Some orgs block Claude Code hooks and/or MCP servers by policy. Cage still works
 the two questions decouple:
 
 - **Hooks blocked (can't capture):** meter off the request path instead. Either
-  `cage import-claude` (pull the on-disk transcripts after the fact — cron/CI/login
-  script friendly, idempotent) or `cage proxy` (wire-level: point
+  `cage import --agent claude` (pull the on-disk transcripts after the fact — cron/CI/login
+  script friendly, idempotent) or `cage data proxy` (wire-level: point
   `ANTHROPIC_BASE_URL` at it and record `usage` live). Either path fills the same
   ledger the SessionEnd hook would.
 - **MCP blocked (can't read in-agent):** this costs only the *agent-facing* read
@@ -92,7 +92,7 @@ the two questions decouple:
 
 ## The universal fallbacks
 
-- **`cage proxy --port 8788`** — a thin metering reverse-proxy. Point any agent's
+- **`cage data proxy --port 8788`** — a thin metering reverse-proxy. Point any agent's
   base URL at it; it forwards verbatim and records `usage`. Fail-open: a metering
   error never changes the bytes the client receives.
 - **`cage mcp`** — the read surface for any MCP-capable agent.
@@ -122,7 +122,7 @@ to read the events, and what it never logs — in
 
 ## Tool-savings receipts — two integration strategies
 
-A *savings receipt* is what makes `cage attrib` / `cage matrix` / `cage roi` show
+A *savings receipt* is what makes `cage insights attrib` / `cage insights matrix` / `cage insights roi` show
 real with/without numbers (token contract in
 [archive/v0.3-tool-receipts-graphify-fux.handoff.md](archive/v0.3-tool-receipts-graphify-fux.handoff.md)).
 How a tool files one depends on who owns it:
@@ -135,15 +135,15 @@ How a tool files one depends on who owns it:
   without cage.
 
 - **External adapter (third-party tools you can't edit) — e.g. graphify.**
-  `cage graphify -- graphify query "…"` runs the unmodified `graphify` command,
+  `cage data graphify -- graphify query "…"` runs the unmodified `graphify` command,
   passes its **stdout/stderr/exit through unchanged**, and on the side parses the
   answer for the `source_file`s it cites — filing one `tool="graphify"` receipt
   (`actual` = answer tokens; `raw_alternative` = the whole *touched, present-on-disk*
   source files, deduped, never the repo). A metering error never alters graphify's
   result; if no source file resolves it files **nothing** (unmeasurable ≠ zero).
   graphify is never edited. This is the same "meter what you observe" family as
-  `cage meter -- <cmd>` and `cage import-codex`. Alias
-  `graphify='cage graphify -- graphify'` to make it transparent.
+  `cage data meter -- <cmd>` and `cage import --agent codex`. Alias
+  `graphify='cage data graphify -- graphify'` to make it transparent.
 
   > Token receipts carry their model price via the task's calls, so `attrib`/`matrix`
   > show real dollars. `roi` prices a receipt only when it links a specific `call`

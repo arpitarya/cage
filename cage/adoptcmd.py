@@ -4,12 +4,12 @@ Drives `cage setup --project-only` (and the project steps of the guided wizard).
 Everything a consumer app needs to start metering, with no repo to clone — it all
 ships in the `cage-flux` PyPI package:
 
-  1. `cage init`           — scaffold .cage/ (policy + gitignored ledger).
+  1. `cage setup`           — scaffold .cage/ (policy + gitignored ledger).
   2. agent wiring          — **opt-in**: wires only the surfaces named in `surfaces`
      (e.g. `--claude`). With no surface flag, no agent is wired — that is a separate,
      explicit step (`cage setup --wire-only <agent>`). One ledger, many surfaces.
   3. graphify interceptor  — drop bin/graphify (routes `graphify query…` through
-     `cage graphify`) and add bin/ to the shell rc PATH (unless --no-graphify).
+     `cage data graphify`) and add bin/ to the shell rc PATH (unless --no-graphify).
 
 The interceptor shim ships as bundled package data (`data/shims/graphify`), copied
 verbatim. Every step is idempotent. Returns a dict of what was done (for --json).

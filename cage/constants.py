@@ -101,6 +101,17 @@ CLEANUP_THROTTLE_HOURS = 24
 # against the newest ledger `ts`, never the wall clock — determinism law.
 PRICES_STALE_DAYS = 45
 
+# Last-import staleness gate (plan Phase 1.6, `cage/report.py`). The report footer's
+# "last import: N ago" line is advice, not a banner — it renders only when the
+# recorded last import is older than this many hours. 24h matches the pull-based
+# capture story (a daily `cage import` cron is the documented hands-off setup, so a
+# ledger refreshed within a day has nothing to advise about). Policy-preferred
+# fallback (the DEFAULT_CONFIDENCE pattern): `policy.toml [capture]
+# import_stale_hours` wins; `0` restores the always-on line. The age is read from
+# the same wall clock `render.ago` already uses — advice text, never a
+# derived-from-ledger figure, the one documented clock carve-out.
+IMPORT_STALE_HOURS = 24
+
 # Authorship-provenance trust ranking (cage/originrecord.py) — a parallel ladder to
 # METHOD_TRUST, for the *different* enum PROV_METHODS (schema.py): hooked (live
 # PostToolUse capture) outranks transcript (parsed after the fact) outranks heuristic
@@ -109,7 +120,7 @@ PRICES_STALE_DAYS = 45
 PROVENANCE_METHOD_TRUST = {"hooked": 2, "transcript": 1, "heuristic": 0}
 PROVENANCE_CORROBORATION_BONUS = 0.2  # confidence bump when 2 independent paths agree
 
-# `cage compare` min-n gate (roadmap P2). Below this many closed tasks a group
+# `cage insights compare` min-n gate (roadmap P2). Below this many closed tasks a group
 # renders "insufficient data (n=X < N)" and is excluded from every delta — the
 # command explains, it never numbers. NOT a vibes number: with n<5 a single
 # outlier task moves the median itself, and the IQR (quartiles) degenerates —
@@ -118,7 +129,7 @@ PROVENANCE_CORROBORATION_BONUS = 0.2  # confidence bump when 2 independent paths
 # credits/limits follow). Heuristic, not user economics ⇒ constants, not policy.
 MIN_COMPARE_N = 5
 
-# `cage estimate` min-n gate (roadmap P3) — same statistical rationale as
+# `cage insights estimate` min-n gate (roadmap P3) — same statistical rationale as
 # MIN_COMPARE_N (a median/IQR band over fewer closed tasks is noise wearing a
 # band), and the same blocking rule: below it the command explains, never
 # numbers. Kept as its own name (not an alias) so the two gates can diverge if

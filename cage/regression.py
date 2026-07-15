@@ -1,4 +1,4 @@
-"""`cage regression` — alert when cost-per-call drifts up (plan §8.3).
+"""`cage insights regression` — alert when cost-per-call drifts up (plan §8.3).
 
 A deterministic threshold on the ledger: split calls into a recent window and the
 baseline before it, compare mean cost per call, and flag drift past a tolerance —

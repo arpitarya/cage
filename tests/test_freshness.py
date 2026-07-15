@@ -202,8 +202,14 @@ def test_report_unpriced_not_duplicated_by_footer(root, bundle_meta):
     # repeat it (include_unpriced=False on the report path)
     _call(root, provider="mistral", model="mystery-9", call_id="c_u",
           ts="2026-01-10T10:00:00Z")
-    text = report.render_report(report.summarize(root, policy.load(None)))
+    from cage import display
+    rep = report.summarize(root, policy.load(None))
+    text = report.render_report(rep, disp=display.Display(usd=True))
     assert text.count("UNPRICED") == 1
+    # token default: the muted pointer speaks once instead of the ⚠ block
+    token_text = report.render_report(rep)
+    assert "UNPRICED" not in token_text
+    assert token_text.count("unpriced — matters when you view $") == 1
 
 
 # ── regression: a scalar under [prices] must not crash provider iteration ────

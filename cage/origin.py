@@ -1,4 +1,4 @@
-"""`cage origin <sha>` — read surface for authorship attribution (plan §3.5).
+"""`cage authorship origin <sha>` — read surface for authorship attribution (plan §3.5).
 
 `origin="unknown"` is a **read-time default**, never a written row: a sha with no
 provenance fragment anywhere (local buffer or `refs/notes/cage-provenance`) simply
@@ -16,7 +16,7 @@ from cage.constants import DEFAULT_CONFIDENCE
 
 
 def _resolve_sha(root: Path, sha: str) -> str:
-    """`HEAD` (or any rev) → its short sha, so `cage origin HEAD` matches the short
+    """`HEAD` (or any rev) → its short sha, so `cage authorship origin HEAD` matches the short
     shas recorded by `originrecord` (fail-open: returns the input unresolved)."""
     try:
         out = subprocess.run(("git", "-C", str(root), "rev-parse", "--short", sha),

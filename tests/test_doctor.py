@@ -74,7 +74,7 @@ def test_metering_matrix_is_honest_about_wired_hooks(proj):
     # Honest doctor (plan §3.6.5): a *wired* hook is not a *firing* one — hooks fire only
     # under a CLI client, never a VS Code extension, so the matrix never claims "capture
     # wired". It frames hooks as an optional CLI-only add-on and points at the universal
-    # pull-based path (`cage import`/`cage export`) plus the last-import staleness signal.
+    # pull-based path (`cage import`/`cage data export`) plus the last-import staleness signal.
     from cage import agents
     initcmd.run(proj)
     agents.install(proj, ("claude", "codex"))

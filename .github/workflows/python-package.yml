@@ -39,6 +39,8 @@ jobs:
       run: pip install -e ".[dev]"
     - name: Skill assets are rendered (no hand-edit drift)
       run: python -m tools.skillgen --check
+    - name: Generated docs match their sources (spec ← goldens · formulas/policy comments ← explain registry)
+      run: python -m tools.docgen --check
     - name: Test with pytest
       run: pytest -q
     - name: Scenario runner S1–S9 (real-CLI capture, PII, determinism, fleet)

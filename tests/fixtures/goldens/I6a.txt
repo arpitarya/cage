@@ -1,0 +1,8 @@
+$ cage insights estimate --label docfix
+Estimate · label=docfix
+
+  n = 12 matching closed tasks
+  tokens: median 7,800 · IQR 6,150–13,525
+  usd:    median $0.0366 · IQR $0.0316–$0.0586
+  method: modeled — history applied to an unrun task, never an invoice
+  confidence: none self-reported — `cage insights calibration` measures the hit-rate

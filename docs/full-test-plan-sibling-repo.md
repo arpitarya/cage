@@ -11,6 +11,33 @@
 
 ## Part A — Automated baseline (run first, ~minutes)
 
+**Tier-1 output-honesty smoke (v0.26):** `cage report` and bare `cage` render
+**tokens by default** — confirm no `$` unless `--usd` (or `[display] usd =
+true`) is set; `cage report --usd` shows the dollar columns; an unpriced model
+renders `—` (never `$0.0000`) with the ⚠ block + one runnable fix line per
+model in the `--usd` view (a muted `· N calls unpriced — matters when you view
+$` pointer in the token view); saved/net columns are absent on a receipt-less
+window (one gating line instead), present with receipts, and a negative net
+with real receipts always renders; `cage insights matrix` shows the token grid,
+`cage insights matrix --usd` adds the cost column or one-line unavailability;
+`python -m tools.docgen --check` is clean (spec ← goldens, formulas/policy
+comments ← registry).
+
+
+**Tier-1 CLI smoke (v0.27 — CLI tiering):** `cage --help` renders the curated
+front door — five daily verbs (`report`/`import`/`setup`/`doctor`/`query`) + the
+seven group names (`insights`/`human`/`authorship`/`prices`/`study`/`policy`/
+`data`), no `usage:`/options noise; a moved verb under its old name errors with a
+direction and exits 1 (`cage attrib` → `error: 'attrib' is now 'cage insights
+attrib'`) and does **not** run the command; each group dispatches (`cage insights
+attrib`, `cage human show`, `cage authorship origin HEAD`, `cage data export
+--no-import`) with byte-identical output to the pre-move golden; `mcp`/`debug`/
+`demo` + `hook-*` stay callable but off the help; no argparse abbreviation
+(`cage rep` → invalid choice, exit 2); the graphify interceptor routes through
+`cage data graphify`; re-running `cage setup` migrates a legacy `import-claude`
+SessionStart hook to `import --agent claude`; `grep -rE 'cage (attrib|matrix|…)'`
+across `cage/`, the rendered agent assets, and committed wired files is clean.
+
 - [ ] `just test` → all passing, 0 failures. Record the count. If red, stop and fix first.
 - [ ] `python -m tools.dummyrepo` → S1–S13 all PASS (scripted capture, adversarial states, bundle PII, compare/estimate/calibration/verdict goldens, fleet merge, attention gaps, pricing/unpriced, launcher mode, pyz parity).
 - [ ] `python -m tools.skillgen --check` → no drift.
@@ -25,7 +52,7 @@ Everything below targets only what A cannot reach: real clients, real extensions
 cd ~/my_programs
 git init cage-testbed && cd cage-testbed
 printf 'hello\n' > README.md && mkdir -p src docs && git add -A && git commit -m init
-cage init                      # project .cage/
+cage setup                      # project .cage/
 cage setup                     # wire ALL FOUR agents + git hooks + skill assets
 cage doctor                    # expect: ok/warn only; note every warn
 ```
@@ -40,7 +67,7 @@ For each cell you actually have installed (mark the rest **N/A (not installed)**
 
 **Per-cell check (same for all):**
 
-1. Session done → `cage import` → `cage report` shows new call rows with the right `agent`, non-zero tokens, a priced USD (not $0 — if $0, check `(provider, model)` exact-match in policy; known bug class).
+1. Session done → `cage import` → `cage report` shows new call rows with the right `agent`, non-zero tokens (tokens are the default view now — plan Phase 2.5). Add `--usd` for dollar columns: a priced USD, **not `$0.0000`** — an unpriced cell renders `—`, not a fake zero (if `—`, check `(provider, model)` exact-match in policy; known bug class). A truly free zero still prints `$0.0000`.
 2. `cage doctor` → capture path for that agent reported correctly (CLI: hook wired + fired; extension: hook marked "may not fire", import path healthy).
 3. Ledger PII grep: `grep -rE "docstring|src/x.py content|<anything you typed>" .cage/ledger/` → **no prompt text, ever** (task rows: top-level dirs only; provenance: repo-relative paths allowed, no content).
 4. Row sanity: `python -m json.tool` one row from `calls-2026-07.jsonl` — fields match schema, `scope`/`project` sensible.
@@ -49,9 +76,9 @@ For each cell you actually have installed (mark the rest **N/A (not installed)**
 
 | Cell | Session log to verify | Extra checks |
 |---|---|---|
-| Claude Code **CLI** | `~/.claude/projects/<slug>/*.jsonl` | Hooks fire live: row appears at SessionEnd *without* manual `cage import`. Post-commit: make the agent commit → `provenance.jsonl` gets a `hooked` row; `cage origin <sha>` explains it. |
+| Claude Code **CLI** | `~/.claude/projects/<slug>/*.jsonl` | Hooks fire live: row appears at SessionEnd *without* manual `cage import`. Post-commit: make the agent commit → `provenance.jsonl` gets a `hooked` row; `cage authorship origin <sha>` explains it. |
 | Claude Code **VS Code ext** | same | Claude's extension honors hooks — verify rows land live; if not, `cage import` must catch up and `debug.log` must say why the hook missed. |
-| Codex **CLI** | `~/.codex/sessions/**/rollout-*.jsonl` | `cage limits` after the session → rate-limit snapshot in `.cage/state/limits.json`; `cage limits --json` = `cage.v1` envelope. |
+| Codex **CLI** | `~/.codex/sessions/**/rollout-*.jsonl` | `cage data limits` after the session → rate-limit snapshot in `.cage/state/limits.json`; `cage data limits --json` = `cage.v1` envelope. |
 | Codex **VS Code ext** | find the real log (extension may write elsewhere — search `~/.codex` and VS Code globalStorage) | **Deliverable:** sanitized sample → `tests/fixtures/transcripts/codex/vscode/`, remove `UNVERIFIED-FORMAT`. If format differs and import parses 0 rows from a non-empty log → confirm `debug.log` records it, file a finding. |
 | Copilot **CLI** | `~/.copilot/session-state/*/events.jsonl` | Hook is user-level (`~/.copilot/hooks/cage.json`) — verify it swept *all* agents' logs (`paths.cage_import_all`), not just copilot's. |
 | Copilot **VS Code ext** | extension log ≠ CLI log — locate it (globalStorage / output channels) | **Deliverable:** real sample → `copilot/vscode` fixture. `.vscode/mcp.json` present → in VS Code, ask Copilot to consult cage via MCP (read check below). |
@@ -59,10 +86,10 @@ For each cell you actually have installed (mark the rest **N/A (not installed)**
 | Kiro **CLI** (if installed) | same token log | Same dedupe check. |
 
 - [ ] After all cells: `cage report` totals = sum of what each agent session added (spot-check arithmetic).
-- [ ] **Attention (v0.18):** claude-sourced call rows carry `gap_ms` (codex/copilot/kiro rows don't — absence explicit); `cage human` shows derived minutes labelled `derived (turn-gaps, capped)`.
-- [ ] **Export sweep (v0.19):** run one agent session, do NOT `cage import`, then `cage export` → the fresh rows are in the output (imports-everything-first); `--no-import` → they aren't; manifest records which ("snapshot only (no sweep)").
+- [ ] **Attention (v0.18):** claude-sourced call rows carry `gap_ms` (codex/copilot/kiro rows don't — absence explicit); `cage human show` shows derived minutes labelled `derived (turn-gaps, capped)`.
+- [ ] **Export sweep (v0.19):** run one agent session, do NOT `cage import`, then `cage data export` → the fresh rows are in the output (imports-everything-first); `--no-import` → they aren't; manifest records which ("snapshot only (no sweep)").
 - [ ] `CAGE_CAPTURE=0 cage import` → no new rows (capture switch); `=1` restores; `[capture] import_before_export = false` skips the export sweep.
-- [ ] Delete the project `.cage/`, run one more agent session, `cage import` from `$HOME` → rows land in **global** `~/.cage` (resolver precedence); restore project ledger after (`cage init` again). Record which sink `cage doctor` names each time.
+- [ ] Delete the project `.cage/`, run one more agent session, `cage import` from `$HOME` → rows land in **global** `~/.cage` (resolver precedence); restore project ledger after (`cage setup` again). Record which sink `cage doctor` names each time.
 - [ ] `cage doctor --paths` (v0.17): per agent, every candidate log location with found/missing + a `why` per miss; active sink + precedence chain at the end; nothing written.
 
 ## Part D — Every read surface, against the real ledger
@@ -70,33 +97,33 @@ For each cell you actually have installed (mark the rest **N/A (not installed)**
 Run each against `cage-testbed`'s now-populated ledger. Pass = renders without error, numbers self-consistent, `method` tags visible where they apply, exit code 0 (or documented).
 
 - [ ] `cage report` · `--project` · `--scope <dir>` · `--since <window>` (7d/24h/2w; cutoff respected across month shards)
-- [ ] `cage attrib` · `cage matrix` · `cage matrix --human` (flag adds the anchor row; without it, byte-identical to before)
-- [ ] `cage budget` (set a tiny budget in policy.toml → warn/block behavior) · `cage roi` · `cage recommend` · `cage forecast` · `cage regression`
-- [ ] `cage human-record` + `cage human` + `cage trend` (record a human receipt with minutes → USD via `[human]` rates; `CAGE_HUMAN_RATE=200 cage human` → header shows provenance, number changes)
-- [ ] `cage why` · `cage quality` + `cage outcome <task> [--redo] --label <word>` (success is the default) (label = single token; try a path → must be rejected)
-- [ ] `cage compare` (groups from Part C tasks; n<5 groups → refusal text, never numbers) · `cage estimate --label <word>` (band, `modeled` tag) · `--record` then close → `cage calibration` (hit-rate line)
-- [ ] `cage verdict <tool>` (with graphify/fux receipts if present, else INSUFFICIENT DATA path)
+- [ ] `cage insights attrib` · `cage insights matrix` · `cage insights matrix --human` (flag adds the anchor row; without it, byte-identical to before)
+- [ ] `cage insights budget` (set a tiny budget in policy.toml → warn/block behavior) · `cage insights roi` · `cage insights recommend` · `cage insights forecast` · `cage insights regression`
+- [ ] `cage human record` + `cage human show` + `cage insights trend` (record a human receipt with minutes → USD via `[human]` rates; `CAGE_HUMAN_RATE=200 cage human show` → header shows provenance, number changes)
+- [ ] `cage insights why` · `cage human quality` + `cage human outcome <task> [--redo] --label <word>` (success is the default) (label = single token; try a path → must be rejected)
+- [ ] `cage insights compare` (groups from Part C tasks; n<5 groups → refusal text, never numbers) · `cage insights estimate --label <word>` (band, `modeled` tag) · `--record` then close → `cage insights calibration` (hit-rate line)
+- [ ] `cage insights verdict <tool>` (with graphify/fux receipts if present, else INSUFFICIENT DATA path)
 - [ ] `cage query "how is roi calculated"` + a concept ("how does cage work") + a nonsense query (suggests closest ids, never guesses) · `cage --help` (grouped, points at query)
-- [ ] `cage limits` (state snapshot, absent → clean message) · credits: no active `[credits]` rows ⇒ **no** credit numbers anywhere (off by default)
-- [ ] `cage origin <sha>` (hooked row from C) · `--attest human` (writes heuristic+human pair) · `cage verify` (**always exit 0**) · `cage notes-sync` (dry-run print by default; `CAGE_NOTES_WRITE=1` only if you want a real local write) · `cage ledger-sync` (dry-run) · `--team` view
+- [ ] `cage data limits` (state snapshot, absent → clean message) · credits: no active `[credits]` rows ⇒ **no** credit numbers anywhere (off by default)
+- [ ] `cage authorship origin <sha>` (hooked row from C) · `--attest human` (writes heuristic+human pair) · `cage authorship verify` (**always exit 0**) · `cage authorship notes-sync` (dry-run print by default; `CAGE_NOTES_WRITE=1` only if you want a real local write) · `cage authorship ledger-sync` (dry-run) · `--team` view
 - [ ] `cage doctor --bundle` → open the archive: doctor report, debug.log, versions, policy provenance, cursors — then `grep` the archive members for any prompt text/paths-with-content → clean
 - [ ] MCP: `cage mcp` server + from Claude Code (`.mcp.json`) ask "what did I spend today" → answer matches `cage report`
-- [ ] `cage proxy` (point any OpenAI-compatible client at it → call rows land) · `cage watch` (foreground loop, Ctrl-C exits 130) · `cage meter` / `cage graphify` receipt paths if wired
+- [ ] `cage data proxy` (point any OpenAI-compatible client at it → call rows land) · `cage data watch` (foreground loop, Ctrl-C exits 130) · `cage data meter` / `cage data graphify` receipt paths if wired
 - [ ] Exit codes: bad subcommand → 2; induced user error (e.g. `--since garbage`) → `error: <msg>` + exit 1, full traceback **only** under `CAGE_DEBUG=1`
 - [ ] **Pricing (v0.19):** `cage prices list` (bundled vs project origin, `[meta]` versions) · `cage prices unpriced` (each none-match key + ready-to-run fix line) · `set` a price → `report` re-prices **retroactively** (spot-check one historical row's USD changed) · `alias` a router key · `sync` dry-run prints, recommendation line appears when project meta is older · UNPRICED ⚠ summary on report/compare/study report while any none-match rows exist.
-- [ ] **Human attention (v0.18):** `cage human`/`trend` show attested vs derived on separate lines, never blended · `cage outcome <task> --minutes 7` → attested beats derived for that task (both visible, never summed) · `cage calibration --human` (measured heuristic accuracy, or refusal below min-n) · `compare`/`verdict`/`study report` print the total-cost line (agent $ + human) with the human method tag; `--agent-only` suppresses it.
-- [ ] **CSV (v0.21):** `cage report --csv`, `attrib --csv`, `compare --csv`, `calibration --csv` → RFC-4180, LF endings, method/match tags present as columns, numbers identical to the text view · `cage export --csv calls` (raw rows, PII grep clean) · CSV runs byte-identical twice · one MCP report call with `format: csv` returns the same content.
-- [ ] **Cleanup (v0.19):** `cage cleanup` → dry-run listing (file, age, class), nothing deleted · `--apply` removes only allowlist classes · with `[cleanup] days = 0`: ledger/, policy.toml, machine id, study.jsonl, `.cage/bin/` all survive · derived views byte-identical before/after · `CAGE_CLEANUP=0` disables the auto path.
+- [ ] **Human attention (v0.18):** `cage human show`/`trend` show attested vs derived on separate lines, never blended · `cage human outcome <task> --minutes 7` → attested beats derived for that task (both visible, never summed) · `cage insights calibration --human` (measured heuristic accuracy, or refusal below min-n) · `compare`/`verdict`/`study report` print the total-cost line (agent $ + human) with the human method tag; `--agent-only` suppresses it.
+- [ ] **CSV (v0.21):** `cage report --csv`, `attrib --csv`, `compare --csv`, `calibration --csv` → RFC-4180, LF endings, method/match tags present as columns, numbers identical to the text view · `cage data export --csv calls` (raw rows, PII grep clean) · CSV runs byte-identical twice · one MCP report call with `format: csv` returns the same content.
+- [ ] **Cleanup (v0.19):** `cage data cleanup` → dry-run listing (file, age, class), nothing deleted · `--apply` removes only allowlist classes · with `[cleanup] days = 0`: ledger/, policy.toml, machine id, study.jsonl, `.cage/bin/` all survive · derived views byte-identical before/after · `CAGE_CLEANUP=0` disables the auto path.
 
 ## Part E — The cost-impact loop, end-to-end by hand
 
 The product story in one sitting, in `cage-testbed`:
 
-1. `cage estimate --label docfix --record` (needs ≥ MIN_ESTIMATE_N history — Part C tasks with `--label docfix`; below it, verify the refusal first, then seed more)
-2. Do the task with an agent → `cage outcome <task> --label docfix`
-3. `cage calibration` → the new task scored against the recorded band
-4. `cage compare --label docfix` → agent-only vs agent+tool groups (if graphify wired), delta `estimated`
-5. `cage verdict graphify` → composed verdict, all inputs tagged, break-even line
+1. `cage insights estimate --label docfix --record` (needs ≥ MIN_ESTIMATE_N history — Part C tasks with `--label docfix`; below it, verify the refusal first, then seed more)
+2. Do the task with an agent → `cage human outcome <task> --label docfix`
+3. `cage insights calibration` → the new task scored against the recorded band
+4. `cage insights compare --label docfix` → agent-only vs agent+tool groups (if graphify wired), delta `estimated`
+5. `cage insights verdict graphify` → composed verdict, all inputs tagged, break-even line
 - [ ] Every number traces: `cage query` explains each calculation with **live** values.
 
 ## Part F — Fleet study, manually (the multi-laptop story)
@@ -105,8 +132,8 @@ Minimum real test = this laptop + one simulated second machine (or a real second
 
 1. This machine: `cage study join baseline` → doctor output + cron line printed; work normally ≥2 days (or backdate via short phases); `cage study start plugin` after wiring graphify; work again.
 2. Second machine (or `CAGE_BASE=/tmp/machine2` simulated root): same join/phases; give it a capture gap on purpose.
-3. Both: `cage export --study` → one bundle each; check manifest = version + opaque machine id + spans + row counts, **no hostname/username anywhere** (`grep -i "$(hostname)\|$USER"` the bundle → nothing).
-4. Analyst laptop, fresh dir: `cage init && cage import bundle1.zip bundle2.zip` → import **twice** → identical totals (idempotent).
+3. Both: `cage data export --study` → one bundle each; check manifest = version + opaque machine id + spans + row counts, **no hostname/username anywhere** (`grep -i "$(hostname)\|$USER"` the bundle → nothing).
+4. Analyst laptop, fresh dir: `cage setup && cage import bundle1.zip bundle2.zip` → import **twice** → identical totals (idempotent).
 5. `cage study report` → coverage first (the gap is flagged), paired-by-machine delta only over complete machines, `estimated` tag + work-mix caveat; with <MIN_COMPARE_N complete machines → the refusal, not a number.
 - [ ] Unenrolled sanity: a repo that never ran `study join` writes rows with **no** `machine` field (byte-identical legacy).
 

@@ -1,4 +1,4 @@
-"""`cage outcome` / `cage quality` — quality-adjusted cost (plan §8.2).
+"""`cage human outcome` / `cage human quality` — quality-adjusted cost (plan §8.2).
 
 Cost is dishonest alone — you can "save" by degrading answers and paying for the
 human redo. Pair every task with the `quality.signal` (did it succeed without a

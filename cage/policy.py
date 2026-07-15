@@ -32,10 +32,11 @@ def _bundled() -> dict:
 # provider's bundled siblings. (Shallow provider-level replace was the pre-0.19
 # behavior — a partial project table silently dropped every bundled row for that
 # provider. Nothing legitimate relied on it: removing a row only ever meant falling
-# back to family/none, and `cage init` copies carry the full table anyway.)
+# back to family/none, and `cage setup` copies carry the full table anyway.)
 _TWO_LEVEL = ("prices", "credits", "alias")
 _SECTIONS = ("prices", "tools", "budgets", "quality", "human", "ledger",
-             "capture", "debug", "credits", "alias", "meta", "cleanup", "wiring")
+             "capture", "debug", "credits", "alias", "meta", "cleanup", "wiring",
+             "display", "sources")
 
 
 def load(policy_path: Path | None = None) -> dict:
@@ -236,7 +237,7 @@ def debug_enabled(pol: dict) -> bool:
 
 def cleanup_enabled(pol: dict) -> bool:
     """Whether the state-dir maintenance sweep (`cage/cleanup.py`) may run — auto
-    (piggybacked on import) and manual `cage cleanup --apply` both honor it. Env
+    (piggybacked on import) and manual `cage data cleanup --apply` both honor it. Env
     `CAGE_CLEANUP` overrides policy `[cleanup] enabled`; default on. Cleanup only
     ever touches the closed state/ allowlist — never the ledger or policy."""
     return _flag("CAGE_CLEANUP", pol, "cleanup", "enabled", True)
@@ -266,8 +267,31 @@ def prices_stale_days(pol: dict) -> int:
         return PRICES_STALE_DAYS
 
 
+def display_usd(pol: dict) -> bool:
+    """Whether `report`/`matrix`/the bare overview render dollar columns by default
+    (plan Phase 2.5): tokens are the measurement, dollars an interpretation you ask
+    for. Precedence: the per-invocation `--usd` flag (handled at the CLI) > env
+    `CAGE_USD` > policy `[display] usd` > off. Display-only — pricing always
+    computes underneath (budget guards, UNPRICED detection), and money-native
+    views (budget/roi/verdict/compare/estimate) never consult this."""
+    return _flag("CAGE_USD", pol, "display", "usd", False)
+
+
+def import_stale_hours(pol: dict) -> int:
+    """Age threshold (hours) past which the report footer's `last import: N ago`
+    advice line renders (plan Phase 1.6) — it's advice, not a banner. Policy
+    `[capture] import_stale_hours` wins; `constants.IMPORT_STALE_HOURS` covers an
+    unset key (the DEFAULT_CONFIDENCE policy-preferred pattern). `0` restores the
+    always-on line (documented opt-out of the gate)."""
+    from cage.constants import IMPORT_STALE_HOURS
+    try:
+        return int(pol.get("capture", {}).get("import_stale_hours", IMPORT_STALE_HOURS))
+    except (TypeError, ValueError):
+        return IMPORT_STALE_HOURS
+
+
 def import_before_export(pol: dict) -> bool:
-    """Whether `cage export` runs the all-agent import sweep before bundling, so a
+    """Whether `cage data export` runs the all-agent import sweep before bundling, so a
     capture-only machine (hooks never fire under a VS Code extension) still ships a
     complete bundle. Policy `[capture] import_before_export`; the `--no-import`
     flag wins per invocation, and `CAGE_CAPTURE=0` / `[capture] enabled=false`
@@ -276,6 +300,6 @@ def import_before_export(pol: dict) -> bool:
 
 
 def default_toml() -> str:
-    """The policy.toml `cage init` writes — a copy of the bundled default."""
+    """The policy.toml `cage setup` writes — a copy of the bundled default."""
     src = paths.bundled_data() / "policy.toml"
     return src.read_text(encoding="utf-8")

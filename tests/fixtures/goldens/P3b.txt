@@ -1,0 +1,6 @@
+$ cage prices route-tool graphify --to anthropic/claude-sonnet-4-6
+✔ [tools.graphify] written to the cage-managed block — <project>/.cage/policy.toml
+  before: —
+  after:  price_at = "anthropic/claude-sonnet-4-6"
+  call-less token receipts from this tool now price via rung 1 (`cage query receipt-pricing`).
+  derived views re-price immediately — the ledger is never rewritten. (Self-costed rows and receipts keep their stored figures.)

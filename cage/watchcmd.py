@@ -1,8 +1,8 @@
-"""`cage watch` — an optional foreground poll loop (plan §3.7).
+"""`cage data watch` — an optional foreground poll loop (plan §3.7).
 
 Capture is pull-based and cage installs **no** OS scheduler (no launchd/systemd/cron/
 schtasks, no `cage scheduler` command). For users who want a running loop they control,
-`cage watch` re-imports every interval until Ctrl-C — a plain stdlib `sleep` poll, no
+`cage data watch` re-imports every interval until Ctrl-C — a plain stdlib `sleep` poll, no
 filesystem-watch dependency. It registers nothing and stops with the terminal; the
 heaviest thing cage ever runs. Hands-off automation, if wanted, is the user's own cron
 line calling `cage import` — documented, never installed by cage.
@@ -23,7 +23,7 @@ def _cycle(root: Path, agent: str, args) -> list[str]:
 def run(root: Path, args) -> int:
     interval = max(1, getattr(args, "interval", 60))
     agent = getattr(args, "agent", "all")
-    print(f"cage watch: importing {agent} every {interval}s — Ctrl-C to stop. "
+    print(f"cage data watch: importing {agent} every {interval}s — Ctrl-C to stop. "
           "(No OS job registered; stops with this terminal.)")
     try:
         while True:
@@ -31,5 +31,5 @@ def run(root: Path, args) -> int:
                 print(line)
             time.sleep(interval)
     except KeyboardInterrupt:  # leaves nothing registered; 130 per the CLI exit-code contract
-        print("\ncage watch: stopped.")
+        print("\ncage data watch: stopped.")
         return 130

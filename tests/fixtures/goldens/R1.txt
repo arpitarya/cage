@@ -1,0 +1,12 @@
+$ cage report --by agent
+Ledger by agent
+
+agent    calls     tok in  tok out  saved tok
+-------  -----  ---------  -------  ---------
+copilot      4  1,968,011   96,212    100,000
+claude       2    912,400   61,200    160,000
+kiro         2    699,122        0          0
+TOTAL        8  3,579,533  157,412    311,340
+
+· kiro: input-only log — tok out not recorded
+· 2 calls unpriced — matters when you view $ (`--usd`; cage prices unpriced)

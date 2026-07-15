@@ -40,34 +40,31 @@ def _latest_task(r) -> str | None:
     return tasks[-1] if tasks else None
 
 
-def cmd_init(_args) -> int:
-    info = initcmd.run(root())
-    print(f"✔ Cage initialised at {info['footprint']}")
-    print(f"  policy   → {info['policy']}")
-    print(f"  ledger   → {info['ledger']}/  (gitignored, append-only)")
-    print(f"  pointer  → {info['claude_md']}")
-    print("· new tunables ship in future versions — `cage policy sync` shows them")
-    print("Next: meter traffic (`cage.meter(...)`), then `cage report`. Try `cage demo`.")
-    return 0
-
-
 def cmd_report(args) -> int:
+    from cage import display, policy
     r = ledger_root()
-    rep = report.summarize(r, _policy(r), dim=args.by, since=args.since,
+    pol = _policy(r)
+    rep = report.summarize(r, pol, dim=args.by, since=args.since,
                            scope=getattr(args, "scope", None),
                            project=_project_filter(args),
                            team=getattr(args, "team", False))
     if (dest := csv_dest(args)) is not None:
         from cage import csvout
         return csvout.write(report.render_csv(rep), dest)
-    return emit(args, rep, report.render_report(rep, last_import=importcmd.last_import(r)))
+    return emit(args, rep, report.render_report(
+        rep, last_import=importcmd.last_import(r), disp=display.resolve(args, pol),
+        stale_hours=policy.import_stale_hours(pol)))
 
 
 def cmd_overview(args) -> int:
-    """Bare `cage` — the one-look spent/saved/net headline (§4). No subcommand."""
+    """Bare `cage` — the one-look headline (§4; tokens by default, plan Phase 2.5).
+    No subcommand."""
+    from cage import display
     r = ledger_root()
-    o = report.overview(r, _policy(r))
-    return emit(args, o, report.render_overview(o, last_import=importcmd.last_import(r)))
+    pol = _policy(r)
+    o = report.overview(r, pol)
+    return emit(args, o, report.render_overview(
+        o, last_import=importcmd.last_import(r), disp=display.resolve(args, pol)))
 
 
 def cmd_attrib(args) -> int:
@@ -82,11 +79,15 @@ def cmd_attrib(args) -> int:
 
 
 def cmd_matrix(args) -> int:
+    from cage import display
     r = ledger_root()
+    pol = _policy(r)
     task = args.task or _latest_task(r)
-    data = matrix.matrix(r, task, _policy(r), human=getattr(args, "human", False),
+    data = matrix.matrix(r, task, pol, human=getattr(args, "human", False),
                          scope=getattr(args, "scope", None))
-    text = matrix.render_matrix(data)
+    # --human implies the $ view: the anchor row and vs-human columns are dollars.
+    usd = display.resolve(args, pol).usd or getattr(args, "human", False)
+    text = matrix.render_matrix(data, usd=usd)
     if getattr(args, "html", None):
         serve.write_html(args.html, f"Matrix · {task}", {f"Matrix · {task}": text})
         print(f"✔ wrote {args.html}")
@@ -140,7 +141,7 @@ def cmd_budget(args) -> int:
 
 
 def cmd_limits(args) -> int:
-    """`cage limits` — provider quota windows (latest local snapshot) + estimated
+    """`cage data limits` — provider quota windows (latest local snapshot) + estimated
     AI-credit consumption (token-based providers only). `--json` emits the `cage.v1`
     envelope. Read-only/derive; never writes the ledger."""
     r = ledger_root()
@@ -208,7 +209,7 @@ def cmd_demo(_args) -> int:
     call_id = demo.seed(root)
     verb = "already seeded" if already else "Seeded"
     print(f"✔ {verb} the §4.4 worked example (task {demo.TASK!r}, call {call_id}).")
-    print("  Now run:  cage attrib   ·   cage matrix   ·   cage report")
+    print("  Now run:  cage insights attrib   ·   cage insights matrix   ·   cage report")
     return 0
 
 
@@ -228,7 +229,7 @@ def cmd_outcome(args) -> int:
     label = getattr(args, "label", None) or ""
     if label and not _LABEL.match(label):
         # Single-token PII guard (roadmap P2): a label is a grouping key for
-        # `cage compare --by label`, never free text, a path, or a message.
+        # `cage insights compare --by label`, never free text, a path, or a message.
         raise CageError("label must be one short token (letters/digits/._-, ≤32 chars) "
                         "— no spaces, slashes, or paths")
     quality.record_outcome(r, args.task, ok=not args.redo)
@@ -238,7 +239,7 @@ def cmd_outcome(args) -> int:
     minutes = getattr(args, "minutes", None)
     if minutes is not None:
         # The §6 attestation friction-drop: same fail-open, idempotent receipt path
-        # as `cage human-record --minutes` — attested minutes outrank derived
+        # as `cage human record --minutes` — attested minutes outrank derived
         # turn-gap minutes for this task (never summed).
         rid = metering.record_human(task=args.task, minutes=minutes, root=r)
         print(f"✔ attested {minutes:g} human minute(s) for {args.task!r}." if rid
@@ -329,7 +330,7 @@ def cmd_policy(args) -> int:
 
 
 def cmd_cleanup(args) -> int:
-    """`cage cleanup` — dry-run print by default (house pattern), --apply prunes."""
+    """`cage data cleanup` — dry-run print by default (house pattern), --apply prunes."""
     from cage import cleanup
     r = ledger_root()
     payload, text = cleanup.run_cli(r, _policy(r), apply=args.apply,
@@ -426,7 +427,7 @@ def cmd_setup(args) -> int:
     here = root()
 
     # Handle --global: initialize the machine-wide global ledger (~/.cage) and exit. This
-    # is the project-less capture sink (plan §3.7) — `cage import`/`cage export` from any
+    # is the project-less capture sink (plan §3.7) — `cage import`/`cage data export` from any
     # dir without a project `.cage/` land here.
     if getattr(args, "global_ledger", False):
         info = initcmd.run(paths.global_home(), pointer=False)
@@ -467,7 +468,7 @@ def cmd_setup(args) -> int:
         print("✔ Cage wired into:")
         for surface, where in agents.install(here, flagged).items():
             print(f"  {surface:<8} → {', '.join(where.values())}")
-        print("Metering: claude=transcript hook · others=`cage meter -- <cmd>` or `cage proxy`.")
+        print("Metering: claude=transcript hook · others=`cage data meter -- <cmd>` or `cage data proxy`.")
         return 0
 
     # Handle --project-only: scaffold + graphify + PATH, no global skill
@@ -494,6 +495,12 @@ def cmd_setup(args) -> int:
             print("\nDone. Verify with `cage doctor`; wire an agent with "
                   "`cage setup --wire-only --<agent>`.")
             return 0
+
+    # init merged into setup (plan Phase 3 §2): ensure .cage/ exists first — the old
+    # `init` verb's job, now unconditional step one of onboarding. Idempotent, so the
+    # wizard's adopt step (when --project/--graphify also scaffold) re-runs it
+    # harmlessly; this closes the skill-only (`--no-project --no-graphify`) gap.
+    initcmd.run(here)
 
     # Standard setup: interactive wizard, --all, or per-agent flags
     flagged = tuple(s for s in agents.SURFACES if getattr(args, s, False))
@@ -525,7 +532,11 @@ def cmd_setup(args) -> int:
 def cmd_doctor(args) -> int:
     if getattr(args, "paths", False):
         from cage import pathprobe
-        print(pathprobe.run(root()))
+        try:  # fail-open: a broken policy still shows built-in candidates
+            pol = policy.load(paths.Footprint(paths.resolve_root(root())).policy)
+        except Exception:  # noqa: BLE001
+            pol = {}
+        print(pathprobe.run(root(), pol))
         return 0
     res = doctorcmd.run(root())
     if getattr(args, "json", False):
@@ -594,7 +605,7 @@ def cmd_notes_sync(args) -> int:
 
 def cmd_ledger_sync(args) -> int:
     """Merge the local ledger buffer into refs/notes/cage-ledger (§3.6.3). Dry-run by
-    default — mirrors `cage notes-sync`; CI (`CAGE_NOTES_WRITE=1`) is the sole writer."""
+    default — mirrors `cage authorship notes-sync`; CI (`CAGE_NOTES_WRITE=1`) is the sole writer."""
     res = ledgersync.sync(root(), write=True if args.write else None)
     if getattr(args, "json", False):
         import json
@@ -615,7 +626,7 @@ def cmd_origin(args) -> int:
         msg = {
             "recorded": f"✔ attested {args.sha!r} as origin={args.attest!r}.",
             "already-attested": f"· {args.sha!r} is already attested — the append-only "
-                                f"ledger keeps the first attestation (run `cage origin {args.sha}` to see it).",
+                                f"ledger keeps the first attestation (run `cage authorship origin {args.sha}` to see it).",
             "no-diff": f"· attestation for {args.sha!r} was a no-op — sha not found or no diff to attest against.",
             "invalid-origin": f"· {args.attest!r} can't be attested (unknown isn't a fact worth writing).",
         }.get(status, f"· attestation for {args.sha!r} was a no-op.")
@@ -629,7 +640,7 @@ def cmd_verify(_args) -> int:
     res = verifycmd.run(root())
     for w in res["warnings"]:
         print(f"  · {w}")
-    print(f"\ncage verify: {len(res['warnings'])} warning(s) — report-only, never fails the build.")
+    print(f"\ncage authorship verify: {len(res['warnings'])} warning(s) — report-only, never fails the build.")
     return 0
 
 

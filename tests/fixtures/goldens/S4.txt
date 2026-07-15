@@ -1,0 +1,22 @@
+$ cage study report --agent-only
+Fleet study · phases: baseline → plugin
+
+coverage (days with rows — gaps kill studies, so they print first):
+  machine m_01aa000000000000
+    baseline     5 day(s) · agents: claude · ⚠ gap days: 2026-07-06
+    plugin       5 day(s) · agents: claude
+  machine m_02aa000000000000
+    baseline     5 day(s) · agents: claude · ⚠ gap days: 2026-07-06
+    plugin       5 day(s) · agents: claude
+  machine m_03aa000000000000
+    baseline     5 day(s) · agents: claude · ⚠ gap days: 2026-07-06
+    plugin       5 day(s) · agents: claude
+  machine m_04aa000000000000
+    baseline     5 day(s) · agents: claude
+    plugin       MISSING — no rows in this phase
+
+paired delta: insufficient machines with both phases (n=3 < 5) — the command explains, it never numbers.
+
+pooled machine-days per phase (measured):
+  baseline     n=20 days · median 235,000 tok · $0.9450 (IQR $0.9225–$0.9675)
+  plugin       n=15 days · median 140,000 tok · $0.5880 (IQR $0.5700–$0.6060)

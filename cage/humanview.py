@@ -1,4 +1,4 @@
-"""`cage human` — Tier-1 agent-vs-human rollup (design §4.1, §5b.1).
+"""`cage human show` — Tier-1 agent-vs-human rollup (design §4.1, §5b.1).
 
 Joins human receipts (the avoided-labor alternative, priced by `human.py`) with the
 agent's measured call cost + active time per task. Reports saved **$ and hours** as
@@ -139,8 +139,8 @@ def render_csv(data: dict) -> str:
 
 def render_human(data: dict) -> str:
     if not data["agents"]:
-        return ("cage: no human receipts yet — record one with `cage human-record` "
-                "(or `cage outcome <task> --minutes N`).\n\n" + _render_derived(data))
+        return (f"cage: no human receipts yet — record one with `{render.cmd('human record')}` "
+                f"(or `{render.cmd('human outcome')} <task> --minutes N`).\n\n" + _render_derived(data))
     rows, tot = [], {"tasks": 0, "human_usd": 0.0, "agent_usd": 0.0, "saved_usd": 0.0,
                      "saved_min": 0.0, "conf_sum": 0.0}
     for name, a in sorted(data["agents"].items(), key=lambda kv: -kv[1]["saved_usd"]):

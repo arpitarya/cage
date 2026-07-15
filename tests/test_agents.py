@@ -207,7 +207,7 @@ def _start_cmds(settings: dict) -> list[str]:
 
 
 _CLAUDE_BACKFILL = ('"$CLAUDE_PROJECT_DIR/.cage/bin/cage-run" '
-                    "import-claude --project .")  # Claude only — no cross-agent sweep
+                    "import --agent claude --project .")  # Claude only — no cross-agent sweep
 
 
 def test_claude_sessionstart_backfill_before_banner(homes):

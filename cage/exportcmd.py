@@ -1,4 +1,4 @@
-"""`cage export` — refresh (import) then emit the ledger in a portable format (§3.7).
+"""`cage data export` — refresh (import) then emit the ledger in a portable format (§3.7).
 
 The pull-based companion to `cage import`: it imports first (so the export is fresh,
 unless ``--no-import``), then serializes the active ledger as one of three formats:
@@ -71,7 +71,7 @@ def sweep(root: Path, since: str | None) -> tuple[bool, int]:
         print(f"↻ imported {added} new call(s)", file=sys.stderr)
         return True, added
     except Exception:  # fail-open: still export what the ledger already holds
-        print("cage export: import refresh failed — emitting the ledger as-is.",
+        print("cage data export: import refresh failed — emitting the ledger as-is.",
               file=sys.stderr)
         return False, 0
 

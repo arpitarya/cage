@@ -8,9 +8,9 @@ tracebacks — never prompt or response bodies) and **off by default** ($0, stdl
 nothing until you turn it on).
 
 > **First, the universal path.** Capture is pull-based (plan §3.7): `cage import` reads
-> every agent's on-disk log into the active ledger, and `cage export` refreshes then emits
+> every agent's on-disk log into the active ledger, and `cage data export` refreshes then emits
 > it — **no hooks, no project required**. If `cage report` looks empty, run `cage import`
-> (or `cage watch`) first; that alone fixes the most common "nothing is captured" case
+> (or `cage data watch`) first; that alone fixes the most common "nothing is captured" case
 > (a Copilot-only user, or any agent under a VS Code extension whose hooks never fire).
 > Hooks are an *optional* real-time add-on that fire only under a CLI client; the debug
 > layer below is for when you want to know *why* a hook isn't firing.
@@ -27,7 +27,7 @@ path needs only the last one):
 1. **The hook fires.** The agent actually executes cage's hook. This only happens under a
    CLI client — a **VS Code extension never runs** `.codex/hooks.json` / `.kiro/hooks/*` /
    `~/.copilot/hooks` (only Claude Code's extension honors its hooks). If the hook never
-   fires, use `cage import` / `cage watch` / your own cron instead.
+   fires, use `cage import` / `cage data watch` / your own cron instead.
 2. **Capture is enabled.** `cage import` no-ops only when capture is switched off
    (`[capture] enabled=false` / `CAGE_CAPTURE=0`). There is **no** cwd-`.cage` guard
    anymore: with no project, capture resolves to the global ledger `~/.cage`
@@ -62,7 +62,7 @@ cage setup              # regenerates .claude / .codex / .copilot / .kiro hooks
 ### 3. Turn debug on
 Two ways. **Prefer the policy file** — it's read by every hook no matter how the agent was
 launched, which matters for GUI agents (Kiro, VS Code Copilot) that don't inherit a shell
-export. `cage setup`/`cage init` already writes a `[debug]` block to `.cage/policy.toml`
+export. `cage setup`/`cage setup` already writes a `[debug]` block to `.cage/policy.toml`
 (default `enabled = false`) — **edit that existing line to `true`; do not append a second
 `[debug]` block** (duplicate tables make TOML refuse to load and crash `cage import`):
 ```toml
@@ -125,7 +125,7 @@ Interpretation, per agent:
 | `error=…` + traceback | Fired but the parser choked on that agent's log format | file the traceback — it's a parser bug for that agent/version |
 | `skip=parsed-zero-rows` | Log has bytes but the parser recovered no rows — the format-drift signature (agent update changed its log shape) | file it with a `cage doctor --bundle` |
 | `ledger.append` `result=write-failed` | The row was parsed but could not be written (unwritable ledger dir / disk) | fix permissions on the shard path in the event |
-| Agent **absent** from `cage debug` / **"never"** in `cage doctor` | The hook isn't firing (e.g. a VS Code extension) | this is expected — capture that agent with `cage import` / `cage watch` / your own cron |
+| Agent **absent** from `cage debug` / **"never"** in `cage doctor` | The hook isn't firing (e.g. a VS Code extension) | this is expected — capture that agent with `cage import` / `cage data watch` / your own cron |
 
 ## What it never logs
 
@@ -150,7 +150,7 @@ reads every agent's on-disk log regardless of hooks or cwd, into the resolved le
 
 ```bash
 cage import            # one-shot: capture everything now
-cage watch             # a foreground loop you start and Ctrl-C (no daemon)
+cage data watch             # a foreground loop you start and Ctrl-C (no daemon)
 ```
 
 **cage installs no background job** — no launchd/systemd/cron/schtasks, and no `cage

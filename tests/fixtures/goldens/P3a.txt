@@ -1,0 +1,5 @@
+$ cage prices set anthropic claude-sonnet-4.6 --input 3.00 --output 15.00 --cache-read 0.30
+✔ [prices.anthropic."claude-sonnet-4.6"] written to the cage-managed block — <project>/.cage/policy.toml
+  before: (none)
+  after:  input=3 output=15 cache_read=0.3
+  derived views re-price immediately — the ledger is never rewritten. (Self-costed rows and receipts keep their stored figures.)

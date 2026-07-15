@@ -1,0 +1,16 @@
+$ cage report --by agent --usd
+Ledger by agent · usd
+
+agent    calls     tok in  tok out                   cost    saved        net
+-------  -----  ---------  -------  ---------------------  -------  ---------
+copilot      4  1,968,011   96,212                $6.6783  $0.3000   -$6.3783
+claude       2    912,400   61,200                $3.6552  $0.4800   -$3.1752
+kiro         2    699,122        0                $2.0974  $0.0000   -$2.0974
+TOTAL        8  3,579,533  157,412  $12.4308 (+ unpriced)  $0.9340  -$11.4968
+
+≈ priced by family (approximate — no exact price row):
+  copilot/claude-sonnet-4.6 → claude-sonnet-4-6
+≈ graphify priced at task model (anthropic/claude-sonnet-4-6)
+· kiro: input-only log — cost understated
+⚠ 2 calls (164,353 tokens) UNPRICED — totals understated
+  fix: cage prices alias - 'copilot/auto' --to <provider>/<model>   # route the router pseudo-model explicitly

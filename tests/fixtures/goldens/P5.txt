@@ -1,0 +1,14 @@
+$ cage policy diff
+policy sync — bundled v0.26.0 vs project v0.19.0
+
+· 29 project keys equal to the bundle — in sync
+
+pricing tables — delegated to `cage prices sync`:
+  prices sync — bundled 2026-07-14 vs project 2026-07-14
+  
+  · 51 project rows equal to the bundle — in sync
+  
+  ✔ nothing to do — project prices match the installed bundle.
+
+dry-run — `--apply` writes adds/updates and stamps [meta] policy_version; customized values are never modified, orphans never deleted.
+· bundled policy defaults are newer (v0.26.0 > v0.19.0) — run 'cage policy sync'

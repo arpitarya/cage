@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# cage: graphify metering interceptor — routes queries through `cage graphify` so each
-# query/path/explain files a token-saving receipt; stdout/exit pass through unchanged.
+# cage: graphify metering interceptor — routes queries through `cage data graphify` so
+# each query/path/explain files a token-saving receipt; stdout/exit pass through unchanged.
 # `graphify update .` and any non-query verb pass straight through (nothing to meter).
-# Installed by `cage adopt`. Recursion guard: resolves the real graphify with this
+# Installed by `cage setup`. Recursion guard: resolves the real graphify with this
 # dir removed from PATH, so it never calls itself.
 set -euo pipefail
 SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REAL="$(PATH="$(echo "$PATH" | tr ':' '\n' | grep -vxF "$SELF_DIR" | paste -sd: -)" \
         command -v graphify || true)"; : "${REAL:=graphify}"
-if command -v cage >/dev/null 2>&1 && cage graphify --help >/dev/null 2>&1; then
-  exec cage graphify -- "$REAL" "$@"
+if command -v cage >/dev/null 2>&1 && cage data graphify --help >/dev/null 2>&1; then
+  exec cage data graphify -- "$REAL" "$@"
 fi
 exec "$REAL" "$@"   # cage absent → identical, unmetered behaviour

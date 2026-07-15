@@ -22,7 +22,7 @@ derived views, so cleanup cannot change a single reported number.
 Two paths: **auto** (`maybe_run`, piggybacked on `cage import` — cage installs no
 scheduler — throttled to one real check per `CLEANUP_THROTTLE_HOURS`, entirely
 fail-open: an error is debug-logged under ``cleanup.prune`` and never blocks
-capture) and **manual** (`cage cleanup`, dry-run print by default, ``--apply`` to
+capture) and **manual** (`cage data cleanup`, dry-run print by default, ``--apply`` to
 execute). Retention: policy ``[cleanup] days`` (`constants.CLEANUP_DEFAULT_DAYS`
 fallback); the whole feature gates on `policy.cleanup_enabled` (env
 ``CAGE_CLEANUP`` beats policy).
@@ -222,7 +222,7 @@ def maybe_run(root: Path, pol: dict) -> None:
 
 def run_cli(root: Path, pol: dict, apply: bool = False,
             days: int | None = None) -> tuple[dict, str]:
-    """`cage cleanup` — dry-run table by default (house pattern), ``--apply``
+    """`cage data cleanup` — dry-run table by default (house pattern), ``--apply``
     executes. ``(payload, text)`` for the emit helper."""
     enabled = policy.cleanup_enabled(pol)
     window = days if days is not None else policy.cleanup_days(pol)
@@ -238,7 +238,7 @@ def run_cli(root: Path, pol: dict, apply: bool = False,
     lines += [f"  {i['cls']:<15} {i['action']:<8} age {i['age_days']:>6.1f}d  "
               f"{Path(i['path']).name}  — {i['detail']}" for i in items]
     if not apply:
-        lines += ["", "dry-run (house pattern) — `cage cleanup --apply` to execute."]
+        lines += ["", "dry-run (house pattern) — `cage data cleanup --apply` to execute."]
         return payload, "\n".join(lines)
     if not enabled:
         lines += ["", "· cleanup is disabled ([cleanup] enabled=false or CAGE_CLEANUP=0) "

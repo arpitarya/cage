@@ -2,8 +2,8 @@
 
 Covers: ledger-resolution precedence (`--ledger`/`CAGE_BASE` → project `.cage/` → global
 `~/.cage`); capture into the global ledger with no project; the additive `project` field
-(Claude-stamped, absent for the others); the incremental file-stat cursor; `cage export`
-(jsonl/csv/json, `--no-import`, filters, summary-matches-report); `cage watch` single
+(Claude-stamped, absent for the others); the incremental file-stat cursor; `cage data export`
+(jsonl/csv/json, `--no-import`, filters, summary-matches-report); `cage data watch` single
 cycle + clean exit; and malformed-policy fail-open on the capture path. cage installs NO
 OS scheduler — that invariant is asserted in test_doctor.py.
 """
@@ -165,7 +165,7 @@ def test_cursor_skips_unchanged_files(tmp_path, monkeypatch):
     assert len(ledger.calls(root)) == 2
 
 
-# ── cage export ───────────────────────────────────────────────────────────────
+# ── cage data export ───────────────────────────────────────────────────────────────
 
 def _seed(root):
     from cage import schema
@@ -269,7 +269,7 @@ def test_export_to_file(tmp_path, capsys):
     assert "wrote 2 call(s)" in capsys.readouterr().err  # status to stderr, file to disk
 
 
-# ── cage watch ────────────────────────────────────────────────────────────────
+# ── cage data watch ────────────────────────────────────────────────────────────────
 
 def test_watch_runs_one_cycle_then_clean_exit(tmp_path, monkeypatch, capsys):
     root = tmp_path / "proj"

@@ -1,4 +1,4 @@
-"""`cage compare` + `cage/taskgroup.py` — measured stack comparison (roadmap P2).
+"""`cage insights compare` + `cage/taskgroup.py` — measured stack comparison (roadmap P2).
 
 Exact-number assertions over a hand-computed seeded ledger. Bundled policy
 prices claude-opus-4-8 at $5 in / $25 out per MTok, so a task with 12,000 in +
@@ -162,7 +162,7 @@ def test_deterministic_byte_identical(seeded):
 
 def test_no_closed_tasks_explains(proj):
     text = compare.render_compare(compare.summarize(proj, policy.load(None)))
-    assert "No closed tasks to compare" in text and "cage outcome" in text
+    assert "No closed tasks to compare" in text and "cage human outcome" in text
 
 
 def test_cli_json_envelope(seeded, monkeypatch, capsys):

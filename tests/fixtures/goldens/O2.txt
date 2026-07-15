@@ -1,0 +1,4 @@
+$ cage --usd
+spent $12.4308  ·  saved $0.9340  ·  net -$11.4968  ·  3,736,945 tokens   (all time)
+  drill:  cage report --by agent   ·   cage insights why <call>   ·   cage insights attrib --task <t>
+⚠ 2 calls (164,353 tokens) UNPRICED — totals understated; run 'cage prices unpriced' (`cage query unpriced` explains)

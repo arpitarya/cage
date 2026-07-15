@@ -2,7 +2,7 @@
 
 Deterministic, no model: minify JSON and cap long arrays/strings (reversibly
 annotated), or collapse whitespace for free text. The point is not the bytes — it
-is the **savings receipt** a tool files so `cage attrib` can credit the compressor.
+is the **savings receipt** a tool files so `cage insights attrib` can credit the compressor.
 The learned Tier-2 compressor is a pluggable adapter over this same receipt shape.
 """
 from __future__ import annotations

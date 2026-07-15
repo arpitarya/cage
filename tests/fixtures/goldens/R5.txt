@@ -1,0 +1,5 @@
+$ cage report
+No calls recorded yet.
+
+next: cage import        pull every agent's usage into the ledger
+      cage doctor        check capture is wired and healthy

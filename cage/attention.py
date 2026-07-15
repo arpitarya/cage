@@ -18,7 +18,7 @@ Method honesty (the law this module enforces for its consumers):
 - derived minutes are always **`estimated`**, labelled ``LABEL``
   (`derived (turn-gaps, capped)`) — never anything else;
 - **attested** minutes (a `tool="human"` receipt on the task, via `human-record`
-  or `cage outcome --minutes`) rank above derived: for a given task attested
+  or `cage human outcome --minutes`) rank above derived: for a given task attested
   wins and derived is kept as *reference* — the two are **never summed**;
 - an agent whose log carries no turn timestamps has no `gap_ms` and thus no
   derived minutes — absence stays explicit, nothing is fabricated.
@@ -78,7 +78,7 @@ def by_agent(calls: list[dict], pol: dict) -> dict[str, dict]:
 
 def attested_by_task(root: Path, pol: dict) -> dict[str, dict]:
     """Attested minutes per task from `tool="human"` receipts (`human-record` /
-    `cage outcome --minutes`), resolved by the existing §3 precedence ladder —
+    `cage human outcome --minutes`), resolved by the existing §3 precedence ladder —
     this module extends that ladder, it never bypasses it."""
     out: dict[str, dict] = {}
     for r in ledger.receipts(root):
@@ -109,7 +109,7 @@ def resolve(root: Path, pol: dict, *, task_ids: list[str] | None = None,
             since: str | None = None) -> dict:
     """The attested-beats-derived resolution over a scope of work.
 
-    ``task_ids`` restricts to those tasks (the `cage compare` slice); otherwise
+    ``task_ids`` restricts to those tasks (the `cage insights compare` slice); otherwise
     the whole ledger windowed by ``since`` (the `verdict`/`study` slice), where
     task-less calls' gaps still count as derived. Per task: attested wins,
     derived becomes reference (``derived_ref_min``) — **never summed**.

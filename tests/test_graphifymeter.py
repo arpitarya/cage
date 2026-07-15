@@ -1,4 +1,4 @@
-"""`cage graphify` external adapter — transparent passthrough + parsed receipt.
+"""`cage data graphify` external adapter — transparent passthrough + parsed receipt.
 
 Covers handoff criteria 1 (byte-identical stdout/stderr/exit; metering never alters
 the result), 3 (one tool="graphify" modeled receipt), 4 (no emit when no source file

@@ -1,4 +1,4 @@
-# Design — the human baseline axis (`cage human`)
+# Design — the human baseline axis (`cage human show`)
 
 **Status:** **implemented** (2026-06-19) — all 10 §6 criteria green, `cage demo`
 unchanged, docs synced, no new dependency. See §8 checklist.
@@ -46,7 +46,7 @@ with no new math — the substrate already carries `raw_alternative`, `actual`,
 >
 > **§5b** adds the tracking the objective needs beyond cost: **time-saving as a
 > co-equal metric**, a **commit-aware task record** (git auto-collected, fail-open),
-> and **`cage trend`** turning timestamps into a cost+time savings time-series.
+> and **`cage insights trend`** turning timestamps into a cost+time savings time-series.
 
 ---
 
@@ -253,7 +253,7 @@ For the fintech sensitivity (a checked-in `policy.toml` with a team's *real*
 internal rate is an info leak), add one optional escape hatch read at derive time:
 
 ```
-CAGE_HUMAN_RATE=120 cage human          # supersedes [human].rate_usd_per_hr
+CAGE_HUMAN_RATE=120 cage human show          # supersedes [human].rate_usd_per_hr
 ```
 
 It is stdlib (`os.environ`), zero-dependency, and stays deterministic because env
@@ -272,7 +272,7 @@ real rate via a CI/shell secret, with the source visible in every report.
 
 ## 4. Read surfaces
 
-### 4.1 New command — `cage human` (point 1, directly)
+### 4.1 New command — `cage human show` (point 1, directly)
 
 Per-agent rollup: for each metered agent (`claude` / `codex` / `copilot` / `kiro`
 / `lib`), total human-alternative cost vs total measured agent cost, net saved,
@@ -302,7 +302,7 @@ Flags: `--since`, `--task <id>` (single task detail), `--agent <name>` (filter),
 `--json` (machine-readable, per design-for-the-agent-as-user), `--html` (writes a
 standalone page; see §4.3).
 
-### 4.2 `matrix` overlay — `cage matrix <task> --human`
+### 4.2 `matrix` overlay — `cage insights matrix <task> --human`
 
 Render the existing 2ⁿ token table, then prepend the **human anchor row** and add
 two columns to every agent row: `vs human $` and `vs human %`. The anchor's
@@ -313,7 +313,7 @@ is byte-for-byte unchanged (no regression to the `demo` §4.4 tables).
 ### 4.3 HTML
 
 `serve.py` gains a "Agent vs human" panel (the §4.1 table + a bar of human-$ vs
-agent-$ per agent). `cage human --html <path>` and `cage matrix … --html <path>`
+agent-$ per agent). `cage human show --html <path>` and `cage insights matrix … --html <path>`
 emit the same content as a standalone, dependency-free HTML file (inline CSS, no
 CDN) — matches cage's existing zero-dependency render discipline so the file
 opens anywhere and can be attached to a report.
@@ -322,12 +322,12 @@ opens anywhere and can be attached to a report.
 
 - **`attrib`** stays tool-only (marginal per-tool *within* the agent path).
   Putting the whole-task human baseline in a per-tool marginal table would
-  conflate the two tiers. Human lives in `cage human` + the matrix overlay.
+  conflate the two tiers. Human lives in `cage human show` + the matrix overlay.
 - **`roi`** stays **strictly tool-only — no `--include-human` flag** (decision D).
   "Agent vs human" is a *join of calls (agent cost) with human receipts*, a
   different computation from roi's receipts-only, net-of-own-cost, per-tool math —
-  and it is exactly what `cage human` already does. A flag would duplicate that
-  logic inside roi and blur the two-tier model. `cage human` *is* the human-ROI
+  and it is exactly what `cage human show` already does. A flag would duplicate that
+  logic inside roi and blur the two-tier model. `cage human show` *is* the human-ROI
   view; the HTML dashboard (§4.3) composes the roi panel and the human panel
   side by side rather than merging the two computations.
 
@@ -337,10 +337,10 @@ opens anywhere and can be attached to a report.
 
 Three entry points, mirroring the three input modes:
 
-1. **CLI** — `cage human-record --task <id> --type feature` (uses the task-type
+1. **CLI** — `cage human record --task <id> --type feature` (uses the task-type
    table), or `--minutes 90 [--rate 90]`, or `--usd 150`. Writes one
    `tool="human"` receipt via `ledger.append` (fail-open).
-2. **Outcome flow** — extend the existing `cage outcome` so logging a task's
+2. **Outcome flow** — extend the existing `cage human outcome` so logging a task's
    result can attach a human estimate in the same step (one habit, not two).
 3. **Library** — `cage.record_human(task=…, minutes=…|usd=…|task_type=…)` for
    Orff to call from `LLMGateway` when it closes out a task, fail-open like
@@ -384,7 +384,7 @@ time), referenced by calls and receipts that already carry `task`:
   "id": "add-broker-csv",
   "ts": "2026-06-19T10:22:00Z",
   "type": "feature",              // feeds the §3 task-type rate + confidence
-  "outcome": "ok",                // absorbs `cage outcome` / the task_ok signal
+  "outcome": "ok",                // absorbs `cage human outcome` / the task_ok signal
   "commit": "a1b9f3c",            // SHA only — never the message
   "branch": "feat/broker-csv",
   "files_changed": 4,
@@ -397,7 +397,7 @@ time), referenced by calls and receipts that already carry `task`:
 ```
 
 **Auto-collection, deterministic & fail-open.** At task close (the existing
-SessionEnd hook / `cage outcome`), snapshot git via plain shell —
+SessionEnd hook / `cage human outcome`), snapshot git via plain shell —
 `git rev-parse --short HEAD`, `git rev-parse --abbrev-ref HEAD`,
 `git diff --shortstat`. No repo, no git, detached state → omit those fields, never
 raise (write-path fail-open, like `ledger.append`). No network, no LLM — satisfies
@@ -429,10 +429,10 @@ constant) at **confidence 0.6**:
 | flat type-table lookup | 0.5 |
 | global default | 0.3 |
 
-### 5b.4 `cage trend` — dates become a savings time-series
+### 5b.4 `cage insights trend` — dates become a savings time-series
 
 ```
-cage trend [--by week|month] [--metric cost|time|both] [--since …] [--json] [--html]
+cage insights trend [--by week|month] [--metric cost|time|both] [--since …] [--json] [--html]
 
 Savings trend · by week · since 2026-05-01
 
@@ -485,8 +485,8 @@ Changing the cap re-derives; the ledger is never rewritten.
 ### 5c.3 Method honesty — attested beats derived, never summed
 
 Derived minutes are always **`estimated`**, labelled `derived (turn-gaps,
-capped)`. Attested minutes — `cage human-record --minutes`, or the friction-drop
-`cage outcome <task> --minutes N` (same fail-open, idempotent receipt path) —
+capped)`. Attested minutes — `cage human record --minutes`, or the friction-drop
+`cage human outcome <task> --minutes N` (same fail-open, idempotent receipt path) —
 rank above derived in the precedence ladder; for a given task **attested wins
 and derived renders as reference — the two are never summed.** The extended
 confidence intuition: attested modes keep their §3 rungs; the derived heuristic
@@ -495,7 +495,7 @@ measured (§5c.4).
 
 ### 5c.4 Calibration — the manual axis grades the heuristic
 
-`cage calibration --human`: over tasks with BOTH attested and derived minutes,
+`cage insights calibration --human`: over tasks with BOTH attested and derived minutes,
 report the derived/attested ratio distribution (median + IQR) — the measured
 accuracy of the heuristic, `method: measured` (an observed frequency of recorded
 signals). Below `MIN_ESTIMATE_N` such tasks it refuses. This mirrors the
@@ -504,9 +504,9 @@ let the measured gap be the confidence.
 
 ### 5c.5 Views
 
-`cage human` / `cage trend` show attested and derived as **separate blocks**
-(absence of gap data is an explicit line, not silence). `cage compare`,
-`cage verdict`, `cage study report` gain one total-cost line — agent $ + human
+`cage human show` / `cage insights trend` show attested and derived as **separate blocks**
+(absence of gap data is an explicit line, not silence). `cage insights compare`,
+`cage insights verdict`, `cage study report` gain one total-cost line — agent $ + human
 minutes × rate, tagged with the human component's method — suppressed by
 `--agent-only`. `matrix --human` is unchanged: baseline receipts answer "what
 would a person instead have cost", a different question from "what did this
@@ -533,12 +533,12 @@ A change is done only when all of these hold and the docs in §8 are updated.
    receipt of equal value, and `0.0` for `ms`/`gco2`; `roi` and `attribution`
    produce byte-identical output before and after being routed through it
    (pure refactor — snapshot test).
-2b. `CAGE_HUMAN_RATE` supersedes the policy rate; `cage human` header prints
+2b. `CAGE_HUMAN_RATE` supersedes the policy rate; `cage human show` header prints
    `rate source: env ($N/hr)` when set and `policy ($N/hr)` when not; the same
    `(ledger, policy, env)` triple yields identical tables (determinism preserved).
-3. `cage human` totals reconcile: `Σ saved == Σ human_$ − Σ agent_$` for the
+3. `cage human show` totals reconcile: `Σ saved == Σ human_$ − Σ agent_$` for the
    filtered window; `--json` emits the same numbers as the table.
-4. `cage matrix <task> --human` shows the anchor as the most expensive row, every
+4. `cage insights matrix <task> --human` shows the anchor as the most expensive row, every
    agent row's `vs human %` is internally consistent, and the run-without-`--human`
    output is **identical** to today (snapshot test against `demo`).
 5. A human receipt with no minutes/type/usd falls back to the global default and
@@ -551,7 +551,7 @@ A change is done only when all of these hold and the docs in §8 are updated.
    beyond top-level dirs.
 8. `$0`: `human.py` / `convert.py` / `tasks.py` import stdlib + `cage.*` only; no
    new dependency. Git is shelled out to, fail-open, never imported as a library.
-9. Time-saving: `cage human` and `cage trend` show `saved hrs`; a task whose
+9. Time-saving: `cage human show` and `cage insights trend` show `saved hrs`; a task whose
    `agent_active_minutes` exceeds `human_minutes` reports **negative** time saved
    (asserted by a test) — the metric can embarrass the agent.
 10. Task record: git auto-collection is fail-open — a non-repo / no-git / detached
@@ -573,9 +573,9 @@ A change is done only when all of these hold and the docs in §8 are updated.
 | `cage/tasks.py` | **new** — `tasks.jsonl` read/write + fail-open git snapshot (§5b.2) |
 | `cage/trend.py` | **new** — cost+time time-series by week/month (§5b.4) |
 | `cage/matrix.py` | optional human anchor row + `vs human` columns behind a flag |
-| `cage/render.py` | tables for `cage human` / `cage trend` (reuse `render.table`) |
+| `cage/render.py` | tables for `cage human show` / `cage insights trend` (reuse `render.table`) |
 | `cage/serve.py` | "Agent vs human" + "Savings trend" panels + standalone `--html` writer |
-| `cage/hooks.py` · `clicmds.py` | snapshot git into `tasks.jsonl` at task close (SessionEnd / `cage outcome`) |
+| `cage/hooks.py` · `clicmds.py` | snapshot git into `tasks.jsonl` at task close (SessionEnd / `cage human outcome`) |
 | `cage/cli.py` + `clicmds.py` | `human`, `human-record`, `trend` subcommands; `matrix --human`; `--html` |
 | `tests/` | the 10 criteria in §6 |
 
@@ -589,7 +589,7 @@ clear inputs → outputs, every acceptance criterion is a test.
 - [x] `docs/cage-plan.md` — added §4.6 "Tier-1: the human baseline" beside the §4.4
   matrix (two-tier model + precedence chain + the two clocks), §3.4 for the
   `tasks.jsonl` substrate addition, and the new CLI lines in §7.
-- [x] `README.md` — added `cage human` / `human-record` / `matrix --human` / `trend`
+- [x] `README.md` — added `cage human show` / `human-record` / `matrix --human` / `trend`
   to the command list, a Tier-1 section, and the one-line summary (cost **and** time
   saved, anchored to commits). Test count refreshed.
 - [x] `docs/agents.md` — noted that Orff records human estimates via `record_human`.
@@ -625,7 +625,7 @@ a dependency — three violations of cage law. Rates live in policy; the bundled
 default ships rounded, market-style blended estimates (non-secret, like bundled
 model prices). The fintech leak risk (real internal rates in a checked-in file) is
 handled by one optional `CAGE_HUMAN_RATE` env override (stdlib, zero-dep), read at
-derive time, with its provenance printed in the `cage human` header so it is
+derive time, with its provenance printed in the `cage human show` header so it is
 auditable rather than hidden. Determinism holds: env is explicit config, not
 entropy.
 
@@ -642,8 +642,8 @@ estimates they are. Honest and adoptable.
 
 Stronger than "defer." "Agent vs human" is a join of *calls* (agent cost) with
 *human receipts* — a different computation from roi's receipts-only, per-tool,
-net-of-own-cost math, and precisely what `cage human` is. A flag would duplicate
-that logic and blur the two-tier model (§1). `cage human` is the human-ROI view;
+net-of-own-cost math, and precisely what `cage human show` is. A flag would duplicate
+that logic and blur the two-tier model (§1). `cage human show` is the human-ROI view;
 the dashboard composes the two panels rather than merging the two computations.
 
 ### E. Commit/task data in `meta` vs a new file → **new `tasks.jsonl`**
@@ -653,7 +653,7 @@ across every receipt of a task and has no home for `outcome`. A task is a
 first-class entity that calls and receipts already reference by id but nothing
 describes. The cost is a third ledger file (contract change → plan §3), justified
 because it also absorbs the existing `outcome` signal and powers the diff-informed
-confidence bump (§5b.3) and `cage trend`. Auto-collected from git, fail-open. The
+confidence bump (§5b.3) and `cage insights trend`. Auto-collected from git, fail-open. The
 discipline guard (§5b.5) keeps it from sprawling.
 
 ### F. Top-level changed dirs vs path count only → **top-level dirs** (low-stakes)

@@ -14,7 +14,7 @@ reads one report. This module holds all of it:
   simply switches phase; a `start` without `stop` extends to the end; rows
   before any marker are *unphased* — excluded from deltas, counted in coverage.
 - **Phase intent vs observed stack.** A phase records what the week was *meant*
-  to be (a plugin can be installed but unused); `cage compare`'s stack signature
+  to be (a plugin can be installed but unused); `cage insights compare`'s stack signature
   (§4.7) stays the within-phase truth of what actually ran.
 - **The unit is the machine-day.** Capture-only fleets never close tasks, so
   per-task medians would be empty by construction; a study's question is "what
@@ -375,7 +375,7 @@ def render_study(d: dict) -> str:
     if not d["phases"]:
         return ("Fleet study · no phase markers recorded yet\n\n"
                 "enroll each machine with `cage study join <phase>` (or `cage study "
-                "start <phase>`), capture, then `cage export --study` and import the "
+                "start <phase>`), capture, then `cage data export --study` and import the "
                 "bundles here.")
     out = ["Fleet study · phases: " + " → ".join(d["phases"])
            + (f" (comparing the first two)" if len(d["phases"]) > 2 else ""), "",

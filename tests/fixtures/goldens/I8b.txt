@@ -1,0 +1,11 @@
+$ cage insights matrix --usd
+Counterfactual matrix · task None
+
+graphify  input tok  source
+--------  ---------  --------
+✗            22,171  modeled
+✓             1,660  measured
+
+full stack vs all-off: ✓ smaller (22,171 → 1,660 tok)
+· cost column unavailable — no priceable model (no task join, no route)
+  fix: cage prices route-tool graphify --to <provider>/<model>

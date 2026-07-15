@@ -49,7 +49,7 @@ def test_meter_without_usage_records_nothing(proj):
 
 
 def test_metercmd_tolerates_dash_dash_separator(proj):
-    # `cage meter -- <cmd>` — argparse REMAINDER keeps the `--`; run() must strip
+    # `cage data meter -- <cmd>` — argparse REMAINDER keeps the `--`; run() must strip
     # it like graphifymeter does, and still propagate the child's exit code.
     import sys
 

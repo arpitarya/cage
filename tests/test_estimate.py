@@ -1,4 +1,4 @@
-"""`cage estimate` + `cage calibration` (roadmap P3) — exact-number assertions.
+"""`cage insights estimate` + `cage insights calibration` (roadmap P3) — exact-number assertions.
 
 Same pricing ground as test_compare: bundled claude-opus-4-8 at $5/$25 per MTok.
 """
@@ -115,7 +115,7 @@ def test_legacy_estimate_without_band_skipped_not_scored(seeded):
 def test_calibration_empty_state_explains(proj):
     text = calibration.render_calibration(calibration.summarize(proj, policy.load(None)))
     assert "no closed tasks with recorded estimates yet" in text
-    assert "cage estimate --record" in text
+    assert "cage insights estimate --record" in text
 
 
 def test_deterministic(seeded):

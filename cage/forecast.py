@@ -1,4 +1,4 @@
-"""`cage forecast` — project monthly spend from the current trajectory (plan §8.5).
+"""`cage insights forecast` — project monthly spend from the current trajectory (plan §8.5).
 
 Takes the observed daily run-rate over the ledger's span and projects it to a
 30-day month, then flags whether the daily budget ceiling implies a month-end blow

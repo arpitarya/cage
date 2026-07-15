@@ -91,7 +91,7 @@ def test_never_list_survives_days_zero(root):
 def test_dry_run_touches_nothing(root, capsys):
     st = _seed_state(root)
     before = {p.name: p.read_bytes() for p in st.iterdir() if p.is_file()}
-    assert cli.main(["cleanup"]) == 0
+    assert cli.main(["data", "cleanup"]) == 0
     out = capsys.readouterr().out
     assert "dry-run" in out and "--apply" in out
     after = {p.name: p.read_bytes() for p in st.iterdir() if p.is_file()}
@@ -101,11 +101,11 @@ def test_dry_run_touches_nothing(root, capsys):
 def test_apply_flag_and_env_toggle(root, capsys, monkeypatch):
     _seed_state(root)
     monkeypatch.setenv("CAGE_CLEANUP", "0")
-    assert cli.main(["cleanup", "--apply"]) == 0
+    assert cli.main(["data", "cleanup", "--apply"]) == 0
     assert "DISABLED" in capsys.readouterr().out
     assert (Footprint(root).state / "junk.tmp").exists()  # env off ⇒ nothing applied
     monkeypatch.delenv("CAGE_CLEANUP")
-    assert cli.main(["cleanup", "--apply"]) == 0
+    assert cli.main(["data", "cleanup", "--apply"]) == 0
     assert "✔ applied" in capsys.readouterr().out
     assert not (Footprint(root).state / "junk.tmp").exists()
 
@@ -149,7 +149,7 @@ def test_derived_views_identical_before_and_after_cleanup(root, capsys):
         call_id="c_det"))
     def views():
         out = []
-        for argv in (["report", "--by", "model"], ["compare"], []):
+        for argv in (["report", "--by", "model"], ["insights", "compare"], []):
             assert cli.main(argv) == 0
             out.append(capsys.readouterr().out)
         return out

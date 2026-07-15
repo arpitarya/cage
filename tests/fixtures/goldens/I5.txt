@@ -1,0 +1,11 @@
+$ cage insights compare --label docfix --agent-only
+Stack comparison · closed tasks · measured group totals (tokens = in+out per task)
+
+stack         n                   median tok        IQR tok  median $            IQR $
+------------  -  ---------------------------  -------------  --------  ---------------
+agent-only    5                       14,200  13,300–15,100   $0.0606  $0.0579–$0.0633
+fux+graphify  2  insufficient data (n=2 < 5)
+graphify      5                        6,900    6,300–7,500   $0.0339  $0.0321–$0.0357
+
+Δ graphify vs agent-only: -7,300 tok · -$0.0267 per task (median, estimated)
+  ⚠ observed difference across different tasks — not a controlled experiment; stacks are per-task observed receipt sets, not configured pipelines

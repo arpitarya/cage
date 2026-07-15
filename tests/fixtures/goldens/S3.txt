@@ -1,0 +1,30 @@
+$ cage study report --agent-only
+Fleet study · phases: baseline → plugin
+
+coverage (days with rows — gaps kill studies, so they print first):
+  machine m_01aa000000000000
+    baseline     5 day(s) · agents: claude · ⚠ gap days: 2026-07-06
+    plugin       5 day(s) · agents: claude
+  machine m_02aa000000000000
+    baseline     5 day(s) · agents: claude · ⚠ gap days: 2026-07-06
+    plugin       5 day(s) · agents: claude
+  machine m_03aa000000000000
+    baseline     5 day(s) · agents: claude · ⚠ gap days: 2026-07-06
+    plugin       5 day(s) · agents: claude
+  machine m_04aa000000000000
+    baseline     5 day(s) · agents: claude · ⚠ gap days: 2026-07-06
+    plugin       5 day(s) · agents: claude
+  machine m_05aa000000000000
+    baseline     5 day(s) · agents: claude · ⚠ gap days: 2026-07-06
+    plugin       5 day(s) · agents: claude
+  machine m_06aa000000000000
+    baseline     5 day(s) · agents: claude
+    plugin       MISSING — no rows in this phase
+
+paired-by-machine delta (plugin − baseline, median of per-machine deltas, n=5 machines):
+  -94,000 tok/day · -$0.3540/day per machine (estimated)
+  ⚠ observed across different weeks with different work mixes — recorded phase intent, not a randomized experiment
+
+pooled machine-days per phase (measured):
+  baseline     n=30 days · median 245,000 tok · $0.9750 (IQR $0.9300–$1.0200)
+  plugin       n=25 days · median 146,000 tok · $0.6060 (IQR $0.5880–$0.6240)

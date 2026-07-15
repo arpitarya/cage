@@ -1,8 +1,8 @@
-"""`cage calibration` — do `cage estimate`'s bands actually land? (roadmap P3)
+"""`cage insights calibration` — do `cage insights estimate`'s bands actually land? (roadmap P3)
 
 The estimator never self-reports confidence; this view **measures** it: over
 closed tasks that carry a recorded estimate (`est_tokens` + band bounds,
-stamped by `cage estimate --record` *before* the task ran), compare the
+stamped by `cage insights estimate --record` *before* the task ran), compare the
 estimate to the measured actual:
 
 - **ratio distribution** — actual_tokens / est_tokens per task (median + IQR);
@@ -19,7 +19,7 @@ are skipped with a visible count, never silently dropped.
 
 `--human` (plan §4.10) applies the same measured-hit-rate pattern to the
 turn-gap heuristic: over tasks carrying BOTH attested minutes (`human-record` /
-`cage outcome --minutes`) and derived turn-gap minutes, report the
+`cage human outcome --minutes`) and derived turn-gap minutes, report the
 derived/attested ratio distribution — the measured accuracy of the derivation.
 Below `MIN_ESTIMATE_N` such tasks the view refuses; the heuristic never
 self-reports confidence.
@@ -77,7 +77,7 @@ def tasks_open_with_estimates(root: Path):
 
 
 def summarize_human(root: Path, pol: dict) -> dict:
-    """`cage calibration --human` — measured accuracy of the turn-gap heuristic.
+    """`cage insights calibration --human` — measured accuracy of the turn-gap heuristic.
 
     Scores every task with BOTH attested and derived minutes: ratio =
     derived / attested (1.0 ⇒ the heuristic matches what a person attested; >1 ⇒
@@ -131,7 +131,7 @@ def render_csv(d: dict) -> str:
 
 
 def render_csv_human(d: dict) -> str:
-    """CSV for `cage calibration --human` over the same payload as the text view:
+    """CSV for `cage insights calibration --human` over the same payload as the text view:
     ``task`` rows (attested vs derived minutes) + one ``summary`` row. A refused
     view (below min-n) keeps the refusal in the summary ``note`` and carries no
     distribution — the command explains, never numbers, in CSV too."""
@@ -154,8 +154,8 @@ def render_calibration_human(d: dict) -> str:
     if not d["ok"]:
         return ("Calibration · derived attention vs attested minutes\n\n"
                 f"{d['reason']}\n"
-                "attest more tasks (`cage outcome <task> --minutes N` or "
-                "`cage human-record --task T --minutes N`) on work whose calls carry "
+                "attest more tasks (`cage human outcome <task> --minutes N` or "
+                "`cage human record --task T --minutes N`) on work whose calls carry "
                 "turn-gap data (gap_ms), then re-run.")
     r = d["ratio"]
     return "\n".join([
@@ -177,8 +177,8 @@ def render_calibration(d: dict) -> str:
                 f"{skip['no-band']} without band bounds")
     if not d["n"]:
         return ("Calibration · no closed tasks with recorded estimates yet\n\n"
-                "record one before starting a task: `cage estimate --record <task>`;\n"
-                "close it with `cage outcome <task>` — then this view measures the hit-rate.\n"
+                "record one before starting a task: `cage insights estimate --record <task>`;\n"
+                "close it with `cage human outcome <task>` — then this view measures the hit-rate.\n"
                 + skipline)
     r = d["ratio"]
     pct = f"{d['hit_rate'] * 100:.0f}%"

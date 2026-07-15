@@ -48,7 +48,7 @@ REGISTRY: tuple[Explanation, ...] = (
         "compare-delta", ("compare", "comparison", "delta", "group", "grouped",
                           "median", "iqr", "observational", "a/b", "ab",
                           "baseline", "agent-only", "cheaper"),
-        "how `cage compare` contrasts closed-task groups by observed stack",
+        "how `cage insights compare` contrasts closed-task groups by observed stack",
         "group closed tasks by stack signature (joined receipt tools; task-id join,\n"
         "  session-window fallback); per group report n · median · IQR of measured\n"
         "  tokens + USD; delta = median(stack) − median(agent-only), same non-stack\n"
@@ -60,14 +60,14 @@ REGISTRY: tuple[Explanation, ...] = (
     Explanation(
         "estimate-band", ("estimate", "estimated-cost", "band", "predict", "forecast-task",
                           "pre-task", "upfront", "before", "how-much-will"),
-        "how `cage estimate` bands an unrun task's cost",
+        "how `cage insights estimate` bands an unrun task's cost",
         "band = median + IQR of measured totals over closed tasks matching the exact\n"
         "  keys (scope / label / agent) — no similarity scoring, no ML. Below\n"
         "  n = {min_estimate_n} matching tasks the command refuses. --record stamps\n"
         "  est_tokens/est_usd/est_n + the token band bounds onto the open task row.",
         ("cage/estimate.py", "cage/taskgroup.py", "cage/constants.py"),
         "modeled — history applied to a task that hasn't run is a reconstruction,\n"
-        "  never an invoice; its empirical confidence is `cage calibration`'s hit-rate."),
+        "  never an invoice; its empirical confidence is `cage insights calibration`'s hit-rate."),
     Explanation(
         "calibration-hit-rate", ("calibration", "calibrate", "hit-rate", "hit", "landed",
                                  "accuracy", "ratio", "in-band", "reliable"),
@@ -82,7 +82,7 @@ REGISTRY: tuple[Explanation, ...] = (
     Explanation(
         "verdict-composition", ("verdict", "saving-or-costing", "worth-it", "keep",
                                 "drop", "net", "break-even", "breakeven", "compose"),
-        "how `cage verdict <tool>` reaches SAVING / COSTING / INSUFFICIENT DATA",
+        "how `cage insights verdict <tool>` reaches SAVING / COSTING / INSUFFICIENT DATA",
         "a pure composer — no new statistics: net = roi.saved − roi.own_cost over the\n"
         "  window (verdict = its sign); marginal saving from attribution's latest task;\n"
         "  direction from trend; drift from regression; redo-rate from quality;\n"
@@ -127,8 +127,8 @@ REGISTRY: tuple[Explanation, ...] = (
         "  per-turn timestamps (claude today; codex/copilot/kiro lack the signal ⇒ no\n"
         "  field, never fabricated). Read-time derive: changing the cap re-prices the\n"
         "  backlog, the ledger is never rewritten. Attested minutes (`human-record`,\n"
-        "  `cage outcome --minutes`) beat derived for a task — never summed;\n"
-        "  `cage calibration --human` measures the heuristic's derived/attested ratio.",
+        "  `cage human outcome --minutes`) beat derived for a task — never summed;\n"
+        "  `cage insights calibration --human` measures the heuristic's derived/attested ratio.",
         ("cage/attention.py", "cage/transcript.py", "policy.toml [human]"),
         "estimated, always — labelled 'derived (turn-gaps, capped)'; only attested\n"
         "  minutes can ever read differently, and only as a real timesheet ('measured')."),
@@ -203,6 +203,28 @@ REGISTRY: tuple[Explanation, ...] = (
         ("cage/pathprobe.py", "cage/debuglog.py", "cage/doctorbundle.py"),
         "n/a — a diagnostic runbook, not a number.",
         kind="concept", plan_ref="§3.7"),
+    Explanation(
+        "sources",
+        ("sources", "source", "import-path", "import-paths", "log-path",
+         "custom-tool", "custom", "network-home", "nonstandard", "config-paths"),
+        "add or replace the log locations cage imports from ([sources] in policy.toml)",
+        "[sources] adds candidate import paths beyond the built-in registry — for a\n"
+        "  nonstandard install, a network home, or a side-by-side log copy. Additive\n"
+        "  by default (empty/absent [sources] = the built-in registry, byte-identical).\n"
+        "    [sources.<agent>] paths = [\"~/alt/logs\", ...]   # one of the four agents\n"
+        "    [sources.<agent>] replace = true                 # ignore that agent's built-ins\n"
+        "                                                     #   (empty paths ⇒ disabled)\n"
+        "    [sources.<name>]  paths = [...], format = \"claude|codex|copilot|kiro\"\n"
+        "                                                     # a custom tool; rows stamp agent=<name>\n"
+        "  Precedence: env home override > policy > built-in. ~ and $VARs expand;\n"
+        "  a glob entry (*?[) is rejected. Capture-side only — no derived view changes.\n"
+        "  Verify with `cage doctor --paths` (provenance column: built-in|env|policy).\n"
+        "  A committed project policy with a machine-absolute path warns — prefer\n"
+        "  ~/.cage/policy.toml or a ~/… path. `policy sync` never touches [sources].\n"
+        "  current sources:\n{sources_live}",
+        ("cage/paths.py", "cage/importcmd.py", "cage/pathprobe.py"),
+        "n/a — describes a capture-config mechanism, not a number.",
+        kind="concept", plan_ref="output-and-simplification.plan.md Phase 4"),
     Explanation(
         "overview", ("overview", "works", "introduction", "explain", "how-cage-works"),
         "the front door: cage's one-way data flow + its laws",
@@ -279,7 +301,7 @@ REGISTRY: tuple[Explanation, ...] = (
         "the two ways a tool's savings claim reaches the ledger",
         "in-tool shim: the tool itself (e.g. fux) emits a receipt as it runs, so the\n"
         "  claim is first-party. External adapter: cage meters a third-party tool from\n"
-        "  the outside (e.g. `cage graphify -- graphify query …`) without that tool\n"
+        "  the outside (e.g. `cage data graphify -- graphify query …`) without that tool\n"
         "  knowing cage exists — the receipt is filed by cage's wrapper, not the tool.\n"
         "  Dollars: a receipt linked to a call prices at that call's model; a\n"
         "  call-less token receipt prices via the resolution ladder — see\n"
@@ -296,10 +318,10 @@ REGISTRY: tuple[Explanation, ...] = (
         "  Tier-2 (attribution.py, matrix): tool vs tool, inside one agent run — what\n"
         "  did each tool in the pipeline save vs that tool being off.\n"
         "  The Tier-1 axis also tracks what the agent COSTS in human time (plan §4.10):\n"
-        "  attested minutes (`human-record`, `cage outcome --minutes N`) are ground\n"
+        "  attested minutes (`human-record`, `cage human outcome --minutes N`) are ground\n"
         "  truth; derived minutes (turn-gaps capped at {idle_cap} min, attention.py)\n"
         "  are the passive estimate. Attested beats derived per task — never summed;\n"
-        "  `cage calibration --human` measures the heuristic against the attested\n"
+        "  `cage insights calibration --human` measures the heuristic against the attested\n"
         "  ground truth (see `attention-minutes` for the formula).",
         ("cage/human.py", "cage/matrix.py", "cage/attention.py"),
         "n/a — describes two measurement axes, not a number.",
@@ -345,7 +367,7 @@ REGISTRY: tuple[Explanation, ...] = (
         "  concatenate, and --since skips whole below-cutoff months.\n"
         "  scope: calls/receipts carry an optional top-level changed dir (same PII guard\n"
         "  as tasks); report/attrib/budget/matrix --scope <dir> slice one component.\n"
-        "  team: cage ledger-sync unions local rows into refs/notes/cage-ledger by row\n"
+        "  team: cage authorship ledger-sync unions local rows into refs/notes/cage-ledger by row\n"
         "  id (CI-sole-writer, like notes-sync); report/attrib --team read the merge,\n"
         "  rolled up by scope, never per-person. Size warning: one stderr line past\n"
         "  ~{warn_mb} MB (policy [ledger] warn_mb overrides) — warn-only, never blocks.",
@@ -372,11 +394,17 @@ REGISTRY: tuple[Explanation, ...] = (
         "measured for exact; alias/family are approximations and carry their footnote."),
     Explanation(
         "unpriced", ("unpriced", "zero", "0", "billing", "missing-price",
-                     "counted-as-0", "understated", "no-price-row"),
-        "what an UNPRICED $0 means and how to fix it",
+                     "counted-as-0", "understated", "no-price-row", "dash",
+                     "em-dash", "—"),
+        "what an UNPRICED cell means and how to fix it",
         "a call whose model matched none bills $0 — the totals are understated and\n"
         "  every read surface says so out loud rather than hiding it (a wrong number\n"
-        "  is worse than none). Fix workflow: `cage prices unpriced` lists each\n"
+        "  is worse than none). In text tables the cell renders `—` (the ONLY\n"
+        "  meaning of the dash: couldn't price; `$0.0000` is always a real zero),\n"
+        "  the TOTAL carries `(+ unpriced)`, and the full ⚠ block renders in the\n"
+        "  `--usd` view (the token default carries one muted pointer). CSV keeps an\n"
+        "  explicit empty + priced_via=none — the glyph never enters data.\n"
+        "  Fix workflow: `cage prices unpriced` lists each\n"
         "  offending (provider, model) with call count, token volume, and a\n"
         "  ready-to-run fix line; find the real rate on the vendor's pricing page\n"
         "  (cage never fetches — no network on any cage code path), then\n"
@@ -466,7 +494,7 @@ REGISTRY: tuple[Explanation, ...] = (
                               "stale-prices", "bundle-newer", "sync-recommendation"),
         "how cage knows your price table is stale ([meta] + prices sync)",
         "the bundled policy carries [meta] prices_version {prices_version_bundled};\n"
-        "  `cage init` (and the first `cage prices set`) stamp the project copy with\n"
+        "  `cage setup` (and the first `cage prices set`) stamp the project copy with\n"
         "  the bundle it derived from (this project: {prices_version_project}).\n"
         "  `cage doctor` and `cage prices list` compare the two — a newer bundle\n"
         "  prints one recommendation line to run `cage prices sync`, never\n"
@@ -545,7 +573,7 @@ REGISTRY: tuple[Explanation, ...] = (
     Explanation(
         "cleanup", ("cleanup", "state-dir", "prune", "stale", "retention",
                     "debug-log-growth", "cursors", "pending-buffers"),
-        "what `cage cleanup` may touch — and what it never may",
+        "what `cage data cleanup` may touch — and what it never may",
         "a CLOSED allowlist over .cage/state/ only: aged debug.log / hooks-seen.jsonl\n"
         "  rows, stale pending-* provenance buffers, cursors whose source log is gone\n"
         "  (safe: the next import re-reads and id-dedupe absorbs it), *.tmp. Never —\n"
@@ -553,7 +581,7 @@ REGISTRY: tuple[Explanation, ...] = (
         "  (fleet pairing breaks without it), study.jsonl, limits.json. Window:\n"
         "  [cleanup] days = {cleanup_days} (currently {cleanup_on}; env CAGE_CLEANUP\n"
         "  overrides). Auto path piggybacks on `cage import`/hook sweeps, throttled\n"
-        "  and fail-open (cage installs no scheduler); manual `cage cleanup` is a\n"
+        "  and fail-open (cage installs no scheduler); manual `cage data cleanup` is a\n"
         "  dry-run until --apply. State files are never read by derived views, so\n"
         "  cleanup cannot change a single reported number.",
         ("cage/cleanup.py", "cage/policy.py", "policy.toml [cleanup]"),
@@ -562,10 +590,10 @@ REGISTRY: tuple[Explanation, ...] = (
     Explanation(
         "import-before-export", ("import-before-export", "export-sweep", "no-import",
                                  "self-refreshing", "snapshot", "bundle-freshness"),
-        "why `cage export` imports first (and how to get a frozen snapshot)",
+        "why `cage data export` imports first (and how to get a frozen snapshot)",
         "export runs the all-agent import sweep before emitting/bundling, so a\n"
         "  capture-only machine (hooks don't fire under a VS Code extension) still\n"
-        "  ships a complete bundle — one `cage export --study` is enough. Currently\n"
+        "  ships a complete bundle — one `cage data export --study` is enough. Currently\n"
         "  {import_before_export}. Precedence: the --no-import flag wins per\n"
         "  invocation > env CAGE_CAPTURE=0 (pauses all capture, sweep included) >\n"
         "  policy [capture] import_before_export. The sweep is fail-open — a broken\n"
@@ -576,13 +604,35 @@ REGISTRY: tuple[Explanation, ...] = (
         "n/a — describes capture freshness, not a number.",
         kind="concept", plan_ref="§3.7"),
     Explanation(
+        "display", ("display", "usd", "--usd", "dollars", "tokens-default",
+                    "token-view", "dollar-view", "signal-gating", "gating",
+                    "all-columns", "hide", "columns", "why-no-cost-column",
+                    "where-are-dollars"),
+        "tokens by default, dollars opt-in, and signal-gated columns",
+        "tokens are the measurement; dollars are an interpretation you ask for\n"
+        "  (plan Phase 2.5). `cage report`, `cage insights matrix`, and the bare `cage`\n"
+        "  headline render tokens-only until `--usd` asks for currency — or set\n"
+        "  `[display] usd = true` for always-on (precedence: flag > env CAGE_USD >\n"
+        "  policy). Pricing footnotes and the full ⚠ UNPRICED block belong to the\n"
+        "  `--usd` view; the token view carries one muted unpriced pointer.\n"
+        "  Signal-gating composes: saved/net (and saved-tok) columns render only\n"
+        "  when ≥1 receipt exists in the window — otherwise one line explains, and\n"
+        "  `--all-columns` restores the fixed shape for scripts. Hard line: a\n"
+        "  negative net with real receipts is never suppressed. Display-only —\n"
+        "  pricing always computes underneath (budget guards, UNPRICED detection),\n"
+        "  money-native views (budget/roi/verdict/compare/estimate) always show\n"
+        "  dollars, and CSV never gates (full schema, always).",
+        ("cage/display.py", "cage/report.py", "cage/matrix.py", "policy.toml [display]"),
+        "n/a — a presentation rule; every dollar that does render keeps its method tag.",
+        kind="concept", plan_ref="output-and-simplification.plan.md Phase 2"),
+    Explanation(
         "csv-output", ("csv", "csv-output", "spreadsheet", "excel", "pivot",
                        "pivot-table", "flat-table", "reporting-format",
                        "report-csv", "one-way"),
         "the CSV reporting surface: which views, the column law, csv-vs-bundle",
         "`--csv` on report · attrib · roi · compare · study report · calibration\n"
         "  (incl. --human) · human · trend — stdout by default (pipe-friendly),\n"
-        "  `--csv <path>` writes a file. Raw rows: `cage export --csv\n"
+        "  `--csv <path>` writes a file. Raw rows: `cage data export --csv\n"
         "  calls|receipts|tasks` (flat ledger rows for pivot tables; the ledger's\n"
         "  own PII surface — counts and ids, never content). MCP mirrors it: a\n"
         "  `format: csv` param on the report/attrib/roi tools.\n"
@@ -593,7 +643,7 @@ REGISTRY: tuple[Explanation, ...] = (
         "  RFC-4180 quoting, LF line endings pinned on every OS (deterministic:\n"
         "  same ledger + policy ⇒ byte-identical CSV). Column contracts:\n"
         "  docs/csv-output.md. Two export kinds, never blurred: CSV is one-way\n"
-        "  REPORTING and never an import source; the fleet bundle (`cage export\n"
+        "  REPORTING and never an import source; the fleet bundle (`cage data export\n"
         "  --study`) stays jsonl — lossless, merge-by-id, re-importable.",
         ("cage/csvout.py", "cage/exportcmd.py", "cage/report.py", "cage/mcpserver.py"),
         "n/a — describes an output format; every row still carries its own method tag.",

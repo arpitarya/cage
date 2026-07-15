@@ -40,7 +40,7 @@ def _footprint(active: Path, source: str) -> tuple[str, str]:
     and a global `~/.cage` knows where capture lands — one sink per run, never both."""
     base = paths.Footprint(active).base
     if not base.is_dir():
-        return _FAIL, ("no ledger yet — `cage init` for this project, or "
+        return _FAIL, ("no ledger yet — `cage setup` for this project, or "
                        "`cage setup --global` for project-less capture into ~/.cage")
     return _OK, f"active ledger: {source} → {base}"
 
@@ -57,18 +57,18 @@ def _hooks(root: Path) -> tuple[str, str]:
     """Hooks are an *optional* real-time add-on, not the capture contract: they fire only
     under a CLI client — a VS Code extension of Codex/Kiro/Copilot never runs them. So a
     missing/wired hook is informational, never a failure; the universal path is `cage
-    import`/`cage export`."""
+    import`/`cage data export`."""
     wired = [s for s, on in agents.status(root).items() if on]
     if not wired:
         return _OK, ("no agent hooks wired (optional) — capture via `cage import` / "
-                     "`cage export`; wire real-time CLI hooks with `cage setup --wire-only --<agent>`")
+                     "`cage data export`; wire real-time CLI hooks with `cage setup --wire-only --<agent>`")
     return _OK, (f"real-time hooks wired (CLI-only, optional): {', '.join(wired)} — "
                  "they don't fire under a VS Code extension; `cage import` is the universal path")
 
 
 def _metering(active: Path) -> tuple[str, str]:
     """Honest four-agent capture matrix (plan §3.7). Capture is **pull-based**: explicit
-    `cage import` / `cage export` (and the optional foreground `cage watch`) is the universal,
+    `cage import` / `cage data export` (and the optional foreground `cage data watch`) is the universal,
     client-independent path for every surface in ``agents.SURFACES``. Hooks are an optional
     real-time add-on that fire only under a CLI client — never under a VS Code extension —
     so a *wired* hook is not the same as a *firing* one. When capture-debug is on, the
@@ -91,10 +91,10 @@ def _metering(active: Path) -> tuple[str, str]:
     li = importcmd.last_import(active)
     rel = render.ago(li) if li else ""
     foot = (f"\n      last import: {rel}" if rel
-            else "\n      last import: never — run `cage import` (or `cage watch`)")
+            else "\n      last import: never — run `cage import` (or `cage data watch`)")
     foot += (f"\n      (automate with your own scheduler line, e.g. `{render.scheduler_hint()}`; "
              "cage installs no scheduler.)")
-    head = ("capture is pull-based — `cage import`/`cage export` is the universal path; "
+    head = ("capture is pull-based — `cage import`/`cage data export` is the universal path; "
             "hooks are an optional CLI-only real-time add-on (they don't fire under a VS "
             "Code extension):")
     return _OK, head + "".join(rows) + foot
@@ -198,7 +198,7 @@ def _prices_age(root: Path) -> tuple[str, str]:
 
 def _state_dir(root: Path) -> tuple[str, str]:
     """State-dir size + prune-candidate visibility (bloat should be visible before
-    it's a problem). Informational — `cage cleanup` is the remedy."""
+    it's a problem). Informational — `cage data cleanup` is the remedy."""
     foot = paths.Footprint(root)
     if not foot.state.exists():
         return _OK, "no state dir yet"
@@ -213,7 +213,7 @@ def _state_dir(root: Path) -> tuple[str, str]:
                   f"({policy.cleanup_days(pol)}d)")
         if stale:
             return _OK, status + (f" · {len(stale)} prune candidate(s) — "
-                                  "`cage cleanup` to review")
+                                  "`cage data cleanup` to review")
         return _OK, status + " · nothing stale"
     except Exception as exc:  # noqa: BLE001 — informational check, never blocks doctor
         return _OK, f"state dir present (scan skipped: {exc})"

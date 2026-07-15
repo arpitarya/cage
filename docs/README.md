@@ -13,6 +13,14 @@ be cited as current spec.
   handoff: an outgoing model's exit interview (intent, scar tissue, working
   with the human). Context for every future maintainer, never spec; departing
   maintainers append their own lessons.
+- [formulas.md](formulas.md) — the formula catalogue: every computed number's
+  shape, method tag, and knobs. **Generated** from the explain registry
+  (`python -m tools.docgen --target formulas`; CI `--check` gates drift —
+  the CLAUDE.md rule, now mechanical).
+- [cli-output-spec.md](cli-output-spec.md) — per-command, per-state output
+  contracts (LIVE BEHAVIOR since output-honesty; README-linked). Code blocks
+  **generate** from the golden-test fixtures (`tools.docgen --target spec`,
+  CI `--check`) — documented and tested output are one artifact.
 
 ## Subsystem design docs
 
@@ -27,6 +35,8 @@ be cited as current spec.
 - [csv-output.md](csv-output.md) — per-view CSV column contracts (plan §3.9).
 - [pricing.md](pricing.md) — how a call prices: family matching, the unpriced
   workflow, policy versioning/sync, fleet repricing, credits vs prices.
+- [sources.md](sources.md) — `[sources]` in policy.toml: configurable import paths
+  per agent + custom tools, provenance, the portability guard (plan Phase 4).
 - [skillgen.md](skillgen.md) — the rendered skill/prompt/steering assets
   (edit fragments, never the rendered files).
 - [agents.md](agents.md) — per-agent wiring and capture surfaces.
@@ -47,7 +57,12 @@ be cited as current spec.
 Unshipped handoff/prompt pairs live here until their release ships them into the
 archive (the lifecycle rule in `CLAUDE.md`).
 
-- (none right now)
+- [output-and-simplification.plan.md](output-and-simplification.plan.md) — the
+  plan of record for the current cycle. Phases 1–4 (output honesty → CLI tiering →
+  `[sources]`) shipped in **v0.28.0**; the backlog sweep remains.
+
+*(Phases 1–4 handoff/prompt pairs archived with the v0.28.0 release — see the
+[archive index](archive/README.md).)*
 
 ## Archive
 

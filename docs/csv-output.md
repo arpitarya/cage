@@ -1,7 +1,7 @@
 # CSV output — column contracts (plan §3.9)
 
 CSV is cage's one-way **reporting** format: flat, for spreadsheets/BI, never an
-import source. The re-importable fleet bundle (`cage export --study`) stays
+import source. The re-importable fleet bundle (`cage data export --study`) stays
 jsonl — the two are never blurred. `cage query csv-output` explains the design;
 this file pins the per-view column contracts.
 
@@ -41,7 +41,7 @@ unpriced_calls, unpriced_tokens, method
 `cage query repricing`). The `unpriced_*` pair is the per-group share of the
 text view's ⚠ UNPRICED warning — an understated total stays visible.
 
-### `cage attrib --csv`
+### `cage insights attrib --csv`
 
 ```
 tool, saved_tokens, saved_usd, method, confidence, priced_via     (+ TOTAL row)
@@ -51,7 +51,7 @@ tool, saved_tokens, saved_usd, method, confidence, priced_via     (+ TOTAL row)
 (`price_at` · `task-model` · `unpriced` — see `cage query receipt-pricing`);
 empty when every receipt is call-linked (the legacy task-model path).
 
-### `cage roi --csv`
+### `cage insights roi --csv`
 
 ```
 tool, receipts, saved_usd, own_cost_usd, net_usd, added_latency_ms, method,
@@ -64,7 +64,7 @@ receipts took, sorted and `+`-joined (`call` = linked; `price_at`/`task-model`
 = ladder rungs; `unpriced` = rung-3 refusals — those also appear in the text
 view's ⚠ line).
 
-### `cage compare --csv`
+### `cage insights compare --csv`
 
 One flat table typed by a leading `kind` column:
 
@@ -95,7 +95,7 @@ d_tokens_per_day, d_usd_per_day, method, note
 - `pooled` — per compared phase (n = machine-days, measured dists).
 - `unpriced` — the ⚠ line, when it renders.
 
-### `cage calibration --csv`
+### `cage insights calibration --csv`
 
 ```
 kind, task, est_tokens, actual_tokens, ratio, in_band, n,
@@ -106,7 +106,7 @@ skipped_open, skipped_zero_actual, skipped_no_band, method
 `task` rows per scored task; one `summary` row (the skip counts stay visible).
 Both `measured`.
 
-### `cage calibration --human --csv`
+### `cage insights calibration --human --csv`
 
 ```
 kind, task, attested_minutes, derived_minutes, ratio, n,
@@ -116,7 +116,7 @@ median_ratio, q1_ratio, q3_ratio, cap_minutes, method, note
 Refused (below min-n) ⇒ the `summary` row carries the reason in `note` and no
 distribution.
 
-### `cage human --csv`
+### `cage human show --csv`
 
 ```
 kind, agent, tasks, human_usd, agent_usd, saved_usd, saved_minutes, confidence,
@@ -128,18 +128,18 @@ turn-gap block, `attention_minutes`) — separate kinds, never blended, exactly
 like the text view's two sections; derived rows carry the
 `derived (turn-gaps, capped)` label in `note`. Both `estimated`.
 
-### `cage trend --csv`
+### `cage insights trend --csv`
 
 ```
 kind, bucket, tasks, agent_usd, human_usd, saved_usd, saved_minutes,
 attention_minutes, method, note
 ```
 
-`attested` vs `derived` rows per bucket, same separation law as `cage human`.
+`attested` vs `derived` rows per bucket, same separation law as `cage human show`.
 
-## Raw rows (`cage export --csv KIND`)
+## Raw rows (`cage data export --csv KIND`)
 
-`cage export --csv calls|receipts|tasks [--since …] [-o FILE]` — flattened
+`cage data export --csv calls|receipts|tasks [--since …] [-o FILE]` — flattened
 ledger rows for pivot tables, exactly as stored (tasks stay raw append-only
 updates, not the last-write-wins merge). Same PII surface as the ledger:
 counts and ids, never content. Honors import-before-export (`--no-import` to

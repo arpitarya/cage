@@ -9,7 +9,7 @@ merge-by-row-id, CI-sole-writer — applied to calls/receipts instead of provena
   call/receipt ids never legitimately collide, so first-by-id holds). This is a CRDT
   for append-only logs: two machines only ever add unique ids, never edit a shared line.
 - **CI is the sole writer** (`sync` pushes only when `CAGE_NOTES_WRITE=1`, which CI sets
-  and a dev machine normally doesn't). A dev's `cage ledger-sync` defaults to a dry-run.
+  and a dev machine normally doesn't). A dev's `cage authorship ledger-sync` defaults to a dry-run.
 - The aggregate rolls up by `scope` (§3.6.2), never per-developer identity by default —
   the shared artifact stays a cost/ROI ledger, not a monitoring dataset. (Per-person
   attribution is a deliberately-deferred opt-in; see the `# v2:` marker in `read_team`.)

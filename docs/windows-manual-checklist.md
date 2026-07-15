@@ -14,7 +14,7 @@ Prefix verification runs with `set CAGE_DEBUG=1` (cmd) / `$env:CAGE_DEBUG=1`
 pip install cage-flux
 cd C:\dev\cage-testbed
 git init . && echo hello > README.md && git add -A && git commit -m init
-cage init
+cage setup
 cage setup --all
 cage doctor
 cage doctor --paths     :: every candidate log location on THIS machine, with why-lines
@@ -51,13 +51,13 @@ global ledger's home).
 
 ## Windows-specific checks
 
-- [ ] `cage watch` then Ctrl-C → exits (echo `%ERRORLEVEL%` — expected 130;
+- [ ] `cage data watch` then Ctrl-C → exits (echo `%ERRORLEVEL%` — expected 130;
       record any deviation rather than forcing it).
 - [ ] Hook files: after `cage setup`, open `.claude\settings.json` /
       `.codex\hooks.json` etc. — the cage command must be the **resolved**
       path, quoted if it contains spaces (`"C:\...\Scripts\cage.exe" import …`).
 - [ ] Git hooks fire from Git-for-Windows: make a commit, then
-      `cage origin <sha>` shows a provenance row (`hook-post-commit` ran under
+      `cage authorship origin <sha>` shows a provenance row (`hook-post-commit` ran under
       git's bundled sh).
 - [ ] The doctor scheduler hint prints a `schtasks /create …` example — and
       `schtasks /query | findstr cage` proves cage installed **nothing**.

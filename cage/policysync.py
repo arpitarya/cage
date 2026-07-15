@@ -104,11 +104,12 @@ def _project_raw(foot: paths.Footprint) -> dict:
 def _walk(tree: dict, known: tuple[str, ...] | None = None) -> dict[tuple[str, ...], dict]:
     """Flatten the non-pricing policy tree to {leaf-table path: {key: scalar}}.
 
-    Skips the delegated pricing families and ``[meta]`` (version bookkeeping,
-    not a tunable); under ``[tools]`` keeps only scalar keys (the subtables are
-    price routes). ``known`` limits the walk to those top-level sections — the
-    project walk passes the cage-known set so a user's own section is invisible
-    to sync entirely."""
+    Skips the delegated pricing families, ``[meta]`` (version bookkeeping, not a
+    tunable), and ``[sources]`` (configurable import paths — entirely user-owned,
+    the bundle ships none, so sync never adds/updates/orphans it, plan Phase 4);
+    under ``[tools]`` keeps only scalar keys (the subtables are price routes).
+    ``known`` limits the walk to those top-level sections — the project walk passes
+    the cage-known set so a user's own section is invisible to sync entirely."""
     tables: dict[tuple[str, ...], dict] = {}
 
     def descend(prefix: tuple[str, ...], node: dict) -> None:
@@ -122,7 +123,7 @@ def _walk(tree: dict, known: tuple[str, ...] | None = None) -> dict[tuple[str, .
                 descend(prefix + (k,), v)
 
     for section, node in (tree or {}).items():
-        if section in _DELEGATED or section == "meta" or not isinstance(node, dict):
+        if section in _DELEGATED or section in ("meta", "sources") or not isinstance(node, dict):
             continue
         if known is not None and section not in known:
             continue
@@ -312,7 +313,7 @@ def render(d: dict, updated: list[str] | None = None) -> str:
     if d.get("no_project"):
         return (f"policy sync — no project policy.toml at {d['policy_path']}\n"
                 f"the bundled defaults apply directly — nothing can be stale.\n"
-                f"run `cage init` to materialize one.")
+                f"run `cage setup` to materialize one.")
     out = [f"policy sync — bundled {_meta_version(d['bundled_meta'])} vs project "
            f"{_meta_version(d['project_meta'])}", ""]
     if d["in_sync_n"]:

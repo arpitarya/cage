@@ -1,6 +1,4 @@
-<p align="center">
-  <img src="https://raw.githubusercontent.com/arpitarya/cage/main/docs/assets/cage-lockup.png" alt="Cage — Alpha Forge · Value Ledger" width="460">
-</p>
+<img src="https://raw.githubusercontent.com/arpitarya/cage/main/docs/assets/cage-lockup.png" alt="Cage — Alpha Forge · Value Ledger" width="460">
 
 # Cage
 
@@ -34,7 +32,7 @@ And the kicker — you built half of it. So when finance points at you and says 
 ## See it
 
 ```bash
-$ cage matrix --task fix-handover-bug
+$ cage insights matrix --task fix-handover-bug
 ```
 
 ```
@@ -60,8 +58,8 @@ cd your-project
 cage setup                      # guided wizard: defaults to all agents, wires skill + hooks + graphify
 # non-interactively: cage setup --all   (or --claude / --codex / … for just one)
 cage demo                       # seed the worked example
-cage matrix                     # the counterfactual permutation table
-cage human                      # agent-vs-human: $ and hours saved
+cage insights matrix                     # the counterfactual permutation table
+cage human show                      # agent-vs-human: $ and hours saved
 cage query "how is human cost calculated"   # explain any number — live formula, $0
 ```
 
@@ -122,7 +120,7 @@ The savings are anchored to the commit they produced — Cage snapshots a git-aw
 
 ## Authorship — who wrote which commit, and how sure are we
 
-A different question than *what did this cost*: **who is accountable for this diff.** `cage origin <sha>` answers it from the same append-only substrate — which agent wrote which files in which commit, with the same honesty discipline (`hooked` > `transcript` > `heuristic` method ranks; `unknown` derived from absence, never stored; `origin=human` only by explicit attestation; CI the sole git-notes writer; counts-never-content — paths and line counts, never a diff body or commit message). Full design: [docs/cage-plan.md](docs/cage-plan.md) §3.5.
+A different question than *what did this cost*: **who is accountable for this diff.** `cage authorship origin <sha>` answers it from the same append-only substrate — which agent wrote which files in which commit, with the same honesty discipline (`hooked` > `transcript` > `heuristic` method ranks; `unknown` derived from absence, never stored; `origin=human` only by explicit attestation; CI the sole git-notes writer; counts-never-content — paths and line counts, never a diff body or commit message). Full design: [docs/cage-plan.md](docs/cage-plan.md) §3.5.
 
 ## Every number is reviewable — and you can ask it
 
@@ -148,6 +146,8 @@ human-cost · how a human alternative is priced
 
 Set `CAGE_HUMAN_RATE=200` and that printed rate changes — proof it's the code's actual number, not a slide. It's deterministic and `$0`: a curated explainer registry, no LLM, no network. `cage query` also explains *how cage itself works* (`cage query "how does cage work"` walks the data flow, attribution, method tags — same live-fact guarantee); `cage query --list` for every topic, `--json` for the agent-as-user.
 
+The complete formula catalogue — every computed number, its shape, its method tag, and its knobs — is one page: **[docs/formulas.md](docs/formulas.md)**. It is **generated from the same registry `cage query` renders from** (`python -m tools.docgen`; CI fails on drift), so the catalogue and the live answers cannot disagree.
+
 ### Pricing is managed, and $0 is never silent
 
 A call whose model has no price row bills **$0 and says so** — `report`, `compare`, and `study report` all print `⚠ N calls (X tokens) UNPRICED — totals understated` rather than letting an analyst publish an understated number; the fix is one pasted `cage prices set`/`alias` line. Family matching absorbs route prefixes, dotted ids, and effort tiers; prices are derive-time, so fixing the table re-prices every historical row (including imported fleet bundles) retroactively — the ledger stores counts, never conclusions, and cage never fetches a price. The full design — how a call prices · the unpriced workflow · policy versioning and `cage prices sync` · fleet repricing · the Copilot approximation · credits vs prices — is [docs/pricing.md](docs/pricing.md); `cage query prices-cli` walks it live.
@@ -171,22 +171,24 @@ You meter at the provider boundary (library adapter, a reverse proxy for clients
 A tool earns rows in `attrib`/`matrix`/`roi` by filing a **savings receipt**, and there are two ways in, by who owns the tool:
 
 - **In-tool (you own it) — e.g. fux** carries a fail-open `cage_receipt.py` and emits its own `tool="fux"` receipt. Cage stays optional; fux runs unchanged with cage absent.
-- **External adapter (third-party) — e.g. graphify:** `cage graphify -- graphify query "…"` runs graphify unmodified, passes its output through byte-for-byte, and files a `tool="graphify"` receipt by parsing the cited `source_file`s. graphify is never edited; a metering error never alters its result.
+- **External adapter (third-party) — e.g. graphify:** `cage data graphify -- graphify query "…"` runs graphify unmodified, passes its output through byte-for-byte, and files a `tool="graphify"` receipt by parsing the cited `source_file`s. graphify is never edited; a metering error never alters its result.
 
 The full command surface (30+ subcommands: ledger · attribution · human axis · fleet study · ops · agents) is grouped in `cage --help`, which points at `cage query` for any "how is this computed". Every read command takes `--json` for the agent-as-user. The doc map — design of record, subsystem docs, operations, archive — starts at [docs/README.md](docs/README.md).
 
 ## Works with any agent — explicit capture over one global ledger
 
-Cage meters whatever speaks the wire format, so all four agents share **one** ledger contract. Capture is **pull-based and universal**: `cage import` reads each agent's on-disk usage log into the ledger, and `cage export` refreshes then emits it — they need no hooks, no project, and work the same whether you run a CLI or a VS Code extension.
+Cage meters whatever speaks the wire format, so all four agents share **one** ledger contract. Capture is **pull-based and universal**: `cage import` reads each agent's on-disk usage log into the ledger, and `cage data export` refreshes then emits it — they need no hooks, no project, and work the same whether you run a CLI or a VS Code extension.
 
 ```bash
 cage import                 # capture every agent's spend into the active ledger
-cage export --format csv    # refresh, then emit (jsonl | csv | json)
+cage data export --format csv    # refresh, then emit (jsonl | csv | json)
 cage report                 # where the spend went
-cage watch                  # optional: a foreground loop you Ctrl-C (no daemon)
+cage data watch                  # optional: a foreground loop you Ctrl-C (no daemon)
 ```
 
 The ledger resolves **`--ledger`/`CAGE_BASE` → project `.cage/` → global `~/.cage`** — so a user with no project captures into the global ledger (`cage setup --global` to seed it). cage installs **no background job** (no launchd/systemd/cron); automate it, if you like, with your own cron line calling `cage import`.
+
+Nonstandard install, a network home, or a custom tool that writes a supported format? Add import paths in `policy.toml` — `[sources.<agent>] paths = ["~/alt/logs"]` (or a custom `[sources.<name>] format = "claude"`); `cage doctor --paths` shows every location with its provenance, and `cage query sources` explains the schema. See [Configurable import paths](docs/sources.md).
 
 | Agent | Capture (universal) | Optional real-time | Read |
 | ----- | ------------------- | ------------------ | ---- |
@@ -196,7 +198,7 @@ The ledger resolves **`--ledger`/`CAGE_BASE` → project `.cage/` → global `~/
 | **Kiro** | `cage import` (token log) | `agentStop` hook (CLI only) | `cage` MCP |
 | **Your code / Orff** | `cage.meter()` library | — | `cage` CLI / MCP |
 
-Hooks are an **optional** real-time add-on — they fire only under a CLI client, never under a VS Code extension — so `cage import`/`cage export` is the path that always works. `cage report --project <name>` slices the global ledger by working dir (exact for Claude; Copilot/Kiro/Codex logs carry no project, so they're excluded from that filter). Committed wired files never embed a machine's absolute cage path — they reference the repo-local shim `.cage/bin/cage-run` (see the Quickstart note; design: [Portable wiring](docs/portable-wiring.md)).
+Hooks are an **optional** real-time add-on — they fire only under a CLI client, never under a VS Code extension — so `cage import`/`cage data export` is the path that always works. `cage report --project <name>` slices the global ledger by working dir (exact for Claude; Copilot/Kiro/Codex logs carry no project, so they're excluded from that filter). Committed wired files never embed a machine's absolute cage path — they reference the repo-local shim `.cage/bin/cage-run` (see the Quickstart note; design: [Portable wiring](docs/portable-wiring.md)).
 
 **An agent's spend isn't showing up?** `cage doctor` shows the active ledger, each agent's real capture state, and "last import: N ago"; the metadata-only debug log says per agent whether a hook fired or raised — see [Debugging capture](docs/debugging-capture.md).
 
@@ -206,15 +208,15 @@ Every read view also renders as CSV for spreadsheets/BI: `--csv` streams to stdo
 
 ```bash
 cage report --csv --since 7d > weekly-spend.csv   # last week's spend, flat
-cage attrib --csv                                  # per-tool savings, method column kept
-cage export --csv calls --since 30d -o calls.csv   # raw ledger rows for a pivot table
+cage insights attrib --csv                                  # per-tool savings, method column kept
+cage data export --csv calls --since 30d -o calls.csv   # raw ledger rows for a pivot table
 ```
 
-`--csv` works on `report` · `attrib` · `roi` · `compare` · `study report` · `calibration` · `human` · `trend`; raw rows come from `cage export --csv calls|receipts|tasks`. CSV is one-way reporting — never an import source; the re-importable fleet bundle stays jsonl (`cage export --study`). Column contracts: [docs/csv-output.md](docs/csv-output.md); `cage query csv-output` explains the design. The `cage` skill on all four agents knows the recipes — ask your agent for "my weekly cost report as CSV".
+`--csv` works on `report` · `attrib` · `roi` · `compare` · `study report` · `calibration` · `human` · `trend`; raw rows come from `cage data export --csv calls|receipts|tasks`. CSV is one-way reporting — never an import source; the re-importable fleet bundle stays jsonl (`cage data export --study`). Column contracts: [docs/csv-output.md](docs/csv-output.md); the **text-output contracts** — every command's rendered output per state, generated from the golden tests — are [docs/cli-output-spec.md](docs/cli-output-spec.md). `cage query csv-output` explains the design. The `cage` skill on all four agents knows the recipes — ask your agent for "my weekly cost report as CSV".
 
 ## The `$0` guarantee
 
-Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 657 tests passing; `cage demo` reproduces the worked attribution example against a real ledger.
+Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 751 tests passing; `cage demo` reproduces the worked attribution example against a real ledger.
 
 **Honest limits.** Cage doesn't decide your human rate — it prices minutes at a blended rate you set, and labels the result `estimated` so it never pretends to be a timesheet. Marginal-by-fixed-order is defensible and `$0`, but it is an *ordering convention*, not a Shapley value (that's a deferred audit mode). And a counterfactual cell is an honest reconstruction, never an invoice — the `method` column says so on every row, on purpose.
 
@@ -222,7 +224,7 @@ Every derived view is parse / arithmetic over the log — **no LLM call, ever, o
 
 Latest release below — full history and detail in [CHANGELOG.md](CHANGELOG.md).
 
-- **v0.25.0 — policy sync: upgrade a project policy.toml to the installed bundle.** `cage policy sync` (dry-run; `cage policy diff` alias) buckets every non-pricing key as add / update / keep (customized) / orphan and `--apply` writes the safe ones: customized values are never modified, orphans never deleted, and on a zero-customization project apply changes no derived view by one byte. Pricing tables delegate to `cage prices sync` (its summary embeds); `[meta] policy_version` tracks the defaults era; doctor and the post-commit note recommend it — never auto-applied. `cage query policy-sync` explains.
+- **v0.28.0 (unreleased) — configurable import paths: `[sources]` in policy.toml.** Add or replace the log locations `cage import` probes — `[sources.<agent>] paths = ["~/alt/logs"]` for a nonstandard install / network home / side-by-side copy, `replace = true` to override an agent's built-ins (empty ⇒ disabled), or a custom tool `[sources.<name>] format = "claude"` whose rows stamp `agent = <name>`. Precedence: env home override > policy > built-in; `~`/`$VAR` expand, globs rejected. `cage doctor --paths` gains a provenance column (`built-in | env | policy`) + a committed-machine-path portability warning; `cage query sources` explains it. Additive — an empty `[sources]` is byte-identical to today, and `policy sync` never touches it. See [Configurable import paths](docs/sources.md). (Sequenced after v0.27.0 CLI tiering.)
 
 ## The name
 

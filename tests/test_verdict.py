@@ -1,4 +1,4 @@
-"""`cage verdict <tool>` (roadmap P4) — a pure composer, tested for honesty:
+"""`cage insights verdict <tool>` (roadmap P4) — a pure composer, tested for honesty:
 its numbers must equal the underlying views' numbers exactly, every input must
 carry a method tag, and a missing input must read INSUFFICIENT DATA."""
 from __future__ import annotations

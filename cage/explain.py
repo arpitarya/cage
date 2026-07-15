@@ -89,17 +89,44 @@ def _live(pol: dict) -> dict:
                                        if foot.policy.exists() else {})
                                       .get("meta", {}).get("policy_version")
                                       or "unknown (pre-0.25)"),
+        # configurable import paths (plan Phase 4) — the live resolved candidate list
+        "sources_live": _sources_live(pol),
     }
 
 
+def _sources_live(pol: dict) -> str:
+    """The resolved import candidates, one indented line each with provenance — the
+    live values behind `cage query sources` (never a hard-coded example)."""
+    res = paths.resolve_log_sources(pol)
+    lines = [f"    · {s.agent:<10} [{s.provenance}] {s.path}" for s in res.sources]
+    lines += [f"    · {a:<10} [disabled by policy]" for a in res.disabled]
+    return "\n".join(lines) or "    (none resolved)"
+
+
 def _subcommand_names() -> list[str]:
-    """Registered top-level subcommands, read live from the parser (no literal list)."""
+    """Every leaf view (an actual derived command), read live from the parser (no
+    literal list). Descends into the Phase-3 command groups (insights/human/
+    authorship/data) so their subcommands count as the views they are; the group
+    name itself is not a view. `hook-*` plumbing is excluded."""
     from cage import cli  # local: cli → clicmds → explain would otherwise cycle
 
-    for action in cli.build_parser()._subparsers._group_actions:  # type: ignore[attr-defined]
-        if isinstance(action, argparse._SubParsersAction):
-            return [n for n in action.choices if not n.startswith("hook-")]
-    return []
+    out: list[str] = []
+
+    def walk(parser) -> bool:  # returns True if the parser has nested subcommands
+        subs = getattr(parser, "_subparsers", None)
+        if subs is None:
+            return False
+        for action in subs._group_actions:  # type: ignore[attr-defined]
+            if isinstance(action, argparse._SubParsersAction):
+                for name, child in action.choices.items():
+                    if name.startswith("hook-"):
+                        continue
+                    if not walk(child):  # a leaf → it's a view
+                        out.append(name)
+        return True
+
+    walk(cli.build_parser())
+    return out
 
 
 _BY_ID = {e.id: e for e in REGISTRY}

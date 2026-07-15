@@ -2,7 +2,7 @@
 
 Each test pins a specific finding so it can't silently regress:
   A. concurrent import sweeps must not double-count one turn (the import lock);
-  B. `cage export --json` is an alias for `--format json`;
+  B. `cage data export --json` is an alias for `--format json`;
   C. `cage demo` is idempotent — re-running never doubles the §4.4 tables;
   D. `cage setup --project-only` scaffolds `.cage/` with no agent flag.
 """
@@ -53,12 +53,12 @@ def test_import_lock_is_failopen(proj):
         pass  # no exception = fail-open contract holds
 
 
-# ── B. cage export --json alias ─────────────────────────────────────────────────
+# ── B. cage data export --json alias ─────────────────────────────────────────────────
 def test_export_json_alias_is_summary(proj, monkeypatch, capsys):
     monkeypatch.chdir(proj)
     meter._policy_for.cache_clear()
     demo.seed(proj)
-    assert cli.main(["export", "--json", "--no-import"]) == 0
+    assert cli.main(["data", "export", "--json", "--no-import"]) == 0
     payload = json.loads(capsys.readouterr().out)
     assert "total" in payload and payload["total"]["calls"] == 1
 
@@ -79,7 +79,7 @@ def test_cli_demo_twice_keeps_444(proj, monkeypatch, capsys):
     assert cli.main(["demo"]) == 0
     assert cli.main(["demo"]) == 0  # second run is a no-op
     capsys.readouterr()
-    assert cli.main(["attrib"]) == 0
+    assert cli.main(["insights", "attrib"]) == 0
     out = capsys.readouterr().out
     assert "41,400" in out  # §4.4 total, not 82,800
 
@@ -97,7 +97,7 @@ def test_setup_project_only_scaffolds_without_agent(proj, monkeypatch, capsys):
 # ── E. the global ~/.cage is never a *project* root (full-test-plan finding #1) ──
 def test_global_cage_is_not_a_project_root(tmp_path, monkeypatch):
     """With a global ledger at $CAGE_HOME/.cage, a fresh dir under it must NOT
-    resolve to the home as its project — `cage init` there was re-initialising the
+    resolve to the home as its project — `cage setup` there was re-initialising the
     global instead of scaffolding the project's own `.cage/` (§3.7 precedence:
     override → project → global; the global is a fallback tier, not a project)."""
     home = tmp_path / "home"

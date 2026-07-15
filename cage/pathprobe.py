@@ -61,7 +61,11 @@ def _why(exists: bool, n_files: int, pattern: str, rows: int, fresh: int) -> str
     return ""
 
 
-def _probe_source(agent: str, src: Path, pattern: str, cursors: dict) -> dict:
+def _probe_source(fmt: str, cursor_key: str, src: Path, pattern: str,
+                  cursors: dict) -> dict:
+    """One candidate's found/missing/parse/cursor facts. ``fmt`` selects the parser
+    (a custom tool reuses a declared format); ``cursor_key`` is the row-stamp name the
+    cursor bucket is keyed on (the tool/agent name, which for a custom tool ≠ fmt)."""
     exists = src.exists()
     if src.is_dir():
         files = sorted(src.glob(pattern))
@@ -69,8 +73,8 @@ def _probe_source(agent: str, src: Path, pattern: str, cursors: dict) -> dict:
         files = [src]
     else:
         files = []
-    rows = sum(_parse_rows(agent, f) for f in files)
-    agent_cursor = cursors.get(agent, {})
+    rows = sum(_parse_rows(fmt, f) for f in files)
+    agent_cursor = cursors.get(cursor_key, {})
     fresh = sum(1 for f in files
                 if agent_cursor.get(str(f)) != importcmd._file_sig(f))
     return {"src": str(src), "pattern": pattern, "exists": exists,
@@ -94,26 +98,86 @@ def _candidate_lines(label: str, env_var: str, candidates: list[Path],
     return out
 
 
-def probe(root: Path) -> dict:
-    """The probe data — read-only over `paths.agent_log_sources` + the candidate
-    lists behind them. Never writes (cursors are read, not updated)."""
+def _git_tracked(root: Path, path: Path) -> bool:
+    """Fail-open: is ``path`` git-tracked under ``root``? (Shelled, never imported —
+    the tasks.py rule; any failure ⇒ False, no portability note.)"""
+    import subprocess
+    try:
+        r = subprocess.run(["git", "-C", str(root), "ls-files", "--error-unmatch",
+                            str(path)], capture_output=True, timeout=5)
+        return r.returncode == 0
+    except Exception:  # noqa: BLE001 — diagnostics only
+        return False
+
+
+def _machine_absolute(raw: str) -> bool:
+    """A policy source path that a teammate's clone can't resolve — an absolute
+    filesystem path, *not* a portable ``~``/``$VAR`` form (plan Phase 4 portability
+    guard). ``~/x`` and ``$HOME/x`` resolve per-machine; ``/Users/me/x`` does not."""
+    if not raw or raw.startswith("~") or "$" in raw:
+        return False
+    import re as _re
+    return raw.startswith("/") or bool(_re.match(r"[A-Za-z]:[\\/]", raw))
+
+
+def probe(root: Path, pol: dict | None = None) -> dict:
+    """The probe data — read-only over the single `paths.resolve_log_sources` (built-in
+    + `[sources]` policy, provenance-tagged). Never writes (cursors are read, not
+    updated). Groups sources by agent/tool in SURFACES-then-custom order; surfaces the
+    resolver's ``problems``/``disabled``, cross-agent path overlaps, and — for a
+    committed *project* policy — machine-absolute source paths that break clones."""
     cursors = _cursor_map(root)
-    per_agent = {a: [_probe_source(a, src, pattern, cursors)
-                     for src, pattern in paths.agent_log_sources(a)]
-                 for a in agents.SURFACES}
-    return {"platform": sys.platform, "agents": per_agent,
+    res = paths.resolve_log_sources(pol)
+    groups: dict[str, list] = {a: [] for a in agents.SURFACES}  # SURFACES first, in order
+    for s in res.sources:
+        d = _probe_source(s.fmt, s.agent, s.path, s.glob, cursors)
+        d.update(provenance=s.provenance, raw=s.raw, fmt=s.fmt,
+                 custom=s.agent not in agents.SURFACES)
+        groups.setdefault(s.agent, []).append(d)
+
+    from collections import defaultdict
+    by_path: dict[str, set] = defaultdict(set)
+    for s in res.sources:
+        by_path[str(s.path)].add(s.agent)
+    overlaps = {p: sorted(a) for p, a in by_path.items() if len(a) > 1}
+
+    # Portability: a committed *project* policy carrying a machine-absolute source path
+    # ships one dev's filesystem to the team. Global policy (~/.cage) is per-machine by
+    # nature — exempt. `~`/`$VAR` paths are portable — exempt.
+    port_warns: list[str] = []
+    src_from = paths.active_ledger_source(root)
+    if src_from.startswith("project"):
+        pol_path = paths.Footprint(paths.resolve_root(root)).policy
+        if _git_tracked(root, pol_path):
+            for s in res.sources:
+                if s.provenance == "policy" and _machine_absolute(s.raw):
+                    port_warns.append(
+                        f"[sources.{s.agent}] {s.raw} is a machine-absolute path in a "
+                        "committed project policy — teammates' clones will probe a path "
+                        "that doesn't exist; move it to ~/.cage/policy.toml or use ~/…")
+
+    return {"platform": sys.platform, "agents": groups,
+            "problems": res.problems, "disabled": res.disabled,
+            "overlaps": overlaps, "portability": port_warns,
             "active_root": str(paths.resolve_root(root)),
-            "active_source": paths.active_ledger_source(root),
+            "active_source": src_from,
             "precedence": "override (--ledger/CAGE_BASE) → project (.cage/) → global (~/.cage)"}
 
 
 def render_paths(root: Path, data: dict) -> str:
     lines = [f"Path probe · {data['platform']} · per agent × candidate log location", ""]
+    from cage import agents
+    disabled = set(data.get("disabled", []))
     for agent, sources in data["agents"].items():
-        lines.append(agent)
+        custom = bool(sources) and sources[0].get("custom")
+        label = f"{agent}  (custom tool, format={sources[0]['fmt']})" if custom else agent
+        lines.append(label)
+        if agent in disabled:
+            lines.append("  · disabled by policy ([sources] replace = true, paths = []) "
+                         "— capture silenced for this agent")
         for s in sources:
             mark = "✔" if s["exists"] and s["rows"] else ("·" if s["exists"] else "✗")
-            head = (f"  {mark} {s['src']}  ({s['pattern']})  "
+            head = (f"  {mark} {s['src']}  ({s['pattern']})  [{s['provenance']}]  "
                     f"{s['files']} file(s) · {s['rows']} parseable row(s) · "
                     f"{s['fresh_files']} not yet imported")
             lines.append(head)
@@ -127,7 +191,20 @@ def render_paths(root: Path, data: dict) -> str:
             lines.extend(_candidate_lines("Kiro user data", "KIRO_DATA_DIR",
                                           paths.kiro_data_candidates(),
                                           _kiro_chosen(), _UNVERIFIED_WINDOWS_KIRO))
-    lines += ["", f"active ledger: {data['active_source']} → {data['active_root']}",
+    if data.get("overlaps"):
+        lines.append("")
+        for p, ags in sorted(data["overlaps"].items()):
+            lines.append(f"⚠ overlap: {p} is declared for {', '.join(ags)} — "
+                         "double-import is deduped by id, but this is likely a typo")
+    if data.get("portability"):
+        lines.append("")
+        lines.extend(f"⚠ {w}" for w in data["portability"])
+    if data.get("problems"):
+        lines.append("")
+        lines.extend(f"⚠ ignored: {p}" for p in data["problems"])
+    lines += ["", "provenance: built-in (registry) · env (a home an env override "
+              "redirected) · policy ([sources] in policy.toml)",
+              f"active ledger: {data['active_source']} → {data['active_root']}",
               f"precedence:    {data['precedence']}"]
     return "\n".join(lines)
 
@@ -136,5 +213,5 @@ def _kiro_chosen() -> Path:
     return paths._first_existing(paths.kiro_data_candidates())
 
 
-def run(root: Path) -> str:
-    return render_paths(root, probe(root))
+def run(root: Path, pol: dict | None = None) -> str:
+    return render_paths(root, probe(root, pol))

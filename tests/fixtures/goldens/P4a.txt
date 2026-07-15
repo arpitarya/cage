@@ -1,0 +1,7 @@
+$ cage prices sync
+prices sync — bundled 2026-07-14 vs project 2020-01-01
+
+· 51 project rows equal to the bundle — in sync
+
+dry-run (house pattern) — `--update` applies bundled values to rows you confirm with --yes; customized rows are never clobbered.
+· bundled prices are newer (2026-07-14 > 2020-01-01) — run 'cage prices sync'

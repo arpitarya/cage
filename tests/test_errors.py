@@ -103,9 +103,9 @@ def test_mcp_bad_json_line_skipped_no_crash():
 
 
 def test_verify_still_exits_zero(proj, monkeypatch):
-    """`cage verify` is report-only and must keep exiting 0 (never a build gate)."""
+    """`cage authorship verify` is report-only and must keep exiting 0 (never a build gate)."""
     monkeypatch.chdir(proj)
-    assert cli.main(["verify"]) == 0
+    assert cli.main(["authorship", "verify"]) == 0
 
 
 # --- fail-open write paths (verify, do not rewrite) -----------------------

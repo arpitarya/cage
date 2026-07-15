@@ -1,5 +1,5 @@
-"""Task grouping — the shared key-matching core under `cage compare` (roadmap P2)
-and `cage estimate`/`cage calibration` (P3).
+"""Task grouping — the shared key-matching core under `cage insights compare` (roadmap P2)
+and `cage insights estimate`/`cage insights calibration` (P3).
 
 Turns the ledger into per-closed-task facts: which tool stack was *observed* on
 the task, and what the task *measurably* cost. Pure derive — no clocks, no
@@ -38,7 +38,7 @@ GROUP_KEYS = ("stack", "scope", "label")
 
 def closed_tasks(root: Path) -> dict[str, dict]:
     """Latest row per task id, filtered to *closed* tasks (an ``outcome`` recorded
-    via `cage outcome` / SessionEnd). Open tasks never enter a comparison."""
+    via `cage human outcome` / SessionEnd). Open tasks never enter a comparison."""
     return {tid: row for tid, row in tasks.read(root).items() if row.get("outcome")}
 
 

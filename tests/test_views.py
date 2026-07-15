@@ -69,8 +69,8 @@ def test_cli_demo_then_views_exit_zero(proj, monkeypatch, capsys):
     monkeypatch.chdir(proj)
     meter._policy_for.cache_clear()
     assert cli.main(["demo"]) == 0
-    assert cli.main(["attrib"]) == 0
-    assert cli.main(["matrix"]) == 0
+    assert cli.main(["insights", "attrib"]) == 0
+    assert cli.main(["insights", "matrix"]) == 0
     assert cli.main(["report", "--by", "model"]) == 0
     assert cli.main(["report", "--json"]) == 0
     out = capsys.readouterr().out
@@ -79,5 +79,5 @@ def test_cli_demo_then_views_exit_zero(proj, monkeypatch, capsys):
 
 def test_cli_why_unknown_call(proj, monkeypatch, capsys):
     monkeypatch.chdir(proj)
-    assert cli.main(["why", "c_nope"]) == 0
+    assert cli.main(["insights", "why", "c_nope"]) == 0
     assert "no call" in capsys.readouterr().out

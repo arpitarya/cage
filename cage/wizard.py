@@ -3,7 +3,7 @@
 Pure orchestration over the existing idempotent primitives (`adoptcmd` for
 scaffold + per-project hook/MCP wiring + graphify shim, `setupcmd` for the global
 /cage skill). No ledger logic lives here; the wizard is just a friendlier front
-door to the granular modes (`cage init` / `cage setup --project-only` /
+door to the granular modes (`cage setup` / `cage setup --project-only` /
 `cage setup --wire-only --<agent>` / `cage setup --<agent>`).
 
 Two entry shapes, same steps:

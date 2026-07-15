@@ -54,7 +54,7 @@ def test_version_carries_the_zipapp_label(pyz, tmp_path):
 
 
 def test_init_writes_the_bundled_policy_from_the_zip(pyz, tmp_path):
-    r = _run(pyz, "init", cwd=tmp_path)
+    r = _run(pyz, "setup", "--project-only", "--no-graphify", cwd=tmp_path)
     assert r.returncode == 0, r.stderr
     written = (tmp_path / ".cage" / "policy.toml").read_text(encoding="utf-8")
     assert written == (REPO_DATA / "policy.toml").read_text(encoding="utf-8")
@@ -63,7 +63,7 @@ def test_init_writes_the_bundled_policy_from_the_zip(pyz, tmp_path):
 def test_doctor_reports_zipapp_and_priced_policy(pyz, tmp_path):
     # The regression trap for the `.exists()` → `.is_file()` migration: a pyz that
     # silently loses the bundled prices would report 0 model prices here.
-    assert _run(pyz, "init", cwd=tmp_path).returncode == 0
+    assert _run(pyz, "setup", "--project-only", "--no-graphify", cwd=tmp_path).returncode == 0
     r = _run(pyz, "doctor", "--json", cwd=tmp_path)
     assert "(zipapp)" in r.stdout
     import json
@@ -87,7 +87,7 @@ def test_setup_extracts_skill_assets_from_the_zip(pyz, tmp_path):
 
 
 def test_derived_view_is_deterministic_under_the_zip(pyz, tmp_path):
-    assert _run(pyz, "init", cwd=tmp_path).returncode == 0
+    assert _run(pyz, "setup", "--project-only", "--no-graphify", cwd=tmp_path).returncode == 0
     assert _run(pyz, "demo", cwd=tmp_path).returncode == 0
     first = _run(pyz, "report", cwd=tmp_path)
     second = _run(pyz, "report", cwd=tmp_path)

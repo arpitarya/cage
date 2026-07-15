@@ -1,4 +1,4 @@
-"""`cage serve` — a minimal local dashboard over the ledger ($0, stdlib http.server)."""
+"""`cage data serve` — a minimal local dashboard over the ledger ($0, stdlib http.server)."""
 from __future__ import annotations
 
 import html

@@ -9,11 +9,13 @@ from __future__ import annotations
 
 import pytest
 
-from cage import cli, demo, humanview, metering as meter, policy, report
+from cage import cli, demo, display, humanview, metering as meter, policy, report
 
 DEMO_SPENT = 0.0483
 DEMO_SAVED = 0.1242
 DEMO_NET = 0.0759
+
+USD = display.Display(usd=True)  # the $ view — tokens are the render default
 
 
 def _pol():
@@ -34,10 +36,24 @@ def test_report_by_task_savings_numbers(seeded):
 
 def test_report_by_task_render_shows_signed_net(seeded):
     root, _ = seeded
-    out = report.render_report(report.summarize(root, _pol(), dim="task"))
+    out = report.render_report(report.summarize(root, _pol(), dim="task"), disp=USD)
     assert "saved" in out and "net" in out
     assert "$0.1242" in out          # saved column
     assert "+$0.0759" in out         # net carries an explicit sign
+
+
+def test_report_tokens_default_no_dollars(seeded):
+    """Tokens are the default view (plan Phase 2.5): no $ anywhere, saved tok
+    gated in, dollars appear only under --usd/[display]."""
+    root, _ = seeded
+    rep = report.summarize(root, _pol(), dim="task")
+    out = report.render_report(rep)
+    assert "$" not in out
+    assert "saved tok" in out and "41,400" in out  # token savings still shown
+    assert "usd" not in out.splitlines()[0]
+    usd_out = report.render_report(rep, disp=USD)
+    assert usd_out.splitlines()[0].endswith("· usd")
+    assert "$0.1242" in usd_out
 
 
 # ── §6.4 — --by agent attributes via the call; no-call → "—", still in total ─
@@ -80,7 +96,9 @@ def test_report_other_dims_have_no_savings(seeded, dim):
     for g in rep["groups"].values():
         assert "saved_usd" not in g and "net_usd" not in g
     header = report.render_report(rep).splitlines()[2]  # title, blank, then columns
-    assert "saved" not in header and "net" not in header and "cost" in header
+    assert "saved" not in header and "net" not in header and "cost" not in header
+    usd_header = report.render_report(rep, disp=USD).splitlines()[2]
+    assert "saved" not in usd_header and "net" not in usd_header and "cost" in usd_header
 
 
 def test_report_json_keys_only_for_attributing_dims(seeded):
@@ -108,6 +126,10 @@ def test_bare_cage_prints_banner(seeded, monkeypatch, capsys):
     meter._policy_for.cache_clear()
     assert cli.main([]) == 0
     out = capsys.readouterr().out
+    assert "tokens" in out and "calls" in out and "drill:" in out
+    assert "$" not in out  # tokens are the default headline (handoff §10)
+    assert cli.main(["--usd"]) == 0
+    out = capsys.readouterr().out
     assert "spent" in out and "saved" in out and "net" in out
     assert "$0.0483" in out and "$0.1242" in out and "+$0.0759" in out
     assert "drill:" in out
@@ -130,7 +152,8 @@ def test_bare_cage_empty_ledger_nudges(proj, monkeypatch, capsys):
     meter._policy_for.cache_clear()
     assert cli.main([]) == 0
     out = capsys.readouterr().out
-    assert "no calls recorded yet" in out
+    assert "No calls recorded yet" in out
+    assert "cage import" in out and "cage doctor" in out  # next steps (spec R5)
     assert "spent" not in out  # a nudge, not a banner of zeros
 
 

@@ -1,0 +1,6 @@
+$ cage prices unpriced
+  —/copilot/auto   2 calls   164,353 tokens
+    fix: cage prices alias - 'copilot/auto' --to <provider>/<model>   # route the router pseudo-model explicitly
+
+⚠ 2 calls (164,353 tokens) billing $0 — totals understated until priced.
+cage never fetches prices (no network) — check the vendor's pricing page, fill in the line, run it. `cage query unpriced` explains.

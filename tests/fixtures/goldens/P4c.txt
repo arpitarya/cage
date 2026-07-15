@@ -1,0 +1,6 @@
+$ cage prices sync
+prices sync — bundled 2026-07-14 vs project 2026-07-14
+
+· 51 project rows equal to the bundle — in sync
+
+✔ nothing to do — project prices match the installed bundle.

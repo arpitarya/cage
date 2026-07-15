@@ -75,7 +75,7 @@ def test_set_reprices_report_without_rewriting_ledger(root, capsys):
     out = capsys.readouterr().out
     assert "before: (none)" in out and "after:  input=2 output=6 cache_read=0.2" in out
     assert "re-price immediately" in out
-    assert cli.main(["report", "--by", "model"]) == 0
+    assert cli.main(["report", "--by", "model", "--usd"]) == 0
     rep = capsys.readouterr().out
     assert "$3.2000" in rep                     # 1M×$2 + 200k×$6 per MTok
     assert _shards(root) == before              # the ledger is never rewritten
@@ -99,7 +99,7 @@ def test_alias_requires_exact_target_and_reprices(root, capsys):
     assert cli.main(["prices", "alias", "-", "copilot/auto",
                      "--to", "anthropic/claude-sonnet-4-6"]) == 0
     assert "alias footnote" in capsys.readouterr().out
-    assert cli.main(["report", "--by", "model"]) == 0
+    assert cli.main(["report", "--by", "model", "--usd"]) == 0
     rep = capsys.readouterr().out
     assert "priced by alias" in rep and "copilot/auto → anthropic/claude-sonnet-4-6" in rep
     assert "UNPRICED" not in rep or "copilot/auto," not in rep
@@ -107,16 +107,22 @@ def test_alias_requires_exact_target_and_reprices(root, capsys):
 
 def test_report_unpriced_summary_line(root, capsys):
     _seed_unpriced(root)
-    assert cli.main(["report", "--by", "model"]) == 0
+    assert cli.main(["report", "--by", "model", "--usd"]) == 0
     out = capsys.readouterr().out
     assert "⚠ 4 calls (1,251,000 tokens) UNPRICED — totals understated" in out
-    assert "run 'cage prices unpriced'" in out
-    assert "cage query unpriced" in out
+    assert "fix: cage prices" in out  # one runnable fix line per unpriced model
+    # the token default carries the one muted pointer instead of the ⚠ block
+    assert cli.main(["report", "--by", "model"]) == 0
+    out = capsys.readouterr().out
+    assert "UNPRICED" not in out
+    assert "unpriced — matters when you view $" in out
 
 
 def test_overview_unpriced_line(root, capsys):
     _seed_unpriced(root)
     assert cli.main([]) == 0
+    assert "unpriced — matters when you view $" in capsys.readouterr().out
+    assert cli.main(["--usd"]) == 0
     assert "UNPRICED — totals understated" in capsys.readouterr().out
 
 

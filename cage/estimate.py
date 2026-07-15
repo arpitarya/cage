@@ -1,4 +1,4 @@
-"""`cage estimate` — a pre-task cost band from matching closed tasks (roadmap P3).
+"""`cage insights estimate` — a pre-task cost band from matching closed tasks (roadmap P3).
 
 Not a prediction model: the band is the **median + IQR of what matching closed
 tasks actually cost** (via `taskgroup.stats` — measured totals), tagged
@@ -12,7 +12,7 @@ same estimate; no clocks in the math.
 
 ``--record <task>`` stamps the estimate onto that **open** task row as additive
 fields — ``est_tokens`` / ``est_usd`` / ``est_n`` plus the band bounds
-``est_tokens_q1`` / ``est_tokens_q3`` (needed so `cage calibration` can score
+``est_tokens_q1`` / ``est_tokens_q3`` (needed so `cage insights calibration` can score
 in-band hits against the band *as it was at estimate time*; recomputing later
 over grown history would score a different band). Bounds are recorded for
 tokens only — tokens are the ground-truth quantity; USD re-prices as policy
@@ -21,7 +21,7 @@ already-closed task is refused at the CLI boundary — a retroactive estimate is
 exactly what calibration must never count.
 
 The estimator never self-reports confidence: the empirical confidence level is
-`cage calibration`'s measured hit-rate over closed tasks with estimates.
+`cage insights calibration`'s measured hit-rate over closed tasks with estimates.
 """
 from __future__ import annotations
 
@@ -81,7 +81,7 @@ def render_estimate(d: dict, recorded: str = "") -> str:
     head = f"Estimate · {_keyline(d['keys'])}"
     if not d["ok"]:
         return (f"{head}\n\n{d['reason']}\n"
-                "close more matching tasks (`cage outcome <task>`) or widen the keys.")
+                "close more matching tasks (`cage human outcome <task>`) or widen the keys.")
     t, u = d["tokens"], d["usd"]
     lines = [head, "",
              f"  n = {d['n']} matching closed tasks",
@@ -89,7 +89,7 @@ def render_estimate(d: dict, recorded: str = "") -> str:
              f"  usd:    median {render.usd(u['median'])} · IQR "
              f"{render.usd(u['q1'])}–{render.usd(u['q3'])}",
              f"  method: {d['method']} — history applied to an unrun task, never an invoice",
-             "  confidence: none self-reported — `cage calibration` measures the hit-rate"]
+             "  confidence: none self-reported — `cage insights calibration` measures the hit-rate"]
     if recorded:
         lines.append(f"  ✔ recorded onto open task {recorded!r} (est_tokens/est_usd/est_n + band)")
     return "\n".join(lines)

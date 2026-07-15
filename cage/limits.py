@@ -1,4 +1,4 @@
-"""`cage limits` — provider quota windows + estimated AI-credit consumption (plan §3.8).
+"""`cage data limits` — provider quota windows + estimated AI-credit consumption (plan §3.8).
 
 **Not a ledger substrate.** Quota (a provider rate-limit %) is a *decaying live gauge*,
 not durable truth, so the latest snapshot per (agent, window) lives in a machine-local
@@ -118,7 +118,7 @@ def _credits_view(root: Path, pol: dict) -> list[dict]:
 
 
 def rollup(root: Path, pol: dict) -> dict:
-    """The `cage limits` data: local quota windows (state file) + estimated credit
+    """The `cage data limits` data: local quota windows (state file) + estimated credit
     consumption (ledger × policy multiplier). Derived, deterministic, $0."""
     foot = paths.Footprint(root)
     return {"quota": _quota_view(foot), "credits": _credits_view(root, pol)}

@@ -1,0 +1,15 @@
+$ cage insights verdict graphify
+VERDICT: graphify is SAVING ≈ $1.3714/mo net (modeled)
+
+inputs (each with its own method tag):
+  · marginal saving (attrib): task 't_v4': 80,000 tok · $0.2400 (modeled)
+  · roi: saved $0.9600 − own cost $0.0000 = net +$0.9600 over 4 receipt(s) (modeled)
+  · trend (agent-vs-human, ledger-wide): INSUFFICIENT DATA — fewer than 2 weekly buckets on the human axis
+  · cost drift (regression): stable (+0%) (measured)
+  · redo-rate (quality): INSUFFICIENT DATA — no task outcomes recorded
+  · break-even: each receipt nets +$0.2400 on average — net-positive from the first receipt (derived from roi)
+
+total cost: agent $1.6800 + human — (no attested minutes and no turn-gap data in scope; only logs with per-turn timestamps carry gap_ms)
+
+verdict composes existing views only — it computes no new statistics;
+a missing input reads INSUFFICIENT DATA, never an approximation.

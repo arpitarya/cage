@@ -12,11 +12,11 @@ the setup with the built-in health check — never eyeball files yourself.
 2. It exits non-zero only on a hard failure (`✗`). Levels: `✔ ok` passed ·
    `· warn` optional/expected-missing (cage still works) · `✗ fail` broken.
 3. Map findings to fixes:
-   - `footprint ✗ no .cage/` → `cage setup` (or `cage init`).
+   - `footprint ✗ no .cage/` → `cage setup`.
    - `hooks · none wired` → `cage setup` / `cage setup --wire-only --<agent>` (opt-in).
    - `interceptor · bin/ not on PATH` → open a new shell.
    - `policy ✗` / `ledger ✗` → surface the exact error in the detail.
-4. All `✔`/`·` → Cage is working; point at `cage report` / `cage matrix`.
+4. All `✔`/`·` → Cage is working; point at `cage report` / `cage insights matrix`.
 5. For a shareable bug report: `cage doctor --bundle` writes one **redacted** archive
    (counts-never-content — doctor output, debug log, versions, footprint row counts,
    policy provenance). Never attach raw ledger/transcript files instead.

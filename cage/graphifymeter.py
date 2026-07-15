@@ -1,7 +1,7 @@
-"""`cage graphify -- graphify <args>` — meter a third-party tool without touching it.
+"""`cage data graphify -- graphify <args>` — meter a third-party tool without touching it.
 
 graphify is read-only, so cage measures it the way it meters any tool it doesn't own
-(`cage meter`, `import-codex`): run it as a subprocess, pass stdout/stderr/exit
+(`cage data meter`, `import-codex`): run it as a subprocess, pass stdout/stderr/exit
 through **unchanged**, and on the side parse the captured answer to file one
 token-saving receipt. A metering error never alters graphify's result (fail-open).
 
@@ -116,10 +116,10 @@ def _graphify_receipt_ids(root: Path) -> set[str] | None:
 def run(root: Path, argv: list[str], task: str = "") -> int:
     """Run `graphify <argv>` transparently; meter on the side. Returns its exit code."""
     cmd = list(argv)
-    if cmd and cmd[0] == "--":            # tolerate `cage graphify -- graphify …`
+    if cmd and cmd[0] == "--":            # tolerate `cage data graphify -- graphify …`
         cmd = cmd[1:]
     if not cmd:
-        print("usage: cage graphify -- graphify <query|path|explain> …", file=sys.stderr)
+        print("usage: cage data graphify -- graphify <query|path|explain> …", file=sys.stderr)
         return 2
     # Only a measured read verb can ever file a receipt — skip both snapshot reads
     # (each a full receipts-shard scan) for install/--help/unknown-verb runs.
@@ -129,7 +129,7 @@ def run(root: Path, argv: list[str], task: str = "") -> int:
         proc = subprocess.run(cmd, capture_output=True, text=True,
                               env={**os.environ, "CAGE_GRAPHIFY_METERED": "1"})
     except (OSError, ValueError) as exc:
-        print(f"cage graphify: could not run {cmd[0]!r}: {exc}", file=sys.stderr)
+        print(f"cage data graphify: could not run {cmd[0]!r}: {exc}", file=sys.stderr)
         return 127
     sys.stdout.write(proc.stdout)         # passthrough — byte-identical to bare graphify
     sys.stderr.write(proc.stderr)

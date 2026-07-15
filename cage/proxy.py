@@ -1,4 +1,4 @@
-"""`cage proxy` — a thin metering reverse-proxy (plan §5, §9.5).
+"""`cage data proxy` — a thin metering reverse-proxy (plan §5, §9.5).
 
 The protocol-targeted meter for clients you can't edit. Point any agent's base URL
 at it (Claude Code `ANTHROPIC_BASE_URL`, Codex/Copilot `OPENAI_BASE_URL`, …); it
@@ -31,7 +31,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             data = resp.read()
             self._respond(resp.status, resp.headers.items(), data)
         except Exception as exc:  # upstream/network failure — surface 502, never hang
-            self.send_error(502, f"cage proxy upstream error: {exc}")
+            self.send_error(502, f"cage data proxy upstream error: {exc}")
             return
         self._meter(data)
 
@@ -72,12 +72,12 @@ def serve(root: Path, port: int = 8788, upstream: str = _DEFAULT_UPSTREAM) -> in
     handler = partial(_Handler)
     _Handler.upstream, _Handler.root = upstream, root
     httpd = http.server.ThreadingHTTPServer(("127.0.0.1", port), handler)
-    print(f"cage proxy: 127.0.0.1:{port} → {upstream}  (metering to {root}/.cage; Ctrl-C to stop)")
+    print(f"cage data proxy: 127.0.0.1:{port} → {upstream}  (metering to {root}/.cage; Ctrl-C to stop)")
     print(f"  point your agent at it, e.g.  export ANTHROPIC_BASE_URL=http://127.0.0.1:{port}")
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
-        print("\ncage proxy: stopped.")
+        print("\ncage data proxy: stopped.")
     finally:
         httpd.server_close()
     return 0

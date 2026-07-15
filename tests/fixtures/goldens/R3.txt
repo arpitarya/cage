@@ -1,0 +1,13 @@
+$ cage report --by agent --usd
+Ledger by agent · usd
+
+agent    calls     tok in  tok out      cost
+-------  -----  ---------  -------  --------
+copilot      1  1,968,011   96,212   $7.3472
+claude       1    912,400   61,200   $3.6552
+TOTAL        2  2,880,411  157,412  $11.0024
+
+≈ priced by family (approximate — no exact price row):
+  copilot/claude-sonnet-4.6 → claude-sonnet-4-6
+· no savings receipts in this window — wire a tool to measure savings
+  (`cage query receipts` explains)

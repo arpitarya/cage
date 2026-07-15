@@ -1,4 +1,4 @@
-"""`cage verdict <tool>` — the one-line answer, composed from views that already
+"""`cage insights verdict <tool>` — the one-line answer, composed from views that already
 exist (roadmap P4).
 
 A **pure composer**: every number below is pulled from `attribution` / `roi` /
@@ -9,7 +9,7 @@ verdict itself when the core input (the tool's receipts, via roi) is missing —
 never an approximation. Every input renders with its own method tag; the
 headline net is tagged **modeled** because it inherits the receipts' modeled
 savings (an invoice-grade verdict would need a controlled experiment — see
-`cage compare` for the observational version).
+`cage insights compare` for the observational version).
 
 Verdict rule (deterministic): net = roi saved − roi own-cost over the window.
 net > 0 ⇒ SAVING · net < 0 ⇒ COSTING · no receipts ⇒ INSUFFICIENT DATA. The

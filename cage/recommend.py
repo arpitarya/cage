@@ -1,4 +1,4 @@
-"""`cage recommend` — the cheapest-path recommender (plan §8.4).
+"""`cage insights recommend` — the cheapest-path recommender (plan §8.4).
 
 Turns the ROI table from a report into a policy suggestion: enable every tool whose
 recorded net saving (saved $ − its own cost) is positive, skip any that costs more

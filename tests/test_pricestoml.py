@@ -96,7 +96,7 @@ def test_parse_failure_raises_cageerror(root):
 
 
 def test_missing_footprint_raises_with_init_hint(proj):
-    with pytest.raises(CageError, match="cage init"):
+    with pytest.raises(CageError, match="cage setup"):
         pricestoml.set_price(proj, "x", "m", ROW)
 
 

@@ -1,0 +1,5 @@
+$ cage insights estimate --label refactor
+Estimate · label=refactor
+
+insufficient history (n=3 < 5 matching closed tasks) — refusing to print a band over noise
+close more matching tasks (`cage human outcome <task>`) or widen the keys.

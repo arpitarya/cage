@@ -1,8 +1,8 @@
-"""`cage trend` — dates become a cost+time savings time-series (design §5b.4).
+"""`cage insights trend` — dates become a cost+time savings time-series (design §5b.4).
 
 Pure derive over `ts` (no new entropy): bucket human receipts by ISO week or month,
 join each to its agent calls, and report agent $ / human $ / saved $ / time saved per
-bucket. Same two-clock model as `cage human` — saved time can go negative.
+bucket. Same two-clock model as `cage human show` — saved time can go negative.
 
 Derived attention (plan §4.10) renders as its own section below the table —
 per-bucket turn-gap minutes via `attention.py`, always `estimated`, never

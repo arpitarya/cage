@@ -2,6 +2,219 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
+## v0.28.0 (2026-07-15) — configurable import paths: `[sources]` in policy.toml
+
+Built from: [docs/archive/v0.28-policy-sources.handoff.md](docs/archive/v0.28-policy-sources.handoff.md) ·
+[docs/archive/v0.28-policy-sources.prompt.md](docs/archive/v0.28-policy-sources.prompt.md) —
+Phase 4 of [docs/output-and-simplification.plan.md](docs/output-and-simplification.plan.md).
+
+**This release also ships the previously-unreleased v0.26.0 (output honesty) and
+v0.27.0 (CLI tiering) work** — the three phases were developed as one stack and cut
+as a single release; their full notes are the two entries below.
+
+A `[sources]` policy table that adds — or replaces — the log locations `cage
+import` probes: one or more paths per agent, plus custom tools that reuse a
+declared parser format. For a nonstandard install, a network home, a side-by-side
+log copy, or an in-house emitter that writes an already-supported format. **Additive
+by construction — an empty or absent `[sources]` is byte-identical to the built-in
+registry**, so capture is unchanged for everyone who doesn't use it. Capture-side
+only: no derived view changes, determinism untouched.
+
+- **Schema.** `[sources.<agent>] paths = ["~/…", "$VAR/…"]` extends one of the four
+  agents (claude · codex · copilot · kiro); `replace = true` drops that agent's
+  built-ins first (empty `paths` ⇒ **disabled by policy** — a clean way to silence a
+  never-installed agent's probe). A custom tool is any table whose name is *not* one
+  of the four agents: it must declare `format = "claude|codex|copilot|kiro"` (the
+  parser to reuse) and its rows import with `agent = <name>`, so `cage report` /
+  `cage insights attrib` split it out. `~`/`$VAR` expand; a glob-shaped entry
+  (`*?[`) is rejected. New log *formats* stay out of scope by construction.
+- **One resolution point.** `paths.resolve_log_sources(pol)` returns the
+  provenance-tagged candidate list the import sweep **and** `cage doctor --paths`
+  both consume — no second resolver. Precedence: **env home override > policy
+  `[sources]` > built-in registry**; a policy path equal to a built-in path is
+  deduped to the built-in tag.
+- **Same capture contract.** Policy paths sweep with the same incremental cursors
+  (keyed on each resolved file path), the same id-dedupe, and the same per-file
+  fail-open (a missing/unreadable path is a debug-logged skip, never an error) as the
+  built-ins. `cage data export`'s import-first sweep includes them; `CAGE_CAPTURE=0`
+  disables them with everything else.
+- **`cage doctor --paths`.** Every candidate now names its **provenance** —
+  `built-in | env | policy` — custom tools appear as their own sections, a
+  `disabled by policy` label shows a replace+empty agent, cross-agent path overlaps
+  are flagged, and a **committed project policy** carrying a machine-absolute source
+  path warns ("teammates' clones will probe a path that doesn't exist — move it to
+  ~/.cage/policy.toml or use ~/…"). A `~`/`$VAR` path and the global `~/.cage`
+  policy are exempt. Malformed entries render as loud `⚠ ignored:` lines.
+- **`cage query sources`.** A new concept entry: the schema, precedence, portability
+  rule, and your **live resolved sources**.
+- **`policy sync` ownership.** `[sources]` is entirely user-owned — the bundled
+  `policy.toml` ships none — so `cage policy sync` never adds, updates, or
+  orphan-warns it (asserted by test).
+- **Docs.** New [docs/sources.md](docs/sources.md) (indexed) + a README capture
+  one-liner. Two must-never-skip tests: empty-`[sources]` byte-identity and the full
+  env>policy>built-in precedence matrix; plus expansion, custom-tool end-to-end
+  (fixture log at a policy path → rows split by the tool name), cursor
+  incrementality, portability warn/no-warn, and sync ownership. Dummyrepo **S15**.
+
+## v0.27.0 (shipped in v0.28.0, 2026-07-15) — CLI tiering: five daily verbs, grouped rooms, a clean pre-1.0 verb break
+
+Built from: [docs/archive/v0.27-cli-tiering.handoff.md](docs/archive/v0.27-cli-tiering.handoff.md) ·
+[docs/archive/v0.27-cli-tiering.prompt.md](docs/archive/v0.27-cli-tiering.prompt.md) —
+Phase 3 of [docs/output-and-simplification.plan.md](docs/output-and-simplification.plan.md).
+
+**⚠ BREAKING — this release removes ~30 top-level verbs and regroups them.** The
+daily loop is five verbs; everything else is one group deep. Nothing lost from
+*capability* — only from the front door. For one release, an old verb name errors
+with a direction (`error: 'attrib' is now 'cage insights attrib'`, exit 1) instead
+of running; it never silently aliases. Recorded ledgers, CSV/JSON schemas, MCP tool
+names, and `hook-*` plumbing are untouched — only the CLI door moved.
+
+- **Tier-1 front door.** `cage --help` now renders five daily verbs
+  (`report` · `import` · `setup` · `doctor` · `query`) + seven group names, one
+  screen, no usage/options noise. Bare `cage` still prints the overview.
+- **Groups (run any group name for its commands).**
+  `cage insights <attrib|matrix|roi|verdict|budget|compare|estimate|calibration|trend|why|forecast|regression|recommend>` ·
+  `cage human <show|record|outcome|quality>` ·
+  `cage authorship <origin|verify|notes-sync|ledger-sync>` ·
+  `cage data <export|cleanup|limits|watch|serve|proxy|meter|graphify>`.
+  `prices`/`study`/`policy` are unchanged. Group subcommands keep their exact
+  flags and output — behavior is frozen (proven by an old-vs-new golden byte-diff
+  per verb; the only diffs are the usage/program line and renamed hint strings).
+- **`init` merged into `setup`.** `cage init` is gone; `cage setup` scaffolds
+  `.cage/` unconditionally as step one, then wires. `cage setup --global` unchanged.
+- **Hidden but callable.** `mcp` (spawned by wired configs), `debug` (diagnostic),
+  `demo` (README-referenced), `graphify` (interceptor seam, under `data`), and the
+  `hook-*` entrypoints stay callable — just off `cage --help`.
+- **Seams migrated.** The graphify interceptor shim now routes through
+  `cage data graphify`; re-running `cage setup` migrates a committed Claude
+  SessionStart hook from the removed `import-claude` to `import --agent claude`
+  (grep-tested like portable wiring). No argparse prefix-matching — an old
+  abbreviation is an invalid choice, not a silent hit.
+- **World regenerated.** All four agents' skill/prompt/steering assets, the
+  `cage query` concept text, `docs/formulas.md`, the bundled `policy.toml` comments,
+  and every emitted hint string now name the grouped verbs (a `render.cmd()` helper
+  centralizes the spelling); a grep gate proves zero stale `cage <old-verb>` in
+  source, rendered assets, or committed wiring.
+
+**Old → new verb map** (the removed-verb error handler and this table are both
+generated from `cage/verbmap.py`):
+
+| removed verb | now |
+| --- | --- |
+| `cage init` | `cage setup` |
+| `cage import-codex` | `cage import --agent codex` |
+| `cage import-claude` | `cage import --agent claude` |
+| `cage attrib` | `cage insights attrib` |
+| `cage matrix` | `cage insights matrix` |
+| `cage roi` | `cage insights roi` |
+| `cage verdict` | `cage insights verdict` |
+| `cage budget` | `cage insights budget` |
+| `cage compare` | `cage insights compare` |
+| `cage estimate` | `cage insights estimate` |
+| `cage calibration` | `cage insights calibration` |
+| `cage trend` | `cage insights trend` |
+| `cage why` | `cage insights why` |
+| `cage forecast` | `cage insights forecast` |
+| `cage regression` | `cage insights regression` |
+| `cage recommend` | `cage insights recommend` |
+| `cage human-record` | `cage human record` |
+| `cage outcome` | `cage human outcome` |
+| `cage quality` | `cage human quality` |
+| `cage origin` | `cage authorship origin` |
+| `cage verify` | `cage authorship verify` |
+| `cage notes-sync` | `cage authorship notes-sync` |
+| `cage ledger-sync` | `cage authorship ledger-sync` |
+| `cage export` | `cage data export` |
+| `cage cleanup` | `cage data cleanup` |
+| `cage limits` | `cage data limits` |
+| `cage watch` | `cage data watch` |
+| `cage serve` | `cage data serve` |
+| `cage proxy` | `cage data proxy` |
+| `cage meter` | `cage data meter` |
+| `cage graphify` | `cage data graphify` |
+
+## v0.26.0 (shipped in v0.28.0, 2026-07-15) — output honesty: tokens by default, `—` for unpriced, signal-gated columns, generated docs
+
+Built from: [docs/archive/v0.26-output-honesty.handoff.md](docs/archive/v0.26-output-honesty.handoff.md) ·
+[docs/archive/v0.26-output-honesty.prompt.md](docs/archive/v0.26-output-honesty.prompt.md) —
+plan Phases 1+2+5.6 of
+[docs/output-and-simplification.plan.md](docs/output-and-simplification.plan.md).
+
+**⚠ This release deliberately changes the rendered text of most read views in
+one go** — driven by field output where `saved $0.0000 / net -$16.11` rendered
+in a receipt-less project and `$0.0000` meant "couldn't price". Every new
+rendering is pinned by a golden test and documented in
+[docs/cli-output-spec.md](docs/cli-output-spec.md) (now generated from those
+same goldens). **CSV schemas and values are byte-frozen** — if you scripted
+against `--csv` or `--json`, nothing moved; if you scraped the text tables,
+read on.
+
+- **Tokens by default; dollars opt-in (plan Phase 2.5).** `cage report` (every
+  `--by` view), `cage matrix`, and the bare `cage` headline render tokens-only
+  until asked for currency: per-invocation `--usd` > env `CAGE_USD` > policy
+  `[display] usd = true` (new bundled section; `policy_version` bumped —
+  `cage policy sync` carries it into projects). Pricing footnotes
+  (family/alias/ladder-rung) and the full ⚠ UNPRICED block render only in the
+  `--usd` view; the token view carries one muted pointer (`· N calls unpriced —
+  matters when you view $`). Money-native views (`budget`, `roi`, `verdict`,
+  `compare`, `estimate`, `human`, `trend`) keep dollars unconditionally.
+  Pricing always computes underneath — budget guards and UNPRICED detection
+  are display-independent.
+- **`—` is the only rendering of "couldn't price".** A group whose every call
+  refused to price shows `—`, never `$0.0000`; the TOTAL carries
+  `(+ unpriced)`; a net over a dashed cost is itself `—`; roi/attrib rows whose
+  receipts all refused the ladder dash their $ cells. `$0.0000` now always
+  means a real zero. CSV keeps explicit empty + `priced_via=none` — the glyph
+  never enters data. The report's ⚠ block now prints one **runnable fix line
+  per unpriced model** (the `cage prices unpriced` builder, one wording).
+- **Signal-gated saved/net (plan Phase 2.1).** saved/net (and the token view's
+  `saved tok`) columns render only when ≥1 savings receipt exists in the
+  window; otherwise the table is spend-only plus one line pointing at
+  `cage query receipts`. `--all-columns` restores the fixed shape. **Hard
+  line, tested by name: a negative net with real receipts renders
+  unconditionally** (`test_negative_net_with_receipts_always_renders`).
+- **Matrix: the token grid always renders (spec I7/I8).** The old whole-view
+  `$0→$0` table and the unpriced-model refusal are both gone: the default is a
+  token grid; `--usd` adds the cost column when a model prices (task join, or
+  a unanimous `[tools.<tool>] price_at` route — matrix is now a ladder
+  consumer) and otherwise appends one line naming the reason plus a runnable
+  fix. `--human` implies `--usd` (the anchor is a dollar row).
+- **Tidiness (plan Phase 1).** 0-call receipt-only bucket rows never render
+  (their savings stay in TOTAL); footnotes/⚠/advice dedupe to one each in a
+  fixed bottom order (the new `cage/display.py` Footer — one implementation,
+  no per-view copies); the kiro input-only caveat renders once, per-view
+  wording (`tok out not recorded` / `cost understated`); `last import: N ago`
+  is staleness-gated (`[capture] import_stale_hours`, default
+  `constants.IMPORT_STALE_HOURS` = 24; `0` restores always-on); the generic
+  kiro model bucket renders `agent (kiro)`; the empty ledger prints next-step
+  lines (`cage import` / `cage doctor`), and an empty *filtered slice* names
+  the active filters instead of pretending the ledger is empty (the `--scope`
+  papercut).
+- **Three generated doc surfaces with CI drift gates (plan Phase 5.6,
+  `tools/docgen` — build-time, stdlib, never in the wheel).**
+  `docs/cli-output-spec.md` code blocks ← the golden fixtures
+  (`tests/fixtures/goldens/`, asserted by `tests/test_output_spec.py`; status
+  flipped to LIVE, README-linked beside the CSV contracts) ·
+  `docs/formulas.md` ← the `explain_data.py` calculation registry (every
+  calculation entry must be catalogued — the check fails otherwise; three
+  pricing entries and trend/budget added) · bundled policy.toml `# formula:`
+  comments ← the same registry. `python -m tools.docgen --check` runs in CI
+  beside skillgen's; `tests/test_docgen.py` gates it locally too.
+- **Goldens.** 30 byte-pinned fixtures across report/overview/matrix/verdict/
+  compare/estimate/prices/study/policy states; `study join`'s output is
+  machine-dependent by design (wiring + doctor) so it is shape-asserted, not
+  byte-pinned. `cage demo`'s matrix table re-pins once to the new rendering
+  (same numbers, new shape).
+- **Query surface.** New `display` concept entry (`cage query display`);
+  `unpriced` teaches the `—` convention and the `--usd` placement; skill/
+  prompt/steering assets regenerated (they teach `--usd` and the gating).
+
+Breaking (text only): scripts parsing `cage report`/`cage matrix`/bare-`cage`
+text output must add `--usd` (or set `[display] usd = true`) to see dollar
+columns; the empty-ledger message changed; the report title separator is now
+`·`. Use `--csv`/`--json` for stable machine surfaces — that's what they're
+for.
+
 ## v0.25.0 (2026-07-14) — policy sync: upgrade a project policy.toml to the installed bundle
 
 Built from: [docs/archive/v0.25-policy-sync.handoff.md](docs/archive/v0.25-policy-sync.handoff.md) ·

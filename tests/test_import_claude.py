@@ -1,4 +1,4 @@
-"""`cage import-claude` — hookless metering from on-disk Claude Code transcripts."""
+"""`cage import --agent claude` — hookless metering from on-disk Claude Code transcripts."""
 from __future__ import annotations
 
 import json

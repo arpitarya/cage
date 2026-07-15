@@ -1,0 +1,24 @@
+cage — measure what your AI agents spend, prove what your tools save
+
+daily:
+  report      where the spend went (tokens; add $ views via [display])
+  import      pull every agent's usage into the ledger
+  setup       make this project (or --global) metered — scaffold + wire
+  doctor      is capture healthy? (--paths shows every probed location)
+  query       ask cage how any number or mechanism works
+
+groups (run any group name for its commands):
+  insights    attrib · matrix · roi · verdict · budget · compare · estimate ·
+              calibration · trend · why · forecast · regression · recommend
+  human       show · record · outcome · quality
+  authorship  origin · verify · notes-sync · ledger-sync
+  prices      list · unpriced · set · alias · route-tool · sync
+  study       join · start · stop · report · id
+  policy      diff · sync
+  data        export · cleanup · limits · watch · serve · proxy · meter
+
+$ cage report --since 7d          # the daily number
+$ cage insights verdict graphify  # is this tool paying for itself?
+$ cage human record 12m           # attest human time on the open task
+$ cage study join baseline        # enroll this laptop in the fleet study
+$ cage prices route-tool graphify --to copilot/claude-sonnet-4.6

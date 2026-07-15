@@ -11,7 +11,7 @@ All four agents now persist a usage log to disk, so the hookless path is an on-d
   `~/.codex/sessions/**/rollout-*.jsonl`, `~/.copilot/session-state/*/events.jsonl`.
 - **kiro** — `kiro.kiroagent/dev_data/tokens_generated.jsonl` (coarse: prompt tokens are
   reliable, output tokens often 0, model frequently the generic `"agent"`). The proxy
-  (`cage meter -- <cmd>`) stays the higher-fidelity fallback when Kiro's log is too thin.
+  (`cage data meter -- <cmd>`) stays the higher-fidelity fallback when Kiro's log is too thin.
 
 Additive: hooks + MCP stay the default real-time path; this runs alongside them and
 dedupes by call id (`hooks.append_new`), so a call seen by both a hook and an import is
@@ -63,7 +63,7 @@ def _mtime_utc(f: Path):
 
 # ── incremental high-water cursors (plan §3.7) ──────────────────────────────
 # The ledger is 22k+ rows and the no-daemon model means manual `cage import`,
-# `export`'s import-first refresh, and the `cage watch` loop all re-run the scan
+# `export`'s import-first refresh, and the `cage data watch` loop all re-run the scan
 # repeatedly. Re-parsing every transcript + reloading the whole ledger per file each
 # run is O(all logs × ledger). The cursor records each source file's last-seen
 # (size, mtime) so an unchanged file is skipped *before* parsing; `append_new`'s
@@ -183,7 +183,7 @@ def import_claude(root: Path, args, *, pol: dict | None = None, seen: set | None
         sources = [(paths.claude_home() / "projects"
                     / paths.claude_project_slug(Path(args.project)), "**/*.jsonl")]
     else:
-        sources = paths.agent_log_sources("claude")
+        sources = [(s.path, s.glob) for s in paths.agent_log_sources("claude", pol)]
     total_rows = total_files = 0
     for src, pattern in sources:
         files = _scan(root, "claude", src, pattern, getattr(args, "since", None), pol=pol,
@@ -199,7 +199,7 @@ def import_codex(root: Path, args, *, pol: dict | None = None, seen: set | None 
                  agent_cursor: dict | None = None) -> tuple[int, int]:
     """Meter Codex from its on-disk rollouts (~/.codex/sessions/**/rollout-*.jsonl)."""
     sources = ([(Path(args.path), "**/rollout-*.jsonl")] if getattr(args, "path", None)
-               else paths.agent_log_sources("codex"))
+               else [(s.path, s.glob) for s in paths.agent_log_sources("codex", pol)])
     total_rows = total_files = 0
     for src, pattern in sources:
         files = _scan(root, "codex", src, pattern, getattr(args, "since", None), pol=pol,
@@ -222,6 +222,46 @@ def _parse_copilot_any(f: Path) -> list[dict]:
     return transcript.parse_copilot_calls(f, session=f.parent.name)
 
 
+# The parser to reuse per declared `[sources.<name>] format` (plan Phase 4). The four
+# built-in import fns above inline the same callables; a custom tool routes through
+# here by its declared format so no new parser is ever written for a custom source.
+_PARSERS = {"claude": lambda f: transcript.parse_calls(f, session=f.stem),
+            "codex": lambda f: transcript.parse_codex_calls(f, session=f.stem),
+            "copilot": _parse_copilot_any,
+            "kiro": lambda f: transcript.parse_kiro_calls(f)}
+
+
+def import_custom_tools(root: Path, args, *, pol: dict | None = None,
+                        seen: set | None = None, cursors: dict | None = None) -> list[str]:
+    """Meter every `[sources.<name>]` custom tool (a name that is not one of the four
+    agents, plan Phase 4). Each reuses its declared-format parser and stamps
+    ``agent = <name>`` on the rows, so `cage report`/`attrib` split it out naturally.
+    Same `_scan`/`_ingest`/cursor/dedupe/fail-open path as the built-ins; a custom
+    tool gets its own cursor bucket (keyed on the resolved file path, like every
+    other source). Returns one summary line per tool that imported anything."""
+    by_tool: dict[str, list] = {}
+    for s in paths.custom_tool_sources(pol):
+        by_tool.setdefault(s.agent, []).append(s)
+    out: list[str] = []
+    for name in sorted(by_tool):
+        n = m = 0
+        agent_cursor = cursors.setdefault(name, {}) if cursors is not None else None
+        for s in by_tool[name]:
+            files = _scan(root, name, s.path, s.glob, getattr(args, "since", None),
+                          pol=pol, agent_cursor=agent_cursor)
+            base_parse = _PARSERS[s.fmt]
+            # Reuse the declared format's parser, then restamp `agent` to the tool name
+            # (the parser stamps its own format's agent, e.g. "claude-code").
+            parse = lambda f, _p=base_parse, _n=name: [{**r, "agent": _n} for r in _p(f)]
+            n += _ingest(root, name, s.path, files, parse,
+                         pol=pol, seen=seen, agent_cursor=agent_cursor)
+            m += len(files)
+        if m:
+            out.append(f"✔ {name} (custom, format={by_tool[name][0].fmt}): "
+                       f"imported {n} call(s) from {m} file(s).")
+    return out
+
+
 def import_copilot(root: Path, args, *, pol: dict | None = None, seen: set | None = None,
                    agent_cursor: dict | None = None) -> tuple[int, int]:
     """Meter Copilot from both stores it actually writes:
@@ -233,7 +273,7 @@ def import_copilot(root: Path, args, *, pol: dict | None = None, seen: set | Non
       counts come from VS Code's chat-session store (plan §3.7; `CAGE_VSCODE_USER`
       overrides the user dir for tests)."""
     sources = ([(Path(args.path), "*/events.jsonl")] if getattr(args, "path", None)
-               else paths.agent_log_sources("copilot"))
+               else [(s.path, s.glob) for s in paths.agent_log_sources("copilot", pol)])
     total_rows = total_files = 0
     for src, pattern in sources:
         files = _scan(root, "copilot", src, pattern, getattr(args, "since", None), pol=pol,
@@ -249,7 +289,7 @@ def import_kiro(root: Path, args, *, pol: dict | None = None, seen: set | None =
     """Meter Kiro from its append-only usage log (kiro.kiroagent/dev_data/
     tokens_generated.jsonl) — a single file, not a glob. Best-effort and idempotent."""
     sources = ([(Path(args.path), "*")] if getattr(args, "path", None)
-               else paths.agent_log_sources("kiro"))
+               else [(s.path, s.glob) for s in paths.agent_log_sources("kiro", pol)])
     total_rows = total_files = 0
     for src, pattern in sources:
         files = _scan(root, "kiro", src, pattern, getattr(args, "since", None), pol=pol,
@@ -266,7 +306,7 @@ _ADAPTERS = {"claude": import_claude, "codex": import_codex,
 
 def proxy_line(agent: str) -> str:
     """The supported hookless path for an agent that writes no usage transcript."""
-    return f"· {agent}: no on-disk usage log — meter via the proxy: cage meter -- <cmd>"
+    return f"· {agent}: no on-disk usage log — meter via the proxy: cage data meter -- <cmd>"
 
 
 def run_agent(root: Path, agent: str, args, *, pol: dict | None = None,
@@ -315,11 +355,20 @@ def run(root: Path, agent: str, args) -> list[str]:
     # hook + a manual import) must not both build `seen` before either commits, or the
     # same turn lands twice. Fail-open — an untakeable lock just falls back to the
     # id-dedupe backstop (see `_import_lock`).
+    # Fail-open: a malformed `[sources]` entry is a debug-logged skip, never an error
+    # (plan Phase 4). Doctor --paths / `cage query sources` surface these loudly.
+    for problem in paths.resolve_log_sources(pol).problems:
+        debuglog.event(root, pol=pol, event="import", agent=agent,
+                       skip="bad-source", detail=problem)
     with _import_lock(foot, pol):
         cursors = _load_cursors(foot)
         seen = {c.get("id") for c in ledger.calls(root)}  # one ledger read shared across agents
         lines = [run_agent(root, a, args, pol=pol, seen=seen,
                            agent_cursor=cursors.setdefault(a, {})) for a in targets]
+        # Custom tools ([sources.<name>], plan Phase 4) sweep on the umbrella `all`
+        # import — the global capture path that grabs the whole stack.
+        if agent == "all":
+            lines += import_custom_tools(root, args, pol=pol, seen=seen, cursors=cursors)
         cursors["_last_import"] = _now_iso()  # pull-based staleness signal for doctor/report
         _save_cursors(foot, cursors)
     # Piggybacked state maintenance (plan §3.6.4): every hook/watch/export sweep
