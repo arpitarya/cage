@@ -216,7 +216,7 @@ cage data export --csv calls --since 30d -o calls.csv   # raw ledger rows for a 
 
 ## The `$0` guarantee
 
-Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 751 tests passing; `cage demo` reproduces the worked attribution example against a real ledger.
+Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 772 tests passing; `cage demo` reproduces the worked attribution example against a real ledger.
 
 **Honest limits.** Cage doesn't decide your human rate — it prices minutes at a blended rate you set, and labels the result `estimated` so it never pretends to be a timesheet. Marginal-by-fixed-order is defensible and `$0`, but it is an *ordering convention*, not a Shapley value (that's a deferred audit mode). And a counterfactual cell is an honest reconstruction, never an invoice — the `method` column says so on every row, on purpose.
 
@@ -224,7 +224,7 @@ Every derived view is parse / arithmetic over the log — **no LLM call, ever, o
 
 Latest release below — full history and detail in [CHANGELOG.md](CHANGELOG.md).
 
-- **v0.28.0 (unreleased) — configurable import paths: `[sources]` in policy.toml.** Add or replace the log locations `cage import` probes — `[sources.<agent>] paths = ["~/alt/logs"]` for a nonstandard install / network home / side-by-side copy, `replace = true` to override an agent's built-ins (empty ⇒ disabled), or a custom tool `[sources.<name>] format = "claude"` whose rows stamp `agent = <name>`. Precedence: env home override > policy > built-in; `~`/`$VAR` expand, globs rejected. `cage doctor --paths` gains a provenance column (`built-in | env | policy`) + a committed-machine-path portability warning; `cage query sources` explains it. Additive — an empty `[sources]` is byte-identical to today, and `policy sync` never touches it. See [Configurable import paths](docs/sources.md). (Sequenced after v0.27.0 CLI tiering.)
+- **v0.29.0 (unreleased) — visible source paths + per-source globs.** A `[sources.<agent>]` may now declare its own filename pattern (`glob = "usage-*.ndjson"`; absent ⇒ the format default, empty `""` is an error) and a `[[sources.<agent>]]` array-of-tables form gives one glob per path — so a tool whose layout isn't the canonical shape is capturable at all. A glob char in a `path` is still rejected, but the message names the fix. And the built-in log-source defaults (paths, globs, redirect env vars, per-OS locations) are now **visible in every project's `.cage/policy.toml`** as a generated **comment block** — inert (the bundle still ships no active `[sources]` table; defaults live in code and upgrade with the package), `~`-relative, drift-gated in CI. Capture-side only — no derived view changes. See [Configurable import paths](docs/sources.md).
 
 ## The name
 

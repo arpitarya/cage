@@ -263,3 +263,83 @@ def test_policy_sync_never_touches_sources(monkeypatch, tmp_path):
     d = policysync.sync_view(root)
     flat = json.dumps(d)
     assert "sources" not in flat  # never in add/update/customized/orphan/project_own
+
+
+# ── per-source glob (v0.29) — the dict `glob` key and the array-of-tables form ──
+
+def test_dict_glob_key_overrides_the_format_default(monkeypatch, tmp_path):
+    _no_env(monkeypatch)
+    add = tmp_path / "logs"
+    pol = {"sources": {"claude": {"paths": [str(add)], "glob": "usage-*.ndjson"}}}
+    added = [s for s in paths.resolve_log_sources(pol).sources
+             if s.agent == "claude" and s.provenance == "policy"]
+    assert len(added) == 1 and added[0].glob == "usage-*.ndjson"  # declared, not **/*.jsonl
+    assert added[0].fmt == "claude"  # still parsed as claude
+
+
+def test_absent_glob_falls_back_to_format_default(monkeypatch, tmp_path):
+    _no_env(monkeypatch)
+    pol = {"sources": {"codex": {"paths": [str(tmp_path / "c")]}}}
+    added = [s for s in paths.resolve_log_sources(pol).sources
+             if s.agent == "codex" and s.provenance == "policy"]
+    assert added[0].glob == paths._FORMAT_GLOB["codex"]  # the imposed default
+
+
+def test_empty_glob_is_a_problem_not_a_silent_fallback(monkeypatch, tmp_path):
+    _no_env(monkeypatch)
+    pol = {"sources": {"claude": {"paths": [str(tmp_path / "x")], "glob": ""}}}
+    res = paths.resolve_log_sources(pol)
+    assert not [s for s in res.sources if s.provenance == "policy"]  # skipped, not defaulted
+    assert any("glob" in p and "non-empty" in p for p in res.problems)
+
+
+def test_glob_in_path_message_names_the_fix(monkeypatch, tmp_path):
+    _no_env(monkeypatch)
+    res = paths.resolve_log_sources({"sources": {"claude": {"paths": ["/logs/*.jsonl"]}}})
+    assert res.problems and any("glob = " in p for p in res.problems)  # points at glob =
+
+
+def test_array_of_tables_form_with_per_entry_glob(monkeypatch, tmp_path):
+    _no_env(monkeypatch)
+    a, b = tmp_path / "a", tmp_path / "b"
+    pol = {"sources": {"claude": [
+        {"path": str(a)},                                  # glob defaults
+        {"path": str(b), "glob": "sess-*.jsonl"},          # own glob
+    ]}}
+    added = [s for s in paths.resolve_log_sources(pol).sources
+             if s.agent == "claude" and s.provenance == "policy"]
+    assert [(s.path, s.glob) for s in added] == \
+        [(a, paths._FORMAT_GLOB["claude"]), (b, "sess-*.jsonl")]
+
+
+def test_dict_and_array_shapes_coexist_across_agents(monkeypatch, tmp_path):
+    _no_env(monkeypatch)
+    pol = {"sources": {
+        "claude": {"paths": [str(tmp_path / "cl")], "glob": "c-*.jsonl"},   # dict form
+        "codex": [{"path": str(tmp_path / "cx"), "glob": "x-*.jsonl"}],     # array form
+    }}
+    res = paths.resolve_log_sources(pol)
+    assert res.problems == []
+    cl = [s for s in res.sources if s.agent == "claude" and s.provenance == "policy"]
+    cx = [s for s in res.sources if s.agent == "codex" and s.provenance == "policy"]
+    assert cl[0].glob == "c-*.jsonl" and cx[0].glob == "x-*.jsonl"
+
+
+def test_array_form_custom_tool_needs_per_entry_format(monkeypatch, tmp_path):
+    _no_env(monkeypatch)
+    ok = tmp_path / "ok"
+    pol = {"sources": {"mytool": [{"path": str(ok), "format": "claude", "glob": "u-*.jsonl"}]}}
+    got = paths.custom_tool_sources(pol)
+    assert len(got) == 1 and got[0].agent == "mytool" and got[0].glob == "u-*.jsonl"
+    # a format-less array entry is rejected (no table level to hold one)
+    bad = paths.resolve_log_sources({"sources": {"t": [{"path": str(ok)}]}})
+    assert bad.problems and not [s for s in bad.sources if s.agent == "t"]
+
+
+def test_doctor_paths_shows_the_declared_glob(monkeypatch, tmp_path):
+    _isolate_homes(tmp_path, monkeypatch)
+    root = tmp_path / "proj"
+    (root / ".cage").mkdir(parents=True)
+    monkeypatch.chdir(root)
+    pol = {"sources": {"claude": {"paths": ["~/alt"], "glob": "usage-*.ndjson"}}}
+    assert "usage-*.ndjson" in pathprobe.run(root, pol)  # the pattern column

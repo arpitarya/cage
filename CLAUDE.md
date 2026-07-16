@@ -273,11 +273,14 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   only: stdlib-only, never imported at runtime, never in the wheel. See `docs/skillgen.md`.
   **`tools/docgen` follows the same law** (plan Phase 5.6): the three generated
   doc surfaces — `docs/cli-output-spec.md` (from the golden fixtures),
-  `docs/formulas.md` and the bundled policy.toml `# formula:` comments (both
-  from the `explain_data.py` registry) — are regenerated with `python -m
-  tools.docgen [--target spec|formulas|policy]`, CI's `python -m tools.docgen
-  --check` gates drift, and the tree is build-time only (never imported at
-  runtime, never in the wheel).
+  `docs/formulas.md` (from the `explain_data.py` registry), and the bundled
+  policy.toml, whose `--target policy` owns **two** regions: the `# formula:`
+  comment lines (from the registry) and the inert, `~`-relative `[sources]`
+  documentation block between the `# cage:sources-start` / `# cage:sources-end`
+  sentinels (from `paths.builtin_source_docs()`, a comment block — the defaults
+  stay in code). Regenerated with `python -m tools.docgen
+  [--target spec|formulas|policy]`, CI's `--check` gates drift, and the tree is
+  build-time only (never imported at runtime, never in the wheel).
 - **Two error regimes, never mixed.** Write paths stay **fail-open** (return `False` /
   swallow, traceable under `CAGE_DEBUG`, never raise into a request/turn). The read/CLI
   boundary is **typed**: an expected user-facing failure raises the single `CageError`
@@ -341,7 +344,7 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
 ## Dev
 
 ```bash
-just test          # python -m pytest -q   (736 passing)
+just test          # python -m pytest -q   (772 passing)
 just demo          # seed §4.4 + print attrib/matrix
 cage --version
 ```
@@ -373,7 +376,14 @@ each agent only needs thin idiomatic wiring (`agents.py` orchestrates):
   `paths.agent_log_sources()` — per-OS candidates behind it (env overrides always
   win; the Windows Kiro layout is labeled UNVERIFIED-LAYOUT until pinned on a real
   install), probed read-only by `cage doctor --paths` ([pathprobe.py](cage/pathprobe.py),
-  exported in the doctor bundle as `paths.txt`). Cross-process locking is the single
+  exported in the doctor bundle as `paths.txt`). A project `policy.toml [sources]`
+  table extends/replaces it (`paths` + optional per-source `glob`, or the
+  `[[sources.<x>]]` array-of-tables form; `resolve_log_sources` is the one
+  resolution point) — additive, empty/absent = the built-in registry byte-for-byte.
+  The built-in defaults are also emitted into every project's `.cage/policy.toml`
+  as an **inert generated comment block** (docgen; the bundle ships no active
+  `[sources]` table — defaults live in code and upgrade with the package).
+  Cross-process locking is the single
   fail-open helper [lockutil.py](cage/lockutil.py) (fcntl → msvcrt → proceed-unlocked,
   debug-logged) — never hand-roll another `fcntl` block.
 - **Read:** `mcpserver.py` (MCP, every agent), `report/attrib/matrix/budget/roi`,

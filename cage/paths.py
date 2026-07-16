@@ -356,8 +356,14 @@ def resolve_log_sources(pol: dict | None = None) -> SourcesResolution:
     tool: it must declare ``format = "claude|codex|copilot|kiro"`` (the parser to
     reuse) and its rows stamp ``agent = <name>``. ``~``/``$VAR`` expand; a glob-shaped
     entry is rejected into ``problems`` (never raised — the sweep stays fail-open).
-    Fully additive: an empty/absent ``[sources]`` returns exactly the built-in
-    registry."""
+
+    Two schema shapes per key, branched on the parsed TOML type: a ``dict``
+    (``[sources.<x>]``, the legacy table — ``paths`` + ``replace`` + an optional
+    table-level ``glob`` applied to every path) or a ``list``
+    (``[[sources.<x>]]``, an array-of-tables — each entry ``{path, glob?}``, additive,
+    no ``replace``). An absent ``glob`` ⇒ today's ``_FORMAT_GLOB[fmt]``; an empty
+    ``glob = ""`` ⇒ a problem (never a silent fallback). Fully additive: an
+    empty/absent ``[sources]`` returns exactly the built-in registry."""
     from cage import agents  # lazy: agents imports paths (avoid the cycle)
     surfaces = agents.SURFACES
     src_tables = (pol or {}).get("sources", {}) if isinstance(pol, dict) else {}
@@ -366,23 +372,72 @@ def resolve_log_sources(pol: dict | None = None) -> SourcesResolution:
     problems: list[str] = []
     disabled: list[str] = []
 
-    def _policy_paths(key: str, table: dict, fmt: str) -> None:
+    def _resolve_glob(key: str, fmt: str, glob) -> str | None:
+        """The glob for one entry: absent ⇒ the format default; a set-but-empty (or
+        non-string) value ⇒ a problem (``None`` return, entry skipped) — an empty
+        ``glob = ""`` is an error, never a silent ``_FORMAT_GLOB`` fallback (§8)."""
+        if glob is None:
+            return _FORMAT_GLOB[fmt]
+        if not isinstance(glob, str) or not glob:
+            problems.append(f"[sources.{key}] glob must be a non-empty string — drop "
+                            f"the key to use the default {fmt} pattern {_FORMAT_GLOB[fmt]!r}")
+            return None
+        return glob
+
+    def _emit(key: str, raw, glob, fmt: str, seen: set) -> None:
+        """Validate + append one policy source (path + resolved glob). A glob char in
+        the ``path`` is rejected with the fix (put it in ``glob =``); a bad glob is
+        rejected; a ``(path, glob)`` already seen is deduped (keeps the earlier —
+        built-in — tag, §8)."""
+        if not isinstance(raw, str) or not raw:
+            problems.append(f"[sources.{key}] each source needs a non-empty string `path`")
+            return
+        if _GLOB_CHARS & set(raw):
+            problems.append(f"[sources.{key}] path {raw!r} contains a glob character "
+                            "(*?[) — list only concrete files or directories and put "
+                            "the pattern in `glob = `")
+            return
+        g = _resolve_glob(key, fmt, glob)
+        if g is None:
+            return
+        p = Path(_expand_source(raw))
+        if (p, g) in seen:  # policy path == a built-in path → keep the built-in tag (§8)
+            return
+        seen.add((p, g))
+        sources.append(LogSource(p, g, "policy", key, fmt, raw))
+
+    def _dict_paths(key: str, table: dict, fmt: str) -> None:
         raw_paths = table.get("paths", [])
         if not isinstance(raw_paths, list) or any(not isinstance(p, str) for p in raw_paths):
             problems.append(f"[sources.{key}] paths must be a list of strings")
             return
+        table_glob = table.get("glob")  # optional; one glob for every path in the table
         seen = {(s.path, s.glob) for s in sources if s.agent == key}
         for raw in raw_paths:
-            if _GLOB_CHARS & set(raw):
-                problems.append(f"[sources.{key}] path {raw!r} contains a glob "
-                                "character (*?[) — list concrete files or directories")
+            _emit(key, raw, table_glob, fmt, seen)
+
+    def _list_paths(key: str, entries: list, default_fmt: str | None) -> None:
+        """The ``[[sources.<x>]]`` array-of-tables form — each entry ``{path, glob?}``.
+        A built-in agent's format is implicit (``default_fmt``); a custom tool has no
+        table level, so each entry declares its own ``format``."""
+        seen = {(s.path, s.glob) for s in sources if s.agent == key}
+        for i, entry in enumerate(entries):
+            if not isinstance(entry, dict):
+                problems.append(f"[[sources.{key}]] entry #{i + 1} must be a table "
+                                "(path = \"…\", optional glob = \"…\")")
                 continue
-            p = Path(_expand_source(raw))
-            key_pair = (p, _FORMAT_GLOB[fmt])
-            if key_pair in seen:  # policy path == a built-in path → keep built-in tag (§8)
+            fmt = default_fmt
+            if fmt is None:  # custom tool: the format lives on each entry
+                fmt = entry.get("format")
+                if fmt not in _FORMAT_GLOB:
+                    problems.append(f"[[sources.{key}]] entry #{i + 1} is a custom tool "
+                                    "— each entry needs format = \"claude|codex|copilot|kiro\"")
+                    continue
+            elif entry.get("format") not in (None, default_fmt):
+                problems.append(f"[[sources.{key}]] format is implicit for the {key} "
+                                "agent — drop the `format` key")
                 continue
-            seen.add(key_pair)
-            sources.append(LogSource(p, _FORMAT_GLOB[fmt], "policy", key, fmt, raw))
+            _emit(key, entry.get("path"), entry.get("glob"), fmt, seen)
 
     # Built-in agents first, in SURFACES order: built-in/env candidates, then adds.
     for agent in surfaces:
@@ -397,13 +452,18 @@ def resolve_log_sources(pol: dict | None = None) -> SourcesResolution:
             for path, glob in _builtin_log_sources(agent):
                 sources.append(LogSource(path, glob, prov, agent, agent, str(path)))
         if isinstance(table, dict):
-            _policy_paths(agent, table, agent)
+            _dict_paths(agent, table, agent)
             if replace and not any(s.agent == agent for s in sources):
                 disabled.append(agent)
+        elif isinstance(table, list):
+            _list_paths(agent, table, agent)
 
     # Custom tools: any `[sources.<name>]` whose name is not one of the four agents.
     for name in sorted(k for k in src_tables if k not in surfaces):
         table = src_tables[name]
+        if isinstance(table, list):
+            _list_paths(name, table, None)  # array-of-tables custom tool: format per entry
+            continue
         if not isinstance(table, dict):
             problems.append(f"[sources.{name}] must be a table")
             continue
@@ -412,7 +472,7 @@ def resolve_log_sources(pol: dict | None = None) -> SourcesResolution:
             problems.append(f"[sources.{name}] is a custom tool — it needs "
                             "format = \"claude|codex|copilot|kiro\" (the parser to reuse)")
             continue
-        _policy_paths(name, table, fmt)
+        _dict_paths(name, table, fmt)
 
     return SourcesResolution(sources, problems, disabled)
 
@@ -430,6 +490,73 @@ def custom_tool_sources(pol: dict | None = None) -> list[LogSource]:
     reuses a declared parser ``fmt`` and stamps ``agent = <name>`` on imported rows."""
     from cage import agents
     return [s for s in resolve_log_sources(pol).sources if s.agent not in agents.SURFACES]
+
+
+# ── build-time descriptor for the generated `[sources]` comment block (docgen) ──
+# `tools/docgen --target policy` renders an inert, ~-relative `[sources]` block into
+# the bundled policy.toml from :func:`builtin_source_docs`. It is deliberately ENV-
+# and MACHINE-INDEPENDENT: it reads no environment and never calls ``Path.home()`` /
+# ``_first_existing`` — the values `_builtin_log_sources` returns bake the current
+# machine's home, env overrides and on-disk probing into an *absolute* path that
+# differs per developer/OS, so ``str(path)``-ing them would make docgen output
+# machine-specific and CI ``--check`` fail (handoff §8, the single most likely break).
+# These path strings are the canonical ~-relative defaults; the *glob* and the
+# per-agent source count come from `_builtin_log_sources` so a new/renamed built-in
+# source can't ship without the block drifting (docgen `--check` gates it).
+_SOURCE_DOC_PATHS = {
+    "claude": [("~/.claude/projects",
+                "every session transcript under the tree, recursively")],
+    "codex": [("~/.codex/sessions",
+               "rollout logs under the tree, recursively")],
+    "copilot": [
+        ("~/.copilot/session-state",
+         "Copilot CLI usage events (one dir per session)"),
+        ("~/Library/Application Support/Code/User/workspaceStorage",
+         "VS Code Copilot chat sessions (macOS location shown; other OS below)"),
+    ],
+    "kiro": [
+        ("~/Library/Application Support/Kiro/User/globalStorage/kiro.kiroagent"
+         "/dev_data/tokens_generated.jsonl",
+         "per-call token log — a FILE source, so the glob is ignored (macOS shown)"),
+    ],
+}
+_SOURCE_DOC_OTHER_OS = {
+    "copilot": ("Linux VS Code:   ~/.config/Code/User/workspaceStorage",
+                "Windows VS Code: %APPDATA%\\Code\\User\\workspaceStorage"),
+    "kiro": ("Linux:   ~/.config/Kiro/User/globalStorage/kiro.kiroagent"
+             "/dev_data/tokens_generated.jsonl",
+             "Windows: %APPDATA%\\Kiro\\User\\globalStorage\\kiro.kiroagent"
+             "\\...\\tokens_generated.jsonl  (UNVERIFIED-LAYOUT — inferred from VS "
+             "Code-family, not pinned on a real Windows Kiro)"),
+}
+
+
+def builtin_source_docs() -> list[dict]:
+    """Env-independent, ~-relative description of the built-in log sources for the
+    generated `[sources]` comment block (docgen — see the note above; never imported
+    at runtime). One dict per agent in ``SURFACES`` order: ``env`` (the home-redirect
+    vars from ``_AGENT_ENV``), ``sources`` (a list of ``(path, glob, meaning)`` — the
+    ``glob`` pulled live from :func:`_builtin_log_sources` so the block drifts when a
+    source is added/changed) and ``other_os`` (non-primary OS locations). Deterministic:
+    reads no environment, never resolves ``Path.home()``. Raises loudly if the doc
+    descriptor and the code registry disagree on a source count, so a new built-in
+    source forces a descriptor update + regeneration."""
+    from cage import agents  # lazy: agents imports paths (avoid the cycle)
+    out: list[dict] = []
+    for agent in agents.SURFACES:
+        docs = _SOURCE_DOC_PATHS[agent]
+        builtin = _builtin_log_sources(agent)  # only the globs are read (env-independent)
+        if len(docs) != len(builtin):
+            raise SystemExit(
+                f"paths.builtin_source_docs: {agent} has {len(builtin)} built-in "
+                f"source(s) but _SOURCE_DOC_PATHS lists {len(docs)} — update the "
+                "descriptor in cage/paths.py, then regenerate the [sources] block "
+                "(`python -m tools.docgen --target policy`)")
+        srcs = [(path, glob, meaning)
+                for (path, meaning), (_bp, glob) in zip(docs, builtin)]
+        out.append({"agent": agent, "env": _AGENT_ENV.get(agent, ()),
+                    "sources": srcs, "other_os": _SOURCE_DOC_OTHER_OS.get(agent, ())})
+    return out
 
 
 class Footprint:

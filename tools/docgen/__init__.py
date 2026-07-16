@@ -12,9 +12,16 @@ wheel):
   the `cage/explain_data.py` calculation registry (the same entries `cage
   query` renders live). Hand-written prose between blocks survives — only the
   anchored code fences are rewritten.
-- ``--target policy``   → the `# formula:` comment lines in the bundled
-  `cage/data/policy.toml`, from the same registry (carried into project
-  policies by `cage policy sync`'s normal add path).
+- ``--target policy``   → **two** generated regions of the bundled
+  `cage/data/policy.toml`: (1) the `# formula:` comment lines above their
+  budget/human headers, from the same registry (carried into project policies
+  by `cage policy sync`'s normal add path); and (2) the inert, ~-relative
+  `[sources]` documentation block between the ``# cage:sources-start`` /
+  ``# cage:sources-end`` sentinels, from `paths.builtin_source_docs()` (a comment
+  block — `tomllib` sees no `sources` key; the defaults stay in code). A missing
+  sentinel fails loudly with the regenerate command; prose outside survives. Both
+  regions are one writer on one file, so `--target policy` owns the whole file and
+  `TARGETS` stays 1:1 with files (a separate `sources` target would race this one).
 
 ``--check`` regenerates in memory and exits 1 on drift instead of writing.
 """

@@ -45,6 +45,7 @@ release that shipped the work: `vX.Y-<feature>.{handoff,prompt}.md`.
 | v0.26 | Output honesty (tokens-default, `—` unpriced, signal-gated columns, doc generators) | [handoff](v0.26-output-honesty.handoff.md) | [prompt](v0.26-output-honesty.prompt.md) | [v0.26.0](../../CHANGELOG.md#v0260-shipped-in-v0280-2026-07-15--output-honesty-tokens-by-default--for-unpriced-signal-gated-columns-generated-docs) |
 | v0.27 | CLI tiering (five daily verbs, grouped rooms, `init`→`setup`) | [handoff](v0.27-cli-tiering.handoff.md) | [prompt](v0.27-cli-tiering.prompt.md) | [v0.27.0](../../CHANGELOG.md#v0270-shipped-in-v0280-2026-07-15--cli-tiering-five-daily-verbs-grouped-rooms-a-clean-pre-10-verb-break) |
 | v0.28 | Configurable import paths (`[sources]` per agent + custom tools) | [handoff](v0.28-policy-sources.handoff.md) | [prompt](v0.28-policy-sources.prompt.md) | [v0.28.0](../../CHANGELOG.md#v0280-2026-07-15--configurable-import-paths-sources-in-policytoml) |
+| v0.29 | Visible source paths (generated commented `[sources]` block) + per-source globs | [handoff](v0.29-sources-defaults.handoff.md) | [prompt](v0.29-sources-defaults.prompt.md) | [v0.29.0](../../CHANGELOG.md#v0290-2026-07-16--visible-source-paths--per-source-globs) |
 
 ## Superseded drafts & research inputs
 

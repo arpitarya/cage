@@ -212,15 +212,19 @@ REGISTRY: tuple[Explanation, ...] = (
         "  nonstandard install, a network home, or a side-by-side log copy. Additive\n"
         "  by default (empty/absent [sources] = the built-in registry, byte-identical).\n"
         "    [sources.<agent>] paths = [\"~/alt/logs\", ...]   # one of the four agents\n"
+        "    [sources.<agent>] glob  = \"usage-*.ndjson\"      # optional; absent ⇒ format default\n"
         "    [sources.<agent>] replace = true                 # ignore that agent's built-ins\n"
         "                                                     #   (empty paths ⇒ disabled)\n"
+        "    [[sources.<agent>]] path = \"~/x\", glob = \"...\"   # array form: one glob per path\n"
         "    [sources.<name>]  paths = [...], format = \"claude|codex|copilot|kiro\"\n"
         "                                                     # a custom tool; rows stamp agent=<name>\n"
-        "  Precedence: env home override > policy > built-in. ~ and $VARs expand;\n"
-        "  a glob entry (*?[) is rejected. Capture-side only — no derived view changes.\n"
-        "  Verify with `cage doctor --paths` (provenance column: built-in|env|policy).\n"
+        "  Precedence: env home override > policy > built-in. ~ and $VARs expand; a glob\n"
+        "  char (*?[) in a `path` is rejected (put it in `glob =`); empty glob=\"\" is an error.\n"
+        "  Capture-side only — no derived view changes.\n"
+        "  Verify with `cage doctor --paths` (glob + provenance column: built-in|env|policy).\n"
         "  A committed project policy with a machine-absolute path warns — prefer\n"
-        "  ~/.cage/policy.toml or a ~/… path. `policy sync` never touches [sources].\n"
+        "  ~/.cage/policy.toml or a ~/… path. `policy sync` never touches [sources]; the\n"
+        "  bundle ships the defaults as a COMMENT block (cage:sources-start), inert.\n"
         "  current sources:\n{sources_live}",
         ("cage/paths.py", "cage/importcmd.py", "cage/pathprobe.py"),
         "n/a — describes a capture-config mechanism, not a number.",
