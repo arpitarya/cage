@@ -61,9 +61,9 @@ archive (the lifecycle rule in `CLAUDE.md`).
   plan of record for the current cycle. Phases 1–4 (output honesty → CLI tiering →
   `[sources]`) shipped in **v0.28.0**; the backlog sweep remains.
 
-*(Phases 1–4 handoff/prompt pairs archived with the v0.28.0 release, and the
-`[sources]` visibility + globs follow-on with **v0.29.0** — see the
-[archive index](archive/README.md).)*
+*(Phases 1–4 handoff/prompt pairs archived with the v0.28.0 release, the
+`[sources]` visibility + globs follow-on with **v0.29.0**, and capture-health
+with **v0.30.0** — see the [archive index](archive/README.md).)*
 
 ## Archive
 

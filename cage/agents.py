@@ -22,6 +22,20 @@ from cage import claudewire, codexwire, copilotwire, gitcommithook, kirowire, ru
 
 SURFACES = ("claude", "codex", "copilot", "kiro")
 
+# The parser stamps a *format* agent on each ledger row (transcript.py) — identical to
+# the surface name for codex/copilot/kiro, but claude rows stamp ``claude-code``. This
+# maps a ledger row's agent back to its SURFACES name, so a row-presence check (capture
+# health's gate 3) matches the surface. Custom-tool rows stamp their own name (not a
+# surface) and fall through unchanged — harmless (they never match a surface).
+_ROW_AGENT_SURFACE = {"claude-code": "claude"}
+
+
+def row_surface(row_agent: str | None) -> str | None:
+    """The SURFACES name for a ledger row's ``agent`` field (``claude-code`` → ``claude``;
+    everything else is identity). A custom-tool name passes through as itself."""
+    return _ROW_AGENT_SURFACE.get(row_agent, row_agent)
+
+
 # The wire module for each surface — add a row here when integrating a new agent.
 _WIRE = {"claude": claudewire, "codex": codexwire,
          "copilot": copilotwire, "kiro": kirowire}

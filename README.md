@@ -216,7 +216,7 @@ cage data export --csv calls --since 30d -o calls.csv   # raw ledger rows for a 
 
 ## The `$0` guarantee
 
-Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 772 tests passing; `cage demo` reproduces the worked attribution example against a real ledger.
+Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 791 tests passing; `cage demo` reproduces the worked attribution example against a real ledger.
 
 **Honest limits.** Cage doesn't decide your human rate — it prices minutes at a blended rate you set, and labels the result `estimated` so it never pretends to be a timesheet. Marginal-by-fixed-order is defensible and `$0`, but it is an *ordering convention*, not a Shapley value (that's a deferred audit mode). And a counterfactual cell is an honest reconstruction, never an invoice — the `method` column says so on every row, on purpose.
 
@@ -224,7 +224,7 @@ Every derived view is parse / arithmetic over the log — **no LLM call, ever, o
 
 Latest release below — full history and detail in [CHANGELOG.md](CHANGELOG.md).
 
-- **v0.29.0 (unreleased) — visible source paths + per-source globs.** A `[sources.<agent>]` may now declare its own filename pattern (`glob = "usage-*.ndjson"`; absent ⇒ the format default, empty `""` is an error) and a `[[sources.<agent>]]` array-of-tables form gives one glob per path — so a tool whose layout isn't the canonical shape is capturable at all. A glob char in a `path` is still rejected, but the message names the fix. And the built-in log-source defaults (paths, globs, redirect env vars, per-OS locations) are now **visible in every project's `.cage/policy.toml`** as a generated **comment block** — inert (the bundle still ships no active `[sources]` table; defaults live in code and upgrade with the package), `~`-relative, drift-gated in CI. Capture-side only — no derived view changes. See [Configurable import paths](docs/sources.md).
+- **v0.30.0 (unreleased) — capture health: silent zero-capture made loud.** When an agent is **installed but its log matched nothing**, `cage report`/`cage doctor` now say so in the footer (`⚠ codex: ~/.codex exists but ~/.codex/sessions matched 0 files — capture is off for this agent`) instead of printing confident totals from the agents that still work. **Triple-gated** so it can never nag wrongly — it fires only when the home exists **and** 0 files matched **and** the agent has never captured a row (self-silencing after the first row), and **self-heals** on the next import once the path is fixed. Opt out an agent you don't use with the existing `[sources.<agent>] replace=true, paths=[]`. No new I/O on the read path (recorded at import into `cursors.json`, render stays pure), tables byte-identical, never in CSV. See [Debugging capture](docs/debugging-capture.md). (Sequenced after v0.29.0 source-path visibility + globs.)
 
 ## The name
 

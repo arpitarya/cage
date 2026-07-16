@@ -53,7 +53,7 @@ def cmd_report(args) -> int:
         return csvout.write(report.render_csv(rep), dest)
     return emit(args, rep, report.render_report(
         rep, last_import=importcmd.last_import(r), disp=display.resolve(args, pol),
-        stale_hours=policy.import_stale_hours(pol)))
+        stale_hours=policy.import_stale_hours(pol), health=importcmd.capture_health(r)))
 
 
 def cmd_overview(args) -> int:

@@ -203,6 +203,32 @@ def _last_import_line(last_import: str | None, stale_hours: int | None = None) -
     return f"· last import: {rel} — `cage import` to refresh" if rel else ""
 
 
+def capture_warnings(health: dict | None) -> list[str]:
+    """The triple-gated "installed but capturing nothing" warnings (docs/capture-health):
+    warn for an agent only when its home marker exists **and** it matched 0 files at the
+    last import **and** it has never contributed a row to the ledger. Clause 3 makes the
+    warning self-silencing — one captured row and it can never fire again. **Pure**: reads
+    only the passed-in ``_health`` record (`importcmd.capture_health`), never the
+    filesystem — so `render_report`/`cage doctor` share one verdict. One ⚠ block per gated
+    agent, in SURFACES order, each carrying a runnable fix (`cage doctor --paths`) and the
+    documented opt-out for an agent you don't use."""
+    from cage import agents
+    out: list[str] = []
+    for a in agents.SURFACES:
+        rec = (health or {}).get(a)
+        if not isinstance(rec, dict):
+            continue
+        if rec.get("home") and rec.get("files", 0) == 0 and not rec.get("captured"):
+            home_path = rec.get("home_path") or f"~/.{a}"
+            src = rec.get("src") or "its log location"
+            out.append(
+                f"⚠ {a}: {home_path} exists but {src} matched 0 files — capture is off "
+                f"for this agent.\n"
+                f"  cage doctor --paths      (if you don't use {a}: "
+                f"[sources.{a}] replace=true, paths=[] )")
+    return out
+
+
 _EMPTY = """No calls recorded yet.
 
 next: cage import        pull every agent's usage into the ledger
@@ -315,12 +341,17 @@ def _row(name: str, g: dict, savings_cols: bool, usd_view: bool, total: bool = F
 
 
 def render_report(rep: dict, last_import: str | None = None, disp=None,
-                  stale_hours: int | None = None) -> str:
+                  stale_hours: int | None = None, health: dict | None = None) -> str:
     """The text report (spec §1, R1–R6): tokens by default, dollars on ``disp.usd``
     (plan Phase 2.5); saved columns signal-gate on receipts-in-window
     (``disp.all_columns`` restores the full grid); pricing footnotes and the full
     ⚠ block belong to the `--usd` view; footer lines dedupe into one
-    fixed-order block (`display.Footer`). CSV is untouched by all of it."""
+    fixed-order block (`display.Footer`). CSV is untouched by all of it.
+
+    ``health`` is the per-agent capture-health record (`importcmd.capture_health`, read
+    at the CLI boundary and passed in — this function stays a **pure** function of its
+    args): a triple-gated "installed but capturing nothing" ⚠ per silent agent
+    (:func:`capture_warnings`). Never enters CSV."""
     from cage import display as _d
     disp = disp or _d.DEFAULT
     if not rep["groups"]:
@@ -378,6 +409,8 @@ def render_report(rep: dict, last_import: str | None = None, disp=None,
         n = rep["total"]["unpriced_calls"]
         foot.gap(f"· {n} call{'s' if n != 1 else ''} unpriced — matters when you "
                  f"view $ (`--usd`; cage prices unpriced)")
+    for w in capture_warnings(health):  # installed-but-capturing-nothing (docs/capture-health)
+        foot.warn(w)
     foot.advice(_last_import_line(last_import, stale_hours))
     for l in rep.get("freshness") or []:  # actionable-only — silent when clean (§3.3)
         if l.startswith("bundled prices are"):

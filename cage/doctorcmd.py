@@ -94,10 +94,26 @@ def _metering(active: Path) -> tuple[str, str]:
             else "\n      last import: never — run `cage import` (or `cage data watch`)")
     foot += (f"\n      (automate with your own scheduler line, e.g. `{render.scheduler_hint()}`; "
              "cage installs no scheduler.)")
+    # Capture health (docs/capture-health): the triple-gated "installed but capturing
+    # nothing" verdict — the same one `cage report` surfaces, defined once in
+    # report.capture_warnings. Fresh install (never imported ⇒ no `_health`) says so and
+    # does no live probe (a read-only doctor, like the rest of this check).
+    from cage import report
+    health = importcmd.capture_health(active)
+    warns = report.capture_warnings(health)
+    if not health:
+        foot += "\n      capture health: never imported — run `cage import`"
+        level = _OK
+    elif warns:
+        foot += "".join(f"\n      {w}" for w in warns)
+        level = _WARN
+    else:
+        foot += "\n      capture health: every installed agent is capturing"
+        level = _OK
     head = ("capture is pull-based — `cage import`/`cage data export` is the universal path; "
             "hooks are an optional CLI-only real-time add-on (they don't fire under a VS "
             "Code extension):")
-    return _OK, head + "".join(rows) + foot
+    return level, head + "".join(rows) + foot
 
 
 def _pricing(root: Path) -> tuple[str, str]:

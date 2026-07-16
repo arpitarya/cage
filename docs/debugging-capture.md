@@ -19,6 +19,28 @@ Use this when: an agent's tokens aren't showing up in `cage report` even after `
 import`, and you need to know whether its hook fired, was skipped by a guard, or hit a
 parser error.
 
+## The capture-health warning (cage tells you first)
+
+You usually won't have to go looking. When an agent is **installed but capturing
+nothing**, `cage report` and `cage doctor` say so in the footer:
+
+```
+⚠ codex: ~/.codex exists but ~/.codex/sessions matched 0 files — capture is off for this agent.
+  cage doctor --paths      (if you don't use codex: [sources.codex] replace=true, paths=[] )
+```
+
+This is **triple-gated** so it can never nag wrongly — it fires for an agent only when
+(1) its home marker exists, (2) its log matched **0 files** at the last import, and
+(3) it has **never contributed a row** to the ledger. Clause 3 makes it self-silencing:
+one captured row and it never warns again, so it only ever names an agent that is
+genuinely capturing zero. Follow `cage doctor --paths` (the next section) to see exactly
+which location cage probed and why it missed — usually a vendor moved its log store, a
+nonstandard install, or the `UNVERIFIED-LAYOUT` Windows Kiro path. If you simply don't
+use that agent, silence it with the documented `[sources.<agent>] replace=true, paths=[]`
+stanza (see [Configurable import paths](sources.md)). The verdict is recorded at import
+into `cursors.json["_health"]` and rendered from that cache — no live filesystem probe on
+the read path, so `cage report` stays deterministic in its tables.
+
 ## The model — what has to be true
 
 For a **hook** to capture in real time, two things must hold (the on-disk `cage import`

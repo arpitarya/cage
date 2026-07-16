@@ -62,6 +62,20 @@ def set_last_import(root: Path, ts: str) -> None:
     f.write_text(json.dumps(cur), encoding="utf-8")
 
 
+def set_capture_gap(root: Path, agent: str = "codex") -> None:
+    """Pin a triple-gated capture-health record for ``agent`` (home present, 0 files,
+    never captured) so the report/doctor "installed but capturing nothing" ⚠ fires — the
+    `_health` input `importcmd` records at import (docs/capture-health). ``~``-relative
+    paths keep the golden byte-stable and OS-independent."""
+    f = paths.Footprint(root).state / "cursors.json"
+    f.parent.mkdir(parents=True, exist_ok=True)
+    cur = json.loads(f.read_text(encoding="utf-8")) if f.exists() else {}
+    cur.setdefault("_health", {})[agent] = {
+        "home": True, "home_path": f"~/.{agent}", "src": f"~/.{agent}/sessions",
+        "files": 0, "captured": False}
+    f.write_text(json.dumps(cur), encoding="utf-8")
+
+
 def wmh(root: Path) -> None:
     """The main report fixture (spec R1/R2/R4, P2): three agents, exact + family
     + UNPRICED pricing, linked + ladder + call-less receipts, kiro input-only."""

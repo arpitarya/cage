@@ -64,7 +64,10 @@ format = "claude"              # required: which parser to reuse
   `format` on each entry (there is no table level to hold one).
 - **`replace`** — drop that agent's built-in candidates first (agent tables only).
   With empty `paths`, the agent is **disabled by policy** (a legitimate way to quiet
-  a never-installed agent's probe noise).
+  a never-installed agent's probe noise). This same stanza is the **opt-out for the
+  capture-health warning**: an agent you don't use, declared
+  `[sources.<agent>] replace = true, paths = []`, has no sources at all, so cage's
+  "installed but capturing nothing" ⚠ (docs/debugging-capture.md) stays silent for it.
 - **`format`** — required for a **custom tool** (any table name that is *not* one of
   the four agents). Must be `claude|codex|copilot|kiro` — the parser to reuse. New
   log *formats* are out of scope: a custom source declares which existing parser

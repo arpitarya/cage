@@ -189,7 +189,13 @@ REGISTRY: tuple[Explanation, ...] = (
          "troubleshoot", "troubleshooting", "why-no-rows", "probe",
          "windows", "location", "log-location"),
         "why is nothing being captured — the three-step diagnosis",
-        "1. `cage doctor --paths` — read-only probe of every candidate log location\n"
+        "0. cage tells you first: when an agent's home exists but its log matched 0\n"
+        "     files and it has never captured a row, `cage report`/`cage doctor` print a\n"
+        "     triple-gated ⚠ 'capture is off for this agent' (self-silencing — one row\n"
+        "     and it never fires again; opt out an unused agent with [sources.<agent>]\n"
+        "     replace=true, paths=[]). The verdict is recorded at import into\n"
+        "     cursors.json[_health], never a live probe on the read path.\n"
+        "  1. `cage doctor --paths` — read-only probe of every candidate log location\n"
         "     per agent on this OS: found/missing, files matched, parseable rows,\n"
         "     cursor state, and a why-line per miss (wrong layout, cursor already\n"
         "     imported, unparseable format). Env overrides and any UNVERIFIED-LAYOUT\n"
@@ -200,7 +206,7 @@ REGISTRY: tuple[Explanation, ...] = (
         "  3. `cage doctor --bundle` — exports both (plus cursors, versions, policy\n"
         "     provenance) as one redacted archive to attach to a bug report; the\n"
         "     home prefix is rendered as `~`, contents are counts-never-content.",
-        ("cage/pathprobe.py", "cage/debuglog.py", "cage/doctorbundle.py"),
+        ("cage/pathprobe.py", "cage/report.py", "cage/doctorbundle.py"),
         "n/a — a diagnostic runbook, not a number.",
         kind="concept", plan_ref="§3.7"),
     Explanation(

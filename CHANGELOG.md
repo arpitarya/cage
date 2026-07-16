@@ -2,6 +2,42 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
+## v0.30.0 (2026-07-16) — capture health: make silent zero-capture loud
+
+Built from: [docs/archive/v0.30-capture-health.handoff.md](docs/archive/v0.30-capture-health.handoff.md) ·
+[docs/archive/v0.30-capture-health.prompt.md](docs/archive/v0.30-capture-health.prompt.md).
+
+When an agent is **installed but its log source matched nothing**, cage now says so —
+instead of quietly capturing zero and printing confident totals from the agents that
+still work. A wrong path (a vendor moved its store, a nonstandard install, the
+`UNVERIFIED-LAYOUT` Windows Kiro path) produces zero rows, which used to be
+indistinguishable from "I don't use that agent." Now `cage report` and `cage doctor`
+carry a footer warning:
+
+```
+⚠ codex: ~/.codex exists but ~/.codex/sessions matched 0 files — capture is off for this agent.
+  cage doctor --paths      (if you don't use codex: [sources.codex] replace=true, paths=[] )
+```
+
+- **Triple-gated so it can never become a false-positive nag.** It fires for an agent
+  only when **all three** hold: its home marker exists, its log matched **0 files** at
+  the last import, and it has **never contributed a row** to the ledger. The third
+  clause makes it **self-silencing** — one captured row and it can never warn again, so
+  it only ever names an agent that is genuinely capturing nothing.
+- **Self-healing.** Fix the path (or the agent starts writing logs) → the next import
+  rewrites the verdict and the warning clears, no other action.
+- **Opt-out reuses the existing knob.** An agent you don't use, declared
+  `[sources.<agent>] replace = true, paths = []` (already "disabled by policy"), stays
+  silent — no new config key.
+- **No new I/O on any read path.** The gate inputs are recorded at import time into
+  `cursors.json["_health"]` (from facts the scan + the one shared ledger read already
+  compute — zero extra reads) and rendered from that cache. `cage report`'s
+  **render stays a pure function of its arguments**; its tables are byte-identical and
+  the warning **never enters CSV**. No new state file (rides beside `_last_import` in
+  the cursor map, cleanup-safe).
+- `cage doctor` surfaces the same verdict (a fresh install with no import yet just says
+  "never imported — run `cage import`"; no live probe).
+
 ## v0.29.0 (2026-07-16) — visible source paths + per-source globs
 
 Built from: [docs/archive/v0.29-sources-defaults.handoff.md](docs/archive/v0.29-sources-defaults.handoff.md) ·

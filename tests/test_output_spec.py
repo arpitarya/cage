@@ -128,6 +128,19 @@ def test_R6_report_stale_advice(run):
     assert out.count("bundled prices are") == 1
 
 
+def test_R7_report_capture_health_warning(run):
+    # codex is installed but its log matched nothing and it has never captured a row —
+    # the triple-gated "capture is off for this agent" ⚠ (docs/capture-health). wmh
+    # seeds claude/copilot/kiro (not codex), so the table renders and only codex warns.
+    go = run(seed.wmh)
+    seed.set_last_import(go.root, _now())
+    seed.set_capture_gap(go.root, "codex")
+    out = go("R7", ["report", "--by", "agent"])
+    assert "⚠ codex: ~/.codex exists but ~/.codex/sessions matched 0 files" in out
+    assert "[sources.codex] replace=true, paths=[]" in out  # the runnable opt-out
+    assert "claude" in out and "codex" not in out.splitlines()[3]  # codex not a table row
+
+
 # ── §2 · insights surfaces (current verb names — Phase 3 regroups the doors) ──
 
 def test_I2_verdict_saving(run):

@@ -159,6 +159,35 @@ The `last import` line renders only past the staleness gate (policy
 `[capture] import_stale_hours`, default 24h); the bundle-age line is
 data-relative (anchored on the newest ledger `ts`, never the wall clock).
 
+**R7 — capture health: installed but capturing nothing**
+
+<!-- golden: R7 -->
+```
+$ cage report --by agent
+Ledger by agent
+
+agent    calls     tok in  tok out  saved tok
+-------  -----  ---------  -------  ---------
+copilot      4  1,968,011   96,212    100,000
+claude       2    912,400   61,200    160,000
+kiro         2    699,122        0          0
+TOTAL        8  3,579,533  157,412    311,340
+
+· kiro: input-only log — tok out not recorded
+⚠ codex: ~/.codex exists but ~/.codex/sessions matched 0 files — capture is off for this agent.
+  cage doctor --paths      (if you don't use codex: [sources.codex] replace=true, paths=[] )
+· 2 calls unpriced — matters when you view $ (`--usd`; cage prices unpriced)
+```
+
+The **capture-health ⚠** (docs/capture-health.md) is triple-gated: it fires for an
+agent only when its home marker exists **and** its log matched 0 files at the last
+import **and** it has never contributed a row to the ledger. That third clause makes
+it self-silencing — one captured row and it never warns again — so it only ever names
+an agent that is genuinely capturing nothing. The verdict is recorded at import
+(`cursors.json["_health"]`) and rendered from that cache; `cage report` stays a pure
+function of its inputs. `cage doctor` surfaces the same line. Opt out of an agent you
+don't use with the documented `[sources.<agent>] replace=true, paths=[]` stanza.
+
 ---
 
 ## 2 · `cage insights …` (Phase 3 — not yet shipped; today's verbs shown per block)

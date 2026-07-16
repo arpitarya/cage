@@ -105,8 +105,84 @@ def last_import(root: Path) -> str | None:
     return _load_cursors(paths.Footprint(root)).get("_last_import")
 
 
+# ── capture health: make silent zero-capture loud (docs/capture-health) ─────────
+# When an agent is installed but its log source matched nothing, cage should say so
+# instead of printing confident totals from the agents that still work. The gate
+# inputs are recorded here at import (from facts `_scan` + the shared ledger read
+# already compute — no new I/O on any read path) into cursors["_health"]; the report
+# and doctor surfaces read them back and apply the triple gate (report.capture_warnings):
+# installed (home exists) AND 0 files matched AND never contributed a row. Clause 3
+# self-silences the warning after one captured row. `_health` rides in the cursor map
+# beside `_last_import` (the same `_`-prefixed-metadata precedent, cleanup-safe: its
+# keys are agent names, never absolute paths).
+
+def _tilde(p) -> str:
+    """``~``-relative form of a path when it's under the real home — keeps the stored
+    ``_health`` (and the warning it renders) free of the username, and machine-portable
+    in tests. An env-redirected home that isn't under ``~`` stays absolute."""
+    s = str(p)
+    home = str(Path.home())
+    return "~" + s[len(home):] if s.startswith(home) else s
+
+
+def _home_markers(agent: str) -> list[Path]:
+    """The home marker(s) whose existence means agent is *installed* (capture-health
+    gate 1). Copilot and Kiro have two homes each — gate 1 passes if **either** exists
+    (a CLI-only Copilot user must not be nagged for an absent VS Code dir, §8)."""
+    if agent == "claude":
+        return [paths.claude_home()]
+    if agent == "codex":
+        return [paths.codex_home()]
+    if agent == "copilot":
+        return [paths.copilot_home(), paths.vscode_user_dir()]
+    if agent == "kiro":
+        return [paths.kiro_home(), paths._first_existing(paths.kiro_data_candidates())]
+    return []
+
+
+def _record_health(root: Path, cursors: dict, health: dict, captured: set,
+                   targets, pol: dict | None) -> None:
+    """Merge the swept agents' capture-health gate inputs into ``cursors["_health"]``
+    ({agent: {home, home_path, src, files, captured}}). Only the agents actually swept
+    this run are touched (a single-agent `cage import --agent X` must not erase the
+    others); a `disabled by policy` agent (no sources) is dropped so it stays silent.
+    Fail-open — health is best-effort and must never break an import (§6)."""
+    try:
+        disabled = set(paths.resolve_log_sources(pol).disabled)
+        hb = cursors.get("_health")
+        if not isinstance(hb, dict):
+            hb = cursors["_health"] = {}
+        for a in targets:
+            if a not in agents.SURFACES:
+                continue  # custom tools are not gated
+            if a in disabled:
+                hb.pop(a, None)  # disabled ⇒ no sources ⇒ silent; drop any stale record
+                continue
+            info = health.get(a, {"files": 0, "src": ""})
+            markers = _home_markers(a)
+            home_path = next((m for m in markers if m.exists()), markers[0] if markers else None)
+            hb[a] = {"home": any(m.exists() for m in markers),
+                     "home_path": _tilde(home_path) if home_path is not None else "",
+                     "src": _tilde(info.get("src", "")),
+                     "files": info.get("files", 0),
+                     "captured": a in captured}
+    except Exception as e:  # fail-open: health is best-effort, never aborts capture
+        debuglog.exception(root, "import.health", e)
+
+
+def capture_health(root: Path) -> dict:
+    """The per-agent capture-health record from the last import (``cursors["_health"]``)
+    — the gate inputs behind the report/doctor "installed but capturing nothing" warning.
+    Empty when never imported. Parallels :func:`last_import`: read once at the CLI
+    boundary and passed into the **pure** `render_report`; the report path never touches
+    the filesystem for it."""
+    h = _load_cursors(paths.Footprint(root)).get("_health")
+    return h if isinstance(h, dict) else {}
+
+
 def _scan(root: Path, agent: str, src: Path, pattern: str, since,
-          *, pol: dict | None = None, agent_cursor: dict | None = None) -> list[Path]:
+          *, pol: dict | None = None, agent_cursor: dict | None = None,
+          health: dict | None = None) -> list[Path]:
     """The files to ingest, honoring ``--since`` and the incremental cursor. Files whose
     (size, mtime) match the cursor are dropped — already fully ingested, nothing new to
     parse. Records observational ``skip=since-filtered`` / ``skip=cursor-unchanged`` debug
@@ -123,6 +199,11 @@ def _scan(root: Path, agent: str, src: Path, pattern: str, since,
         raw = []  # absent location — a normal miss, recorded by the probe event
     debuglog.event(root, pol=pol, event="probe", agent=agent, src=str(src),
                    pattern=pattern, exists=src.exists(), files_matched=len(raw))
+    if health is not None:  # capture-health gate 2: raw glob matches (pre-cursor), so a
+        # steady-state agent whose files are all cursor-skipped still reads as "has data";
+        # the first src per agent is kept as the representative probed path for the message.
+        h = health.setdefault(agent, {"files": 0, "src": str(src)})
+        h["files"] += len(raw)
     cut = ledger.since_cutoff(since)  # reuses constants.SINCE_WINDOW_DAYS — no new literal
     if cut is None:
         files = raw
@@ -175,7 +256,7 @@ def _ingest(root: Path, agent: str, src: Path, files: list[Path], parse,
 
 
 def import_claude(root: Path, args, *, pol: dict | None = None, seen: set | None = None,
-                  agent_cursor: dict | None = None) -> tuple[int, int]:
+                  agent_cursor: dict | None = None, health: dict | None = None) -> tuple[int, int]:
     """Meter Claude Code from the transcripts it already writes to ~/.claude/projects."""
     if getattr(args, "path", None):
         sources = [(Path(args.path), "**/*.jsonl")]
@@ -187,7 +268,7 @@ def import_claude(root: Path, args, *, pol: dict | None = None, seen: set | None
     total_rows = total_files = 0
     for src, pattern in sources:
         files = _scan(root, "claude", src, pattern, getattr(args, "since", None), pol=pol,
-                      agent_cursor=agent_cursor)
+                      agent_cursor=agent_cursor, health=health)
         total_rows += _ingest(root, "claude", src, files,
                               lambda f: transcript.parse_calls(f, session=f.stem),
                               pol=pol, seen=seen, agent_cursor=agent_cursor)
@@ -196,14 +277,14 @@ def import_claude(root: Path, args, *, pol: dict | None = None, seen: set | None
 
 
 def import_codex(root: Path, args, *, pol: dict | None = None, seen: set | None = None,
-                 agent_cursor: dict | None = None) -> tuple[int, int]:
+                 agent_cursor: dict | None = None, health: dict | None = None) -> tuple[int, int]:
     """Meter Codex from its on-disk rollouts (~/.codex/sessions/**/rollout-*.jsonl)."""
     sources = ([(Path(args.path), "**/rollout-*.jsonl")] if getattr(args, "path", None)
                else [(s.path, s.glob) for s in paths.agent_log_sources("codex", pol)])
     total_rows = total_files = 0
     for src, pattern in sources:
         files = _scan(root, "codex", src, pattern, getattr(args, "since", None), pol=pol,
-                      agent_cursor=agent_cursor)
+                      agent_cursor=agent_cursor, health=health)
         total_rows += _ingest(root, "codex", src, files,
                               lambda f: transcript.parse_codex_calls(f, session=f.stem),
                               pol=pol, seen=seen, agent_cursor=agent_cursor)
@@ -263,7 +344,7 @@ def import_custom_tools(root: Path, args, *, pol: dict | None = None,
 
 
 def import_copilot(root: Path, args, *, pol: dict | None = None, seen: set | None = None,
-                   agent_cursor: dict | None = None) -> tuple[int, int]:
+                   agent_cursor: dict | None = None, health: dict | None = None) -> tuple[int, int]:
     """Meter Copilot from both stores it actually writes:
 
     - CLI: `~/.copilot/session-state/*/events.jsonl` (usage in `session.shutdown`;
@@ -277,7 +358,7 @@ def import_copilot(root: Path, args, *, pol: dict | None = None, seen: set | Non
     total_rows = total_files = 0
     for src, pattern in sources:
         files = _scan(root, "copilot", src, pattern, getattr(args, "since", None), pol=pol,
-                      agent_cursor=agent_cursor)
+                      agent_cursor=agent_cursor, health=health)
         total_rows += _ingest(root, "copilot", src, files, _parse_copilot_any,
                               pol=pol, seen=seen, agent_cursor=agent_cursor)
         total_files += len(files)
@@ -285,7 +366,7 @@ def import_copilot(root: Path, args, *, pol: dict | None = None, seen: set | Non
 
 
 def import_kiro(root: Path, args, *, pol: dict | None = None, seen: set | None = None,
-                agent_cursor: dict | None = None) -> tuple[int, int]:
+                agent_cursor: dict | None = None, health: dict | None = None) -> tuple[int, int]:
     """Meter Kiro from its append-only usage log (kiro.kiroagent/dev_data/
     tokens_generated.jsonl) — a single file, not a glob. Best-effort and idempotent."""
     sources = ([(Path(args.path), "*")] if getattr(args, "path", None)
@@ -293,7 +374,7 @@ def import_kiro(root: Path, args, *, pol: dict | None = None, seen: set | None =
     total_rows = total_files = 0
     for src, pattern in sources:
         files = _scan(root, "kiro", src, pattern, getattr(args, "since", None), pol=pol,
-                      agent_cursor=agent_cursor)
+                      agent_cursor=agent_cursor, health=health)
         total_rows += _ingest(root, "kiro", src, files, lambda f: transcript.parse_kiro_calls(f),
                               pol=pol, seen=seen, agent_cursor=agent_cursor)
         total_files += len(files)
@@ -310,9 +391,11 @@ def proxy_line(agent: str) -> str:
 
 
 def run_agent(root: Path, agent: str, args, *, pol: dict | None = None,
-              seen: set | None = None, agent_cursor: dict | None = None) -> str:
+              seen: set | None = None, agent_cursor: dict | None = None,
+              health: dict | None = None) -> str:
     if agent in _ADAPTERS:
-        n, m = _ADAPTERS[agent](root, args, pol=pol, seen=seen, agent_cursor=agent_cursor)
+        n, m = _ADAPTERS[agent](root, args, pol=pol, seen=seen, agent_cursor=agent_cursor,
+                                health=health)
         return f"✔ {agent}: imported {n} call(s) from {m} file(s)."
     debuglog.event(root, pol=pol, event="import", agent=agent, result="proxy",
                    note="no on-disk usage log")
@@ -362,13 +445,18 @@ def run(root: Path, agent: str, args) -> list[str]:
                        skip="bad-source", detail=problem)
     with _import_lock(foot, pol):
         cursors = _load_cursors(foot)
-        seen = {c.get("id") for c in ledger.calls(root)}  # one ledger read shared across agents
+        all_rows = ledger.calls(root)  # one ledger read shared across agents + capture health
+        seen = {c.get("id") for c in all_rows}
+        captured = {agents.row_surface(c.get("agent")) for c in all_rows}  # gate 3 (no 2nd read)
+        health: dict = {}  # per-agent {files, src} accumulated by _scan across this sweep
         lines = [run_agent(root, a, args, pol=pol, seen=seen,
-                           agent_cursor=cursors.setdefault(a, {})) for a in targets]
+                           agent_cursor=cursors.setdefault(a, {}), health=health)
+                 for a in targets]
         # Custom tools ([sources.<name>], plan Phase 4) sweep on the umbrella `all`
         # import — the global capture path that grabs the whole stack.
         if agent == "all":
             lines += import_custom_tools(root, args, pol=pol, seen=seen, cursors=cursors)
+        _record_health(root, cursors, health, captured, targets, pol)
         cursors["_last_import"] = _now_iso()  # pull-based staleness signal for doctor/report
         _save_cursors(foot, cursors)
     # Piggybacked state maintenance (plan §3.6.4): every hook/watch/export sweep
