@@ -59,6 +59,32 @@ def append_row(root: Path, kind: str, row: dict) -> bool:
     return ok
 
 
+def append_new(root: Path, rows: list[dict], seen: set | None = None) -> int:
+    """Append only call rows whose id isn't already in the ledger. Returns #added.
+
+    The **correctness backstop** for capture: every capture path (the pull import
+    sweep, capture-on-read, a real-time hook) funnels through here, so a call seen by
+    two paths is appended once — id-dedupe makes the paths idempotent and safe to run
+    together (plan capture-architecture §2). Lives in ``ledger.py`` (not an agent's
+    hook module) precisely because the universal import path must not depend on one
+    agent's Claude-specific hook code; `hooks.append_new` is a compatibility re-export.
+
+    ``seen`` is an optional caller-owned set of already-known call ids: pass it to skip
+    the per-call ledger reload and amortize the dedupe across a multi-file run (the
+    ledger is 22k+ rows — re-reading it per file/call is the import hot path, plan
+    §3.7). It is mutated in place with each appended id so later batches see them.
+    Omit it and the legacy self-contained behavior holds (reload once here)."""
+    if seen is None:
+        seen = {c.get("id") for c in calls(root)}
+    added = 0
+    for row in rows:
+        if row.get("id") not in seen:
+            if append_row(root, "calls", row):
+                seen.add(row.get("id"))
+                added += 1
+    return added
+
+
 def read(path: Path) -> list[dict]:
     """All rows; a truncated final line (crash mid-append) is silently dropped."""
     if not path.exists():
