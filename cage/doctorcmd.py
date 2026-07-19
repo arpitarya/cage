@@ -102,7 +102,21 @@ def _metering(active: Path) -> tuple[str, str]:
     health = importcmd.capture_health(active)
     warns = report.capture_warnings(health)
     if not health:
-        foot += "\n      capture health: never imported — run `cage import`"
+        # Under capture-on-read every read sweeps before it renders, so an empty
+        # `_health` no longer means "you haven't run `cage import`" — it means capture
+        # never ran: disabled (`[capture] enabled=false` / `CAGE_CAPTURE=0`) or a swept
+        # source errored. Doctor itself deliberately does NOT sweep (it diagnoses capture,
+        # so masking the state it reports would defeat the check — capture-architecture
+        # §8/§10), hence this stays a read of recorded facts.
+        from cage import policy as _pol
+        if not _pol.capture_enabled(policy.load(paths.Footprint(active).policy)):
+            foot += ("\n      capture health: capture disabled ([capture] enabled=false "
+                     "or CAGE_CAPTURE=0) — no sweep runs; `cage report` shows only what's "
+                     "already captured")
+        else:
+            foot += ("\n      capture health: nothing captured yet — run a read "
+                     "(`cage report`) or `cage import`; if it stays empty, `CAGE_DEBUG=1 "
+                     "cage import` then `cage debug` for the reason")
         level = _OK
     elif warns:
         foot += "".join(f"\n      {w}" for w in warns)
@@ -114,6 +128,54 @@ def _metering(active: Path) -> tuple[str, str]:
             "hooks are an optional CLI-only real-time add-on (they don't fire under a VS "
             "Code extension):")
     return level, head + "".join(rows) + foot
+
+
+def _capture_timeline(active: Path) -> tuple[str, str]:
+    """Per-source, per-**mode** (pull/push) last-seen + counts (capture-architecture
+    §12.4) — the one place that answers "what has cage captured, how, and when" across
+    the whole pull+push model, symmetric for every agent (not just the ones with hooks).
+
+    Built **read-only** from the ledger it already holds — doctor deliberately does NOT
+    sweep first (a sweep would mask the very breakage this diagnoses, §8/§10), so the
+    timeline reflects the state as-is. **pull** rows are calls the import sweep landed
+    (grouped to a surface); **push** rows are receipts a live meter filed (graphify/fux via
+    `record_receipt`). Uses `render.ago` (wall clock) — doctor is a diagnostic, never a
+    derived-from-ledger view, so determinism holds. Informational (never fails)."""
+    try:
+        calls = ledger.calls(active)
+        receipts = ledger.receipts(active)
+    except Exception as exc:  # noqa: BLE001 — a broken ledger is reported elsewhere
+        return _OK, f"capture timeline unavailable ({exc})"
+    pull_n: dict[str, int] = {a: 0 for a in agents.SURFACES}
+    pull_ts: dict[str, str] = {a: "" for a in agents.SURFACES}
+    for c in calls:
+        a = agents.row_surface(c.get("agent"))
+        if a in pull_n:
+            pull_n[a] += 1
+            ts = c.get("ts", "")
+            if ts > pull_ts[a]:
+                pull_ts[a] = ts
+    push_n: dict[str, int] = {}
+    push_ts: dict[str, str] = {}
+    for r in receipts:
+        if r.get("tool") == "human":
+            continue  # a different axis (`cage human show`), not a capture mode
+        tool = r.get("tool") or "?"
+        push_n[tool] = push_n.get(tool, 0) + 1
+        ts = r.get("ts", "")
+        if ts > push_ts.get(tool, ""):
+            push_ts[tool] = ts
+    rows = []
+    for a in agents.SURFACES:
+        seen = render.ago(pull_ts[a]) if pull_ts[a] else "never"
+        cnt = f"{pull_n[a]:,} rows" if pull_n[a] else "—"
+        rows.append(f"\n      · {a:<9} pull   {seen:<10} {cnt}")
+    for tool in ("graphify", "fux", *sorted(t for t in push_n if t not in ("graphify", "fux"))):
+        seen = render.ago(push_ts.get(tool, "")) if push_ts.get(tool) else "never"
+        cnt = f"{push_n.get(tool, 0):,} receipts" if push_n.get(tool) else "—"
+        rows.append(f"\n      · {tool:<9} push   {seen:<10} {cnt}")
+    return _OK, ("capture timeline (last seen · this ledger; doctor does not sweep):"
+                 + "".join(rows))
 
 
 def _pricing(root: Path) -> tuple[str, str]:
@@ -444,6 +506,7 @@ def run(root: Path) -> dict:
         ("hooks", *_hooks(root)),
         ("portability", *_portability(root)),
         ("metering", *_metering(active)),
+        ("timeline", *_capture_timeline(active)),
         ("trace", *_capture_trace(active)),
         ("interceptor", *_interceptor(root)),
         ("ledger", *_ledger_roundtrip()),

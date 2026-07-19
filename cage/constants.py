@@ -112,6 +112,21 @@ PRICES_STALE_DAYS = 45
 # derived-from-ledger figure, the one documented clock carve-out.
 IMPORT_STALE_HOURS = 24
 
+# Capture-on-read throttle (capture-architecture Phase 1, `cage/importcmd.py`). Every
+# read that matters (report / insights / MCP read tools) lazily sweeps the log registry
+# before it answers, so capture is guaranteed fresh the instant before any number is
+# shown — no hook, no scheduler. Back-to-back reads must not re-sweep, so the sweep is
+# throttled on the `_last_import` cursor timestamp (no new state file): a read within
+# this window of the last capture is a no-op. 60s is deliberately short — long enough to
+# absorb a burst of reads in one interaction, short enough that a read a minute later
+# recaptures. Policy-preferred fallback (the DEFAULT_CONFIDENCE pattern):
+# `policy.toml [capture] read_throttle_secs` wins; `0` disables the throttle (every read
+# sweeps). The capture-on-read behavior itself is gated by `[capture] on_read` /
+# `CAGE_CAPTURE_ON_READ` (default on) and, like all capture, by `[capture] enabled` /
+# `CAGE_CAPTURE`; the determinism suite pins it OFF so derived views stay a pure function
+# of a fixed ledger.
+CAPTURE_ON_READ_THROTTLE_SECS = 60
+
 # Authorship-provenance trust ranking (cage/originrecord.py) — a parallel ladder to
 # METHOD_TRUST, for the *different* enum PROV_METHODS (schema.py): hooked (live
 # PostToolUse capture) outranks transcript (parsed after the fact) outranks heuristic

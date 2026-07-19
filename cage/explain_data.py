@@ -236,6 +236,35 @@ REGISTRY: tuple[Explanation, ...] = (
         "n/a — describes a capture-config mechanism, not a number.",
         kind="concept", plan_ref="output-and-simplification.plan.md Phase 4"),
     Explanation(
+        "capture-on-read",
+        ("capture-on-read", "on-read", "lazy", "sweep", "read-sweep", "hookless",
+         "canonical", "routing", "route-key", "reclaim", "why-ledger", "no-import",
+         "quiet", "captured", "throttle"),
+        "how a read captures first — the hookless primary path",
+        "Every read that matters (report / insights / the MCP read tools) lazily runs the\n"
+        "  incremental import sweep BEFORE it answers, so a number is never staler than the\n"
+        "  instant it's shown — no hook, no scheduler, no daemon. Cursors make a warm no-op\n"
+        "  a stat per source file; the sweep is throttled on the `_last_import` cursor\n"
+        "  (policy [capture] read_throttle_secs, ~60s fallback), so back-to-back reads don't\n"
+        "  re-sweep. When new rows land, a dim `· captured N new … since last read` line\n"
+        "  prints to STDERR (never stdout — a --json/--csv stream stays pure); zero new ⇒\n"
+        "  silent. The MCP read tools return the same summary as a structured field.\n"
+        "  Push (graphify/fux/proxy) and pull both resolve ONE canonical ledger\n"
+        "  (`paths.canonical_ledger`), and a pushed receipt carries a non-PII routing key\n"
+        "  (a hash of the resolved ledger-root path, never a basename) so a project read\n"
+        "  can reclaim a stray saving by EXACT key — never a blind union.\n"
+        "  Suppress: --no-import (this read), CAGE_CAPTURE_ON_READ=0 (standing, the\n"
+        "  determinism switch), or CAGE_CAPTURE=0 (all capture). Silence the line with\n"
+        "  --quiet / CAGE_QUIET=1. Diagnose with --why-ledger (which ledger + why + key),\n"
+        "  `cage doctor` (per-source, per-mode pull/push timeline — doctor never sweeps),\n"
+        "  and CAGE_DEBUG=1 (ledger-resolution decisions, every sweep, every reclaim).\n"
+        "  Fail-open: a capture error is traced, never blocks the read. Determinism holds —\n"
+        "  it changes WHEN rows arrive, never how a number is computed; the golden/\n"
+        "  determinism suites run with it off against a fixed ledger.",
+        ("cage/importcmd.py", "cage/paths.py", "cage/report.py"),
+        "n/a — describes the capture trigger, not a number.",
+        kind="concept", plan_ref="capture-architecture.plan.md §2, §3, §12"),
+    Explanation(
         "overview", ("overview", "works", "introduction", "explain", "how-cage-works"),
         "the front door: cage's one-way data flow + its laws",
         "record_call / record_receipt → append-only {calls_path} / {receipts_path} →\n"

@@ -155,6 +155,45 @@ def resolve_root(start: Path | None = None) -> Path:
     return proj if proj is not None else global_home()
 
 
+def canonical_ledger(start: Path | None = None, *, pol: dict | None = None) -> Path:
+    """THE one ledger resolver push *and* pull both call (capture-architecture §3.1).
+
+    Byte-for-byte :func:`resolve_root` — the same precedence (``--ledger``/``CAGE_BASE``
+    → nearest project ``.cage/`` from cwd → global ``~/.cage``) — but named as the single
+    convergence point so no push path calls ``resolve_root`` directly, and every
+    resolution logs *which* ledger it picked and *why* under ``CAGE_DEBUG``. That trace is
+    the exact diagnostic for the stranded-saving class this design fights (a graphify
+    receipt and a later ``cage report`` resolving different ledgers). Fail-open: the debug
+    log is best-effort and never perturbs resolution."""
+    root = resolve_root(start)
+    try:
+        from cage import debuglog
+        debuglog.event(root, pol=pol, event="ledger-resolve", resolved_root=str(root),
+                       source=active_ledger_source(start),
+                       route_key=routing_key(root))
+    except Exception:  # noqa: BLE001 — resolution must never depend on its own tracing
+        pass
+    return root
+
+
+def routing_key(root: Path) -> str:
+    """A stable, **non-PII** project routing key: a hash of the resolved ledger-root path,
+    **not** the basename (capture-architecture §9.6 Q1). Stamped on pushed receipts so a
+    read can *reclaim* a stray graphify/fux saving by **exact key match only** — never a
+    blind union that would over-attribute (two repos named ``api`` share a basename but
+    never a full path).
+
+    OS-stable by construction: the path is resolved to absolute, back/forward separators
+    are folded to ``/``, and case is folded, so the same logical ledger yields the same
+    key whether push and read run from Windows or POSIX shells on one machine. It is a
+    one-way hash — the path itself (a PII surface) never travels in the row, only its
+    digest — and is **never part of any id**. Empty string is never returned; a global
+    ledger hashes its own resolved path, distinct from every project key."""
+    import hashlib
+    norm = str(Path(root).resolve()).replace("\\", "/").casefold()
+    return hashlib.sha256(norm.encode("utf-8")).hexdigest()[:16]
+
+
 def active_ledger_source(start: Path | None = None) -> str:
     """Which precedence tier the active ledger came from — for ``cage doctor`` to print
     *which* sink is live when both a project and the global ledger exist."""

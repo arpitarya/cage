@@ -14,7 +14,7 @@ All four agents now persist a usage log to disk, so the hookless path is an on-d
   (`cage data meter -- <cmd>`) stays the higher-fidelity fallback when Kiro's log is too thin.
 
 Additive: hooks + MCP stay the default real-time path; this runs alongside them and
-dedupes by call id (`hooks.append_new`), so a call seen by both a hook and an import is
+dedupes by call id (`ledger.append_new`), so a call seen by both a hook and an import is
 counted once. Fail-open per file, idempotent on re-import, $0/stdlib, counts-never-content.
 """
 from __future__ import annotations
@@ -24,7 +24,7 @@ import datetime as _dt
 import json
 from pathlib import Path
 
-from cage import agents, debuglog, hooks, ledger, limits, lockutil, paths, policy, transcript
+from cage import agents, debuglog, ledger, limits, lockutil, paths, policy, transcript
 
 # Agents that persist a usage log to disk (everything else → proxy fallback).
 LOG_BEARING = ("claude", "codex", "copilot", "kiro")
@@ -38,7 +38,7 @@ def _import_lock(foot: paths.Footprint, pol: dict | None = None):
     once). Holding an exclusive lock across the read-check-append section means the
     second sweep rebuilds ``seen`` only after the first has committed, so id-dedupe
     catches it. **Fail-open** via `lockutil.locked` (fcntl → msvcrt → unlocked): if
-    the lock can't be taken, proceed — `hooks.append_new`'s id-dedupe stays the
+    the lock can't be taken, proceed — `ledger.append_new`'s id-dedupe stays the
     backstop, exactly as before this lock existed. Never raises into capture."""
 
     def _miss(exc):
@@ -242,7 +242,7 @@ def _ingest(root: Path, agent: str, src: Path, files: list[Path], parse,
                 debuglog.event(root, pol=pol, event="import", agent=agent,
                                skip="parsed-zero-rows", file=str(f), bytes=f.stat().st_size)
             parsed += len(rows)
-            total += hooks.append_new(root, rows, seen)
+            total += ledger.append_new(root, rows, seen)
             if agent_cursor is not None:
                 sig = _file_sig(f)
                 if sig is not None:
@@ -465,3 +465,113 @@ def run(root: Path, agent: str, args) -> list[str]:
     from cage import cleanup
     cleanup.maybe_run(root, pol)
     return lines
+
+
+def _parse_iso(ts: str):
+    try:
+        return _dt.datetime.fromisoformat((ts or "").replace("Z", "+00:00"))
+    except (ValueError, AttributeError):
+        return None
+
+
+class _SweepArgs:
+    """The minimal arg shape `run` reads for a capture-on-read sweep — deliberately a
+    FRESH namespace, never the read command's own args: a `cage report --project foo`
+    must not have its output-filter `project` (a basename) misread by `import_claude` as
+    a Claude project *slug* restriction, and its `--since` must not narrow capture. A
+    capture-on-read sweep is always the full all-agent incremental scan (cursors keep a
+    warm no-op cheap)."""
+    agent = "all"
+    path = None
+    project = None
+    since = None
+
+
+def ensure_captured(root: Path, args=None, *, pol: dict | None = None) -> dict | None:
+    """The **capture-on-read** primary path (capture-architecture Phase 1): lazily run
+    the incremental sweep before a read returns, so any number a user sees was captured
+    the instant before. Returns a counts-only summary of what became newly visible
+    (``{"calls", "agents", "savings"}``) when there is something to announce, else
+    ``None`` — **zero new ⇒ silent** (no nag on a warm cache). Prints nothing itself; the
+    CLI read handler renders the summary line, the MCP server returns it as a structured
+    field (never stray stdout).
+
+    Suppressed — returns ``None`` — when: ``--no-import`` is set; capture is off
+    (`[capture] enabled=false` / `CAGE_CAPTURE=0`); capture-on-read specifically is off
+    (`[capture] on_read=false` / `CAGE_CAPTURE_ON_READ=0`, the switch the determinism
+    suite pins); or the throttle window (`policy.read_throttle_secs`, keyed on the
+    `_last_import` cursor — no new state file) hasn't elapsed since the last sweep.
+
+    **Fail-open**: any capture error is traced under ``CAGE_DEBUG`` and swallowed — a
+    read must always succeed even if capture can't. Reuses `run`'s `_import_lock`, so
+    concurrent reads can't double-append (id-dedupe is the backstop regardless)."""
+    try:
+        if pol is None:
+            pol = _load_policy(root)
+        if getattr(args, "no_import", False):
+            debuglog.event(root, pol=pol, event="capture-on-read", skip="--no-import")
+            return None
+        if not policy.capture_enabled(pol):
+            debuglog.event(root, pol=pol, event="capture-on-read", skip="capture-disabled")
+            return None
+        if not policy.capture_on_read_enabled(pol):
+            debuglog.event(root, pol=pol, event="capture-on-read", skip="on-read-disabled")
+            return None
+        prev_import = last_import(root)
+        window = policy.read_throttle_secs(pol)
+        if prev_import and window > 0:
+            from cage import render
+            secs = render.age_seconds(prev_import)
+            if secs is not None and secs < window:
+                debuglog.event(root, pol=pol, event="capture-on-read", skip="throttled",
+                               age_secs=secs, window=window)
+                return None
+        before_calls = {c.get("id") for c in ledger.calls(root)}
+        debuglog.event(root, pol=pol, event="capture-on-read", action="sweep",
+                       resolved_root=str(root))
+        run(root, "all", args if isinstance(args, _SweepArgs) else _SweepArgs())
+        after_calls = ledger.calls(root)
+        new_calls = [c for c in after_calls if c.get("id") not in before_calls]
+        # Savings surfaced "since last read": receipts pushed (graphify/fux) between the
+        # previous sweep and now — the pull sweep never appends receipts itself, so this
+        # is the push-side arrivals. First read (no prior cursor) establishes the
+        # baseline and announces none (nothing is "since last read" when there was none).
+        cut = _parse_iso(prev_import) if prev_import else None
+        new_savings = 0
+        if cut is not None:
+            for r in ledger.receipts(root):
+                if r.get("tool") == "human":
+                    continue
+                ts = _parse_iso(r.get("ts", ""))
+                if ts is not None and ts > cut:
+                    new_savings += 1
+        n_calls = len(new_calls)
+        if not n_calls and not new_savings:
+            return None  # zero new ⇒ silent
+        agent_set = sorted({agents.row_surface(c.get("agent")) for c in new_calls})
+        debuglog.event(root, pol=pol, event="capture-on-read", result="captured",
+                       calls=n_calls, savings=new_savings, agents=",".join(agent_set))
+        return {"calls": n_calls, "agents": agent_set, "savings": new_savings}
+    except Exception as e:  # fail-open: a read must succeed even if capture can't
+        debuglog.exception(root, "capture-on-read", e, pol=pol)
+        return None
+
+
+def capture_summary_line(summary: dict | None) -> str:
+    """The dim one-line capture-on-read confirmation printed *above* a read (§12.2), or
+    ``""`` when there's nothing to announce (zero new ⇒ silent). Counts only, never
+    content. Shared by every CLI read handler so the wording is defined once."""
+    if not summary:
+        return ""
+    parts = []
+    n = summary.get("calls", 0)
+    if n:
+        agents_ = summary.get("agents") or []
+        who = f" ({', '.join(agents_)})" if agents_ else ""
+        parts.append(f"{n} new call{'s' if n != 1 else ''}{who}")
+    m = summary.get("savings", 0)
+    if m:
+        parts.append(f"{m} graphify saving{'s' if m != 1 else ''}")
+    if not parts:
+        return ""
+    return f"· captured {' + '.join(parts)} since last read"

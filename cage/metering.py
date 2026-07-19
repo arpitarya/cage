@@ -19,7 +19,10 @@ from cage import ledger, paths, policy, prices, schema
 def _resolve_root(root: Path | None) -> Path:
     # Capture is global by default (§3.7): a no-project caller writes the global
     # ledger, never a stray .cage/ in whatever dir the process happens to run from.
-    return root or paths.resolve_root()
+    # `canonical_ledger` is the ONE resolver push and pull share (capture-architecture
+    # §3.1) — no direct `resolve_root` in a push path — and it traces the decision
+    # under CAGE_DEBUG so a stranded-saving mystery is one grep.
+    return root or paths.canonical_ledger()
 
 
 @lru_cache(maxsize=8)
@@ -63,6 +66,10 @@ def record_receipt(*, tool: str, raw_alternative: float, actual: float,
                    root: Path | None = None, **fields) -> str:
     """Append one savings receipt; return its id (empty string on failure)."""
     r = _resolve_root(root)
+    # Stamp the non-PII project routing key on every pushed receipt (graphify/fux/proxy)
+    # so a read can reclaim a stray saving by exact key (capture-architecture §9.6).
+    # Additive: a caller that already passed `route_key` in **fields wins.
+    fields.setdefault("route_key", paths.routing_key(r))
     row = schema.make_receipt(tool=tool, raw_alternative=raw_alternative, actual=actual,
                               call=call, task=task, scope=scope, **fields)
     return row["id"] if ledger.append_row(r, "receipts", row) else ""

@@ -2,6 +2,52 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
+## v0.31.0 (2026-07-19) — capture-on-read: capture without hooks, made visible
+
+Built from: [docs/capture-architecture.handoff.md](docs/capture-architecture.handoff.md) ·
+[docs/capture-architecture.prompt.md](docs/capture-architecture.prompt.md) — **Phase 1** of
+the phased [docs/capture-architecture.plan.md](docs/capture-architecture.plan.md) (Phase 2,
+which deletes the token-capture hooks, is a separate later release; the docs stay active in
+`docs/` until it ships). Additive — **no hook file or wiring module was touched**.
+
+Capture no longer depends on a hook firing. **Every read that matters — `cage report`,
+`cage insights *`, and the MCP read tools — lazily runs the incremental import sweep before
+it answers**, so a number is never staler than the instant it's shown. No daemon, no
+scheduler (the "cage installs no scheduler" invariant holds), no project required. The
+sweep is throttled on the existing `_last_import` cursor (~60s, policy `[capture]
+read_throttle_secs`), so back-to-back reads don't re-sweep; a warm cache is a `stat` per
+source file. Fail-open: a capture error is traced under `CAGE_DEBUG` and never blocks a read.
+
+- **One canonical ledger for push and pull.** `paths.canonical_ledger()` is the single
+  resolver both the push path (graphify/fux/proxy `record_receipt`/`record_call`) and every
+  read call — no direct `resolve_root` left in a push path, and every resolution is traced
+  under `CAGE_DEBUG` ("which ledger + why"). A pushed receipt now carries a **non-PII project
+  routing key** — a hash of the resolved ledger-root path (never the basename), OS-stable,
+  additive/optional (absent = the legacy row, never part of any id). A project read
+  **reclaims** a stray graphify/fux saving (one pushed to the global `~/.cage` because the
+  tool ran outside the tree) by **exact key match only** — never a blind global→project
+  union that would over-attribute two repos sharing a basename.
+- **Capture is now visible.** A `graphify`/`fux` saving prints one `✔ cage: graphify saving
+  captured — ~N tokens` line to **stderr** (never stdout — the tool's parseable output stays
+  clean). A read that captures new rows prints `· captured N new calls (claude, codex) + M
+  graphify savings since last read` (also stderr; **zero new ⇒ silent**). The MCP read tools
+  return the same summary as a **structured field**, never stray stdout. `cage doctor` gains
+  a **per-source, per-mode (pull/push) capture timeline** — and deliberately does **not**
+  sweep first, so it never masks the breakage it diagnoses. `--why-ledger` prints the
+  resolution decision on demand; `--quiet` / `CAGE_QUIET=1` silences the confirmations.
+- **Suppressible and deterministic.** `--no-import` (this read), `CAGE_CAPTURE_ON_READ=0`
+  (standing), or `CAGE_CAPTURE=0` (all capture) turn it off. Derived numbers stay a pure
+  function of the ledger — capture-on-read changes *when* rows arrive, never how a number is
+  computed — and the golden/determinism suites run with it **off** against a fixed ledger, so
+  a warm read is byte-identical to before. CSV never gates: no confirmation text ever enters
+  a CSV stream.
+- **Prerequisite refactors (reviewable first commit).** `hooks.append_new` — the documented
+  "correctness backstop" — moved to `ledger.py` (the universal import path must not depend on
+  the Claude-specific hook module; a re-export shim keeps `hooks.append_new` working). The
+  `cage doctor` "never imported" message was rewritten: under capture-on-read an empty
+  capture-health record means capture is **off or errored**, not "you haven't run `cage
+  import`".
+
 ## v0.30.0 (2026-07-16) — capture health: make silent zero-capture loud
 
 Built from: [docs/archive/v0.30-capture-health.handoff.md](docs/archive/v0.30-capture-health.handoff.md) ·

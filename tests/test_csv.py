@@ -420,11 +420,13 @@ def test_mcp_format_csv_parity(seeded, monkeypatch):
     root, _ = seeded
     from cage import mcpserver
     monkeypatch.setenv("CAGE_BASE", str(root / ".cage"))
-    assert mcpserver._call("cage_report", {"format": "csv"}) == REPORT_GOLDEN
-    assert mcpserver._call("cage_attrib", {"format": "csv"}) == ATTRIB_GOLDEN
-    assert mcpserver._call("cage_roi", {"format": "csv"}) == ROI_GOLDEN
+    # _call now returns (text, capture_summary) — capture-on-read rides back as a
+    # structured field, never in the rendered text (capture-architecture Phase 1).
+    assert mcpserver._call("cage_report", {"format": "csv"})[0] == REPORT_GOLDEN
+    assert mcpserver._call("cage_attrib", {"format": "csv"})[0] == ATTRIB_GOLDEN
+    assert mcpserver._call("cage_roi", {"format": "csv"})[0] == ROI_GOLDEN
     # default stays the text table
-    assert mcpserver._call("cage_report", {}).startswith("Ledger by route")
+    assert mcpserver._call("cage_report", {})[0].startswith("Ledger by route")
     # every CSV-capable tool declares the param
     for tool in mcpserver.TOOLS:
         if tool["name"] in ("cage_report", "cage_attrib", "cage_roi"):

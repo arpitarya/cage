@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from cage import convert, ledger, prices, render
+from cage import convert, ledger, paths, prices, render
 
 DIMENSIONS = ("route", "agent", "model", "provider", "day", "task")
 SAVINGS_DIMS = ("task", "agent")  # dims a receipt joins cleanly to (§3.1); others fuzzy
@@ -37,6 +37,41 @@ def _team_rows(root: Path, team: bool):
         if t is not None:
             return t["calls"], t["receipts"]
     return None, None
+
+
+def read_receipts(root: Path, pol: dict, since: str | None = None) -> list[dict]:
+    """Receipts for a read, with the **routing-key reclaim backstop** folded in
+    (capture-architecture §3.1b, §9.6). A pushed graphify/fux saving can land in the
+    global ``~/.cage`` when the tool ran *outside* this project's tree; a project read
+    then reclaims it — but **only** the global receipts whose ``route_key`` *exactly*
+    equals this project's key (`paths.routing_key`), merged by row id. Never a blind
+    global→project union (two repos sharing a basename would over-attribute). Skipped
+    entirely — byte-identical to the legacy read — when this read already *is* the global
+    ledger or a ``--ledger``/``CAGE_BASE`` override (push and pull then share one sink, so
+    nothing can strand). Fail-open: an unreadable global ledger degrades to local only."""
+    local = ledger.receipts(root, since=since)
+    try:
+        import os
+        if os.environ.get("CAGE_BASE"):
+            return local  # explicit override — one shared sink, nothing to reclaim
+        gbase = paths.global_home()
+        if paths.Footprint(root).base.resolve() == paths.Footprint(gbase).base.resolve():
+            return local  # this read already IS the global ledger
+        key = paths.routing_key(root)
+        extra = [r for r in ledger.receipts(gbase, since=since)
+                 if r.get("route_key") == key]
+        if not extra:
+            return local
+        from cage import debuglog, mergeutil
+        merged = mergeutil.union_by_id(local, extra)
+        debuglog.event(root, pol=pol, event="reclaim", route_key=key,
+                       reclaimed=len(merged) - len(local),
+                       source=str(paths.Footprint(gbase).base))
+        return merged
+    except Exception as e:  # fail-open: reclaim is a backstop, never blocks a read
+        from cage import debuglog
+        debuglog.exception(root, "report.reclaim", e, pol=pol)
+        return local
 
 
 def _grouping_calls(root: Path, since: str | None, team_calls):
@@ -83,7 +118,7 @@ def summarize(root: Path, pol: dict, dim: str = "route", since: str | None = Non
     raw_calls = tc if tc is not None else ledger.calls(root)
     all_calls = ledger.by_project(raw_calls, project)
     windowed_receipts = (ledger.since(tr, since) if tr is not None
-                         else ledger.since(ledger.receipts(root, since=since), since))
+                         else ledger.since(read_receipts(root, pol, since=since), since))
     calls = ledger.by_project(ledger.by_scope(_grouping_calls(root, since, tc), scope), project)
     groups: dict[str, dict] = {}
     unpriced: dict[str, dict] = {}   # provider/model that billed $0 → calls/tokens
@@ -284,7 +319,7 @@ def overview(root: Path, pol: dict, since: str | None = None) -> dict:
             unpriced_calls += 1
             unpriced_tokens += c.get("tokens_in", 0) + c.get("tokens_out", 0)
     tokens = sum(c.get("tokens_in", 0) + c.get("tokens_out", 0) for c in calls)
-    rcpts = ledger.since(ledger.receipts(root, since=since), since)
+    rcpts = ledger.since(read_receipts(root, pol, since=since), since)
     saved = sum(s for _, _, s, _, _ in _nonhuman_savings(ledger.calls(root), rcpts, pol))
     return {"since": since, "empty": not calls, "calls": len(calls),
             "spent_usd": spent, "saved_usd": saved, "net_usd": saved - spent,

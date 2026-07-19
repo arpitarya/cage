@@ -60,6 +60,17 @@ archive (the lifecycle rule in `CLAUDE.md`).
 - [output-and-simplification.plan.md](output-and-simplification.plan.md) — the
   plan of record for the current cycle. Phases 1–4 (output honesty → CLI tiering →
   `[sources]`) shipped in **v0.28.0**; the backlog sweep remains.
+- [capture-architecture.plan.md](capture-architecture.plan.md) — design of record for
+  the capture rework: capture-on-read replaces hooks as the correctness path, push
+  (graphify/fux/proxy) and pull converge on one canonical ledger, and capture becomes
+  visible. Built as [capture-architecture.handoff.md](capture-architecture.handoff.md)
+  + [capture-architecture.prompt.md](capture-architecture.prompt.md). **Phase 1
+  (additive — no hook touched) shipped in v0.31.0**; the pair stays here (not archived)
+  until **Phase 2** (deleting the token-capture hooks) ships in a later release.
+- [capture-health.handoff.md](capture-health.handoff.md) +
+  [capture-health.prompt.md](capture-health.prompt.md) — make silent zero-capture loud
+  (an installed agent that matched no files warns on `cage report`). Sequence **after**
+  capture-on-read, which makes its `_health` data fresher.
 
 *(Phases 1–4 handoff/prompt pairs archived with the v0.28.0 release, the
 `[sources]` visibility + globs follow-on with **v0.29.0**, and capture-health

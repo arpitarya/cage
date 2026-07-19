@@ -23,6 +23,41 @@ def ledger_root() -> Path:
     return paths.resolve_root()
 
 
+def quiet(args) -> bool:
+    """Whether capture confirmations are suppressed — the per-invocation ``--quiet``
+    flag or ``CAGE_QUIET`` env (1/true/yes/on). Visibility, never a gate: pricing/reads
+    are untouched, only the ``· captured …`` / ``✔ cage: … captured`` lines are silenced."""
+    import os
+    if getattr(args, "quiet", False):
+        return True
+    return (os.environ.get("CAGE_QUIET") or "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def captured_read_root(args) -> Path:
+    """The active-ledger root for a **read**, after running capture-on-read (the lazy
+    pre-read sweep) and surfacing its one-line confirmation (capture-architecture Phase 1).
+    Every read handler uses this in place of `ledger_root()`.
+
+    The confirmation goes to **stderr** — never stdout — so it can never corrupt a
+    ``--json``/``--csv`` stream or a piped table (CSV never gates), while still landing in
+    the terminal (and the agent's tool result) as visible proof capture ran. Suppressed by
+    ``--quiet``/``CAGE_QUIET``. `ensure_captured` is throttled, gated, and fail-open, and
+    ``--why-ledger`` (when set) prints the ledger-resolution decision on demand."""
+    import sys
+
+    from cage import importcmd, paths
+    r = ledger_root()
+    if getattr(args, "why_ledger", False) and not quiet(args):
+        print(f"· ledger: {paths.active_ledger_source()} → "
+              f"{paths.Footprint(r).base} (route-key {paths.routing_key(r)})",
+              file=sys.stderr)
+    summary = importcmd.ensure_captured(r, args)
+    line = importcmd.capture_summary_line(summary)
+    if line and not quiet(args):
+        print(line, file=sys.stderr)
+    return r
+
+
 def emit(args, payload: dict, text: str) -> int:
     """Print machine-readable JSON when ``--json`` is set, else the human text."""
     if getattr(args, "json", False):

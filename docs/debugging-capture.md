@@ -19,6 +19,53 @@ Use this when: an agent's tokens aren't showing up in `cage report` even after `
 import`, and you need to know whether its hook fired, was skipped by a guard, or hit a
 parser error.
 
+## Capture-on-read (the primary path, v0.31+)
+
+You rarely need `cage import` by hand any more: **every read runs the incremental sweep
+first**. `cage report`, `cage insights *`, and the MCP read tools all capture-on-read —
+they sweep your agent logs into the ledger, then render — so a number is never staler than
+the instant it's shown. No hook, no scheduler, no project required. The sweep is throttled
+(~60s, policy `[capture] read_throttle_secs`) so back-to-back reads don't re-sweep, and it
+is fail-open: a capture error is traced under `CAGE_DEBUG` and never blocks the read.
+
+When a read captures new rows it prints one line to **stderr** (never stdout, so a
+`--json`/`--csv` stream stays pure), and **stays silent when nothing is new**:
+
+```
+· captured 240 new calls (claude, codex) + 3 graphify savings since last read
+```
+
+A `graphify`/`fux` saving prints its own stderr proof the moment it's filed:
+
+```
+✔ cage: graphify saving captured — ~900 tokens (→ /repo/.cage)
+```
+
+Controls (all counts-only, never content):
+
+- **`--why-ledger`** on any read prints which ledger resolved and why, plus its routing
+  key: `· ledger: project (.cage/) → /repo/.cage (route-key c89f4cc8…)`. This is the
+  one-grep answer to "my graphify saving vanished" — push and read must resolve the same
+  ledger, and this shows both.
+- **`--quiet`** / **`CAGE_QUIET=1`** silences the confirmations (numbers are unchanged).
+- **`--no-import`** skips the pre-read sweep for one invocation; **`CAGE_CAPTURE_ON_READ=0`**
+  disables it standing (the switch the determinism/golden suites use); **`CAGE_CAPTURE=0`**
+  pauses *all* capture.
+- **`cage doctor`** shows a per-source, per-**mode** (pull/push) capture timeline —
+  what cage has captured, how, and when, for every agent and the graphify/fux push side.
+  Doctor deliberately does **not** sweep first, so it never masks the breakage it
+  diagnoses.
+- **`CAGE_DEBUG=1`** logs the **ledger-resolution decision** on every push and read
+  (`event=ledger-resolve`), every capture-on-read sweep (`event=capture-on-read`), and
+  every routing-key reclaim (`event=reclaim`) — see the trace section below.
+
+**One canonical ledger.** Push (graphify/fux/proxy) and pull now resolve the *same* ledger
+(`paths.canonical_ledger`). A pushed saving carries a non-PII routing key — a hash of the
+resolved ledger-root path — so a repo-root read can **reclaim** a graphify saving pushed
+from a subdirectory or a project saving that landed in the global `~/.cage`, matched by
+**exact key only** (never a blind union). If a saving still seems missing, `--why-ledger`
+on both the graphify run and the report shows whether they agreed on the ledger.
+
 ## The capture-health warning (cage tells you first)
 
 You usually won't have to go looking. When an agent is **installed but capturing
