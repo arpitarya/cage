@@ -65,23 +65,10 @@ def _root(payload: dict) -> Path:
     return paths.resolve_root(start)
 
 
-def append_new(root: Path, rows: list[dict], seen: set | None = None) -> int:
-    """Append only call rows whose id isn't already in the ledger. Returns #added.
-
-    ``seen`` is an optional caller-owned set of already-known call ids: pass it to skip
-    the per-call ledger reload and amortize the dedupe across a multi-file run (the
-    ledger is 22k+ rows — re-reading it per file/call is the import hot path, plan
-    §3.7). It is mutated in place with each appended id so later batches see them.
-    Omit it and the legacy self-contained behavior holds (reload once here)."""
-    if seen is None:
-        seen = {c.get("id") for c in ledger.calls(root)}
-    added = 0
-    for row in rows:
-        if row.get("id") not in seen:
-            if ledger.append_row(root, "calls", row):
-                seen.add(row.get("id"))
-                added += 1
-    return added
+# The dedupe-append primitive moved to `ledger.py` (the universal import path must not
+# depend on this Claude-specific hook module — capture-architecture §9.6). Re-exported
+# here so existing callers (`hooks.append_new`) and tests keep working unchanged.
+append_new = ledger.append_new
 
 
 def _capture_calls(payload: dict) -> int:

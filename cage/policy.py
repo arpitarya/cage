@@ -228,6 +228,30 @@ def capture_enabled(pol: dict) -> bool:
     return _flag("CAGE_CAPTURE", pol, "capture", "enabled", True)
 
 
+def capture_on_read_enabled(pol: dict) -> bool:
+    """Whether a read (report / insights / MCP read tools) lazily sweeps the log registry
+    before answering — the capture-on-read primary path (capture-architecture Phase 1).
+    Env `CAGE_CAPTURE_ON_READ` (0/1) overrides policy `[capture] on_read`; default **on**.
+    A *separate* switch from `capture_enabled`: `CAGE_CAPTURE=0` pauses ALL capture
+    (explicit `cage import` included), while this pauses only the read-triggered sweep —
+    the knob the determinism/golden suite pins off so a read never mutates the ledger
+    under a fixed-ledger test. `--no-import` is the per-invocation equivalent."""
+    return _flag("CAGE_CAPTURE_ON_READ", pol, "capture", "on_read", True)
+
+
+def read_throttle_secs(pol: dict) -> int:
+    """Seconds within which a second read won't re-sweep (capture-on-read throttle,
+    keyed on the `_last_import` cursor — no new state file). Policy `[capture]
+    read_throttle_secs` wins; `constants.CAPTURE_ON_READ_THROTTLE_SECS` covers an unset
+    key (the DEFAULT_CONFIDENCE policy-preferred pattern); `0` disables the throttle."""
+    from cage.constants import CAPTURE_ON_READ_THROTTLE_SECS
+    try:
+        return int(pol.get("capture", {}).get("read_throttle_secs",
+                                              CAPTURE_ON_READ_THROTTLE_SECS))
+    except (TypeError, ValueError):
+        return CAPTURE_ON_READ_THROTTLE_SECS
+
+
 def debug_enabled(pol: dict) -> bool:
     """Whether the capture path writes its metadata-only debug log + hook heartbeat
     (`cage/debuglog.py`). Env `CAGE_DEBUG` overrides policy `[debug] enabled`; default

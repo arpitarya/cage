@@ -244,7 +244,7 @@ inputs (each with its own method tag):
   · marginal saving (attrib): task 't_n2': 50,000 tok · $0.1500 (modeled)
   · roi: saved $0.3000 − own cost $0.8000 = net -$0.5000 over 2 receipt(s) (modeled)
   · trend (agent-vs-human, ledger-wide): INSUFFICIENT DATA — fewer than 2 weekly buckets on the human axis
-  · cost drift (regression): stable (+0%) (measured)
+  · cost drift (regression): INSUFFICIENT DATA — not enough history on both sides of the window
   · redo-rate (quality): INSUFFICIENT DATA — no task outcomes recorded
   · break-even: each receipt nets -$0.2500 on average — no receipt volume reaches break-even at current costs (derived from roi)
 

@@ -186,16 +186,22 @@ def test_health_survives_cursor_cleanup(tmp_path, monkeypatch):
     before = _health(root)
     assert before
     # Inject an orphan cursor (absolute, non-existent) so the orphan-cursor prune
-    # actually rewrites cursors.json — the pass that could clobber `_health`.
+    # actually rewrites cursors.json — the pass that could clobber `_health`. Use an
+    # OS-native absolute path (under tmp_path, never created) rather than a POSIX
+    # "/gone/…": Python 3.13's ntpath.isabs no longer treats a single-slash path as
+    # absolute on Windows, so a "/gone/…" cursor would slip past the orphan guard
+    # (os.path.isabs) there and the prune would be a no-op (real cursors are drive-
+    # absolute C:\…, so production is unaffected — this is test-data only).
+    orphan = str(tmp_path / "gone-abs" / "rollout-x.jsonl")  # absolute on all OSes, absent
     foot = paths.Footprint(root)
     cur = json.loads(foot.cursors.read_text(encoding="utf-8"))
-    cur.setdefault("codex", {})["/gone/abs/rollout-x.jsonl"] = [1, 2.0]
+    cur.setdefault("codex", {})[orphan] = [1, 2.0]
     foot.cursors.write_text(json.dumps(cur), encoding="utf-8")
     pol = policy.load(None)
     counts = cleanup.prune(root, pol, days=0)
     assert counts.get("cursor-orphan")                  # the rewrite really ran
     after = json.loads(foot.cursors.read_text(encoding="utf-8"))
-    assert "/gone/abs/rollout-x.jsonl" not in after.get("codex", {})  # orphan dropped
+    assert orphan not in after.get("codex", {})         # orphan dropped
     assert _health(root) == before                      # …but `_health` is untouched
 
 

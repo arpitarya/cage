@@ -79,22 +79,34 @@ def make_call(*, route: str, provider: str, model: str, tokens_in: int = 0,
 def make_receipt(*, tool: str, raw_alternative: float, actual: float,
                  call: str = "", task: str = "", unit: str = "tokens",
                  method: str = "modeled", confidence: float = 1.0,
-                 meta: dict | None = None, scope: str = "", ts: str | None = None) -> dict:
+                 meta: dict | None = None, scope: str = "", route_key: str = "",
+                 ts: str | None = None) -> dict:
     """One savings receipt. `saved` is derived so it can never disagree (plan §3.2).
 
     `scope` is the optional top-level changed dir (plan §3.6.2) — same counts-safe key
     as `make_call`; empty by default (non-monorepo), so an unset `scope` is the legacy
     contract.
+
+    `route_key` is the optional non-PII project routing key (`paths.routing_key`, a hash
+    of the resolved ledger-root path — never a path, never a basename) stamped on a
+    **pushed** receipt (graphify/fux/proxy) so a read can reclaim a stray saving by
+    *exact* key (capture-architecture §9.6). Additive and included **only when set** —
+    like `gap_ms` on a call, an absent `route_key` is byte-identical to the legacy
+    contract, and it is deliberately kept out of the CSV column contract (`RECEIPT_FIELDS`)
+    so the reporting CSV is unchanged. Never part of any id.
     """
     if unit not in UNITS:
         raise ValueError(f"unit {unit!r} not in {UNITS}")
     if method not in METHODS:
         raise ValueError(f"method {method!r} not in {METHODS}")
-    return {"id": ids.new_id("r"), "ts": ts or _now(), "call": call, "task": task,
-            "tool": tool, "unit": unit, "raw_alternative": float(raw_alternative),
-            "actual": float(actual), "saved": float(raw_alternative) - float(actual),
-            "method": method, "confidence": float(confidence), "meta": meta or {},
-            "scope": str(scope)}
+    row = {"id": ids.new_id("r"), "ts": ts or _now(), "call": call, "task": task,
+           "tool": tool, "unit": unit, "raw_alternative": float(raw_alternative),
+           "actual": float(actual), "saved": float(raw_alternative) - float(actual),
+           "method": method, "confidence": float(confidence), "meta": meta or {},
+           "scope": str(scope)}
+    if route_key:
+        row["route_key"] = str(route_key)
+    return row
 
 
 def _repo_relative(path: str) -> None:

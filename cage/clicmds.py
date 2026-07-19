@@ -9,7 +9,7 @@ from cage import (adoptcmd, agents, attribution, budget, compare, demo, doctorcm
                   ledger, ledgersync, limits, matrix, mcpserver, metercmd, metering, notessync,
                   origin, paths, policy, provenance, proxy, quality, recommend, regression,
                   render, report, roi, serve, tasks, trend, verifycmd, watchcmd, wizard)
-from cage.cliutil import csv_dest, emit, ledger_root, root
+from cage.cliutil import captured_read_root, csv_dest, emit, ledger_root, root
 from cage.errors import CageError
 
 
@@ -42,7 +42,7 @@ def _latest_task(r) -> str | None:
 
 def cmd_report(args) -> int:
     from cage import display, policy
-    r = ledger_root()
+    r = captured_read_root(args)
     pol = _policy(r)
     rep = report.summarize(r, pol, dim=args.by, since=args.since,
                            scope=getattr(args, "scope", None),
@@ -60,7 +60,7 @@ def cmd_overview(args) -> int:
     """Bare `cage` — the one-look headline (§4; tokens by default, plan Phase 2.5).
     No subcommand."""
     from cage import display
-    r = ledger_root()
+    r = captured_read_root(args)
     pol = _policy(r)
     o = report.overview(r, pol)
     return emit(args, o, report.render_overview(
@@ -68,7 +68,7 @@ def cmd_overview(args) -> int:
 
 
 def cmd_attrib(args) -> int:
-    r = ledger_root()
+    r = captured_read_root(args)
     task = args.task or _latest_task(r)
     data = attribution.attribute(r, task, _policy(r), scope=getattr(args, "scope", None),
                                  team=getattr(args, "team", False))
@@ -80,7 +80,7 @@ def cmd_attrib(args) -> int:
 
 def cmd_matrix(args) -> int:
     from cage import display
-    r = ledger_root()
+    r = captured_read_root(args)
     pol = _policy(r)
     task = args.task or _latest_task(r)
     data = matrix.matrix(r, task, pol, human=getattr(args, "human", False),
@@ -96,7 +96,7 @@ def cmd_matrix(args) -> int:
 
 
 def cmd_human(args) -> int:
-    r = ledger_root()
+    r = captured_read_root(args)
     data = humanview.rollup(r, _policy(r), since=args.since, agent=args.agent, task=args.task)
     if (dest := csv_dest(args)) is not None:
         from cage import csvout
@@ -120,7 +120,7 @@ def cmd_human_record(args) -> int:
 
 
 def cmd_trend(args) -> int:
-    r = ledger_root()
+    r = captured_read_root(args)
     data = trend.series(r, _policy(r), by=args.by, since=args.since)
     if (dest := csv_dest(args)) is not None:
         from cage import csvout
@@ -134,7 +134,7 @@ def cmd_trend(args) -> int:
 
 
 def cmd_budget(args) -> int:
-    r = ledger_root()
+    r = captured_read_root(args)
     verdict = budget.check(r, _policy(r), session=args.session,
                            scope=getattr(args, "scope", None))
     return emit(args, verdict, budget.render_budget(verdict))
@@ -144,7 +144,7 @@ def cmd_limits(args) -> int:
     """`cage data limits` — provider quota windows (latest local snapshot) + estimated
     AI-credit consumption (token-based providers only). `--json` emits the `cage.v1`
     envelope. Read-only/derive; never writes the ledger."""
-    r = ledger_root()
+    r = captured_read_root(args)
     data = limits.rollup(r, _policy(r))
     if getattr(args, "json", False):
         import json
@@ -155,7 +155,7 @@ def cmd_limits(args) -> int:
 
 
 def cmd_roi(args) -> int:
-    r = ledger_root()
+    r = captured_read_root(args)
     data = roi.by_tool(r, _policy(r), since=args.since)
     if (dest := csv_dest(args)) is not None:
         from cage import csvout
@@ -164,7 +164,7 @@ def cmd_roi(args) -> int:
 
 
 def cmd_why(args) -> int:
-    lr = ledger_root()
+    lr = captured_read_root(args)
     data = provenance.explain(lr, args.call_id, pol=_policy(lr))
     return emit(args, data, provenance.render_why(data, args.call_id))
 
@@ -216,7 +216,7 @@ def cmd_demo(_args) -> int:
 # ── §8 ledger features ───────────────────────────────────────────────────────
 
 def cmd_quality(args) -> int:
-    lr = ledger_root()
+    lr = captured_read_root(args)
     s = quality.summarize(lr, pol=_policy(lr))
     return emit(args, s, quality.render_quality(s))
 
@@ -248,7 +248,7 @@ def cmd_outcome(args) -> int:
 
 
 def cmd_compare(args) -> int:
-    r = ledger_root()
+    r = captured_read_root(args)
     by = tuple(k.strip() for k in (args.by or "stack").split(",") if k.strip())
     bad = [k for k in by if k not in ("stack", "scope", "label")]
     if bad:
@@ -264,7 +264,7 @@ def cmd_compare(args) -> int:
 
 def cmd_estimate(args) -> int:
     from cage import estimate
-    r = ledger_root()
+    r = captured_read_root(args)
     d = estimate.band(r, _policy(r), scope=args.scope, label=args.label, agent=args.agent)
     recorded = ""
     if args.record:
@@ -284,7 +284,7 @@ def cmd_estimate(args) -> int:
 
 def cmd_calibration(args) -> int:
     from cage import calibration
-    r = ledger_root()
+    r = captured_read_root(args)
     if getattr(args, "human", False):  # plan §4.10 — score the turn-gap heuristic
         d = calibration.summarize_human(r, _policy(r))
         if (dest := csv_dest(args)) is not None:
@@ -302,7 +302,7 @@ def cmd_calibration(args) -> int:
 
 def cmd_verdict(args) -> int:
     from cage import verdict
-    r = ledger_root()
+    r = captured_read_root(args)
     d = verdict.compose(r, _policy(r), args.tool, since=args.since,
                         agent_only=getattr(args, "agent_only", False))
     return emit(args, render.envelope("verdict", d) if args.json else d,
@@ -386,19 +386,19 @@ def cmd_study(args) -> int:
 
 
 def cmd_regression(args) -> int:
-    lr = ledger_root()
+    lr = captured_read_root(args)
     r = regression.detect(lr, since=args.since, tolerance=args.tolerance, pol=_policy(lr))
     return emit(args, r, regression.render_regression(r))
 
 
 def cmd_recommend(args) -> int:
-    lr = ledger_root()
+    lr = captured_read_root(args)
     r = recommend.recommend(lr, _policy(lr), since=args.since)
     return emit(args, r, recommend.render_recommend(r))
 
 
 def cmd_forecast(args) -> int:
-    lr = ledger_root()
+    lr = captured_read_root(args)
     f = forecast.project(lr, _policy(lr))
     return emit(args, f, forecast.render_forecast(f))
 

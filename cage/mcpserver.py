@@ -69,29 +69,38 @@ def _latest_task(root: Path) -> str | None:
     return tasks[-1] if tasks else None
 
 
-def _call(name: str, args: dict) -> str:
+def _call(name: str, args: dict) -> tuple[str, dict | None]:
     root = _root()
+    # Capture-on-read (capture-architecture Phase 1): the MCP read tools are the
+    # agent-facing surface and the de-facto real-time path — an agent asking cage about
+    # spend mid-session triggers a fresh sweep first. The summary rides back as a
+    # STRUCTURED field (see `_handle`), never stdout — stray stdout would corrupt the
+    # JSON-RPC protocol. Throttled + gated + fail-open inside `ensure_captured`.
+    from cage import importcmd
+    summary = importcmd.ensure_captured(root)
     as_csv = args.get("format") == "csv"  # same structure feeds both renderers
     if name == "cage_report":
         rep = report.summarize(root, _pol(root), dim=args.get("by", "route"),
                                since=args.get("since"))
-        return report.render_csv(rep) if as_csv else report.render_report(rep)
-    if name == "cage_attrib":
+        text = report.render_csv(rep) if as_csv else report.render_report(rep)
+    elif name == "cage_attrib":
         task = args.get("task") or _latest_task(root)
         data = attribution.attribute(root, task, _pol(root))
-        return attribution.render_csv(data) if as_csv else attribution.render_attrib(data)
-    if name == "cage_matrix":
+        text = attribution.render_csv(data) if as_csv else attribution.render_attrib(data)
+    elif name == "cage_matrix":
         task = args.get("task") or _latest_task(root)
-        return matrix.render_matrix(matrix.matrix(root, task, _pol(root)))
-    if name == "cage_budget":
-        return budget.render_budget(budget.check(root, _pol(root), session=args.get("session")))
-    if name == "cage_roi":
+        text = matrix.render_matrix(matrix.matrix(root, task, _pol(root)))
+    elif name == "cage_budget":
+        text = budget.render_budget(budget.check(root, _pol(root), session=args.get("session")))
+    elif name == "cage_roi":
         data = roi.by_tool(root, _pol(root), since=args.get("since"))
-        return roi.render_csv(data) if as_csv else roi.render_roi(data)
-    if name == "cage_why":
+        text = roi.render_csv(data) if as_csv else roi.render_roi(data)
+    elif name == "cage_why":
         cid = args["call_id"]
-        return provenance.render_why(provenance.explain(root, cid), cid)
-    raise ValueError(f"unknown tool '{name}'")
+        text = provenance.render_why(provenance.explain(root, cid), cid)
+    else:
+        raise ValueError(f"unknown tool '{name}'")
+    return text, summary
 
 
 def _handle(msg: dict) -> dict | None:
@@ -107,8 +116,11 @@ def _handle(msg: dict) -> dict | None:
         return _ok(mid, {"tools": TOOLS})
     if method == "tools/call":
         try:
-            text = _call(params.get("name", ""), params.get("arguments") or {})
-            return _ok(mid, {"content": [{"type": "text", "text": text}]})
+            text, capture = _call(params.get("name", ""), params.get("arguments") or {})
+            result = {"content": [{"type": "text", "text": text}]}
+            if capture:  # capture-on-read proof-of-life — a structured field, not stdout
+                result["structuredContent"] = {"capture": capture}
+            return _ok(mid, result)
         except Exception as exc:  # noqa: BLE001 — surface as a tool error, not a crash
             return _ok(mid, {"content": [{"type": "text", "text": f"error: {exc}"}],
                              "isError": True})

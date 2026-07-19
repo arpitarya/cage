@@ -72,6 +72,21 @@ def _csv_flag(p: argparse.ArgumentParser) -> None:
                         "stay columns — see `cage query csv-output`")
 
 
+def _capture_flags(p: argparse.ArgumentParser) -> None:
+    """Capture-on-read controls shared by every read surface (capture-architecture
+    Phase 1). ``--no-import`` skips the lazy pre-read sweep for this invocation (env
+    ``CAGE_CAPTURE=0`` / ``CAGE_CAPTURE_ON_READ=0`` do the same standing); ``--quiet``
+    (env ``CAGE_QUIET``) silences the ``· captured …`` confirmation without changing any
+    number; ``--why-ledger`` prints the ledger-resolution decision (which sink + why +
+    route-key) to stderr on demand."""
+    p.add_argument("--no-import", dest="no_import", action="store_true",
+                   help="skip the capture-on-read pre-sweep for this read")
+    p.add_argument("--quiet", action="store_true",
+                   help="silence capture confirmations (or set CAGE_QUIET=1)")
+    p.add_argument("--why-ledger", dest="why_ledger", action="store_true",
+                   help="print which ledger resolved and why (to stderr)")
+
+
 def _group(sub, name: str, help_text: str):
     """A command group (insights/human/authorship/data) — a subparser holding nested
     subparsers that dispatch to the same run functions. Bare `cage <group>` prints the
@@ -94,6 +109,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--ledger", metavar="DIR", help="use this cage base dir as the active "
                    "ledger (overrides the project/global resolution; the .cage-equivalent "
                    "holding ledger/, state/ and policy.toml)")
+    _capture_flags(p)  # bare `cage` (overview) is a read too — capture-on-read applies
     # required=False: bare `cage` (no subcommand) prints the headline banner via main().
     # parser_class: children are stock ArgumentParsers, so only the root overrides help.
     sub = p.add_subparsers(dest="cmd", required=False, metavar="<command>",
@@ -116,6 +132,7 @@ def build_parser() -> argparse.ArgumentParser:
                           "(scripts wanting fixed shape; CSV never gates)")
     _json_flag(rep)
     _csv_flag(rep)
+    _capture_flags(rep)
     rep.set_defaults(fn=clicmds.cmd_report)
 
     im = sub.add_parser("import", help="capture every agent's on-disk usage into the active ledger (the universal path)",
@@ -203,6 +220,7 @@ def build_parser() -> argparse.ArgumentParser:
     at.add_argument("--team", action="store_true", help="read the merged refs/notes/cage-ledger team view (§3.6.3)")
     _json_flag(at)
     _csv_flag(at)
+    _capture_flags(at)
     at.set_defaults(fn=clicmds.cmd_attrib)
 
     mx = insights.add_parser("matrix", help="counterfactual permutation table for a task (§4.4)",
@@ -218,12 +236,14 @@ def build_parser() -> argparse.ArgumentParser:
                          "always renders; `[display] usd = true` for always-on)")
     _json_flag(mx)
     _html_flag(mx)
+    _capture_flags(mx)
     mx.set_defaults(fn=clicmds.cmd_matrix)
 
     ro = insights.add_parser("roi", help="saved $ per tool vs its own cost + latency")
     ro.add_argument("--since", metavar="WINDOW", help="window like 30d / 2w")
     _json_flag(ro)
     _csv_flag(ro)
+    _capture_flags(ro)
     ro.set_defaults(fn=clicmds.cmd_roi)
 
     vd = insights.add_parser("verdict",
@@ -234,12 +254,14 @@ def build_parser() -> argparse.ArgumentParser:
     vd.add_argument("--agent-only", action="store_true",
                     help="suppress the total-cost line (agent $ + human attention minutes × rate)")
     _json_flag(vd)
+    _capture_flags(vd)
     vd.set_defaults(fn=clicmds.cmd_verdict)
 
     bd = insights.add_parser("budget", help="session/day spend vs policy ceilings (§8.1)")
     bd.add_argument("--session", help="session id to total against the session cap")
     bd.add_argument("--scope", metavar="DIR", help="filter to one monorepo top-level dir (§3.6.2)")
     _json_flag(bd)
+    _capture_flags(bd)
     bd.set_defaults(fn=clicmds.cmd_budget)
 
     cp = insights.add_parser("compare",
@@ -253,6 +275,7 @@ def build_parser() -> argparse.ArgumentParser:
                     help="suppress the total-cost line (agent $ + human attention minutes × rate)")
     _json_flag(cp)
     _csv_flag(cp)
+    _capture_flags(cp)
     cp.set_defaults(fn=clicmds.cmd_compare)
 
     es = insights.add_parser("estimate",
@@ -265,6 +288,7 @@ def build_parser() -> argparse.ArgumentParser:
                     help="stamp the band onto this OPEN task row (est_tokens/est_usd/est_n "
                          "+ band bounds) so `cage insights calibration` can score it at close")
     _json_flag(es)
+    _capture_flags(es)
     es.set_defaults(fn=clicmds.cmd_estimate)
 
     cb = insights.add_parser("calibration",
@@ -275,6 +299,7 @@ def build_parser() -> argparse.ArgumentParser:
                          "minute ratio over tasks carrying both (refuses thin data)")
     _json_flag(cb)
     _csv_flag(cb)
+    _capture_flags(cb)
     cb.set_defaults(fn=clicmds.cmd_calibration)
 
     tr = insights.add_parser("trend", help="cost+time savings over time, by week or month (§5b.4)")
@@ -284,26 +309,31 @@ def build_parser() -> argparse.ArgumentParser:
     _json_flag(tr)
     _html_flag(tr)
     _csv_flag(tr)
+    _capture_flags(tr)
     tr.set_defaults(fn=clicmds.cmd_trend)
 
     wy = insights.add_parser("why", help="full provenance: a call + every receipt against it")
     wy.add_argument("call_id")
     _json_flag(wy)
+    _capture_flags(wy)
     wy.set_defaults(fn=clicmds.cmd_why)
 
     fc = insights.add_parser("forecast", help="project monthly spend vs the budget (§8.5)")
     _json_flag(fc)
+    _capture_flags(fc)
     fc.set_defaults(fn=clicmds.cmd_forecast)
 
     rg = insights.add_parser("regression", help="alert when cost-per-call drifts up (§8.3)")
     rg.add_argument("--since", default="7d", metavar="WINDOW", help="recent window vs the baseline before it")
     rg.add_argument("--tolerance", type=float, default=0.2, help="drift fraction that trips the flag")
     _json_flag(rg)
+    _capture_flags(rg)
     rg.set_defaults(fn=clicmds.cmd_regression)
 
     rc = insights.add_parser("recommend", help="cheapest-path: which tools to enable/skip (§8.4)")
     rc.add_argument("--since", metavar="WINDOW")
     _json_flag(rc)
+    _capture_flags(rc)
     rc.set_defaults(fn=clicmds.cmd_recommend)
 
     # ── group: human (agent-vs-human axis) ─────────────────────────────────────
@@ -316,6 +346,7 @@ def build_parser() -> argparse.ArgumentParser:
     _json_flag(hu)
     _html_flag(hu)
     _csv_flag(hu)
+    _capture_flags(hu)
     hu.set_defaults(fn=clicmds.cmd_human)
 
     hr = human.add_parser("record", help="record a Tier-1 human alternative for a task (§5)",
@@ -348,6 +379,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     ql = human.add_parser("quality", help="quality-adjusted cost: cost per successful task (§8.2)")
     _json_flag(ql)
+    _capture_flags(ql)
     ql.set_defaults(fn=clicmds.cmd_quality)
 
     # ── group: authorship (who wrote which files + its git-notes distribution) ──
@@ -533,6 +565,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     lm = data.add_parser("limits", help="provider quota windows + estimated AI-credit use")
     _json_flag(lm)
+    _capture_flags(lm)
     lm.set_defaults(fn=clicmds.cmd_limits)
 
     wt = data.add_parser("watch", help="foreground poll loop: import every interval until Ctrl-C (no OS job)",

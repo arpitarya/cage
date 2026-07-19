@@ -84,7 +84,12 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
 - **Meter** ([metering.py](cage/metering.py)) — the library adapter. **Fail-open**:
   a metering error must never propagate into a request path. The public name is
   `cage.meter` (a context manager); the *module* is `cage.metering` — keep them
-  distinct or the package attribute shadows the submodule.
+  distinct or the package attribute shadows the submodule. The push path resolves its
+  sink through `paths.canonical_ledger()` (the ONE resolver push and pull share,
+  capture-architecture §3.1) — never `resolve_root` directly — and stamps a non-PII
+  `route_key` (a hash of the resolved ledger-root path, never a basename; additive/
+  optional, never in an id) on pushed receipts so a read can reclaim a stray saving by
+  exact key.
 - **Attribution** ([attribution.py](cage/attribution.py), [matrix.py](cage/matrix.py))
   — the differentiator (plan §4). Marginal-by-fixed-order; a reconstructed
   counterfactual cell is `modeled`/`estimated`, never `measured` (only the recorded
@@ -344,7 +349,7 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
 ## Dev
 
 ```bash
-just test          # python -m pytest -q   (791 passing)
+just test          # python -m pytest -q   (814 passing)
 just demo          # seed §4.4 + print attrib/matrix
 cage --version
 ```
@@ -361,7 +366,17 @@ each agent only needs thin idiomatic wiring (`agents.py` orchestrates):
   global** (plan §3.7): `cage import`/`cage data export` over a **resolved** ledger
   (`--ledger`/`CAGE_BASE` → project `.cage/` → global `~/.cage`, via `paths.resolve_root`)
   is the universal path that works with no hooks and no project; hooks are an optional
-  CLI-only real-time add-on (they don't fire under a VS Code extension). `importcmd.run`
+  CLI-only real-time add-on (they don't fire under a VS Code extension). **Capture-on-read**
+  (capture-architecture Phase 1) makes a *read* the primary trigger: `report`/`insights *`/
+  the MCP read tools call `importcmd.ensure_captured` before rendering (throttled on
+  `_last_import`, gated by `[capture] on_read` / `CAGE_CAPTURE_ON_READ`, suppressible with
+  `--no-import`, fail-open) — so a number is never staler than the instant it's shown, with
+  no hook. It writes the ledger only, so derived numbers stay a pure function of it, and the
+  determinism/golden suites pin it OFF. Confirmations go to **stderr** (`· captured N new …`,
+  silent when zero); the graphify/fux push prints `✔ cage: … captured` to stderr too; MCP
+  returns the summary as `structuredContent.capture`. `cage doctor` does **not** sweep (it
+  diagnoses capture) but gains a per-source, per-**mode** (pull/push) timeline. Phase 1 is
+  additive — **no hook file touched**; deleting the token-capture hooks is Phase 2. `importcmd.run`
   honors the **consumer capture switch** — `policy.capture_enabled(pol)`: env `CAGE_CAPTURE`
   (0/1) overrides `policy.toml [capture] enabled` (default on), so a consumer can pause
   metering without unwiring hooks. It **no longer guards on a cwd `.cage/`**: a hook firing
@@ -456,3 +471,13 @@ This project meters LLM traffic into `.cage/` (a *flux*: $0, deterministic).
 - The ledger carries token *counts*, never prompt text — PII-safe by construction.
 - Edit prices / budgets / pipeline order in `.cage/policy.toml`.
 <!-- cage:end -->
+
+## graphify
+
+This project has a graphify knowledge graph at graphify-out/.
+
+Rules:
+- Before answering architecture or codebase questions, read graphify-out/GRAPH_REPORT.md for god nodes and community structure
+- If graphify-out/wiki/index.md exists, navigate it instead of reading raw files
+- For cross-module "how does X relate to Y" questions, prefer `graphify query "<question>"`, `graphify path "<A>" "<B>"`, or `graphify explain "<concept>"` over grep — these traverse the graph's EXTRACTED + INFERRED edges instead of scanning files
+- After modifying code files in this session, run `graphify update .` to keep the graph current (AST-only, no API cost)

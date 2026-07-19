@@ -80,26 +80,51 @@ def _raw_alternative(files: list[str]) -> int:
     return total
 
 
-def _meter(root: Path, answer: str, argv: list[str], task: str) -> None:
-    """File one graphify receipt from the captured answer. Fully fail-open."""
+def _meter(root: Path, answer: str, argv: list[str], task: str) -> int:
+    """File one graphify receipt from the captured answer. Fully fail-open. Returns the
+    saved token count when a receipt was filed (for the confirmation line), else 0."""
     try:
         op = _op_of(argv)
         if not op:
-            return
+            return 0
         files = _cited_files(answer, op)
         raw = _raw_alternative(files)
         if raw <= 0:                      # nothing parsed/resolved → unmeasurable
-            return
+            return 0
         actual = toks(answer)
         if actual >= raw:                 # no saving to claim — stay honest
-            return
+            return 0
         from cage import record_receipt
-        record_receipt(tool="graphify", unit="tokens", raw_alternative=raw,
-                       actual=actual, method="modeled",
-                       confidence=GRAPHIFY_RECEIPT_CONFIDENCE,
-                       task=task, root=root, meta={"op": op})
+        rid = record_receipt(tool="graphify", unit="tokens", raw_alternative=raw,
+                             actual=actual, method="modeled",
+                             confidence=GRAPHIFY_RECEIPT_CONFIDENCE,
+                             task=task, root=root, meta={"op": op})
+        return int(raw - actual) if rid else 0
     except Exception:                     # any metering error → graphify result intact
-        return
+        return 0
+
+
+def _quiet() -> bool:
+    import os
+    return (os.environ.get("CAGE_QUIET") or "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _confirm(root: Path, saved_tokens: int) -> None:
+    """One **stderr** line proving cage captured the graphify saving (§12.2) — counts
+    only, never content. stderr, never stdout: graphify's stdout is parseable output a
+    caller may pipe, and this line must never corrupt it. Suppressed by ``CAGE_QUIET``.
+    Because graphify runs as a command in the agent's turn, the line lands in the tool
+    result the human/agent sees — "graphify saving captured," exactly the ask. Fail-open
+    (a confirmation must never break the passthrough)."""
+    try:
+        if _quiet() or saved_tokens <= 0:
+            return
+        from cage import paths
+        where = paths.Footprint(root).base
+        print(f"✔ cage: graphify saving captured — ~{saved_tokens:,} tokens "
+              f"(→ {where})", file=sys.stderr)
+    except Exception:  # noqa: BLE001 — the confirmation must never break graphify
+        pass
 
 
 def _graphify_receipt_ids(root: Path) -> set[str] | None:
@@ -135,7 +160,14 @@ def run(root: Path, argv: list[str], task: str = "") -> int:
     sys.stderr.write(proc.stderr)
     if proc.returncode == 0 and op:
         after = _graphify_receipt_ids(root) if before is not None else None
-        if after is not None and after - before:
+        if after is not None and (new_ids := after - before):
+            # The child self-metered — surface the same confirmation off its own receipt
+            # (counts only) so a natively-shimmed graphify is just as visible.
+            saved = 0
+            for r in ledger.receipts(root):
+                if r.get("id") in new_ids:
+                    saved += int(round(r.get("saved", 0.0)))
+            _confirm(root, saved)
             return proc.returncode        # the child self-metered — one saving, one receipt
-        _meter(root, proc.stdout, cmd, task or Path.cwd().name)
+        _confirm(root, _meter(root, proc.stdout, cmd, task or Path.cwd().name))
     return proc.returncode

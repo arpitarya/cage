@@ -17,6 +17,13 @@ def _bare_cage_in_hooks(monkeypatch, tmp_path):
     global ledger — tests stay hermetic and deterministic."""
     monkeypatch.setattr("cage.paths.cage_bin", lambda: "cage")
     monkeypatch.setenv("CAGE_HOME", str(tmp_path / "global-home"))
+    # Capture-on-read is the new primary path (capture-architecture Phase 1), but it
+    # couples a read to a write and would sweep the developer's REAL agent homes from
+    # inside a `cage report`. Pin it OFF for the whole suite so every determinism/golden
+    # test reads a FIXED ledger (the hard requirement); the dedicated capture-on-read
+    # tests opt back in with `monkeypatch.setenv("CAGE_CAPTURE_ON_READ", "1")` over
+    # isolated empty homes.
+    monkeypatch.setenv("CAGE_CAPTURE_ON_READ", "0")
     # The copilot import also scans VS Code's chat-session store — point it at a
     # throwaway dir so a pathless sweep never reads the developer's real sessions.
     monkeypatch.setenv("CAGE_VSCODE_USER", str(tmp_path / "vscode-user"))
