@@ -66,7 +66,10 @@ archive (the lifecycle rule in `CLAUDE.md`).
   visible. Built as [capture-architecture.handoff.md](capture-architecture.handoff.md)
   + [capture-architecture.prompt.md](capture-architecture.prompt.md). **Phase 1
   (additive — no hook touched) shipped in v0.31.0**; the pair stays here (not archived)
-  until **Phase 2** (deleting the token-capture hooks) ships in a later release.
+  until **Phase 2** (deleting the token-capture hooks) ships in a later release. Phase 2 is
+  blocked on a field gate, now a concrete procedure:
+  [phase2-field-gate.md](phase2-field-gate.md) (hooks-on vs hooks-off ledger, compared by
+  row id; pass = capture-on-read is a superset).
 - [capture-health.handoff.md](capture-health.handoff.md) +
   [capture-health.prompt.md](capture-health.prompt.md) — make silent zero-capture loud
   (an installed agent that matched no files warns on `cage report`). Sequence **after**

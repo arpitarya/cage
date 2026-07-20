@@ -394,5 +394,7 @@ survives" tests.
   what phasing decoupled. §9.7's change-map is the de-risking artifact; the code should be
   written later, against these decisions. **Gate:** Phase 1 running in the field long enough to
   show capture-on-read captures everything the hooks did (compare a hooks-on machine's ledger
-  against a hooks-off one over the same work).
+  against a hooks-off one over the same work). The prose gate is now a concrete, ready-to-run
+  procedure — see [phase2-field-gate.md](phase2-field-gate.md) (pass = capture-on-read's row-id
+  set is a superset of the hooks-on set; no row only the hooks caught).
 - **OPEN:** exact throttle default. Start conservative (~60s) and make it policy-tunable.
