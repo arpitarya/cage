@@ -319,11 +319,80 @@ new features get built on the old model:
 2. Stop feeding `backfill_status`/`realtime_status` into any new surface; build the doctor
    timeline from capture facts.
 
-## 10. Open questions
+## 9.7 Phase 2 change-map (verified against the code — do not re-derive)
 
-- **OPEN (Phase 2, not now):** task-close story once SessionEnd is deleted — explicit
-  `cage outcome` only, or derive task boundaries from transcript session edges at import?
-- **OPEN (small, implementer resolves):** does `cage doctor` sweep before or after rendering its
-  timeline? Must not mask the problem it diagnoses (§8). Recommendation: report pre-sweep state,
-  then sweep.
+Produced by reading the full Phase 2 surface. Preserved here so the branch can be written later
+against final decisions without redoing the analysis.
+
+**Delete:** `hooks.stop` / `session_start` / `session_end` / `_capture_calls` / `_snapshot_tasks`
+· `cli.py` parsers `hook-stop` / `hook-session-start` / `hook-session-end` ·
+`agents.backfill_status` / `realtime_status` + all 8 wire-module implementations · the
+token-hook writes in all four wire modules.
+
+**Keep — the five entanglements to protect:**
+1. `PostToolUse` — shares one config block with Stop/SessionEnd in `claudewire._simple()`.
+2. The git provenance hooks — installed only under `if "claude" in out`.
+3. The **cleanup chokepoint** — must be *proven* to survive via capture-on-read's
+   `importcmd.run → cleanup.maybe_run`.
+4. `codexwire.status()` — calls the to-be-deleted `backfill_status`.
+5. `hooks.py` reduced to a **provenance-only** module.
+
+**Migration:** each wire module's `install()` must *strip* previously-written token entries on
+re-run (idempotent), not merely stop adding them.
+
+**Tests:** rework `test_agents` / `test_portable_wiring` / `test_launcher_mode` + dummyrepo
+S1/S2; add the DoD-required "cleanup still fires for a Claude-only user" and "provenance
+survives" tests.
+
+## 10. Decisions (resolved — do not re-litigate)
+
+- **Doctor ordering → `cage doctor` NEVER sweeps.** Reverses this handoff's earlier §10
+  recommendation. Precedent: `pathprobe.probe()` is documented *"read-only… never writes
+  (cursors are read, not updated)"* — doctor's diagnostic layer is already architecturally
+  read-only. A diagnostic that mutates what it diagnoses is a category error; sweeping would
+  mask broken capture and make `cage doctor` produce different output on consecutive runs.
+  Users are covered because report/insights/MCP all capture-on-read. **Phase 1 already
+  complies** (`cmd_doctor` uses `root()`, not the capture helper) — verified, no change needed.
+- **Test suppression → a dedicated internal gate, conftest OFF, new tests opt in.**
+  Isolating homes is insufficient: the sweep would still run, still bump `_last_import`, which
+  feeds the report footer's staleness advice (`report.py:381 → _last_import_line`) — goldens
+  containing that line would drift. Reusing `CAGE_CAPTURE=0` in conftest would disable capture
+  for existing import tests across the suite. The gate is **internal/test-only** — the
+  user-facing story stays two switches (`CAGE_CAPTURE`, `--no-import`); `cage query capture`
+  must not advertise it.
+- **Routing key in CSV → row only, NOT in `RECEIPT_FIELDS`.** `scope`/`project` earn columns
+  because they're analytically useful (you can group by them); a routing **hash** has none in a
+  spreadsheet — it's reclaim plumbing. Adding a CSV column later is trivial; removing one breaks
+  index-reading consumers. Expose it via `--why-ledger` / the debug trace if ever needed.
+- **Task-close (Phase 2) → `outcome-only`.** The ledger is **append-only**: synthetic task rows,
+  once written, are permanent — a guess cannot be un-written. Task rows feed the closed-task
+  join → `compare`/`estimate`/`calibration`/`verdict`, all of which make **dollar claims**;
+  a derived boundary would propagate a semantic guess into a cost figure. This does *not*
+  inherit the `gap_ms` precedent: turn-gap attention measures something real (elapsed time),
+  whereas a task boundary is a categorical assertion. `MIN_COMPARE_N`/`MIN_ESTIMATE_N` blocking
+  to `INSUFFICIENT DATA` is the honest failure mode and is already built.
+  **Reversible in the safe direction:** if tasks prove too sparse in the field, add
+  import-derived later as an explicitly-tagged `estimated` layer that *loses to attestation*
+  (the human-axis precedent). Starting derived and removing it later is the hard direction.
+- **Transcript provenance fallback (Phase 2) → PRESERVE, re-homed onto the import path.**
+  `_record_transcript_provenance` currently fires only from `session_end()`, which **does not
+  fire under the VS Code extension** — so for VS Code users the fallback is already dead *and*
+  `PostToolUse` doesn't fire either, meaning those sessions get no provenance at all. Re-homing
+  it onto the import path is therefore a **strict improvement**, and it fixes the original
+  complaint (broken hooks under VS Code). It is also the only option consistent with the design
+  thesis — no capture path may depend on a hook firing — and with §11, which kept provenance
+  precisely because it is a **trust tier**, not latency. Constraints: method stays `transcript`
+  (trust 1, **never** promoted to `hooked`); dedupe by row id (`union_by_id`); fail-open and
+  `CAGE_DEBUG`-logged.
+
+**Still genuinely open:**
+
+- **OPEN — the Phase 2 field gate (the only thing blocking the branch).** Phase 2 deletes the
+  safety net; the whole reason for phasing was to not remove it until Phase 1 has proven itself
+  in real use. Phase 1 is hours old. **Do not write the Phase 2 branch yet** — a ready-to-merge
+  deletion branch creates pressure to merge before the evidence exists, which re-couples exactly
+  what phasing decoupled. §9.7's change-map is the de-risking artifact; the code should be
+  written later, against these decisions. **Gate:** Phase 1 running in the field long enough to
+  show capture-on-read captures everything the hooks did (compare a hooks-on machine's ledger
+  against a hooks-off one over the same work).
 - **OPEN:** exact throttle default. Start conservative (~60s) and make it policy-tunable.
