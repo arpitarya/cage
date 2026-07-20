@@ -13,5 +13,14 @@ __pycache__/
 .cage/out/
 .cage/state/
 
+# graphify — regenerable knowledge-graph output (graphify update .); the whole tree
+# is ignored so a `git add` can't sweep in the multi-MB graph.json/graph.html blobs.
+graphify-out/
+
+# Claude Code — personal/machine-local settings only. `.claude/settings.json` is the
+# committable, team-shared wiring file (deliberately NOT ignored) — it stays untracked
+# for now because it still carries the token-capture hooks that Phase 2 removes.
+.claude/settings.local.json
+
 # macOS
 .DS_Store
