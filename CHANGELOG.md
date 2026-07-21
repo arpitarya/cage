@@ -2,6 +2,32 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
+## v0.31.1 (2026-07-21) — docs: the Phase 2 field gate, made runnable
+
+Documentation and repo-hygiene only — **no code changed**; the runtime is byte-identical to
+v0.31.0 (same 814 tests, same derived numbers). This release ships the paperwork the v0.31.0
+capture-architecture Phase 1 left in the working tree, so the Phase 2 waiting period is
+measurable instead of prose.
+
+- **The Phase 2 field gate is now a runnable procedure, not a sentence.**
+  [docs/phase2-field-gate.md](docs/phase2-field-gate.md) turns the handoff §10 gate into a
+  concrete comparison: build a hooks-on ledger and a hooks-off (`CAGE_CAPTURE_ON_READ`-only)
+  ledger over the same span of work, compare them **by row id** (`mergeutil.union_by_id`
+  semantics), and pass **iff** capture-on-read's row set is a **superset** of the hooks-on set
+  — no row that only the hooks caught. References the exact switches (`CAGE_CAPTURE`,
+  `CAGE_CAPTURE_ON_READ`, `--no-import`) and the `importcmd.ensure_captured` path. It is an
+  acceptance test, not a runner — no `cage/**` code, no Phase 2 work. Linked from the handoff
+  §10 and `docs/README.md` Active work.
+- **Phase 2 decisions record.** `docs/capture-architecture.handoff.md` gained §9.7 (the
+  verified Phase 2 change-map) and §10 (five resolved decisions plus the field gate), so the
+  Phase 2 branch can be written later against fixed decisions rather than re-derived.
+- **Repo hygiene.** `.gitignore` now ignores the regenerable `graphify-out/` tree in full (the
+  prior partial rule left ~7MB unignored) and the machine-local `.claude/settings.local.json`.
+
+Built from: [docs/capture-architecture.handoff.md](docs/capture-architecture.handoff.md) §9.7+§10
+and [docs/phase2-field-gate.md](docs/phase2-field-gate.md). Phase 2 itself is unshipped — the
+capture-architecture handoff/prompt/plan pairs stay **active in `docs/`**, not archived.
+
 ## v0.31.0 (2026-07-19) — capture-on-read: capture without hooks, made visible
 
 Built from: [docs/capture-architecture.handoff.md](docs/capture-architecture.handoff.md) ·
