@@ -119,6 +119,22 @@ def test_self_silencing_a_prior_row_clears_the_warning(tmp_path, monkeypatch):
     assert report.capture_warnings(_health(root)) == []  # never nags an agent with rows
 
 
+def test_first_ever_import_marks_the_agent_captured_same_run(tmp_path, monkeypatch):
+    # F2 regression (docs/regression/2026-07-22-capture-report.md): the VERY FIRST import
+    # of an agent must record `captured=True` in the SAME run. The run-shared `captured`
+    # set is snapshotted from the ledger *before* this run's appends, so a brand-new
+    # surface isn't in it yet — before the fix it read `captured=False` until a *second*
+    # import, leaving `cage doctor` claiming an agent wasn't capturing while its
+    # freshly-imported rows already sat in the ledger. `imported > 0` closes the off-by-one.
+    root = _isolate(tmp_path, monkeypatch)
+    paths.codex_home().mkdir(parents=True)
+    _codex_log(root)                                     # a real codex log, empty ledger
+    _imp(root)                                           # codex's first-ever capture
+    rec = _health(root)["codex"]
+    assert rec["files"] > 0 and rec["captured"] is True  # captured in THIS run, not the next
+    assert report.capture_warnings(_health(root)) == []  # so doctor/report never nag
+
+
 def test_self_healing_files_reappear_clears_the_warning(tmp_path, monkeypatch):
     root = _isolate(tmp_path, monkeypatch)
     paths.codex_home().mkdir(parents=True)

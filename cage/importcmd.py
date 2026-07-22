@@ -161,11 +161,15 @@ def _record_health(root: Path, cursors: dict, health: dict, captured: set,
             info = health.get(a, {"files": 0, "src": ""})
             markers = _home_markers(a)
             home_path = next((m for m in markers if m.exists()), markers[0] if markers else None)
+            # `captured` is a lifetime set snapshotted BEFORE this run's appends, so a
+            # first-ever import wouldn't be in it; OR in the rows this run just appended
+            # (`imported > 0`) so a surface's very first capture reads healthy immediately
+            # rather than only after the next import (the F2 first-capture false-negative).
             hb[a] = {"home": any(m.exists() for m in markers),
                      "home_path": _tilde(home_path) if home_path is not None else "",
                      "src": _tilde(info.get("src", "")),
                      "files": info.get("files", 0),
-                     "captured": a in captured}
+                     "captured": a in captured or info.get("imported", 0) > 0}
     except Exception as e:  # fail-open: health is best-effort, never aborts capture
         debuglog.exception(root, "import.health", e)
 
@@ -396,6 +400,12 @@ def run_agent(root: Path, agent: str, args, *, pol: dict | None = None,
     if agent in _ADAPTERS:
         n, m = _ADAPTERS[agent](root, args, pol=pol, seen=seen, agent_cursor=agent_cursor,
                                 health=health)
+        # Record rows appended *this run* so `_record_health` can mark an agent captured
+        # on its FIRST-ever import: the run-shared `captured` set is snapshotted from the
+        # ledger *before* these appends, so a brand-new surface isn't in it yet (the F2
+        # first-capture false-negative). `imported > 0` closes that off-by-one.
+        if health is not None:
+            health.setdefault(agent, {"files": 0, "src": ""})["imported"] = n
         return f"✔ {agent}: imported {n} call(s) from {m} file(s)."
     debuglog.event(root, pol=pol, event="import", agent=agent, result="proxy",
                    note="no on-disk usage log")
