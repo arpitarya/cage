@@ -354,6 +354,28 @@ just demo          # seed §4.4 + print attrib/matrix
 cage --version
 ```
 
+## Regression & capture reports (do this after every testing run)
+
+The sibling repo **cage-lab** (`../cage-lab`) is the out-of-tree, **black-box**
+regression suite + per-agent capture labs (it installs the shipped `cage` and never
+imports it; the in-tree suite can't see packaging, entry points, or bundled data).
+Its numbers are validated against a hand-derived reference, and its labs slice the
+**real** `~/.cage` ledger per agent to surface capture gaps.
+
+**Standing rule: after every cage-lab testing/capture run, publish the findings into
+[`docs/regression/`](docs/regression/) here, dated** — so they live with cage, are
+diffable release-to-release, and any agent working on cage can read them without the
+test repo checked out. The runner does it automatically:
+
+```bash
+CAGE_REAL_LEDGER=~/.cage python ../cage-lab/labs/run_all.py   # writes docs/regression/<date>-{capture-report.md,.json,fixes.md} + latest-*
+```
+
+When you (an agent) run cage-lab by hand, still drop the dated report + a prioritized
+`*-fixes.md` into `docs/regression/` and add the row to its README index. The latest
+findings and their fix checklist are the input for the next round of cage fixes; see
+`docs/regression/latest-capture-report.md`.
+
 ## Adapters & agents (one ledger, many surfaces)
 
 Cage targets the **wire protocol**, so the meter and read surface are universal and

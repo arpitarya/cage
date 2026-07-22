@@ -1,0 +1,184 @@
+{
+  "real_ledger": "/tmp/realledger/.cage",
+  "totals": {
+    "calls": 36451,
+    "receipts": 3
+  },
+  "labs": {
+    "claude-only": {
+      "agents": [
+        "claude-code"
+      ],
+      "calls": 36002,
+      "usd": 7025.0209,
+      "tokens_in": 8178535219,
+      "tokens_out": 36858377,
+      "unpriced_calls": 0,
+      "unpriced_tokens": 0,
+      "receipts": 3
+    },
+    "copilot-only": {
+      "agents": [
+        "copilot"
+      ],
+      "calls": 60,
+      "usd": 3.5914,
+      "tokens_in": 2164279,
+      "tokens_out": 27155,
+      "unpriced_calls": 24,
+      "unpriced_tokens": 975842,
+      "receipts": 0
+    },
+    "kiro-only": {
+      "agents": [
+        "kiro"
+      ],
+      "calls": 16,
+      "usd": 0.0006,
+      "tokens_in": 198,
+      "tokens_out": 0,
+      "unpriced_calls": 0,
+      "unpriced_tokens": 0,
+      "receipts": 0
+    },
+    "copilot-kiro": {
+      "agents": [
+        "copilot",
+        "kiro"
+      ],
+      "calls": 76,
+      "usd": 3.592,
+      "tokens_in": 2164477,
+      "tokens_out": 27155,
+      "unpriced_calls": 24,
+      "unpriced_tokens": 975842,
+      "receipts": 0
+    }
+  },
+  "capture_health": {
+    "claude": {
+      "captured": true,
+      "files": 187,
+      "home": true,
+      "home_path": "~/.claude",
+      "src": "~/.claude/projects"
+    },
+    "codex": {
+      "captured": false,
+      "files": 20,
+      "home": true,
+      "home_path": "~/.codex",
+      "src": "~/.codex/sessions"
+    },
+    "copilot": {
+      "captured": false,
+      "files": 152,
+      "home": true,
+      "home_path": "~/.copilot",
+      "src": "~/.copilot/session-state"
+    },
+    "kiro": {
+      "captured": false,
+      "files": 1,
+      "home": true,
+      "home_path": "~/.kiro",
+      "src": "~/Library/Application Support/Kiro/User/globalStorage/kiro.kiroagent/dev_data/tokens_generated.jsonl"
+    }
+  },
+  "findings": [
+    {
+      "id": "receipts-empty",
+      "severity": "high",
+      "summary": "Tool-savings receipts are effectively absent \u2014 the attribution thesis has no real data",
+      "evidence": {
+        "total_receipts": 3,
+        "demo_seed_receipts": 3,
+        "real_receipts": 0,
+        "calls": 36451
+      }
+    },
+    {
+      "id": "health-contradiction",
+      "severity": "high",
+      "summary": "capture-health flags agents captured:false while their rows exist \u2014 the flag conflates 'nothing new this run' with 'broken'",
+      "evidence": {
+        "contradictions": [
+          {
+            "agent": "codex",
+            "captured_flag": false,
+            "rows_in_ledger": 373,
+            "files_seen": 20
+          },
+          {
+            "agent": "copilot",
+            "captured_flag": false,
+            "rows_in_ledger": 60,
+            "files_seen": 152
+          },
+          {
+            "agent": "kiro",
+            "captured_flag": false,
+            "rows_in_ledger": 16,
+            "files_seen": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "unpriced-copilot-auto",
+      "severity": "medium",
+      "summary": "copilot/auto is UNPRICED \u2014 understates copilot cost",
+      "evidence": {
+        "calls": 24,
+        "tokens": 975842
+      }
+    },
+    {
+      "id": "kiro-empty",
+      "severity": "high",
+      "summary": "kiro capture yields almost nothing (input-only Library log)",
+      "evidence": {
+        "calls": 16,
+        "tokens_in": 198,
+        "tokens_out": 0,
+        "src": "~/Library/Application Support/Kiro/User/globalStorage/kiro.kiroagent/dev_data/tokens_generated.jsonl"
+      }
+    },
+    {
+      "id": "cache-dominated-headline",
+      "severity": "medium",
+      "summary": "\u224898% of tokens_in are cache reads \u2014 the headline token/$ number misleads without a split",
+      "evidence": {
+        "cached_pct": 98.0,
+        "fresh_input_tokens": 162031676,
+        "cached_tokens": 8037093572,
+        "total_tokens_in": 8199125248
+      }
+    },
+    {
+      "id": "gap-ms-sparse",
+      "severity": "low",
+      "summary": "gap_ms (passive human-attention axis) is stamped on ~1% of rows \u2014 the axis has almost no data",
+      "evidence": {
+        "rows_with_gap_ms": 371,
+        "rows": 36451
+      }
+    },
+    {
+      "id": "no-debug-log",
+      "severity": "medium",
+      "summary": "No debug.log exists \u2014 CAGE_DEBUG has never run, so there is zero trail for why codex/copilot/kiro read captured:false",
+      "evidence": {
+        "debug_log_present": false
+      }
+    },
+    {
+      "id": "stale-import",
+      "severity": "low",
+      "summary": "last import is stale \u2014 capture is pull-based and nothing has run recently",
+      "evidence": {
+        "last_import": null
+      }
+    }
+  ]
+}
