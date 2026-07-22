@@ -37,6 +37,12 @@ and readable by any agent working on cage without needing the test repo checked 
 
 Latest always at [`latest-capture-report.md`](latest-capture-report.md).
 
+### Corrections
+
+| date | corrects | what changed |
+|------|----------|--------------|
+| [2026-07-23](2026-07-23-f2-correction.md) | 2026-07-22 §F2 | real root cause was a snapshot-ordering off-by-one (`captured` read before this run's appends), not a this-run-vs-lifetime confusion; blast radius corrected to first-import-only, never a false "capturing nothing" warning. Fixed in `cage/importcmd.py`, shipped v0.31.2. |
+
 ## What cage-lab is
 
 A black-box regression suite + per-agent capture labs for the cage-flux package
