@@ -344,6 +344,27 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   and must never be cited as current spec.** A shipped feature whose
   handoff/prompt still sits in `docs/` root is a release bug, same as a missing
   changelog entry.
+- **Every prompt doc declares the model tier that should execute it.** A
+  `docs/*.prompt.md` starts with a `**Model:**` line naming the tier and the
+  one-line reason. Work in this repo spans mechanical git hygiene to
+  multi-hypothesis diagnosis across a fail-open capture path, and running the
+  wrong tier fails in both directions — an over-powered model on a scripted
+  cleanup burns budget and invents scope, an under-powered one on a deletion
+  with hidden entanglements (Phase 2's five, `hooks.py`'s four subsystems)
+  misses what it can't see. The rubric:
+  - **Haiku** — fully scripted, zero judgment: run a command, read a file back,
+    mechanical find/replace with an exact target. Rare here.
+  - **Sonnet** — a decided plan with an explicit change-map: git hygiene,
+    docs, additive well-specced features, wide-but-mechanical refactors, and
+    executing a handoff whose decisions are already made.
+  - **Opus** — anything where the *diagnosis* is the work, or where a wrong
+    call is expensive/irreversible: root-causing a silent capture failure,
+    deleting code with entanglements, design/architecture, debate gates,
+    writing the handoff itself, and any change to the substrate contract,
+    determinism law, or method tagging.
+  When in doubt on a *destructive or diagnostic* task, choose Opus; on an
+  *additive, fully-specced* one, choose Sonnet. State the tier when handing a
+  prompt to a human, too — not just in the file.
 - Keep modules small and single-purpose (fux spirit). Tests live in `tests/`.
 
 ## Dev
