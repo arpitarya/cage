@@ -224,7 +224,7 @@ Every derived view is parse / arithmetic over the log — **no LLM call, ever, o
 
 Latest release below — full history and detail in [CHANGELOG.md](CHANGELOG.md).
 
-- **v0.31.1 (2026-07-21) — docs: the Phase 2 field gate, made runnable.** Documentation and repo-hygiene only — **no code changed**; the runtime is byte-identical to v0.31.0. The Phase 2 field gate is now a concrete, runnable procedure ([docs/phase2-field-gate.md](docs/phase2-field-gate.md)): a hooks-on ledger vs a hooks-off (`CAGE_CAPTURE_ON_READ`-only) ledger compared **by row id**, passing **iff** capture-on-read's set is a **superset** of the hooks-on set (no row only the hooks caught). Also lands the Phase 2 decisions record (handoff §9.7+§10) and `.gitignore` hygiene (the regenerable `graphify-out/` tree now fully ignored).
+- **v0.31.2 (2026-07-23) — fix: capture-health false negative on an agent's first-ever import.** `_health.captured` is snapshotted from the ledger *before* this run's own imports are appended, so a brand-new agent's very first capture read `captured:false` until a second import self-healed it — fixed by unioning in this run's own appends. Also corrects the 2026-07-22 regression report's F2 diagnosis: the real cause was this snapshot-ordering off-by-one, not a this-run-vs-lifetime confusion, and it never produced a false "capturing nothing" warning ([correction doc](docs/regression/2026-07-23-f2-correction.md)).
 
 ## The name
 

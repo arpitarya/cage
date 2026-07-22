@@ -2,6 +2,29 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
+## v0.31.2 (2026-07-23) — fix: capture-health false negative on an agent's first-ever import
+
+- **Fix: `_health.captured` now reads true on a surface's very first import, same run.**
+  `_record_health`'s `captured` set is snapshotted from `ledger.calls(root)` **before**
+  `run_agent` appends this run's newly-imported rows — a snapshot-ordering off-by-one that
+  left a brand-new agent's very first import reading `captured:false` until a *second* import
+  self-healed it. `run_agent` now records the row count it imported this run
+  (`health[agent]["imported"]`), and `_record_health` unions that against the lifetime
+  `captured` set (`a in captured or info.get("imported", 0) > 0`). New regression test:
+  `test_first_ever_import_marks_the_agent_captured_same_run`
+  ([tests/test_capture_health.py](tests/test_capture_health.py)), confirmed failing before the
+  fix and passing after; verified against a real ledger (one `cage import` flipped all four
+  surfaces to `captured:true`).
+- **Correction to the 2026-07-22 regression report's F2 finding.** That report's stated root
+  cause — "`captured` tracks this-run delta, not lifetime" — didn't match the code, which has
+  read the lifetime `ledger.calls(root)` set since v0.30.0. The real defect and the corrected
+  blast radius (this never produced a false "installed but capturing nothing" warning) are
+  documented in [docs/regression/2026-07-23-f2-correction.md](docs/regression/2026-07-23-f2-correction.md)
+  — a new dated entry per this repo's never-rewrite-history convention; the 07-22 report is
+  unchanged.
+- **New Must-Know Rule:** every `docs/*.prompt.md` must declare the model tier that should
+  execute it (`**Model:**` line + one-line reason), with a Haiku/Sonnet/Opus rubric.
+
 ## v0.31.1 (2026-07-21) — docs: the Phase 2 field gate, made runnable
 
 Documentation and repo-hygiene only — **no code changed**; the runtime is byte-identical to
