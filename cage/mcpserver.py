@@ -3,10 +3,10 @@
 A minimal Model Context Protocol server on stdio: newline-delimited JSON-RPC 2.0,
 hand-rolled so it adds no dependency. Publishes Cage's read paths — report /
 attrib / matrix / budget / roi / why — as MCP *tools*, so an agent (Claude Code,
-Codex, Kiro, Copilot) can ask "what did this cost, and what saved me money?" and
+Kiro, Copilot) can ask "what did this cost, and what saved me money?" and
 answer from its own ledger. Every tool is deterministic and never calls an LLM.
 
-    claude mcp add cage -- cage mcp        # or the equivalent for codex / kiro
+    claude mcp add cage -- cage mcp        # or the equivalent for copilot / kiro
 """
 from __future__ import annotations
 

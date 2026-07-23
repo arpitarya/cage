@@ -73,7 +73,7 @@ def cage_command_tail(command: str) -> str | None:
     return None
 
 
-# The codex/kiro self-locating one-liner (`runshim.selflocating_command`) doesn't
+# Kiro's self-locating one-liner (`runshim.selflocating_command`) doesn't
 # start with an executable name — it resolves the git root first, so the shim path
 # sits mid-command. The one-liner names the shim TWICE (`[ -x "…cage-run" ]` then
 # `exec "…cage-run" <tail>`), so the leading `.*` is deliberately greedy: it anchors
@@ -353,13 +353,11 @@ def kiro_token_log() -> Path:
 def _builtin_log_sources(agent: str) -> list[tuple[Path, str]]:
     """The hard-coded ``(source, glob)`` candidate log locations per agent — one list
     per agent so a new location (like Copilot's VS Code chat-session store) is added
-    exactly once. For claude/codex/copilot the source is a directory + glob; for kiro
+    exactly once. For claude/copilot the source is a directory + glob; for kiro
     it is the token log file itself (glob ``*`` — `_scan` treats a file source as
     itself). The policy-aware, provenance-tagged form is :func:`resolve_log_sources`."""
     if agent == "claude":
         return [(claude_home() / "projects", "**/*.jsonl")]
-    if agent == "codex":
-        return [(codex_home() / "sessions", "**/rollout-*.jsonl")]
     if agent == "copilot":
         return [(copilot_home() / "session-state", "*/events.jsonl"),
                 (vscode_user_dir() / "workspaceStorage", "*/chatSessions/*.jsonl")]
@@ -406,10 +404,10 @@ class SourcesResolution(NamedTuple):
 # One canonical glob per parser format for a *policy-declared* directory (a built-in
 # copilot has two globs; a policy path uses the dominant CLI form). A file source is
 # taken directly (`_scan` ignores the glob for a file).
-_FORMAT_GLOB = {"claude": "**/*.jsonl", "codex": "**/rollout-*.jsonl",
+_FORMAT_GLOB = {"claude": "**/*.jsonl",
                 "copilot": "*/events.jsonl", "kiro": "*"}
 # Per-agent home env overrides — a built-in candidate is tagged ``env`` when any is set.
-_AGENT_ENV = {"claude": ("CLAUDE_CONFIG_DIR",), "codex": ("CODEX_HOME",),
+_AGENT_ENV = {"claude": ("CLAUDE_CONFIG_DIR",),
               "copilot": ("COPILOT_HOME", "CAGE_VSCODE_USER"),
               "kiro": ("KIRO_HOME", "KIRO_DATA_DIR")}
 _GLOB_CHARS = frozenset("*?[")
@@ -434,8 +432,8 @@ def resolve_log_sources(pol: dict | None = None) -> SourcesResolution:
     A ``[sources.<agent>] paths = [...]`` *adds* candidates (tagged ``policy``);
     ``replace = true`` drops that agent's built-ins first (empty ``paths`` then =
     disabled). A policy path equal to a built-in path is deduped to the built-in tag.
-    A ``[sources.<name>]`` whose ``<name>`` is not one of the four agents is a custom
-    tool: it must declare ``format = "claude|codex|copilot|kiro"`` (the parser to
+    A ``[sources.<name>]`` whose ``<name>`` is not one of the three agents is a custom
+    tool: it must declare ``format = "claude|copilot|kiro"`` (the parser to
     reuse) and its rows stamp ``agent = <name>``. ``~``/``$VAR`` expand; a glob-shaped
     entry is rejected into ``problems`` (never raised — the sweep stays fail-open).
 
@@ -513,7 +511,7 @@ def resolve_log_sources(pol: dict | None = None) -> SourcesResolution:
                 fmt = entry.get("format")
                 if fmt not in _FORMAT_GLOB:
                     problems.append(f"[[sources.{key}]] entry #{i + 1} is a custom tool "
-                                    "— each entry needs format = \"claude|codex|copilot|kiro\"")
+                                    "— each entry needs format = \"claude|copilot|kiro\"")
                     continue
             elif entry.get("format") not in (None, default_fmt):
                 problems.append(f"[[sources.{key}]] format is implicit for the {key} "
@@ -540,7 +538,7 @@ def resolve_log_sources(pol: dict | None = None) -> SourcesResolution:
         elif isinstance(table, list):
             _list_paths(agent, table, agent)
 
-    # Custom tools: any `[sources.<name>]` whose name is not one of the four agents.
+    # Custom tools: any `[sources.<name>]` whose name is not one of the three agents.
     for name in sorted(k for k in src_tables if k not in surfaces):
         table = src_tables[name]
         if isinstance(table, list):
@@ -552,7 +550,7 @@ def resolve_log_sources(pol: dict | None = None) -> SourcesResolution:
         fmt = table.get("format")
         if fmt not in _FORMAT_GLOB:
             problems.append(f"[sources.{name}] is a custom tool — it needs "
-                            "format = \"claude|codex|copilot|kiro\" (the parser to reuse)")
+                            "format = \"claude|copilot|kiro\" (the parser to reuse)")
             continue
         _dict_paths(name, table, fmt)
 
@@ -568,7 +566,7 @@ def agent_log_sources(agent: str, pol: dict | None = None) -> list[LogSource]:
 
 
 def custom_tool_sources(pol: dict | None = None) -> list[LogSource]:
-    """The `[sources.<name>]` custom-tool sources (name ∉ the four agents) — each
+    """The `[sources.<name>]` custom-tool sources (name ∉ the three agents) — each
     reuses a declared parser ``fmt`` and stamps ``agent = <name>`` on imported rows."""
     from cage import agents
     return [s for s in resolve_log_sources(pol).sources if s.agent not in agents.SURFACES]
@@ -588,8 +586,6 @@ def custom_tool_sources(pol: dict | None = None) -> list[LogSource]:
 _SOURCE_DOC_PATHS = {
     "claude": [("~/.claude/projects",
                 "every session transcript under the tree, recursively")],
-    "codex": [("~/.codex/sessions",
-               "rollout logs under the tree, recursively")],
     "copilot": [
         ("~/.copilot/session-state",
          "Copilot CLI usage events (one dir per session)"),

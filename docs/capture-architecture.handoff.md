@@ -326,16 +326,19 @@ against final decisions without redoing the analysis.
 
 **Delete:** `hooks.stop` / `session_start` / `session_end` / `_capture_calls` / `_snapshot_tasks`
 · `cli.py` parsers `hook-stop` / `hook-session-start` / `hook-session-end` ·
-`agents.backfill_status` / `realtime_status` + all 8 wire-module implementations · the
-token-hook writes in all four wire modules.
+`agents.backfill_status` / `realtime_status` + all 6 wire-module implementations · the
+token-hook writes in all three wire modules.
 
-**Keep — the five entanglements to protect:**
+**Keep — the four entanglements to protect:**
 1. `PostToolUse` — shares one config block with Stop/SessionEnd in `claudewire._simple()`.
 2. The git provenance hooks — installed only under `if "claude" in out`.
 3. The **cleanup chokepoint** — must be *proven* to survive via capture-on-read's
    `importcmd.run → cleanup.maybe_run`.
-4. `codexwire.status()` — calls the to-be-deleted `backfill_status`.
-5. `hooks.py` reduced to a **provenance-only** module.
+4. `hooks.py` reduced to a **provenance-only** module.
+
+(Codex was removed completely before this phase — `codexwire.py` no longer exists, so its
+`status()`/`backfill_status()` entanglement is moot; see
+`docs/archive/*-codex-removal.handoff.md`.)
 
 **Migration:** each wire module's `install()` must *strip* previously-written token entries on
 re-run (idempotent), not merely stop adding them.

@@ -2,7 +2,7 @@
 
 Wired hook/MCP entries used to embed the wiring machine's *absolute* cage path
 (`paths.cage_bin()` at setup time). Several wired files are committed to git
-(`.mcp.json`, `.vscode/mcp.json`, `.claude/settings.json`, `.codex/hooks.json`,
+(`.mcp.json`, `.vscode/mcp.json`, `.claude/settings.json`,
 `.kiro/hooks/*.hook`, `.kiro/settings/mcp.json`) — so one developer's path
 shipped to the whole team and every clone got broken wiring. The fix: committed
 wiring references a **committed shim** that resolves cage *at runtime* on each

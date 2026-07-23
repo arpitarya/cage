@@ -1,7 +1,7 @@
 """`cage data graphify -- graphify <args>` — meter a third-party tool without touching it.
 
 graphify is read-only, so cage measures it the way it meters any tool it doesn't own
-(`cage data meter`, `import-codex`): run it as a subprocess, pass stdout/stderr/exit
+(`cage data meter`, `cage import`): run it as a subprocess, pass stdout/stderr/exit
 through **unchanged**, and on the side parse the captured answer to file one
 token-saving receipt. A metering error never alters graphify's result (fail-open).
 

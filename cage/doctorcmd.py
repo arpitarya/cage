@@ -1,6 +1,6 @@
 """`cage doctor` — verify a project's Cage setup is correct and working.
 
-A deterministic, $0 health check any agent (claude / codex / copilot / kiro) can run
+A deterministic, $0 health check any agent (claude / copilot / kiro) can run
 to confirm Cage is installed and wired before trusting its numbers. Each check returns
 (level, detail): level is "ok" | "warn" | "fail". The overall status is the worst level
 (fail > warn > ok); the CLI exits non-zero on any fail so scripts/agents can gate on it.

@@ -124,7 +124,7 @@ REGISTRY: tuple[Explanation, ...] = (
         "  [human] idle_cap_minutes wins, constants.IDLE_CAP_MINUTES is the fallback)\n"
         "  gap_ms = wall-clock between the previous assistant turn's end and the human\n"
         "  turn that led to the call — stamped at import only where the log carries\n"
-        "  per-turn timestamps (claude today; codex/copilot/kiro lack the signal ⇒ no\n"
+        "  per-turn timestamps (claude today; copilot/kiro lack the signal ⇒ no\n"
         "  field, never fabricated). Read-time derive: changing the cap re-prices the\n"
         "  backlog, the ledger is never rewritten. Attested minutes (`human-record`,\n"
         "  `cage human outcome --minutes`) beat derived for a task — never summed;\n"
@@ -220,12 +220,12 @@ REGISTRY: tuple[Explanation, ...] = (
         "[sources] adds candidate import paths beyond the built-in registry — for a\n"
         "  nonstandard install, a network home, or a side-by-side log copy. Additive\n"
         "  by default (empty/absent [sources] = the built-in registry, byte-identical).\n"
-        "    [sources.<agent>] paths = [\"~/alt/logs\", ...]   # one of the four agents\n"
+        "    [sources.<agent>] paths = [\"~/alt/logs\", ...]   # one of the three agents\n"
         "    [sources.<agent>] glob  = \"usage-*.ndjson\"      # optional; absent ⇒ format default\n"
         "    [sources.<agent>] replace = true                 # ignore that agent's built-ins\n"
         "                                                     #   (empty paths ⇒ disabled)\n"
         "    [[sources.<agent>]] path = \"~/x\", glob = \"...\"   # array form: one glob per path\n"
-        "    [sources.<name>]  paths = [...], format = \"claude|codex|copilot|kiro\"\n"
+        "    [sources.<name>]  paths = [...], format = \"claude|copilot|kiro\"\n"
         "                                                     # a custom tool; rows stamp agent=<name>\n"
         "  Precedence: env home override > policy > built-in. ~ and $VARs expand; a glob\n"
         "  char (*?[) in a `path` is rejected (put it in `glob =`); empty glob=\"\" is an error.\n"
@@ -699,7 +699,7 @@ REGISTRY: tuple[Explanation, ...] = (
                             "team-share", "gitignore"),
         "why committed wiring references .cage/bin/cage-run, never an absolute path",
         "wired files that are committed to git (.claude/settings.json, .mcp.json,\n"
-        "  .vscode/mcp.json, .codex/hooks.json, .kiro/hooks/*.kiro.hook) used to embed\n"
+        "  .vscode/mcp.json, .kiro/hooks/*.kiro.hook) used to embed\n"
         "  the wiring machine's absolute cage path — one dev's filesystem shipped to\n"
         "  the team, breaking every clone. They now reference the committed shim\n"
         "  .cage/bin/cage-run (identical bytes on every machine), which resolves cage\n"
@@ -708,9 +708,9 @@ REGISTRY: tuple[Explanation, ...] = (
         "  no capture (fail-open extended to wiring; `cage doctor` diagnoses, never\n"
         "  the hook path). Per host: Claude hooks use the documented\n"
         "  $CLAUDE_PROJECT_DIR placeholder; .mcp.json uses ${{CLAUDE_PROJECT_DIR:-.}}\n"
-        "  expansion; .vscode/mcp.json uses ${{workspaceFolder}}; codex/kiro hooks\n"
-        "  self-locate via git rev-parse (their hosts guarantee neither variable nor\n"
-        "  cwd). User-level files (~/.copilot/hooks, ~/.codex/config.toml MCP,\n"
+        "  expansion; .vscode/mcp.json uses ${{workspaceFolder}}; kiro hooks\n"
+        "  self-locate via git rev-parse (its host guarantees neither variable nor\n"
+        "  cwd). User-level files (~/.copilot/hooks,\n"
         "  .git/hooks) stay absolute — per-machine by nature, never cloned. The ONE\n"
         "  exception: .kiro/settings/mcp.json must stay absolute (Kiro spawns MCP\n"
         "  servers from its install dir, no workspace variable) — gitignore it.\n"
@@ -721,7 +721,7 @@ REGISTRY: tuple[Explanation, ...] = (
         "  through the interpreter only — nothing exe-shaped probed or executed;\n"
         "  CAGE_RUN_PYTHON=1 is the runtime-only override on the standard shim. See\n"
         "  `cage query restricted-env`.",
-        ("cage/runshim.py", "cage/claudewire.py", "cage/codexwire.py",
+        ("cage/runshim.py", "cage/claudewire.py",
          "cage/kirowire.py", "cage/doctorcmd.py"),
         "n/a — describes the wiring mechanism, not a number.",
         kind="concept", plan_ref="§5"),

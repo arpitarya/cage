@@ -29,7 +29,7 @@ The user-level `~/.copilot/hooks/cage.json` stays on the *resolved* absolute cag
 (a bare `cage` fails under the extension's PATH — that constraint is unchanged): it is
 per-machine by nature and never cloned, so absolute is the robust choice there.
 
-One wire file per agent (mirrors claudewire/codexwire/kirowire) — a new agent gets its
+One wire file per agent (mirrors claudewire/kirowire) — a new agent gets its
 own `<agent>wire.py`.
 """
 from __future__ import annotations

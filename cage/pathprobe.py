@@ -30,8 +30,6 @@ def _parse_rows(agent: str, f: Path) -> int:
     try:
         if agent == "claude":
             return len(transcript.parse_calls(f, session=f.stem))
-        if agent == "codex":
-            return len(transcript.parse_codex_calls(f, session=f.stem))
         if agent == "copilot":
             return len(importcmd._parse_copilot_any(f))
         if agent == "kiro":

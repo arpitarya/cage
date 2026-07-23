@@ -1,8 +1,8 @@
 """The shared "consult Cage for spend" pointer block, embedded into agent instruction /
 steering files (Copilot's `copilot-instructions.md`, Kiro's `steering/cage.md`).
 
-Per-agent *wiring* lives in one file per agent — `claudewire.py`, `codexwire.py`,
-`copilotwire.py`, `kirowire.py`; a new agent gets its own `<agent>wire.py`. This module
+Per-agent *wiring* lives in one file per agent — `claudewire.py`, `copilotwire.py`,
+`kirowire.py`; a new agent gets its own `<agent>wire.py`. This module
 only holds the cross-agent pointer text those wire files share.
 """
 from __future__ import annotations

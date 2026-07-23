@@ -645,7 +645,7 @@ def cmd_verify(_args) -> int:
 
 
 def cmd_import(args) -> int:
-    """Umbrella hookless import across all four agents (default ``--agent all``) — the
+    """Umbrella hookless import across all three agents (default ``--agent all``) — the
     canonical explicit capture verb. Captures into the active ledger (``--ledger``/
     ``CAGE_BASE`` → project ``.cage/`` → global ``~/.cage``), so it works with no hooks
     and no project. Each agent prints its own count line; the proxy fallback for those
@@ -660,12 +660,6 @@ def cmd_import(args) -> int:
         return 0
     for line in importcmd.run(ledger_root(), args.agent, args):
         print(line)
-    return 0
-
-
-def cmd_import_codex(args) -> int:
-    n, m = importcmd.import_codex(ledger_root(), args)
-    print(f"✔ imported {n} Codex call(s) from {m} rollout file(s).")
     return 0
 
 

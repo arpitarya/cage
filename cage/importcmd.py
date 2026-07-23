@@ -1,14 +1,14 @@
-"""Unified hookless metering — `cage import [--agent claude|codex|copilot|kiro|all]`.
+"""Unified hookless metering — `cage import [--agent claude|copilot|kiro|all]`.
 
 One umbrella over the per-agent hookless paths. Cage targets the wire protocol, so a
 metered call is the same row no matter which agent emitted it; only *how we recover it
 without hooks* differs by agent:
 
-All four agents now persist a usage log to disk, so the hookless path is an on-disk
+All three agents now persist a usage log to disk, so the hookless path is an on-disk
 **import** for every one of them:
 
-- **claude / codex / copilot** — `~/.claude/projects/**/*.jsonl`,
-  `~/.codex/sessions/**/rollout-*.jsonl`, `~/.copilot/session-state/*/events.jsonl`.
+- **claude / copilot** — `~/.claude/projects/**/*.jsonl`,
+  `~/.copilot/session-state/*/events.jsonl`.
 - **kiro** — `kiro.kiroagent/dev_data/tokens_generated.jsonl` (coarse: prompt tokens are
   reliable, output tokens often 0, model frequently the generic `"agent"`). The proxy
   (`cage data meter -- <cmd>`) stays the higher-fidelity fallback when Kiro's log is too thin.
@@ -24,11 +24,11 @@ import datetime as _dt
 import json
 from pathlib import Path
 
-from cage import (agents, capturelog, debuglog, ledger, limits, lockutil, paths,
+from cage import (agents, capturelog, debuglog, ledger, lockutil, paths,
                   policy, transcript)
 
 # Agents that persist a usage log to disk (everything else → proxy fallback).
-LOG_BEARING = ("claude", "codex", "copilot", "kiro")
+LOG_BEARING = ("claude", "copilot", "kiro")
 
 
 @contextlib.contextmanager
@@ -132,8 +132,6 @@ def _home_markers(agent: str) -> list[Path]:
     (a CLI-only Copilot user must not be nagged for an absent VS Code dir, §8)."""
     if agent == "claude":
         return [paths.claude_home()]
-    if agent == "codex":
-        return [paths.codex_home()]
     if agent == "copilot":
         return [paths.copilot_home(), paths.vscode_user_dir()]
     if agent == "kiro":
@@ -216,7 +214,7 @@ def _scan(root: Path, agent: str, src: Path, pattern: str, since,
     (size, mtime) match the cursor are dropped — already fully ingested, nothing new to
     parse. Records observational ``skip=since-filtered`` / ``skip=cursor-unchanged`` debug
     events when files existed but were all dropped (a common "why nothing captured?" cause).
-    ``agent_cursor=None`` (the standalone import-claude/-codex commands) ⇒ no skip.
+    ``agent_cursor=None`` (the standalone import-claude command) ⇒ no skip.
     Every candidate source gets a metadata-only ``probe`` event (path, exists, files
     matched) so `CAGE_DEBUG=1` answers "which locations did cage look at, and which
     missed" — the raw feed behind `cage doctor --paths`."""
@@ -305,25 +303,6 @@ def import_claude(root: Path, args, *, pol: dict | None = None, seen: set | None
     return total_rows, total_files
 
 
-def import_codex(root: Path, args, *, pol: dict | None = None, seen: set | None = None,
-                 agent_cursor: dict | None = None, health: dict | None = None) -> tuple[int, int]:
-    """Meter Codex from its on-disk rollouts (~/.codex/sessions/**/rollout-*.jsonl)."""
-    sources = ([(Path(args.path), "**/rollout-*.jsonl")] if getattr(args, "path", None)
-               else [(s.path, s.glob) for s in paths.agent_log_sources("codex", pol)])
-    total_rows = total_files = 0
-    for src, pattern in sources:
-        files = _scan(root, "codex", src, pattern, getattr(args, "since", None), pol=pol,
-                      agent_cursor=agent_cursor, health=health)
-        total_rows += _ingest(root, "codex", src, files,
-                              lambda f: transcript.parse_codex_calls(f, session=f.stem),
-                              pol=pol, seen=seen, agent_cursor=agent_cursor)
-        total_files += len(files)
-        # Latest-only Codex quota snapshot — a machine-local state file, NOT a ledger row
-        # (plan §3.8). Fail-open: never blocks the import; a renamed/absent block writes nothing.
-        limits.snapshot_codex(root, files)
-    return total_rows, total_files
-
-
 def _parse_copilot_any(f: Path) -> list[dict]:
     """Dispatch on the on-disk store: VS Code chat-session files (extension) parse via
     `parse_copilot_vscode_calls`; everything else is the CLI `events.jsonl` format."""
@@ -332,11 +311,10 @@ def _parse_copilot_any(f: Path) -> list[dict]:
     return transcript.parse_copilot_calls(f, session=f.parent.name)
 
 
-# The parser to reuse per declared `[sources.<name>] format` (plan Phase 4). The four
+# The parser to reuse per declared `[sources.<name>] format` (plan Phase 4). The three
 # built-in import fns above inline the same callables; a custom tool routes through
 # here by its declared format so no new parser is ever written for a custom source.
 _PARSERS = {"claude": lambda f: transcript.parse_calls(f, session=f.stem),
-            "codex": lambda f: transcript.parse_codex_calls(f, session=f.stem),
             "copilot": _parse_copilot_any,
             "kiro": lambda f: transcript.parse_kiro_calls(f)}
 
@@ -410,8 +388,7 @@ def import_kiro(root: Path, args, *, pol: dict | None = None, seen: set | None =
     return total_rows, total_files
 
 
-_ADAPTERS = {"claude": import_claude, "codex": import_codex,
-             "copilot": import_copilot, "kiro": import_kiro}
+_ADAPTERS = {"claude": import_claude, "copilot": import_copilot, "kiro": import_kiro}
 
 
 def proxy_line(agent: str) -> str:

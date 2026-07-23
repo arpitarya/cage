@@ -1,0 +1,149 @@
+# Handoff: remove Codex support from cage completely
+
+**One-liner:** Retire the "four agents, always" invariant — cage supports exactly three
+agents from this release on: **Claude Code · Copilot · Kiro**.
+
+**Owner / executor:** Claude Code. **Model tier:** plan **Opus** (product-invariant rewrite,
+one real judgment call below) → execute **Sonnet** (this session, decisions already locked).
+
+## 1. Context & why
+
+Arpit decided (2026-07-23) that Codex must be removed from cage completely. This is a
+**product/scope call, not a capture-quality call** — in the real ledger, Codex is one of
+the *healthier* captured agents (373 rows, $17.94 captured, second only to claude-code),
+unlike Kiro (near-empty) and Copilot (40% UNPRICED). Do not describe this anywhere as a
+bug fix or a response to a capture failure.
+
+This supersedes the CLAUDE.md invariant `agents.SURFACES = ("claude", "codex", "copilot",
+"kiro")` → `("claude", "copilot", "kiro")`, and every place that invariant fans out to
+(wiring, read surfaces, tests, generated assets, docs).
+
+Investigated via an Opus pass (2026-07-24) that verified a prior session's surface-map
+memory against the current v0.32.0 tree and resolved the open questions below.
+
+## 2. Decisions (locked — do not re-litigate)
+
+- **`cage data limits` is removed with codex, not kept generic.** `snapshot_codex` is the
+  sole writer of `state/limits.json` anywhere in the tree, and no other supported provider's
+  session log carries a `rate_limits` block. A live command with a deleted-only data source
+  is dead surface waiting to rot. If a future provider ever writes a quota block, the
+  mechanism is reintroduced generically then — not kept dormant now. Removed alongside:
+  `limits.py`, `Footprint.limits`, the `data limits` subparser + handler, `snapshot_codex`
+  call site, `credits.py` (verify it has no non-limits consumer first — if it does, keep
+  it), `test_limits.py`.
+- **The `format="codex"` custom-tool transcript parser is deleted, not kept selectable.**
+  A half-removed agent still reachable via `[sources.<tool>] format = "codex"` is exactly
+  the "silently break one" ambiguity CLAUDE.md's four-agents rule warns against — "removed
+  completely" means the parser goes too: `transcript.parse_codex_calls` +
+  `_codex_usage`/`_codex_model`/`_codex_rate_limits`, and the `claude|codex|copilot|kiro`
+  format-string litany across `paths.py`/`explain_data.py`/`docgen`.
+- **`codex_home()` (paths.py) stays.** Not codex *support* — it backs wiringscan's
+  asset-staleness scan and doctor's leftover-artifact detection, which must keep being able
+  to see a `~/.codex` directory to warn about orphaned wiring after this ships.
+- **The wiringscan orphan-ownership gap is a deferred follow-up, not in scope here.**
+  Confirmed: a pre-existing `.codex/hooks.json` running `cage import --agent codex` is
+  invisible to the current liveness scanner (the verb `import` stays live; `--agent codex`
+  is an argument, not a verb) — and post-removal it's also silently non-functional
+  (argparse `choices` rejects `codex`, hook fails, shim swallows to exit 0). Same F1-class
+  failure shape the scanner was built to kill, in a form the current detector structurally
+  can't see (ownership problem, not dead-verb problem). Fixing this needs its own design
+  pass (a new `Orphaned` check class in wiringscan) — flagged as the immediate next item
+  after this ships, not bundled into it.
+- **The 7 `-codex`-named openai price rows in `data/policy.toml` stay.** There is no codex
+  route prefix (`MODEL_ROUTE_PREFIXES = ("copilot/",)` only) — Copilot keeps the entire
+  openai price table alive via `transcript._copilot_provider`'s gpt-family mapping, so
+  nothing is orphaned. The `-codex`-named rows family-match `gpt-5` and cost nothing to
+  keep; dropping them is optional cosmetic cleanup, not part of this change (avoids an
+  unforced `P1.txt` golden re-bless).
+- **No confirmed conflict with the in-progress Phase 2 field gate.** `docs/phase2-field-gate.md`
+  is a documented procedure with no evidence of an active data collection run in this repo
+  (no state file, no in-flight comparison). If a hooks-on/hooks-off comparison is later
+  found to be mid-collection with codex rows in its baseline, re-baseline rather than
+  invalidate — but nothing here blocks on that.
+- **Sequencing:** land before capture-architecture Phase 2 (deleting the token-capture
+  hooks) — codex removal shrinks Phase 2's per-agent wiring surface by one, confirmed
+  against `capture-architecture.{handoff,plan}.md`.
+
+## 3. Non-negotiables
+
+- `$0`/stdlib-only; deterministic (derived views byte-identical) — this change touches no
+  ledger/schema/enum/method-tagging; assert byte-identical derived output before/after for
+  a fixture ledger with no codex rows.
+- Fail-open on every write path unaffected by this change stays fail-open.
+- CLAUDE.md is a **proposed diff** for review like any steering edit — but this change is
+  large enough (rewrites a stated invariant across ~10 lines) that it lands in the same
+  commit set as the code, per the existing convention for shipped-invariant changes.
+- Historical CHANGELOG entries are never rewritten — add the removal as a new entry.
+- Existing rows in a user's ledger that carry `agent="codex"` (or provider `openai` from a
+  past codex import) are **data, not code** — never scrubbed. Derived views simply stop
+  producing *new* codex rows; old ones read exactly as before.
+
+## 4. Surface map (by subsystem, verified against v0.32.0 HEAD)
+
+**Core dispatch:** `agents.py` — `SURFACES` tuple, `_WIRE` map, docstrings (`:6-10`, `:82`).
+
+**Wiring (delete):** `codexwire.py` (whole module — imported only by `agents.py`).
+`setupcmd.py` — the claude+codex shared-skill-dir loop (`:53-56`, `:74`) becomes claude-only.
+
+**Meter/import (delete codex leaves):** `importcmd.py` (`LOG_BEARING`, `import_codex`,
+`_ADAPTERS["codex"]`, `_home_dirs` branch, dispatch lambda, docstring). `transcript.py`
+(`parse_codex_calls`, `_codex_usage`, `_codex_model`, `_codex_rate_limits`, docstring).
+`paths.py` (`agent_log_sources` codex branch, `_FORMAT_GLOB["codex"]`, `_AGENT_ENV["codex"]`,
+`_builtin_log_sources` codex row, docstring litanies — keep `codex_home()` per §2).
+`pathprobe.py` (`parse_codex_calls` call in the `--paths` probe). `clicmds.py:666`
+`cmd_import_codex` — verify it's genuinely unreachable (no subparser registers it) before
+deleting.
+
+**Read surface:** `limits.py` and friends per §2. Prose/help/concept strings in
+`mcpserver.py`, `cli.py`, `humanview.py`, `explain_data.py` naming codex or "four agents."
+
+**Pricing/policy:** no code change needed (§2) — `data/policy.toml`'s `-codex` rows and
+`MODEL_ROUTE_PREFIXES` are untouched.
+
+**Generated assets:** `tools/skillgen/platforms.toml` (`[platform.codex]` block + the
+four-agents comment) + `gen.py` — regenerate + `--bless`. `tools/docgen`'s generated
+`[sources]` policy comment block (`format = "claude|codex|copilot|kiro"` → three) —
+regenerate + `--check`.
+
+**Tooling:** `tools/dummyrepo/run.py` — `AGENTS` tuple drives S1–S17 fixture planting;
+S11 and S15 explicitly seed `agent="codex"` calls for pricing scenarios — rewrite to
+`agent="copilot"` (still openai-provider), not delete the scenario.
+
+**Docs:** `CLAUDE.md` (~10 lines beyond "Four agents, always" — the Adapters&agents prose,
+the wire-convention list, the wiring-liveness paragraph, the all-agent-sweep line),
+`docs/agents.md`, `docs/sources.md`, `README.md`, `docs/cage-plan.md` (add a removal note,
+don't rewrite history). `CHANGELOG.md` — new entry only, never rewritten.
+
+**Tests (real counts, heaviest first):** `test_agents.py`, `test_capture_health.py`,
+`test_wiringscan.py`, `test_limits.py` (deleted whole), `test_transcript.py`,
+`test_sources.py`, `test_import_unified.py`, `test_platform_paths.py`,
+`test_output_spec.py`, `test_launcher_mode.py`, plus `test_capture_log.py`,
+`test_capture_observability.py`, `test_fixture_corpus.py`, `test_docgen_sources.py`,
+`test_setup_modes.py`, `test_portable_wiring.py`, `test_capture_on_read.py`. Fixture dirs
+`tests/fixtures/transcripts/codex/{cli,vscode}/` deleted.
+
+## 5. Testing & validation
+
+Full hard gate, same as every prior phase in this arc:
+```
+just test · python -m tools.dummyrepo · python -m tools.docgen --check ·
+python -m tools.skillgen --check · just demo
+```
+Re-bless any golden whose rendered output changes (doctor's codex-off advice line, the
+prices list if touched) via `CAGE_BLESS_GOLDENS=1 pytest tests/test_output_spec.py`, then
+regenerate `docs/cli-output-spec.md`.
+
+## 6. Documentation impact
+
+- [ ] `CLAUDE.md` — rewrite "Four agents, always" → three; the ~10 dependent lines above.
+- [ ] `docs/agents.md`, `docs/sources.md`, `README.md`, `docs/cage-plan.md` (removal note).
+- [ ] `CHANGELOG.md` + README "What's new" (replace); `__version__` bump; test-count refresh.
+- [ ] `docs/cli-output-spec.md` — regenerate if any golden moved.
+- [ ] This pair archived to `docs/archive/vX.Y-codex-removal.{handoff,prompt}.md` in the
+      same release that ships it, linked from that CHANGELOG entry, per the lifecycle rule.
+
+## 7. Open questions
+
+None blocking — every decision above is locked. The wiringscan orphan-ownership scanner
+and the optional `-codex` price-row cleanup are explicitly deferred follow-ups, not part
+of this change's definition of done.

@@ -92,7 +92,7 @@ def _render_derived(data: dict) -> str:
     derived = data.get("derived") or {}
     if not derived:
         return ("derived attention: no turn-gap data (gap_ms) in scope — only logs "
-                "with per-turn timestamps carry it (claude today; codex/copilot/kiro "
+                "with per-turn timestamps carry it (claude today; copilot/kiro "
                 "logs lack the signal).")
     head = ["agent", "sessions", "calls", "attn min", "attn hrs"]
     rows = [[name, str(a["sessions"]), str(a["calls"]), f"{a['minutes']:g}",

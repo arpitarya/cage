@@ -35,7 +35,7 @@ higher-fidelity fallback where Kiro's log is too thin. All idempotent.
   `.kiro/settings/mcp.json` to `.gitignore`; `cage doctor` says so rather than this
   module silently shipping a broken relative path.
 
-One wire file per agent (mirrors claudewire/codexwire/copilotwire) — a new agent gets
+One wire file per agent (mirrors claudewire/copilotwire) — a new agent gets
 its own `<agent>wire.py`.
 """
 from __future__ import annotations

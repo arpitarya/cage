@@ -2,17 +2,15 @@
 
 Asset copy, per agent (per-project hook/MCP wiring is `cage hooks install`). The
 target agent is **explicit** — `cage setup` installs only the surfaces it is asked
-for, never all four by default. Two scopes, same assets:
+for, never all three by default. Two scopes, same assets:
 
   scope=global (default — one machine-wide copy, every repo sees it):
     claude  → ~/.claude/skills/cage/            (slash-command skill)
-    codex   → ~/.codex/skills/cage/             (slash-command skill)
     copilot → <vscode-user>/prompts/cage.prompt.md   (reusable Copilot prompt)
     kiro    → ~/.kiro/steering/cage.md           (user steering doc)
 
   scope=project (committed with the repo — the team gets it, nothing machine-wide):
     claude  → <root>/.claude/skills/cage/
-    codex   → <root>/.codex/skills/cage/         (Codex scans repo .codex/skills, issue #21907)
     copilot → <root>/.github/prompts/cage.prompt.md
     kiro    → <root>/.kiro/steering/cage.md
 
@@ -49,20 +47,20 @@ def _copy_file(src, dst: Path) -> None:
 _ASSETS = (("cage", "cage", "cage"), ("cage-doctor", "cage-doctor", "cage-doctor"))
 
 
-def _skill_base(name: str, project: bool, root: Path | None) -> Path:
-    """Skill-dir parent for a skills agent (claude/codex): repo `.<name>` vs home."""
+def _skill_base(project: bool, root: Path | None) -> Path:
+    """Skill-dir parent for the claude skills agent: repo `.claude` vs home."""
     if project:
-        return root / f".{name}"  # .claude / .codex at the repo root
-    return paths.claude_home() if name == "claude" else paths.codex_home()
+        return root / ".claude"
+    return paths.claude_home()
 
 
 def run(surfaces: tuple[str, ...] | None = None, *, scope: str = "global",
         root: Path | None = None) -> dict:
-    """Install the assets for ``surfaces`` (default: all four).
+    """Install the assets for ``surfaces`` (default: all three).
 
     ``scope="project"`` writes the assets into the repo at ``root`` (committed,
     team-shared) instead of the machine-wide home. The CLI layer requires an
-    explicit choice; ``None`` (all four) is kept for callers that want every agent."""
+    explicit choice; ``None`` (all three) is kept for callers that want every agent."""
     project = scope == "project"
     if project and root is None:
         raise ValueError("project scope needs a root")
@@ -71,11 +69,10 @@ def run(surfaces: tuple[str, ...] | None = None, *, scope: str = "global",
     out: dict[str, str] = {}
 
     for skill, prompt, steer in _ASSETS:
-        for name in ("claude", "codex"):
-            if name in picked:
-                dst = _skill_base(name, project, root) / "skills" / skill
-                _copy_skill(data / "skills" / skill, dst)
-                out[f"{name}:{skill}"] = str(dst)
+        if "claude" in picked:
+            dst = _skill_base(project, root) / "skills" / skill
+            _copy_skill(data / "skills" / skill, dst)
+            out[f"claude:{skill}"] = str(dst)
 
         if "copilot" in picked:
             base = (root / ".github") if project else paths.vscode_user_dir()

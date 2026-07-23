@@ -139,7 +139,7 @@ def build_parser() -> argparse.ArgumentParser:
                         epilog="examples:\n"
                                "  cage import                              # every agent (default --agent all)\n"
                                "  cage import --agent claude --project .    # only this repo's Claude sessions\n"
-                               "  cage import --agent codex --since 7d      # Codex rollouts touched in 7d\n"
+                               "  cage import --agent copilot --since 7d    # Copilot events touched in 7d\n"
                                "  cage --ledger ~/.cage import              # capture into a specific ledger\n"
                                "Captures into the resolved ledger (--ledger/CAGE_BASE → project .cage/ → global ~/.cage);\n"
                                "works with no hooks and no project. Idempotent + incremental (per-agent cursor).",
@@ -165,7 +165,7 @@ def build_parser() -> argparse.ArgumentParser:
                         formatter_class=argparse.RawDescriptionHelpFormatter)
     for _s in SURFACES:
         st.add_argument(f"--{_s}", action="store_true", help=f"set up the {_s} agent non-interactively (skips the wizard)")
-    st.add_argument("--all", dest="all_agents", action="store_true", help="set up all four agents non-interactively (capture works for any of them)")
+    st.add_argument("--all", dest="all_agents", action="store_true", help="set up all three agents non-interactively (capture works for any of them)")
     st.add_argument("--project-only", action="store_true", help="scaffold .cage/ + graphify + PATH only; skip the global skill")
     st.add_argument("--wire-only", action="store_true", help="wire agent(s) only; skip scaffold and graphify")
     st.add_argument("--status", action="store_true", help="report which agents are wired (no changes)")
