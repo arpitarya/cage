@@ -11,6 +11,14 @@
 Status: **design of record (v0.1)**. Nothing built yet. This document defines
 the category, the substrate, the attribution engine, and the build order.
 
+> **v0.33.0 note:** Codex was removed from cage completely (a product/scope
+> decision — see `docs/archive/*-codex-removal.handoff.md`). This plan predates
+> that decision and still describes Codex as a supported agent in several
+> places (§3.7, §3.8, §5.3) — read those as history, not current behavior.
+> §3.8 (`cage data limits`) in particular describes a feature removed with
+> Codex, since its Codex-sourced `rate_limits` data was the only quota signal
+> any supported agent ever provided.
+
 ---
 
 ## 1. The category: what a *flux* is

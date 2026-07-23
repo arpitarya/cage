@@ -130,7 +130,7 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   The passive side of the axis (plan §4.10): call rows carry an additive
   optional `gap_ms` (previous assistant end → the human turn that led to the
   call), stamped at import only where the log has per-turn timestamps (claude
-  yes; codex/copilot/kiro no — absence explicit, never fabricated; never in an
+  yes; copilot/kiro no — absence explicit, never fabricated; never in an
   id). [attention.py](cage/attention.py) is the ONE place gap math lives —
   derived minutes = Σ min(gap_ms, idle cap), always `estimated`, labelled
   `derived (turn-gaps, capped)`; the cap is policy `[human] idle_cap_minutes`
@@ -242,11 +242,13 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
 - **Determinism** — no clocks/random in derived views; ids carry the only entropy.
   Same ledger + same policy ⇒ same tables. Tests assert exact plan numbers.
 - **`method` is sacred** — never let a projection read as `measured`. Tag every cell.
-- **Four agents, always** — Cage supports **Claude Code · Codex · Copilot · Kiro**
-  (`agents.SURFACES = ("claude", "codex", "copilot", "kiro")`). Never drop or
-  silently break one: every wiring/read surface (`agents.py`, `mcpserver.py`,
-  `cage setup`, the skill/steering data) must keep all four first-class, and new
-  surface work fans out to all four. This is a product invariant, not a default.
+- **Three agents, always** — Cage supports **Claude Code · Copilot · Kiro**
+  (`agents.SURFACES = ("claude", "copilot", "kiro")`). Never drop or silently
+  break one: every wiring/read surface (`agents.py`, `mcpserver.py`, `cage
+  setup`, the skill/steering data) must keep all three first-class, and new
+  surface work fans out to all three. This is a product invariant, not a
+  default — Codex was removed completely in v0.33.0 (a product/scope decision,
+  not a capture-quality one — see docs/archive/*-codex-removal.handoff.md).
 - **A renamed or removed verb is a wiring migration, not just a CLI change.**
   Renaming/removing a top-level verb must add an entry to `verbmap.REMOVED`
   ([verbmap.py](cage/verbmap.py)) so the old spelling prints a direction instead of
@@ -309,16 +311,6 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   `1` error (full traceback only under `CAGE_DEBUG=1`) · `2` argparse usage · `130`
   interrupt; `cage authorship verify` stays exit 0. Don't add an exception hierarchy or convert a
   write path into a raising one.
-- **Quota & credits are `estimated` and live outside the ledger.** `cage data limits`
-  ([limits.py](cage/limits.py), plan §3.8) reads Codex `rate_limits` (a *sibling* of
-  `payload.info`, via `transcript._codex_rate_limits`) into a latest-only, overwrite-only
-  machine-local `.cage/state/limits.json` (`Footprint.limits`) — **never** a `limits.jsonl`
-  row, never partitioned, never synced to refs/notes. Credit numbers are tokens × a
-  `[credits.<provider>."<model>"] per_mtok` policy multiplier ([credits.py](cage/credits.py),
-  the `convert.saved_usd` analogue) — token-based providers only, **exact model-id match**,
-  **off by default** (no active rows ship); an unknown multiplier ⇒ no number (a wrong
-  number is worse than none), and Kiro/Copilot credits are never derived from tokens.
-  `cage data limits --json` uses the `cage.v1` envelope (`render.envelope`).
 - **Transcript call ids are deterministic.** A usage row with no stable source id (a Claude
   turn lacking `uuid`) derives its `call_id` from `(agent, session, model, tokens_in,
   tokens_out, cached_in, ts)` (`transcript._composite_id`) so re-imports dedupe in
@@ -386,7 +378,7 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
 ## Dev
 
 ```bash
-just test          # python -m pytest -q   (881 passing)
+just test          # python -m pytest -q   (858 passing)
 just demo          # seed §4.4 + print attrib/matrix
 cage --version
 ```
@@ -419,8 +411,8 @@ Cage targets the **wire protocol**, so the meter and read surface are universal 
 each agent only needs thin idiomatic wiring (`agents.py` orchestrates):
 
 - **Meter:** `metering.py` (library), `proxy.py` + `usageparse.py` (any client you
-  point a base URL at), `transcript.py` (Claude Code / Codex / Copilot CLI / Kiro session
-  logs — `LOG_BEARING` is now all four of `agents.SURFACES`; Kiro's `tokens_generated.jsonl`
+  point a base URL at), `transcript.py` (Claude Code / Copilot CLI / Kiro session
+  logs — `LOG_BEARING` is now all three of `agents.SURFACES`; Kiro's `tokens_generated.jsonl`
   is coarse so the proxy stays its higher-fidelity fallback). Capture is **pull-based and
   global** (plan §3.7): `cage import`/`cage data export` over a **resolved** ledger
   (`--ledger`/`CAGE_BASE` → project `.cage/` → global `~/.cage`, via `paths.resolve_root`)
@@ -466,7 +458,7 @@ each agent only needs thin idiomatic wiring (`agents.py` orchestrates):
   (`--scope` / `--team` filters, `ledger-sync` into refs/notes/cage-ledger via the
   shared `mergeutil.union_by_id` core, plan §3.6).
 - **Wiring — one `<agent>wire.py` per agent (a standing convention):** `claudewire.py`
-  (hooks+MCP), `codexwire.py` (TOML MCP), `copilotwire.py` (user-level `~/.copilot/hooks`+MCP+pointer),
+  (hooks+MCP), `copilotwire.py` (user-level `~/.copilot/hooks`+MCP+pointer),
   `kirowire.py` (one `agentStop` Agent Hook+MCP+steering — Kiro's hook file is
   *one hook per file*: `{name,version,description,when:{type},then:{type,command}}`,
   not a `hooks[]` container, and Kiro has no session-start trigger so the single
@@ -475,16 +467,16 @@ each agent only needs thin idiomatic wiring (`agents.py` orchestrates):
   row + a `SURFACES` entry for a new agent).
   **Committed wiring is portable (plan §5.3):** every project-committed wired
   file (`.claude/settings.json`, `.mcp.json`, `.vscode/mcp.json`,
-  `.codex/hooks.json`, `.kiro/hooks/*.kiro.hook`) references the committed
+  `.kiro/hooks/*.kiro.hook`) references the committed
   runtime-resolving shim `.cage/bin/cage-run` ([runshim.py](cage/runshim.py) —
   written by `agents.install`, identical bytes on every machine, resolution:
   PATH → ~/.local/bin/pipx/$VIRTUAL_ENV → `python3 -m cage` → exit 0 silently,
   fail-open) — **never** `paths.cage_bin()`'s absolute path. Per-host reference
   mechanism is documented in each wire module's docstring (Claude:
   `$CLAUDE_PROJECT_DIR` / `${CLAUDE_PROJECT_DIR:-.}`; VS Code:
-  `${workspaceFolder}`; codex/kiro hooks: the `runshim.selflocating_command`
-  git-root one-liner). User-level configs (~/.copilot/hooks, ~/.codex
-  config.toml MCP, .git/hooks) stay absolute — per-machine by nature. The ONE
+  `${workspaceFolder}`; kiro hooks: the `runshim.selflocating_command`
+  git-root one-liner). User-level configs (~/.copilot/hooks,
+  .git/hooks) stay absolute — per-machine by nature. The ONE
   exception: `.kiro/settings/mcp.json` stays absolute (Kiro spawns MCP servers
   from its install dir, no workspace variable) — gitignore-advised via doctor.
   Re-running setup migrates legacy absolute entries (idempotent, printed).
@@ -498,7 +490,7 @@ each agent only needs thin idiomatic wiring (`agents.py` orchestrates):
   out to `runshim.write(python_launcher=)` (interpreter-only `_SH_PY`/`_CMD_PY`
   shim pair — nothing exe-shaped, grep-tested in
   `tests/test_launcher_mode.py` + dummyrepo S12) and to every wire module's
-  `install(root, python_launcher=)` (copilot hook bash/powershell, codex + kiro
+  `install(root, python_launcher=)` (copilot hook bash/powershell, kiro
   MCP `command = "python3"|"py"`, git commit hooks — user-level files carry
   interpreter commands instead of `paths.cage_bin()`; claudewire accepts and
   ignores the kwarg, its files reference the shim). `CAGE_RUN_PYTHON=1` is the

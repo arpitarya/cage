@@ -56,16 +56,16 @@ Per-tool savings any meter can attempt. The part no cost dashboard does is the r
 pip install cage-flux           # the CLI, zero third-party deps
 cd your-project
 cage setup                      # guided wizard: defaults to all agents, wires skill + hooks + graphify
-# non-interactively: cage setup --all   (or --claude / --codex / … for just one)
+# non-interactively: cage setup --all   (or --claude / … for just one)
 cage demo                       # seed the worked example
 cage insights matrix                     # the counterfactual permutation table
 cage human show                      # agent-vs-human: $ and hours saved
 cage query "how is human cost calculated"   # explain any number — live formula, $0
 ```
 
-> **Adopting into a project** — `cage setup` is the single front door: it offers Claude Code / Codex / Copilot / Kiro and **defaults to wiring all of them** (any agent's hook captures the whole stack, so there's no reason to pick just one). Drive it non-interactively with `cage setup --all` — or `cage setup --claude` for a single agent (`--no-skill` / `--no-project` / `--no-graphify` to skip parts). For finer control: `cage setup --project-only` scaffolds `.cage/` + the `bin/graphify` interceptor without the global skill (agent wiring opt-in via `--<agent>`), `cage setup --wire-only --claude` wires just one agent's hooks + MCP, and `cage setup --status` reports what's already wired.
+> **Adopting into a project** — `cage setup` is the single front door: it offers Claude Code / Copilot / Kiro and **defaults to wiring all of them** (any agent's hook captures the whole stack, so there's no reason to pick just one). Drive it non-interactively with `cage setup --all` — or `cage setup --claude` for a single agent (`--no-skill` / `--no-project` / `--no-graphify` to skip parts). For finer control: `cage setup --project-only` scaffolds `.cage/` + the `bin/graphify` interceptor without the global skill (agent wiring opt-in via `--<agent>`), `cage setup --wire-only --claude` wires just one agent's hooks + MCP, and `cage setup --status` reports what's already wired.
 >
-> **What gets committed vs what stays local.** The project-wired files (`.claude/settings.json`, `.mcp.json`, `.vscode/mcp.json`, `.codex/hooks.json`, `.kiro/hooks/`) are committed with the repo and contain **no absolute paths** — they reference the committed shim `.cage/bin/cage-run` (identical bytes on every machine), which resolves cage at runtime and **exits 0 silently when cage isn't installed** (a teammate's clone gets working agents, no noise, no capture). Commit `.cage/` as-is: its own `.gitignore` already excludes the machine-local parts (`ledger/`, `out/`, `state/`). Per-machine configs stay absolute and are never cloned: `~/.copilot/hooks/`, `~/.codex/config.toml`, `.git/hooks/` — plus the one committed exception, `.kiro/settings/mcp.json` (Kiro can't launch MCP servers portably; add it to your `.gitignore` — `cage doctor` reminds you). Re-running `cage setup` migrates any pre-0.20 absolute entries and prints what moved; `cage doctor` has a portability check. Design and rationale: [Portable wiring](docs/portable-wiring.md).
+> **What gets committed vs what stays local.** The project-wired files (`.claude/settings.json`, `.mcp.json`, `.vscode/mcp.json`, `.kiro/hooks/`) are committed with the repo and contain **no absolute paths** — they reference the committed shim `.cage/bin/cage-run` (identical bytes on every machine), which resolves cage at runtime and **exits 0 silently when cage isn't installed** (a teammate's clone gets working agents, no noise, no capture). Commit `.cage/` as-is: its own `.gitignore` already excludes the machine-local parts (`ledger/`, `out/`, `state/`). Per-machine configs stay absolute and are never cloned: `~/.copilot/hooks/`, `.git/hooks/` — plus the one committed exception, `.kiro/settings/mcp.json` (Kiro can't launch MCP servers portably; add it to your `.gitignore` — `cage doctor` reminds you). Re-running `cage setup` migrates any pre-0.20 absolute entries and prints what moved; `cage doctor` has a portability check. Design and rationale: [Portable wiring](docs/portable-wiring.md).
 
 Metering from your own code is the library adapter — it targets the *protocol*, not any named client, and is fail-open (a metering error never breaks your call):
 
@@ -112,7 +112,7 @@ Agent vs human · 14 tasks · rate source: policy ($80/hr)
 
 agent     tasks   human $    agent $    saved $   saved hrs   conf   method
 claude       9    $1,140.00    $4.12    $1,135.88     13.2     0.51   estimated
-codex        3      $260.00    $1.55      $258.45      3.1     0.50   estimated
+copilot      3      $260.00    $1.55      $258.45      3.1     0.50   estimated
 TOTAL       14    $1,530.00    $6.55    $1,523.45     17.9     0.51
 ```
 
@@ -166,7 +166,7 @@ record_call / record_receipt  →  .cage/ledger/{calls,receipts,tasks,provenance
                                              · human · trend · budget · why · origin
 ```
 
-You meter at the provider boundary (library adapter, a reverse proxy for clients you can't edit, or by parsing a Claude Code / Codex transcript). Everything downstream is a deterministic projection. The ledger carries token **counts**, never prompt bodies — PII-safe by construction; point `CAGE_LEDGER` at a private store to keep even the counts off-disk.
+You meter at the provider boundary (library adapter, a reverse proxy for clients you can't edit, or by parsing a Claude Code transcript). Everything downstream is a deterministic projection. The ledger carries token **counts**, never prompt bodies — PII-safe by construction; point `CAGE_LEDGER` at a private store to keep even the counts off-disk.
 
 A tool earns rows in `attrib`/`matrix`/`roi` by filing a **savings receipt**, and there are two ways in, by who owns the tool:
 
@@ -177,7 +177,7 @@ The full command surface (30+ subcommands: ledger · attribution · human axis �
 
 ## Works with any agent — explicit capture over one global ledger
 
-Cage meters whatever speaks the wire format, so all four agents share **one** ledger contract. Capture is **pull-based and universal**: `cage import` reads each agent's on-disk usage log into the ledger, and `cage data export` refreshes then emits it — they need no hooks, no project, and work the same whether you run a CLI or a VS Code extension.
+Cage meters whatever speaks the wire format, so all three agents share **one** ledger contract. Capture is **pull-based and universal**: `cage import` reads each agent's on-disk usage log into the ledger, and `cage data export` refreshes then emits it — they need no hooks, no project, and work the same whether you run a CLI or a VS Code extension.
 
 ```bash
 cage import                 # capture every agent's spend into the active ledger
@@ -193,12 +193,11 @@ Nonstandard install, a network home, or a custom tool that writes a supported fo
 | Agent | Capture (universal) | Optional real-time | Read |
 | ----- | ------------------- | ------------------ | ---- |
 | **Claude Code** | `cage import` (transcript) | Stop hook (CLI only) | `cage` MCP |
-| **Codex** | `cage import` (rollouts) | Stop hook (CLI only) | `cage` MCP |
 | **Copilot** | `cage import` (session log) | `agentStop` hook (CLI only) | `cage` MCP |
 | **Kiro** | `cage import` (token log) | `agentStop` hook (CLI only) | `cage` MCP |
 | **Your code / Orff** | `cage.meter()` library | — | `cage` CLI / MCP |
 
-Hooks are an **optional** real-time add-on — they fire only under a CLI client, never under a VS Code extension — so `cage import`/`cage data export` is the path that always works. `cage report --project <name>` slices the global ledger by working dir (exact for Claude; Copilot/Kiro/Codex logs carry no project, so they're excluded from that filter). Committed wired files never embed a machine's absolute cage path — they reference the repo-local shim `.cage/bin/cage-run` (see the Quickstart note; design: [Portable wiring](docs/portable-wiring.md)).
+Hooks are an **optional** real-time add-on — they fire only under a CLI client, never under a VS Code extension — so `cage import`/`cage data export` is the path that always works. `cage report --project <name>` slices the global ledger by working dir (exact for Claude; Copilot/Kiro logs carry no project, so they're excluded from that filter). Committed wired files never embed a machine's absolute cage path — they reference the repo-local shim `.cage/bin/cage-run` (see the Quickstart note; design: [Portable wiring](docs/portable-wiring.md)).
 
 **An agent's spend isn't showing up?** `cage doctor` shows the active ledger, each agent's real capture state, and "last import: N ago"; the metadata-only debug log says per agent whether a hook fired or raised — see [Debugging capture](docs/debugging-capture.md).
 
@@ -216,7 +215,7 @@ cage data export --csv calls --since 30d -o calls.csv   # raw ledger rows for a 
 
 ## The `$0` guarantee
 
-Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 881 tests passing; `cage demo` reproduces the worked attribution example against a real ledger.
+Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 858 tests passing; `cage demo` reproduces the worked attribution example against a real ledger.
 
 **Honest limits.** Cage doesn't decide your human rate — it prices minutes at a blended rate you set, and labels the result `estimated` so it never pretends to be a timesheet. Marginal-by-fixed-order is defensible and `$0`, but it is an *ordering convention*, not a Shapley value (that's a deferred audit mode). And a counterfactual cell is an honest reconstruction, never an invoice — the `method` column says so on every row, on purpose.
 
@@ -224,7 +223,7 @@ Every derived view is parse / arithmetic over the log — **no LLM call, ever, o
 
 Latest release below — full history and detail in [CHANGELOG.md](CHANGELOG.md).
 
-- **v0.32.0 (2026-07-24) — stale wiring is detected and healed; a dead verb can no longer disable capture silently.** A hook or shim installed before a verb was renamed exits 1 with its output going nowhere, so it looks exactly like cage not being installed — this silently disabled graphify metering for 9 days while `cage doctor` reported ✅. Doctor now checks every installed artifact's verb against the **live CLI parser** (including user-level files), `cage setup` rewrites dead verbs to their current form alongside the existing path migration, and the `receipts: 0` line names a dead interceptor instead of implying the savings tools went unused. Derived numbers unchanged.
+- **v0.33.0 (2026-07-24) — Codex removed: cage is Claude Code · Copilot · Kiro.** A product/scope decision, not a capture-quality one — Codex was actually one of the healthier captured agents in the real ledger. Retires the "four agents, always" invariant; `cage data limits` (Codex's quota-only feature) goes with it. Existing ledger rows with `agent="codex"` are untouched. See [CHANGELOG.md](CHANGELOG.md) for the full accounting, including the one known follow-up (a pre-existing `.codex/hooks.json` on an upgraded machine is now silently orphaned, not yet flagged by the wiring-liveness scanner).
 
 ## The name
 

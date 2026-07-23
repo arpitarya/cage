@@ -1,7 +1,7 @@
 # Cage with your coding agent
 
 Cage meters whatever speaks the OpenAI/Anthropic wire format and reads the ledger
-over MCP. One ledger contract, four surfaces — nothing about an agent is hardcoded.
+over MCP. One ledger contract, three surfaces — nothing about an agent is hardcoded.
 
 ```bash
 cd your-project
@@ -46,18 +46,6 @@ Agent wiring is **opt-in everywhere**: `cage adopt`/`cage hooks install` with no
   already writes to `~/.claude/projects/` — same rows the SessionEnd hook would
   produce, off the request path. `--project <dir>` scopes it to one repo, `--since 7d`
   to recent sessions. Idempotent (deduped on the per-turn id), so it's safe on a cron.
-
-## Codex
-
-- **Meter (reliable default):** Codex CLI reads a project `.codex/hooks.json` using the
-  same hook schema as Claude Code, so `cage hooks install --codex` wires a
-  **SessionStart** backfill — `cage import --agent codex --since 7d` parses the rollouts
-  Codex always writes to `~/.codex/sessions`, on the next start. The window only bounds
-  the scan (import dedupes by id). Symmetric with Claude's SessionStart-backfill.
-- **Meter (alt):** `cage data meter -- codex exec …` runs Codex under the proxy (sets
-  `OPENAI_BASE_URL`) for real-time/budget-blocking capture.
-- **Read:** `cage hooks install --codex` registers `[mcp_servers.cage]` in
-  `~/.codex/config.toml`; the `/cage` skill is installed to `~/.codex/skills/`.
 
 ## GitHub Copilot
 
@@ -142,7 +130,7 @@ How a tool files one depends on who owns it:
   source files, deduped, never the repo). A metering error never alters graphify's
   result; if no source file resolves it files **nothing** (unmeasurable ≠ zero).
   graphify is never edited. This is the same "meter what you observe" family as
-  `cage data meter -- <cmd>` and `cage import --agent codex`. Alias
+  `cage data meter -- <cmd>` and `cage import --agent claude`. Alias
   `graphify='cage data graphify -- graphify'` to make it transparent.
 
   > Token receipts carry their model price via the task's calls, so `attrib`/`matrix`

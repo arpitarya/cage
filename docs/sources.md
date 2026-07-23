@@ -1,8 +1,8 @@
 # Configurable import paths — `[sources]` in `policy.toml`
 
 Cage imports each agent's usage log from a **built-in registry** of per-OS
-locations (`~/.claude/projects/**/*.jsonl`, `~/.codex/sessions/**/rollout-*.jsonl`,
-Copilot's CLI + VS Code stores, Kiro's token log). The `[sources]` table lets you
+locations (`~/.claude/projects/**/*.jsonl`, Copilot's CLI + VS Code stores,
+Kiro's token log). The `[sources]` table lets you
 **add or replace** those locations — for a nonstandard install, a network home, a
 side-by-side log copy, or a **custom tool** that writes an already-supported format.
 
@@ -14,19 +14,16 @@ determinism law is untouched.
 ## Schema
 
 ```toml
-# Extend one of the four agents (claude · codex · copilot · kiro):
+# Extend one of the three agents (claude · copilot · kiro):
 [sources.claude]
 paths = ["~/work/claude-logs", "$TEAM_SHARE/claude"]   # dirs (agent glob) or files
 
-# A directory whose layout isn't the format's canonical glob → declare your own:
+# A directory whose layout isn't the format's canonical glob → declare your own,
+# and replace the agent's built-ins entirely (the rare clean override):
 [sources.copilot]
-paths = ["~/.myproxy/copilot"]
-glob  = "usage-*.ndjson"       # optional; absent ⇒ the format's default glob
-
-# Replace an agent's built-ins entirely (the rare clean override):
-[sources.codex]
-paths   = ["/mnt/net/codex/sessions"]
-replace = true                 # built-in ~/.codex/sessions is ignored
+paths   = ["/mnt/net/copilot/session-state"]
+glob    = "usage-*.ndjson"     # optional; absent ⇒ the format's default glob
+replace = true                 # built-in ~/.copilot/session-state is ignored
 
 # Silence a never-installed agent's probe (replace + empty = disabled by policy):
 [sources.kiro]
@@ -51,8 +48,8 @@ format = "claude"              # required: which parser to reuse
   `path` is rejected — **put the pattern in `glob = `** and list only concrete files
   or directories.
 - **`glob`** — *optional* filename pattern for the directories in this table. Absent
-  ⇒ the format's canonical glob (`**/*.jsonl` for claude, `**/rollout-*.jsonl` for
-  codex, …). An **empty `glob = ""` is an error** (drop the key to use the default —
+  ⇒ the format's canonical glob (`**/*.jsonl` for claude, `*/events.jsonl` for
+  copilot, …). An **empty `glob = ""` is an error** (drop the key to use the default —
   never a silent fallback). Ignored for a file source (Kiro's token log). This is the
   one capability the built-in registry can't express: a tool that writes
   `usage-*.ndjson` instead of the canonical shape.
@@ -69,17 +66,17 @@ format = "claude"              # required: which parser to reuse
   `[sources.<agent>] replace = true, paths = []`, has no sources at all, so cage's
   "installed but capturing nothing" ⚠ (docs/debugging-capture.md) stays silent for it.
 - **`format`** — required for a **custom tool** (any table name that is *not* one of
-  the four agents). Must be `claude|codex|copilot|kiro` — the parser to reuse. New
+  the three agents). Must be `claude|copilot|kiro` — the parser to reuse. New
   log *formats* are out of scope: a custom source declares which existing parser
   reads it. Rows import with `agent = <table name>`, so `cage report`/`cage insights
-  attrib` split the tool out naturally. The four agent names are **reserved** — 
+  attrib` split the tool out naturally. The three agent names are **reserved** — 
   `[sources.claude]` is the claude agent table, not a custom tool.
 
 ## Precedence
 
 **env home override > policy `[sources]` > built-in registry** — resolved in one
 place (`paths.resolve_log_sources`). An env override (`CLAUDE_CONFIG_DIR`,
-`CODEX_HOME`, `COPILOT_HOME`, `KIRO_HOME`, …) redirects a built-in home and tags its
+`COPILOT_HOME`, `KIRO_HOME`, …) redirects a built-in home and tags its
 candidate `env`; policy paths add `policy` candidates; a policy path equal to a
 built-in path is deduped to the built-in tag.
 

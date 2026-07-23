@@ -2,6 +2,60 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
+## v0.33.0 (2026-07-24) — Codex removed: cage is Claude Code · Copilot · Kiro
+
+A product/scope decision, **not** a capture-quality one — in the real ledger Codex was one
+of the *healthier* captured agents (373 rows, $17.94 captured, second only to Claude Code),
+unlike Kiro (near-empty) and Copilot (40% UNPRICED). This retires the "four agents, always"
+invariant; `agents.SURFACES` is now `("claude", "copilot", "kiro")`. Derived views for
+existing `agent="codex"` ledger rows are untouched — old data reads exactly as before, cage
+simply stops producing new codex rows.
+
+- **Core removal:** `agents.py` (`SURFACES` + `_WIRE` map), `codexwire.py` deleted outright,
+  every codex leaf in `importcmd.py`/`transcript.py`/`paths.py`. The `format="codex"`
+  custom-tool transcript parser is deleted too, not kept selectable — a half-removed agent
+  still reachable via `[sources.<tool>] format = "codex"` was exactly the ambiguity the
+  four-agents rule warned against. `paths.codex_home()` and `wiringscan`'s codex scanning
+  stay deliberately: they back detection of a pre-existing `.codex/hooks.json` left on an
+  upgraded machine — an orphan the current liveness scanner can't yet flag correctly (a known
+  gap, not fixed here; see below).
+- **`cage data limits` removed with it.** Codex's `rate_limits` block was the sole writer of
+  `state/limits.json` anywhere in the tree; no other supported agent's session log carries a
+  quota signal. A live command whose only data source is gone is dead surface waiting to
+  rot, so `limits.py`, `credits.py`, `Footprint.limits` and the `data limits` subcommand go
+  with it. A future provider that writes a quota block reintroduces the mechanism generically
+  then, rather than keeping it dormant now.
+- **`verbmap.REMOVED["import-codex"]` dropped** — its heal target, `import --agent codex`, is
+  itself dead now, which the property test asserting every `REMOVED` entry heals to a
+  parser-valid command correctly caught. (`import-claude`'s entry stays: its target verb,
+  `import`, remains live even though `--agent codex` alone wouldn't — a different shape of
+  the same class of problem.)
+- **The 7 `-codex`-named openai price rows in the bundled `policy.toml` stay** — there is no
+  codex route prefix; Copilot keeps the entire openai price table alive via its own
+  gpt-family model mapping, so nothing is orphaned. Dropping the `-codex` rows is optional
+  cosmetic cleanup, not part of this change.
+- **Known follow-up, explicitly deferred:** a pre-existing `.codex/hooks.json` on an upgraded
+  machine still runs `cage import --agent codex`, which the parser now rejects (`--agent`
+  `choices` no longer include `codex`) — the hook fails, the shim swallows it to `exit 0`,
+  and capture silently does nothing. The current wiring-liveness scanner can't see this: it
+  checks verb tokens, and `import` itself is still a live verb. Fixing it needs a new
+  *orphaned-surface* check class (an artifact whose command targets an agent no longer in
+  `SURFACES`) — its own design pass, not bundled into this release.
+- Regenerated: `docs/formulas.md`, `docs/cli-output-spec.md` (the capture-health warning
+  golden moved its example from codex to kiro — same triple-gate logic, exercised over a
+  still-supported agent), the bundled `policy.toml`'s `[sources]` comment block, and the
+  `cage` skill asset (byte-identical — claude alone still renders it).
+- Tests: 23 codex-only tests deleted (the parser, the standalone import path, the fixture
+  corpus's `codex/{cli,vscode}` dir); every other codex-dependent test re-pointed at a real
+  surface. `tools/dummyrepo`'s `AGENTS` tuple drops codex; S11/S15's incidental
+  `agent="codex"` pricing-scenario stamps move to `agent="copilot"`. `python -m
+  tools.dummyrepo` all-green (S1-S18).
+
+Built from: [docs/archive/v0.33-codex-removal.handoff.md](docs/archive/v0.33-codex-removal.handoff.md)
++ [docs/archive/v0.33-codex-removal.prompt.md](docs/archive/v0.33-codex-removal.prompt.md).
+
+858 tests passing.
+
 ## v0.32.0 (2026-07-24) — stale-wiring liveness: detect + heal orphaned wiring
 
 Closes the root cause behind F1. No derived number changes (`report`/`attrib`/`matrix` are
