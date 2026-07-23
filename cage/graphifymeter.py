@@ -28,7 +28,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from cage import ledger
+from cage import debuglog, ledger
 from cage.constants import CHARS_PER_TOKEN, GRAPHIFY_RECEIPT_CONFIDENCE
 
 # Expected graphify output formats (owned by graphify; pinned here so a format
@@ -86,21 +86,30 @@ def _meter(root: Path, answer: str, argv: list[str], task: str) -> int:
     try:
         op = _op_of(argv)
         if not op:
+            debuglog.event(root, event="receipt", tool="graphify", produced=False,
+                           skip_reason="non-measured-op")
             return 0
         files = _cited_files(answer, op)
         raw = _raw_alternative(files)
         if raw <= 0:                      # nothing parsed/resolved → unmeasurable
+            debuglog.event(root, event="receipt", tool="graphify", produced=False,
+                           skip_reason="no-source-file-parsed", op=op)
             return 0
         actual = toks(answer)
         if actual >= raw:                 # no saving to claim — stay honest
+            debuglog.event(root, event="receipt", tool="graphify", produced=False,
+                           skip_reason="no-saving-to-claim", op=op)
             return 0
         from cage import record_receipt
         rid = record_receipt(tool="graphify", unit="tokens", raw_alternative=raw,
                              actual=actual, method="modeled",
                              confidence=GRAPHIFY_RECEIPT_CONFIDENCE,
                              task=task, root=root, meta={"op": op})
+        debuglog.event(root, event="receipt", tool="graphify", produced=bool(rid),
+                       skip_reason="" if rid else "ledger-write-failed", op=op)
         return int(raw - actual) if rid else 0
-    except Exception:                     # any metering error → graphify result intact
+    except Exception as e:                # any metering error → graphify result intact
+        debuglog.exception(root, "graphify.meter", e)
         return 0
 
 
@@ -167,6 +176,8 @@ def run(root: Path, argv: list[str], task: str = "") -> int:
             for r in ledger.receipts(root):
                 if r.get("id") in new_ids:
                     saved += int(round(r.get("saved", 0.0)))
+            debuglog.event(root, event="receipt", tool="graphify", produced=False,
+                           skip_reason="linked-receipt-skipped", op=op)
             _confirm(root, saved)
             return proc.returncode        # the child self-metered — one saving, one receipt
         _confirm(root, _meter(root, proc.stdout, cmd, task or Path.cwd().name))

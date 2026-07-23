@@ -24,7 +24,8 @@ import datetime as _dt
 import json
 from pathlib import Path
 
-from cage import agents, debuglog, ledger, limits, lockutil, paths, policy, transcript
+from cage import (agents, capturelog, debuglog, ledger, limits, lockutil, paths,
+                  policy, transcript)
 
 # Agents that persist a usage log to disk (everything else → proxy fallback).
 LOG_BEARING = ("claude", "codex", "copilot", "kiro")
@@ -172,6 +173,30 @@ def _record_health(root: Path, cursors: dict, health: dict, captured: set,
                      "captured": a in captured or info.get("imported", 0) > 0}
     except Exception as e:  # fail-open: health is best-effort, never aborts capture
         debuglog.exception(root, "import.health", e)
+
+
+def _record_capture_log(root: Path, health: dict, all_rows: list, targets) -> None:
+    """One `state/capture.log` breadcrumb line per swept agent this run — the
+    always-on proof-of-capture (`cage/capturelog.py`, docs/debugging-capture.md).
+    ``rows_total`` is derived from the shared ``all_rows`` read (taken *before* this
+    run's appends) plus this run's own ``imported`` delta — no second ledger read.
+    Fail-open: best-effort, never aborts an import."""
+    try:
+        before_counts: dict[str, int] = {}
+        for c in all_rows:
+            a = agents.row_surface(c.get("agent"))
+            before_counts[a] = before_counts.get(a, 0) + 1
+        for a in targets:
+            if a not in agents.SURFACES:
+                continue  # custom tools ([sources.<name>]) aren't part of this breadcrumb
+            info = health.get(a, {"files": 0, "src": ""})
+            rows_new = info.get("imported", 0)
+            capturelog.record(root, a, files_seen=info.get("files", 0),
+                              rows_new=rows_new,
+                              rows_total=before_counts.get(a, 0) + rows_new,
+                              src=_tilde(info.get("src", "")))
+    except Exception as e:  # fail-open: the breadcrumb is best-effort, never aborts capture
+        debuglog.exception(root, "capture.log", e)
 
 
 def capture_health(root: Path) -> dict:
@@ -467,6 +492,7 @@ def run(root: Path, agent: str, args) -> list[str]:
         if agent == "all":
             lines += import_custom_tools(root, args, pol=pol, seen=seen, cursors=cursors)
         _record_health(root, cursors, health, captured, targets, pol)
+        _record_capture_log(root, health, all_rows, targets)
         cursors["_last_import"] = _now_iso()  # pull-based staleness signal for doctor/report
         _save_cursors(foot, cursors)
     # Piggybacked state maintenance (plan §3.6.4): every hook/watch/export sweep

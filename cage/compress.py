@@ -8,8 +8,9 @@ The learned Tier-2 compressor is a pluggable adapter over this same receipt shap
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
-from cage import schema
+from cage import debuglog, schema
 from cage.constants import CHARS_PER_TOKEN
 
 
@@ -42,7 +43,13 @@ def compress(text: str, *, max_items: int = 20, max_str: int = 200) -> tuple[str
 
 
 def receipt(text: str, *, call: str = "", task: str = "", method: str = "measured",
-            **kw) -> dict:
+            root: Path | None = None, **kw) -> dict:
+    """``root`` is optional and logging-only (best-effort, `CAGE_DEBUG`-gated) — the
+    caller pushes the returned dict itself, this function never touches the ledger."""
     _out, raw, act = compress(text, **kw)
+    produced = raw > act
+    if root is not None:
+        debuglog.event(root, event="receipt", tool="compressor", produced=produced,
+                       skip_reason="" if produced else "no-saving-to-claim")
     return schema.make_receipt(tool="compressor", raw_alternative=raw, actual=act,
                                call=call, task=task, method=method)

@@ -2,7 +2,8 @@
 
 Everything a capture bug-report needs, in one zip, under the same PII
 discipline as the ledger: **counts-never-content**. The bundle carries doctor
-output, the metadata-only debug log + hook heartbeats (if present), version +
+output, the metadata-only debug log + the always-on capture breadcrumb
+(`state/capture.log`, `cage/capturelog.py`) + hook heartbeats (if present), version +
 platform, resolved footprint paths with per-shard *row counts*, policy
 **provenance** (which file won and which cage env overrides are set — never a
 prompt, never a diff, never a ledger row body), and the import cursor state.
@@ -149,6 +150,7 @@ def run(root: Path, out: str | None = None) -> Path:
     add("footprint.txt", lambda: _footprint_text(root, active, source))
     add("policy-provenance.txt", lambda: _policy_provenance_text(active))
     for name, path in (("state/debug.log", foot.debug_log),
+                       ("state/capture.log", foot.capture_log),
                        ("state/hooks-seen.jsonl", foot.hooks_seen),
                        ("state/cursors.json", foot.cursors)):
         if path.exists():

@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
 
-from cage import ledger, paths, policy, prices, schema
+from cage import debuglog, ledger, paths, policy, prices, schema
 
 
 def _resolve_root(root: Path | None) -> Path:
@@ -72,7 +72,10 @@ def record_receipt(*, tool: str, raw_alternative: float, actual: float,
     fields.setdefault("route_key", paths.routing_key(r))
     row = schema.make_receipt(tool=tool, raw_alternative=raw_alternative, actual=actual,
                               call=call, task=task, scope=scope, **fields)
-    return row["id"] if ledger.append_row(r, "receipts", row) else ""
+    ok = ledger.append_row(r, "receipts", row)
+    debuglog.event(r, event="receipt", tool=tool, produced=bool(ok),
+                   skip_reason="" if ok else "push-sink-unresolved")
+    return row["id"] if ok else ""
 
 
 def record_human(*, task: str, minutes: float | None = None, usd: float | None = None,

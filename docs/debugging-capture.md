@@ -88,6 +88,57 @@ stanza (see [Configurable import paths](sources.md)). The verdict is recorded at
 into `cursors.json["_health"]` and rendered from that cache — no live filesystem probe on
 the read path, so `cage report` stays deterministic in its tables.
 
+## The always-on capture breadcrumb (`state/capture.log`)
+
+Unlike everything else on this page, `state/capture.log` needs **no debug flag** —
+it's the standing proof-of-capture the 2026-07-22 regression report needed before F1
+(zero real savings receipts) could even be diagnosed. Every real import sweep — a
+manual `cage import`, a hook firing, or a non-throttled capture-on-read sweep — appends
+one line per agent it actually swept, counts-only:
+
+```
+{"ts": "2026-07-23T10:15:02+00:00", "agent": "codex", "files_seen": 14,
+ "rows_new": 3, "rows_total": 212, "src": "~/.codex/sessions"}
+```
+
+- **`files_seen`** — files the glob matched this sweep (pre-cursor).
+- **`rows_new`** — rows this run actually appended (0 is a normal, healthy line —
+  it means the sweep ran and found nothing new, not that it didn't run).
+- **`rows_total`** — that agent's lifetime row count in the ledger, including this run.
+- **`src`** — the tilde-relative source location probed, never contents.
+
+**A no-op read appends nothing.** A throttled capture-on-read (within
+`[capture] read_throttle_secs`), or a read while `[capture] enabled=false` /
+`CAGE_CAPTURE=0`, never calls the sweep at all — so it never reaches this breadcrumb.
+Only a *real* sweep writes a line, which is what makes the log's mere presence useful:
+if `capture.log` never grows, capture genuinely never ran (not "ran and found nothing").
+
+It's local state, never read by any derived view (`report`/`attrib`/`matrix` are
+byte-identical whether this writes or not), and size-managed by the same allowlisted
+cleanup as `debug.log` (the `capture-log` class, `policy.toml [cleanup] days`). It's
+also in `cage doctor --bundle` (`state/capture.log`) alongside `debug.log`.
+
+## Receipt produce/skip logging — the F1 instrument
+
+The other half of the F6 instrument, this one **is** `CAGE_DEBUG`-gated (verbose, so
+off by default): every receipt push/skip site logs `event=receipt` with `tool`,
+`produced` (bool), and — when nothing was produced — `skip_reason`:
+
+| Site | `skip_reason` | Meaning |
+|---|---|---|
+| `graphifymeter._meter` | `non-measured-op` | the graphify subcommand wasn't `query`/`path`/`explain` |
+| `graphifymeter._meter` | `no-source-file-parsed` | the answer cited no file that resolved on disk — unmeasurable, not zero |
+| `graphifymeter._meter` | `no-saving-to-claim` | the answer wasn't smaller than its cited sources |
+| `graphifymeter.run` | `linked-receipt-skipped` | graphify self-metered natively — the wrapper defers, no double-count |
+| `metering.record_receipt` | `push-sink-unresolved` | the ledger append itself failed (unwritable sink) |
+| `responsecache.lookup` | `cache-miss` | no cached response for this prompt hash |
+| `compress.receipt` | `no-saving-to-claim` | the compressed form wasn't smaller than the original |
+
+`produced=True` (no `skip_reason`) means the site actually built/pushed a receipt.
+Before F6 a skipped receipt was completely silent — this is what makes "why did cage
+report zero savings for tool X" answerable from `CAGE_DEBUG=1 cage debug --tail` instead
+of a guess.
+
 ## The model — what has to be true
 
 For a **hook** to capture in real time, two things must hold (the on-disk `cage import`
@@ -161,7 +212,7 @@ cat .cage/state/debug.log
 
 ### 6. Share it (bug reports)
 ```bash
-cage doctor --bundle    # one redacted archive: doctor output, debug.log,
+cage doctor --bundle    # one redacted archive: doctor output, debug.log, capture.log,
                         # versions, footprint row counts, policy provenance
 ```
 Counts-never-content — safe to attach as-is; never attach raw ledger shards or

@@ -701,6 +701,14 @@ class Footprint:
         return Path(os.environ.get("CAGE_DEBUG_LOG", self.state / "debug.log"))
 
     @property
+    def capture_log(self) -> Path:
+        """Always-on capture breadcrumb (`cage/capturelog.py`) — one line per agent per
+        real import run, counts-only. Unlike `debug_log`, this is **never** gated on
+        `CAGE_DEBUG` — it's the standing proof-of-capture. Override the path with
+        `CAGE_CAPTURE_LOG`; size-managed by the `capture-log` cleanup class."""
+        return Path(os.environ.get("CAGE_CAPTURE_LOG", self.state / "capture.log"))
+
+    @property
     def hooks_seen(self) -> Path:
         """Per-(agent,event) hook heartbeat — append-only, last-write-wins on read.
         Gated by the same debug switch, so it is absent unless debug is enabled."""

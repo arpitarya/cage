@@ -15,7 +15,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from cage import debuglog, hooks, importcmd, ledger, metering, transcript
+from cage import (compress, debuglog, graphifymeter, hooks, importcmd, ledger,
+                  metering, responsecache, transcript)
 
 
 @pytest.fixture
@@ -197,3 +198,62 @@ def test_cleanup_prune_failure_logs(root, monkeypatch):
     (st / "cleanup.stamp").unlink(missing_ok=True)
     cleanup.maybe_run(root, policy.load(None))      # whole-body fail-open
     assert "cleanup.prune" in _contexts(root)
+
+
+# ── receipt sites (F6 — the F1 instrument) -----------------------------------
+# Every receipt push/skip site logs whether a receipt was produced and, if not, why —
+# a `CAGE_DEBUG`-gated trail, unlike `state/capture.log`'s always-on breadcrumb.
+
+def _receipt_events(root: Path, tool: str) -> list[dict]:
+    return [e for e in _events(root) if e.get("event") == "receipt" and e.get("tool") == tool]
+
+
+def test_graphify_meter_logs_skip_and_produce(root):
+    graphifymeter._meter(root, "no citations here at all", ["query", "x"], "t")
+    ev = _receipt_events(root, "graphify")
+    assert ev[-1]["produced"] is False and ev[-1]["skip_reason"] == "no-source-file-parsed"
+
+    src = root / "big.py"
+    src.write_text("x" * 4000, encoding="utf-8")
+    answer = f"NODE label [src={src} loc=L1 community=0]"
+    graphifymeter._meter(root, answer, ["query", "x"], "t")
+    ev = _receipt_events(root, "graphify")
+    assert ev[-1]["produced"] is True and ev[-1]["skip_reason"] == ""
+
+
+def test_metering_record_receipt_logs_produce_and_skip(root, monkeypatch):
+    rid = metering.record_receipt(tool="rc-ok", raw_alternative=10, actual=2, root=root)
+    assert rid
+    ev = _receipt_events(root, "rc-ok")
+    assert ev[-1]["produced"] is True
+
+    blocker = root / "not-a-dir"
+    blocker.write_text("", encoding="utf-8")
+    monkeypatch.setenv("CAGE_LEDGER", str(blocker / "ledger"))  # parent is a file → OSError
+    rid2 = metering.record_receipt(tool="rc-fail", raw_alternative=10, actual=2, root=root)
+    assert rid2 == ""
+    monkeypatch.delenv("CAGE_LEDGER")
+    ev2 = _receipt_events(root, "rc-fail")
+    assert ev2[-1]["produced"] is False and ev2[-1]["skip_reason"] == "push-sink-unresolved"
+
+
+def test_responsecache_lookup_logs_miss_and_hit(root):
+    responsecache.lookup(root, "prompt-x")  # miss — nothing cached yet
+    ev = _receipt_events(root, "response-cache")
+    assert ev[-1]["produced"] is False and ev[-1]["skip_reason"] == "cache-miss"
+
+    responsecache.store(root, "prompt-x", "value", 50)
+    responsecache.lookup(root, "prompt-x")  # hit
+    ev = _receipt_events(root, "response-cache")
+    assert ev[-1]["produced"] is True
+
+
+def test_compress_receipt_logs_skip_and_produce(root):
+    compress.receipt("{}", root=root)  # nothing to shrink — no saving to claim
+    ev = _receipt_events(root, "compressor")
+    assert ev[-1]["produced"] is False and ev[-1]["skip_reason"] == "no-saving-to-claim"
+
+    big = json.dumps({"a": list(range(1000))})
+    compress.receipt(big, root=root)
+    ev = _receipt_events(root, "compressor")
+    assert ev[-1]["produced"] is True

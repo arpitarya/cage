@@ -195,18 +195,21 @@ REGISTRY: tuple[Explanation, ...] = (
         "     and it never fires again; opt out an unused agent with [sources.<agent>]\n"
         "     replace=true, paths=[]). The verdict is recorded at import into\n"
         "     cursors.json[_health], never a live probe on the read path.\n"
-        "  1. `cage doctor --paths` — read-only probe of every candidate log location\n"
+        "  1. `state/capture.log` — always-on, never gated on CAGE_DEBUG: one line per\n"
+        "     agent per real import run (files_seen/rows_new/rows_total/src), the\n"
+        "     standing proof capture ran at all. Pruned by the capture-log cleanup class.\n"
+        "  2. `cage doctor --paths` — read-only probe of every candidate log location\n"
         "     per agent on this OS: found/missing, files matched, parseable rows,\n"
         "     cursor state, and a why-line per miss (wrong layout, cursor already\n"
         "     imported, unparseable format). Env overrides and any UNVERIFIED-LAYOUT\n"
         "     candidates are labeled.\n"
-        "  2. `CAGE_DEBUG=1 cage import` — the same probes stream to debug.log as\n"
-        "     metadata-only events, plus per-file parse/append/dedupe detail\n"
-        "     (`cage debug` to read them).\n"
-        "  3. `cage doctor --bundle` — exports both (plus cursors, versions, policy\n"
-        "     provenance) as one redacted archive to attach to a bug report; the\n"
-        "     home prefix is rendered as `~`, contents are counts-never-content.",
-        ("cage/pathprobe.py", "cage/report.py", "cage/doctorbundle.py"),
+        "  3. `CAGE_DEBUG=1 cage import` — the same probes stream to debug.log as\n"
+        "     metadata-only events, plus per-file parse/append/dedupe detail and, at\n"
+        "     every receipt push/skip site, produced/skip_reason (`cage debug` to read).\n"
+        "  4. `cage doctor --bundle` — exports capture.log + debug.log (plus cursors,\n"
+        "     versions, policy provenance) as one redacted archive to attach to a bug\n"
+        "     report; the home prefix is rendered as `~`, contents are counts-never-content.",
+        ("cage/pathprobe.py", "cage/report.py", "cage/doctorbundle.py", "cage/capturelog.py"),
         "n/a — a diagnostic runbook, not a number.",
         kind="concept", plan_ref="§3.7"),
     Explanation(
@@ -613,9 +616,10 @@ REGISTRY: tuple[Explanation, ...] = (
         "cleanup", ("cleanup", "state-dir", "prune", "stale", "retention",
                     "debug-log-growth", "cursors", "pending-buffers"),
         "what `cage data cleanup` may touch — and what it never may",
-        "a CLOSED allowlist over .cage/state/ only: aged debug.log / hooks-seen.jsonl\n"
-        "  rows, stale pending-* provenance buffers, cursors whose source log is gone\n"
-        "  (safe: the next import re-reads and id-dedupe absorbs it), *.tmp. Never —\n"
+        "a CLOSED allowlist over .cage/state/ only: aged debug.log / capture.log /\n"
+        "  hooks-seen.jsonl rows, stale pending-* provenance buffers, cursors whose\n"
+        "  source log is gone (safe: the next import re-reads and id-dedupe absorbs\n"
+        "  it), *.tmp. Never —\n"
         "  by construction, not convention: ledger/, policy.toml, the machine id\n"
         "  (fleet pairing breaks without it), study.jsonl, limits.json. Window:\n"
         "  [cleanup] days = {cleanup_days} (currently {cleanup_on}; env CAGE_CLEANUP\n"

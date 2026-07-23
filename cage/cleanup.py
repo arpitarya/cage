@@ -8,6 +8,7 @@ cursors outlive deleted source logs, tmp files linger. This module ages them out
 What may be cleaned is closed **by construction** — `scan` only ever looks at:
 
 - ``debug-log``      — `debug.log` rows older than the window (current rows kept);
+- ``capture-log``    — `capture.log` rows older than the window (current rows kept);
 - ``hooks-seen``     — `hooks-seen.jsonl` rows older than the window;
 - ``pending-buffer`` — `pending-*.jsonl` session buffers untouched for the window;
 - ``cursor-orphan``  — `cursors.json` entries whose source log no longer exists
@@ -37,7 +38,7 @@ from pathlib import Path
 from cage import debuglog, lockutil, paths, policy
 from cage.constants import CLEANUP_THROTTLE_HOURS
 
-CLASSES = ("debug-log", "hooks-seen", "pending-buffer", "cursor-orphan", "tmp")
+CLASSES = ("debug-log", "capture-log", "hooks-seen", "pending-buffer", "cursor-orphan", "tmp")
 
 # Temp suffix for the atomic line-file rewrites below — deliberately NOT `.tmp`,
 # so a crash mid-rewrite can never leave a file the next run classifies as
@@ -87,7 +88,8 @@ def scan(root: Path, pol: dict, days: int | None = None) -> list[dict]:
     cutoff = _cutoff_iso(window)
     found: list[dict] = []
 
-    for cls, path in (("debug-log", foot.debug_log), ("hooks-seen", foot.hooks_seen)):
+    for cls, path in (("debug-log", foot.debug_log), ("capture-log", foot.capture_log),
+                      ("hooks-seen", foot.hooks_seen)):
         try:
             if path.exists() and path.is_file():
                 stale, total = _aged_rows(path, cutoff)
@@ -155,7 +157,7 @@ def _apply_item(foot: paths.Footprint, item: dict, cutoff: str) -> None:
     if item["action"] == "delete":
         path.unlink(missing_ok=True)
         return
-    if item["cls"] in ("debug-log", "hooks-seen"):
+    if item["cls"] in ("debug-log", "capture-log", "hooks-seen"):
         def keep(line: str) -> bool:
             line = line.strip()
             if not line:
