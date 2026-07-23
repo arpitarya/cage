@@ -59,6 +59,64 @@ def test_logger_is_self_fail_open(proj, monkeypatch):
     debuglog.heartbeat(proj, "x", "y", str(proj))
 
 
+def test_event_writes_under_an_explicit_cage_base_override(tmp_path, monkeypatch):
+    """A ``--ledger``/``CAGE_BASE`` scratch root is an *explicit* sink — the footprint
+    re-bases onto it, so the debug log belongs there. Before v0.31.4 the guard tested
+    ``cwd/.cage`` (unrelated to the override) and went silent, taking the F6 receipt
+    trace with it — see docs/regression/2026-07-24-f1-root-cause.md."""
+    base, cwd = tmp_path / "scratch", tmp_path / "elsewhere"
+    cwd.mkdir()  # a bare cwd: no .cage/ of its own
+    monkeypatch.setenv("CAGE_BASE", str(base))
+    monkeypatch.setenv("CAGE_DEBUG", "1")
+    monkeypatch.delenv("CAGE_DEBUG_LOG", raising=False)
+
+    debuglog.event(cwd, event="receipt", tool="graphify", produced=True, skip_reason="")
+
+    rows = [json.loads(l) for l in (base / "state" / "debug.log").read_text().splitlines()]
+    assert rows[-1]["event"] == "receipt" and rows[-1]["tool"] == "graphify"
+    assert rows[-1]["produced"] is True
+    assert not (cwd / ".cage").exists()  # still never scatters a footprint beside the cwd
+
+
+def test_event_still_refused_in_a_bare_cwd_with_no_cage_and_no_override(tmp_path, monkeypatch):
+    """The guard is opened only for the explicit-override case. With neither ``.cage/``
+    nor ``CAGE_BASE``/``CAGE_DEBUG_LOG``, logging must still refuse rather than create a
+    stray footprint that ``find_project_root`` would later read as a project."""
+    bare = tmp_path / "bare"
+    bare.mkdir()
+    monkeypatch.setenv("CAGE_DEBUG", "1")
+    for env in ("CAGE_BASE", "CAGE_DEBUG_LOG"):
+        monkeypatch.delenv(env, raising=False)
+
+    debuglog.event(bare, event="receipt", tool="graphify", produced=True)
+
+    assert not (bare / ".cage").exists()
+    assert list(bare.iterdir()) == []  # nothing written at all
+
+
+def test_derived_view_byte_identical_with_debug_under_cage_base_on_vs_off(tmp_path, monkeypatch):
+    """Opening the guard is observability only: it can never move a reported number.
+    Same ledger + same policy ⇒ byte-identical `cage report`, debug on or off."""
+    from cage import demo, policy, report
+
+    def rendered(base, debug: bool) -> str:
+        monkeypatch.setenv("CAGE_BASE", str(base))
+        monkeypatch.delenv("CAGE_DEBUG_LOG", raising=False)
+        monkeypatch.setenv("CAGE_DEBUG", "1") if debug else \
+            monkeypatch.delenv("CAGE_DEBUG", raising=False)
+        cwd = base.parent / f"cwd-{base.name}"
+        cwd.mkdir()
+        demo.seed(cwd)
+        debuglog.event(cwd, event="receipt", tool="graphify", produced=True)
+        return report.render_report(report.summarize(cwd, policy.load(None), dim="agent"))
+
+    off = rendered(tmp_path / "off", debug=False)
+    on = rendered(tmp_path / "on", debug=True)
+    assert off == on
+    assert not (tmp_path / "off" / "state" / "debug.log").exists()  # off ⇒ no file
+    assert (tmp_path / "on" / "state" / "debug.log").exists()       # on  ⇒ recorded
+
+
 def test_heartbeat_last_write_wins_per_key(proj, monkeypatch):
     initcmd.run(proj)
     monkeypatch.setenv("CAGE_DEBUG", "1")

@@ -42,6 +42,7 @@ Latest always at [`latest-capture-report.md`](latest-capture-report.md).
 | date | corrects | what changed |
 |------|----------|--------------|
 | [2026-07-23](2026-07-23-f2-correction.md) | 2026-07-22 §F2 | real root cause was a snapshot-ordering off-by-one (`captured` read before this run's appends), not a this-run-vs-lifetime confusion; blast radius corrected to first-import-only, never a false "capturing nothing" warning. Fixed in `cage/importcmd.py`, shipped v0.31.2. |
+| [2026-07-24](2026-07-24-f1-root-cause.md) | 2026-07-22 §F1 | "no real savings ever captured" is false machine-wide — 5 real receipts live in a *project* ledger while the 36k calls live in the *global* one. Real cause is a **dead** interceptor, not a missing one: the v0.28.0 verb rename left the installed shim's `cage graphify --help` probe exiting 1, so it falls through to the unmetered binary — a class failure across every pre-rename shim/hook. Instrument gap (`debuglog` silent under `CAGE_BASE`) fixed in v0.31.4; the stale-wiring class fix is deferred to a design pass. |
 
 ## What cage-lab is
 

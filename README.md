@@ -216,7 +216,7 @@ cage data export --csv calls --since 30d -o calls.csv   # raw ledger rows for a 
 
 ## The `$0` guarantee
 
-Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 831 tests passing; `cage demo` reproduces the worked attribution example against a real ledger.
+Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 834 tests passing; `cage demo` reproduces the worked attribution example against a real ledger.
 
 **Honest limits.** Cage doesn't decide your human rate — it prices minutes at a blended rate you set, and labels the result `estimated` so it never pretends to be a timesheet. Marginal-by-fixed-order is defensible and `$0`, but it is an *ordering convention*, not a Shapley value (that's a deferred audit mode). And a counterfactual cell is an honest reconstruction, never an invoice — the `method` column says so on every row, on purpose.
 
@@ -224,7 +224,7 @@ Every derived view is parse / arithmetic over the log — **no LLM call, ever, o
 
 Latest release below — full history and detail in [CHANGELOG.md](CHANGELOG.md).
 
-- **v0.31.3 (2026-07-23) — F6: capture observability, the instrument for F1.** A new always-on `state/capture.log` breadcrumb (one line per agent per real import run — files/rows/src, never `CAGE_DEBUG`-gated) proves capture ran at all, plus `CAGE_DEBUG`-gated produce/skip logging at every receipt push site (graphify, `record_receipt`, response-cache, compressor) so a skipped savings receipt is no longer silent. Logging only — no derived numbers changed. See [docs/debugging-capture.md](docs/debugging-capture.md).
+- **v0.31.4 (2026-07-24) — fix: `CAGE_DEBUG` went silent under `--ledger`/`CAGE_BASE`.** The debug log's anti-scatter guard tested `cwd/.cage` even when an explicit override had re-based the footprint elsewhere, so all tracing — the F6 receipt produce/skip log included — was suppressed in exactly the scratch-ledger setup a capture diagnosis uses. An explicit override now authorizes the write; a bare cwd is still refused. Observability only, derived views byte-identical. Ships with the [F1 root-cause correction](docs/regression/2026-07-24-f1-root-cause.md).
 
 ## The name
 

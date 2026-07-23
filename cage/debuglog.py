@@ -54,12 +54,27 @@ def _explicit_log() -> bool:
     return bool(os.environ.get("CAGE_DEBUG_LOG"))
 
 
+def _explicit_base() -> bool:
+    """True when ``CAGE_BASE`` (what ``--ledger`` sets) names the active ledger root.
+    ``paths.Footprint`` re-bases the whole footprint — ledger, state, debug log — onto
+    that path, so the log lands *inside the sink the user named*, never beside a cwd."""
+    return bool(os.environ.get("CAGE_BASE"))
+
+
 def _may_write_under_cage(root: Path) -> bool:
     """Never *create* a `.cage/` just to log: writing the default `.cage/state/...` path
     in a non-cage dir would scatter a footprint that `find_project_root` then treats as a
-    project. Default path writes only if `.cage/` already exists; `CAGE_DEBUG_LOG` opts
-    out of this guard for cross-dir debugging."""
-    return _explicit_log() or (root / ".cage").is_dir()
+    project. Default path writes only if `.cage/` already exists; an explicit
+    ``--ledger``/``CAGE_BASE`` override or ``CAGE_DEBUG_LOG`` opts out of the guard.
+
+    The override case is not a convenience: under ``CAGE_BASE`` (a scratch ledger — how a
+    capture diagnosis reproduces without touching the real one) ``resolve_root`` returns
+    the *cwd* while the footprint re-bases onto the override, so the old ``root/.cage``
+    test inspected a directory unrelated to the active sink and silently suppressed every
+    event — the F6 receipt produce/skip trace included. That cost the F1 diagnosis its
+    instrument (`docs/regression/2026-07-24-f1-root-cause.md`). A bare cwd with neither
+    ``.cage/`` nor an override is still refused, so debug never scatters."""
+    return _explicit_log() or _explicit_base() or (root / ".cage").is_dir()
 
 
 def _append(path: Path, row: dict) -> None:

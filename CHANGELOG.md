@@ -2,6 +2,42 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
+## v0.31.4 (2026-07-24) — fix: capture-debug went silent under `--ledger`/`CAGE_BASE`
+
+Observability only — no derived number changes (`report`/`attrib`/`matrix` are byte-identical
+with debug on or off, asserted).
+
+- **`debuglog` no longer suppresses every event under an explicit ledger override.**
+  `_may_write_under_cage` gated the default log path on `root/.cage` existing — the anti-scatter
+  guard that stops a stray footprint appearing beside an arbitrary cwd. But under
+  `--ledger`/`CAGE_BASE`, `paths.resolve_root` returns the *cwd* while `paths.Footprint`
+  re-bases ledger + state + debug log onto the override, so the guard inspected a directory
+  with nothing to do with the active sink and silently dropped every event — including the F6
+  receipt produce/skip trace shipped one release earlier. That is precisely the setup a capture
+  diagnosis runs in (a scratch ledger, so the real one is never mutated), so the instrument was
+  blind exactly where it was needed; the F1 diagnosis had to fall back to `CAGE_DEBUG_LOG` to
+  see anything. An explicit `CAGE_BASE` now authorizes the write (new `_explicit_base()`,
+  alongside the existing `_explicit_log()`); the log still lands *inside* the sink the user
+  named, never beside the cwd. **The guard is not otherwise widened** — a bare cwd with neither
+  `.cage/` nor an override is still refused, so debug never scatters.
+- **New tests** in [tests/test_debuglog.py](tests/test_debuglog.py) — confirmed failing before
+  the fix, passing after: an event written under a `CAGE_BASE` override (with no `.cage/`
+  scattered beside the cwd), the bare-cwd refusal preserved, and a determinism assertion that a
+  rendered `cage report` is byte-identical with debug-under-`CAGE_BASE` on vs off.
+  `test_debug_coverage` unchanged and green.
+- **Regression correction published:**
+  [docs/regression/2026-07-24-f1-root-cause.md](docs/regression/2026-07-24-f1-root-cause.md) —
+  corrects §F1 of the 2026-07-22 capture report (the 07-22 report itself is unchanged, per the
+  never-rewrite convention). Two corrections matter: "no real savings has ever been captured" is
+  false machine-wide (5 real receipts live in a *project* ledger while the 36k calls live in the
+  *global* one — the report's numerator and denominator came from different sinks), and the real
+  cause is a **dead** interceptor rather than a missing one — the v0.28.0 verb rename left the
+  installed shim's `cage graphify --help` probe exiting 1, so it falls through to the raw
+  unmetered binary, silently. That is a class failure across every wiring artifact written
+  before the rename (the global `SessionStart` hook's `cage import-claude` fails identically).
+  The stale-wiring class fix and the loud "receipts: 0 — attribution has no data" doctor check
+  are **deferred to a design pass** and deliberately not in this release.
+
 ## v0.31.3 (2026-07-23) — F6: capture observability — the instrument for F1
 
 Built from: [docs/f6-capture-observability.prompt.md](docs/f6-capture-observability.prompt.md).
