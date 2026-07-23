@@ -549,10 +549,6 @@ default = 0.3       # global fallback
 #   ~/.claude/projects
 #     glob **/*.jsonl   — every session transcript under the tree, recursively
 #
-# codex   (redirect home: CODEX_HOME)
-#   ~/.codex/sessions
-#     glob **/rollout-*.jsonl   — rollout logs under the tree, recursively
-#
 # copilot   (redirect home: COPILOT_HOME, CAGE_VSCODE_USER)
 #   ~/.copilot/session-state
 #     glob */events.jsonl   — Copilot CLI usage events (one dir per session)

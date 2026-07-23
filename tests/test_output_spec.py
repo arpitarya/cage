@@ -129,16 +129,16 @@ def test_R6_report_stale_advice(run):
 
 
 def test_R7_report_capture_health_warning(run):
-    # codex is installed but its log matched nothing and it has never captured a row —
-    # the triple-gated "capture is off for this agent" ⚠ (docs/capture-health). wmh
-    # seeds claude/copilot/kiro (not codex), so the table renders and only codex warns.
-    go = run(seed.wmh)
+    # kiro is installed but its log matched nothing and it has never captured a row —
+    # the triple-gated "capture is off for this agent" ⚠ (docs/capture-health).
+    # spend_only seeds claude/copilot (not kiro), so the table renders and only kiro warns.
+    go = run(seed.spend_only)
     seed.set_last_import(go.root, _now())
-    seed.set_capture_gap(go.root, "codex")
+    seed.set_capture_gap(go.root, "kiro")
     out = go("R7", ["report", "--by", "agent"])
-    assert "⚠ codex: ~/.codex exists but ~/.codex/sessions matched 0 files" in out
-    assert "[sources.codex] replace=true, paths=[]" in out  # the runnable opt-out
-    assert "claude" in out and "codex" not in out.splitlines()[3]  # codex not a table row
+    assert "⚠ kiro: ~/.kiro exists but ~/.kiro/sessions matched 0 files" in out
+    assert "[sources.kiro] replace=true, paths=[]" in out  # the runnable opt-out
+    assert "claude" in out and "kiro" not in out.splitlines()[3]  # kiro not a table row
 
 
 # ── §2 · insights surfaces (current verb names — Phase 3 regroups the doors) ──

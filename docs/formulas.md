@@ -247,7 +247,7 @@ minutes = Σ min(gap_ms, idle cap) / 60000    (cap = 10 min; policy
   [human] idle_cap_minutes wins, constants.IDLE_CAP_MINUTES is the fallback)
   gap_ms = wall-clock between the previous assistant turn's end and the human
   turn that led to the call — stamped at import only where the log carries
-  per-turn timestamps (claude today; codex/copilot/kiro lack the signal ⇒ no
+  per-turn timestamps (claude today; copilot/kiro lack the signal ⇒ no
   field, never fabricated). Read-time derive: changing the cap re-prices the
   backlog, the ledger is never rewritten. Attested minutes (`human-record`,
   `cage human outcome --minutes`) beat derived for a task — never summed;

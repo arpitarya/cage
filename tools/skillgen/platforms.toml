@@ -23,21 +23,10 @@
 #   intro        intro-framing fragment basename under fragments/intro/.
 #   meter        metering-note fragment basename under fragments/meter/.
 #
-# Four-agents invariant: claude/codex/copilot/kiro are all first-class and must
-# all render. claude and codex deliberately share data/skills/cage/SKILL.md
-# (cage setup copies that one dir to both ~/.claude and ~/.codex), so their slots
-# must stay byte-identical — render_all asserts it.
+# Three-agents invariant: claude/copilot/kiro are all first-class and must
+# all render.
 
 [platform.claude]
-kind = "skill"
-skill_dst = "cage/data/skills/cage/SKILL.md"
-name = "cage"
-description = "Show LLM spend, per-tool savings attribution, and budget from the Cage ledger ($0, deterministic). Trigger when the user asks what a session/project cost, what saved money, or whether they are over budget."
-header = "# /cage — read the LLM cost & savings ledger"
-intro = "skill"
-meter = "skill"
-
-[platform.codex]
 kind = "skill"
 skill_dst = "cage/data/skills/cage/SKILL.md"
 name = "cage"

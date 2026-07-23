@@ -145,10 +145,8 @@ def render(platform: Platform) -> list[RenderedArtifact]:
 def render_all(platforms: dict[str, Platform], only: str | None = None) -> list[RenderedArtifact]:
     """Render the selected platforms (or all), deduped by output path.
 
-    claude and codex deliberately render the SAME file (cage setup copies one
-    skill dir to both ~/.claude and ~/.codex), so a full render collides on that
-    path. The collision is the guard: the two must be byte-identical, else the
-    per-host slots have drifted and we raise rather than silently pick one.
+    Two platforms rendering to the same output path must be byte-identical —
+    the collision is the guard against per-host slots silently drifting apart.
     """
     keys = [only] if only else sorted(platforms)
     by_path: dict[str, RenderedArtifact] = {}
