@@ -1,6 +1,6 @@
-"""`cage import [--agent ...]` — unified hookless metering across all four agents.
+"""`cage import [--agent ...]` — unified hookless metering across all three agents.
 
-Claude + Codex + Copilot import on-disk usage logs; Kiro (no usage log) prints the
+Claude + Copilot import on-disk usage logs; Kiro (no usage log) prints the
 proxy fallback. Every surface in agents.SURFACES is reachable and first-class.
 """
 from __future__ import annotations
@@ -18,8 +18,8 @@ def _args(agent="all", path=None, project=None, since=None):
 def _init_root(d, monkeypatch):
     (d / ".cage").mkdir(parents=True)
     # Isolate every agent home so a default (path-less) import never reads real machine
-    # data (~/.claude, ~/.codex, ~/.copilot, Kiro's user-data dir).
-    for env in ("CLAUDE_CONFIG_DIR", "CODEX_HOME", "COPILOT_HOME", "KIRO_DATA_DIR"):
+    # data (~/.claude, ~/.copilot, Kiro's user-data dir).
+    for env in ("CLAUDE_CONFIG_DIR", "COPILOT_HOME", "KIRO_DATA_DIR"):
         monkeypatch.setenv(env, str(d / f"home-{env.lower()}"))
     monkeypatch.chdir(d)
     return d
@@ -29,13 +29,6 @@ def _claude_line(uuid, tin, tout):
     return json.dumps({"type": "assistant", "uuid": uuid, "timestamp": "2026-06-14T10:00:00Z",
                        "message": {"model": "claude-opus-4-8",
                                    "usage": {"input_tokens": tin, "output_tokens": tout}}})
-
-
-def _codex_line(cid, tin, tout):
-    return json.dumps({"id": cid, "timestamp": "2026-06-14T10:00:00Z",
-                       "payload": {"type": "token_count", "model": "gpt-5",
-                                   "info": {"last_token_usage": {"input_tokens": tin,
-                                                                 "output_tokens": tout}}}})
 
 
 # --- consumer capture switches ------------------------------------------------
@@ -54,16 +47,16 @@ def test_capture_switch_env_overrides_policy(monkeypatch):
 def test_stop_hook_captures_claude_only_no_sweep(tmp_path, monkeypatch):
     # The Claude Stop hook records Claude's own turn and never sweeps another agent's log.
     import io
-    root = _init_root(tmp_path, monkeypatch)             # isolates CODEX_HOME etc.
-    cx = tmp_path / "home-codex_home" / "sessions" / "rollout-x.jsonl"
+    root = _init_root(tmp_path, monkeypatch)             # isolates COPILOT_HOME etc.
+    cx = tmp_path / "home-copilot_home" / "session-state" / "s" / "events.jsonl"
     cx.parent.mkdir(parents=True)
-    cx.write_text(_codex_line("c1", 50, 10) + "\n", encoding="utf-8")  # would be swept, if we swept
+    cx.write_text('{"foreign": "log"}\n', encoding="utf-8")  # would be swept, if we swept
     tp = tmp_path / "live.jsonl"
     tp.write_text(_claude_line("u1", 100, 40) + "\n", encoding="utf-8")
     monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(
         {"transcript_path": str(tp), "cwd": str(tmp_path), "session_id": "s"})))
     hooks.stop()
-    assert {c["agent"] for c in ledger.calls(root)} == {"claude-code"}   # codex NOT pulled in
+    assert {c["agent"] for c in ledger.calls(root)} == {"claude-code"}   # copilot NOT pulled in
 
 
 def test_import_skipped_when_capture_disabled(tmp_path, monkeypatch, capsys):
@@ -122,19 +115,6 @@ def test_claude_import_counts_and_idempotent(tmp_path, monkeypatch, capsys):
     assert "✔ claude: imported 2 call(s) from 1 file(s)." in capsys.readouterr().out
     before = b"".join(p.read_bytes() for p in paths.Footprint(root).shards("calls"))
     clicmds.cmd_import(_args(agent="claude", path=str(tp)))  # re-import → no double count
-    assert b"".join(p.read_bytes() for p in paths.Footprint(root).shards("calls")) == before
-
-
-def test_codex_import_counts_and_idempotent(tmp_path, monkeypatch, capsys):
-    root = _init_root(tmp_path, monkeypatch)
-    tp = tmp_path / "rollout-2026.jsonl"
-    tp.write_text(_codex_line("c1", 80, 40) + "\n", encoding="utf-8")
-    clicmds.cmd_import(_args(agent="codex", path=str(tp)))
-    calls = ledger.calls(root)
-    assert len(calls) == 1 and calls[0]["tokens_in"] == 80 and calls[0]["agent"] == "codex"
-    assert "✔ codex: imported 1 call(s) from 1 file(s)." in capsys.readouterr().out
-    before = b"".join(p.read_bytes() for p in paths.Footprint(root).shards("calls"))
-    clicmds.cmd_import(_args(agent="codex", path=str(tp)))
     assert b"".join(p.read_bytes() for p in paths.Footprint(root).shards("calls")) == before
 
 

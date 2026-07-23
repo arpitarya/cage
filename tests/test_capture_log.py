@@ -14,7 +14,7 @@ from types import SimpleNamespace
 
 from cage import agents, capturelog, cleanup, debuglog, importcmd, paths, policy
 
-_HOME_ENVS = ("CLAUDE_CONFIG_DIR", "CODEX_HOME", "COPILOT_HOME", "KIRO_HOME",
+_HOME_ENVS = ("CLAUDE_CONFIG_DIR", "COPILOT_HOME", "KIRO_HOME",
               "KIRO_DATA_DIR", "CAGE_VSCODE_USER")
 
 
@@ -36,15 +36,13 @@ def _rows(root):
     return capturelog.tail(root, 0)
 
 
-def _codex_log(root):
-    d = paths.codex_home() / "sessions" / "2026" / "06"
+def _copilot_log(root):
+    d = paths.copilot_home() / "session-state" / "sid"
     d.mkdir(parents=True, exist_ok=True)
-    line = json.dumps({"timestamp": "2026-06-14T10:00:00Z", "type": "event_msg",
-                       "payload": {"type": "token_count", "info": {
-                           "total_token_usage": {"input_tokens": 100, "output_tokens": 40,
-                                                 "cached_input_tokens": 0}},
-                           "model": "gpt-5.3-codex"}})
-    (d / "rollout-2026-06-14-x.jsonl").write_text(line + "\n", encoding="utf-8")
+    line = json.dumps({"type": "session.shutdown", "timestamp": "2026-06-14T10:00:00Z",
+                       "data": {"modelMetrics": {"claude-sonnet-4-6": {
+                           "usage": {"input_tokens": 100, "output_tokens": 40}}}}})
+    (d / "events.jsonl").write_text(line + "\n", encoding="utf-8")
 
 
 # ── one line per swept agent per real run ──────────────────────────────────────
@@ -60,16 +58,16 @@ def test_real_import_appends_one_line_per_swept_agent(tmp_path, monkeypatch):
 
 def test_single_agent_import_appends_only_that_agent(tmp_path, monkeypatch):
     root = _isolate(tmp_path, monkeypatch)
-    _imp(root, "codex")
-    assert [r["agent"] for r in _rows(root)] == ["codex"]
+    _imp(root, "copilot")
+    assert [r["agent"] for r in _rows(root)] == ["copilot"]
 
 
 def test_first_ever_import_records_rows_new_and_rows_total(tmp_path, monkeypatch):
     root = _isolate(tmp_path, monkeypatch)
-    paths.codex_home().mkdir(parents=True)
-    _codex_log(root)
-    _imp(root, "codex")
-    rows = [r for r in _rows(root) if r["agent"] == "codex"]
+    paths.copilot_home().mkdir(parents=True)
+    _copilot_log(root)
+    _imp(root, "copilot")
+    rows = [r for r in _rows(root) if r["agent"] == "copilot"]
     assert len(rows) == 1
     assert rows[0]["files_seen"] == 1
     assert rows[0]["rows_new"] == 1
@@ -82,22 +80,22 @@ def test_first_import_agrees_with_capture_health(tmp_path, monkeypatch):
     # capture.log's rows_new/rows_total must agree with cursors["_health"]["captured"]
     # for the very first import of an agent, in the SAME run.
     root = _isolate(tmp_path, monkeypatch)
-    paths.codex_home().mkdir(parents=True)
-    _codex_log(root)
-    _imp(root, "codex")
-    health = importcmd.capture_health(root)["codex"]
-    row = next(r for r in _rows(root) if r["agent"] == "codex")
+    paths.copilot_home().mkdir(parents=True)
+    _copilot_log(root)
+    _imp(root, "copilot")
+    health = importcmd.capture_health(root)["copilot"]
+    row = next(r for r in _rows(root) if r["agent"] == "copilot")
     assert health["captured"] is True
     assert row["rows_new"] > 0 and row["rows_total"] > 0
 
 
 def test_second_import_no_new_rows_keeps_rows_total_steady(tmp_path, monkeypatch):
     root = _isolate(tmp_path, monkeypatch)
-    paths.codex_home().mkdir(parents=True)
-    _codex_log(root)
-    _imp(root, "codex")
-    _imp(root, "codex")  # re-import: cursor-unchanged, nothing new
-    rows = [r for r in _rows(root) if r["agent"] == "codex"]
+    paths.copilot_home().mkdir(parents=True)
+    _copilot_log(root)
+    _imp(root, "copilot")
+    _imp(root, "copilot")  # re-import: cursor-unchanged, nothing new
+    rows = [r for r in _rows(root) if r["agent"] == "copilot"]
     assert len(rows) == 2
     assert rows[1]["rows_new"] == 0
     assert rows[1]["rows_total"] == 1  # the one row from the first run, still there
@@ -129,7 +127,7 @@ def test_capture_disabled_appends_nothing(tmp_path, monkeypatch):
 
 def test_capture_log_is_size_managed_by_cleanup(tmp_path, monkeypatch):
     root = _isolate(tmp_path, monkeypatch)
-    _imp(root, "codex")
+    _imp(root, "copilot")
     foot = paths.Footprint(root)
     old_ts = (_dt.datetime.now(_dt.timezone.utc) - _dt.timedelta(days=90)).isoformat()
     rows = [json.loads(l) for l in
@@ -158,8 +156,8 @@ def test_write_failure_is_fail_open_and_logged(tmp_path, monkeypatch):
     state = root / ".cage" / "state"
     state.mkdir(parents=True, exist_ok=True)
     (state / "capture.log").mkdir()  # a directory in the way → the append raises
-    lines = _imp(root, "codex")  # must not raise; import still succeeds
-    assert any("codex" in l for l in lines)
+    lines = _imp(root, "copilot")  # must not raise; import still succeeds
+    assert any("copilot" in l for l in lines)
     events = [e for e in debuglog.tail(root, 0) if e.get("event") == "exception"]
     assert any(e.get("context") == "capture.log" for e in events)
 
@@ -185,7 +183,7 @@ def test_derived_views_byte_identical_with_and_without_the_breadcrumb(tmp_path, 
 
 def test_doctor_bundle_includes_capture_log(tmp_path, monkeypatch):
     root = _isolate(tmp_path, monkeypatch)
-    _imp(root, "codex")
+    _imp(root, "copilot")
     from cage import doctorbundle
     out = doctorbundle.run(root, str(tmp_path / "bundle.zip"))
     import zipfile

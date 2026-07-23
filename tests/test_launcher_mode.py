@@ -28,7 +28,6 @@ _EXE_SHAPES = ("cage.exe", "command -v cage", "where cage", ".local/bin/cage",
 @pytest.fixture
 def homes(tmp_path, monkeypatch):
     monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "claude_home"))
-    monkeypatch.setenv("CODEX_HOME", str(tmp_path / "codex_home"))
     monkeypatch.setenv("COPILOT_HOME", str(tmp_path / "copilot_home"))
     monkeypatch.setenv("KIRO_HOME", str(tmp_path / "kiro_home"))
     proj = tmp_path / "proj"
@@ -44,7 +43,6 @@ def _wired_files(proj: Path, tmp_path: Path) -> dict[str, Path]:
         "shim": proj / ".cage" / "bin" / "cage-run",
         "shim.cmd": proj / ".cage" / "bin" / "cage-run.cmd",
         "copilot-hook": tmp_path / "copilot_home" / "hooks" / "cage.json",
-        "codex-config": tmp_path / "codex_home" / "config.toml",
         "kiro-mcp": proj / ".kiro" / "settings" / "mcp.json",
         "post-commit": proj / ".git" / "hooks" / "post-commit",
         "prepare-commit-msg": proj / ".git" / "hooks" / "prepare-commit-msg",
@@ -68,11 +66,6 @@ def test_setup_flag_persists_mode_and_writes_nothing_exe_shaped(homes, tmp_path,
     entry = cop["agentStop"][0]
     assert entry["bash"] == "python3 -m cage import --agent copilot --since 7d"
     assert entry["powershell"] == "py -3 -m cage import --agent copilot --since 7d"
-    codex = (tmp_path / "codex_home" / "config.toml").read_text(encoding="utf-8")
-    if os.name == "nt":
-        assert 'command = "py"' in codex and '"-3", "-m", "cage", "mcp"' in codex
-    else:
-        assert 'command = "python3"' in codex and '"-m", "cage", "mcp"' in codex
     kiro = cfgio.load_json(homes / ".kiro" / "settings" / "mcp.json")["mcpServers"]["cage"]
     assert kiro["command"] in ("python3", "py")
     assert "-m" in kiro["args"] and "cage" in kiro["args"]

@@ -63,12 +63,12 @@ def test_quoted_cage_bin_quotes_paths_with_spaces(monkeypatch):
 
 def test_reresolve_matches_windows_and_quoted_forms(monkeypatch):
     monkeypatch.setattr(paths, "cage_bin", lambda: "/resolved/cage")
-    for cmd in ("cage import --agent codex",
-                "/old/path/cage import --agent codex",
-                r"C:\old\cage.exe import --agent codex",
-                '"C:\\Program Files\\cage\\cage.exe" import --agent codex'):
+    for cmd in ("cage import --agent claude",
+                "/old/path/cage import --agent claude",
+                r"C:\old\cage.exe import --agent claude",
+                '"C:\\Program Files\\cage\\cage.exe" import --agent claude'):
         out = paths.reresolve_cage_command(cmd)
-        assert out == "/resolved/cage import --agent codex", cmd
+        assert out == "/resolved/cage import --agent claude", cmd
         assert paths.is_cage_import_command(cmd)
     assert paths.reresolve_cage_command("rm -rf /") is None  # foreign hooks untouched
 
@@ -113,7 +113,7 @@ def test_locked_fail_open_on_unwritable_lock_dir(tmp_path, monkeypatch):
 # ── the path probe: one screen of truth, writes nothing ────────────────────────
 
 def _isolated(monkeypatch, tmp_path):
-    for env in ("CLAUDE_CONFIG_DIR", "CODEX_HOME", "COPILOT_HOME", "KIRO_DATA_DIR",
+    for env in ("CLAUDE_CONFIG_DIR", "COPILOT_HOME", "KIRO_DATA_DIR",
                 "CAGE_VSCODE_USER"):
         monkeypatch.setenv(env, str(tmp_path / f"home-{env.lower()}"))
     root = tmp_path / "proj"
@@ -125,7 +125,7 @@ def test_doctor_paths_reports_misses_with_why_lines(tmp_path, monkeypatch):
     root = _isolated(monkeypatch, tmp_path)
     monkeypatch.chdir(root)
     out = pathprobe.run(root)
-    for agent in ("claude", "codex", "copilot", "kiro"):
+    for agent in ("claude", "copilot", "kiro"):
         assert agent in out
     assert "location absent" in out                    # empty homes → why-lines
     assert "active ledger:" in out and "precedence:" in out
@@ -176,11 +176,11 @@ def test_probe_debug_event_fires_on_import(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(root)
     from types import SimpleNamespace
     from cage import clicmds
-    assert clicmds.cmd_import(SimpleNamespace(agent="codex", path=None, project=None,
+    assert clicmds.cmd_import(SimpleNamespace(agent="claude", path=None, project=None,
                                               since=None)) == 0
     log = paths.Footprint(root).debug_log.read_text()
     probes = [json.loads(l) for l in log.splitlines() if '"probe"' in l]
-    assert probes and probes[0]["agent"] == "codex"
+    assert probes and probes[0]["agent"] == "claude"
     assert probes[0]["exists"] is False and probes[0]["files_matched"] == 0
 
 
@@ -188,5 +188,5 @@ def test_import_missing_source_yields_no_phantom_file(tmp_path, monkeypatch):
     # A missing source dir used to become `[src]` — a phantom candidate that parsers
     # then "parsed" to zero rows. It now scans to an empty list.
     root = _isolated(monkeypatch, tmp_path)
-    files = importcmd._scan(root, "codex", tmp_path / "nope", "**/rollout-*.jsonl", None)
+    files = importcmd._scan(root, "claude", tmp_path / "nope", "**/*.jsonl", None)
     assert files == []

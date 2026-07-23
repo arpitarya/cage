@@ -6,7 +6,7 @@ exact call rows + plant metadata — see the corpus README). The test plants the
 log into an isolated fake agent home at its real relative location, runs the
 real default (pathless) `cage import` scan, and asserts the ledger rows match
 byte-for-byte — ids included (they're deterministic), `ts` excluded only where
-the log carries no timestamp and the row gets a write-time stamp (codex/kiro).
+the log carries no timestamp and the row gets a write-time stamp (kiro).
 """
 from __future__ import annotations
 
@@ -37,7 +37,7 @@ def _plant(fixture: Path, spec: dict, home: Path) -> None:
 def _isolated_root(d, monkeypatch):
     (d / ".cage").mkdir(parents=True)
     # Isolate every agent home so the default (pathless) scan never reads real machine data.
-    for env in ("CLAUDE_CONFIG_DIR", "CODEX_HOME", "COPILOT_HOME", "KIRO_DATA_DIR",
+    for env in ("CLAUDE_CONFIG_DIR", "COPILOT_HOME", "KIRO_DATA_DIR",
                 "CAGE_VSCODE_USER"):
         monkeypatch.setenv(env, str(d / f"home-{env.lower()}"))
     monkeypatch.delenv("CAGE_CAPTURE", raising=False)
@@ -56,7 +56,7 @@ def _comparable(rows: list[dict], volatile: list[str]) -> list[dict]:
 
 
 def test_corpus_covers_every_agent_and_surface():
-    # The four-agent invariant, structurally: a missing fixture dir is a failure,
+    # The three-agent invariant, structurally: a missing fixture dir is a failure,
     # never a silently narrower parametrization.
     want = {Path(a) / s for a in agents.SURFACES for s in SURFACES_TESTED}
     assert set(FIXTURES) == want

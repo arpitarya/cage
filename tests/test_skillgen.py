@@ -2,7 +2,7 @@
 
 skillgen is build-time only (never imported by the cage package at runtime), so
 these tests import it directly from the repo's ``tools`` namespace. They guard the
-invariants the renderer exists to protect: byte-determinism, the four-agents
+invariants the renderer exists to protect: byte-determinism, the three-agents
 product invariant, the per-host anchor lines (frontmatter/commands/PII claim), no
 unfilled slots, that --check passes clean and fails on drift, and that nothing
 under tools/skillgen/ ships in the wheel.
@@ -16,8 +16,8 @@ import pytest
 
 from tools.skillgen import gen
 
-# The four sacred agents (agents.SURFACES) plus the generic `agents` target.
-SACRED = ("claude", "codex", "copilot", "kiro")
+# The three sacred agents (agents.SURFACES) plus the generic `agents` target.
+SACRED = ("claude", "copilot", "kiro")
 ALL_HOSTS = SACRED + ("agents",)
 
 REPO_ROOT = gen.REPO_ROOT
@@ -28,12 +28,12 @@ def platforms():
     return gen.load_platforms()
 
 
-def test_all_hosts_present_four_sacred_plus_agents(platforms):
-    """All five hosts parse; the four sacred agents are never dropped."""
+def test_all_hosts_present_three_sacred_plus_agents(platforms):
+    """All four hosts parse; the three sacred agents are never dropped."""
     for key in ALL_HOSTS:
         assert key in platforms, f"missing platform '{key}'"
     for key in SACRED:
-        assert key in platforms, f"four-agents invariant broken: '{key}' missing"
+        assert key in platforms, f"three-agents invariant broken: '{key}' missing"
 
 
 def test_every_host_renders(platforms):
@@ -51,22 +51,25 @@ def test_render_is_deterministic(platforms):
 
 
 def test_render_all_dedupes_shared_path(platforms):
-    """claude and codex share one file and must render byte-identical; the full
-    render therefore yields 4 unique files, not 5."""
+    """No two real hosts currently share an output path, so a full render yields
+    one unique file per host. A synthetic host sharing claude's path and content
+    proves the dedup itself still collapses correctly when it does happen."""
     arts = gen.render_all(platforms)
     paths = [a.path for a in arts]
-    assert len(paths) == len(set(paths)) == 4
-    claude = gen.render(platforms["claude"])[0]
-    codex = gen.render(platforms["codex"])[0]
-    assert claude.path == codex.path == "cage/data/skills/cage/SKILL.md"
-    assert claude.content == codex.content
+    assert len(paths) == len(set(paths)) == len(platforms)
+    twin = dict(platforms)
+    twin["claude-twin"] = replace(platforms["claude"], key="claude-twin")
+    twin_arts = gen.render_all(twin)
+    twin_paths = [a.path for a in twin_arts]
+    assert len(twin_paths) == len(set(twin_paths)) == len(platforms)  # twin collapsed in
 
 
 def test_render_all_raises_on_shared_path_drift(platforms):
     """If two hosts target one path with different content, render_all raises
     rather than silently picking one (the shared-path guard)."""
     drifted = dict(platforms)
-    drifted["codex"] = replace(platforms["codex"], header="# divergent header")
+    drifted["claude-twin"] = replace(platforms["claude"], key="claude-twin",
+                                     header="# divergent header")
     with pytest.raises(ValueError, match="conflicting content to the same path"):
         gen.render_all(drifted)
 

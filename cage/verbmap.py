@@ -17,7 +17,6 @@ from __future__ import annotations
 REMOVED: dict[str, str] = {
     # merged / renamed singletons
     "init": "setup",
-    "import-codex": "import --agent codex",
     "import-claude": "import --agent claude",
     # → insights
     "attrib": "insights attrib",

@@ -42,7 +42,7 @@ CORPUS = REPO_ROOT / "tests" / "fixtures" / "transcripts"
 
 # Sandboxed agent-home env vars (the same overrides the pytest corpus uses) —
 # every one points inside the sandbox so no run can read or write real machine data.
-HOME_ENVS = ("CLAUDE_CONFIG_DIR", "CODEX_HOME", "COPILOT_HOME", "KIRO_DATA_DIR", "KIRO_HOME",
+HOME_ENVS = ("CLAUDE_CONFIG_DIR", "COPILOT_HOME", "KIRO_DATA_DIR", "KIRO_HOME",
              "CAGE_VSCODE_USER")
 # Inherited cage knobs that must never leak into the sandbox.
 STRIP_ENVS = ("CAGE_BASE", "CAGE_LEDGER", "CAGE_DEBUG", "CAGE_DEBUG_LOG", "CAGE_CAPTURE",
@@ -53,7 +53,7 @@ STRIP_ENVS = ("CAGE_BASE", "CAGE_LEDGER", "CAGE_DEBUG", "CAGE_DEBUG_LOG", "CAGE_
 # placeholders — if one leaks into the ledger, capture copied content.
 PII_MARKERS = ("content stripped", '"prompt"', '"message"', '"text"', '"summary"')
 
-AGENTS = ("claude", "codex", "copilot", "kiro")
+AGENTS = ("claude", "copilot", "kiro")
 
 
 class Fail(Exception):
@@ -186,7 +186,7 @@ def shard_bytes(repo: Path) -> bytes:
 # ── scenarios ────────────────────────────────────────────────────────────────
 
 def s1_cli(base: Path) -> str:
-    """S1 — per agent × CLI: wiring reports all four; planted CLI logs import to exact
+    """S1 — per agent × CLI: wiring reports all three; planted CLI logs import to exact
     rows; doctor exits 0; a simulated teammate clone gets portable wiring (no absolute
     paths, the committed shim resolves). (The hook-fires-live half is manual.)"""
     repo, env = make_sandbox(base, "s1-cli")
@@ -204,7 +204,7 @@ def s1_cli(base: Path) -> str:
     assert_pii_clean(repo)
     expect_ok(repo, env, "doctor")
     clone_note = _clone_simulation(base, repo, env)
-    return f"wired 4/4 · CLI fixtures → exact rows · doctor ok · {clone_note}"
+    return f"wired 3/3 · CLI fixtures → exact rows · doctor ok · {clone_note}"
 
 
 def _clone_simulation(base: Path, repo: Path, env: dict) -> str:
@@ -718,7 +718,7 @@ for i in range(3):
         call_id=f"c_auto{i}"))
 ledger.append_row(root, "calls", schema.make_call(
     route="chat", provider="mistral", model="mistral-large-3", tokens_in=1000000,
-    tokens_out=200000, agent="codex", ts="2026-07-02T10:00:00Z", call_id="c_m1"))
+    tokens_out=200000, agent="copilot", ts="2026-07-02T10:00:00Z", call_id="c_m1"))
 """
 
 _S11_BACKDATE = """
@@ -850,8 +850,7 @@ def s12_launcher(base: Path) -> str:
              repo / ".cage" / "bin" / "cage-run.cmd",
              repo / ".kiro" / "settings" / "mcp.json",
              repo / ".git" / "hooks" / "post-commit",
-             Path(env["COPILOT_HOME"]) / "hooks" / "cage.json",
-             Path(env["CODEX_HOME"]) / "config.toml"]
+             Path(env["COPILOT_HOME"]) / "hooks" / "cage.json"]
     for f in wired:
         text = f.read_text(encoding="utf-8")
         for shape in ("cage.exe", "command -v cage", "where cage", ".local/bin/cage"):
@@ -1002,7 +1001,7 @@ stamped = datetime.date.fromisoformat(str(meta.get("prices_date"))[:10])
 ts = (stamped + datetime.timedelta(days=100)).isoformat() + "T10:00:00Z"
 ledger.append_row(root, "calls", schema.make_call(
     route="chat", provider="mistral", model="mistral-large-3", tokens_in=10000,
-    tokens_out=1000, agent="codex", ts=ts, call_id="c_s15"))
+    tokens_out=1000, agent="copilot", ts=ts, call_id="c_s15"))
 """
 
 _S15_OPTOUT = """

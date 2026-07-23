@@ -1,4 +1,4 @@
-"""Multi-agent wiring: claude / codex / copilot / kiro installers + MCP dispatch."""
+"""Multi-agent wiring: claude / copilot / kiro installers + MCP dispatch."""
 from __future__ import annotations
 
 import json
@@ -11,7 +11,6 @@ from cage import agents, cfgio, mcpserver
 @pytest.fixture
 def homes(tmp_path, monkeypatch):
     monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "claude_home"))
-    monkeypatch.setenv("CODEX_HOME", str(tmp_path / "codex_home"))
     monkeypatch.setenv("COPILOT_HOME", str(tmp_path / "copilot_home"))  # user-level hooks
     return tmp_path
 
@@ -31,8 +30,7 @@ def test_install_all_surfaces(homes):
     proj = homes / "proj"
     proj.mkdir()
     agents.install(proj)
-    assert agents.status(proj) == {"claude": True, "codex": True,
-                                   "copilot": True, "kiro": True}
+    assert agents.status(proj) == {"claude": True, "copilot": True, "kiro": True}
     # The committed shim is written alongside the wiring (both twins, plan §5).
     assert (proj / ".cage" / "bin" / "cage-run").exists()
     assert (proj / ".cage" / "bin" / "cage-run.cmd").exists()
@@ -63,12 +61,9 @@ def test_install_all_surfaces(homes):
     assert kiro_hook["when"]["type"] == "agentStop"
     assert kiro_hook["then"]["type"] == "runCommand"
     assert kiro_hook["then"]["command"] == runshim.selflocating_command("import --agent kiro")
-    # All four now have BOTH real-time and backfill capture wired
+    # All three now have BOTH real-time and backfill capture wired
     assert agents.realtime_status(proj) == {a: True for a in agents.SURFACES}
     assert agents.backfill_status(proj) == {a: True for a in agents.SURFACES}
-    # Codex TOML block (HOME-level)
-    cfg = (homes / "codex_home" / "config.toml").read_text()
-    assert "[mcp_servers.cage]" in cfg
 
 
 def test_copilot_hook_is_user_level_and_migrates_stale_repo_hook(homes):
@@ -116,9 +111,6 @@ def test_committed_wiring_never_carries_resolved_path(homes, monkeypatch):
     s = cfgio.load_json(proj / ".claude" / "settings.json")["hooks"]
     assert s["Stop"][0]["hooks"][0]["command"] == \
         f'"$CLAUDE_PROJECT_DIR/{runshim.SHIM_REL}" hook-stop'
-    cx = cfgio.load_json(proj / ".codex" / "hooks.json")["hooks"]
-    assert cx["Stop"][0]["hooks"][0]["command"] == \
-        runshim.selflocating_command("import --agent codex --since 7d")
     k = cfgio.load_json(proj / ".kiro" / "hooks" / "cage.kiro.hook")
     assert "/opt/cage" not in k["then"]["command"]
     assert (cfgio.load_json(proj / ".mcp.json")["mcpServers"]["cage"]["command"]
@@ -126,7 +118,6 @@ def test_committed_wiring_never_carries_resolved_path(homes, monkeypatch):
     # user-level files DO carry the resolved path (per-machine by nature)
     cop = cfgio.load_json(homes / "copilot_home" / "hooks" / "cage.json")["hooks"]
     assert any("/opt/cage/bin/cage" in h["bash"] for h in cop["agentStop"])
-    assert "/opt/cage/bin/cage" in (homes / "codex_home" / "config.toml").read_text()
     # the ONE exception: Kiro's MCP config stays absolute by necessity
     kiro_mcp = cfgio.load_json(proj / ".kiro" / "settings" / "mcp.json")
     assert kiro_mcp["mcpServers"]["cage"]["command"] == "/opt/cage/bin/cage"
@@ -147,21 +138,17 @@ def test_reinstall_migrates_legacy_absolute_hook_without_duplicating(homes, monk
         "SessionStart": [{"hooks": [{"type": "command",
                                      "command": "/opt/cage/bin/cage import-claude --project ."}]}],
     }}), encoding="utf-8")
-    out = agents.install(proj, ("claude", "codex", "kiro"))
+    out = agents.install(proj, ("claude", "kiro"))
     s = cfgio.load_json(proj / ".claude" / "settings.json")["hooks"]
     assert len(s["Stop"]) == 1 and len(s["SessionStart"]) == 2   # migrated, not duplicated
     assert s["Stop"][0]["hooks"][0]["command"] == \
         f'"$CLAUDE_PROJECT_DIR/{runshim.SHIM_REL}" hook-stop'
     assert "migrated" in out["claude"]                            # migration is reported
-    cx = cfgio.load_json(proj / ".codex" / "hooks.json")["hooks"]
-    assert len(cx["Stop"]) == 1
-    assert cx["Stop"][0]["hooks"][0]["command"] == \
-        runshim.selflocating_command("import --agent codex --since 7d")
     # second run: already portable — nothing further migrates, files byte-identical
-    before = legacy.read_bytes(), (proj / ".codex" / "hooks.json").read_bytes()
-    out2 = agents.install(proj, ("claude", "codex", "kiro"))
-    assert "migrated" not in out2["claude"] and "migrated" not in out2["codex"]
-    assert (legacy.read_bytes(), (proj / ".codex" / "hooks.json").read_bytes()) == before
+    before = legacy.read_bytes()
+    out2 = agents.install(proj, ("claude", "kiro"))
+    assert "migrated" not in out2["claude"]
+    assert legacy.read_bytes() == before
 
 
 def test_reresolve_cage_command_leaves_foreign_hooks_alone():
@@ -178,11 +165,10 @@ def test_setup_project_scope_writes_into_repo(homes):
     proj.mkdir()
     out = setupcmd.run(scope="project", root=proj)
     assert (proj / ".claude" / "skills" / "cage" / "SKILL.md").exists()
-    assert (proj / ".codex" / "skills" / "cage" / "SKILL.md").exists()
     assert (proj / ".github" / "prompts" / "cage.prompt.md").exists()
     assert (proj / ".kiro" / "steering" / "cage.md").exists()
     # nothing leaked into the agent homes
-    assert not (homes / "codex_home" / "skills" / "cage").exists()
+    assert not (homes / "claude_home" / "skills" / "cage").exists()
     assert all(str(proj) in v for v in out.values())
 
 
@@ -190,7 +176,7 @@ def test_setup_project_scope_requires_root():
     from cage import setupcmd
     import pytest as _pytest
     with _pytest.raises(ValueError):
-        setupcmd.run(("codex",), scope="project")
+        setupcmd.run(("kiro",), scope="project")
 
 
 def test_install_is_idempotent(homes):
@@ -234,26 +220,6 @@ def test_claude_sessionstart_backfill_no_duplicate_on_reinstall(homes):
     assert cmds.count('"$CLAUDE_PROJECT_DIR/.cage/bin/cage-run" hook-session-start') == 1
 
 
-def test_codex_capture_hooks_wired_and_idempotent(homes):
-    # Codex reads a project .codex/hooks.json (same schema/events as Claude) — wire the
-    # real-time Stop hook + the SessionStart backfill, both running the import command.
-    proj = homes / "proj"
-    proj.mkdir()
-    agents.install(proj, ("codex",))
-    agents.install(proj, ("codex",))  # idempotent
-    from cage import runshim
-    hooks = cfgio.load_json(proj / ".codex" / "hooks.json")["hooks"]
-    # Codex only — no cross-agent sweep; self-locating shim form (committed file)
-    imp = runshim.selflocating_command("import --agent codex --since 7d")
-    for event in ("Stop", "SessionStart"):
-        cmds = [h["command"] for e in hooks[event] for h in e["hooks"]]
-        assert cmds == [imp]  # wired into each event exactly once
-    assert agents.backfill_status(proj)["codex"] is True
-    assert agents.realtime_status(proj)["codex"] is True  # real-time capture wired
-    # the MCP read surface is still wired in the global config
-    assert "[mcp_servers.cage]" in (homes / "codex_home" / "config.toml").read_text()
-
-
 def test_install_selected_surface_only(homes):
     proj = homes / "proj"
     proj.mkdir()
@@ -269,8 +235,7 @@ def test_adopt_no_surface_skips_all_wiring(homes):
     proj.mkdir()
     res = adoptcmd.run(proj, graphify=False)  # no PATH/shim mutation in tests
     assert "hooks" not in res
-    assert agents.status(proj) == {"claude": False, "codex": False,
-                                   "copilot": False, "kiro": False}
+    assert agents.status(proj) == {"claude": False, "copilot": False, "kiro": False}
 
 
 def test_adopt_surface_subset(homes):
@@ -293,7 +258,7 @@ def test_wizard_apply_wires_one_agent_and_skill(homes, monkeypatch):
     proj.mkdir()
     log = wizard.apply(proj, agent="claude", skill=True, project=True, graphify=False)
     s = agents.status(proj)
-    assert s["claude"] is True and s["codex"] is False
+    assert s["claude"] is True and s["kiro"] is False
     assert any("metering + MCP wired" in line for line in log)
     assert any("global skill" in line for line in log)
 
@@ -306,7 +271,7 @@ def test_wizard_apply_all_wires_every_agent(homes, monkeypatch):
     proj = homes / "proj"
     proj.mkdir()
     log = wizard.apply(proj, agent="all", skill=True, project=True, graphify=False)
-    assert agents.status(proj) == {a: True for a in agents.SURFACES}  # all four wired
+    assert agents.status(proj) == {a: True for a in agents.SURFACES}  # all three wired
     assert any("all agents metering + MCP wired" in line for line in log)
 
 
@@ -314,8 +279,8 @@ def test_wizard_apply_skill_only_skips_project(homes):
     from cage import wizard
     proj = homes / "proj"
     proj.mkdir()
-    log = wizard.apply(proj, agent="codex", skill=True, project=False, graphify=False)
-    assert agents.status(proj)["codex"] is False  # no per-project wiring
+    log = wizard.apply(proj, agent="kiro", skill=True, project=False, graphify=False)
+    assert agents.status(proj)["kiro"] is False  # no per-project wiring
     assert not (proj / ".cage").exists()           # init never ran
     assert any("global skill" in line for line in log)
 
@@ -332,21 +297,21 @@ def test_wizard_interactive_plan_defaults_to_all(monkeypatch):
 
 def test_wizard_interactive_plan_parses_answers(monkeypatch):
     from cage import wizard
-    # options are ("all", claude, codex, copilot, kiro) → "3" = codex
-    answers = iter(["3", "n", "y", "n"])  # codex · no skill · yes project · no graphify
+    # options are ("all", claude, copilot, kiro) → "3" = copilot
+    answers = iter(["3", "n", "y", "n"])  # copilot · no skill · yes project · no graphify
     monkeypatch.setattr("builtins.input", lambda *a: next(answers))
     assert wizard.interactive_plan() == {
-        "agent": "codex", "skill": False, "skill_scope": "global",
+        "agent": "copilot", "skill": False, "skill_scope": "global",
         "project": True, "graphify": False}
 
 
 def test_wizard_interactive_plan_skill_scope_defaults_to_project(monkeypatch):
-    # codex (option 3) · yes skill · empty scope (→ default) · empty project · empty graphify
+    # copilot (option 3) · yes skill · empty scope (→ default) · empty project · empty graphify
     from cage import wizard
     answers = iter(["3", "y", "", "", ""])
     monkeypatch.setattr("builtins.input", lambda *a: next(answers))
     plan = wizard.interactive_plan()
-    assert plan["agent"] == "codex" and plan["skill"] is True
+    assert plan["agent"] == "copilot" and plan["skill"] is True
     assert plan["skill_scope"] == "project"   # repo-level is the default
     assert plan["project"] is True            # scaffold default stays yes
     assert plan["graphify"] is False          # graphify default is now no
@@ -360,15 +325,15 @@ def test_wizard_interactive_plan_skill_scope_global_explicit(monkeypatch):
     assert wizard.interactive_plan()["skill_scope"] == "global"
 
 
-def test_wizard_apply_installs_repo_level_codex_skill(homes):
+def test_wizard_apply_installs_repo_level_claude_skill(homes):
     from cage import wizard
     proj = homes / "proj"
     proj.mkdir()
-    log = wizard.apply(proj, agent="codex", skill=True, project=False,
+    log = wizard.apply(proj, agent="claude", skill=True, project=False,
                        graphify=False, skill_scope="project")
-    # Skill lands in the repo, not the codex home; logged as a repo skill.
-    assert (proj / ".codex" / "skills" / "cage" / "SKILL.md").exists()
-    assert not (homes / "codex_home" / "skills" / "cage").exists()
+    # Skill lands in the repo, not the claude home; logged as a repo skill.
+    assert (proj / ".claude" / "skills" / "cage" / "SKILL.md").exists()
+    assert not (homes / "claude_home" / "skills" / "cage").exists()
     assert any("repo skill" in line for line in log)
 
 
@@ -396,20 +361,18 @@ def test_mcp_unknown_method_errors():
     assert r["error"]["code"] == -32601
 
 
-def test_setup_installs_global_asset_for_all_four(tmp_path, monkeypatch):
+def test_setup_installs_global_asset_for_all_three(tmp_path, monkeypatch):
     from cage import setupcmd
     monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "claude"))
-    monkeypatch.setenv("CODEX_HOME", str(tmp_path / "codex"))
     monkeypatch.setenv("CAGE_VSCODE_USER", str(tmp_path / "vscode"))
     monkeypatch.setenv("KIRO_HOME", str(tmp_path / "kiro"))
     out = setupcmd.run()
-    # Both skills (cage + cage-doctor) ship to all four agents — namespaced keys.
+    # Both skills (cage + cage-doctor) ship to all three agents — namespaced keys.
     assert set(out) == {
-        "claude:cage", "codex:cage", "copilot:cage", "kiro:cage",
-        "claude:cage-doctor", "codex:cage-doctor", "copilot:cage-doctor", "kiro:cage-doctor",
+        "claude:cage", "copilot:cage", "kiro:cage",
+        "claude:cage-doctor", "copilot:cage-doctor", "kiro:cage-doctor",
     }
     assert (tmp_path / "claude" / "skills" / "cage" / "SKILL.md").exists()
-    assert (tmp_path / "codex" / "skills" / "cage" / "SKILL.md").exists()
     assert (tmp_path / "vscode" / "prompts" / "cage.prompt.md").exists()
     assert (tmp_path / "kiro" / "steering" / "cage.md").exists()
     # The new doctor skill is installed for every agent too.

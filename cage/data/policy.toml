@@ -540,8 +540,8 @@ default = 0.3       # global fallback
 #                        replace = true           drop the built-ins first
 #   [[sources.<agent>]]  path = "~/dir"           array form: one glob per path
 #                        glob = "usage-*.ndjson"
-#   [sources.<tool>]     format = "claude|codex|copilot|kiro"   custom tool (name
-#                        paths  = [...]           ∉ the four); rows stamp agent=<tool>
+#   [sources.<tool>]     format = "claude|copilot|kiro"   custom tool (name
+#                        paths  = [...]           ∉ the three); rows stamp agent=<tool>
 #   A glob char (*?[) in a `path` is rejected — put the pattern in `glob = `.
 #   An empty `glob = ""` is an error (drop the key to use the format default).
 #

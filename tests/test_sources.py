@@ -27,7 +27,7 @@ def _claude_line(uuid, tin, tout, cwd="/Users/me/my_programs/widget"):
                                    "usage": {"input_tokens": tin, "output_tokens": tout}}})
 
 
-_HOME_ENVS = ("CLAUDE_CONFIG_DIR", "CODEX_HOME", "COPILOT_HOME", "KIRO_HOME",
+_HOME_ENVS = ("CLAUDE_CONFIG_DIR", "COPILOT_HOME", "KIRO_HOME",
               "KIRO_DATA_DIR", "CAGE_VSCODE_USER")
 
 
@@ -93,9 +93,9 @@ def test_empty_sources_import_is_identical_to_no_sources_key(monkeypatch, tmp_pa
 
 def test_precedence_env_beats_policy_beats_builtin(monkeypatch, tmp_path):
     _no_env(monkeypatch)
-    # env home override on codex only → its built-in candidate is tagged `env`;
+    # env home override on copilot only → its built-in candidates are tagged `env`;
     # claude keeps `built-in`.
-    monkeypatch.setenv("CODEX_HOME", str(tmp_path / "codex-redirected"))
+    monkeypatch.setenv("COPILOT_HOME", str(tmp_path / "copilot-redirected"))
     add = tmp_path / "extra-claude"
     pol = {"sources": {"claude": {"paths": [str(add)]}}}
     res = paths.resolve_log_sources(pol)
@@ -103,20 +103,20 @@ def test_precedence_env_beats_policy_beats_builtin(monkeypatch, tmp_path):
     claude = [s for s in res.sources if s.agent == "claude"]
     assert [s.provenance for s in claude] == ["built-in", "policy"]  # built-in first, add second
     assert claude[1].path == add and claude[1].fmt == "claude"
-    codex = [s for s in res.sources if s.agent == "codex"]
-    assert codex and all(s.provenance == "env" for s in codex)  # redirected home ⇒ env
+    copilot = [s for s in res.sources if s.agent == "copilot"]
+    assert copilot and all(s.provenance == "env" for s in copilot)  # redirected home ⇒ env
 
 
 def test_replace_drops_builtins_and_empty_disables(monkeypatch, tmp_path):
     _isolate_homes(tmp_path, monkeypatch)
-    only = tmp_path / "only-codex"
+    only = tmp_path / "only-copilot"
     pol = {"sources": {
-        "codex": {"paths": [str(only)], "replace": True},   # replace built-ins
-        "kiro": {"paths": [], "replace": True},              # disable entirely
+        "copilot": {"paths": [str(only)], "replace": True},   # replace built-ins
+        "kiro": {"paths": [], "replace": True},                # disable entirely
     }}
     res = paths.resolve_log_sources(pol)
-    codex = [s for s in res.sources if s.agent == "codex"]
-    assert [s.path for s in codex] == [only] and codex[0].provenance == "policy"
+    copilot = [s for s in res.sources if s.agent == "copilot"]
+    assert [s.path for s in copilot] == [only] and copilot[0].provenance == "policy"
     assert not [s for s in res.sources if s.agent == "kiro"]
     assert res.disabled == ["kiro"]
 
@@ -279,10 +279,10 @@ def test_dict_glob_key_overrides_the_format_default(monkeypatch, tmp_path):
 
 def test_absent_glob_falls_back_to_format_default(monkeypatch, tmp_path):
     _no_env(monkeypatch)
-    pol = {"sources": {"codex": {"paths": [str(tmp_path / "c")]}}}
+    pol = {"sources": {"copilot": {"paths": [str(tmp_path / "c")]}}}
     added = [s for s in paths.resolve_log_sources(pol).sources
-             if s.agent == "codex" and s.provenance == "policy"]
-    assert added[0].glob == paths._FORMAT_GLOB["codex"]  # the imposed default
+             if s.agent == "copilot" and s.provenance == "policy"]
+    assert added[0].glob == paths._FORMAT_GLOB["copilot"]  # the imposed default
 
 
 def test_empty_glob_is_a_problem_not_a_silent_fallback(monkeypatch, tmp_path):
@@ -315,14 +315,14 @@ def test_array_of_tables_form_with_per_entry_glob(monkeypatch, tmp_path):
 def test_dict_and_array_shapes_coexist_across_agents(monkeypatch, tmp_path):
     _no_env(monkeypatch)
     pol = {"sources": {
-        "claude": {"paths": [str(tmp_path / "cl")], "glob": "c-*.jsonl"},   # dict form
-        "codex": [{"path": str(tmp_path / "cx"), "glob": "x-*.jsonl"}],     # array form
+        "claude": {"paths": [str(tmp_path / "cl")], "glob": "c-*.jsonl"},     # dict form
+        "copilot": [{"path": str(tmp_path / "cp"), "glob": "x-*.jsonl"}],     # array form
     }}
     res = paths.resolve_log_sources(pol)
     assert res.problems == []
     cl = [s for s in res.sources if s.agent == "claude" and s.provenance == "policy"]
-    cx = [s for s in res.sources if s.agent == "codex" and s.provenance == "policy"]
-    assert cl[0].glob == "c-*.jsonl" and cx[0].glob == "x-*.jsonl"
+    cp = [s for s in res.sources if s.agent == "copilot" and s.provenance == "policy"]
+    assert cl[0].glob == "c-*.jsonl" and cp[0].glob == "x-*.jsonl"
 
 
 def test_array_form_custom_tool_needs_per_entry_format(monkeypatch, tmp_path):

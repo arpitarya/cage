@@ -127,41 +127,6 @@ def _w(path, text):
     return path
 
 
-def test_parse_codex_finds_nested_usage(tmp_path):
-    tp = tmp_path / "rollout-x.jsonl"
-    tp.write_text(json.dumps({"type": "event", "payload": {
-        "usage": {"input_tokens": 200, "output_tokens": 80}}}) + "\n", encoding="utf-8")
-    rows = transcript.parse_codex_calls(tp, session="abc")
-    assert len(rows) == 1
-    assert rows[0]["tokens_in"] == 200 and rows[0]["tokens_out"] == 80
-    assert rows[0]["agent"] == "codex" and rows[0]["provider"] == "openai"
-
-
-def _codex_token_count_line(inp, out, ts=""):
-    rec = {"type": "event_msg", "payload": {"type": "token_count", "info": {
-        "last_token_usage": {"input_tokens": inp, "output_tokens": out}}}}
-    if ts:
-        rec["timestamp"] = ts
-    return json.dumps(rec)
-
-
-def test_codex_ids_never_collide_across_sessions(tmp_path):
-    # Every rollout stem starts with "rollout-", so a session *prefix* in the id was one
-    # shared namespace: identical line indexes in two sessions produced identical ids and
-    # append_new silently dropped the second session's calls (41% of real rows in the
-    # 2026-07 manual validation). Ids must differ across sessions at the same line index.
-    a = tmp_path / "rollout-2026-06-01T00-00-00-aaa.jsonl"
-    b = tmp_path / "rollout-2026-06-02T00-00-00-bbb.jsonl"
-    line = _codex_token_count_line(100, 10)
-    a.write_text(line + "\n", encoding="utf-8")
-    b.write_text(line + "\n", encoding="utf-8")
-    ida = transcript.parse_codex_calls(a)[0]["id"]
-    idb = transcript.parse_codex_calls(b)[0]["id"]
-    assert ida != idb
-    # …and stay deterministic per (session, line) so re-imports still dedupe.
-    assert transcript.parse_codex_calls(a)[0]["id"] == ida
-
-
 def _chat_session_request(rid, prompt, completion, ext="github.copilot-chat", ts=1783447814720):
     return {"requestId": rid, "timestamp": ts, "modelId": "copilot/auto",
             "agent": {"extensionId": {"value": ext}},
@@ -192,18 +157,6 @@ def test_copilot_vscode_chat_sessions_parse_and_rewrite_merge(tmp_path):
     assert all(r["session"] == "sess-1" and r["agent"] == "copilot" for r in rows)
     assert rows[0]["ts"] == "2026-07-07T18:10:14.720Z"     # epoch ms → ISO Z
     assert transcript.parse_copilot_vscode_calls(tp)[0]["id"] == rows[0]["id"]  # deterministic
-
-
-def test_codex_ts_comes_from_the_event_not_import_time(tmp_path):
-    # A May rollout imported in July must not land in the July shard: the row ts is the
-    # token_count event's own timestamp. A line with no timestamp still gets a
-    # write-time stamp (fail-open, never an empty ts).
-    tp = tmp_path / "rollout-2026-05-01T00-00-00-ccc.jsonl"
-    tp.write_text(_codex_token_count_line(100, 10, ts="2026-05-01T00:00:05Z") + "\n"
-                  + _codex_token_count_line(50, 5) + "\n", encoding="utf-8")
-    rows = transcript.parse_codex_calls(tp)
-    assert rows[0]["ts"] == "2026-05-01T00:00:05Z"
-    assert rows[1]["ts"]  # no event timestamp → write-time stamp, still present
 
 
 def test_session_end_hook_records(tmp_path, monkeypatch):

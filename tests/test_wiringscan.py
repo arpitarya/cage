@@ -120,13 +120,6 @@ def _claude_commands(root: Path) -> list[str]:
             for e in entries for h in e.get("hooks", [])]
 
 
-def _codex_commands(root: Path) -> list[str]:
-    data = cfgio.load_json(root / ".codex" / "hooks.json")
-    return [h.get("command", "")
-            for entries in data.get("hooks", {}).values()
-            for e in entries for h in e.get("hooks", [])]
-
-
 def _copilot_commands() -> list[str]:
     path = paths.copilot_home() / "hooks" / "cage.json"
     return [h.get("bash", "")
@@ -165,20 +158,21 @@ def test_import_claude_still_heals(homes):
         f"current backfill missing after heal: {cmds}"
 
 
-def test_import_codex_still_heals(homes):
-    """MUST-PRESERVE: the v0.9-era Codex import hook heals to the current form."""
+def test_codex_import_hook_is_no_longer_managed(homes):
+    """Codex was removed completely: `agents.install` no longer has a wire module for
+    it, so a pre-existing `.codex/hooks.json` from before the removal is untouched —
+    orphaned wiring, not healed (the wiringscan orphan-ownership gap, a deferred
+    follow-up per docs/codex-removal.handoff.md §2)."""
     path = homes / ".codex" / "hooks.json"
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({"hooks": {
+    before = json.dumps({"hooks": {
         event: [{"hooks": [{"type": "command",
                             "command": "/old/bin/cage import-codex --since 7d"}]}]
-        for event in ("Stop", "SessionStart")}}, indent=2) + "\n", encoding="utf-8")
-    agents.install(homes, ("codex",))
-    cmds = _codex_commands(homes)
-    assert not any("import-codex" in c for c in cmds), \
-        f"dead verb `import-codex` survived setup: {cmds}"
-    assert all("import --agent codex --since 7d" in c for c in cmds), \
-        f"current import missing after heal: {cmds}"
+        for event in ("Stop", "SessionStart")}}, indent=2) + "\n"
+    path.write_text(before, encoding="utf-8")
+    out = agents.install(homes, ("codex",))
+    assert "codex" not in out  # no wire module ran
+    assert path.read_text(encoding="utf-8") == before  # byte-identical, untouched
 
 
 def test_dead_verb_heals_in_a_non_import_slot(homes):
@@ -298,14 +292,18 @@ def _snapshot(root: Path) -> dict[str, str]:
 
 
 def test_install_heals_every_stale_artifact(homes):
+    """Every artifact `agents.install` still manages heals; `.codex/hooks.json` is the
+    one exception — codex has no wire module anymore, so it stays dead/orphaned rather
+    than healing (the deferred orphan-scanner gap, docs/codex-removal.handoff.md §2)."""
     _plant_everything(homes)
-    agents.install(homes, ("claude", "codex", "copilot", "kiro"))
-    assert wiringscan.run(homes, assets=False).dead == []
+    agents.install(homes, ("claude", "copilot", "kiro"))
+    dead = wiringscan.run(homes, assets=False).dead
+    assert dead == [wiringscan.Dead(".codex/hooks.json", "import-codex", "", True)]
 
 
 def test_foreign_hooks_are_byte_identical_after_heal(homes):
     _plant_everything(homes)
-    agents.install(homes, ("claude", "codex", "copilot", "kiro"))
+    agents.install(homes, ("claude", "copilot", "kiro"))
     cmds = _claude_commands(homes)
     assert _FOREIGN_HOOK in cmds, f"a foreign hook was rewritten or dropped: {cmds}"
     assert _FOREIGN_CAGEISH in cmds, f"a cage-mentioning foreign hook was touched: {cmds}"

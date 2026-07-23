@@ -23,7 +23,6 @@ posix_only = pytest.mark.skipif(os.name != "posix", reason="sh shim — POSIX ho
 @pytest.fixture
 def homes(tmp_path, monkeypatch):
     monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "claude_home"))
-    monkeypatch.setenv("CODEX_HOME", str(tmp_path / "codex_home"))
     monkeypatch.setenv("COPILOT_HOME", str(tmp_path / "copilot_home"))
     monkeypatch.setenv("KIRO_HOME", str(tmp_path / "kiro_home"))
     return tmp_path
@@ -33,7 +32,7 @@ def homes(tmp_path, monkeypatch):
 # exception (.kiro/settings/mcp.json — absolute by necessity, see kirowire.py)
 # is deliberately absent here and asserted separately.
 _COMMITTED = (".claude/settings.json", ".mcp.json", ".vscode/mcp.json",
-              ".codex/hooks.json", ".kiro/hooks/cage.kiro.hook")
+              ".kiro/hooks/cage.kiro.hook")
 
 
 def test_committed_files_contain_no_absolute_cage_path(homes, monkeypatch):
@@ -107,9 +106,9 @@ def test_shim_prefers_path_and_passes_args_through(tmp_path):
     shim = Path(runshim.write(tmp_path)["cage-run"])
     bindir = tmp_path / "fakepath"
     _plant_fake_cage(bindir / "cage", "PATH-CAGE")
-    r = _run_shim(shim, ["import", "--agent", "codex"], _fake_env(tmp_path, [bindir]))
+    r = _run_shim(shim, ["import", "--agent", "claude"], _fake_env(tmp_path, [bindir]))
     assert r.returncode == 0
-    assert r.stdout.strip() == "PATH-CAGE import --agent codex"  # args pass through
+    assert r.stdout.strip() == "PATH-CAGE import --agent claude"  # args pass through
 
 
 @posix_only
