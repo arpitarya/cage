@@ -2,6 +2,73 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
+## v0.32.0 (2026-07-24) — stale-wiring liveness: detect + heal orphaned wiring
+
+Closes the root cause behind F1. No derived number changes (`report`/`attrib`/`matrix` are
+byte-identical, asserted); no ledger, schema, enum or method-tagging change.
+
+**The failure.** v0.28.0 renamed 31 top-level verbs. Every wiring artifact written before it
+still names the old verb, so the command exits 1 — and because hook/shim stdout goes nowhere
+and both shims fail open to `exit 0`, **a dead verb is indistinguishable from cage not being
+installed**. On a real machine `bin/graphify` probed the pre-rename verb and silently exec'd
+the unmetered binary for 9 days while `cage doctor` reported ✅, because the interceptor check
+tested existence + PATH, not liveness. Diagnosed in
+[docs/regression/2026-07-24-f1-root-cause.md](docs/regression/2026-07-24-f1-root-cause.md).
+
+- **New `cage/wiringscan.py` — detection against the live parser.** Every installed
+  artifact's command tail is resolved to its verb and checked against `cli.build_parser()`,
+  the same code the CLI runs and therefore ground truth for "will this exit 1".
+  `verbmap.REMOVED` is **not** the detector — it only supplies the replacement tail. The
+  distinction is load-bearing: `adopt` was deleted outright rather than renamed, so it is
+  dead, still installed on real machines, and absent from `REMOVED`; a grep against that
+  table would miss it entirely. Detection is read-only and side-effect-free — nothing is
+  executed, no import runs (executing a probe could not distinguish "verb dead" from "cage
+  absent" anyway, which is the whole bug).
+- **User-level artifacts are scanned.** `~/.copilot/hooks`, `~/.codex/config.toml`,
+  `.git/hooks` and the global skill/prompt/steering copies, alongside the committed files —
+  both real-world failures were user-level, so a liveness check that skipped them would miss
+  its own reason to exist. `doctor`'s `portability` check stays committed-only; it answers a
+  different question (what ships to a teammate).
+- **`cage doctor` gains a `wiring` check**, rendered above the receipts check: it names each
+  dead command **and** its remediation, `✗` for a wired artifact (capture is silently off),
+  `·` for a stale agent asset (the agent sees a wrong verb, errors, and adapts). Assets are
+  prose rather than commands, so they are hash-compared against the bundled originals.
+- **`interceptor` now tests liveness, not existence.** The exact false ✅ from F1: the shim
+  existed and was on PATH the entire time it was dead.
+- **`cage setup` heals a dead verb**, rewriting it to the current form via `verbmap.REMOVED`
+  in the same pass as the existing absolute-path→shim migration, and refreshing a stale
+  `bin/graphify` (on `--wire-only` too, not only `--project-only`). Idempotent; foreign
+  (non-cage) artifacts are never touched; a dead verb with no known replacement is reported,
+  never guessed at.
+- **Bundled F1 Fix 3 — the deferred receipts check.** `receipts: 0` now reads
+  "the graphify interceptor is dead (see wiring above); fix it before concluding the tools
+  are unused" when that is the actual cause. Shipped *with* its prerequisite, because alone
+  it would have misread a dead shim as "you never used the savings tools".
+- **The `" import"` substring predicate is retired.** `claudewire._is_stale_import` and
+  `paths.is_cage_import_command` healed `import-claude`/`import-codex` only because those
+  strings happen to contain `" import"`. The wiring filters now take the union of an *exact*
+  import-verb rule (collapse the superseded form) and a *parser* dead-verb rule (heal the
+  orphan) — same commands healed, non-accidental reason, and explicitly pinned by
+  `test_import_claude_still_heals` / `test_import_codex_still_heals`.
+- **Fixed: copilot duplicate hook entries.** A dead-verb entry matched neither old test, so
+  `_wire_hooks` kept it *and* appended a correct one — leaving the dead command firing on
+  every event.
+- **Fixed: `just demo` and `install.sh` had been broken since v0.28.0** — the same rename,
+  the same class of failure, in the repo's own dev tooling (`cage attrib`/`cage matrix`,
+  and an `install.sh` line telling every new user to run `cage init`). A guard test now
+  covers dev tooling too.
+- **Safety net: a `verbmap.REMOVED` → parser round-trip property test.** Every remediation
+  must be a command the CLI accepts, and no key may still be live. This would have caught
+  the whole class at the rename commit.
+- `cage query stale-wiring` explains the design; `docs/debugging-capture.md` documents the
+  symptom, the doctor output and the fix. dummyrepo **S18** covers detect → heal →
+  idempotence black-box through the shipped CLI.
+
+Built from: [docs/archive/v0.32-stale-wiring.handoff.md](docs/archive/v0.32-stale-wiring.handoff.md)
++ [docs/archive/v0.32-stale-wiring.prompt.md](docs/archive/v0.32-stale-wiring.prompt.md).
+
+881 tests passing.
+
 ## v0.31.4 (2026-07-24) — fix: capture-debug went silent under `--ledger`/`CAGE_BASE`
 
 Observability only — no derived number changes (`report`/`attrib`/`matrix` are byte-identical

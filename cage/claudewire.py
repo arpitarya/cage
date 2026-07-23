@@ -38,7 +38,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from cage import paths, runshim
+from cage import paths, runshim, wiringscan
 
 
 def _shim() -> str:
@@ -66,13 +66,18 @@ def _simple() -> dict:
 
 
 def _reref(command: str) -> str | None:
-    """A cage command (binary or shim form) rewritten to the current shim reference,
-    preserving the subcommand; None for a foreign hook. Idempotent on the current
-    form — healing a healed file changes nothing."""
+    """A cage command (binary or shim form) rewritten to the current shim reference
+    **and the current verb**; None for a foreign hook. Idempotent on the current form —
+    healing a healed file changes nothing.
+
+    Two migrations in one pass: the executable becomes the committed shim (plan §5),
+    and a verb renamed in v0.28.0 becomes its replacement (`wiringscan.heal_tail`, via
+    `verbmap.REMOVED`). A dead verb with no known replacement is left exactly as it is —
+    heal never guesses a tail; `cage doctor` reports it instead."""
     tail = paths.cage_command_tail(command)
     if tail is None:
         return None
-    return f"{_shim()} {tail}".rstrip()
+    return f"{_shim()} {wiringscan.heal_tail(tail)}".rstrip()
 
 
 def _load(path: Path) -> dict:
@@ -98,25 +103,31 @@ def _entry(command: str) -> dict:
     return {"hooks": [{"type": "command", "command": command}]}
 
 
-def _is_stale_import(command: str, current: str) -> bool:
-    """A superseded cage import-backfill command (an absolute-path legacy form, or the
-    old `import-claude --project .` before the all-agent heartbeat) — a cage command
-    containing `import` that isn't the current backfill. Dropped on re-wire so the
-    slot doesn't accumulate stale forms."""
-    return (paths.cage_command_tail(command) is not None
-            and " import" in command and command != current)
+def _is_ours(command: str) -> bool:
+    """A cage backfill entry this slot owns: a live `import …` in any form, **or** any
+    cage command whose verb the parser rejects (a v0.28-orphaned `import-claude`).
+
+    The union replaces the old `" import" in command` substring test, which healed
+    `import-claude` only because that string happens to contain `" import"`. Same
+    commands healed, non-accidental reason — see tests/test_wiringscan.py."""
+    return (paths.is_cage_import_command(command)
+            or wiringscan.is_dead_cage_command(command))
 
 
 def _wire_session_start(entries: list) -> None:
-    """Ensure the all-agent backfill precedes the banner, idempotently. Drops any
-    superseded import command, prepends the current backfill, appends the banner."""
+    """Ensure the backfill precedes the banner, idempotently.
+
+    Drops **every** cage backfill entry — current ones included — then re-inserts one
+    at the front. Dropping unconditionally is what makes the order deterministic: once
+    `_reref` heals a dead verb in place, a stale `import-claude` becomes byte-identical
+    to the current backfill, so a "drop only if superseded" rule would leave it wherever
+    it sat (after the banner, if that's where it was) and silently invert the order."""
     bf = BACKFILL()
     for e in entries:
         e["hooks"] = [h for h in e.get("hooks", [])
-                      if not _is_stale_import(h.get("command", ""), bf)]
+                      if not _is_ours(h.get("command", ""))]
     entries[:] = [e for e in entries if e.get("hooks")]
-    if not _has(entries, bf):
-        entries.insert(0, _entry(bf))
+    entries.insert(0, _entry(bf))
     if not _has(entries, BANNER()):
         entries.append(_entry(BANNER()))
 

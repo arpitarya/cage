@@ -32,7 +32,18 @@ import os
 import re
 from pathlib import Path
 
-from cage import paths, runshim
+from cage import paths, runshim, wiringscan
+
+
+def _is_ours(command: str) -> bool:
+    """A cage entry this slot owns: a live `import …` (collapse the superseded form
+    into the current one) **or** any cage command whose verb the parser rejects (heal
+    a v0.28-orphaned `import-codex`). The union is what preserves that healing now
+    that `is_cage_import_command` matches the verb exactly instead of the substring
+    `" import"` — see tests/test_wiringscan.py."""
+    return (paths.is_cage_import_command(command)
+            or wiringscan.is_dead_cage_command(command))
+
 
 _MARKER = "[mcp_servers.cage]"
 # The whole cage-written MCP block, for in-place mode/path healing — cage always
@@ -108,14 +119,16 @@ def _install_hook(root: Path | None) -> tuple[str | None, int]:
     for event in CAPTURE_EVENTS:
         entries = hooks.setdefault(event, [])
         # Drop every cage-import entry (a stale per-agent/absolute-path import or a
-        # prior sweep), keep foreign hooks, then add exactly one current per-agent
-        # import. Idempotent; a dropped non-current form counts as migrated.
+        # prior sweep) **and every dead-verb cage entry** (the v0.9 `import-codex`
+        # form, which the exact-verb import rule no longer matches), keep foreign
+        # hooks, then add exactly one current per-agent import. Idempotent; a dropped
+        # non-current form counts as migrated.
         for e in entries:
             old = [h.get("command", "") for h in e.get("hooks", [])
-                   if paths.is_cage_import_command(h.get("command", ""))]
+                   if _is_ours(h.get("command", ""))]
             migrated += sum(1 for c in old if c != cmd)
             e["hooks"] = [h for h in e.get("hooks", [])
-                          if not paths.is_cage_import_command(h.get("command", ""))]
+                          if not _is_ours(h.get("command", ""))]
         entries[:] = [e for e in entries if e.get("hooks")]
         entries.append({"hooks": [{"type": "command", "command": cmd}]})
     path.parent.mkdir(parents=True, exist_ok=True)

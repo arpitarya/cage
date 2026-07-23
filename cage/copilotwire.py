@@ -36,7 +36,16 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from cage import cfgio, paths, pointers, runshim
+from cage import cfgio, paths, pointers, runshim, wiringscan
+
+
+def _is_ours(command: str) -> bool:
+    """A cage entry this hook slot owns: a live `import …` (collapse the superseded
+    form) **or** any cage command whose verb the parser rejects. Before the union, a
+    dead-verb entry matched neither test, so `_wire_hooks` kept it *and* appended a
+    correct one — leaving the dead command still firing on every event."""
+    return (paths.is_cage_import_command(command)
+            or wiringscan.is_dead_cage_command(command))
 
 # Copilot CLI hooks: {"version":1,"hooks":{<event>:[{"type":"command","bash":…}]}};
 # each entry carries both bash + powershell for cross-OS.
@@ -72,7 +81,7 @@ def _wire_hooks(root: Path, python_launcher: bool = False) -> str:
         arr = hooks.setdefault(event, [])
         # drop any cage-import entry (stale form / prior all-agent sweep), keep foreign
         # hooks, then add exactly one current Copilot self-import
-        arr[:] = [h for h in arr if not paths.is_cage_import_command(h.get("bash", ""))]
+        arr[:] = [h for h in arr if not _is_ours(h.get("bash", ""))]
         arr.append(entry)
     cfgio.save_json(path, data)
     return str(path)
@@ -89,7 +98,7 @@ def _migrate_repo_hook(root: Path) -> None:
     hooks = data.get("hooks", {})
     for event in list(hooks):
         hooks[event] = [h for h in hooks[event]
-                        if not paths.is_cage_import_command(h.get("bash", ""))]
+                        if not _is_ours(h.get("bash", ""))]
         if not hooks[event]:
             del hooks[event]
     if hooks:

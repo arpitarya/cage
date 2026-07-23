@@ -16,7 +16,8 @@ from pathlib import Path
 
 import datetime as _dt
 
-from cage import agents, debuglog, importcmd, ledger, paths, policy, prices, render, schema
+from cage import (agents, debuglog, importcmd, ledger, paths, policy, prices, render,
+                  schema, wiringscan)
 
 _OK, _WARN, _FAIL = "ok", "warn", "fail"
 _RANK = {_OK: 0, _WARN: 1, _FAIL: 2}
@@ -404,15 +405,66 @@ def _portability(root: Path) -> tuple[str, str]:
     return _OK, "; ".join([detail] + notes) if notes else detail
 
 
-def _interceptor(root: Path) -> tuple[str, str]:
+def _wiring(scan) -> tuple[str, str]:
+    """Every installed artifact's cage verb, checked against the **live parser**
+    (`cage/wiringscan.py`). A renamed verb makes a hook or shim exit 1 with its output
+    going nowhere — indistinguishable from cage being absent, which is why this class
+    of failure went unseen for 9 days (F1). Read-only: nothing is executed.
+
+    User-level artifacts are scanned deliberately (both real failures were user-level);
+    `_portability` above stays committed-only because it answers a different question.
+    Severity is tiered: a dead *wired* command is `✗` (capture is silently off), a stale
+    *asset* is `·` (the agent sees a wrong verb, errors, and adapts)."""
+    problems = [d.line for d in scan.dead]
+    if scan.stale_assets:
+        agents_ = ", ".join(sorted({s.agent for s in scan.stale_assets}))
+        problems.append(f"{len(scan.stale_assets)} stale agent asset(s) ({agents_}) — "
+                        "their bytes differ from this cage version's; re-run "
+                        "`cage setup --<agent>` to refresh")
+    if not problems:
+        return _OK, "all wired commands name live verbs; agent assets current"
+    fix = ("re-run `cage setup --wire-only --<agent>` to heal the wiring"
+           if scan.dead else "")
+    level = _FAIL if scan.dead else _WARN
+    return level, "; ".join(problems + ([fix] if fix else []))
+
+
+def _interceptor(root: Path, scan) -> tuple[str, str]:
+    """Existence + PATH + **liveness**. The first two alone reported ✅ for 9 days while
+    the shim's capability probe named a removed verb and every graphify call fell
+    through to the unmetered binary — existence is not liveness (F1)."""
     shim = root / "bin" / "graphify"
     if not shim.exists():
         return _WARN, "graphify interceptor not installed (ok if you don't use graphify)"
+    if scan.interceptor_dead:
+        return _FAIL, ("bin/graphify probes a verb that no longer exists — every "
+                       "graphify call falls through UNMETERED and silently; re-run "
+                       "`cage setup --wire-only --<agent>` to refresh it")
     import os
     on_path = str(shim.parent) in os.environ.get("PATH", "").split(os.pathsep)
     if not on_path:
         return _WARN, "bin/graphify exists but bin/ is not on PATH (open a new shell)"
-    return _OK, "graphify interceptor installed and on PATH"
+    return _OK, "graphify interceptor installed, on PATH, and naming live verbs"
+
+
+def _receipts(active: Path, scan) -> tuple[str, str]:
+    """Are there savings receipts to attribute? Zero receipts means `cage insights
+    attrib` has nothing to work with — but the *reason* matters, and reporting it bare
+    would misread a dead interceptor as "you never used the savings tools". When the
+    interceptor is dead the line says so and points up at the wiring check; the two
+    together tell the true story (F1's deferred check, shipped with its prerequisite)."""
+    try:
+        n = len(ledger.read_kind(active, "receipts"))
+    except Exception as exc:  # noqa: BLE001 — diagnosis must never crash doctor
+        return _OK, f"receipts check skipped: {exc}"
+    if n:
+        return _OK, f"{n} savings receipt(s) — attribution has data"
+    if scan.interceptor_dead:
+        return _WARN, ("receipts: 0 — the graphify interceptor is dead (see wiring "
+                       "above); fix it before concluding the tools are unused")
+    return _WARN, ("receipts: 0 — attribution has no data yet; savings are recorded by "
+                   "`cage data graphify -- …`, the fux/compressor shims, and the "
+                   "response cache")
 
 
 def _ago(ts: str) -> str:
@@ -494,6 +546,13 @@ def run(root: Path) -> dict:
     inspected; wiring/interceptor checks stay cwd-oriented (they're about *this* project)."""
     active = paths.resolve_root(root)
     source = paths.active_ledger_source(root)
+    # One scan feeds three checks (wiring / interceptor / receipts) so the artifact
+    # enumeration and parser build happen once. Fail-open: a scan that can't run must
+    # not take the whole doctor down with it.
+    try:
+        scan = wiringscan.run(root)
+    except Exception:  # noqa: BLE001
+        scan = wiringscan.Scan(dead=[], stale_assets=[], interceptor_dead=False)
     checks = [
         ("tool", *_tool()),
         ("footprint", *_footprint(active, source)),
@@ -505,10 +564,14 @@ def run(root: Path) -> dict:
         ("state", *_state_dir(active)),
         ("hooks", *_hooks(root)),
         ("portability", *_portability(root)),
+        # `wiring` must render ABOVE `receipts`: a dead verb is the *reason* receipts
+        # can be empty, and the receipts line points back up at it.
+        ("wiring", *_wiring(scan)),
         ("metering", *_metering(active)),
         ("timeline", *_capture_timeline(active)),
         ("trace", *_capture_trace(active)),
-        ("interceptor", *_interceptor(root)),
+        ("interceptor", *_interceptor(root, scan)),
+        ("receipts", *_receipts(active, scan)),
         ("ledger", *_ledger_roundtrip()),
     ]
     rows = [{"name": n, "level": lv, "detail": d} for n, lv, d in checks]

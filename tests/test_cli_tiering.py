@@ -121,6 +121,24 @@ def test_no_stale_old_verb_hints_in_source_or_assets():
     assert not hits, "stale `cage <old-verb>` strings:\n" + "\n".join(hits)
 
 
+def test_no_stale_old_verb_in_dev_tooling():
+    """The justfile/install scripts are wiring too — `just demo` shipped broken from
+    v0.28.0 to v0.32.0 because the rename missed them and nothing checked. Same class
+    of failure as an orphaned hook, so it gets the same guard."""
+    hits = []
+    for name in ("justfile", "install.sh"):
+        f = REPO / name
+        if not f.exists():
+            continue
+        for i, line in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):
+            for m in _STALE.finditer(line):
+                seg = line[m.start():]
+                if _GROUPED.match("cage " + seg[5:]):
+                    continue
+                hits.append(f"{name}:{i}: {m.group(0)}")
+    assert not hits, "stale `cage <old-verb>` in dev tooling:\n" + "\n".join(hits)
+
+
 def test_no_stale_old_verb_hints_in_rendered_skill_assets():
     hits = _scan(["cage/data/skills", "cage/data/prompts", "cage/data/steering"], {".md"})
     assert not hits, "stale verbs in rendered agent assets:\n" + "\n".join(hits)

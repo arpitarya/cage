@@ -726,6 +726,42 @@ REGISTRY: tuple[Explanation, ...] = (
         "n/a — describes the wiring mechanism, not a number.",
         kind="concept", plan_ref="§5"),
     Explanation(
+        # NB: keywords avoid generic stems ("wiring", "setup", "verb") that would
+        # steal queries from `overview`/`portable-wiring` — same discipline as above.
+        "stale-wiring", ("stale-wiring", "stale", "orphaned", "dead-verb", "liveness",
+                         "renamed", "silently", "unmetered", "interceptor",
+                         "false-ok", "heal"),
+        "how cage detects and heals an installed artifact whose verb no longer exists",
+        "a wiring artifact written before a verb was renamed still names the OLD\n"
+        "  verb, so it exits 1 — and because hook/shim output goes nowhere and both\n"
+        "  shims fail open to exit 0, a dead verb is indistinguishable from cage not\n"
+        "  being installed. That silently disabled capture for 9 days while doctor\n"
+        "  reported OK, because the interceptor check tested existence + PATH, not\n"
+        "  liveness.\n"
+        "  DETECTION (`cage/wiringscan.py`, read-only — nothing is ever executed):\n"
+        "  every installed artifact's command tail is resolved to its verb and\n"
+        "  checked against the LIVE PARSER (cli.build_parser()), which is the same\n"
+        "  code the CLI runs and therefore ground truth for 'will this exit 1'.\n"
+        "  verbmap.REMOVED is NOT the detector — it only supplies the replacement\n"
+        "  tail. The distinction matters: a verb deleted outright rather than renamed\n"
+        "  is dead and absent from REMOVED, so a grep against it would miss the\n"
+        "  artifact entirely. User-level files are scanned too (~/.copilot/hooks,\n"
+        "  ~/.codex/config.toml, .git/hooks, the global skill copies) — the real\n"
+        "  failures were user-level. Agent assets are prose, not commands, so they\n"
+        "  are hash-compared against the bundled originals instead.\n"
+        "  HEALING: `cage setup` rewrites a dead verb to its current form via\n"
+        "  verbmap.REMOVED, alongside the absolute-path→shim migration it already\n"
+        "  does, and refreshes a stale bin/graphify interceptor. Idempotent; foreign\n"
+        "  (non-cage) hooks are never touched; a dead verb with no known replacement\n"
+        "  is reported, never guessed at.\n"
+        "  Severity: a dead WIRED command is a failure (capture is silently off); a\n"
+        "  stale ASSET is advisory (the agent sees a wrong verb, errors, adapts).\n"
+        "  See `cage doctor` — the wiring check names each fault and its fix.",
+        ("cage/wiringscan.py", "cage/doctorcmd.py", "cage/claudewire.py",
+         "cage/verbmap.py", "cage/paths.py"),
+        "n/a — describes a detection + repair mechanism, not a number.",
+        kind="concept", plan_ref="§5"),
+    Explanation(
         # NB: keywords avoid generic stems ("setup", "wiring") that would steal
         # queries from `overview`/`portable-wiring` — same discipline as above.
         "restricted-env", ("restricted-env", "restricted", "locked-down", "lockdown",

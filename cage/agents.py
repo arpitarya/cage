@@ -58,6 +58,14 @@ def install(root: Path, surfaces: tuple[str, ...] | None = None) -> dict:
         gh = gitcommithook.install(root, python_launcher=launcher)  # PostToolUse capture buffer → sha resolution (plan §3.5)
         if gh["installed"]:
             out["claude"]["git-hooks"] = ", ".join(gh["installed"])
+    # Heal an already-installed graphify interceptor whose capability probe names a
+    # verb removed in v0.28.0 (it would exec the real binary unmetered, silently —
+    # the F1 root cause). Refresh-only: never scaffolds a shim into a project that
+    # doesn't have one. Wired here, not in `adoptcmd.run`, so `cage setup --wire-only`
+    # heals it too — the path a user re-runs when doctor reports it dead.
+    from cage import adoptcmd
+    if adoptcmd.refresh_shim(root):
+        out.setdefault("graphify", {})["shim"] = "refreshed bin/graphify → current verb"
     return out
 
 

@@ -16,8 +16,8 @@ lint:
 # Smoke: seed a demo task, then prove the attribution thesis end-to-end.
 demo:
     {{python}} -m cage demo
-    {{python}} -m cage attrib
-    {{python}} -m cage matrix
+    {{python}} -m cage insights attrib
+    {{python}} -m cage insights matrix
 
 # Install the engine (editable) so repo edits live-reflect in the `cage` binary.
 install:

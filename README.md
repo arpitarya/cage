@@ -216,7 +216,7 @@ cage data export --csv calls --since 30d -o calls.csv   # raw ledger rows for a 
 
 ## The `$0` guarantee
 
-Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 834 tests passing; `cage demo` reproduces the worked attribution example against a real ledger.
+Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 881 tests passing; `cage demo` reproduces the worked attribution example against a real ledger.
 
 **Honest limits.** Cage doesn't decide your human rate — it prices minutes at a blended rate you set, and labels the result `estimated` so it never pretends to be a timesheet. Marginal-by-fixed-order is defensible and `$0`, but it is an *ordering convention*, not a Shapley value (that's a deferred audit mode). And a counterfactual cell is an honest reconstruction, never an invoice — the `method` column says so on every row, on purpose.
 
@@ -224,7 +224,7 @@ Every derived view is parse / arithmetic over the log — **no LLM call, ever, o
 
 Latest release below — full history and detail in [CHANGELOG.md](CHANGELOG.md).
 
-- **v0.31.4 (2026-07-24) — fix: `CAGE_DEBUG` went silent under `--ledger`/`CAGE_BASE`.** The debug log's anti-scatter guard tested `cwd/.cage` even when an explicit override had re-based the footprint elsewhere, so all tracing — the F6 receipt produce/skip log included — was suppressed in exactly the scratch-ledger setup a capture diagnosis uses. An explicit override now authorizes the write; a bare cwd is still refused. Observability only, derived views byte-identical. Ships with the [F1 root-cause correction](docs/regression/2026-07-24-f1-root-cause.md).
+- **v0.32.0 (2026-07-24) — stale wiring is detected and healed; a dead verb can no longer disable capture silently.** A hook or shim installed before a verb was renamed exits 1 with its output going nowhere, so it looks exactly like cage not being installed — this silently disabled graphify metering for 9 days while `cage doctor` reported ✅. Doctor now checks every installed artifact's verb against the **live CLI parser** (including user-level files), `cage setup` rewrites dead verbs to their current form alongside the existing path migration, and the `receipts: 0` line names a dead interceptor instead of implying the savings tools went unused. Derived numbers unchanged.
 
 ## The name
 

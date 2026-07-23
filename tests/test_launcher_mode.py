@@ -235,8 +235,8 @@ def test_doctor_check_names_unchanged(homes):
     initcmd.run(homes)
     names = [c["name"] for c in doctorcmd.run(homes)["checks"]]
     assert names == ["tool", "footprint", "policy", "pricing", "prices-meta", "prices-age", "policy-version",
-                     "state", "hooks", "portability", "metering", "timeline", "trace", "interceptor",
-                     "ledger"]
+                     "state", "hooks", "portability", "wiring", "metering", "timeline", "trace",
+                     "interceptor", "receipts", "ledger"]
 
 
 def test_query_restricted_env_answers():

@@ -27,6 +27,16 @@ def _bare_cage_in_hooks(monkeypatch, tmp_path):
     # The copilot import also scans VS Code's chat-session store — point it at a
     # throwaway dir so a pathless sweep never reads the developer's real sessions.
     monkeypatch.setenv("CAGE_VSCODE_USER", str(tmp_path / "vscode-user"))
+    # Redirect every agent home off the real machine. `cage doctor`'s wiring-liveness
+    # check (cage/wiringscan.py) deliberately scans USER-LEVEL artifacts — both real
+    # F1 failures were user-level — so without this the suite reads the developer's own
+    # ~/.claude/settings.json and ~/.copilot/hooks, and a stale artifact on one machine
+    # turns doctor tests red for reasons that have nothing to do with the code. Tests
+    # that need their own agent homes (test_portable_wiring, test_wiringscan) override
+    # these with their own `homes` fixture.
+    for var, sub in (("CLAUDE_CONFIG_DIR", "claude-home"), ("CODEX_HOME", "codex-home"),
+                     ("COPILOT_HOME", "copilot-home"), ("KIRO_HOME", "kiro-home")):
+        monkeypatch.setenv(var, str(tmp_path / sub))
     # `cage --ledger` sets `CAGE_BASE` via os.environ (process-scoped in production); clear
     # it per test so a `--ledger` test can't re-base a later test's Footprint.
     monkeypatch.delenv("CAGE_BASE", raising=False)

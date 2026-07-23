@@ -73,17 +73,60 @@ def cage_command_tail(command: str) -> str | None:
     return None
 
 
+# The codex/kiro self-locating one-liner (`runshim.selflocating_command`) doesn't
+# start with an executable name — it resolves the git root first, so the shim path
+# sits mid-command. The one-liner names the shim TWICE (`[ -x "…cage-run" ]` then
+# `exec "…cage-run" <tail>`), so the leading `.*` is deliberately greedy: it anchors
+# on the LAST reference, the one that actually runs. `; exit 0` is trimmed after.
+_SELFLOCATING = re.compile(r'.*cage-run(?:\.cmd)?["\']?\s+(.+)$')
+
+
+def _selflocating_tail(command: str) -> str | None:
+    """The subcommand tail of the self-locating shim one-liner, else None."""
+    m = _SELFLOCATING.search(command or "")
+    if not m:
+        return None
+    return m.group(1).split(";")[0].strip()
+
+
+def cage_tail_any(command: str) -> str | None:
+    """The subcommand tail for **any** cage command shape — the binary/shim/interpreter
+    forms `cage_command_tail` handles, *plus* the self-locating one-liner. Detection
+    superset only: `cage_command_tail` stays deliberately narrower because the migration
+    paths rewrite through it, and rewriting a self-locating one-liner into a plain shim
+    reference would throw away its git-root resolution."""
+    tail = cage_command_tail(command)
+    return tail if tail is not None else _selflocating_tail(command)
+
+
+def cage_verb_path(command: str) -> tuple[str, ...]:
+    """The verb tokens of a cage command — `()` for a foreign (non-cage) command.
+
+    ``cage insights attrib --csv`` → ``("insights", "attrib")``; ``cage import --agent
+    codex`` → ``("import",)``. Stops at the first flag, and keeps at most two levels
+    (cage's parser is two deep: a group verb plus its subcommand)."""
+    tail = cage_tail_any(command)
+    if tail is None:
+        return ()
+    verbs: list[str] = []
+    for token in tail.split():
+        if token.startswith("-") or len(verbs) == 2:
+            break
+        verbs.append(token)
+    return tuple(verbs)
+
+
 def is_cage_import_command(command: str) -> bool:
     """True if ``command`` is a cage ``import …`` hook command (any agent/flags), in
     binary, shim, or self-locating one-liner form. Lets the wiring collapse a
     superseded per-agent import (e.g. `cage import --agent codex`) into the current
-    per-agent import on re-setup, instead of leaving both."""
-    cmd = command or ""
-    if " import" not in cmd:
-        return False
-    # the codex/kiro self-locating one-liner doesn't start with an executable name —
-    # its shim path in the middle is the cage marker
-    return cage_command_tail(cmd) is not None or "cage-run" in cmd
+    per-agent import on re-setup, instead of leaving both.
+
+    Deliberately **exact** on the verb (not the old `" import"` substring): a dead
+    `import-claude`/`import-codex` is no longer caught here but by
+    `wiringscan.is_dead_cage_command`, and the wiring filters take the union of the
+    two. Same commands healed, non-accidental reason — see tests/test_wiringscan.py."""
+    return cage_verb_path(command)[:1] == ("import",)
 
 
 def reresolve_cage_command(command: str) -> str | None:

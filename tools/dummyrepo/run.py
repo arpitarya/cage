@@ -1220,6 +1220,59 @@ def s17_sources(base: Path) -> str:
             "no false portability warn (uncommitted)")
 
 
+def s18_stale_wiring(base: Path) -> str:
+    """S18 — stale-wiring liveness (docs/stale-wiring.handoff.md): an installed
+    artifact naming a verb the CLI no longer accepts is detected by `cage doctor`
+    against the live parser, healed by re-running `cage setup`, and the heal is
+    idempotent. Black-box: everything through the shipped CLI, nothing imported."""
+    repo, env = make_sandbox(base, "s18-stale-wiring")
+    expect_ok(repo, env, "setup", "--project-only", "--no-graphify")
+    expect_ok(repo, env, "setup", "--wire-only", "--all")
+
+    # Plant the two real historical forms + a stale graphify interceptor, exactly as
+    # v0.27 left them on a real machine.
+    settings = repo / ".claude" / "settings.json"
+    data = json.loads(settings.read_text(encoding="utf-8"))
+    data["hooks"]["SessionStart"] = [{"hooks": [
+        {"type": "command", "command": "/old/bin/cage import-claude --project ."}]}]
+    settings.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    bin_dir = repo / "bin"
+    bin_dir.mkdir(exist_ok=True)
+    (bin_dir / "graphify").write_text(
+        "#!/usr/bin/env bash\n"
+        'if command -v cage >/dev/null 2>&1 && cage graphify --help >/dev/null 2>&1; then\n'
+        '  exec cage graphify -- "$REAL" "$@"\n'
+        "fi\n", encoding="utf-8")
+    (bin_dir / "graphify").chmod(0o755)
+
+    doc = cage(repo, env, "doctor").stdout   # exits 1 by design here
+    if "import-claude" not in doc:
+        raise Fail("doctor did not report the dead `import-claude` wiring")
+    if "import --agent claude" not in doc:
+        raise Fail("doctor reported the fault but not its remediation")
+    if "UNMETERED" not in doc:
+        raise Fail("doctor did not report the dead graphify interceptor")
+
+    expect_ok(repo, env, "setup", "--wire-only", "--all")
+    body = settings.read_text(encoding="utf-8")
+    if "import-claude" in body:
+        raise Fail("re-running setup did not heal the dead verb")
+    if "import --agent claude" not in body:
+        raise Fail("heal dropped the backfill instead of rewriting it")
+    shim = (bin_dir / "graphify").read_text(encoding="utf-8")
+    if "cage data graphify" not in shim:
+        raise Fail("re-running setup did not refresh the stale graphify interceptor")
+
+    doc2 = cage(repo, env, "doctor").stdout
+    if "is not a command" in doc2 or "UNMETERED" in doc2:
+        raise Fail(f"doctor still reports dead wiring after the heal:\n{doc2}")
+    before = settings.read_bytes() + (bin_dir / "graphify").read_bytes()
+    expect_ok(repo, env, "setup", "--wire-only", "--all")
+    if settings.read_bytes() + (bin_dir / "graphify").read_bytes() != before:
+        raise Fail("healing an already-healed tree was not byte-identical")
+    return "dead verb + dead interceptor detected · healed by re-setup · idempotent"
+
+
 # id → (phase that ships it, callable or None-if-pending)
 SCENARIOS: dict[str, tuple[str, object]] = {
     "S1": ("P0", s1_cli),
@@ -1239,6 +1292,7 @@ SCENARIOS: dict[str, tuple[str, object]] = {
     "S15": ("pricing", s15_freshness),
     "S16": ("pricing", s16_policy_sync),
     "S17": ("sources", s17_sources),
+    "S18": ("stale-wiring", s18_stale_wiring),
 }
 
 MANUAL_CHECKLIST = """\

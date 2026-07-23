@@ -54,7 +54,53 @@ Controls (all counts-only, never content):
 - **`cage doctor`** shows a per-source, per-**mode** (pull/push) capture timeline —
   what cage has captured, how, and when, for every agent and the graphify/fux push side.
   Doctor deliberately does **not** sweep first, so it never masks the breakage it
-  diagnoses.
+  diagnoses. Its **`wiring`** check is the one below.
+
+## Capture is silently off: a dead verb in an installed artifact
+
+The failure with no symptom. A hook or shim installed before a verb was renamed still
+names the **old** verb, so it exits 1 — and because hook output goes nowhere and both
+shims fail open to `exit 0`, **a dead verb looks exactly like cage not being installed**.
+No error, no log line, no missing file. On one machine this silently disabled graphify
+metering for 9 days while `cage doctor` reported ✅, because the interceptor check tested
+existence + PATH rather than liveness.
+
+`cage doctor` now checks every installed artifact's verb against the **live parser**:
+
+```
+✗ wiring       ~/.claude/settings.json: `cage import-claude` is not a command
+               → `cage import --agent claude`; re-run `cage setup --wire-only --<agent>`
+✗ interceptor  bin/graphify probes a verb that no longer exists — every graphify call
+               falls through UNMETERED and silently; re-run `cage setup …` to refresh it
+· receipts     receipts: 0 — the graphify interceptor is dead (see wiring above); fix it
+               before concluding the tools are unused
+```
+
+The fix is to re-run setup — it rewrites a dead verb to its current form in the same pass
+as the absolute-path→shim migration, and refreshes a stale `bin/graphify`:
+
+```bash
+cage setup --wire-only --<agent>     # heals wiring; idempotent
+cage setup --<agent>                 # also refreshes the agent's skill/prompt/steering assets
+```
+
+Notes on what is and isn't checked:
+
+- The detector is the parser, **not** the rename table: a verb deleted outright rather
+  than renamed is dead and absent from that table, so only the parser sees it.
+- **User-level** artifacts are scanned (`~/.copilot/hooks`, `~/.codex/config.toml`,
+  `.git/hooks`, the global skill copies) — the real-world failures were user-level.
+- **Foreign (non-cage) hooks are never flagged and never modified**, including ones that
+  mention the word "cage".
+- A dead verb with **no known replacement** is reported but never rewritten — healing
+  does not guess.
+- Stale **agent assets** (skills/prompts/steering that differ from the bundled originals)
+  are advisory `·`, not a failure: the agent sees a wrong verb, errors, and adapts —
+  strictly less severe than capture being silently off.
+- Detection is read-only: nothing is executed, and no import runs. Executing a probe
+  could not tell "verb dead" from "cage absent" anyway — that ambiguity *is* the bug.
+
+`cage query stale-wiring` explains the design.
 - **`CAGE_DEBUG=1`** logs the **ledger-resolution decision** on every push and read
   (`event=ledger-resolve`), every capture-on-read sweep (`event=capture-on-read`), and
   every routing-key reclaim (`event=reclaim`) — see the trace section below.

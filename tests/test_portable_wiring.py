@@ -222,3 +222,30 @@ def test_query_portable_wiring_answers():
     assert "cage-run" in body and "exit 0" in body
     (by_words,) = explain.match("why no absolute paths in committed wiring")
     assert by_words.id == "portable-wiring"
+
+
+def test_heal_migrates_path_and_verb_in_one_pass(homes, monkeypatch):
+    """Portability and liveness are healed together: a v0.27 hook carries BOTH a
+    machine-absolute path and a since-renamed verb, and one `cage setup` must fix
+    both — a hook that is portable but dead is no better than one that is neither."""
+    monkeypatch.setattr(paths, "cage_bin", lambda: "/old/machine/bin/cage")
+    settings = homes / ".claude" / "settings.json"
+    settings.parent.mkdir(parents=True, exist_ok=True)
+    settings.write_text(json.dumps({"hooks": {"SessionStart": [{"hooks": [
+        {"type": "command",
+         "command": "/old/machine/bin/cage import-claude --project ."}]}]}},
+        indent=2), encoding="utf-8")
+    agents.install(homes, ("claude",))
+    body = settings.read_text(encoding="utf-8")
+    assert "/old/machine/bin/cage" not in body      # portability healed
+    assert "import-claude" not in body              # liveness healed
+    assert "cage-run" in body and "import --agent claude" in body
+
+
+def test_committed_wiring_names_only_live_verbs(homes):
+    """The standing invariant, mechanised: nothing cage commits may name a verb the
+    CLI rejects. This is the check that would have failed the v0.28.0 rename."""
+    from cage import wiringscan
+    agents.install(homes, agents.SURFACES)
+    for rel, command in wiringscan.committed_artifacts(homes):
+        assert not wiringscan.is_dead_cage_command(command), f"{rel}: {command}"

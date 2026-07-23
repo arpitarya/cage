@@ -15,7 +15,7 @@ echo "→ engine (editable)"
 
 echo
 echo "✔ Cage installed. Verify:  cage --version   (or: $PY -m cage --version)"
-echo "  In any project:         cage init  →  meter calls  →  cage report"
+echo "  In any project:         cage setup  →  meter calls  →  cage report"
 if ! command -v cage >/dev/null 2>&1; then
   echo "  Note: 'cage' is not on PATH yet — add your user-base bin dir:"
   echo "    export PATH=\"\$($PY -c 'import site,os;print(os.path.join(site.USER_BASE,\"bin\"))'):\$PATH\""
