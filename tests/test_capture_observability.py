@@ -67,7 +67,7 @@ def test_zero_new_is_silent(tmp_path, monkeypatch):
     root = tmp_path / "proj"
     (root / ".cage").mkdir(parents=True)
     monkeypatch.setenv("CAGE_CAPTURE_ON_READ", "1")
-    for env in ("CLAUDE_CONFIG_DIR", "CODEX_HOME", "COPILOT_HOME", "KIRO_DATA_DIR"):
+    for env in ("CLAUDE_CONFIG_DIR", "COPILOT_HOME", "KIRO_DATA_DIR"):
         monkeypatch.setenv(env, str(tmp_path / f"empty-{env.lower()}"))
     # Empty homes ⇒ the sweep captures nothing ⇒ no summary, so the CLI prints no line.
     summary = importcmd.ensure_captured(
@@ -84,7 +84,7 @@ def test_no_confirmation_text_in_csv(tmp_path, monkeypatch, capsys):
     (root / ".cage").mkdir(parents=True)
     monkeypatch.chdir(root)
     monkeypatch.setenv("CAGE_CAPTURE_ON_READ", "1")
-    for env in ("CLAUDE_CONFIG_DIR", "CODEX_HOME", "COPILOT_HOME", "KIRO_DATA_DIR"):
+    for env in ("CLAUDE_CONFIG_DIR", "COPILOT_HOME", "KIRO_DATA_DIR"):
         monkeypatch.setenv(env, str(tmp_path / f"home-{env.lower()}"))
     # Plant a claude turn so a real capture happens on this read.
     slug = tmp_path / "home-claude_config_dir" / "projects" / "repo"
@@ -107,7 +107,7 @@ def test_mcp_no_stray_stdout(seeded, monkeypatch, capsys):
     root, _ = seeded
     monkeypatch.chdir(root)
     monkeypatch.setenv("CAGE_CAPTURE_ON_READ", "1")
-    for env in ("CLAUDE_CONFIG_DIR", "CODEX_HOME", "COPILOT_HOME", "KIRO_DATA_DIR"):
+    for env in ("CLAUDE_CONFIG_DIR", "COPILOT_HOME", "KIRO_DATA_DIR"):
         monkeypatch.setenv(env, str(root / f"home-{env.lower()}"))
     req = json.dumps({"jsonrpc": "2.0", "id": 7, "method": "tools/call",
                       "params": {"name": "cage_report", "arguments": {}}}) + "\n"
@@ -125,19 +125,19 @@ def test_mcp_capture_summary_is_a_structured_field(seeded, monkeypatch):
     root, _ = seeded
     monkeypatch.chdir(root)
     monkeypatch.setenv("CAGE_CAPTURE_ON_READ", "1")
-    for env in ("CLAUDE_CONFIG_DIR", "CODEX_HOME", "COPILOT_HOME", "KIRO_DATA_DIR"):
+    for env in ("CLAUDE_CONFIG_DIR", "COPILOT_HOME", "KIRO_DATA_DIR"):
         monkeypatch.setenv(env, str(root / f"h-{env.lower()}"))
-    # Plant a codex rollout so the MCP read captures something and surfaces the field.
-    sess = root / "h-codex_home" / "sessions"
-    sess.mkdir(parents=True)
-    (sess / "rollout-x.jsonl").write_text(json.dumps(
-        {"type": "event_msg", "payload": {"type": "token_count", "info": {
-            "total_token_usage": {"input_tokens": 10, "output_tokens": 5,
-                                  "cached_input_tokens": 0}}},
-         "timestamp": "2026-06-14T10:00:00Z"}) + "\n", encoding="utf-8")
+    # Plant a claude turn so the MCP read captures something and surfaces the field.
+    slug = root / "h-claude_config_dir" / "projects" / "repo"
+    slug.mkdir(parents=True)
+    (slug / "s.jsonl").write_text(json.dumps(
+        {"type": "assistant", "uuid": "u1", "cwd": "/repo",
+         "timestamp": "2026-06-14T10:00:00Z",
+         "message": {"model": "claude-opus-4-8",
+                     "usage": {"input_tokens": 10, "output_tokens": 5}}}) + "\n",
+        encoding="utf-8")
     reply = mcpserver._handle({"jsonrpc": "2.0", "id": 1, "method": "tools/call",
                                "params": {"name": "cage_report", "arguments": {}}})
     # The capture proof rides as structuredContent, never in the rendered text.
     sc = reply["result"].get("structuredContent")
-    if sc is not None:  # only present when the sweep actually captured
-        assert "capture" in sc and "calls" in sc["capture"]
+    assert sc is not None and "capture" in sc and "calls" in sc["capture"]

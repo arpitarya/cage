@@ -97,12 +97,12 @@ def test_generation_is_env_independent(monkeypatch):
     baseline = _block(gen.gen_policy())
     # env overrides redirect _builtin_log_sources' *paths*; the block must not move.
     monkeypatch.setenv("CLAUDE_CONFIG_DIR", "/somewhere/else/.claude")
-    monkeypatch.setenv("CODEX_HOME", "/tmp/codex-home")
+    monkeypatch.setenv("COPILOT_HOME", "/tmp/copilot-home")
     monkeypatch.setenv("KIRO_DATA_DIR", "/var/kiro")
     assert _block(gen.gen_policy()) == baseline     # identical bytes
 
 
-def test_block_names_all_four_agents_with_env_and_unverified_label():
+def test_block_names_all_three_agents_with_env_and_unverified_label():
     block = _block(gen.gen_policy())
     from cage import agents
     for a in agents.SURFACES:
@@ -114,7 +114,7 @@ def test_block_names_all_four_agents_with_env_and_unverified_label():
 # ── the load-bearing inertness test ───────────────────────────────────────────
 
 def test_fresh_project_sees_no_active_sources_but_the_block_is_present(tmp_path, monkeypatch):
-    for env in ("CLAUDE_CONFIG_DIR", "CODEX_HOME", "COPILOT_HOME", "KIRO_HOME",
+    for env in ("CLAUDE_CONFIG_DIR", "COPILOT_HOME", "KIRO_HOME",
                 "KIRO_DATA_DIR", "CAGE_VSCODE_USER"):
         monkeypatch.delenv(env, raising=False)
     root = tmp_path / "proj"
@@ -125,7 +125,7 @@ def test_fresh_project_sees_no_active_sources_but_the_block_is_present(tmp_path,
     assert not policy.load_project_raw(fp.policy).get("sources")  # but no active table
     # and capture still resolves exactly the built-ins, tagged built-in.
     res = paths.resolve_log_sources(policy.load(fp.policy))
-    for agent in ("claude", "codex", "copilot", "kiro"):
+    for agent in agents.SURFACES:
         got = [(s.path, s.glob) for s in res.sources if s.agent == agent]
         assert got == paths._builtin_log_sources(agent)
         assert all(s.provenance == "built-in" for s in res.sources if s.agent == agent)

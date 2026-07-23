@@ -62,12 +62,12 @@ def test_every_check_has_a_known_level(proj):
     assert all(c["level"] in {"ok", "warn", "fail"} for c in res["checks"])
 
 
-def test_metering_matrix_lists_all_four_agents(proj):
+def test_metering_matrix_lists_all_three_agents(proj):
     from cage import agents
     detail = next(c["detail"] for c in doctorcmd.run(proj)["checks"] if c["name"] == "metering")
     for a in agents.SURFACES:  # every surface is first-class — none silently dropped
         assert a in detail
-        assert f"cage import --agent {a}" in detail  # all four now have an import path
+        assert f"cage import --agent {a}" in detail  # all three now have an import path
 
 
 def test_metering_matrix_is_honest_about_wired_hooks(proj):
@@ -77,7 +77,7 @@ def test_metering_matrix_is_honest_about_wired_hooks(proj):
     # pull-based path (`cage import`/`cage data export`) plus the last-import staleness signal.
     from cage import agents
     initcmd.run(proj)
-    agents.install(proj, ("claude", "codex"))
+    agents.install(proj, ("claude",))
     detail = next(c["detail"] for c in doctorcmd.run(proj)["checks"] if c["name"] == "metering")
     assert "pull-based" in detail
     assert "hook wired" in detail and "VS Code" in detail

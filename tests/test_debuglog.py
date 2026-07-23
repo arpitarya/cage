@@ -258,7 +258,7 @@ def test_doctor_shows_per_agent_last_fired_including_never(proj, monkeypatch):
     detail = next(c["detail"] for c in doctorcmd.run(proj)["checks"] if c["name"] == "trace")
     assert "capture debug ON" in detail
     assert "claude" in detail and "last fired" in detail
-    assert "never fired" in detail  # codex / copilot / kiro have no heartbeat yet
+    assert "never fired" in detail  # copilot / kiro have no heartbeat yet
 
 
 # --- the core invariant: debug never changes capture -------------------------

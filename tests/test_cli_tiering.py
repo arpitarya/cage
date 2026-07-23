@@ -148,12 +148,11 @@ def test_committed_wiring_names_only_non_moving_verbs():
     """The wire modules emit hook-*/import/mcp into committed files — never a moved
     verb (else a cloned settings.json would break after this release). The claude
     backfill in particular must have migrated off the removed `import-claude`."""
-    from cage import claudewire, kirowire, runshim
+    from cage import claudewire, kirowire
     blob = " ".join([
         claudewire.BACKFILL(), claudewire.BANNER(),
         *claudewire._simple().values(),
         kirowire._import_cmd(),
-        runshim.selflocating_command("import --agent codex --since 7d"),
     ])
     # every command word after the shim reference must be a surviving verb
     for old in verbmap.REMOVED:
