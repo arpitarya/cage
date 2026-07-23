@@ -6,7 +6,7 @@ from pathlib import Path
 
 from cage import (adoptcmd, agents, attribution, budget, compare, demo, doctorcmd,
                   explain, exportcmd, forecast, graphifymeter, humanview, importcmd, initcmd,
-                  ledger, ledgersync, limits, matrix, mcpserver, metercmd, metering, notessync,
+                  ledger, ledgersync, matrix, mcpserver, metercmd, metering, notessync,
                   origin, paths, policy, provenance, proxy, quality, recommend, regression,
                   render, report, roi, serve, tasks, trend, verifycmd, watchcmd, wizard)
 from cage.cliutil import captured_read_root, csv_dest, emit, ledger_root, root
@@ -138,20 +138,6 @@ def cmd_budget(args) -> int:
     verdict = budget.check(r, _policy(r), session=args.session,
                            scope=getattr(args, "scope", None))
     return emit(args, verdict, budget.render_budget(verdict))
-
-
-def cmd_limits(args) -> int:
-    """`cage data limits` — provider quota windows (latest local snapshot) + estimated
-    AI-credit consumption (token-based providers only). `--json` emits the `cage.v1`
-    envelope. Read-only/derive; never writes the ledger."""
-    r = captured_read_root(args)
-    data = limits.rollup(r, _policy(r))
-    if getattr(args, "json", False):
-        import json
-        print(json.dumps(render.envelope("limits", data), ensure_ascii=False, indent=2))
-        return 0
-    print(limits.render_limits(data))
-    return 0
 
 
 def cmd_roi(args) -> int:

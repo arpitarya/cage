@@ -57,8 +57,7 @@ def age_seconds(ts: str) -> int | None:
 
 
 def envelope(command: str, data) -> dict:
-    """The versioned ``cage.v1`` machine envelope (introduced for ``cage data limits --json``;
-    a wider rollout is a separate packet). ``generatedAt`` is wall-clock *metadata*, never
+    """The versioned ``cage.v1`` machine envelope. ``generatedAt`` is wall-clock *metadata*, never
     a derived-from-ledger figure, so the ``data`` payload stays deterministic (same ledger
     + policy ⇒ same ``data``)."""
     now = _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")

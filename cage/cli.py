@@ -36,7 +36,7 @@ groups (run any group name for its commands):
   prices      list · unpriced · set · alias · route-tool · sync
   study       join · start · stop · report · id
   policy      diff · sync
-  data        export · cleanup · limits · watch · serve · proxy · meter
+  data        export · cleanup · watch · serve · proxy · meter
 
 $ cage report --since 7d          # the daily number
 $ cage insights verdict graphify  # is this tool paying for itself?
@@ -510,7 +510,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     # ── group: data (capture, export, and local adapters) ──────────────────────
     data = _group(sub, "data",
-                  "capture, export & local adapters: export · cleanup · limits · "
+                  "capture, export & local adapters: export · cleanup · "
                   "watch · serve · proxy · meter")
 
     ex = data.add_parser("export", help="import (refresh) then emit the ledger as jsonl/csv/json",
@@ -562,11 +562,6 @@ def build_parser() -> argparse.ArgumentParser:
                     help="retention window for this run (default: [cleanup] days, else 30)")
     _json_flag(cu)
     cu.set_defaults(fn=clicmds.cmd_cleanup)
-
-    lm = data.add_parser("limits", help="provider quota windows + estimated AI-credit use")
-    _json_flag(lm)
-    _capture_flags(lm)
-    lm.set_defaults(fn=clicmds.cmd_limits)
 
     wt = data.add_parser("watch", help="foreground poll loop: import every interval until Ctrl-C (no OS job)",
                          epilog="example:\n"

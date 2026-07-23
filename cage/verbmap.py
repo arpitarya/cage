@@ -45,7 +45,6 @@ REMOVED: dict[str, str] = {
     # → data
     "export": "data export",
     "cleanup": "data cleanup",
-    "limits": "data limits",
     "watch": "data watch",
     "serve": "data serve",
     "proxy": "data proxy",

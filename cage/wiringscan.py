@@ -1,6 +1,6 @@
 """Wiring liveness — is an installed artifact's cage command still a command? (F1)
 
-v0.28.0 renamed 31 top-level verbs (`verbmap.REMOVED`). Every wiring artifact written
+v0.28.0 renamed 30 top-level verbs (`verbmap.REMOVED`). Every wiring artifact written
 before that still names the old verb, so it exits 1 — and because hook/shim stdout goes
 nowhere and both shims fail open to `exit 0`, **a dead verb is indistinguishable from
 cage not being installed**. A real machine's `bin/graphify` probed the pre-rename

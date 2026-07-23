@@ -726,14 +726,6 @@ class Footprint:
         return self.state / "cursors.json"
 
     @property
-    def limits(self) -> Path:
-        """Latest-only provider quota snapshot (`cage/limits.py`) — Codex rate-limit
-        windows keyed agent→window_minutes. **Overwrite, never appended; machine-local,
-        never synced to refs/notes.** Quota is a decaying live gauge, not durable ledger
-        truth, so it is deliberately *not* a ledger substrate (plan §3.8)."""
-        return self.state / "limits.json"
-
-    @property
     def debug_log(self) -> Path:
         """Capture-path debug log (`cage/debuglog.py`) — metadata-only, written only
         when `CAGE_DEBUG=1` / `[debug] enabled`. Override the path with `CAGE_DEBUG_LOG`."""
