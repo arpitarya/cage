@@ -2,6 +2,39 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
+## v0.31.3 (2026-07-23) — F6: capture observability — the instrument for F1
+
+Built from: [docs/f6-capture-observability.prompt.md](docs/f6-capture-observability.prompt.md).
+Logging only — no derived number changes (`report`/`attrib`/`matrix` are byte-identical with
+or without the breadcrumb writing).
+
+- **New always-on capture breadcrumb: `state/capture.log`.** One line per agent per real
+  import run — `ts · agent · files_seen · rows_new · rows_total · src` — counts-only, never
+  gated on `CAGE_DEBUG` (unlike `debug.log`). A throttled/no-op capture-on-read (or capture
+  switched off) never reaches it — only a real sweep appends. New `Footprint.capture_log`
+  (`cage/paths.py`), written by the new `cage/capturelog.py`, wired into `importcmd.run` at
+  the existing `_record_health` call site (no second ledger read — `rows_total` is derived
+  from the already-shared `all_rows`/`captured` read plus this run's own `imported` delta).
+  Fail-open: a write failure never breaks an import, traced under `CAGE_DEBUG` at
+  `context="capture.log"`. Size-managed by a new `capture-log` cleanup class (`cleanup.py`) —
+  prunable state, not permanent record, never in the `NEVER` allowlist. Included in
+  `cage doctor --bundle` (`state/capture.log`) alongside `debug.log`.
+- **Receipt produce/skip logging — the F1 instrument, `CAGE_DEBUG`-gated.** Every receipt
+  push/skip site now logs `event=receipt` with `tool`, `produced` (bool), and a `skip_reason`
+  when nothing was produced: `graphifymeter.py` (`non-measured-op` /
+  `no-source-file-parsed` / `no-saving-to-claim` / `linked-receipt-skipped`),
+  `metering.record_receipt` (`push-sink-unresolved` on a failed ledger append),
+  `responsecache.lookup`/`hit_receipt` (`cache-miss`), and `compress.receipt`
+  (`no-saving-to-claim`). Before this, a skipped receipt was completely silent — F1 (zero
+  real savings receipts) is now diagnosable from the debug log instead of a guess.
+- **New tests:** [tests/test_capture_log.py](tests/test_capture_log.py) (breadcrumb
+  content, no-op silence, cleanup pruning, fail-open, doctor-bundle inclusion) plus new
+  produce/skip coverage in [tests/test_debug_coverage.py](tests/test_debug_coverage.py) and
+  a cross-check against the F2 fix in
+  [tests/test_capture_health.py](tests/test_capture_health.py).
+- **Docs:** [docs/debugging-capture.md](docs/debugging-capture.md) documents `capture.log`
+  and the receipt skip-reason vocabulary; `cage query capture` mentions both.
+
 ## v0.31.2 (2026-07-23) — fix: capture-health false negative on an agent's first-ever import
 
 - **Fix: `_health.captured` now reads true on a surface's very first import, same run.**

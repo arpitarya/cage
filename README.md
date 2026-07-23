@@ -216,7 +216,7 @@ cage data export --csv calls --since 30d -o calls.csv   # raw ledger rows for a 
 
 ## The `$0` guarantee
 
-Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 815 tests passing; `cage demo` reproduces the worked attribution example against a real ledger.
+Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 831 tests passing; `cage demo` reproduces the worked attribution example against a real ledger.
 
 **Honest limits.** Cage doesn't decide your human rate — it prices minutes at a blended rate you set, and labels the result `estimated` so it never pretends to be a timesheet. Marginal-by-fixed-order is defensible and `$0`, but it is an *ordering convention*, not a Shapley value (that's a deferred audit mode). And a counterfactual cell is an honest reconstruction, never an invoice — the `method` column says so on every row, on purpose.
 
@@ -224,7 +224,7 @@ Every derived view is parse / arithmetic over the log — **no LLM call, ever, o
 
 Latest release below — full history and detail in [CHANGELOG.md](CHANGELOG.md).
 
-- **v0.31.2 (2026-07-23) — fix: capture-health false negative on an agent's first-ever import.** `_health.captured` is snapshotted from the ledger *before* this run's own imports are appended, so a brand-new agent's very first capture read `captured:false` until a second import self-healed it — fixed by unioning in this run's own appends. Also corrects the 2026-07-22 regression report's F2 diagnosis: the real cause was this snapshot-ordering off-by-one, not a this-run-vs-lifetime confusion, and it never produced a false "capturing nothing" warning ([correction doc](docs/regression/2026-07-23-f2-correction.md)).
+- **v0.31.3 (2026-07-23) — F6: capture observability, the instrument for F1.** A new always-on `state/capture.log` breadcrumb (one line per agent per real import run — files/rows/src, never `CAGE_DEBUG`-gated) proves capture ran at all, plus `CAGE_DEBUG`-gated produce/skip logging at every receipt push site (graphify, `record_receipt`, response-cache, compressor) so a skipped savings receipt is no longer silent. Logging only — no derived numbers changed. See [docs/debugging-capture.md](docs/debugging-capture.md).
 
 ## The name
 

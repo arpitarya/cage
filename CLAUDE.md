@@ -89,7 +89,11 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   capture-architecture §3.1) — never `resolve_root` directly — and stamps a non-PII
   `route_key` (a hash of the resolved ledger-root path, never a basename; additive/
   optional, never in an id) on pushed receipts so a read can reclaim a stray saving by
-  exact key.
+  exact key. **Capture observability (F6):** an always-on `state/capture.log` breadcrumb
+  (`cage/capturelog.py`, one line per agent per real import run — counts only, never
+  read by any derived view) proves capture ran at all; a `CAGE_DEBUG`-gated
+  produce/skip log at every receipt push site (graphifymeter/record_receipt/
+  responsecache/compress) makes a silently-skipped savings receipt diagnosable.
 - **Attribution** ([attribution.py](cage/attribution.py), [matrix.py](cage/matrix.py))
   — the differentiator (plan §4). Marginal-by-fixed-order; a reconstructed
   counterfactual cell is `modeled`/`estimated`, never `measured` (only the recorded
@@ -370,7 +374,7 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
 ## Dev
 
 ```bash
-just test          # python -m pytest -q   (815 passing)
+just test          # python -m pytest -q   (831 passing)
 just demo          # seed §4.4 + print attrib/matrix
 cage --version
 ```
