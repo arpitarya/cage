@@ -247,6 +247,18 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   silently break one: every wiring/read surface (`agents.py`, `mcpserver.py`,
   `cage setup`, the skill/steering data) must keep all four first-class, and new
   surface work fans out to all four. This is a product invariant, not a default.
+- **A renamed or removed verb is a wiring migration, not just a CLI change.**
+  Renaming/removing a top-level verb must add an entry to `verbmap.REMOVED`
+  ([verbmap.py](cage/verbmap.py)) so the old spelling prints a direction instead of
+  exiting 1 silently — and it must be swept everywhere the old spelling could still be
+  hard-coded: every wire module, `install.sh`, `justfile`, docs/skills (skillgen),
+  and `tools/dummyrepo`. `just demo` and `install.sh` shipped broken from v0.28.0 to
+  v0.32.0 because the rename touched the CLI and nothing else, and nothing checked.
+  `tests/test_cli_tiering.py` grep-gates source, assets, **and dev tooling**
+  (`justfile`/`install.sh`) for a stale `cage <old-verb>` spelling — treat a failure
+  there as a wiring bug, not a lint nit. See the wiring-liveness paragraph above: a
+  verb deleted outright (never added to `REMOVED`) is the harder case the live-parser
+  detector exists to catch.
 - **Every release updates the changelog** — bump `__version__`, add the full release
   notes to `CHANGELOG.md` (newest first, don't skip versions) and a **1–2 line**
   summary to the README "What's new" section — which keeps **only the latest
@@ -500,6 +512,31 @@ each agent only needs thin idiomatic wiring (`agents.py` orchestrates):
   `gitcommithook.py` (local `post-commit`/`prepare-commit-msg` git hooks, riding along
   with `claudewire.py` inside `agents.install`). All idempotent. Every agent's hook runs
   the same all-agent sweep (`paths.cage_import_all`) so any agent captures the whole stack.
+- **Wiring liveness** ([wiringscan.py](cage/wiringscan.py), v0.32.0) — is an installed
+  artifact's cage command still a command? A wiring artifact written before a verb was
+  renamed still names the OLD verb, so it exits 1 — and because hook/shim output goes
+  nowhere and both shims fail open to `exit 0`, a dead verb is indistinguishable from
+  cage not being installed at all. A real machine's `bin/graphify` probed a pre-rename
+  verb and silently exec'd the unmetered binary for 9 days while `cage doctor` reported
+  OK, because the interceptor check tested existence + PATH, not liveness — the root
+  cause behind F1's empty receipts. **The detector is the live parser
+  (`cli.build_parser()`), never `verbmap.REMOVED`** — the parser is the same code the
+  CLI runs, so it's ground truth for "will this exit 1"; `REMOVED` only supplies the
+  replacement tail for the fix-hint. The distinction is load-bearing: a verb deleted
+  outright rather than renamed (`cage adopt`) is dead, still installed on real
+  machines, and **absent from `REMOVED`** — a grep against it would miss the artifact
+  entirely. Scanning covers **user-level** artifacts too (`~/.copilot/hooks`,
+  `~/.codex/config.toml`, `.git/hooks`, the global skill/prompt/steering copies) — both
+  real-world failures were user-level, so a check that skipped them would miss its own
+  reason to exist — and is **read-only and side-effect-free by construction**: nothing
+  is ever executed, no `cage import` runs. Severity is tiered: a dead **wired** command
+  is a doctor failure (capture is silently off); a stale **asset** (skill/prompt/
+  steering prose) is advisory only (the agent sees a wrong verb, errors, adapts) and
+  never gates the `report` footer. `cage setup` heals a dead verb via `verbmap.REMOVED`
+  alongside its existing path migration, and refreshes a stale `bin/graphify`;
+  idempotent, foreign (non-cage) artifacts are never touched, and a dead verb with no
+  known replacement is reported, never guessed at. `cage query stale-wiring` explains
+  the mechanism; `cage doctor`'s `wiring` check names each fault and its fix.
 - **§8 features:** `quality.py`, `regression.py`, `recommend.py`, `forecast.py`.
 - **Tier-0 savings:** `compress.py`, `responsecache.py` (emit receipts).
 
