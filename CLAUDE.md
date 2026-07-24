@@ -378,7 +378,7 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
 ## Dev
 
 ```bash
-just test          # python -m pytest -q   (858 passing)
+just test          # python -m pytest -q   (877 passing)
 just demo          # seed §4.4 + print attrib/matrix
 cage --version
 ```
@@ -529,6 +529,10 @@ each agent only needs thin idiomatic wiring (`agents.py` orchestrates):
   idempotent, foreign (non-cage) artifacts are never touched, and a dead verb with no
   known replacement is reported, never guessed at. `cage query stale-wiring` explains
   the mechanism; `cage doctor`'s `wiring` check names each fault and its fix.
+  `cage doctor --wiring` (v0.34.0) renders the same scan as a browsable per-artifact
+  inventory — scope + agent + status (current/stale/dead/foreign) + a per-agent
+  fully/partially/not-wired/needs-healing verdict, never forking the liveness logic;
+  `cage query wiring-inventory` explains it.
 - **§8 features:** `quality.py`, `regression.py`, `recommend.py`, `forecast.py`.
 - **Tier-0 savings:** `compress.py`, `responsecache.py` (emit receipts).
 
