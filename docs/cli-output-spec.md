@@ -14,9 +14,10 @@ python -m tools.docgen --target spec        # rewrites the blocks below
 CI runs `python -m tools.docgen --check` — a shipped output change without a
 regenerated spec fails the build (the skillgen pattern; rule recorded in
 CLAUDE.md). Blocks *without* a `golden:` anchor (the Phase-3 `insights` group
-listing and `study join`) are illustrative: the former documents an unshipped
-regrouping, the latter's wiring + doctor output is machine-dependent by design
-(it gets shape assertions instead of a byte golden).
+listing, `study join`, and `cage doctor --wiring`) are illustrative: the first
+documents an unshipped regrouping, the other two render real home-directory
+paths and installed-vs-bundled asset bytes — machine-dependent by design (they
+get shape assertions instead of a byte golden).
 
 Rules the outputs encode: tokens are the default, dollars opt-in (`--usd` /
 `[display] usd`) · unpriced = `—` never `$0.0000` · saved/net columns only when
@@ -584,7 +585,42 @@ pooled machine-days per phase (measured):
 
 ---
 
-## 5 · `cage policy …`
+## 5 · `cage doctor …`
+
+**D1 — `--wiring` (ILLUSTRATIVE — every row involves a machine's real home-directory
+paths and installed-vs-bundled asset bytes, same reason plain `cage doctor` has no
+byte-pinned block; shape-asserted in `tests/test_wiring_inventory.py` instead)**
+
+```
+$ cage doctor --wiring
+Wiring inventory (project + global/user; read-only):
+
+  project:
+    ✔ claude   hook          .claude/settings.json                      current
+    ✔ claude   mcp           .mcp.json                                  current
+    ✔ copilot  instructions  .github/copilot-instructions.md            current
+    ✗ copilot  mcp           .vscode/mcp.json                           dead — …
+    ✔ kiro     steering      .kiro/steering/cage.md                     current
+    ○ -        git-hook      .git/hooks/post-commit                     foreign — not cage-managed
+
+  global:
+    ✔ copilot  hook          ~/.copilot/hooks/cage.json                 current
+    · claude   skill         ~/.claude/skills/cage/SKILL.md             stale
+
+  claude   fully wired
+  copilot  needs healing (1 dead, 0 stale)
+  kiro     partially wired (missing: hook)
+
+cage 0.34.0 · bundled prices 2026-07-14 · bundled policy v0.26.0
+```
+
+`--json` carries the same `items`/`rollups`/`version` fields (`doctorcmd.wiring_report`);
+plain `cage doctor` is unaffected (an additive flag). `cage query wiring-inventory`
+explains the status taxonomy and the per-agent verdict rule.
+
+---
+
+## 6 · `cage policy …`
 
 **P5 — `diff` (dry-run categorized)**
 
@@ -644,7 +680,7 @@ pricing tables — delegated to `cage prices sync`:
 
 ---
 
-## 6 · bare `cage` (the overview headline)
+## 7 · bare `cage` (the overview headline)
 
 **O1 — DEFAULT: tokens**
 

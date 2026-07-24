@@ -538,6 +538,88 @@ def _ledger_roundtrip() -> tuple[str, str]:
         return _FAIL, f"ledger round-trip raised: {exc}"
 
 
+def version_footer(root: Path) -> dict:
+    """The honest "versions installed" answer (handoff §5): running cage (+ `zipapp`
+    tag), the bundled `[meta]` versions, and the project policy's `[meta]` if one
+    exists — per-artifact versions are unknowable (artifacts are stampless), this is
+    the closest real signal. Reuses the same project-vs-bundle read `_bundled_prices`/
+    `_policy_version` already do."""
+    from cage import __version__
+    bundled = policy.bundled_raw().get("meta", {})
+    out = {
+        "cage": __version__,
+        "zipapp": paths.distribution() == "zipapp",
+        "bundled": {"prices_version": bundled.get("prices_version"),
+                    "policy_version": bundled.get("policy_version")},
+        "project": None,
+    }
+    pol_path = paths.Footprint(root).policy
+    if pol_path.exists():
+        try:
+            project_meta = policy.load_project_raw(pol_path).get("meta", {})
+            out["project"] = {"prices_version": project_meta.get("prices_version"),
+                              "policy_version": project_meta.get("policy_version")}
+        except Exception:  # noqa: BLE001 — a broken policy is reported by the policy check
+            out["project"] = {}
+    return out
+
+
+def wiring_report(root: Path) -> dict:
+    """`cage doctor --wiring` payload: the installed-artifact inventory
+    (`wiringscan.inventory`) + the version footer, as one plain-dict data structure
+    for the text and `--json` renderers to share (house pattern)."""
+    inv = wiringscan.inventory(root)
+    return {
+        "items": [{"agent": a.agent, "kind": a.kind, "scope": a.scope,
+                   "display": a.display, "status": a.status, "detail": a.detail}
+                  for a in inv.items],
+        "rollups": [{"agent": r.agent, "verdict": r.verdict, "missing": list(r.missing),
+                     "dead": r.dead, "stale": r.stale} for r in inv.rollups],
+        "version": version_footer(root),
+    }
+
+
+_STATUS_GLYPH = {"current": "✔", "stale": "·", "dead": "✗", "foreign": "○"}
+
+
+def render_wiring_text(rep: dict) -> str:
+    """The text form of `wiring_report()` — one data structure, two renderers (the
+    `--json` branch just dumps the dict as-is)."""
+    lines = ["Wiring inventory (project + global/user; read-only):"]
+    for scope in ("project", "global"):
+        rows = [it for it in rep["items"] if it["scope"] == scope]
+        if not rows:
+            continue
+        lines.append(f"\n  {scope}:")
+        for it in rows:
+            glyph = _STATUS_GLYPH.get(it["status"], "?")
+            agent = it["agent"] or "-"
+            lines.append(f"    {glyph} {agent:<8} {it['kind']:<13} {it['display']:<42} {it['status']}"
+                        + (f" — {it['detail']}" if it["detail"] else ""))
+    lines.append("")
+    for r in rep["rollups"]:
+        lines.append(f"  {r['agent']:<8} {_rollup_line(r)}")
+    v = rep["version"]
+    tag = " (zipapp)" if v["zipapp"] else ""
+    foot = f"\ncage {v['cage']}{tag} · bundled prices {v['bundled']['prices_version']} · bundled policy v{v['bundled']['policy_version']}"
+    if v["project"]:
+        foot += (f" · project prices {v['project'].get('prices_version')}"
+                 f" · project policy v{v['project'].get('policy_version')}")
+    lines.append(foot)
+    return "\n".join(lines)
+
+
+def _rollup_line(r: dict) -> str:
+    """Four mutually-exclusive verdicts (wiringscan._agent_inventory): "needs healing"
+    takes priority over "fully wired" when something present is broken."""
+    v = r["verdict"]
+    if v == "partially wired" and r["missing"]:
+        v += f" (missing: {', '.join(r['missing'])})"
+    elif v == "needs healing":
+        v += f" ({r['dead']} dead, {r['stale']} stale)"
+    return v
+
+
 def run(root: Path) -> dict:
     """Run every check; return {status, checks:[{name, level, detail}]}.
 

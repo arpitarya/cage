@@ -191,6 +191,10 @@ def build_parser() -> argparse.ArgumentParser:
                     help="read-only path probe: every candidate log location per agent on "
                          "this OS — found/missing, files matched, parseable rows, cursor "
                          "state, and why a location missed (writes nothing)")
+    dr.add_argument("--wiring", action="store_true",
+                    help="installed-artifact inventory: every wired file (project + "
+                         "global/user), its status (current/stale/dead/foreign), and "
+                         "a per-agent fully/partially/not-wired verdict (read-only)")
     dr.set_defaults(fn=clicmds.cmd_doctor)
 
     qy = sub.add_parser("query", help="explain how a value is calculated, or how cage itself works ($0, deterministic)",

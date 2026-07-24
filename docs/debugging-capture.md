@@ -101,6 +101,14 @@ Notes on what is and isn't checked:
   could not tell "verb dead" from "cage absent" anyway — that ambiguity *is* the bug.
 
 `cage query stale-wiring` explains the design.
+
+**The itemized view: `cage doctor --wiring`.** The `wiring`/`interceptor` checks above are
+a pass/fail rollup over the same scan; `--wiring` renders the full inventory instead — every
+artifact, project and global/user, grouped by agent, with a `current`/`stale`/`dead`/`foreign`
+status and a per-agent `fully wired`/`partially wired (missing: …)`/`not wired`/`needs
+healing (N dead, M stale)` verdict, plus a version footer (running cage, bundled `[meta]`,
+project `[meta]`). `--json` carries the same fields. Read-only — nothing is executed or
+healed; `cage setup` still owns healing. `cage query wiring-inventory` explains the design.
 - **`CAGE_DEBUG=1`** logs the **ledger-resolution decision** on every push and read
   (`event=ledger-resolve`), every capture-on-read sweep (`event=capture-on-read`), and
   every routing-key reclaim (`event=reclaim`) — see the trace section below.

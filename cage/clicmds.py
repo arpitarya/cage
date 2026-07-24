@@ -524,6 +524,14 @@ def cmd_doctor(args) -> int:
             pol = {}
         print(pathprobe.run(root(), pol))
         return 0
+    if getattr(args, "wiring", False):
+        rep = doctorcmd.wiring_report(root())
+        if getattr(args, "json", False):
+            import json
+            print(json.dumps(rep))
+        else:
+            print(doctorcmd.render_wiring_text(rep))
+        return 0
     res = doctorcmd.run(root())
     if getattr(args, "json", False):
         import json

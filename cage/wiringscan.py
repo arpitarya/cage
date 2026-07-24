@@ -325,3 +325,289 @@ def run(root: Path, *, assets: bool = True) -> Scan:
     return Scan(dead=dead,
                 stale_assets=stale_assets() if assets else [],
                 interceptor_dead=interceptor_dead)
+
+
+# ── inventory (`cage doctor --wiring`) ───────────────────────────────────────────
+#
+# A browsable itemization of the same data `run()` already computes — renders the
+# enumeration + liveness, forks none of it. Two extra questions `run()` doesn't
+# answer: which artifact belongs to which *agent* (for grouping + a per-agent
+# rollup), and what's *missing* from a partially-wired agent (`run()` only sees
+# what's on disk, never what should be).
+
+
+class Artifact(NamedTuple):
+    """One inventory row."""
+    agent: str      # "claude" | "copilot" | "kiro" | "codex" (orphaned) | "" (shared)
+    kind: str       # "hook" | "mcp" | "instructions" | "steering" | "git-hook" |
+                     # "shim" | "skill" | "prompt" | "other"
+    scope: str      # "project" | "global"
+    display: str
+    status: str     # "current" | "stale" | "dead" | "foreign"
+    detail: str = ""
+
+
+class AgentRollup(NamedTuple):
+    """Per-agent verdict; `doctorcmd.render_wiring_text` formats it into the display
+    line the same way for both this and the `--json` dict form."""
+    agent: str
+    verdict: str            # "fully wired" | "partially wired" | "not wired"
+    missing: tuple[str, ...] = ()
+    dead: int = 0
+    stale: int = 0
+
+
+class Inventory(NamedTuple):
+    items: list[Artifact]
+    rollups: list[AgentRollup]
+
+
+class _Spec(NamedTuple):
+    """One artifact a full `cage setup --wire-only --<agent>` writes. `required=False`
+    marks a piece that's normal to be missing — Kiro's project `.kiro/settings/mcp.json`
+    is gitignore-advised (kirowire.py), and the git-hooks are best-effort by design
+    (gitcommithook.py) — so its absence must never read as a partial install (handoff §8)."""
+    kind: str
+    scope: str
+    display: str
+    required: bool
+    present: bool
+    commands: tuple[str, ...] = ()
+
+
+def _spec_status(display: str, commands: tuple[str, ...], committed: bool) -> tuple[str, str]:
+    """(status, detail) for a *present* artifact — dead beats current; staleness for a
+    hook/mcp command isn't tracked (only asset bytes are, via `stale_assets()`)."""
+    for c in commands:
+        verbs = paths.cage_verb_path(c)
+        if verbs and not is_live_verb(verbs):
+            return "dead", Dead(display, " ".join(verbs), remediation(verbs), committed).line
+    return "current", ""
+
+
+# Each `_<agent>_specs` is the one place that agent's expected artifact shape lives —
+# built from the wire module's own `status`/`backfill_status`/`realtime_status`
+# (never a re-derived presence check), so it can't drift from what `install()` writes.
+# A new agent needs a row here too (mirrors the "add a row" convention in
+# `agents.py`/`_WIRE`) — but the AGENT LIST itself always comes from `agents.SURFACES`,
+# never from this table's keys (see `inventory()`).
+
+def _claude_specs(root: Path) -> list[_Spec]:
+    from cage import gitcommithook
+    settings = root / ".claude" / "settings.json"
+    # A verb check (`cage_verb_path` truthy), not `claudewire.status()` — that
+    # function matches only the *current* canonical command form, so a hook whose
+    # only entry is a legacy dead verb would read as "not wired" instead of "dead"
+    # and hide exactly the class of bug this inventory exists to surface.
+    cage_cmds = tuple(c for c in _hook_commands(settings) if paths.cage_verb_path(c))
+    specs = [_Spec("hook", "project", ".claude/settings.json", True,
+                    bool(cage_cmds), cage_cmds)]
+    mcp = root / ".mcp.json"
+    mcp_cmd = cfgio.load_json(mcp).get("mcpServers", {}).get("cage", {}).get("command", "")
+    specs.append(_Spec("mcp", "project", ".mcp.json", True, bool(mcp_cmd),
+                        (mcp_cmd,) if mcp_cmd else ()))
+    for name in ("post-commit", "prepare-commit-msg"):
+        path = root / ".git" / "hooks" / name
+        try:
+            text = path.read_text(encoding="utf-8", errors="ignore") if path.exists() else ""
+        except OSError:
+            text = ""
+        specs.append(_Spec("git-hook", "project", f".git/hooks/{name}", False,
+                            gitcommithook._MARKER in text))
+    return specs
+
+
+def _copilot_specs(root: Path) -> list[_Spec]:
+    from cage import copilotwire
+    specs = [_Spec("instructions", "project", ".github/copilot-instructions.md", True,
+                    copilotwire.status(root))]
+    mcp = root / ".vscode" / "mcp.json"
+    mcp_cmd = cfgio.load_json(mcp).get("servers", {}).get("cage", {}).get("command", "")
+    specs.append(_Spec("mcp", "project", ".vscode/mcp.json", True, bool(mcp_cmd),
+                        (mcp_cmd,) if mcp_cmd else ()))
+    hook_path = paths.copilot_home() / "hooks" / "cage.json"
+    # Same verb-truthy present-check as claude's hook, not `backfill_status`/
+    # `realtime_status` (exact-match to the *current* command form only).
+    cage_cmds = tuple(c for c in _hook_commands(hook_path, key="bash")
+                      if paths.cage_verb_path(c))
+    specs.append(_Spec("hook", "global", _display(hook_path), True,
+                        bool(cage_cmds), cage_cmds))
+    return specs
+
+
+def _kiro_specs(root: Path) -> list[_Spec]:
+    from cage import kirowire
+    steering = root / ".kiro" / "steering" / "cage.md"
+    specs = [_Spec("steering", "project", ".kiro/steering/cage.md", True, steering.exists())]
+    hook = root / ".kiro" / "hooks" / "cage.kiro.hook"
+    hook_cmd = cfgio.load_json(hook).get("then", {}).get("command", "") if hook.exists() else ""
+    # Verb-truthy present-check (see `_claude_specs`), not `backfill_status` (exact
+    # match to the current command only — would miss a dead-verb-only hook).
+    specs.append(_Spec("hook", "project", ".kiro/hooks/cage.kiro.hook", True,
+                        bool(paths.cage_verb_path(hook_cmd)), (hook_cmd,) if hook_cmd else ()))
+    mcp = root / ".kiro" / "settings" / "mcp.json"
+    srv = cfgio.load_json(mcp).get("mcpServers", {}).get("cage", {})
+    mcp_cmd = " ".join([srv.get("command", ""), *srv.get("args", [])]).strip()
+    specs.append(_Spec("mcp", "project", ".kiro/settings/mcp.json", False,
+                        kirowire.status(root), (mcp_cmd,) if mcp_cmd else ()))
+    return specs
+
+
+_SPECS = {"claude": _claude_specs, "copilot": _copilot_specs, "kiro": _kiro_specs}
+
+
+def _agent_inventory(agent: str, specs: list[_Spec], stale: int) -> tuple[list[Artifact], AgentRollup]:
+    """Build this agent's rows + rollup. ``stale`` is its stale-**asset** count
+    (`scan.stale_assets`, computed once for the whole scan) — folded into the same
+    verdict as a dead command, since both mean "re-run `cage setup`" (doctorcmd._wiring
+    tiers them the same way)."""
+    items: list[Artifact] = []
+    missing: list[str] = []
+    dead = 0
+    any_present = False
+    for s in specs:
+        if not s.present:
+            if s.required:
+                missing.append(s.kind)
+            continue
+        any_present = True
+        status, detail = _spec_status(s.display, s.commands, s.scope == "project")
+        if status == "dead":
+            dead += 1
+        items.append(Artifact(agent, s.kind, s.scope, s.display, status, detail))
+    # Four mutually-exclusive verdicts (DoD §2) — "needs healing" takes priority over
+    # "fully wired" when something present is broken; a "not wired" agent stays purely
+    # informational (no missing-list nag) even if it happens to have a dead leftover.
+    if dead or stale:
+        verdict = "needs healing"
+    elif not any_present:
+        verdict = "not wired"
+    elif missing:
+        verdict = "partially wired"
+    else:
+        verdict = "fully wired"
+    return items, AgentRollup(agent, verdict,
+                              tuple(missing) if verdict == "partially wired" else (),
+                              dead, stale)
+
+
+def _asset_rows(root: Path, scan: Scan) -> list[Artifact]:
+    """Skill/prompt/steering asset copies — informational only, never gates a rollup
+    verdict: `cage setup` (assets) and `cage setup --wire-only` (the specs above) are
+    separate invocations, so folding asset presence into the wiring verdict would
+    misreport someone who deliberately ran only one of them. Kiro's project steering
+    doc is skipped here — it's already the `steering` row in `_kiro_specs` (kirowire
+    and `cage setup` write the same file for two different reasons)."""
+    from cage import setupcmd
+    stale = {s.artifact for s in scan.stale_assets}
+    out: list[Artifact] = []
+
+    def add(agent: str, kind: str, scope: str, path: Path) -> None:
+        if not path.exists():
+            return
+        if scope == "project":
+            try:
+                display = str(path.relative_to(root))
+            except ValueError:
+                display = str(path)
+        else:
+            display = _display(path)
+        out.append(Artifact(agent, kind, scope, display,
+                            "stale" if display in stale else "current"))
+
+    for skill, prompt, _steer in setupcmd._ASSETS:
+        add("claude", "skill", "global", paths.claude_home() / "skills" / skill / "SKILL.md")
+        add("claude", "skill", "project", root / ".claude" / "skills" / skill / "SKILL.md")
+        add("copilot", "prompt", "global", paths.vscode_user_dir() / "prompts" / f"{prompt}.prompt.md")
+        add("copilot", "prompt", "project", root / ".github" / "prompts" / f"{prompt}.prompt.md")
+        add("kiro", "steering", "global", paths.kiro_home() / "steering" / f"{_steer}.md")
+    return out
+
+
+def _git_hook_foreign(root: Path) -> list[Artifact]:
+    """A `.git/hooks/{post-commit,prepare-commit-msg}` that exists but isn't cage's —
+    `user_artifacts()` deliberately never returns these (never ours to judge), so this
+    is the one place they're surfaced: shown, never acted on."""
+    from cage import gitcommithook
+    out: list[Artifact] = []
+    for name in ("post-commit", "prepare-commit-msg"):
+        path = root / ".git" / "hooks" / name
+        if not path.exists():
+            continue
+        try:
+            text = path.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+        if gitcommithook._MARKER not in text:
+            out.append(Artifact("", "git-hook", "project", f".git/hooks/{name}",
+                                "foreign", "not cage-managed"))
+    return out
+
+
+def _leftover(root: Path, covered: set[str]) -> list[Artifact]:
+    """Anything the raw enumeration finds that isn't part of a known agent's expected
+    set — an orphaned pre-removal artifact (`.codex/hooks.json`) or a stray cage
+    command in an unanticipated slot. Never invented, never silently dropped."""
+    out: list[Artifact] = []
+    for display, command, committed in (
+            [(d, c, True) for d, c in committed_artifacts(root)]
+            + [(d, c, False) for d, c in user_artifacts(root)]):
+        if display in covered:
+            continue
+        verbs = paths.cage_verb_path(command)
+        if not verbs:
+            continue  # a foreign command at a shared-looking location — not ours to judge
+        status = "current" if is_live_verb(verbs) else "dead"
+        detail = (Dead(display, " ".join(verbs), remediation(verbs), committed).line
+                  if status == "dead" else "")
+        out.append(Artifact(_leftover_agent(display), "other",
+                            "project" if committed else "global", display, status, detail))
+    return out
+
+
+def _leftover_agent(display: str) -> str:
+    """A cosmetic label for a leftover row — e.g. a lingering global
+    `~/.claude/settings.json` no current wire module writes, or the pre-removal
+    `.codex/`. Never used for the expected-set/rollup computation (that's `_SPECS`
+    keyed on `agents.SURFACES` alone) — display only, so it can't misclassify what
+    counts as "wired"."""
+    low = display.lower()
+    for tag in (".codex", "codex"), (".claude", "claude"), ("copilot", "copilot"), (".kiro", "kiro"):
+        if tag[0] in low:
+            return tag[1]
+    return ""
+
+
+def inventory(root: Path) -> Inventory:
+    """The full per-artifact installed inventory (`cage doctor --wiring`), grouped by
+    scope + agent. The agent list is `agents.SURFACES` — never hand-written here, so
+    a future agent (or codex's removal) updates this automatically. Read-only: builds
+    entirely on `run()`'s enumeration; nothing is executed or healed."""
+    from cage import agents
+
+    scan = run(root)
+    items: list[Artifact] = []
+    rollups: list[AgentRollup] = []
+    covered: set[str] = set()
+
+    for agent in agents.SURFACES:
+        build = _SPECS.get(agent)
+        specs = build(root) if build else []
+        stale_n = sum(1 for s in scan.stale_assets if s.agent == agent)
+        agent_items, rollup = _agent_inventory(agent, specs, stale_n)
+        items += agent_items
+        rollups.append(rollup)
+        covered |= {s.display for s in specs if s.present}
+
+    items += _asset_rows(root, scan)
+    items += _git_hook_foreign(root)
+    items += _leftover(root, covered)
+
+    shim = root / "bin" / "graphify"
+    if shim.exists():
+        items.append(Artifact("", "shim", "project", "bin/graphify",
+                              "dead" if scan.interceptor_dead else "current",
+                              "probes a removed verb — every graphify call falls "
+                              "through UNMETERED and silently" if scan.interceptor_dead else ""))
+
+    return Inventory(items=items, rollups=rollups)

@@ -215,7 +215,7 @@ cage data export --csv calls --since 30d -o calls.csv   # raw ledger rows for a 
 
 ## The `$0` guarantee
 
-Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 858 tests passing; `cage demo` reproduces the worked attribution example against a real ledger.
+Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 877 tests passing; `cage demo` reproduces the worked attribution example against a real ledger.
 
 **Honest limits.** Cage doesn't decide your human rate — it prices minutes at a blended rate you set, and labels the result `estimated` so it never pretends to be a timesheet. Marginal-by-fixed-order is defensible and `$0`, but it is an *ordering convention*, not a Shapley value (that's a deferred audit mode). And a counterfactual cell is an honest reconstruction, never an invoice — the `method` column says so on every row, on purpose.
 
@@ -223,7 +223,7 @@ Every derived view is parse / arithmetic over the log — **no LLM call, ever, o
 
 Latest release below — full history and detail in [CHANGELOG.md](CHANGELOG.md).
 
-- **v0.33.0 (2026-07-24) — Codex removed: cage is Claude Code · Copilot · Kiro.** A product/scope decision, not a capture-quality one — Codex was actually one of the healthier captured agents in the real ledger. Retires the "four agents, always" invariant; `cage data limits` (Codex's quota-only feature) goes with it. Existing ledger rows with `agent="codex"` are untouched. See [CHANGELOG.md](CHANGELOG.md) for the full accounting, including the one known follow-up (a pre-existing `.codex/hooks.json` on an upgraded machine is now silently orphaned, not yet flagged by the wiring-liveness scanner).
+- **v0.34.0 (2026-07-24) — `cage doctor --wiring`: the installed-artifact inventory.** A browsable itemization of every cage-installed artifact (hooks, MCP configs, skill/prompt/steering copies) across project and global/user scope, with a current/stale/dead/foreign status per row and a per-agent fully/partially/not-wired verdict — driven off `agents.SURFACES`, never a hand-written agent list. Read-only, `--json` parity, no fabricated per-artifact version. See [CHANGELOG.md](CHANGELOG.md) for the full accounting.
 
 ## The name
 

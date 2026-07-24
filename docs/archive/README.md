@@ -49,6 +49,7 @@ release that shipped the work: `vX.Y-<feature>.{handoff,prompt}.md`.
 | v0.30 | Capture health (triple-gated "installed but capturing nothing" warning) | [handoff](v0.30-capture-health.handoff.md) | [prompt](v0.30-capture-health.prompt.md) | [v0.30.0](../../CHANGELOG.md#v0300-2026-07-16--capture-health-make-silent-zero-capture-loud) |
 | v0.32 | Stale-wiring liveness (detect + heal an orphaned dead verb) | [handoff](v0.32-stale-wiring.handoff.md) | [prompt](v0.32-stale-wiring.prompt.md) | [v0.32.0](../../CHANGELOG.md#v0320-2026-07-24--stale-wiring-liveness-detect--heal-orphaned-wiring) |
 | v0.33 | Codex removal (cage is claude/copilot/kiro) | [handoff](v0.33-codex-removal.handoff.md) | [prompt](v0.33-codex-removal.prompt.md) | [v0.33.0](../../CHANGELOG.md#v0330-2026-07-24--codex-removed-cage-is-claude-code--copilot--kiro) |
+| v0.34 | Installed-artifact inventory (`cage doctor --wiring`) | [handoff](v0.34-wiring-inventory.handoff.md) | — | [v0.34.0](../../CHANGELOG.md#v0340-2026-07-24--cage-doctor---wiring-the-installed-artifact-inventory) |
 
 ## Superseded drafts & research inputs
 
@@ -62,6 +63,9 @@ release that shipped the work: `vX.Y-<feature>.{handoff,prompt}.md`.
 
 ## Mapping notes (where the version was ambiguous)
 
+- **v0.34-wiring-inventory** — no archived prompt: the executing prompt
+  self-declared itself throwaway ("delete this file when done") and was deleted
+  per its own instruction; the handoff alone carries the decided design.
 - **v0.5-fix-cost-rendering** — no dedicated changelog entry; mapped to the release
   whose commit introduced it (v0.5.0). The derive-time repricing rule it fixed is
   documented in `CLAUDE.md` (Per-call cost).

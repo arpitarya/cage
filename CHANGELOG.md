@@ -2,6 +2,48 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
+## v0.34.0 (2026-07-24) — `cage doctor --wiring`: the installed-artifact inventory
+
+A browsable itemization of every cage-installed artifact — project **and**
+global/user scope — so a user can see what was installed, what wasn't, and what's
+out of date, with nothing tracked by git. Renders `wiringscan.py`'s existing
+enumeration + liveness (v0.32.0's F1 fix); forks none of it.
+
+- **`cage doctor --wiring`** (`cage/wiringscan.py`, `cage/doctorcmd.py`): lists every
+  artifact grouped by scope (project vs global/user) and agent (always driven off
+  `agents.SURFACES`, never a hand-written list — the codex-removal-safe design the
+  handoff asked for). Each row carries a **status**: `current` (a live verb / asset
+  hash matches the bundle), `stale` (·, an installed skill/prompt/steering copy
+  differs from the bundled original), `dead` (✗, a wiring command names a removed
+  verb, with the same fix-hint `wiringscan.remediation` already computes), or
+  `foreign` (○, a non-cage artifact at a cage location — shown, never judged; e.g.
+  a `.git/hooks/post-commit` without the `# cage-managed-hook` marker).
+- **Per-agent rollup** — four mutually-exclusive verdicts: `needs healing (N dead,
+  M stale)` (takes priority whenever something present is broken) → `not wired`
+  (nothing present — purely informational, never a warning) → `partially wired
+  (missing: …)` (some but not all of the agent's *required* pieces present) →
+  `fully wired`. "Required" excludes the two documented exceptions that are normal
+  to be missing: Kiro's project `.kiro/settings/mcp.json` (gitignore-advised,
+  `kirowire.py`) and the best-effort git hooks (`gitcommithook.py`). Skill/prompt/
+  steering asset copies render as informational rows but never gate the verdict —
+  `cage setup` (assets) and `cage setup --wire-only` (hooks/MCP) are separate
+  invocations, and folding one into the other would misreport someone who
+  deliberately ran only one.
+- **No fabricated per-artifact version** — artifacts are stampless (the
+  stale-wiring investigation confirmed this); a version footer instead prints the
+  running `cage` version (+ `(zipapp)` tag), the bundled `[meta]` (`prices_version`/
+  `policy_version`), and the project `policy.toml [meta]` if one exists — the
+  honest "what's installed" answer without inventing data. Phase B
+  (version-stamping artifacts) stays a separate, later, not-yet-decided change.
+- **`--json` parity** — one data structure (`doctorcmd.wiring_report`), two
+  renderers (`render_wiring_text` / `json.dumps`), the house pattern. Plain `cage
+  doctor` is byte-unchanged (an additive flag; golden-covered in
+  `tests/test_output_spec.py`). Read-only and side-effect-free by construction —
+  nothing is ever executed or healed (`cage setup` still owns healing); a fresh
+  scan over `wiringscan.run()`'s scan, not a fork of it.
+- New `cage query wiring-inventory` concept entry.
+- Built from [docs/archive/v0.34-wiring-inventory.handoff.md](docs/archive/v0.34-wiring-inventory.handoff.md).
+
 ## v0.33.0 (2026-07-24) — Codex removed: cage is Claude Code · Copilot · Kiro
 
 A product/scope decision, **not** a capture-quality one — in the real ledger Codex was one

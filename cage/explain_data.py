@@ -762,6 +762,40 @@ REGISTRY: tuple[Explanation, ...] = (
         "n/a — describes a detection + repair mechanism, not a number.",
         kind="concept", plan_ref="§5"),
     Explanation(
+        # NB: keywords avoid the bare "wiring"/"stale"/"dead" stems already owned by
+        # `stale-wiring` — this entry is about the ITEMIZED VIEW, not the detection.
+        "wiring-inventory", ("wiring-inventory", "inventory", "installed-artifact",
+                             "partially-wired", "not-wired", "fully-wired"),
+        "what `cage doctor --wiring` lists and how it decides fully/partially/not wired",
+        "a browsable itemization of every artifact `cage setup` writes, grouped by\n"
+        "  scope (project vs global/user) and agent (claude/copilot/kiro — always\n"
+        "  `agents.SURFACES`, never a hand-written list). It renders wiringscan's\n"
+        "  enumeration + liveness (see `stale-wiring`) — it does not fork them.\n"
+        "  STATUS per row: current (a live verb / asset hash matches the bundle) ·\n"
+        "  stale (an installed skill/prompt/steering copy differs from the bundled\n"
+        "  original) · dead (a wiring command names a removed verb) · foreign (a\n"
+        "  non-cage artifact at a cage location — shown, never judged, e.g. a git\n"
+        "  post-commit hook without the cage marker).\n"
+        "  PER-AGENT VERDICT: needs healing (any dead command or stale asset for\n"
+        "  that agent — takes priority) > not wired (nothing present — purely\n"
+        "  informational, never a warning) > partially wired (some but not all of\n"
+        "  the agent's REQUIRED pieces present — names what's missing) > fully\n"
+        "  wired. 'Required' excludes a known gitignore exception (Kiro's project\n"
+        "  .kiro/settings/mcp.json must stay absolute, see `portable-wiring`) and\n"
+        "  the best-effort git hooks — their absence is normal, never a partial\n"
+        "  install. Skill/prompt/steering asset copies are shown informationally\n"
+        "  but never gate the verdict: `cage setup` (assets) and `cage setup\n"
+        "  --wire-only` (hooks/MCP) are separate invocations, so folding one into\n"
+        "  the other would misreport someone who deliberately ran only one.\n"
+        "  No per-artifact VERSION is shown — artifacts are stampless, so a\n"
+        "  fabricated version would be worse than none; the version footer (running\n"
+        "  cage, bundled [meta], project [meta]) is the honest answer instead.\n"
+        "  Read-only and side-effect-free: nothing is ever executed or healed\n"
+        "  (`cage setup` heals); `--json` carries the same status taxonomy.",
+        ("cage/wiringscan.py", "cage/doctorcmd.py", "cage/agents.py"),
+        "n/a — describes a diagnostic view, not a number.",
+        kind="concept", plan_ref="§5"),
+    Explanation(
         # NB: keywords avoid generic stems ("setup", "wiring") that would steal
         # queries from `overview`/`portable-wiring` — same discipline as above.
         "restricted-env", ("restricted-env", "restricted", "locked-down", "lockdown",
