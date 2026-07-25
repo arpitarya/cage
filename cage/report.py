@@ -7,7 +7,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from cage import convert, ledger, paths, prices, render
+from cage import convert, ledger, paths, policy, prices, render
+from cage.constants import TOKENS_PER_MILLION
 
 DIMENSIONS = ("route", "agent", "model", "provider", "day", "task")
 SAVINGS_DIMS = ("task", "agent")  # dims a receipt joins cleanly to (§3.1); others fuzzy
@@ -24,7 +25,20 @@ def _new_group() -> dict:
     # csv — plan §3.9): the text view warns from `unpriced_detail`; the CSV shows
     # the same gap per group so a spreadsheet can't publish an understated total.
     return {"calls": 0, "tokens_in": 0, "tokens_out": 0, "cached_in": 0, "usd": 0.0,
-            "unpriced_calls": 0, "unpriced_tokens": 0}
+            "cache_usd": 0.0, "unpriced_calls": 0, "unpriced_tokens": 0}
+
+
+def _cache_read_usd(pol: dict, provider: str, model: str, cached_in: int) -> float:
+    """F5 (docs/regression/2026-07-22-capture-report.md): the cache-read-billed
+    slice of a call's cost alone — `cached_in` tokens at the model's real
+    `cache_read` per-million rate, never a hardcoded discount fraction, so the
+    split stays correct if pricing changes. A component of `prices.call_cost_usd`'s
+    total, split out here (report-only concern) rather than growing `prices.py`
+    past its stated ≤50-line budget. Meaningful only for a call that priced through
+    a real row (exact/alias/family) — a `self`-priced or unpriced call has no
+    token-level cache split to report."""
+    p = policy.price(pol, provider, model)
+    return round(cached_in * p["cache_read"] / TOKENS_PER_MILLION, 6)
 
 
 def _team_rows(root: Path, team: bool):
@@ -138,6 +152,9 @@ def summarize(root: Path, pol: dict, dim: str = "route", since: str | None = Non
             kiro["tokens_out"] += c.get("tokens_out", 0)
         usd, match, key = prices.call_usd_match(pol, c)
         g["usd"] += usd
+        if match not in ("none", "self"):  # only a real price row has a token-level split
+            g["cache_usd"] += _cache_read_usd(pol, c.get("provider") or "",
+                                              c.get("model") or "", c.get("cached_in", 0))
         if match == "none":
             u = unpriced.setdefault(f"{c.get('provider') or '—'}/{c.get('model') or '—'}",
                                     {"calls": 0, "tokens": 0,
@@ -156,6 +173,7 @@ def summarize(root: Path, pol: dict, dim: str = "route", since: str | None = Non
              "tokens_in": sum(g["tokens_in"] for g in groups.values()),
              "tokens_out": sum(g["tokens_out"] for g in groups.values()),
              "cached_in": sum(g["cached_in"] for g in groups.values()),
+             "cache_usd": sum(g["cache_usd"] for g in groups.values()),
              "unpriced_calls": sum(g["unpriced_calls"] for g in groups.values()),
              "unpriced_tokens": sum(g["unpriced_tokens"] for g in groups.values())}
     unpriced_receipts = {"receipts": 0, "tokens": 0, "tools": set()}  # rung-3 refusals (§4.5)
@@ -425,6 +443,17 @@ def render_report(rep: dict, last_import: str | None = None, disp=None,
                                       for m, k in sorted(rep["alias"].items())))
         for rung, tool, key in rep.get("rung_models", []):
             foot.footnote(receiptprice.footnote(rung, tool, key))
+        t = rep["total"]
+        # F5 (docs/regression/2026-07-22-capture-report.md): a headline like
+        # "8.2B tokens, $7,046" reads as alarming when it's almost entirely
+        # prefix-cache re-reads billed at a discount. One line, real numbers —
+        # no other report structure changes.
+        if t.get("tokens_in"):
+            cache_tok_pct = render.pct(t.get("cached_in", 0), t["tokens_in"])
+            cache_usd_pct = render.pct(t.get("cache_usd", 0.0), t["usd"]) if t["usd"] else "—"
+            foot.caveat(f"· cache: {cache_tok_pct} of input tokens were cache reads, "
+                        f"{cache_usd_pct} of cost ({render.usd(t.get('cache_usd', 0.0))} "
+                        f"of {render.usd(t['usd'])})")
     if rep.get("kiro_input_only"):
         foot.caveat("· kiro: input-only log — cost understated" if disp.usd
                     else "· kiro: input-only log — tok out not recorded")

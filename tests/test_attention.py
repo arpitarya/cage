@@ -4,11 +4,12 @@ views — every number exact, every derive deterministic."""
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 
 from cage import (attention, calibration, cli, compare, hooks, humanview, ledger,
-                  metering, policy, schema, tasks, transcript, trend, verdict)
+                  metering, paths, policy, schema, tasks, transcript, trend, verdict)
 
 POL = {"human": {"rate_usd_per_hr": 60.0}}  # $1/min — makes USD arithmetic readable
 M = dict(route="chat", provider="anthropic", model="claude-opus-4-8", agent="claude-code")
@@ -287,3 +288,150 @@ def test_bundled_policy_leaves_idle_cap_to_the_constant():
     pol = policy.load(None)
     from cage.constants import IDLE_CAP_MINUTES
     assert attention.idle_cap_minutes(pol) == float(IDLE_CAP_MINUTES) == 10.0
+
+
+# ── F7: gap_ms observability (docs/regression/2026-07-22-capture-report.md) ──
+#
+# A low gap_ms count against the *total call-row* count reads as under-coverage,
+# but most call rows are tool-call iterations within one agentic turn — by design
+# only the first call after a genuine human turn is eligible. These tests assert
+# the debug event's counts reconcile exactly, so "coverage" is measurable against
+# the real denominator (human turns), not the misleading one (all call rows).
+
+def _gap_events(root):
+    log = paths.Footprint(root).debug_log
+    if not log.exists():
+        return []
+    out = []
+    for line in log.read_text(encoding="utf-8").splitlines():
+        r = json.loads(line)
+        if r.get("event") == "gap_ms":
+            out.append(r)
+    return out
+
+
+def test_no_root_no_logging_default_stays_byte_identical(tmp_path):
+    """Every existing caller of `parse_calls(path, session=...)` must keep working
+    unchanged — root/pol are additive and optional."""
+    tp = tmp_path / "s.jsonl"
+    tp.write_text(_rec("assistant", "2026-06-14T10:00:00Z", uuid="a1") + "\n",
+                  encoding="utf-8")
+    rows = transcript.parse_calls(tp, session="s")
+    assert len(rows) == 1  # unchanged behaviour with no root/pol supplied
+
+
+def test_debug_off_by_default_writes_nothing(tmp_path):
+    (tmp_path / ".cage").mkdir()
+    tp = tmp_path / "s.jsonl"
+    tp.write_text(_rec("user", "2026-06-14T10:00:00Z") + "\n"
+                  + _rec("assistant", "2026-06-14T10:00:05Z", uuid="a1") + "\n",
+                  encoding="utf-8")
+    transcript.parse_calls(tp, session="s", root=tmp_path)
+    assert not paths.Footprint(tmp_path).debug_log.exists()
+
+
+def test_gap_counts_reconcile_exactly_first_turn_and_stamped(tmp_path, monkeypatch):
+    monkeypatch.setenv("CAGE_DEBUG", "1")
+    (tmp_path / ".cage").mkdir()
+    tp = tmp_path / "s.jsonl"
+    tp.write_text("\n".join([
+        _rec("user", "2026-06-14T10:00:00Z"),                    # 1st human turn: no prev asst ts
+        _rec("assistant", "2026-06-14T10:00:05Z", uuid="a1"),
+        _rec("user", "2026-06-14T10:01:35Z"),                    # eligible: 90s gap
+        _rec("assistant", "2026-06-14T10:01:40Z", uuid="a2"),
+    ]) + "\n", encoding="utf-8")
+    transcript.parse_calls(tp, session="s", root=tmp_path)
+    events = _gap_events(tmp_path)
+    assert len(events) == 1
+    e = events[0]
+    assert e["human_turns"] == 2 and e["stamped"] == 1 and e["skip_first_turn"] == 1
+    assert e["skip_bad_ts"] == 0 and e["skip_negative_gap"] == 0
+    assert e["skip_superseded"] == 0 and e["skip_dangling_eof"] == 0
+    total = (e["stamped"] + e["skip_first_turn"] + e["skip_bad_ts"]
+            + e["skip_negative_gap"] + e["skip_superseded"] + e["skip_dangling_eof"])
+    assert total == e["human_turns"]  # every human turn is accounted for exactly once
+
+
+def test_negative_gap_is_logged_not_fabricated(tmp_path, monkeypatch):
+    monkeypatch.setenv("CAGE_DEBUG", "1")
+    (tmp_path / ".cage").mkdir()
+    tp = tmp_path / "s.jsonl"
+    tp.write_text("\n".join([
+        _rec("assistant", "2026-06-14T10:05:00Z", uuid="a1"),
+        _rec("user", "2026-06-14T10:04:00Z"),                    # clock disorder
+        _rec("assistant", "2026-06-14T10:06:00Z", uuid="a2"),
+    ]) + "\n", encoding="utf-8")
+    transcript.parse_calls(tp, session="s", root=tmp_path)
+    e = _gap_events(tmp_path)[0]
+    assert e["skip_negative_gap"] == 1 and e["stamped"] == 0
+
+
+def test_superseded_gap_is_logged_distinctly_from_a_loss(tmp_path, monkeypatch):
+    """Two human turns before any call consumes the first: the later, more
+    accurate gap wins — this is precedence, not data loss, and it must be
+    counted under its own name rather than silently disappearing."""
+    monkeypatch.setenv("CAGE_DEBUG", "1")
+    (tmp_path / ".cage").mkdir()
+    tp = tmp_path / "s.jsonl"
+    tp.write_text("\n".join([
+        _rec("assistant", "2026-06-14T10:00:00Z", uuid="a1"),
+        _rec("user", "2026-06-14T10:00:10Z"),                    # gap 1 (superseded)
+        _rec("user", "2026-06-14T10:00:20Z"),                    # gap 2 (wins)
+        _rec("assistant", "2026-06-14T10:00:30Z", uuid="a2"),
+    ]) + "\n", encoding="utf-8")
+    rows = transcript.parse_calls(tp, session="s", root=tmp_path)
+    # both gaps measure from the same prev_asst_ts (10:00:00); the fresher
+    # (second, 20s) human turn's gap is the one that survives to the call row.
+    assert rows[1]["gap_ms"] == 20_000
+    e = _gap_events(tmp_path)[0]
+    assert e["skip_superseded"] == 1 and e["stamped"] == 1 and e["human_turns"] == 2
+
+
+def test_dangling_gap_at_eof_is_logged_not_lost(tmp_path, monkeypatch):
+    """A human turn's gap computed, but the transcript ends before any further
+    call row can carry it — nothing to attach it to, not a bug."""
+    monkeypatch.setenv("CAGE_DEBUG", "1")
+    (tmp_path / ".cage").mkdir()
+    tp = tmp_path / "s.jsonl"
+    tp.write_text("\n".join([
+        _rec("assistant", "2026-06-14T10:00:00Z", uuid="a1"),
+        _rec("user", "2026-06-14T10:00:30Z"),                    # gap computed, never consumed
+    ]) + "\n", encoding="utf-8")
+    transcript.parse_calls(tp, session="s", root=tmp_path)
+    e = _gap_events(tmp_path)[0]
+    assert e["skip_dangling_eof"] == 1 and e["stamped"] == 0 and e["call_rows"] == 1
+
+
+def test_no_human_turns_emits_no_event(tmp_path, monkeypatch):
+    """A transcript with call rows but zero human turns (pure agentic continuation,
+    e.g. a resumed session fragment) has nothing to report — no event, not a
+    zeroed-out one, keeps the debug log free of noise-signal lines."""
+    monkeypatch.setenv("CAGE_DEBUG", "1")
+    (tmp_path / ".cage").mkdir()
+    tp = tmp_path / "s.jsonl"
+    tp.write_text(_rec("assistant", "2026-06-14T10:00:00Z", uuid="a1") + "\n",
+                  encoding="utf-8")
+    transcript.parse_calls(tp, session="s", root=tmp_path)
+    assert _gap_events(tmp_path) == []
+
+
+def test_real_transcript_reconciles_exactly(tmp_path, monkeypatch):
+    """The load-bearing proof: on an ACTUAL Claude Code transcript (not a synthetic
+    fixture), every human turn is accounted for by stamped + the named skip
+    reasons — nothing vanishes unexplained. Skipped (not a bug in the fixture
+    machinery) if no real transcript is available on this machine."""
+    import glob
+    monkeypatch.setenv("CAGE_DEBUG", "1")
+    (tmp_path / ".cage").mkdir()
+    candidates = glob.glob(str(Path.home() / ".claude/projects/*/*.jsonl"))
+    if not candidates:
+        pytest.skip("no real Claude transcript available on this machine")
+    real = Path(max(candidates, key=lambda p: Path(p).stat().st_size))
+    transcript.parse_calls(real, session="real", root=tmp_path)
+    events = _gap_events(tmp_path)
+    if not events:
+        pytest.skip("largest real transcript on this machine has no human turns")
+    e = events[0]
+    total = (e["stamped"] + e["skip_first_turn"] + e["skip_bad_ts"]
+            + e["skip_negative_gap"] + e["skip_superseded"] + e["skip_dangling_eof"])
+    assert total == e["human_turns"]

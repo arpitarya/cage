@@ -95,20 +95,37 @@ def _human_user_turn(rec: dict) -> bool:
     return True
 
 
-def parse_calls(transcript_path: Path, session: str = "") -> list[dict]:
+def parse_calls(transcript_path: Path, session: str = "",
+                root: Path | None = None, pol: dict | None = None) -> list[dict]:
     """One call row per assistant turn that carries usage. Tolerant of bad lines.
 
     `gap_ms` (plan §4.10): the first call row after each human user turn carries the
     wall-clock gap between the previous assistant turn's timestamp and that user
     turn's timestamp — the passive human-attention signal. Stamped only when both
     timestamps exist and parse and the gap is non-negative (an out-of-order clock is
-    dropped, never clamped into fake attention); every other row omits the field."""
+    dropped, never clamped into fake attention); every other row omits the field.
+
+    F7 (docs/regression/2026-07-22-capture-report.md): a low `gap_ms` count against
+    the *total call-row* count reads as under-coverage, but most call rows are
+    tool-call iterations *within* one agentic turn — by design only the first call
+    after a genuine human turn is eligible. ``root``/``pol`` (both optional, so
+    every existing caller stays byte-identical) turn on one summary
+    ``debuglog.event`` per parsed file recording the real denominator: how many
+    human turns were seen, how many resolved to a stamped gap, and — the DoD's
+    explicit ask — *why* each of the rest didn't, split by reason. The reasons
+    fully reconcile (``human_turns == stamped + every skip_* count``): a second
+    human turn before any call consumes the first is a legitimate *supersession*
+    (the fresher gap is the more accurate signal, not a loss), and a pending gap
+    with no more call rows before end-of-file is *dangling*, not lost data. Never
+    fabricate a gap to close a hole; log the hole instead."""
     if not transcript_path.exists():
         return []
     session = session or transcript_path.stem
     rows = []
     prev_asst_ts: _dt.datetime | None = None   # end of the last assistant turn seen
     pending_gap_ms: int | None = None          # computed at the human turn, spent on the next call
+    human_turns = stamped = 0
+    skip_first_turn = skip_bad_ts = skip_negative_gap = skip_superseded = 0
     for line in transcript_path.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line:
@@ -118,11 +135,20 @@ def parse_calls(transcript_path: Path, session: str = "") -> list[dict]:
         except ValueError:
             continue
         if _human_user_turn(rec):
+            human_turns += 1
             user_ts = _parse_ts(rec.get("timestamp"))
-            if user_ts is not None and prev_asst_ts is not None:
+            if user_ts is None:
+                skip_bad_ts += 1
+            elif prev_asst_ts is None:
+                skip_first_turn += 1  # the session's first turn — expected, not a miss
+            else:
                 gap = int((user_ts - prev_asst_ts).total_seconds() * 1000)
                 if gap >= 0:
+                    if pending_gap_ms is not None:
+                        skip_superseded += 1  # a fresher human turn beat an unconsumed gap
                     pending_gap_ms = gap
+                else:
+                    skip_negative_gap += 1  # out-of-order clock — dropped, never fabricated
             continue
         if rec.get("type") != "assistant":
             continue
@@ -136,8 +162,22 @@ def parse_calls(transcript_path: Path, session: str = "") -> list[dict]:
                             gap_ms=pending_gap_ms)
         prev_asst_ts = _parse_ts(rec.get("timestamp")) or prev_asst_ts
         if row:
+            if pending_gap_ms is not None:
+                stamped += 1
             pending_gap_ms = None  # spent on this call — one gap, one row
             rows.append(row)
+    if root is not None and human_turns:
+        skip_dangling_eof = 1 if pending_gap_ms is not None else 0  # transcript ended mid-gap
+        from cage import debuglog
+        try:
+            debuglog.event(root, pol=pol, event="gap_ms", session=session,
+                           human_turns=human_turns, call_rows=len(rows), stamped=stamped,
+                           skip_first_turn=skip_first_turn, skip_bad_ts=skip_bad_ts,
+                           skip_negative_gap=skip_negative_gap,
+                           skip_superseded=skip_superseded,
+                           skip_dangling_eof=skip_dangling_eof)
+        except Exception:  # fail-open: this visibility log must never break parsing
+            pass
     return rows
 
 

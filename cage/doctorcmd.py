@@ -179,6 +179,49 @@ def _capture_timeline(active: Path) -> tuple[str, str]:
                  + "".join(rows))
 
 
+def _capture_quality(root: Path) -> tuple[str, str]:
+    """Distinguishes a log-bearing agent that IS capturing rows from one whose
+    capture is present but nearly worthless — ``tokens_out == 0`` across every
+    recorded call (F3, docs/regression/2026-07-22-capture-report.md). Kiro's
+    on-disk log is coarse *by design* (module docstring, cage/transcript.py:
+    "output tokens often 0") and hits this in real use; the same signal is worth
+    surfacing for any agent, so the check is agent-agnostic in mechanism.
+
+    Deliberately **separate** from ``_metering``'s "installed but capturing
+    nothing" gate (``capture_warnings``, files==0). That gate stays silent for a
+    present-but-thin kiro log on purpose
+    (``test_kiro_present_but_empty_is_silent_not_broken``) — a coarse log is
+    normal, not broken. This check only fires once real rows exist and are
+    *still* nearly worthless, which is a different, narrower signal: not "capture
+    is off" but "capture is on and this is the ceiling — use the proxy."
+
+    Read-only from the ledger, like ``_capture_timeline`` (doctor never sweeps —
+    §8/§10); informational, never fails doctor outright."""
+    try:
+        calls = ledger.calls(root)
+    except Exception:  # noqa: BLE001 — a broken ledger is reported by other checks
+        return _OK, "capture quality unavailable (ledger read failed)"
+    per_agent: dict[str, dict] = {}
+    for c in calls:
+        a = agents.row_surface(c.get("agent"))
+        if a not in agents.SURFACES:
+            continue
+        g = per_agent.setdefault(a, {"calls": 0, "tokens_in": 0, "tokens_out": 0})
+        g["calls"] += 1
+        g["tokens_in"] += c.get("tokens_in", 0)
+        g["tokens_out"] += c.get("tokens_out", 0)
+    thin = [(a, g) for a, g in per_agent.items() if g["calls"] and g["tokens_out"] == 0]
+    if not thin:
+        return _OK, "every capturing agent's log carries real output-token data"
+    lines = []
+    for a, g in sorted(thin):
+        lines.append(f"\n      · {a}: {g['calls']:,} call(s), {g['tokens_in']:,} input "
+                     f"token(s), 0 output — coarse/input-only capture. Higher-fidelity: "
+                     f"cage data meter -- <{a} cmd>  (see `cage data proxy`)")
+    return _WARN, ("capture is present but token-thin (input-only log, by design "
+                   "for some agents):" + "".join(lines))
+
+
 def _pricing(root: Path) -> tuple[str, str]:
     """Scan recorded calls for models that bill $0 with no exact *or* family price
     row — the silent-$0 sharp edge. A wrong $0 must read as UNPRICED here, not hide."""
@@ -651,6 +694,7 @@ def run(root: Path) -> dict:
         ("wiring", *_wiring(scan)),
         ("metering", *_metering(active)),
         ("timeline", *_capture_timeline(active)),
+        ("capture-quality", *_capture_quality(active)),
         ("trace", *_capture_trace(active)),
         ("interceptor", *_interceptor(root, scan)),
         ("receipts", *_receipts(active, scan)),

@@ -378,7 +378,7 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
 ## Dev
 
 ```bash
-just test          # python -m pytest -q   (877 passing)
+just test          # python -m pytest -q   (902 passing)
 just demo          # seed §4.4 + print attrib/matrix
 cage --version
 ```

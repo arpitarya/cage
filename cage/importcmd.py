@@ -297,7 +297,8 @@ def import_claude(root: Path, args, *, pol: dict | None = None, seen: set | None
         files = _scan(root, "claude", src, pattern, getattr(args, "since", None), pol=pol,
                       agent_cursor=agent_cursor, health=health)
         total_rows += _ingest(root, "claude", src, files,
-                              lambda f: transcript.parse_calls(f, session=f.stem),
+                              lambda f: transcript.parse_calls(f, session=f.stem,
+                                                               root=root, pol=pol),
                               pol=pol, seen=seen, agent_cursor=agent_cursor)
         total_files += len(files)
     return total_rows, total_files
@@ -372,6 +373,28 @@ def import_copilot(root: Path, args, *, pol: dict | None = None, seen: set | Non
     return total_rows, total_files
 
 
+def _log_kiro_src(root: Path, src: Path, *, pol: dict | None = None) -> None:
+    """F3 visibility (docs/regression/2026-07-22-capture-report.md): one debug event
+    per import run recording the resolved kiro `src`'s raw state — existed?, byte
+    size, rows parsed, tokens summed. Read **unconditionally**, independent of the
+    incremental cursor, so "found but empty/thin" stays visible on every run even
+    when the cursor would otherwise skip an unchanged file — the failure mode F3
+    named ("no logging to distinguish 'empty' from 'never checked'"). Kiro's log is
+    a single small file by design (coarse capture), so a second parse pass here is
+    cheap; the same approach does not apply to claude/copilot's larger transcript
+    sets. Counts/paths only — never token content (PII guard). Fail-open."""
+    try:
+        exists = src.exists()
+        size = src.stat().st_size if exists else 0
+        rows = transcript.parse_kiro_calls(src) if exists else []
+        tin = sum(r.get("tokens_in", 0) for r in rows)
+        tout = sum(r.get("tokens_out", 0) for r in rows)
+        debuglog.event(root, pol=pol, event="kiro-src", src=str(src), exists=exists,
+                       bytes=size, rows_parsed=len(rows), tokens_in=tin, tokens_out=tout)
+    except Exception as e:  # fail-open: this visibility log must never break import
+        debuglog.exception(root, "import.kiro-src", e, pol=pol)
+
+
 def import_kiro(root: Path, args, *, pol: dict | None = None, seen: set | None = None,
                 agent_cursor: dict | None = None, health: dict | None = None) -> tuple[int, int]:
     """Meter Kiro from its append-only usage log (kiro.kiroagent/dev_data/
@@ -380,6 +403,7 @@ def import_kiro(root: Path, args, *, pol: dict | None = None, seen: set | None =
                else [(s.path, s.glob) for s in paths.agent_log_sources("kiro", pol)])
     total_rows = total_files = 0
     for src, pattern in sources:
+        _log_kiro_src(root, src, pol=pol)
         files = _scan(root, "kiro", src, pattern, getattr(args, "since", None), pol=pol,
                       agent_cursor=agent_cursor, health=health)
         total_rows += _ingest(root, "kiro", src, files, lambda f: transcript.parse_kiro_calls(f),

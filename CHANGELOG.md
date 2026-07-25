@@ -2,6 +2,56 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
+## v0.35.0 (2026-07-24) — capture-report follow-ups: Kiro visibility, cache honesty, gap_ms observability
+
+Closes the three low-priority findings the 2026-07-22 capture report parked (F3,
+F5, F7) — none a capture-loss bug, each small and additive.
+
+- **F3 — `cage doctor` distinguishes "capturing but token-thin" from healthy**
+  (`doctorcmd._capture_quality`). Any agent with calls captured but
+  `tokens_out == 0` across all of them now warns and points at the higher-fidelity
+  proxy path (`cage data meter -- <cmd>` / `cage data proxy`). Deliberately
+  **separate** from the existing "installed but capturing nothing" gate (files==0)
+  — a genuinely-empty log stays silent as designed; this is the narrower, distinct
+  signal for a log that IS matching rows but they're nearly worthless. Verified
+  against this machine's real Kiro log (16 calls, 198 input, 0 output — an exact
+  match to the report's evidence). Also resolves the report's open path question:
+  the macOS Kiro CLI (`/usr/local/bin/kiro`) is a launcher for the same `Kiro.app`
+  (a VS Code fork) — there is no separate CLI-Kiro data store, so the existing
+  `~/Library/Application Support/Kiro/...` path is correct and unambiguous.
+  Import-time visibility added too: one `debuglog.event(event="kiro-src", ...)`
+  per import run, read **unconditionally** (independent of the incremental
+  cursor) so "found but thin" never hides behind a no-op cursor-skipped run.
+- **F5 — `report --usd` shows the cache-vs-fresh split.** One new footer line:
+  `· cache: N% of input tokens were cache reads, M% of cost ($x of $y)`. The cost
+  split uses the model's real `cache_read` price row (resolved via
+  `policy.price`, `report._cache_read_usd`) — never a hardcoded 0.1× — so it
+  stays correct if pricing changes. No table/column/CSV structure change; a
+  `$7,046` headline that's 98% prefix-cache re-reads no longer reads as alarming
+  without the split that explains it.
+- **F7 — `gap_ms` coverage was measured, not fixed** (there was nothing to fix).
+  The 2026-07-22 report's "~1% of rows" reads as under-coverage but compares
+  against the wrong denominator: only the first call after a genuine human turn
+  is ever eligible, and most call rows are tool-call iterations inside one
+  agentic turn that were never supposed to carry a gap. Reimplemented the gap
+  logic as a probe and ran it against all 141 real Claude transcripts on the
+  reporting machine — reproduces the evidence exactly (371/36,322) and traces
+  every human turn's fate: legitimate first-turn skips, genuine clock-disorder
+  skips, or a fresher human turn correctly superseding an unconsumed gap. Nothing
+  is unexplained. `transcript.parse_calls` gains optional `root`/`pol` params
+  (both `None` by default — every existing caller stays byte-identical); when
+  set, one summary `debuglog.event(event="gap_ms", ...)` per parsed file records
+  `human_turns`/`stamped`/every named skip reason, reconciling exactly
+  (`human_turns == stamped + Σ skip_*`, proven on a real transcript). No gap is
+  ever fabricated to raise the number — the report's own line in the wall
+  against exactly that stays intact.
+- `docs/regression/2026-07-22-capture-report.md`: F3/F5/F7 marked ✅ resolved
+  in place, with F7's corrected framing (recommended coverage denominator:
+  `stamped / (human_turns − skip_first_turn − skip_negative_gap)` ≈ 88% on the
+  measured machine, not "~1%").
+- Built from
+  [docs/archive/v0.35-phase3-deferred-findings.handoff.md](docs/archive/v0.35-phase3-deferred-findings.handoff.md).
+
 ## v0.34.0 (2026-07-24) — `cage doctor --wiring`: the installed-artifact inventory
 
 A browsable itemization of every cage-installed artifact — project **and**

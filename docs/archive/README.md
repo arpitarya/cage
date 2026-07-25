@@ -50,6 +50,7 @@ release that shipped the work: `vX.Y-<feature>.{handoff,prompt}.md`.
 | v0.32 | Stale-wiring liveness (detect + heal an orphaned dead verb) | [handoff](v0.32-stale-wiring.handoff.md) | [prompt](v0.32-stale-wiring.prompt.md) | [v0.32.0](../../CHANGELOG.md#v0320-2026-07-24--stale-wiring-liveness-detect--heal-orphaned-wiring) |
 | v0.33 | Codex removal (cage is claude/copilot/kiro) | [handoff](v0.33-codex-removal.handoff.md) | [prompt](v0.33-codex-removal.prompt.md) | [v0.33.0](../../CHANGELOG.md#v0330-2026-07-24--codex-removed-cage-is-claude-code--copilot--kiro) |
 | v0.34 | Installed-artifact inventory (`cage doctor --wiring`) | [handoff](v0.34-wiring-inventory.handoff.md) | — | [v0.34.0](../../CHANGELOG.md#v0340-2026-07-24--cage-doctor---wiring-the-installed-artifact-inventory) |
+| v0.35 | Capture-report follow-ups (F3 Kiro visibility, F5 cache split, F7 gap_ms observability) | [handoff](v0.35-phase3-deferred-findings.handoff.md) | [prompt](v0.35-phase3-deferred-findings.prompt.md) | [v0.35.0](../../CHANGELOG.md#v0350-2026-07-24--capture-report-follow-ups-kiro-visibility-cache-honesty-gap_ms-observability) |
 
 ## Superseded drafts & research inputs
 

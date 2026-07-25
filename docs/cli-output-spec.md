@@ -69,6 +69,7 @@ TOTAL        8  3,579,533  157,412  $12.4308 (+ unpriced)  $0.9340  -$11.4968
 ≈ priced by family (approximate — no exact price row):
   copilot/claude-sonnet-4.6 → claude-sonnet-4-6
 ≈ graphify priced at task model (anthropic/claude-sonnet-4-6)
+· cache: 0% of input tokens were cache reads, 0% of cost ($0.0000 of $12.4308)
 · kiro: input-only log — cost understated
 ⚠ 2 calls (164,353 tokens) UNPRICED — totals understated
   fix: cage prices alias - 'copilot/auto' --to <provider>/<model>   # route the router pseudo-model explicitly
@@ -94,6 +95,7 @@ TOTAL        2  2,880,411  157,412  $11.0024
 
 ≈ priced by family (approximate — no exact price row):
   copilot/claude-sonnet-4.6 → claude-sonnet-4-6
+· cache: 0% of input tokens were cache reads, 0% of cost ($0.0000 of $11.0024)
 · no savings receipts in this window — wire a tool to measure savings
   (`cage query receipts` explains)
 ```
@@ -115,6 +117,7 @@ TOTAL                          8  3,579,533  157,412  $12.4308 (+ unpriced)
 
 ≈ priced by family (approximate — no exact price row):
   copilot/claude-sonnet-4.6 → claude-sonnet-4-6
+· cache: 0% of input tokens were cache reads, 0% of cost ($0.0000 of $12.4308)
 · kiro: input-only log — cost understated
 ⚠ 2 calls (164,353 tokens) UNPRICED — totals understated
   fix: cage prices alias - 'copilot/auto' --to <provider>/<model>   # route the router pseudo-model explicitly

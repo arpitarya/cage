@@ -215,7 +215,7 @@ cage data export --csv calls --since 30d -o calls.csv   # raw ledger rows for a 
 
 ## The `$0` guarantee
 
-Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 877 tests passing; `cage demo` reproduces the worked attribution example against a real ledger.
+Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 902 tests passing; `cage demo` reproduces the worked attribution example against a real ledger.
 
 **Honest limits.** Cage doesn't decide your human rate — it prices minutes at a blended rate you set, and labels the result `estimated` so it never pretends to be a timesheet. Marginal-by-fixed-order is defensible and `$0`, but it is an *ordering convention*, not a Shapley value (that's a deferred audit mode). And a counterfactual cell is an honest reconstruction, never an invoice — the `method` column says so on every row, on purpose.
 
@@ -223,7 +223,7 @@ Every derived view is parse / arithmetic over the log — **no LLM call, ever, o
 
 Latest release below — full history and detail in [CHANGELOG.md](CHANGELOG.md).
 
-- **v0.34.0 (2026-07-24) — `cage doctor --wiring`: the installed-artifact inventory.** A browsable itemization of every cage-installed artifact (hooks, MCP configs, skill/prompt/steering copies) across project and global/user scope, with a current/stale/dead/foreign status per row and a per-agent fully/partially/not-wired verdict — driven off `agents.SURFACES`, never a hand-written agent list. Read-only, `--json` parity, no fabricated per-artifact version. See [CHANGELOG.md](CHANGELOG.md) for the full accounting.
+- **v0.35.0 (2026-07-24) — capture-report follow-ups: Kiro visibility, cache honesty, gap_ms observability.** `cage doctor` now distinguishes an agent that's *capturing but token-thin* (e.g. Kiro's input-only log) from a genuinely healthy one, and points at the higher-fidelity proxy path. `report --usd` adds a cache-vs-fresh split line, priced off each model's real cache-read rate — never a hardcoded discount — so a headline that's mostly 0.1×-billed prefix-cache reads no longer reads as alarming. And the human-attention axis's `gap_ms` "coverage" turned out to be measured against the wrong denominator all along: verified against every real transcript on the reporting machine, with the fix being *observability* (every skip reason now named and reconciles exactly), not a parser change. See [CHANGELOG.md](CHANGELOG.md) for the full accounting.
 
 ## The name
 

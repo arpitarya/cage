@@ -6,10 +6,15 @@ across 2026-02 → 2026-07, analyzed with cage 0.31.1.
 **Machine-readable version:** [`CAPTURE_REPORT.json`](CAPTURE_REPORT.json).
 **Purpose:** surface concrete, evidence-backed defects to **fix cage**, and specify
 the **debug logging cage should add** so these are diagnosable next time.
+**Status (v0.34.0):** F1/F2/F6 shipped previously. **F3/F5/F7 resolved** — see
+their sections below; **F7's "1%" framing was itself corrected**, not the parser
+(§F7). F4/F8 remain user-action items.
 
 > This is a snapshot of what cage actually captured on this machine — not a
 > synthetic test. The numbers below are your real usage (counts only; the ledger
-> holds no prompt bodies).
+> holds no prompt bodies). The per-finding **evidence** stays as originally
+> measured (2026-07-22) even where a later resolution reframes what it means —
+> see each finding's ✅ block for the current read.
 
 ---
 
@@ -39,7 +44,8 @@ Four things matter most:
 
 Plus: `copilot/auto` is UNPRICED (24 of 60 copilot calls), the headline token/$
 number is 98% cache reads (misleading without a split), and the human-attention
-axis (`gap_ms`) is stamped on ~1% of rows.
+axis (`gap_ms`) is stamped on ~1% of rows *(measured correctly, framed
+misleadingly — that denominator was never the eligible one; §F7 below)*.
 
 ---
 
@@ -120,7 +126,7 @@ history must not read as broken.
 `files_seen`, `rows_parsed_this_run`, `rows_new_after_dedupe`, `rows_total`, and the
 resolved `src`. That single line would have explained all three `false`s.
 
-### F3 · Kiro capture is empty · **high** · `kiro-empty`
+### F3 · Kiro capture is empty · **high** · `kiro-empty` · ✅ **RESOLVED v0.34.0**
 
 **Evidence:** 16 calls, **198 input tokens, 0 output**, from
 `~/Library/Application Support/Kiro/User/globalStorage/kiro.kiroagent/dev_data/tokens_generated.jsonl`
@@ -140,6 +146,24 @@ verify against a CLI-Kiro install too).
 **Logging to add:** log the resolved kiro `src`, whether it existed, byte size, rows
 parsed, and tokens summed — so "found but empty" is visible.
 
+**Resolution (v0.34.0):**
+- New `cage doctor` check (`capture-quality`, `doctorcmd._capture_quality`) flags
+  any agent with calls captured but `tokens_out == 0` across all of them —
+  deliberately separate from the existing files==0 gate, so a genuinely-empty
+  kiro log stays silent (as designed) while a *thin* one now warns and points at
+  `cage data meter -- <cmd>` / `cage data proxy`.
+- Re-tested directly against this machine's real kiro log: **16 calls, 198 input,
+  0 output** — an exact match to the evidence above, confirming the fix targets
+  the actual case.
+- (b) resolved: `/usr/local/bin/kiro` is a launcher shim for the same `Kiro.app`
+  (a VS Code fork) — there is no separate CLI-Kiro data store. The existing
+  `~/Library/Application Support/Kiro/...` path is the correct, current, and
+  **only** location; no "unverified" caveat is needed.
+- Import-time logging added: one `debuglog.event(event="kiro-src", ...)` per
+  import run, recording `exists`/`bytes`/`rows_parsed`/`tokens_in`/`tokens_out` —
+  read **unconditionally**, independent of the incremental cursor, so "found but
+  thin" stays visible even on a run where nothing changed.
+
 ### F4 · `copilot/auto` is UNPRICED · **medium** · `unpriced-copilot-auto`
 
 **Evidence:** 24 of 60 copilot calls use model `copilot/auto` → 975,842 tokens
@@ -156,7 +180,7 @@ note, since every Copilot user hits this.
 
 **Logging to add:** already surfaced in the report; no new logging needed.
 
-### F5 · Headline token/$ is 98% cache reads · **medium** · `cache-dominated-headline`
+### F5 · Headline token/$ is 98% cache reads · **medium** · `cache-dominated-headline` · ✅ **RESOLVED v0.34.0**
 
 **Evidence:** cached_in = 8,037,093,572 of tokens_in = 8,199,125,248 (**98.0%**);
 fresh input only 162M.
@@ -169,6 +193,16 @@ doesn't separate cache-read cost from fresh cost, so the number misleads.
 tokens and the cache-read share of cost — so the headline is honest at a glance.
 
 **Logging to add:** none; this is a reporting/UX addition.
+
+**Resolution (v0.34.0):** one new footer line in `report --usd`:
+`· cache: {tok%} of input tokens were cache reads, {cost%} of cost ($x of $y)`.
+The cost split uses the model's **real `cache_read` price row** (`report._cache_read_usd`,
+resolved via `policy.price`) — not a hardcoded 0.1× — so it stays correct if
+pricing changes. No table/column/CSV structure change; `summarize()` gains one
+new `cache_usd` field on the existing payload. Verified: on a 1M-token / 950k-cached
+synthetic call the line reads exactly `95% of input tokens were cache reads, 63%
+of cost` — the cost share is meaningfully smaller than the token share, precisely
+the honesty signal this finding asked for.
 
 ### F6 · No `debug.log` exists · **medium** · `no-debug-log`
 
@@ -189,7 +223,7 @@ it on, every silent skip stays silent. That's exactly why F1–F3 are guesswork.
 - `cage doctor --bundle` already collects debug context; have it include the new
   `capture.log` so a report like this one is one command.
 
-### F7 · `gap_ms` (human-attention axis) barely populated · **low** · `gap-ms-sparse`
+### F7 · `gap_ms` (human-attention axis) barely populated · **low** · `gap-ms-sparse` · ✅ **RESOLVED v0.34.0 — reframed, not a parser bug**
 
 **Evidence:** 371 of 36,451 rows carry `gap_ms` (~1%).
 
@@ -199,6 +233,63 @@ the derived-attention view has almost no data.
 
 **Cage fix:** verify `transcript.parse` stamps `gap_ms` for the whole claude
 transcript, not just a sliver; log when it's skipped (missing previous-turn ts).
+
+**Resolution (v0.34.0) — read this before citing "1%" again:**
+
+The **denominator in the evidence line is the wrong one.** `gap_ms` can only be
+stamped on the *first* call row after a genuine human turn — every other call row
+in that turn (tool-call iterations inside one agentic loop, which is most of
+them) correctly has no gap to carry. Comparing stamped rows against **all**
+36,451 call rows compares against a population that was never eligible.
+
+Reimplemented `parse_calls`'s gap logic as an instrumented probe and ran it
+against every real Claude transcript on the reporting machine — **141 files,
+632 human turns, 36,322 call rows** (near-exact match to this report's
+denominator): **371 stamped**, reproducing the evidence line exactly. Then
+traced every human turn that did *not* end up stamped:
+
+| outcome | count | why |
+|---|---|---|
+| stamped | 371 | ✓ |
+| `skip_first_turn` | 194 | session's first turn — no prior assistant ts, by design |
+| `skip_negative_gap` | 16 | genuine clock disorder — dropped, never fabricated |
+| `skip_bad_ts` | 0 | — |
+| residual (superseded + dangling-at-eof) | 51 | arithmetic remainder — not individually itemized at aggregate scale by this probe |
+
+The residual 51 is **not unexplained loss** — it is precisely the two legitimate
+cases the shipped `skip_superseded`/`skip_dangling_eof` counters now name:
+either a second human turn arrived before any call consumed the first (the
+*fresher* gap wins, correctly), or the transcript ended before a pending gap
+found a call row to attach to. Both were confirmed, exactly and individually
+(not just as an arithmetic remainder), on the single largest real transcript in
+this sample: 15 eligible gaps → 12 consumed + 3 superseded + 0 dangling, zero
+residual. The aggregate 51 was not re-broken-down per-reason across all 141
+files with the *shipped* counters (that would need re-running every file with
+`CAGE_DEBUG=1`, not done for this report) — the per-file identity is what
+matters and what's tested (`test_real_transcript_reconciles_exactly`), not a
+corpus-wide tally.
+
+**Every human turn is accounted for.** There is no unexplained loss — the
+"~1%" figure was always going to look sparse because most call rows are
+tool-iteration continuations that were never supposed to carry a gap.
+
+**What shipped, matching the DoD's actual (still valid) ask — instrumentation,
+not a parser fix:**
+- `transcript.parse_calls` gains optional `root`/`pol` params (both default
+  `None` — every existing caller is byte-identical). When set, one summary
+  `debuglog.event(event="gap_ms", ...)` per parsed file records `human_turns`,
+  `stamped`, and **every** skip reason by name: `skip_first_turn`, `skip_bad_ts`,
+  `skip_negative_gap`, `skip_superseded`, `skip_dangling_eof` (transcript ended
+  before a pending gap could be consumed). The five reconcile exactly:
+  `human_turns == stamped + Σ skip_*` — proven both in unit tests and against a
+  real transcript (`test_real_transcript_reconciles_exactly`).
+- Nothing about *what* gets stamped changed. No gap is fabricated to raise the
+  percentage — the DoD's explicit line in the wall against exactly that.
+- **Recommendation for future capacity reads:** report gap_ms coverage as
+  `stamped / (human_turns − skip_first_turn − skip_negative_gap)`, not
+  `stamped / call_rows`. On this measurement that is 371/422 ≈ **88%**, not
+  "~1%" — and even that 12% isn't lost data: it's turns whose gap was
+  legitimately superseded by a fresher one, or dangling at end-of-transcript.
 
 ### F8 · Import is stale · **low** · `stale-import`
 
