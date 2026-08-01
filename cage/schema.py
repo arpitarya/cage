@@ -67,7 +67,7 @@ def make_call(*, route: str, provider: str, model: str, tokens_in: int = 0,
     attribution axis* (`cage report --project`, plan §3.7), deliberately separate from
     `scope` (the monorepo top-level dir). Basename only, never a full path (the same PII
     guard as `scope`/tasks). Only logs that carry the cwd can set it (Claude transcripts
-    do; Copilot/Kiro/Codex leave it empty), so an empty `project` is the legacy contract.
+    do; Copilot/Kiro leave it empty), so an empty `project` is the legacy contract.
 
     Four more additive-optional fields (import-ledger plan §2.1), each **omitted when
     at its default** so an unstamped row stays byte-identical to the legacy contract,

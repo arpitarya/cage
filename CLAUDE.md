@@ -28,10 +28,13 @@ changelog entry.
 record_call / record_receipt  →  .cage/ledger/{calls,receipts,tasks}-YYYY-MM.jsonl  (+ legacy *.jsonl)
         (meter, plan §5)                      │           · provenance.jsonl (unpartitioned buffer)
                                               ▼  derive ($0, no model)
-  cage.toml (prices/order/budgets)       → report · attrib · matrix · budget · roi
-                                             · compare · verdict · why · origin
+  cage.toml (order/budgets/routing)      → report · attrib · matrix · budget · roi
+  + prices.toml (model prices, [credits])   · compare · verdict · why · origin
                                              + --scope (monorepo slice) · --team · ledger-sync (§3.6)
 ```
+
+Prices live in `prices.toml`; a legacy in-`cage.toml` prices block still reads via the
+fallback. **Vendor facts move, routing decisions stay.**
 
 Long-lived logs are month-partitioned (writers append to a dated shard chosen from
 the row's own `ts`; readers glob + concatenate, legacy single files still read; `--since`
@@ -59,9 +62,25 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   (`pricestoml`/`policysync`) and `cleanup.NEVER` (which protects **both** names) follow
   it. Bundled default `data/cage.toml`, read-only at runtime. `cage query config-file`
   explains it.
+- **Prices file** ([paths.py](cage/paths.py) `Footprint.prices`) — model prices are a
+  **vendor rate card** with the opposite lifecycle to policy (replaced wholesale by
+  `cage prices sync`, never hand-preserved), so they live in `.cage/prices.toml`:
+  every `[prices.<provider>.<model>]` row, `[credits]`, and the `[meta]
+  prices_version/prices_date` counters. `cage.toml` keeps the **routing decisions**
+  (`[alias]`, `[tools.<tool>] price_at`) and `[meta] cage_version/policy_version` —
+  **vendor facts move, routing decisions stay.** The split is **non-breaking**:
+  `prices.toml` → legacy in-`cage.toml` prices → bundled default, resolved in ONE
+  place (`Footprint.prices`); `cage setup` migrates a legacy inline block
+  **money-neutrally** (idempotent, non-destructive); both present ⇒ `prices.toml`
+  wins (`cage doctor` names the shadowed block, one-line stderr warning at load).
+  `policy.load` still returns ONE merged dict, so every pricing consumer
+  (`prices.call_usd`, `policy.price_match`, `convert`, `receiptprice`) is unchanged.
+  `[meta]` splits **per key** — a mis-split silently stops a staleness check firing.
+  `cage query prices-file` explains it.
 - **Constants** ([constants.py](cage/constants.py)) — the *third audit layer*. Cage
   keeps its numbers in three places, never mixed: **contract** = the enums in
-  `schema.py`; **policy** = user-economics in `cage.toml`; **constants** = code
+  `schema.py`; **policy** = user-economics in `cage.toml` (routing) + `prices.toml`
+  (the vendor rate card half of that layer); **constants** = code
   heuristics not meant as config but that must be reviewable (`CHARS_PER_TOKEN`,
   `TOKENS_PER_MILLION`, `MAX_MATRIX_TOOLS`, `METHOD_TRUST`, `DEFAULT_CONFIDENCE`,
   `GRAPHIFY_RECEIPT_CONFIDENCE`, `SINCE_WINDOW_DAYS`,
@@ -236,6 +255,22 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   pytest tests/test_output_spec.py`). (The generated `docs/cli-output-spec.md` and
   its `tools/docgen` generator were removed in the hookless rebuild; the goldens
   remain the contract.)
+- **OTel GenAI export** ([otelout.py](cage/otelout.py), plan/handoff
+  `docs/archive/v0.39-otel-export.handoff.md`) — `cage data export --otel`, a third
+  one-way REPORTING format beside `--csv`/`--study` (never an import source; the
+  fleet bundle stays jsonl). Calls map to `gen_ai.system` / `gen_ai.request.model` /
+  `gen_ai.usage.input_tokens` / `output_tokens` / `gen_ai.client.operation.duration`
+  (omitted, never a fabricated zero, when `latency_ms` is unknown). **The GenAI
+  semantic conventions are pre-stable** (own repo, no 1.0, names can still change) —
+  the targeted version is pinned in `constants.OTEL_SEMCONV_VERSION` and stamped in
+  every document's `cage.meta` block; a spec bump is a deliberate, changelog'd
+  change, same discipline as `prices_version`. **Receipts/savings have no GenAI
+  equivalent** — cage-namespaced under `cage.savings[].cage.*`, never an invented
+  `gen_ai.*` name; `cage.saved` is GROSS, `cage.saved_usd` prices through the same
+  `receiptprice` ladder every other view uses and is omitted (never `$0`) on an
+  UNPRICED refusal or a non-money unit; `cage.method` always survives. `dependencies
+  = []` unchanged — stdlib `json` only, no OTel SDK. `cage query otel-export`
+  explains it.
 - **Display honesty** ([display.py](cage/display.py)) — the ONE display-context
   home (plan Phases 1+2). `Display` carries the resolved presentation switches
   (`usd`: tokens are the default, dollars opt-in — flag > env `CAGE_USD` >
@@ -279,6 +314,14 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   there as a wiring bug, not a lint nit. See the wiring-liveness paragraph above: a
   verb deleted outright (never added to `REMOVED`) is the harder case the live-parser
   detector exists to catch.
+- **`paths.py` splits on contact, never wholesale.** The next change that touches one
+  of its concerns moves that concern out *with* it. Named seams: `routing.py`
+  (`kiro_routed` + `canonical_ledger` + `resolve_root` precedence) · `logsources.py`
+  (registry + `resolve_log_sources` + drift) · `agenthomes.py` (`claude_home` /
+  `copilot_home` / `kiro_home` + the doctor-bundle env allowlist) · `footprint.py`.
+  Pure moves with re-exports from `paths` — no behaviour change, no import breakage.
+  **A deletion and a move never share a diff** (CODEX-OUT's verdict): if the touching
+  change is a removal, do the removal, and leave the seam for the next one.
 - **`[meta] cage_version` is the package version, always** — it is *printed* by
   `cage prices list` and *copied into every newly scaffolded project*, so a stale literal
   propagates. Derive it from `cage.__version__` (the `manifest.py` pattern), never
@@ -329,8 +372,14 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
 - **Pricing is managed** ([pricescmd.py](cage/pricescmd.py), [pricestoml.py](cage/pricestoml.py),
   plan §3.3) — `cage prices list|unpriced|set|alias|sync` manages the project
   `[prices]`/`[alias]` tables; writes are text surgery (in-place value edits marked
-  `# cage:custom`, or a deterministic cage-managed block) — never a whole-file rewrite,
-  and the bundled `data/cage.toml` is read-only at runtime. `policy.price_match`
+  `# cage:custom`, or a deterministic cage-managed block) — never a whole-file rewrite.
+  Writes are a **two-file** split: `cage prices set`/`sync` write **`prices.toml`**
+  (vendor facts); `alias`/`route-tool` write **`cage.toml`** (routing decisions).
+  `cage prices sync` replaces the cage-managed region of `prices.toml` while
+  `# cage:custom` rows survive; `cage policy sync` is unambiguously `cage.toml`-only.
+  The bundled defaults are read-only at runtime and ship split as `data/cage.toml`
+  + `data/prices.toml` (both resolve from the zipapp via `paths.bundled_data()`).
+  `policy.price_match`
   resolves exact → alias → family over *normalized* ids (`copilot/` route-prefix strip —
   a closed list; `.`↔`-` folding; effort suffixes low/medium/high/max drop); a normalized
   match renders `family`, an alias renders `alias`, **never `exact`** (method law), and a
@@ -347,8 +396,8 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
 - **State cleanup is a closed allowlist, and deletion is manual-only (v0.37)**
   ([cleanup.py](cage/cleanup.py), plan §3.6.4) — aged debug.log/hooks-seen rows, stale
   `pending-*` buffers, orphan cursors, `*.tmp`; never ledger/ (tool savings included —
-  see below), cage.toml (and legacy policy.toml), machine.json, study.jsonl, limits.json
-  (by construction). **Deletion only ever happens via an explicit `cage data cleanup
+  see below), cage.toml (and legacy policy.toml), prices.toml, machine.json,
+  study.jsonl, limits.json (by construction). **Deletion only ever happens via an explicit `cage data cleanup
   --apply`**, which runs regardless of `[cleanup] enabled` — an explicitly-typed command
   is always honored. The auto path (piggybacked on `importcmd.run`/session-end,
   throttled, fail-open, `cleanup.prune` debug context) only ever **warns**, once per
@@ -372,6 +421,17 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   parked, not lost; it graduates to a compare doc or plan entry when picked up
   (and keeps a `# v2:` idea out of the code). A settled fork graduates to a plan
   entry and, on ship, an ADR; the compare doc stays as the evidence behind it.
+- **Deleting a doc is a citation migration, not just a file removal** — the prose
+  twin of the removed-verb rule. Source comments cite docs by path (`docs/x.md`), and
+  a deleted doc leaves those pointers dangling **silently**: nothing fails, and a
+  reader chasing a "column contract" or a "design of record" finds nothing. The v0.36
+  hookless sweep deleted five design docs and swept none of their citations; the rot
+  surfaced twice, a week apart. So: **removing a doc must, in the same change, either
+  re-point every citation at the surviving home (`cage query <id>`, the owning module,
+  a CLAUDE.md section) or state inline that the doc was removed and why.** A citation
+  that is deliberately historical ("the generated `docs/cli-output-spec.md` was
+  removed in the hookless rebuild") is correct and must read as past tense. Sweep with:
+  `grep -rho "docs/[a-z0-9-]*\.md" cage/*.py | sort -u` and test each target exists.
 - **A proposal has a lifecycle too — parked in `proposals/`, ARCHIVED once
   IMPLEMENTED.** `docs/proposals/` must read as *ideas not yet built*, exactly as
   `docs/` root reads as *work not yet done*. The four states:
@@ -613,7 +673,7 @@ the worked examples to copy.
 ## Dev
 
 ```bash
-just test          # python -m pytest -q   (983 tests; +10 Windows-only skips)
+just test          # python -m pytest -q   (995 tests; +10 Windows-only skips)
 just demo          # seed §4.4 + print attrib/matrix
 cage --version
 ```

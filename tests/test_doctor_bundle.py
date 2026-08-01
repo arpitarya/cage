@@ -21,7 +21,7 @@ PII_MARKERS = (b"content stripped", b'"prompt"', b'"raw_alternative"')
 
 
 def _seeded_root(tmp_path, monkeypatch, debug: bool):
-    for env in ("CLAUDE_CONFIG_DIR", "CODEX_HOME", "COPILOT_HOME", "KIRO_DATA_DIR"):
+    for env in ("CLAUDE_CONFIG_DIR", "COPILOT_HOME", "KIRO_DATA_DIR"):
         monkeypatch.setenv(env, str(tmp_path / f"home-{env.lower()}"))
     mkcage(tmp_path)  # Directive A: materialize [sources] so the pathless sweep resolves homes
     if debug:

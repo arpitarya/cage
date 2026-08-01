@@ -105,7 +105,8 @@ def attribute(root: Path, task: str, pol: dict, scope: str | None = None,
 def render_csv(data: dict) -> str:
     """CSV over the same `attribute()` payload as the text table (one structure,
     two renderers). Per-step method + confidence are columns — the worst-case
-    provenance survives into the spreadsheet. Column contract in docs/csv-output.md."""
+    provenance survives into the spreadsheet. Column contract: `csvout.py` +
+    `cage query csv-output` (CLAUDE.md, CSV output / plan §3.9)."""
     from cage import csvout
     head = ["tool", "gross_saved_tokens", "gross_saved_usd", "method", "confidence",
             "priced_via"]

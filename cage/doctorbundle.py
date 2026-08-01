@@ -36,7 +36,7 @@ DEFAULT_NAME = "cage-doctor-bundle.zip"
 # secrets; values are paths/flags/rates the user themselves configured).
 _CAGE_ENVS = ("CAGE_BASE", "CAGE_LEDGER", "CAGE_HOME", "CAGE_DEBUG", "CAGE_DEBUG_LOG",
               "CAGE_CAPTURE", "CAGE_NOTES_WRITE", "CAGE_PYTHON",
-              "CLAUDE_CONFIG_DIR", "CODEX_HOME", "COPILOT_HOME", "KIRO_HOME",
+              "CLAUDE_CONFIG_DIR", "COPILOT_HOME", "KIRO_HOME",
               "KIRO_DATA_DIR", "CAGE_VSCODE_USER")
 
 _EPOCH = (1980, 1, 1, 0, 0, 0)  # fixed zip timestamp — same inputs ⇒ same bytes

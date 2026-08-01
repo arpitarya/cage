@@ -23,7 +23,7 @@ def _on_read_isolated(monkeypatch, tmp_path):
     """Turn capture-on-read ON, but point every agent home at an isolated empty dir so
     the sweep only ever sees what a test plants — never the real ~/.claude etc."""
     monkeypatch.setenv("CAGE_CAPTURE_ON_READ", "1")
-    for env in ("CLAUDE_CONFIG_DIR", "CODEX_HOME", "COPILOT_HOME", "KIRO_DATA_DIR"):
+    for env in ("CLAUDE_CONFIG_DIR", "COPILOT_HOME", "KIRO_DATA_DIR"):
         monkeypatch.setenv(env, str(tmp_path / f"home-{env.lower()}"))
 
 
@@ -186,8 +186,8 @@ def test_warm_cache_byte_identical(tmp_path, monkeypatch, capsys):
 def test_summary_line_counts_only():
     assert importcmd.capture_summary_line(None) == ""
     assert importcmd.capture_summary_line({"calls": 0, "agents": [], "savings": 0}) == ""
-    line = importcmd.capture_summary_line({"calls": 240, "agents": ["claude", "codex"],
+    line = importcmd.capture_summary_line({"calls": 240, "agents": ["claude", "kiro"],
                                            "savings": 3})
-    assert line == ("· captured 240 new calls (claude, codex) + 3 graphify savings "
+    assert line == ("· captured 240 new calls (claude, kiro) + 3 graphify savings "
                     "since last read")
     assert "token" not in line and "prompt" not in line  # counts only, no content

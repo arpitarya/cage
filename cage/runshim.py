@@ -163,9 +163,8 @@ def write(root: Path, *, python_launcher: bool = False) -> dict:
 
 def selflocating_command(sub: str) -> str:
     """The committed hook command for hosts that provide neither a repo variable nor
-    a guaranteed repo cwd — Codex (hook cwd is the *session* cwd, possibly a subdir;
-    its own docs recommend resolving from the git root) and Kiro (hook cwd is
-    undocumented, and Kiro's relative-path record is unreliable). POSIX shell:
+    a guaranteed repo cwd — Kiro (hook cwd is undocumented, and Kiro's relative-path
+    record is unreliable). POSIX shell:
     locate the repo root via git, exec the committed shim, and exit 0 when either
     is missing — fail-open, no noise in the agent's hook run."""
     return (f'r="$(git rev-parse --show-toplevel 2>/dev/null)" && '

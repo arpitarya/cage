@@ -348,8 +348,8 @@ def _state_dir(root: Path) -> tuple[str, str]:
 
 def _committed_commands(root: Path) -> list[tuple[str, str]]:
     """(file, command-string) pairs from every *project-committed* wired file. The
-    user-level configs (~/.copilot/hooks, ~/.codex/config.toml, .git/hooks) are
-    per-machine by nature and deliberately not scanned."""
+    user-level configs (~/.copilot/hooks, .git/hooks) are per-machine by nature and
+    deliberately not scanned."""
     from cage import cfgio
     out: list[tuple[str, str]] = []
 
@@ -360,7 +360,6 @@ def _committed_commands(root: Path) -> list[tuple[str, str]]:
                     out.append((rel, h.get("command", "")))
 
     hooks_cmds(".claude/settings.json")
-    hooks_cmds(".codex/hooks.json")
     for name, srv in cfgio.load_json(root / ".mcp.json").get("mcpServers", {}).items():
         if name == "cage":
             out.append((".mcp.json", srv.get("command", "")))

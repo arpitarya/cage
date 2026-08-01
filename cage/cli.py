@@ -17,7 +17,9 @@ from cage.report import DIMENSIONS
 
 # The verbatim front-door help (plan Phase 3 mock). `_RootParser.format_help` returns
 # this exactly — no usage/options noise; the daily loop and the groups, one screen.
-# Golden-pinned by tests/test_output_spec.py; any edit updates docs/cli-output-spec.md.
+# Golden-pinned by tests/test_output_spec.py — the goldens ARE the output contract
+# (the generated docs/cli-output-spec.md was removed in the hookless rebuild);
+# any edit ⇒ re-bless with CAGE_BLESS_GOLDENS=1.
 _ROOT_HELP = """\
 cage — measure what your AI agents spend, prove what your tools save
 
@@ -470,7 +472,7 @@ def build_parser() -> argparse.ArgumentParser:
                   "capture, export & local adapters: export · cleanup · "
                   "watch · serve · proxy · meter")
 
-    ex = data.add_parser("export", help="import (refresh) then emit the ledger as jsonl/csv/json",
+    ex = data.add_parser("export", help="import (refresh) then emit the ledger as jsonl/csv/json/otel",
                          epilog="examples:\n"
                                 "  cage data export                         # refresh, then raw jsonl to stdout\n"
                                 "  cage data export --csv calls -o spend.csv # flat call rows for a spreadsheet\n"
@@ -478,9 +480,10 @@ def build_parser() -> argparse.ArgumentParser:
                                 "  cage data export --format json --since 30d  # structured summary (matches `cage report`)\n"
                                 "  cage data export --no-import --format jsonl # emit the ledger as-is, no refresh\n"
                                 "  cage data export --project . --agent claude # one project's Claude rows\n"
+                                "  cage data export --otel -o calls.otel.json  # GenAI-conformant JSON (PRE-STABLE spec)\n"
                                 "Two export kinds, never blurred: the fleet bundle (--study, jsonl) is lossless,\n"
-                                "merge-by-id, and re-importable; CSV is a one-way REPORTING format for\n"
-                                "spreadsheets — never an import source (`cage query csv-output`).",
+                                "merge-by-id, and re-importable; CSV/otel are one-way REPORTING formats —\n"
+                                "never an import source (`cage query csv-output`, `cage query otel-export`).",
                          formatter_class=argparse.RawDescriptionHelpFormatter)
     ex.add_argument("--format", choices=["jsonl", "csv", "json"], default=None,
                     help="jsonl=raw rows (re-ingestable) · csv=flat call rows (same as "
@@ -492,6 +495,11 @@ def build_parser() -> argparse.ArgumentParser:
                          "counts and ids, never content")
     ex.add_argument("--json", action="store_const", dest="format", const="json",
                     help="alias for --format json (the structured summary)")
+    ex.add_argument("--otel", action="store_true",
+                    help="one-way OpenTelemetry GenAI-conformant JSON (calls as "
+                         "gen_ai.* attributes, receipts as cage-namespaced cage.* "
+                         "data); PRE-STABLE spec — semconv version pinned + stamped "
+                         "in the output (`cage query otel-export`)")
     ex.add_argument("--since", metavar="WINDOW", help="window like 7d / 24h / 2w")
     ex.add_argument("--project", nargs="?", const=".", metavar="NAME",
                     help="filter to one project (basename; '.' = current dir). Claude-exact (§3.7)")

@@ -796,8 +796,9 @@ REGISTRY: tuple[Explanation, ...] = (
         "  tags are COLUMNS (a spreadsheet can tell measured from estimated), and\n"
         "  refusals/caveats/UNPRICED counts survive into the rows; stdlib `csv`,\n"
         "  RFC-4180 quoting, LF line endings pinned on every OS (deterministic:\n"
-        "  same ledger + policy ⇒ byte-identical CSV). Column contracts:\n"
-        "  docs/csv-output.md. Two export kinds, never blurred: CSV is one-way\n"
+        "  same ledger + policy ⇒ byte-identical CSV). The column contracts live in\n"
+        "  `csvout.py` itself (one render_csv beside each render_*). Two export kinds,\n"
+        "  never blurred: CSV is one-way\n"
         "  REPORTING and never an import source; the fleet bundle (`cage data export\n"
         "  --study`) stays jsonl — lossless, merge-by-id, re-importable.",
         ("cage/csvout.py", "cage/exportcmd.py", "cage/report.py", "cage/mcpserver.py"),
@@ -854,8 +855,8 @@ REGISTRY: tuple[Explanation, ...] = (
         "  tail. The distinction matters: a verb deleted outright rather than renamed\n"
         "  is dead and absent from REMOVED, so a grep against it would miss the\n"
         "  artifact entirely. User-level files are scanned too (~/.copilot/hooks,\n"
-        "  ~/.codex/config.toml, .git/hooks) — the real failures were user-level, and\n"
-        "  these hold pre-removal hook leftovers cage no longer writes.\n"
+        "  .git/hooks) — the real failures were user-level, and these hold\n"
+        "  pre-removal hook leftovers cage no longer writes.\n"
         "  HEALING: `cage setup` rewrites a dead verb to its current form via\n"
         "  verbmap.REMOVED, alongside the absolute-path→shim migration it already\n"
         "  does, and refreshes a stale bin/graphify interceptor. Idempotent; foreign\n"
@@ -1023,4 +1024,27 @@ REGISTRY: tuple[Explanation, ...] = (
         "usage rows carry NO method (diagnostic); receipts + forward model are modeled,\n"
         "  never measured — report-reads visibly weaker than query receipts.",
         kind="concept", plan_ref="archive/v0.36-graphify-capture.plan.md GC0–GC5 (pending: OPEN-WORK.md)"),
+    Explanation(
+        "otel-export", ("otel", "opentelemetry", "otel-export", "genai", "gen_ai",
+                        "semconv", "semantic-convention", "langfuse", "helicone",
+                        "otlp", "vendor", "pre-stable"),
+        "`cage data export --otel`: calls as gen_ai.* attributes, savings cage-namespaced",
+        "one-way REPORTING JSON, exactly like --csv (never an import source; --study\n"
+        "  stays jsonl): calls → gen_ai.system / gen_ai.request.model /\n"
+        "  gen_ai.usage.input_tokens / output_tokens, plus\n"
+        "  gen_ai.client.operation.duration (seconds) when latency_ms is known —\n"
+        "  omitted, never zero, when it isn't. Receipts/savings have NO GenAI\n"
+        "  equivalent: cage-namespaced under cage.savings[].cage.* (cage.saved is\n"
+        "  GROSS, cage.saved_usd prices via the same receiptprice ladder every other\n"
+        "  view uses and is omitted — never $0 — on an UNPRICED refusal or a non-money\n"
+        "  unit). No gen_ai.* name is ever invented. **The GenAI conventions are\n"
+        "  PRE-STABLE** ({semconv}, {semconv_status}) — names can still change\n"
+        "  upstream, so cage pins the targeted version in one constant and stamps it\n"
+        "  in every document's cage.meta block; a spec bump is a deliberate,\n"
+        "  changelog'd change, never silent drift.",
+        ("cage/otelout.py", "cage/exportcmd.py", "cage/constants.py"),
+        "cage.method survives on every savings row — a modeled/estimated figure can\n"
+        "  never arrive at a vendor looking measured; calls are the ledger's own\n"
+        "  ground truth.",
+        kind="concept", plan_ref="otel-export.handoff.md"),
 )

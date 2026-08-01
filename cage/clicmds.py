@@ -692,11 +692,11 @@ def cmd_export(args) -> int:
     r = ledger_root()
     pol = _policy(r)
     if getattr(args, "study", None) is not None:
-        if getattr(args, "csv_kind", None) or getattr(args, "format", None):
+        if getattr(args, "csv_kind", None) or getattr(args, "format", None) or getattr(args, "otel", False):
             # Two export kinds, never blurred: the bundle is lossless jsonl by
-            # design; CSV is one-way reporting and never an import source.
+            # design; CSV/OTel are one-way reporting formats and never an import source.
             raise CageError("--study writes the jsonl fleet bundle — it cannot "
-                            "combine with --csv/--format (`cage query csv-output`)")
+                            "combine with --csv/--format/--otel (`cage query csv-output`)")
         from cage import study
         refresh = {"ran": False, "new_calls": 0}
         if getattr(args, "do_import", True) and policy.import_before_export(pol):

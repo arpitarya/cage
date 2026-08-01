@@ -25,7 +25,7 @@ def root(tmp_path, monkeypatch):
     mkcage(tmp_path)
     monkeypatch.setenv("CAGE_DEBUG", "1")
     monkeypatch.delenv("CAGE_CAPTURE", raising=False)
-    for env in ("CLAUDE_CONFIG_DIR", "CODEX_HOME", "COPILOT_HOME", "KIRO_DATA_DIR"):
+    for env in ("CLAUDE_CONFIG_DIR", "COPILOT_HOME", "KIRO_DATA_DIR"):
         monkeypatch.setenv(env, str(tmp_path / f"home-{env.lower()}"))
     monkeypatch.chdir(tmp_path)
     return tmp_path

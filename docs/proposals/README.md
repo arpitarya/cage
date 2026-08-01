@@ -18,15 +18,10 @@ Naming: `<topic>.proposal.md`. Written in short points, not walls of prose.
 
 ## Parked
 
-**Reviewed 2026-08-01** — every entry checked against the code; the two parked
-CLAUDE.md proposals were found **still needed** (CLAUDE.md verified stale on both).
+**Reviewed 2026-08-01** — every entry checked against the code.
 
 Active (awaiting Arpit's accept or a trigger):
 
-- [claude-md-prices-file.md](claude-md-prices-file.md) — parked CLAUDE.md edits for the
-  `prices.toml` split. **Still needed** (flow diagram stale). → CMD-SYNC
-- [claude-md-sources-authority.md](claude-md-sources-authority.md) — parked CLAUDE.md
-  edits for Directive A. **Still needed** (extend/replace language stale). → CMD-SYNC
 - [agent-vs-human-v2.md](agent-vs-human-v2.md) — per-commit rebuild: tokens/commit ·
   authorship (mostly built) · suggested-vs-accepted (counts) · time (attestation only).
 
@@ -36,13 +31,8 @@ Active (awaiting Arpit's accept or a trigger):
   real ledger; refreshed per release via checklist line.
 - [insights-adoption.md](insights-adoption.md) — `cage insights adoption`: per-agent
   invoked/receipted/missed/never; counts only, usage rows stay unpriced.
-- [structural-debt.md](structural-debt.md) — two rules: `paths.py` splits on contact
-  (named seams, re-exports); a bare-`cage` landing screen. Low.
 - [cage-skills.md](cage-skills.md) — six skills over existing surfaces; start with
   cage-analyst + cage-task-closer (feeds the starved closed-task pipeline).
-- [otel-genai-export.md](otel-genai-export.md) — `cage data export --otel`, one-way
-  like CSV; feeds Langfuse/Helicone rather than competing. **Not scheduled.** (Was
-  `market-plays.md`; its two other plays were declined and removed 2026-08-01.)
 - [tool-integration-contract.md](tool-integration-contract.md) — the paved road:
   interceptor template · `cage data meter <tool>` · per-tool detection registry.
   **fux is the second tool**; ships only when two tools use it.
@@ -59,3 +49,24 @@ read as *ideas not yet built*. See the lifecycle rule in [`../../CLAUDE.md`](../
 - **windows-graphify-interceptor** → built as v0.38's `graphify.cmd` twin.
   [archived proposal](../archive/v0.38-windows-graphify-interceptor.proposal.md) ·
   living spec: [shim-contract.md](../shim-contract.md)
+- **structural-debt** → mixed outcome, both parts resolved 2026-08-01: Part 1
+  (`paths.py` splits on contact) **implemented** as a CLAUDE.md rule; Part 2 (a bare-`cage`
+  state line) **declined** — bare `cage` already shows ledger state via `cmd_overview`,
+  the premise behind Part 2 was false on every draft.
+  [archived proposal](../archive/v0.39-structural-debt.proposal.md) ·
+  living spec: `CLAUDE.md`'s `paths.py splits on contact` rule
+- **claude-md-prices-file** → CLAUDE.md's flow diagram + Must-Know bullets now name
+  `prices.toml` as the vendor rate card home. **Implemented** verbatim (CMD-SYNC).
+  [archived proposal](../archive/v0.39-claude-md-prices-file.proposal.md) ·
+  living spec: `CLAUDE.md` itself
+- **claude-md-sources-authority** → **declined** (CMD-SYNC) — contradicted by
+  `paths.resolve_log_sources`'s own docstring (an empty/absent `[sources]` is fully
+  additive, byte-identical to the built-in registry); the proposal described a
+  Directive A end-state that never shipped.
+  [archived proposal](../archive/v0.39-claude-md-sources-authority.proposal.md) ·
+  living spec: `cage/paths.py` `resolve_log_sources`
+- **otel-genai-export** → built as `cage data export --otel` (OTEL). The pre-stable
+  finding survived into the build: semconv version pinned + stamped, receipts/savings
+  cage-namespaced, never an invented `gen_ai.*` name.
+  [archived proposal](../archive/v0.39-otel-genai-export.proposal.md) ·
+  living spec: `cage/otelout.py` · `cage query otel-export`

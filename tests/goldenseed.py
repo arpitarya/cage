@@ -62,7 +62,7 @@ def set_last_import(root: Path, ts: str) -> None:
     f.write_text(json.dumps(cur), encoding="utf-8")
 
 
-def set_capture_gap(root: Path, agent: str = "codex") -> None:
+def set_capture_gap(root: Path, agent: str = "kiro") -> None:
     """Pin a triple-gated capture-health record for ``agent`` (home present, 0 files,
     never captured) so the report/doctor "installed but capturing nothing" ⚠ fires — the
     `_health` input `importcmd` records at import (docs/capture-health). ``~``-relative

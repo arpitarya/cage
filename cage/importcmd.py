@@ -181,7 +181,7 @@ def _record_health(root: Path, cursors: dict, health: dict, captured: set,
 
 def _record_capture_log(root: Path, health: dict, all_rows: list, targets) -> None:
     """One `state/capture.log` breadcrumb line per swept agent this run — the
-    always-on proof-of-capture (`cage/capturelog.py`, docs/debugging-capture.md).
+    always-on proof-of-capture (`cage/capturelog.py`; diagnose via `cage doctor --bundle`).
     ``rows_total`` is derived from the shared ``all_rows`` read (taken *before* this
     run's appends) plus this run's own ``imported`` delta — no second ledger read.
     Fail-open: best-effort, never aborts an import."""

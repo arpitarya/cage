@@ -2,6 +2,92 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
+## v0.39.0 (2026-08-02) — OTel GenAI export; Codex agent residue removed
+
+Two independent tracks landed the same day: a new one-way export format, and a
+cleanup of what the v0.33.0 Codex-agent removal left behind. No substrate or
+determinism-law change in either.
+
+Built from: [OTel handoff](docs/archive/v0.39-otel-export.handoff.md) +
+[prompt](docs/archive/v0.39-otel-export.prompt.md) · [Codex-purge
+handoff](docs/archive/v0.39-codex-purge.handoff.md) +
+[prompt](docs/archive/v0.39-codex-purge.prompt.md).
+
+### OTel GenAI export (OTEL)
+
+`cage data export --otel` — a one-way export of the ledger as OpenTelemetry
+GenAI-conformant JSON, alongside the existing `--csv` / `--study` / jsonl formats.
+Cage stays the `$0` local ledger and feeds the enterprise stack (Langfuse, Helicone,
+any OTLP sink) instead of competing with it.
+
+#### Added
+
+- **Calls map to GenAI attributes**: `gen_ai.system` (provider) ·
+  `gen_ai.request.model` · `gen_ai.usage.input_tokens` / `output_tokens` ·
+  `gen_ai.client.operation.duration` (seconds, from `latency_ms`) — omitted, never a
+  fabricated zero, when a call's latency was never captured.
+- **`cage query otel-export`** explains the mapping, the pre-stable caveat, and the
+  receipts/savings decision below.
+
+#### Decided — the GenAI conventions are pre-stable
+
+As of semconv v1.42.0 (June 2026) the `gen_ai.*` attributes live in a dedicated repo,
+carry no 1.0, and names can still change between releases — which collides with
+cage's determinism law (same ledger + policy ⇒ same output). So the targeted version
+is **pinned in one constant** (`constants.OTEL_SEMCONV_VERSION`) and **stamped in
+every emitted document's `cage.meta` block**; a spec bump is a deliberate,
+changelog'd change, exactly like `prices_version`. Help text and docs say
+"pre-stable".
+
+#### Decided — receipts/savings have no GenAI equivalent
+
+No `gen_ai.*` name is invented for cage-only data. Every receipt/savings row lands
+in a separate `cage.savings` array under `cage.*` keys (`cage.tool`, `cage.saved`,
+`cage.method`, `cage.confidence`, …). `cage.saved` is always GROSS
+(`netsaved.GROSS_NOTE`); `cage.saved_usd` prices through the same `receiptprice`
+resolution ladder every other view uses and is **omitted, never `$0`**, on an
+UNPRICED ladder refusal or a non-money unit (`ms`/`gco2`). `cage.method` always
+survives so a `modeled`/`estimated` figure can never arrive at a vendor looking
+measured. Legacy Tier-1 human-axis rows (axis removed v0.36) are excluded, counted
+in `cage.meta.legacy_human_excluded`.
+
+#### Unchanged — deliberately
+
+- **`dependencies = []`** — stdlib `json` only; no `opentelemetry-*`, no HTTP client,
+  no OTLP SDK. Not an OTLP exporter — cage writes a file, the user's collector
+  ingests it.
+- **One-way REPORTING, exactly like `--csv`** — never an import source. The fleet
+  bundle (`--study`) stays jsonl.
+
+### Codex residue removed (CODEX-OUT)
+
+Support for the Codex **agent** ended in v0.33.0; this removes what was left behind.
+
+#### Removed
+
+- **`paths.codex_home()` and the `CODEX_HOME` env read**, `wiringscan`'s
+  `~/.codex/config.toml` scan and its `.codex/hooks.json` enumeration, doctor's
+  `.codex/hooks.json` read, and `CODEX_HOME` from the `cage doctor --bundle` env
+  allowlist.
+- **The trade this makes, stated rather than buried: cage can no longer detect a stale
+  `cage` verb in a pre-v0.33 `~/.codex/config.toml`.** A machine still holding one keeps
+  a dead verb forever, undetected — the user-level F1 class the wiring-liveness check
+  exists to catch. Accepted (Arpit, 2026-08-01): Codex has been unsupported for five
+  releases, nobody on a supported upgrade path starts from a pre-0.33 install, and
+  carrying scan code for a product cage will never support again is its own liability.
+
+#### Unchanged — deliberately
+
+- **`data/prices.toml` is byte-identical.** `gpt-5.3-codex`, `gpt-5.2-codex`,
+  `gpt-5.1-codex{,-max,-mini}`, `gpt-5-codex` and `codex-mini-latest` are **OpenAI model
+  ids that Copilot emits**, not the removed agent — the file has said so at the row since
+  v0.33. Deleting them would silently UNPRICE real Copilot traffic.
+  `policy.normalize_model`'s `…-codex-high` → `…-codex` effort fold stays for the same
+  reason. A new regression guard
+  (`test_pricing.test_codex_model_ids_are_not_the_codex_agent`) prices a Copilot call on
+  every one of those ids, so the next blind `grep -i codex` fails loudly instead of
+  costing money.
+
 ## v0.38.0 (2026-08-01) — graphify is metered on Windows; CI grows a graphify axis
 
 Closes the gap v0.37.2 disclosed. The graphify PATH interceptor was a single

@@ -311,7 +311,7 @@ def render_csv(d: dict) -> str:
     - ``pooled`` — one row per compared phase (machine-days, measured dists).
     - ``unpriced`` — mirrors the text ⚠ warning when it renders.
 
-    Column contract in docs/csv-output.md."""
+    Column contract: `csvout.py` (`cage query csv-output`)."""
     from cage import csvout
     head = ["kind", "machine", "phase", "days", "gap_days", "agents", "n",
             "median_tokens", "q1_tokens", "q3_tokens", "median_usd", "q1_usd",

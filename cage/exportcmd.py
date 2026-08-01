@@ -24,11 +24,12 @@ import json
 import sys
 from pathlib import Path
 
-from cage import csvout, importcmd, ledger, prices
+from cage import csvout, importcmd, ledger, otelout, prices
 from cage.errors import CageError
 from cage.schema import CALL_FIELDS, RECEIPT_FIELDS
 
-# Closed, deterministic CSV column contracts per row kind (docs/csv-output.md).
+# Closed, deterministic CSV column contracts per row kind (see `csvout.py`;
+# `cage query csv-output` explains the guarantees).
 # calls/receipts extend the schema tuples with the additive fleet `machine` stamp;
 # tasks.jsonl has no closed schema tuple, so the export pins one here: identity +
 # outcome + label + the recorded-estimate fields (plan §3.4) + the PII-guarded git
@@ -152,16 +153,38 @@ def run(root: Path, args, *, pol: dict) -> int:
     project = getattr(args, "project", None)
     kind = getattr(args, "csv_kind", None)
     fmt = getattr(args, "format", None)
+    otel = getattr(args, "otel", False)
     if kind and fmt:
         raise CageError("--csv and --format are mutually exclusive — --csv calls "
                         "already is the flat call-row CSV")
     if kind and kind != "calls" and (agent or project):
         raise CageError(f"--agent/--project filter call rows only, not {kind} — "
                         "drop the filter or export --csv calls")
+    if otel and (kind or fmt):
+        raise CageError("--otel is its own format — it cannot combine with "
+                        "--csv/--format/--json")
     refresh = {"ran": False, "new_calls": 0}
     if getattr(args, "do_import", True) and _policy.import_before_export(pol):
         ran, added = sweep(root, since)
         refresh = {"ran": ran, "new_calls": added}
+    if otel:
+        rows = _filtered(root, since, project, agent)
+        # `--agent`/`--project` filter the emitted `calls` array only, exactly like
+        # every other export filter; receipts have neither field to filter on, and
+        # the pricing ladder needs the *unfiltered* call set to resolve a call-less
+        # receipt's task-model rung regardless of what the calls array shows.
+        receipts = ledger.since(ledger.receipts(root, since=since), since)
+        out = otelout.render(rows, receipts, ledger.calls(root), pol)
+        unit = "otel document"
+        if getattr(args, "output", None):
+            try:
+                Path(args.output).write_text(out, encoding="utf-8", newline="")
+            except OSError as e:
+                raise CageError(f"cannot write export to {args.output}: {e}") from e
+            print(f"✔ wrote 1 {unit} → {args.output} (otel, pre-stable)", file=sys.stderr)
+        else:
+            sys.stdout.write(out)
+        return 0
     fmt = fmt or ("csv" if kind else "jsonl")
     if kind and kind != "calls":
         rows = _raw_rows(root, kind, since)

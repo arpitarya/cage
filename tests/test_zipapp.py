@@ -36,7 +36,6 @@ def _run(pyz_path: Path, *args: str, cwd: Path, extra_env: dict | None = None):
         "PYTHONUTF8": "1",
         "CAGE_HOME": str(home / "cage-global"),
         "CLAUDE_CONFIG_DIR": str(home / "claude"),
-        "CODEX_HOME": str(home / "codex"),
         "COPILOT_HOME": str(home / "copilot"),
         "KIRO_HOME": str(home / "kiro"),
         "CAGE_VSCODE_USER": str(home / "vscode-user"),

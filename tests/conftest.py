@@ -37,7 +37,7 @@ def _bare_cage_in_hooks(monkeypatch, tmp_path):
     # turns doctor tests red for reasons that have nothing to do with the code. Tests
     # that need their own agent homes (test_portable_wiring, test_wiringscan) override
     # these with their own `homes` fixture.
-    for var, sub in (("CLAUDE_CONFIG_DIR", "claude-home"), ("CODEX_HOME", "codex-home"),
+    for var, sub in (("CLAUDE_CONFIG_DIR", "claude-home"),
                      ("COPILOT_HOME", "copilot-home"), ("KIRO_HOME", "kiro-home")):
         monkeypatch.setenv(var, str(tmp_path / sub))
     # `cage --ledger` sets `CAGE_BASE` via os.environ (process-scoped in production); clear

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from cage import policy, prices, report
+from cage import policy, prices, report, schema
 from cage import metering as meter
 
 # A minimal, explicit price table — independent of the bundled policy so the
@@ -260,3 +260,26 @@ def test_fixture_corpus_ids_all_price_no_none():
         assert match != "none", f"{prov}/{model} is UNPRICED in the bundled table"
     # the codex CLI fixture id is load-bearing: exact, never a family guess
     assert policy.price_match(pol, "openai", "gpt-5.1-codex")[1] == "exact"
+
+
+def test_codex_model_ids_are_not_the_codex_agent():
+    """REGRESSION GUARD (v0.39 CODEX-OUT): the Codex *agent* was purged, but
+    `gpt-5.x-codex` are **OpenAI model ids Copilot emits** — `data/prices.toml` says so
+    at the row. A blind `grep -i codex && delete` would silently UNPRICE real Copilot
+    traffic, so a Copilot call on each id must still cost out to a non-zero figure.
+
+    Also pins the effort-suffix fold (`policy.normalize_model`): Copilot routes stamp
+    `…-codex-high`, which vendors bill at the base rate — a `family` match, never `none`."""
+    pol = policy.load(None)
+    for model in ("gpt-5.3-codex", "gpt-5.2-codex", "gpt-5.1-codex",
+                  "gpt-5.1-codex-max", "gpt-5.1-codex-mini", "gpt-5-codex",
+                  "codex-mini-latest"):
+        call = schema.make_call(route="chat", provider="openai", model=model,
+                                tokens_in=1_000_000, tokens_out=100_000, agent="copilot",
+                                ts="2026-07-02T10:00:00Z", call_id=f"c_{model}")
+        usd, match, _ = prices.call_usd_match(pol, call)
+        assert match != "none" and usd > 0, f"{model} is UNPRICED for a copilot call"
+    # the effort suffix Copilot appends folds to the base row rather than falling off
+    base, _, _ = policy.price_match(pol, "openai", "gpt-5.3-codex")
+    row, match, key = policy.price_match(pol, "openai", "gpt-5.3-codex-high")
+    assert match == "family" and key == "gpt-5.3-codex" and row["input"] == base["input"]

@@ -57,7 +57,7 @@ def test_refusal_below_min_n(seeded):
 def test_agent_key_matches_task_agents(seeded):
     root, pol = seeded
     assert estimate.band(root, pol, agent="claude")["n"] == 5
-    assert estimate.band(root, pol, agent="codex")["ok"] is False
+    assert estimate.band(root, pol, agent="kiro")["ok"] is False
 
 
 def test_record_stamps_band_on_open_task(seeded):

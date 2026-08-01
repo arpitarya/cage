@@ -1,4 +1,5 @@
-"""Always-on capture breadcrumb — `state/capture.log` (plan F6, docs/debugging-capture.md).
+"""Always-on capture breadcrumb — `state/capture.log` (plan F6; diagnose with
+`cage doctor --bundle` and `CAGE_DEBUG=1`, see CLAUDE.md *Capture observability*).
 
 F1 (zero real savings receipts) was undiagnosable because there was no log of *why*
 a receipt wasn't filed — this module is half the instrument that fixes that (the

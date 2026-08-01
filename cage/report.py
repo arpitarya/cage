@@ -573,7 +573,7 @@ def render_report(rep: dict, last_import: str | None = None, disp=None,
                     "from savings — the agent-vs-human axis was removed in v0.36 and "
                     "these rows have no price route (`cage query savings-axis`)")
     if rep.get("project"):
-        foot.caveat("· project view is exact for Claude only — Copilot/Kiro/Codex logs "
+        foot.caveat("· project view is exact for Claude only — Copilot/Kiro logs "
                     "carry no project, so their spend is excluded from this filter.")
     if disp.usd:
         from cage import receiptprice

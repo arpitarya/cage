@@ -13,10 +13,6 @@ idiomatic config to those universals:
 exposing `install` / `status`, and is added to `SURFACES` + the dispatch map below.
 Hook wiring was removed with the hook machinery; each wire module's `install` heals
 (strips/deletes) any hook artifacts a previous version wrote.
-
-Codex support was removed completely (a product/scope call, not a capture-quality one
-— see docs/archive/*-codex-removal.handoff.md); a pre-existing `.codex/hooks.json` on
-an upgraded machine is now orphaned wiring, not a supported surface.
 """
 from __future__ import annotations
 

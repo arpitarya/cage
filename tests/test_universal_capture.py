@@ -31,7 +31,7 @@ def _claude_line(uuid, tin, tout, cwd="/Users/me/my_programs/widget"):
 
 
 def _isolate_agent_homes(d, monkeypatch):
-    for env in ("CLAUDE_CONFIG_DIR", "CODEX_HOME", "COPILOT_HOME", "KIRO_DATA_DIR"):
+    for env in ("CLAUDE_CONFIG_DIR", "COPILOT_HOME", "KIRO_DATA_DIR"):
         monkeypatch.setenv(env, str(d / f"home-{env.lower()}"))
 
 
@@ -172,7 +172,7 @@ def test_cursor_skips_unchanged_files(tmp_path, monkeypatch):
 def _seed(root):
     from cage import schema
     for i, (agent, model, tin) in enumerate((("claude-code", "claude-opus-4-8", 100),
-                                             ("codex", "gpt-5", 200))):
+                                             ("copilot", "gpt-5", 200))):
         ledger.append_row(root, "calls", schema.make_call(
             route="chat", provider="anthropic" if agent == "claude-code" else "openai",
             model=model, tokens_in=tin, tokens_out=10, agent=agent,
@@ -232,9 +232,9 @@ def test_export_filters(tmp_path, capsys):
     root = tmp_path / "proj"
     (root / ".cage").mkdir(parents=True)
     _seed(root)
-    exportcmd.run(root, _export_args(format="jsonl", agent="codex"), pol=policy.load(None))
+    exportcmd.run(root, _export_args(format="jsonl", agent="copilot"), pol=policy.load(None))
     rows = [json.loads(l) for l in capsys.readouterr().out.splitlines() if l.strip()]
-    assert len(rows) == 1 and rows[0]["agent"] == "codex"
+    assert len(rows) == 1 and rows[0]["agent"] == "copilot"
     exportcmd.run(root, _export_args(format="jsonl", project="alpha"), pol=policy.load(None))
     rows = [json.loads(l) for l in capsys.readouterr().out.splitlines() if l.strip()]
     assert len(rows) == 1 and rows[0]["project"] == "alpha"

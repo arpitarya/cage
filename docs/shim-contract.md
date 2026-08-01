@@ -109,16 +109,46 @@ or not. Arguments are forwarded verbatim, including spaces, embedded quotes and 
 
 The sh twin iterates a fixed word list. The cmd twin walks PATH with a **flat nested
 `for`** (directories × PATHEXT entries) — no subroutine call, no `goto` jump back into
-the loop. That structure is a hard requirement, not a style choice: an earlier draft used
-`call :subroutine` from inside the loop plus a `goto` back-edge to re-enter it per PATH
-directory, and on real Windows CI cmd.exe aborted with its own internal safety net —
-`Recursion Count=335, Stack Usage=90 percent, ****** BATCH PROCESSING IS ABORTED ******`
-— **before this script's own logic ever hit a bound**. cmd.exe's `call`/`goto` bookkeeping
-leaks stack frames under that combination; nothing in the *design* was unbounded, the
-*interpreter* was. A flat `for` loop has no such failure mode: it terminates after at
-most `len(PATH directories) × len(PATHEXT entries)` iterations by construction, so no
-counter is needed. The `where graphify` fail-open fallback is likewise a single small
+the loop. It terminates after at most `len(PATH directories) × len(PATHEXT entries)`
+iterations by construction, so no counter is needed.
+
+> **⚠️ Diagnosis corrected 2026-08-02 — an earlier version of this section named the
+> wrong cause.** It attributed the real Windows CI failure
+> (`Recursion Count=335, Stack Usage=90 percent, ****** BATCH PROCESSING IS ABORTED ******`)
+> to a `call :subroutine` + `goto` back-edge leaking cmd.exe stack frames. **That was a
+> hypothesis that did not survive.** Rewriting to the flat loop was a real improvement
+> but **did not fix the observed failure** — see B8a for the actual cause. The flat `for`
+> is retained on its own merits (provable termination, no interpreter bookkeeping to
+> trust); it is **not** load-bearing against the recursion abort. Corrected against the
+> v0.38.0 CHANGELOG, written by the session that debugged it on real Windows CI.
+
+## B8a — No `<` or `>` anywhere inside a parenthesized block, **including in comments**
+
+**The actual cause of the recursion abort**, and the single most expensive Windows fact
+this project has bought. A `rem` comment sitting *inside* the nested `for` block read
+`"<candidate>"`. **cmd.exe's parser still tokenizes redirection characters inside a
+comment when that comment is nested in a multi-line `(...)` block** — the `<`/`>`
+corrupted the block's parsing, which surfaced as the recursion abort on *every*
+invocation.
+
+**The rule, binding on this twin and on every future interceptor** (TOOL-SDK's tools
+implement this same shape): **comments live outside every parenthesized block.** Never
+write `<`, `>`, `|` or `&` inside `(...)`, in code *or* in a `rem`, without escaping —
+cmd.exe does not have "comments" in the sense the word implies; `rem` is a command whose
+line is still tokenized.
+
+This is invisible on POSIX, invisible in review, and produces an error message that
+points at recursion rather than at the character that caused it. **It cost five pushes
+and two wrong hypotheses to find** — which is exactly why it is written here rather
+than left in a changelog entry. The `where graphify` fail-open fallback is likewise a single small
 loop, never a `goto`-driven one.
+
+**Test-harness corollary (also bought on CI):** a Windows test that invokes the twin
+must leave enough of `PATH` intact for the shim's own `findstr.exe` / `where.exe`
+(`%SystemRoot%\\System32`) to resolve. Wiping `PATH` to the test's tmp dirs makes the
+shim fail for a reason that has nothing to do with the shim. Prepend tmp dirs onto the
+system dirs — never the whole inherited `PATH` (that risks exposing a real `cage` and
+defeating the "cage absent" assumption), and never nothing.
 
 ---
 

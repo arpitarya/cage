@@ -200,3 +200,14 @@ NET_ATTRIB_WINDOW_S = 120
 # Not tuned against outcomes — it is an ordering claim (net < gross), not a measurement.
 NET_SAVED_CONFIDENCE = 0.4
 
+# OTel GenAI semantic-convention version cage's `--otel` export targets
+# (`cage/otelout.py`, docs/otel-export.handoff.md). **The convention is pre-stable**:
+# as of this version the `gen_ai.*` attributes live in a dedicated repo, carry no 1.0,
+# and names can still change between releases. Cage's determinism law — same ledger +
+# policy ⇒ same output — means cage never silently follows upstream: this is the ONE
+# pinned target, stamped in every emitted document's `cage.meta` block, exactly like
+# `[meta] prices_version`. Bumping it is a deliberate, changelog'd change, never a
+# silent drift with an upstream release.
+OTEL_SEMCONV_VERSION = "1.42.0"
+OTEL_SEMCONV_STATUS = "pre-stable"
+

@@ -79,5 +79,5 @@ def test_policy_project_overrides_bundled(proj):
     assert policy.budgets(pol)["session_usd"] == 9.5
     # bundled prices still present after the merge (Opus 4.8 = $5/M input, current rate)
     assert policy.price(pol, "anthropic", "claude-opus-4-8")["input"] == 5.00
-    # OpenAI gpt-5 family present too (Codex / Copilot)
+    # OpenAI gpt-5 family present too (Copilot emits gpt-family ids)
     assert policy.price(pol, "openai", "gpt-5")["output"] == 10.00

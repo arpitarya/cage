@@ -112,7 +112,7 @@ def render_csv(d: dict) -> str:
       in ``note`` — the caveat survives into the spreadsheet;
     - one ``unpriced`` row mirrors the text view's ⚠ warning when it renders.
 
-    Column contract in docs/csv-output.md."""
+    Column contract: `csvout.py` (`cage query csv-output`)."""
     from cage import csvout
     keys = d["by"]
     head = ["kind", *keys, "baseline", "n", "median_tokens", "iqr_lo_tokens",

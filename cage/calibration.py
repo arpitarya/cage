@@ -72,8 +72,8 @@ def render_csv(d: dict) -> str:
     """CSV over the same `summarize()` payload as the text view (one structure,
     two renderers): one ``task`` row per scored task, then one ``summary`` row
     carrying the distribution, the hit-rate, and the visible skip counts. Both
-    are ``measured`` — recorded estimates vs recorded actuals. Column contract in
-    docs/csv-output.md."""
+    are ``measured`` — recorded estimates vs recorded actuals. Column contract:
+    `csvout.py` + `cage query csv-output` (plan §3.9)."""
     from cage import csvout
     head = ["kind", "task", "est_tokens", "actual_tokens", "ratio", "in_band",
             "n", "median_ratio", "q1_ratio", "q3_ratio", "hit_rate", "hits",

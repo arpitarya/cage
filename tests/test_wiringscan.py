@@ -6,12 +6,12 @@ verb is indistinguishable from cage being absent. That is the root cause behind 
 (v0.28.0 renamed 31 verbs; `anton/bin/graphify` and a global SessionStart hook were
 silently dead for 9 days while `cage doctor` reported ✅).
 
-**The must-preserve tests below (`test_import_claude_still_heals` /
-`test_import_codex_still_heals`) are the load-bearing ones.** Those two commands are
-healed today by an *accident*: the old predicate matched the substring `" import"`,
-which `" import-claude"` happens to contain. Retiring that coincidence for a
-parser-based predicate must keep both cases healing — this is the single place a wrong
-move silently turns capture off. They are asserted green before and after the swap.
+**The must-preserve test below (`test_import_claude_stale_hook_is_stripped`) is the
+load-bearing one.** That command is healed today by an *accident*: the old predicate
+matched the substring `" import"`, which `" import-claude"` happens to contain.
+Retiring that coincidence for a parser-based predicate must keep the case healing —
+this is the single place a wrong move silently turns capture off. It is asserted green
+before and after the swap.
 """
 from __future__ import annotations
 
@@ -36,7 +36,6 @@ posix_only = pytest.mark.skipif(os.name != "posix", reason="sh shim — POSIX ho
     ("cage insights attrib", True),
     # dead: renamed in v0.28.0 …
     ("cage import-claude --project .", False),
-    ("cage import-codex --since 7d", False),
     ("cage graphify --help", False),
     ("cage export --json", False),
     ("cage matrix", False),
@@ -61,14 +60,14 @@ def test_every_command_shape_yields_its_verb():
     """All four wiring shapes must resolve to the same verb — a shape we fail to parse
     scans as 'foreign' and its dead verb goes unreported."""
     for command in (
-            "cage import --agent codex --since 7d",
-            "/abs/path/cage import --agent codex --since 7d",
-            '"$CLAUDE_PROJECT_DIR/.cage/bin/cage-run" import --agent codex --since 7d',
-            "python3 -m cage import --agent codex --since 7d",
-            "py -3 -m cage import --agent codex --since 7d",
-            # the codex/kiro self-locating one-liner — mid-command shim reference
+            "cage import --agent claude --since 7d",
+            "/abs/path/cage import --agent claude --since 7d",
+            '"$CLAUDE_PROJECT_DIR/.cage/bin/cage-run" import --agent claude --since 7d',
+            "python3 -m cage import --agent claude --since 7d",
+            "py -3 -m cage import --agent claude --since 7d",
+            # the kiro self-locating one-liner — mid-command shim reference
             'r="$(git rev-parse --show-toplevel 2>/dev/null)" && [ -x "$r/.cage/bin/'
-            'cage-run" ] && exec "$r/.cage/bin/cage-run" import --agent codex '
+            'cage-run" ] && exec "$r/.cage/bin/cage-run" import --agent claude '
             '--since 7d; exit 0'):
         assert paths.cage_verb_path(command) == ("import",), command
 
@@ -106,7 +105,6 @@ def test_heal_tail_rewrites_dead_verbs_only():
 def homes(tmp_path, monkeypatch):
     """Redirect every agent home off the real machine (mirrors test_portable_wiring)."""
     monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "claude_home"))
-    monkeypatch.setenv("CODEX_HOME", str(tmp_path / "codex_home"))
     monkeypatch.setenv("COPILOT_HOME", str(tmp_path / "copilot_home"))
     monkeypatch.setenv("KIRO_HOME", str(tmp_path / "kiro_home"))
     monkeypatch.setenv("CAGE_HOME", str(tmp_path / "cage_home"))
@@ -137,10 +135,9 @@ def _plant_claude(root: Path, session_start: list[str], **events: str) -> None:
     path.write_text(json.dumps({"hooks": hooks}, indent=2) + "\n", encoding="utf-8")
 
 
-# ── the two must-preserve cases ─────────────────────────────────────────────────
-# These are the real historical forms found installed on a live machine, not
-# synthetic ones. `cage import-claude` shipped in claudewire until v0.28.0
-# (048a962); `cage import-codex` until v0.9.0 (26788ff).
+# ── the must-preserve case ──────────────────────────────────────────────────────
+# This is the real historical form found installed on a live machine, not a
+# synthetic one. `cage import-claude` shipped in claudewire until v0.28.0 (048a962).
 
 def test_import_claude_stale_hook_is_stripped(homes):
     """MUST-PRESERVE: a v0.27 Claude backfill/banner hook naming a dead verb must not
@@ -152,23 +149,6 @@ def test_import_claude_stale_hook_is_stripped(homes):
     cmds = _claude_commands(homes)
     assert not any(paths.cage_command_tail(c) is not None for c in cmds), \
         f"a stale cage hook survived setup: {cmds}"
-
-
-def test_codex_import_hook_is_no_longer_managed(homes):
-    """Codex was removed completely: `agents.install` no longer has a wire module for
-    it, so a pre-existing `.codex/hooks.json` from before the removal is untouched —
-    orphaned wiring, not healed (the wiringscan orphan-ownership gap, a deferred
-    follow-up per docs/codex-removal.handoff.md §2)."""
-    path = homes / ".codex" / "hooks.json"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    before = json.dumps({"hooks": {
-        event: [{"hooks": [{"type": "command",
-                            "command": "/old/bin/cage import-codex --since 7d"}]}]
-        for event in ("Stop", "SessionStart")}}, indent=2) + "\n"
-    path.write_text(before, encoding="utf-8")
-    out = agents.install(homes, ("codex",))
-    assert "codex" not in out  # no wire module ran
-    assert path.read_text(encoding="utf-8") == before  # byte-identical, untouched
 
 
 def test_stale_hook_in_a_non_session_slot_is_stripped(homes):
@@ -207,11 +187,6 @@ def _plant_everything(root: Path) -> None:
     treated as none of cage's business."""
     _plant_claude(root, ["/old/bin/cage import-claude --project ."],
                   Stop=_FOREIGN_HOOK, SessionEnd=_FOREIGN_CAGEISH)
-    codex = root / ".codex" / "hooks.json"
-    codex.parent.mkdir(parents=True, exist_ok=True)
-    codex.write_text(json.dumps({"hooks": {"Stop": [{"hooks": [
-        {"type": "command", "command": "/old/bin/cage import-codex --since 7d"}]}]}},
-        indent=2) + "\n", encoding="utf-8")
     shim = root / "bin" / "graphify"
     shim.parent.mkdir(parents=True, exist_ok=True)
     shim.write_text(
@@ -228,7 +203,7 @@ def test_scan_flags_exactly_the_stale_artifacts(homes):
     _plant_everything(homes)
     scan = wiringscan.run(homes, assets=False)
     verbs = sorted({d.command for d in scan.dead})
-    assert verbs == ["graphify", "import-claude", "import-codex"], verbs
+    assert verbs == ["graphify", "import-claude"], verbs
     assert scan.interceptor_dead
     # every foreign hook is absent from the findings — detection never judges them
     flagged = " ".join(d.artifact + d.command for d in scan.dead)
@@ -252,7 +227,7 @@ def test_scan_reports_remediation_only_when_one_exists(homes):
 def test_a_freshly_wired_project_scans_clean(homes):
     """The handoff's §10 open question: a clean `cage setup` must produce zero
     findings — every verb cage emits today is parser-valid."""
-    agents.install(homes, ("claude", "codex", "copilot", "kiro"))
+    agents.install(homes, ("claude", "copilot", "kiro"))
     scan = wiringscan.run(homes, assets=False)
     assert scan.dead == [], [d.line for d in scan.dead]
     assert not scan.interceptor_dead
@@ -266,13 +241,12 @@ def _snapshot(root: Path) -> dict[str, str]:
 
 
 def test_install_heals_every_stale_artifact(homes):
-    """Every artifact `agents.install` still manages heals; `.codex/hooks.json` is the
-    one exception — codex has no wire module anymore, so it stays dead/orphaned rather
-    than healing (the deferred orphan-scanner gap, docs/codex-removal.handoff.md §2)."""
+    """Every artifact `agents.install` manages heals — a re-setup over a v0.27-era tree
+    leaves no dead verb behind at all."""
     _plant_everything(homes)
     agents.install(homes, ("claude", "copilot", "kiro"))
     dead = wiringscan.run(homes, assets=False).dead
-    assert dead == [wiringscan.Dead(".codex/hooks.json", "import-codex", "", True)]
+    assert dead == [], [d.line for d in dead]
 
 
 def test_foreign_hooks_are_byte_identical_after_heal(homes):
@@ -286,9 +260,9 @@ def test_foreign_hooks_are_byte_identical_after_heal(homes):
 def test_second_install_is_byte_identical(homes):
     """Idempotence: healing a healed tree changes nothing (no mtime churn, no diff)."""
     _plant_everything(homes)
-    agents.install(homes, ("claude", "codex", "copilot", "kiro"))
+    agents.install(homes, ("claude", "copilot", "kiro"))
     before = _snapshot(homes)
-    agents.install(homes, ("claude", "codex", "copilot", "kiro"))
+    agents.install(homes, ("claude", "copilot", "kiro"))
     assert _snapshot(homes) == before
 
 
@@ -357,7 +331,7 @@ def test_doctor_receipts_line_is_plain_when_wiring_is_healthy(homes):
 def test_doctor_wiring_is_ok_on_a_freshly_wired_project(homes):
     from cage import doctorcmd, initcmd
     initcmd.run(homes)
-    agents.install(homes, ("claude", "codex", "copilot", "kiro"))
+    agents.install(homes, ("claude", "copilot", "kiro"))
     assert _check(doctorcmd.run(homes), "wiring")["level"] == "ok"
 
 

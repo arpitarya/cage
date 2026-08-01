@@ -21,11 +21,7 @@ spec.
 
 ## Active work
 
-**GF-DEBT closed 2026-08-01** (v0.38.0, unreleased) — the six honesty debts WIN-GF/CI-GF
-left are closed; pair archived to
-[archive/v0.38-graphify-honesty-debts.handoff.md](archive/v0.38-graphify-honesty-debts.handoff.md).
-`docs/` root now carries no loose handoff/prompt pair — the graphify-works track
-continues at ADOPT and NET-1, tracked in [OPEN-WORK.md](OPEN-WORK.md).
+Nothing in flight — `docs/` root carries no loose handoff/prompt pairs right now.
 
 ## The lab manual
 

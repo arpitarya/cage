@@ -140,10 +140,10 @@ def test_derived_view_byte_identical_with_debug_under_cage_base_on_vs_off(tmp_pa
 def test_heartbeat_last_write_wins_per_key(proj, monkeypatch):
     initcmd.run(proj)
     monkeypatch.setenv("CAGE_DEBUG", "1")
-    debuglog.heartbeat(proj, "codex", "import", "/first")
-    debuglog.heartbeat(proj, "codex", "import", "/second")
+    debuglog.heartbeat(proj, "kiro", "import", "/first")
+    debuglog.heartbeat(proj, "kiro", "import", "/second")
     seen = debuglog.last_seen(proj)
-    assert seen[("codex", "import")]["cwd"] == "/second"
+    assert seen[("kiro", "import")]["cwd"] == "/second"
 
 
 # --- import instrumentation (the surviving capture path) ---------------------

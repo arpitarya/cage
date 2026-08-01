@@ -28,8 +28,8 @@ Scanning is **read-only and side-effect-free by construction**: no artifact is e
 executed, no `cage import` runs, nothing is written. Executing a probe could not
 distinguish "verb dead" from "cage absent" anyway — that ambiguity is the whole bug.
 
-Scope note: this scans **user-level** artifacts too (`~/.copilot/hooks`,
-`~/.codex/config.toml`, `.git/hooks`, the global skill/prompt/steering copies). Both
+Scope note: this scans **user-level** artifacts too (`~/.copilot/hooks`, `.git/hooks`,
+the global skill/prompt/steering copies). Both
 real-world failures were user-level, so a liveness check that skipped them would miss
 its own reason to exist. `doctorcmd._portability` stays committed-only — it answers a
 different question (what ships to teammates).
@@ -142,7 +142,7 @@ def is_dead_cage_command(command: str) -> bool:
 
     This is the staleness half of the wiring filters; `paths.is_cage_import_command`
     is the collapse half. The wire modules take the **union**, which is what preserves
-    `import-claude`/`import-codex` healing after the substring predicate was retired."""
+    `import-claude` healing after the substring predicate was retired."""
     verbs = paths.cage_verb_path(command)
     return bool(verbs) and not is_live_verb(verbs)
 
@@ -189,7 +189,7 @@ def hook_commands(path: Path, key: str = "command") -> list[str]:
     out = []
     for entries in cfgio.load_json(path).get("hooks", {}).values():
         for e in entries:
-            if isinstance(e, dict) and "hooks" in e:      # claude/codex nesting
+            if isinstance(e, dict) and "hooks" in e:      # claude's nested form
                 out += [h.get(key, "") for h in e.get("hooks", [])]
             elif isinstance(e, dict):                      # copilot flat entries
                 out.append(e.get(key, ""))
@@ -201,8 +201,8 @@ def committed_artifacts(root: Path) -> list[tuple[str, str]]:
     set `doctorcmd._portability` also walks — it stays committed-only because its
     question is "what ships to a teammate", not "does this still run"."""
     out: list[tuple[str, str]] = []
-    for rel in (".claude/settings.json", ".codex/hooks.json"):
-        out += [(rel, c) for c in hook_commands(root / rel)]
+    out += [(".claude/settings.json", c)
+            for c in hook_commands(root / ".claude" / "settings.json")]
     for rel, key in ((".mcp.json", "mcpServers"), (".vscode/mcp.json", "servers")):
         srv = cfgio.load_json(root / rel).get(key, {}).get("cage", {})
         if srv.get("command"):
@@ -225,17 +225,6 @@ def user_artifacts(root: Path) -> list[tuple[str, str]]:
     srv = cfgio.load_json(kiro_mcp).get("mcpServers", {}).get("cage", {})
     if srv.get("command"):
         out.append((display_path(kiro_mcp), " ".join([srv["command"], *srv.get("args", [])])))
-    codex_cfg = paths.codex_home() / "config.toml"
-    if codex_cfg.exists():
-        try:
-            text = codex_cfg.read_text(encoding="utf-8")
-        except OSError:
-            text = ""
-        m = re.search(r'\[mcp_servers\.cage\]\ncommand = "([^"\n]*)"\nargs = \[([^\]\n]*)\]',
-                      text)
-        if m:
-            args = " ".join(a.strip().strip('"') for a in m.group(2).split(","))
-            out.append((display_path(codex_cfg), f"{m.group(1)} {args}".strip()))
     git_hooks = root / ".git" / "hooks"
     for name in ("post-commit", "prepare-commit-msg"):
         path = git_hooks / name
@@ -339,7 +328,7 @@ def run(root: Path, *, assets: bool = True) -> Scan:
 
 class Artifact(NamedTuple):
     """One inventory row."""
-    agent: str      # "claude" | "copilot" | "kiro" | "codex" (orphaned) | "" (shared)
+    agent: str      # "claude" | "copilot" | "kiro" | "" (shared)
     kind: str       # "mcp" | "git-hook" (foreign only) | "shim" | "other"
     scope: str      # "project" | "global"
     display: str
@@ -482,8 +471,8 @@ def _git_hook_foreign(root: Path) -> list[Artifact]:
 
 def _leftover(root: Path, covered: set[str]) -> list[Artifact]:
     """Anything the raw enumeration finds that isn't part of a known agent's expected
-    set — an orphaned pre-removal artifact (`.codex/hooks.json`) or a stray cage
-    command in an unanticipated slot. Never invented, never silently dropped."""
+    set — an orphaned pre-removal hook artifact or a stray cage command in an
+    unanticipated slot. Never invented, never silently dropped."""
     out: list[Artifact] = []
     for display, command, committed in (
             [(d, c, True) for d, c in committed_artifacts(root)]
@@ -503,12 +492,11 @@ def _leftover(root: Path, covered: set[str]) -> list[Artifact]:
 
 def _leftover_agent(display: str) -> str:
     """A cosmetic label for a leftover row — e.g. a lingering global
-    `~/.claude/settings.json` no current wire module writes, or the pre-removal
-    `.codex/`. Never used for the expected-set/rollup computation (that's `_SPECS`
-    keyed on `agents.SURFACES` alone) — display only, so it can't misclassify what
-    counts as "wired"."""
+    `~/.claude/settings.json` no current wire module writes. Never used for the
+    expected-set/rollup computation (that's `_SPECS` keyed on `agents.SURFACES`
+    alone) — display only, so it can't misclassify what counts as "wired"."""
     low = display.lower()
-    for tag in (".codex", "codex"), (".claude", "claude"), ("copilot", "copilot"), (".kiro", "kiro"):
+    for tag in ((".claude", "claude"), ("copilot", "copilot"), (".kiro", "kiro")):
         if tag[0] in low:
             return tag[1]
     return ""
@@ -517,7 +505,7 @@ def _leftover_agent(display: str) -> str:
 def inventory(root: Path) -> Inventory:
     """The full per-artifact installed inventory (`cage doctor --wiring`), grouped by
     scope + agent. The agent list is `agents.SURFACES` — never hand-written here, so
-    a future agent (or codex's removal) updates this automatically. Read-only: builds
+    adding or removing an agent updates this automatically. Read-only: builds
     entirely on `run()`'s enumeration; nothing is executed or healed."""
     from cage import agents
 

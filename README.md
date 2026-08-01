@@ -220,7 +220,7 @@ cage data export --csv calls --since 30d -o calls.csv   # raw ledger rows for a 
 
 ## The `$0` guarantee
 
-Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 983 tests; `cage demo` reproduces the worked attribution example against a real ledger.
+Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 995 tests; `cage demo` reproduces the worked attribution example against a real ledger.
 
 **Honest limits.** Marginal-by-fixed-order is defensible and `$0`, but it is an *ordering convention*, not a Shapley value (that's a deferred audit mode). And a counterfactual cell is an honest reconstruction, never an invoice — the `method` column says so on every row, on purpose.
 
@@ -228,7 +228,7 @@ Every derived view is parse / arithmetic over the log — **no LLM call, ever, o
 
 Latest release below — full history and detail in [CHANGELOG.md](CHANGELOG.md).
 
-- **v0.38.0 (2026-08-01) — graphify is metered on Windows.** The PATH interceptor was one extensionless bash script, and Windows resolves a bare `graphify` only through `PATHEXT`, so cage's shim could never be *found* there. It now ships as a twin pair with a `graphify.cmd` — plain text, no `.exe`, nothing compiled — against one written [behaviour contract](docs/shim-contract.md) whose divergences (cmd has no `exec`) are documented rather than pretended away. `cage doctor` learned the matching liveness check, so an interceptor this OS cannot resolve is a failure instead of a green tick, and CI grew a `$0` graphify leg on all three OSes that installs the real binary and asserts a bare `graphify query` files a savings row. See [CHANGELOG.md](CHANGELOG.md) for the full accounting.
+- **v0.39.0 (2026-08-02) — OTel GenAI export; Codex agent residue removed.** `cage data export --otel` writes the ledger as OpenTelemetry GenAI-conformant JSON — a third one-way reporting format beside `--csv`/`--study` — with the pre-stable semconv target pinned in one constant and stamped on every document, and cage-only receipts/savings kept out of the `gen_ai.*` namespace entirely. Separately, the Codex-**agent** residue left behind by v0.33.0's removal is gone (`paths.codex_home()`, the wiring/doctor scans, the env allowlist entry) while the *model ids* Copilot emits (`gpt-5.x-codex`, `codex-mini-latest`) stay byte-identical in `data/prices.toml`, now pinned by a regression guard. See [CHANGELOG.md](CHANGELOG.md) for the full accounting.
 
 ## The name
 

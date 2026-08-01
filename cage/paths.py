@@ -11,8 +11,8 @@ from typing import NamedTuple
 
 def cage_bin() -> str:
     """Absolute path to the `cage` executable, for the commands cage writes into agent
-    hook files. **GUI-launched agents** (Kiro IDE, the Copilot extension, a Codex app)
-    run hooks with a minimal PATH that omits `~/.local/bin`, so a bare `cage` in a hook
+    hook files. **GUI-launched agents** (Kiro IDE, the Copilot extension) run hooks
+    with a minimal PATH that omits `~/.local/bin`, so a bare `cage` in a hook
     fails silently with 'command not found' and nothing is captured — the #1 reason a
     wired hook doesn't fire. Resolve it at wire time; fall back to the package's own
     console-script dir (`Scripts\\cage.exe` beside a Windows interpreter), then bare."""
@@ -103,7 +103,7 @@ def cage_verb_path(command: str) -> tuple[str, ...]:
     """The verb tokens of a cage command — `()` for a foreign (non-cage) command.
 
     ``cage insights attrib --csv`` → ``("insights", "attrib")``; ``cage import --agent
-    codex`` → ``("import",)``. Stops at the first flag, and keeps at most two levels
+    claude`` → ``("import",)``. Stops at the first flag, and keeps at most two levels
     (cage's parser is two deep: a group verb plus its subcommand)."""
     tail = cage_tail_any(command)
     if tail is None:
@@ -119,11 +119,11 @@ def cage_verb_path(command: str) -> tuple[str, ...]:
 def is_cage_import_command(command: str) -> bool:
     """True if ``command`` is a cage ``import …`` hook command (any agent/flags), in
     binary, shim, or self-locating one-liner form. Lets the wiring collapse a
-    superseded per-agent import (e.g. `cage import --agent codex`) into the current
+    superseded per-agent import (e.g. `cage import --agent claude`) into the current
     per-agent import on re-setup, instead of leaving both.
 
     Deliberately **exact** on the verb (not the old `" import"` substring): a dead
-    `import-claude`/`import-codex` is no longer caught here but by
+    hyphenated `import-<agent>` is no longer caught here but by
     `wiringscan.is_dead_cage_command`, and the wiring filters take the union of the
     two. Same commands healed, non-accidental reason — see tests/test_wiringscan.py."""
     return cage_verb_path(command)[:1] == ("import",)
@@ -373,10 +373,6 @@ def claude_project_slug(project: Path) -> str:
     return re.sub(r"[^a-zA-Z0-9]", "-", str(project.resolve()))
 
 
-def codex_home() -> Path:
-    return Path(os.environ.get("CODEX_HOME", Path.home() / ".codex"))
-
-
 def copilot_home() -> Path:
     """Copilot CLI home (`$COPILOT_HOME` or ~/.copilot). Holds `session-state/<id>/
     events.jsonl` (the usage log) and `hooks/` (the lifecycle hook config)."""
@@ -608,7 +604,9 @@ def materialize_sources(text: str, seed: list[dict] | None = None) -> str:
 # Resolution happens in ONE place (:func:`resolve_log_sources`); the import sweep and
 # `cage doctor --paths` both consume its provenance-tagged form. Additive: no
 # `[sources]` ⇒ the built-in registry byte-for-byte, so capture is unchanged for
-# everyone who doesn't use it (docs/sources.md).
+# everyone who doesn't use it. Explained live by `cage query sources`.
+# NB: this 'byte-for-byte fallback' wording predates Directive A — reconcile when
+# CMD-SYNC lands (docs/proposals/claude-md-sources-authority.md).
 
 class LogSource(NamedTuple):
     """One candidate log location, tagged with where it came from. ``provenance`` is

@@ -16,6 +16,192 @@ Entry format:
 
 ---
 
+## 2026-08-02 — shim-contract B8 diagnosis corrected + B8a added (docs-only)
+
+- **Milestone:** the living spec no longer carries a disproved technical claim; the real
+  Windows fact that cost five pushes is now written where future interceptors inherit it.
+- **Implemented (documentation only):**
+  - `docs/shim-contract.md` **B8** — the flat-`for` requirement no longer justifies
+    itself with the `call`/`goto` stack-leak hypothesis (which did **not** fix the
+    observed failure). Retained on its own merits, correction marked and dated, sourced
+    from the v0.38.0 CHANGELOG written by the debugging session.
+  - **B8a (new)** — no `<`/`>` inside a parenthesized block, *including in `rem`
+    comments*: cmd.exe tokenizes redirection characters there because `rem` is a command
+    whose line is still parsed. Binding on this twin and on every future interceptor.
+  - Test-harness corollary — keep `%SystemRoot%\System32` on `PATH` for the shim's own
+    `findstr.exe`/`where.exe`; prepend tmp dirs, never wipe, never inherit wholesale.
+  - `docs/OPEN-WORK.md` — WIN-CI closed and removed; State corrected to released.
+- **Why:** the CHANGELOG had been corrected but the contract had not, leaving history
+  truthful and the spec wrong — the inverse of this repo's docs law.
+- **Files:** `docs/shim-contract.md` · `docs/OPEN-WORK.md` · `docs/WORKLOG.md`
+- **Tests:** none run — documentation only; no code touched. Suite last green at 995.
+- **Next step:** ADOPT.
+
+## 2026-08-02 — OTEL: `cage data export --otel` — GenAI-conformant JSON, pre-stable spec pinned
+
+- **Milestone:** `cage data export --otel` ships, closing the OTEL item off
+  OPEN-WORK.md's Pending table.
+- **Implemented:** new module `cage/otelout.py` renders calls → `gen_ai.system` /
+  `gen_ai.request.model` / `gen_ai.usage.input_tokens` / `output_tokens` /
+  `gen_ai.client.operation.duration` (seconds, from `latency_ms`; omitted, never a
+  fabricated zero, when latency was never captured). Wired `--otel` into `cage data
+  export` (`cage/cli.py`, `cage/exportcmd.py`), mutually exclusive with
+  `--csv`/`--format`/`--study` (typed `CageError`). **Decision — receipts/savings
+  have no GenAI equivalent**: cage-namespaced under `cage.savings[].cage.*`, never an
+  invented `gen_ai.*` name; `cage.saved` is GROSS, `cage.saved_usd` prices through
+  the existing `receiptprice` resolution ladder (`price_at` → `task-model` →
+  refusal) and is omitted — never `$0` — on an UNPRICED refusal or a non-money unit
+  (`ms`/`gco2`); `cage.method` always survives. Legacy Tier-1 human-axis rows are
+  excluded and counted in `cage.meta.legacy_human_excluded`, same predicate
+  `report.py` uses. **Pinned the pre-stable semconv target**:
+  `constants.OTEL_SEMCONV_VERSION = "1.42.0"` / `OTEL_SEMCONV_STATUS = "pre-stable"`,
+  stamped in every document's `cage.meta` block and interpolated live into `cage
+  query otel-export` (new registry entry, `explain.py`'s `_live()` gained
+  `semconv`/`semconv_status`). `--agent`/`--project` filter the `calls` array only —
+  receipts have neither field, and the pricing ladder is built from the *unfiltered*
+  call set so a call-less receipt can still resolve its task-model rung.
+- **Files:** `cage/otelout.py` (new), `cage/constants.py`, `cage/exportcmd.py`,
+  `cage/cli.py`, `cage/clicmds.py`, `cage/explain.py`, `cage/explain_data.py`,
+  `tests/test_otel_export.py` (new, 13 tests).
+- **Tests:** green — 982 → 995 (13 new), full suite `python -m pytest -q`.
+- **Docs:** proposal `otel-genai-export.md` and the handoff/prompt pair archived to
+  `docs/archive/v0.39-otel-{export.handoff,export.prompt,genai-export.proposal}.md`
+  (implemented-for-v0.39, unreleased); `docs/proposals/README.md`,
+  `docs/archive/README.md`, `docs/README.md` (Active work emptied),
+  `docs/OPEN-WORK.md`, `docs/DOC-REGISTRY.md`, `CHANGELOG.md` (new `## Unreleased —
+  OTel GenAI export (OTEL)` section), `README.md` + `CLAUDE.md` test counts, and a
+  new `CLAUDE.md` **OTel GenAI export** architecture bullet all updated in this
+  change.
+- **Next:** nothing carried forward — no residual. `cage data export --otel`'s
+  sample document and the receipts/savings decision are reproducible via `cage query
+  otel-export` and `tests/test_otel_export.py`.
+
+## 2026-08-02 — CMD-SYNC: `prices.toml` split applied to CLAUDE.md; `[sources]` authority declined
+
+- **Milestone:** CMD-SYNC fully resolved — one CLAUDE.md docs proposal applied
+  verbatim, one independently re-verified and declined. Zero code changes.
+- **Implemented:** applied `claude-md-prices-file` — the one-way-data-flow diagram +
+  caption now name `cage.toml` (order/budgets/routing) and `prices.toml` (model
+  prices, `[credits]`) as the two config inputs; new **Prices file** architecture
+  bullet (`Footprint.prices`); **Pricing is managed** Must-Know bullet states the
+  two-file write split (`prices set`/`sync` → `prices.toml`; `alias`/`route-tool` →
+  `cage.toml`); **State cleanup** NEVER list gained `prices.toml`; constants/
+  numbers-layers phrasing updated. Governing sentence kept verbatim: *vendor facts
+  move, routing decisions stay*. `grep -c prices.toml CLAUDE.md`: 0 → 10.
+- **Declined (no code):** `claude-md-sources-authority` — independently re-verified
+  against `cage/paths.py` `resolve_log_sources`'s docstring, which still reads *"an
+  empty/absent `[sources]` returns exactly the built-in registry"*, matching what
+  CLAUDE.md already said. The proposal asked CLAUDE.md to assert the opposite
+  (`[sources]` as the sole authority, no runtime fallback) — a Directive A end-state
+  that never shipped. Applying it would have replaced a true statement with a false
+  one, so it was not applied.
+- **Files:** `CLAUDE.md`; both proposals moved to
+  `docs/archive/v0.39-claude-md-{prices-file,sources-authority}.proposal.md`; the
+  handoff+prompt pair moved to `docs/archive/v0.39-claude-md-sync.{handoff,prompt}.md`;
+  `docs/proposals/README.md`, `docs/README.md`, `docs/OPEN-WORK.md`,
+  `docs/archive/README.md`, `docs/DOC-REGISTRY.md` updated.
+- **Tests:** green — 995 passed / 0 failed / 10 skipped (unchanged by this docs-only
+  change; `git diff --stat cage/` carries no edits from this session).
+- **Next:** none — CMD-SYNC has no residual. Directive A (making `[sources]` the sole
+  authority) stays unfiled unless it is explicitly wanted — it would be a code change.
+
+## 2026-08-01 — DEBT: `paths.py` split-on-contact rule landed; Part 2 declined
+
+- **Milestone:** DEBT fully resolved — one CLAUDE.md rule shipped, one feature request
+  closed as unnecessary after its premise failed verification a third time.
+- **Implemented:** Part 1 — added the **`paths.py` splits on contact, never wholesale**
+  bullet to `CLAUDE.md`'s "Must-Know Rules" (beside the "renamed or removed verb" rule).
+  Names the four seams (`routing.py`/`logsources.py`/`agenthomes.py`/`footprint.py`) and
+  CODEX-OUT's earned clause — a deletion and a move never share a diff.
+- **Declined (no code):** Part 2 (a one-line state header above `_ROOT_HELP` on bare
+  `cage`) was never built. Verifying the prompt's own required first step (`run cage
+  with no args`) showed bare `cage` dispatches to `clicmds.cmd_overview` (`cli.py:651`),
+  not `_ROOT_HELP` — and `cmd_overview` already prints tokens · calls · unpriced ·
+  last-import, with deliberate capture-on-read (`cli.py:114`). Both the original
+  proposal ("prints argparse usage") and the handoff's "correction" ("prints
+  `_ROOT_HELP`") were wrong; this is the **second** independent verification reaching
+  the same conclusion (the first closed it in an earlier session same day — see
+  `docs/WORKLOG.md`). Offered the human four rescope options; chose "leave Part 2 alone
+  entirely."
+- **Files:** `CLAUDE.md` · `docs/proposals/README.md` · `docs/README.md` ·
+  `docs/OPEN-WORK.md` · `docs/archive/v0.39-structural-debt.{proposal,handoff,prompt}.md`
+  (new) · `docs/proposals/structural-debt.md`, `docs/structural-debt.{handoff,prompt}.md`
+  (removed, superseded by the archive copies)
+- **Tests:** not run — no code changed, docs/CLAUDE.md only.
+- **Next:** WIN-CI (unaffected, unrelated track).
+
+## 2026-08-01 — CODEX-OUT: the Codex agent's residue is gone; its model ids are not
+
+- **Milestone:** `grep -riI codex cage/` returns **only** category 2 (the OpenAI model
+  rows in `data/prices.toml` + `policy.normalize_model`'s effort fold). The agent is
+  fully out; live Copilot pricing is provably untouched.
+- **Implemented:**
+  - **Deleted (the agent):** `paths.codex_home()` + its `CODEX_HOME` env read ·
+    `wiringscan`'s `~/.codex/config.toml` MCP scan, its `.codex/hooks.json` entry in
+    `committed_artifacts`, and the `.codex` tag in `_leftover_agent` ·
+    `doctorcmd`'s `hooks_cmds(".codex/hooks.json")` · `"CODEX_HOME"` from
+    `doctorbundle._CAGE_ENVS` · the `~/.codex/config.toml` mention in `explain_data`'s
+    stale-wiring entry · `agents.py`'s removal paragraph.
+  - **Kept, deliberately (the model family):** all 20 `gpt-5.x-codex` /
+    `codex-mini-latest` rows in `data/prices.toml` (**byte-identical — verified by an
+    empty `git diff` and an unchanged sha256**) and `policy.normalize_model`'s
+    `…-codex-high` → `…-codex` fold. These are OpenAI ids **Copilot emits**; deleting
+    them would silently UNPRICE a supported agent.
+  - **New regression guard:** `test_pricing.test_codex_model_ids_are_not_the_codex_agent`
+    prices a `agent="copilot"` call on every one of the seven codex ids and asserts the
+    effort-suffix fold still resolves to the base row. The next blind
+    `grep -i codex && delete` now fails loudly instead of costing money.
+  - **Prose (drop the word, keep the sentence):** `schema.py` · `ledger.py` ·
+    `report.py` (the `--project` caveat) · `proxy.py` · `runshim.py` · `paths.py`.
+  - **`paths.py:106/122/126`** (the three judgement calls): all three are *docstring
+    examples* of verb-tail parsing, not behaviour. 106/122 re-pointed at
+    `--agent claude`; 126's `import-claude`/`import-codex` pair generalised to
+    `import-<agent>`. `import-codex` is still caught as a dead verb by the live parser
+    — the detector never enumerated agent names, so nothing was lost.
+  - **Trade-off recorded, not buried:** a pre-v0.33 `~/.codex/config.toml` can no longer
+    be scanned for a dead `cage` verb — the user-level F1 class. Named in the CHANGELOG
+    `Removed` entry per Arpit's call.
+  - **DEBT:** `paths.py` deliberately **not** split. The verdict — *a deletion and a
+    move never share a diff* — was promoted by the concurrent DEBT session into
+    `CLAUDE.md`'s `paths.py`-splits-on-contact rule, alongside the `agenthomes` seam;
+    the motivating proposal is archived as
+    `docs/archive/v0.39-structural-debt.proposal.md`.
+- **Files:** `cage/{paths,wiringscan,doctorcmd,doctorbundle,explain_data,agents,schema,
+  ledger,report,proxy,runshim}.py` · `tests/{test_wiringscan,test_pricing,conftest,
+  goldenseed,test_estimate,test_debuglog,test_capture_on_read,test_prices_cli,
+  test_universal_capture,test_zipapp,test_substrate,test_debug_coverage,
+  test_doctor_bundle}.py` · `CHANGELOG.md` · `README.md` · `CLAUDE.md` ·
+  `docs/{OPEN-WORK,README,DOC-REGISTRY}.md` · `docs/proposals/structural-debt.md` ·
+  `docs/archive/v0.39-codex-purge.{handoff,prompt}.md` (+ archive README row).
+- **Tests:** green — **982 passed, 10 skipped** (was 983/10: two codex cases deleted,
+  one guard added). **No golden needed re-blessing** — the removed text appears in no
+  golden fixture, and `tests/fixtures/goldens/P1.txt`'s seven codex *price* rows are
+  category 2 and unchanged.
+- **Next:** OTEL or DEBT (both parallel-safe); v0.39 is uncommitted and unreleased.
+
+## 2026-08-01 — Dead doc-citation sweep + Codex legacy labelling ⚠️ UNVERIFIED
+
+- **Milestone:** every dangling `docs/*.md` pointer in source is resolved; the Codex
+  residue is documented as deliberate rather than looking like dead code.
+- **Implemented (comments/docstrings only, no logic):**
+  - 11 citations re-pointed across `cli`, `attribution`, `calibration`, `capturelog`,
+    `importcmd`, `paths`, `compare`, `study`, `csvout`, `exportcmd`, `explain_data`.
+    Dead targets were `cli-output-spec.md`, `csv-output.md` (×6),
+    `debugging-capture.md` (×2), `sources.md`.
+  - `paths.codex_home()` gained a docstring stating it is **legacy-only** and why the
+    scan must survive (pre-v0.33 machines hold a stale cage command; deleting the scan
+    is the user-level F1 class), plus the deletion condition.
+  - `doctorcmd`'s `.codex/hooks.json` scan gained the same one-line note.
+  - `CLAUDE.md`: new rule — **deleting a doc is a citation migration**, with the sweep
+    command inline.
+- **Deliberately not done:** removing Codex scanning (it is stale-artifact detection,
+  not support) · changing `paths.py`'s pre-Directive-A `[sources]` wording (that is
+  CMD-SYNC, awaiting accept — flagged inline so they land together).
+- **Files:** 12 modules + `CLAUDE.md` · `docs/WORKLOG.md`
+- **Tests: NOT RUN** — Cowork sandbox is Python 3.10, cage needs 3.11+. All 12 files
+  verified to parse. **Run `just test` before commit.**
+- **Next step:** `just test`, then WIN-CI.
+
 ## 2026-08-01 — v0.38.0: GF-DEBT — the six honesty debts WIN-GF/CI-GF left behind
 
 - **Implemented, all six, same change as v0.38.0 (never shipped separately):**

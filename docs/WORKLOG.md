@@ -12,6 +12,166 @@ by milestone) — the worklog is what *happened this session*.
 
 ---
 
+## 2026-08-02 (Cowork) — WIN-CI closed; the living spec still held the wrong diagnosis
+
+- **Asked:** v0.38.0 is released after the first-ever Windows CI run went red on two
+  real bugs — is anything left to do?
+- **Yes, one thing that mattered, and it was not bookkeeping.** The CHANGELOG's
+  diagnosis was corrected (commit `d29dea7`), but **`docs/shim-contract.md` B8 still
+  carried the superseded hypothesis** — that a `call`/`goto` back-edge leaked cmd.exe
+  stack frames. The contract is the **living spec**; the changelog is history. So the
+  repo was in the inverted state its own docs law forbids: history held the truth, the
+  spec held a disproved technical claim stated as fact.
+- **Two concrete harms from leaving it:** a future agent would inherit a **false lesson**
+  ("`call`/`goto` causes recursion aborts"), and would **not** inherit the real one. And
+  TOOL-SDK's proposal says every future tool interceptor "implements this same shape" —
+  so the next interceptor's author would put a `<` in a `rem` and rediscover this from
+  scratch.
+- **Fixed:** B8 now states the flat `for` is retained on its own merits (provable
+  termination) and is **not** load-bearing against the abort, with the correction marked
+  and dated. Added **B8a — no `<` or `>` anywhere inside a parenthesized block,
+  including in comments**: cmd.exe tokenizes redirection characters inside a `rem`
+  nested in `(...)`, because `rem` is a *command* whose line is still tokenized, not a
+  comment in the sense the word implies. Also added the **test-harness corollary**:
+  leave `%SystemRoot%\System32` on `PATH` so the shim's own `findstr.exe`/`where.exe`
+  resolve — prepend tmp dirs onto system dirs, never the whole inherited PATH (which
+  would expose a real `cage` and defeat the "cage absent" assumption), never nothing.
+- **Why it belongs in the contract specifically:** it is invisible on POSIX, invisible
+  in review, and its error message points at recursion rather than at the character that
+  caused it. Five pushes and two wrong hypotheses is exactly the cost a written contract
+  exists to stop the *next* person paying.
+- **Bookkeeping:** WIN-CI removed from Pending with a closure entry; the State line
+  corrected from "built, in tree, uncommitted" to released-and-on-PyPI with the 12-job
+  green run recorded. Queue is now GF-LAUNCHER · ADOPT · NET-1 · TOOL-SDK · DOGFOOD ·
+  SKILLS · HR1 — **nothing blocked**.
+- **Noted, not filed:** Windows is now CI-*executed* but still not field-validated, and
+  the README already says exactly that — no change needed.
+- **Next step:** ADOPT (do agents invoke graphify at all), then NET-1.
+
+---
+
+## 2026-08-02 (Claude Code, Sonnet) — OTEL executed: `cage data export --otel` built end to end
+
+- **Asked:** execute `docs/otel-export.prompt.md` (picked up via the IDE selection) —
+  add `--otel` to `cage data export`, mapping calls to GenAI attributes and deciding
+  how receipts/savings (no GenAI equivalent) are represented, honoring the pre-stable
+  semconv finding from the handoff review.
+- **Did:** new module `cage/otelout.py`; `--otel` wired into `cage/cli.py` /
+  `cage/exportcmd.py` / `cage/clicmds.py`, mutually exclusive with
+  `--csv`/`--format`/`--study`. Pinned `constants.OTEL_SEMCONV_VERSION = "1.42.0"` /
+  `OTEL_SEMCONV_STATUS = "pre-stable"`, stamped in every document's `cage.meta` block.
+  **Decided:** receipts/savings are cage-namespaced (`cage.savings[].cage.*`) —
+  `cage.saved` GROSS, `cage.saved_usd` via the existing `receiptprice` ladder, omitted
+  (never `$0`) on an UNPRICED refusal or a non-money unit; no `gen_ai.*` name
+  invented. Calls omit `gen_ai.client.operation.duration` when `latency_ms` is 0
+  (never a fabricated zero-duration span). Added `cage query otel-export`
+  (`explain.py`'s `_live()` gained `semconv`/`semconv_status`) and 13 tests in
+  `tests/test_otel_export.py` covering the mapping, omission rules, determinism,
+  legacy-human exclusion, and the flag-combination errors.
+- **Verified:** full suite green, 982 → 995 (13 new, 0 regressions); manual smoke
+  of `cage data export --otel` against a seeded ledger, confirmed byte-identical
+  across two runs and combination errors render the right `CageError` text.
+- **Decided/open:** the duration attribute reuses the convention's *metric* name
+  (`gen_ai.client.operation.duration`) as a flat JSON key, since this export is an
+  attribute map, not real OTLP metrics/spans (out of scope per the handoff) — stated
+  in the module docstring rather than left implicit. Nothing left open; no residual
+  filed on OPEN-WORK.md.
+- **Docs:** proposal + handoff/prompt archived to
+  `docs/archive/v0.39-otel-{export.handoff,export.prompt,genai-export.proposal}.md`;
+  `docs/proposals/README.md`, `docs/archive/README.md`, `docs/README.md` (Active work
+  emptied), `docs/OPEN-WORK.md`, `docs/DOC-REGISTRY.md`, `CHANGELOG.md`, `README.md` +
+  `CLAUDE.md` test counts, and a new `CLAUDE.md` architecture bullet all updated in
+  this change, last (per the handoff's parallel-execution rule).
+- **Next:** none — OTEL is closed. Whatever CODEX-OUT/DEBT/CMD-SYNC leave behind in
+  OPEN-WORK.md's next-priority line (WIN-CI → ADOPT → NET-1) is unaffected by this
+  change.
+
+## 2026-08-02 (Claude Code, Sonnet) — CMD-SYNC executed: prices.toml applied, sources authority declined
+
+- **Asked:** execute `docs/claude-md-sync.prompt.md` — apply the `prices.toml` split
+  proposal to CLAUDE.md, decline the `[sources]` authority proposal, both docs-only.
+- **Independently re-verified proposal 2 before acting**, per the prompt's own
+  instruction. Read `cage/paths.py` `resolve_log_sources`'s full docstring: *"Precedence
+  per built-in agent: env override > policy `[sources]` > built-in … Fully additive: an
+  empty/absent `[sources]` returns exactly the built-in registry."* That is exactly what
+  CLAUDE.md already said. Same verdict as the handoff — **declined, not applied**.
+- **Did:** applied proposal 1 verbatim — the one-way-data-flow diagram + caption now
+  name `cage.toml` (order/budgets/routing) and `prices.toml` (model prices, `[credits]`)
+  separately; new **Prices file** architecture bullet
+  (`Footprint.prices`); **Pricing is managed** bullet states the two-file write split
+  (`prices set`/`sync` → `prices.toml`, `alias`/`route-tool` → `cage.toml`); **State
+  cleanup** NEVER list gained `prices.toml`; constants/numbers-layers phrasing updated.
+  `grep -c prices.toml CLAUDE.md`: 0 → 10. Governing sentence kept verbatim: **vendor
+  facts move, routing decisions stay.**
+  Archived both proposals to `docs/archive/v0.39-claude-md-{prices-file,sources-authority}.proposal.md`
+  and the handoff+prompt pair to `docs/archive/v0.39-claude-md-sync.{handoff,prompt}.md`.
+  Updated `docs/proposals/README.md` (both moved Active → Graduated), `docs/README.md`
+  (dropped from Active work — docs root carries no loose pair), `docs/OPEN-WORK.md`
+  (CMD-SYNC row removed from Pending, closure paragraph rewritten), `docs/archive/README.md`
+  index row added, `DOC-REGISTRY.md` rows bumped.
+- **Zero code changes** — `git diff --stat cage/` confirmed empty for this session's own
+  edits (the pre-existing uncommitted `cage/` diff in the tree predates this session,
+  from concurrent CODEX-OUT/DEBT/OTEL work). `just test`: 995 passed / 0 failed / 10
+  skipped (unchanged by this docs-only change).
+- **Decided/left open:** nothing — CMD-SYNC is fully resolved, no residual item filed.
+  Directive A (making `[sources]` the sole authority) stays unfiled unless requested —
+  it would be a code change, not a doc sync.
+- **Next step:** none for CMD-SYNC. Queue continues per `docs/OPEN-WORK.md`.
+
+## 2026-08-01 (Claude Code, Sonnet) — DEBT executed: Part 1 landed, Part 2 re-verified closed
+
+- **Asked:** execute `docs/structural-debt.prompt.md` (opened in the IDE, model just
+  set to Sonnet per the doc's own tier).
+- **Followed the prompt's own instruction literally.** Part 2 requires "run `cage` with
+  no args… If what you observe differs from this, stop and report" before building
+  anything. Ran it. Output: `cmd_overview`'s headline (tokens · calls · unpriced ·
+  last-import) **and a live capture-on-read that imported 3004 real calls** into my
+  actual `~/.cage` ledger — not `_ROOT_HELP`. Stopped, as instructed.
+- **This is the same finding an earlier session already closed the same day** (see the
+  "DEBT Part 2 CLOSED" entry below) — I had not read that entry yet when I hit this
+  independently, so it's now a **third** confirmation of the same false premise across
+  two different agents/sessions.
+- **Asked the human directly** (AskUserQuestion, since this changes what "done" means
+  for an already-decided handoff): four options — fix capture-on-read only, build the
+  state line and drop the overview call, stop and re-scope with a new handoff, or leave
+  Part 2 alone. **Chose: leave Part 2 alone entirely.**
+- **Did:** Part 1 landed — the `paths.py` splits-on-contact rule in `CLAUDE.md`
+  (Must-Know Rules, beside the removed-verb rule). Archived the resolved
+  proposal+handoff+prompt trio to `docs/archive/v0.39-structural-debt.*` (mixed outcome:
+  Part 1 implemented, Part 2 declined, both stated in the archive headers with a
+  claim-vs-truth table). Updated `docs/proposals/README.md` (Active → Graduated),
+  `docs/README.md` (dropped from Active work), `docs/OPEN-WORK.md` (DEBT row removed
+  from Pending, closure paragraph rewritten to point at the archive), `IMPLEMENTATION.md`
+  entry added.
+- **Decided/left open:** nothing — DEBT is fully resolved, no residual item filed.
+- **Note on environment:** heavy concurrent activity in this working tree during the
+  session (CODEX-OUT landed mid-session, ~30 files touched) — re-read every shared doc
+  immediately before editing it to avoid clobbering concurrent writes; no collisions hit.
+- **Next:** unchanged — WIN-CI, then whatever OPEN-WORK names next.
+
+## 2026-08-01 (Claude Code, Opus) — CODEX-OUT: purge the Codex agent, protect Codex pricing
+
+- **Asked:** execute `docs/codex-purge.prompt.md`. Remove every Codex reference —
+  *except* the two that aren't the agent. No paid LLM calls; cage tree stays uncommitted.
+- **Done:** classified all 116 `codex` hits in `cage/` + `tests/` into the three
+  categories **before** deleting anything, then executed category by category.
+  Category 1 (the agent) deleted from `paths`/`wiringscan`/`doctorcmd`/`doctorbundle`/
+  `explain_data`/`agents` and from the test env-redirects + codex cases. Category 3
+  (stale prose) had the word dropped from six modules. **Category 2 held**:
+  `data/prices.toml` is byte-identical (empty `git diff`, unchanged sha) and a new guard
+  test prices a Copilot call on all seven `gpt-5.x-codex` ids. Suite 983 ⇒ **982 green**;
+  no golden moved. Pair archived to `docs/archive/v0.39-codex-purge.*`; CHANGELOG,
+  OPEN-WORK, IMPLEMENTATION, archive index, README/CLAUDE.md test counts updated.
+- **Decided:** (a) `paths.py:106/122/126` are all docstring *examples*, not migration
+  behaviour — re-pointed at `claude` / generalised to `import-<agent>`; the dead-verb
+  detector is the live parser and never enumerated agent names, so `cage import-codex`
+  is still reported dead. (b) The handoff **mis-filed `test_output_spec.py`** under
+  "delete codex cases" — its only hit is `prices set openai gpt-5.3-codex`, category 2,
+  kept. (c) `paths.py` deliberately not split; `agenthomes` stays a named seam.
+- **Open:** the accepted trade — a pre-v0.33 `~/.codex/config.toml` keeps a dead `cage`
+  verb undetected. Named in the CHANGELOG `Removed` entry, by design.
+- **Next step:** OTEL or DEBT (both parallel-safe with this, now landed).
+
 ## 2026-08-01 (Claude Code, Sonnet) — GF-DEBT: close the six honesty debts WIN-GF/CI-GF left
 
 - **Asked:** execute `docs/graphify-honesty-debts.prompt.md` before v0.38.0 is
@@ -329,6 +489,209 @@ by milestone) — the worklog is what *happened this session*.
   partitioning). Not filed as new OPEN-WORK items in this pass — flagging here for
   whoever picks up next to triage and file if still red.
 - **Next:** **K — relabel `saved` as gross** (proposal B), OPEN-WORK's next item.
+
+## 2026-08-01 (Cowork) — CMD-SYNC: one proposal applies, one is WRONG and declined
+
+- **Asked:** review both CLAUDE.md proposals, produce a pair, and can they run in
+  parallel?
+- **Verdict: apply `claude-md-prices-file`, DECLINE `claude-md-sources-authority`.**
+- **✅ Proposal 1 verified true against code:** `data/prices.toml` exists,
+  `policy._BUNDLED_PRICES` loads it, `_bundled()` merges both files — and **CLAUDE.md
+  mentions `prices.toml` exactly zero times** while its flow diagram still reads
+  `cage.toml (prices/order/budgets)`. The file every agent loads names the wrong home
+  for the vendor rate card. Real, load-bearing, apply.
+- **❌ Proposal 2 is wrong — applying it would make CLAUDE.md lie.** It asks CLAUDE.md to
+  say `[sources]` is the *only* path source with no built-in fallback. But
+  `paths.resolve_log_sources`'s own docstring says: *"env override > policy `[sources]`
+  > built-in … **Fully additive: an empty/absent `[sources]` returns exactly the built-in
+  registry**"* — which is what CLAUDE.md **already** says. The proposal describes a
+  Directive A end-state that **never fully shipped**: the `sources_seed`/`sources_drift`
+  machinery exists, the runtime fallback was never removed. Declined, archived with the
+  contradicting docstring cited as evidence.
+- **⚠️ Correction to my own review from earlier today.** I reported both proposals
+  "verified still needed — CLAUDE.md stale on both". I had compared CLAUDE.md against
+  each proposal's *quoted* "current text" and inferred staleness. **I never checked the
+  code.** Proposal 2 isn't stale documentation, it's an unbuilt design. The error is
+  recorded in the handoff and in the proposal itself rather than quietly fixed — it is
+  the same failure I keep catching in the plan files (a marker is an assertion, not
+  evidence), this time in my own review.
+- **Parallel: NO, and moot.** Both edit `CLAUDE.md` — overlapping regions of one dense
+  reference file, a guaranteed conflict for zero speedup. And after the review only one
+  job remains, so there is nothing to parallelise. Flagged that CLAUDE.md was edited
+  **three times today** (CODEX-OUT, DEBT, the doc-citation sweep), so the executor must
+  re-read it rather than work from a remembered copy.
+- **Residual noted, not filed:** if Directive A is actually wanted, it is a *code*
+  change (remove the fallback, make no-`[sources]` loud) — a feature, not a doc sync.
+  Nothing indicates it is wanted.
+- **The prompt makes the executor re-verify proposal 2 independently** and stop if they
+  disagree, rather than trusting my verdict — I was wrong on this exact question once.
+- **Next step:** unchanged — WIN-CI; CMD-SYNC and OTEL are both ready.
+
+---
+
+## 2026-08-01 (Cowork) — DEBT Part 2 CLOSED: my premise was wrong twice, verified
+
+- **Asked:** the executing agent found Part 2's premise false *again* and offered four
+  scopes. Chose: **leave Part 2 alone / close it.**
+- **Verified in code before answering** (having been wrong twice, I did not take either
+  side on trust): `cli.py:651` — no subcommand → `clicmds.cmd_overview`, **not**
+  `_ROOT_HELP`. `cmd_overview` calls `captured_read_root()`. And `cli.py:114` states the
+  intent outright: `_capture_flags(p)  # bare cage (overview) is a read too —
+  capture-on-read applies`.
+- **Both of my premises were false, in opposite directions.** Proposal: "prints argparse
+  usage". Handoff v1: "prints `_ROOT_HELP`, state is missing". Truth: `cmd_overview`
+  already prints tokens · calls · unpriced · last-import — *the exact gap I re-scoped to
+  already had a feature.*
+- **Worse: my v1 acceptance criterion would have caused a regression.** I required "a
+  test proves bare `cage` writes nothing" and called it the one way the feature could do
+  harm. That capture-on-read is **designed** — Phase 1's *a number is never staler than
+  the instant it's shown* — and is gated, throttled, fail-open, `--no-import`-escapable
+  and stderr-announced. Suppressing it would make the one command whose job is showing
+  state show stale state. Flagged in both docs as **do not implement**.
+- **Why closed rather than re-scoped a third time:** two independent premises collapsed
+  on inspection. An item that evaporates each time it is examined is telling you
+  something. v0.38 is uncommitted with WIN-CI and CODEX-OUT queued behind it.
+- **Corrected rather than quietly rewritten:** the handoff keeps a claim-vs-truth table,
+  the prompt carries an explicit *ignore the earlier draft* warning, and the proposal
+  keeps its original wrong text below the closure note. The error is the useful record.
+- **Part 1 survives untouched** — a CLAUDE.md rule has no premise to be wrong about.
+- **Next step:** unchanged — WIN-CI, then CODEX-OUT / OTEL.
+
+---
+
+## 2026-08-01 (Cowork) — OTEL specced; parallelism answered with a file-overlap map
+
+- **Asked:** review `otel-genai-export.md`, produce a pair, and can it run in parallel
+  with CODEX-OUT and DEBT?
+- **⚠️ Review finding that changed the design.** The proposal called OTel GenAI "the
+  enterprise lingua franca". **It is pre-stable** — as of semconv v1.42.0 (June 2026)
+  `gen_ai.*` moved to its own repo, has no 1.0, is labelled *Development*, and names can
+  still change between versions. That collides directly with cage's determinism law
+  (same ledger ⇒ same output), because an export tracking a moving spec silently changes
+  shape. **Design gained: pin the targeted semconv version in `constants.py`, stamp it
+  in the emitted document, and treat a spec bump as a deliberate changelog'd change —
+  the `prices_version` discipline.** Help text and docs must say "pre-stable".
+- **Second constraint written hard:** no `opentelemetry-*` dependency. Cage writes a
+  file; the collector ingests it. Adding an SDK to emit JSON would end `dependencies = []`,
+  which *is* the product.
+- **Third:** never invent a `gen_ai.*` attribute for cage-only data (receipts, savings
+  have no upstream equivalent) — omit or cage-namespace, decided and stated. And omit
+  rather than emit a `0` that reads as measured.
+- **Parallelism answered with an actual overlap map, not a guess.** CODEX-OUT touches 12
+  modules; DEBT touches `cli.py` + CLAUDE.md; OTEL touches `exportcmd.py` + a new module.
+  **Code collision ≈ zero.** The only real contact points are (1) `explain_data.py` —
+  CODEX-OUT edits the stale-wiring entry, OTEL adds a new one, different regions; and
+  (2) the **shared bookkeeping** — OPEN-WORK/WORKLOG/IMPLEMENTATION/CHANGELOG/DOC-REGISTRY
+  plus the **test-count line in README + CLAUDE.md**, which three concurrent agents would
+  certainly collide on.
+- **Rules issued:** code and tests first, shared docs **last** with a re-read; whoever
+  lands last owns the test count. If two run truly concurrently, **CODEX-OUT goes first**
+  — widest blast radius, most re-blessed goldens, far easier to land a small change on
+  top of it than the reverse. Serial-preferred order: CODEX-OUT → OTEL → DEBT.
+- **Next step:** unchanged — WIN-CI first; then any of the three.
+
+---
+
+## 2026-08-01 (Cowork) — DEBT specced; my own proposal's premise was false
+
+- **Asked:** a handoff + prompt for structural-debt.
+- **Split it honestly: the two halves are different animals.** Part 1 (`paths.py`) is a
+  **rule**, not a task — there is nothing to build beyond writing it into CLAUDE.md, and
+  a handoff that pretends otherwise would invent work. Part 2 is a real, small feature.
+- **⚠️ Found while spec'ing: part 2's premise was wrong — my own proposal's.** It claimed
+  *"`cage` with no args today prints argparse usage."* It does not. `cli._ROOT_HELP` is a
+  hand-written one-screen brief (daily verbs, grouped subcommands, five worked examples)
+  that the parser's formatter returns instead of argparse's dump. **The help is already
+  good.** Building a "landing flow" would have replaced something that works.
+- **Re-scoped to the real gap: *state*.** A user reads a fine menu and still can't tell
+  whether a ledger exists, whether capture ran, or whether anything is unpriced. So: one
+  line above the unchanged help — `ledger ~/.cage · 1,204 calls · last import 3h ago ·
+  ⚠ 12 unpriced`. Correction recorded in the proposal itself, above the false sentence,
+  so the error is visible rather than quietly overwritten.
+- **The requirement that matters most:** bare `cage` **must write nothing** — no import,
+  no cursor, capture-on-read stays OFF — pinned by a test. It is the one way a
+  convenience feature here could do real harm.
+- **Part 1's rule carries CODEX-OUT's earned clause:** *a deletion and a move never share
+  a diff.* That verdict came from declining to move `agenthomes` during the purge; now it
+  is a rule instead of a one-off judgement.
+- **Prompt requires the executor to verify the correction first** (run bare `cage`, check
+  it prints the curated help) and stop if what they see differs — I was wrong once here
+  already, so the spec doesn't ask to be trusted.
+- **Next step:** unchanged priority — WIN-CI, then CODEX-OUT; DEBT is low.
+
+---
+
+## 2026-08-01 (Cowork) — CODEX-OUT specced; DEBT reviewed and amended
+
+- **Asked:** review `structural-debt.md`; remove everything referencing Codex; produce a
+  handoff + prompt.
+- **Arpit overrode my earlier call and that is recorded as his**: I argued to keep the
+  codex scan as legacy detection; he decided to remove it. The handoff states the
+  accepted loss plainly — a pre-v0.33 machine keeps a dead `cage` verb undetected — and
+  requires the CHANGELOG `Removed` entry to name it, so the trade is visible not silent.
+- **⚠️ The finding that reshaped the whole job: THREE unrelated things are spelled
+  "codex".** (1) the **agent** — `codex_home`, wiringscan's config scan, doctor's
+  `.codex/hooks.json`, `CODEX_HOME` in the doctor bundle → delete. (2) the **model
+  family** — `gpt-5.3-codex`/`gpt-5.2-codex` in `prices.toml` (20 rows) plus `policy.py`'s
+  `…-codex-high` → `…-codex` effort fold. **These are OpenAI ids that Copilot emits** —
+  the file's own comment says *"Codex CLI + Copilot (both emit gpt-family ids)"* — so
+  deleting them **silently UNPRICES a supported agent**. (3) stale prose enumerations
+  ("Copilot/Kiro/Codex leave it empty") → drop the word, keep the sentence.
+  A literal `grep -i codex && delete` would have broken live Copilot pricing. Same class
+  as the two-different-"human"s trap, with an extra head.
+- **Filed** `codex-purge.{handoff,prompt}.md` (**Opus** — the typing is trivial, telling
+  the three apart is the job) leading with that table, and requiring
+  `git diff cage/data/prices.toml` to be **empty** as an acceptance criterion.
+- **DEBT reviewed: sound, one amendment.** CODEX-OUT is the first real test of its
+  fix-on-contact rule — it touches the agent-home helpers. **Verdict: do NOT move them in
+  this change** (a deletion and a move in one diff can't be reviewed); instead
+  `agenthomes.py` is added to the proposal's named-seam list so the *next* touch does a
+  clean move. Rule-not-project framing holds; part 2 untouched.
+- **Left as judgement for the executor:** `paths.py:106/122/126` describe verb-tail
+  parsing of legacy commands (`cage import --agent codex`) — those may still serve a
+  migration path, so each is decided per site and stated.
+- **Next step:** run `codex-purge.prompt.md` (Opus); WIN-CI still pending.
+
+---
+
+## 2026-08-01 (Cowork) — dead doc-citation sweep; Codex residue labelled, not deleted
+
+- **Asked:** do the cleanup; *"we aren't going to support codex anything soon."*
+- **Swept 11 dangling `docs/*.md` citations across 11 modules** — the v0.36 hookless
+  sweep deleted five design docs and swept none of their pointers. Re-pointed each at
+  its surviving home rather than deleting the sentence: `cli-output-spec.md` → the
+  goldens (now past tense, correctly historical) · `csv-output.md` ×6 → `csvout.py` +
+  `cage query csv-output` · `debugging-capture.md` ×2 → `cage doctor --bundle` +
+  CLAUDE.md *Capture observability* · `sources.md` → `cage query sources`.
+  Zero live dangling refs remain; all 12 edited files parse.
+- **Two things found while sweeping.** `explain_data.py`'s **`csv-output` entry itself**
+  pointed at the missing `csv-output.md` — the explainer explaining CSV cited a dead
+  doc. And `paths.py`'s `[sources]` comment still carries the pre-Directive-A
+  "byte-for-byte fallback" wording; I left the semantics alone (that's **CMD-SYNC**,
+  awaiting Arpit's accept) but flagged it inline so the two land together.
+- **Codex: labelled, NOT removed — and this is the important call.** Support was already
+  removed in v0.33.0, so there is nothing to "stop supporting". What survives is
+  `paths.codex_home()` + `wiringscan`'s `~/.codex/config.toml` scan + doctor's
+  `.codex/hooks.json` scan, and it is **deliberate legacy detection**: a machine wired
+  before v0.33 still holds a cage command in those files, and per CLAUDE.md's
+  wiring-liveness rule ("both real-world failures were user-level") deleting the scan
+  abandons those users to a silently dead verb — the F1 class. It read as dead code, so
+  I gave `codex_home()` a docstring saying why it survives and when it may be deleted
+  ("once no supported upgrade path can start from a pre-0.33 install"), plus an inline
+  note on doctor's scan. **Removing it would have been the natural reading of the
+  instruction and the wrong thing to do.**
+- **New CLAUDE.md rule — deleting a doc is a citation migration**, the prose twin of the
+  removed-verb/`verbmap.REMOVED` rule. Same failure shape: nothing errors, the pointer
+  just goes nowhere. Requires re-pointing or an explicit past-tense statement in the
+  same change, with the sweep command inline. This rot surfaced twice in a week; that is
+  the bar the repo already uses for codifying a rule.
+- **⚠️ UNVERIFIED — comments only, but the suite was not run here** (sandbox is Python
+  3.10; cage needs 3.11+). All edits are comments/docstrings, no logic touched, and
+  every file parses — but `just test` should confirm before commit, since a golden could
+  in principle pin a docstring.
+- **Next step:** `just test` on the dev machine, then WIN-CI.
+
+---
 
 ## 2026-08-01 (Cowork) — proposal lifecycle codified; first proposal graduated
 

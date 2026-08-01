@@ -13,7 +13,7 @@ Laws this module pins:
 - **Determinism** — LF line endings regardless of OS (`lineterminator="\\n"` here;
   file writes pass `newline=""` so the platform layer can't re-translate), one
   canonical number rendering (no locale, no float noise), fixed column order per
-  view (documented in docs/csv-output.md).
+  view — this module IS the column contract (`cage query csv-output` explains it).
 - **`method` is sacred** — method/match tags are columns, never dropped; a
   spreadsheet must be able to tell `measured` from `estimated`.
 """

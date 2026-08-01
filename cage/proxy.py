@@ -1,7 +1,7 @@
 """`cage data proxy` — a thin metering reverse-proxy (plan §5, §9.5).
 
 The protocol-targeted meter for clients you can't edit. Point any agent's base URL
-at it (Claude Code `ANTHROPIC_BASE_URL`, Codex/Copilot `OPENAI_BASE_URL`, …); it
+at it (Claude Code `ANTHROPIC_BASE_URL`, Copilot `OPENAI_BASE_URL`, …); it
 forwards verbatim to the real upstream, tees the response to extract `usage`, and
 records one call row. Fail-open and fail-fast: a metering or parse error never
 changes the bytes the client receives. The library path needs no proxy at all.

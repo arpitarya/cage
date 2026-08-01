@@ -25,7 +25,7 @@ def _seed_unpriced(root):
             call_id=f"c_auto{i}"))
     ledger.append_row(root, "calls", schema.make_call(
         route="chat", provider="mistral", model="mistral-large-3", tokens_in=1_000_000,
-        tokens_out=200_000, agent="codex", ts="2026-07-02T10:00:00Z", call_id="c_m1"))
+        tokens_out=200_000, agent="kiro", ts="2026-07-02T10:00:00Z", call_id="c_m1"))
 
 
 def _shards(root):
