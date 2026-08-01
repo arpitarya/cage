@@ -240,17 +240,23 @@ def _run(shim: Path, *args: str, path_dirs: list[Path], env: dict | None = None,
     `shim` names which file `path_dirs` is expected to resolve to; it is not invoked
     directly by path.
 
-    Invoking a quoted absolute `.cmd` path as `cmd.exe /c "<path>" args` reproducibly
-    triggered the same "BATCH RECURSION exceeds STACK limits" abort on real Windows
-    CI, byte-identically, across every rewrite of the shim's own PATH-walk logic —
-    while the `present` leg's bare-name invocation of the SAME file never did. That
-    is conclusive: the abort was in how a quoted-absolute-path `.cmd` invocation is
-    parsed by `cmd.exe /c`, not in the shim. Bare-name resolution is also the more
-    faithful test — it's what B2 of the contract is actually about."""
+    PATH is `path_dirs` plus **just enough of the real system directories**
+    (`%SystemRoot%\\System32`, `%SystemRoot%`) for `findstr.exe`/`where.exe`/`cmd.exe`
+    itself to resolve — never the *whole* inherited PATH (that could put a real
+    `cage` on it, defeating B5's "cage absent" assumption below) and never *nothing*
+    (every earlier attempt at this test wiped PATH down to just the tmp test
+    directories, and reproducibly hit cmd.exe's own "BATCH RECURSION exceeds STACK
+    limits" abort, byte-identically, no matter how the shim's own logic or the
+    invocation style changed — because the shim's own calls to `findstr`/`where` had
+    no way to find their executables). `tools/cigraphify.py`'s `present` leg, which
+    passes on real Windows CI against this identical committed file, never wipes PATH
+    either."""
     del shim
     e = {k: v for k, v in os.environ.items() if k != "CAGE_GRAPHIFY_SHIM"}
     e.update(env or {})
-    e["PATH"] = os.pathsep.join(str(d) for d in path_dirs)
+    system_root = e.get("SystemRoot", r"C:\Windows")
+    system_dirs = [f"{system_root}\\System32", system_root] if os.name == "nt" else []
+    e["PATH"] = os.pathsep.join([*(str(d) for d in path_dirs), *system_dirs])
     # Quote only where cmd.exe's own line parser would otherwise misread the arg (a
     # space, an empty string, or a character with special meaning outside quotes) —
     # a bare simple word stays bare, matching what the older argv-list invocation used
