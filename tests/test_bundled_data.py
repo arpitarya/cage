@@ -43,10 +43,16 @@ def test_distribution_is_wheel_outside_a_zipapp():
 
 
 def test_graphify_shim_copies_byte_identical_with_exec_bit(tmp_path, monkeypatch):
+    """`_install_shim` now writes the twin PAIR (v0.38.0, docs/shim-contract.md) and
+    returns the path of whichever twin this OS actually resolves — `graphify.cmd` on
+    Windows, the extensionless `graphify` everywhere else. Both bundled copies must be
+    byte-identical to what's on disk, whichever one the returned path names."""
     monkeypatch.setattr("shutil.which", lambda _: "/usr/bin/graphify")
     dst = adoptcmd._install_shim(tmp_path)
     assert dst is not None
     shim = Path(dst)
-    assert shim.read_bytes() == (REPO_DATA / "shims" / "graphify").read_bytes()
+    assert shim.name == paths.graphify_shim_name()
+    for name in paths.GRAPHIFY_SHIMS:
+        assert (shim.parent / name).read_bytes() == (REPO_DATA / "shims" / name).read_bytes()
     if os.name == "posix":
         assert shim.stat().st_mode & stat.S_IXUSR

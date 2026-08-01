@@ -57,6 +57,23 @@ Built from: [handoff](docs/archive/v0.38-win-graphify-shim.handoff.md) ·
   there is no `cage` command on PATH, so the interceptor degrades to correct *unmetered*
   passthrough. That is true of both twins; fixing one alone is exactly the drift the
   contract exists to prevent.
+- **GF-DEBT, same change:** restored the deleted `docs/restricted-environments.md` (8
+  citing files), stated the python-launcher/graphify-metering conflict (GF-LAUNCHER) in
+  the README, that doc, and a new `cage doctor` `launcher-gap` check, added the
+  `cage query graphify-shims` explainer, filed [ADR 0007](docs/adr/0007-graphify-twin-pair-hand-paired-not-templated.md)
+  for the hand-paired-twin decisions, updated cage-lab to state POSIX-twin-only
+  coverage, and wrote + regression-tested the CI-corpus sizing rule (a too-small corpus
+  makes every query honestly `unmeasurable`, which had let an early draft of the
+  `present` leg pass while proving nothing).
+- **A real bug, found by actually running this on Windows CI before release.** The
+  first `graphify.cmd` walked PATH with `call :subroutine` from inside a `for` loop
+  plus a `goto` back-edge to re-enter it — cmd.exe aborted with its own internal
+  safety net (`Recursion Count=335, Stack Usage=90 percent, BATCH PROCESSING IS
+  ABORTED`) on every single invocation, hundreds of hops before this script's own
+  bound was ever reached. Rewritten as a flat nested `for` (directories × PATHEXT
+  entries) with no subroutine call and no backward jump — terminates by construction,
+  nothing left to count. Caught by pushing to CI and reading the Windows job before
+  tagging a release, exactly per plan.
 
 ## v0.37.2 (2026-08-01) — README tells the truth; the knowledge graph is committed
 

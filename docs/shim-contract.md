@@ -94,18 +94,31 @@ this contract exists to prevent. Tracked as **GF-LAUNCHER** in
 stdout, stderr and exit code are identical to invoking the real binary directly, metered
 or not. Arguments are forwarded verbatim, including spaces, embedded quotes and `!`.
 
-## B7 — No leaked state, no partial state
+## B7 — No leaked state, no partial state; delayed expansion is off wherever `%*` is forwarded
 
 - sh: `set -euo pipefail`.
-- cmd: `@echo off` + `setlocal`, and **delayed expansion stays off** — it eats `!` out of
-  `%*` when the arguments are forwarded.
+- cmd: `@echo off` + `setlocal`. Delayed expansion (`!var!`) is enabled **only** around
+  the PATH-walk (it needs to read a variable set earlier in the same parenthesized `for`
+  block, which plain `%var%` cannot do) and is turned back off, via a second `setlocal
+  DisableDelayedExpansion`, **before** either line that forwards `%*` to the real binary.
+  Delayed expansion active at a forwarding line would eat a literal `!` out of the
+  caller's arguments — a real, documented cmd.exe hazard, not a hypothetical one.
 - Environment mutations (the B1 stamp, scratch variables) never reach the caller.
 
-## B8 — Resolution is bounded and provably terminating
+## B8 — Resolution is bounded and provably terminating, with no `call`/`goto` back-edge into the walk
 
-The sh twin iterates a fixed word list. The cmd twin consumes PATH head-first and
-additionally caps the walk at 512 directories. A shim that hangs is worse than a shim
-that does not meter.
+The sh twin iterates a fixed word list. The cmd twin walks PATH with a **flat nested
+`for`** (directories × PATHEXT entries) — no subroutine call, no `goto` jump back into
+the loop. That structure is a hard requirement, not a style choice: an earlier draft used
+`call :subroutine` from inside the loop plus a `goto` back-edge to re-enter it per PATH
+directory, and on real Windows CI cmd.exe aborted with its own internal safety net —
+`Recursion Count=335, Stack Usage=90 percent, ****** BATCH PROCESSING IS ABORTED ******`
+— **before this script's own logic ever hit a bound**. cmd.exe's `call`/`goto` bookkeeping
+leaks stack frames under that combination; nothing in the *design* was unbounded, the
+*interpreter* was. A flat `for` loop has no such failure mode: it terminates after at
+most `len(PATH directories) × len(PATHEXT entries)` iterations by construction, so no
+counter is needed. The `where graphify` fail-open fallback is likewise a single small
+loop, never a `goto`-driven one.
 
 ---
 
@@ -118,7 +131,7 @@ that does not meter.
 | **D3** | the current directory is not searched | cmd.exe resolves cwd *before* PATH; the sh twin deliberately declines the POSIX cwd (an empty PATH entry) | a `graphify.cmd` in cwd but not on PATH ⇒ 127 rather than running. Deliberate: twin parity, and no cwd hijack. **Scoped exception:** the pathological-PATH fallback (below) delegates to `where`, which searches cwd first — a fail-open last resort, still content-filtered. |
 | **D4** | three `findstr /C:` literals instead of one `grep -E` alternation | findstr has no alternation | identical marker set, OR-ed, case-sensitive in both |
 | **D5** | `if exist` only — no execute-bit test | Windows has no execute bit | existence is the whole test |
-| **D6** | `%*` instead of `"$@"` | cmd has no argument array | quoting is preserved as *typed*, which is the closest available; this is why B7 forbids delayed expansion |
+| **D6** | `%*` instead of `"$@"` | cmd has no argument array | quoting is preserved as *typed*, which is the closest available; this is why delayed expansion must be off (B7) at both lines that forward `%*` |
 | **D7** | the B4 message uses an ASCII hyphen where sh uses an em dash | a `.cmd` is read in the console's OEM codepage; an em dash renders as mojibake | one character of the shim's own diagnostic differs. graphify's own output is untouched. |
 
 **Fail-open last resort (cmd only).** If the PATH walk finds nothing — a pathologically

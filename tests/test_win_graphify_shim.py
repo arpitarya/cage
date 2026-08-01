@@ -87,10 +87,19 @@ def test_the_twins_can_never_select_each_other():
 
 # ── contract: the cmd twin's own hazards ────────────────────────────────────────
 
-def test_cmd_twin_never_enables_delayed_expansion():
+def test_cmd_twin_disables_delayed_expansion_before_forwarding_args():
     """B7. Delayed expansion eats `!` out of `%*`, so `graphify query "why!"` would
-    silently lose a character of the user's query."""
-    assert "enabledelayedexpansion" not in CMD.read_text(encoding="utf-8").lower()
+    silently lose a character of the user's query — but the PATH-walk earlier in the
+    script needs delayed expansion to read a same-block variable, so the invariant is
+    narrower than "never enabled anywhere": it must be OFF again before either line
+    that forwards `%*` to the real binary."""
+    text = CMD.read_text(encoding="utf-8")
+    assert "enabledelayedexpansion" in text.lower()          # the walk turns it on...
+    assert "disabledelayedexpansion" in text.lower()         # ...and turns it back off
+    disable_at = text.lower().index("disabledelayedexpansion")
+    for marker in ('call cage data graphify -- "%_cage_gf_real%" %*',
+                  'call "%_cage_gf_real%" %*'):
+        assert text.lower().index(marker) > disable_at, marker
 
 
 def test_cmd_twin_reads_the_exit_code_on_its_own_line():
@@ -122,13 +131,20 @@ def test_cmd_twin_is_crlf():
     assert raw.count(b"\r\n") == raw.count(b"\n") > 0
 
 
-def test_cmd_twin_bounds_its_own_walk():
-    """B8. A shim that hangs is worse than a shim that does not meter — and the cap is
-    also what makes a mis-split PATH degrade to the fail-open resolver instead of
-    spinning."""
-    text = CMD.read_text(encoding="utf-8")
-    assert "GTR 512" in text
-    assert "where graphify" in text                      # the fail-open last resort
+def test_cmd_twin_walk_is_flat_with_no_call_goto_backedge():
+    """B8, re-derived from a real failure. An earlier draft used `call :subroutine`
+    from inside a `for` loop plus a `goto` back-edge to re-enter it — reproduced on
+    real Windows CI as cmd.exe's own internal safety abort (`Recursion Count=...,
+    BATCH PROCESSING IS ABORTED`) hundreds of hops before this script's own logic ever
+    hit a bound. The fix is structural: a flat nested `for` (directories x PATHEXT)
+    with no subroutine call and no backward jump into itself — provably terminating
+    by construction, with nothing left to count."""
+    executable = "\n".join(ln for ln in CMD.read_text(encoding="utf-8").splitlines()
+                          if not ln.strip().lower().startswith(("rem ", "@echo")))
+    assert "call :" not in executable.lower()             # no subroutine invocation
+    assert "goto cage_gf_walk" not in executable.lower()  # no back-edge into the walk
+    assert "for %%d in" in executable and "for %%e in" in executable  # flat dir x ext walk
+    assert "where graphify" in executable                 # the fail-open last resort
 
 
 # ── the twin pair is installed and healed as a pair ─────────────────────────────
