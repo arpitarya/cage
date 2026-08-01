@@ -56,6 +56,11 @@ _SHELL_CAGE = re.compile(r"(?:^|[\s|&;(])cage\s+([a-z][a-z0-9-]*(?:\s+[a-z][a-z0
 # unmetered behaviour") otherwise reads as a `cage absent` invocation and reports a
 # dead verb that nothing ever runs. Only executable lines are evidence.
 _SHELL_COMMENT = re.compile(r"(?:^|\s)#.*$", re.MULTILINE)
+# The same rule for the Windows twin (`data/shims/graphify.cmd`), whose comments are
+# `rem` lines: "rem … when a cage command resolves …" would otherwise report a dead
+# `cage command` verb and fail doctor on prose. Anchored at statement start, where
+# `rem` is unambiguously a comment in batch — a shell line can never begin with it.
+_BATCH_COMMENT = re.compile(r"^[ \t]*@?rem\b.*$", re.MULTILINE | re.IGNORECASE)
 
 
 class Dead(NamedTuple):
@@ -249,31 +254,39 @@ def user_artifacts(root: Path) -> list[tuple[str, str]]:
 
 
 def verbs_in_shell(text: str) -> list[tuple[str, ...]]:
-    """The `cage <verb>` invocations in a shell script's **executable** lines.
+    """The `cage <verb>` invocations in a shim's **executable** lines — sh `#` comments
+    and batch `rem` comments alike are stripped first, because prose is not evidence.
 
     Split out from `interceptor_verbs` so `pathshim` can apply the identical scan to a
     shim found anywhere on PATH rather than re-deriving one — the detector must have a
     single implementation, or the PATH-winning check and the root check could disagree
-    about the same file."""
+    about the same file. Both twins go through this one function for the same reason."""
     return [tuple(m.split())
-            for m in _SHELL_CAGE.findall(_SHELL_COMMENT.sub("", text))]
+            for m in _SHELL_CAGE.findall(
+                _SHELL_COMMENT.sub("", _BATCH_COMMENT.sub("", text)))]
 
 
 def interceptor_verbs(root: Path) -> list[tuple[str, ...]]:
-    """The `cage <verb>` invocations inside `<root>/bin/graphify`. The shim is a shell
-    script, so its verbs are text, not a config value — but the same parser check
-    applies, and this is what replaces doctor's existence+PATH false ✅.
+    """The `cage <verb>` invocations inside `<root>/bin/graphify` **and its `.cmd`
+    twin**. A shim is a script, so its verbs are text, not a config value — but the same
+    parser check applies, and this is what replaces doctor's existence+PATH false ✅.
+
+    Both twins are scanned on every OS, not just the resolvable one: `bin/` is committed
+    and shared, so a dead verb in the twin this machine cannot run is still a dead verb
+    on a teammate's machine — and staying silent about it is the same silence that let
+    F1 run for nine days.
 
     Root-scoped by design; the shim that actually *runs* is whichever `graphify` PATH
     resolves first, which can live outside every scanned root — that is `pathshim`."""
-    shim = root / "bin" / "graphify"
-    if not shim.exists():
-        return []
-    try:
-        text = shim.read_text(encoding="utf-8", errors="ignore")
-    except OSError:
-        return []
-    return verbs_in_shell(text)
+    out: list[tuple[str, ...]] = []
+    for shim in paths.graphify_shims(root):
+        if not shim.exists():
+            continue
+        try:
+            out += verbs_in_shell(shim.read_text(encoding="utf-8", errors="ignore"))
+        except OSError:
+            continue
+    return out
 
 
 # ── the scan ────────────────────────────────────────────────────────────────────
@@ -296,11 +309,21 @@ def run(root: Path, *, assets: bool = True) -> Scan:
         if verbs and not is_live_verb(verbs):
             dead.append(Dead(artifact, " ".join(verbs), remediation(verbs), committed))
 
+    # Per-twin, so the finding names the file to fix rather than a generic
+    # "bin/graphify" that may not even be the copy carrying the dead verb.
     interceptor_dead = False
-    for verbs in interceptor_verbs(root):
-        if not is_live_verb(verbs):
-            interceptor_dead = True
-            dead.append(Dead("bin/graphify", " ".join(verbs), remediation(verbs), True))
+    for shim in paths.graphify_shims(root):
+        if not shim.exists():
+            continue
+        try:
+            text = shim.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+        for verbs in verbs_in_shell(text):
+            if not is_live_verb(verbs):
+                interceptor_dead = True
+                dead.append(Dead(f"bin/{shim.name}", " ".join(verbs),
+                                 remediation(verbs), True))
 
     return Scan(dead=dead, stale_assets=[], interceptor_dead=interceptor_dead)
 
@@ -514,13 +537,20 @@ def inventory(root: Path) -> Inventory:
     items += _git_hook_foreign(root)
     items += _leftover(root, covered)
 
-    shim = root / "bin" / "graphify"
-    if shim.exists():
-        items.append(Artifact("", "shim", "project", "bin/graphify",
-                              "dead" if scan.interceptor_dead else "current",
-                              "probes a removed verb — every graphify call falls "
-                              "through UNMETERED and silently" if scan.interceptor_dead else ""))
-    items += _path_winner(root, shim)
+    # Both twins are listed when present — the inventory's job is to show what is
+    # installed, and "the copy this OS cannot run" is exactly the fact a Windows user
+    # upgrading a POSIX-scaffolded project needs to see.
+    primary = root / "bin" / paths.graphify_shim_name()
+    for shim in paths.graphify_shims(root):
+        if not shim.exists():
+            continue
+        detail = ("probes a removed verb — every graphify call falls through UNMETERED "
+                  "and silently" if scan.interceptor_dead else
+                  "" if shim == primary else
+                  f"the other twin — this OS resolves bin/{primary.name}, not this copy")
+        items.append(Artifact("", "shim", "project", f"bin/{shim.name}",
+                              "dead" if scan.interceptor_dead else "current", detail))
+    items += _path_winner(root, primary)
 
     return Inventory(items=items, rollups=rollups)
 

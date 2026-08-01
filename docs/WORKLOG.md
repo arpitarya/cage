@@ -12,6 +12,76 @@ by milestone) — the worklog is what *happened this session*.
 
 ---
 
+## 2026-08-01 (Claude Code, Sonnet) — GF-DEBT: close the six honesty debts WIN-GF/CI-GF left
+
+- **Asked:** execute `docs/graphify-honesty-debts.prompt.md` before v0.38.0 is
+  committed — restore the deleted `restricted-environments.md`, state GF-LAUNCHER
+  where users are, add a `cage query` explainer for the twin pair, write ADR 0007,
+  make cage-lab state POSIX-only coverage, and write down the corpus-sizing lesson.
+- **Done:** all six, in the same change. Restored `docs/restricted-environments.md`
+  from `git show b2c4253^:...` (restore-then-update: fixed a stale
+  "companion to portable-wiring.md" reference, dropped the removed Codex row, added a
+  GF-LAUNCHER subsection). README Platforms line + `cage doctor`'s new `launcher-gap`
+  check + the restored doc all state the same gap now. New `cage query graphify-shims`
+  concept entry, live-interpolated. `docs/adr/0007-graphify-twin-pair-hand-paired-not-templated.md`
+  filed. `docs/cage-lab/{01-setup,03-verify}.md` updated. The corpus-sizing rule is
+  written into `tools/cigraphify.py`'s docstring **and** enforced — 4 new tests in
+  `tests/test_cigraphify.py` prove `check_bare_graphify_is_intercepted` cannot pass on
+  a zero-row or zero-saving result, with no real graphify needed. Two incidental test
+  fixes (`test_doctor.py`'s check-name set; a stale-verb grep false-positive in the new
+  explainer's own prose). 979/0 ⇒ **983/0**.
+- **Decided:**
+  - **`launcher-gap` is its own doctor check**, not folded into `_interceptor` — it
+    answers "are two independent switches both on", a different shape of question
+    than "is the installed shim alive".
+  - **The vacuous-CI-run check was NOT deferred** — on inspection,
+    `check_bare_graphify_is_intercepted` already raised `Fail` on an empty or
+    zero-saving result (written the same session as WIN-GF/CI-GF, before GF-DEBT
+    existed as a task). What was missing was a *regression test proving it*, not the
+    enforcement itself — added four, monkeypatching the shell-call/ledger-read seams
+    rather than requiring real graphify.
+  - **Corrected the explainer's own prose rather than weakening the stale-verb grep
+    gate** — `cage/explain_data.py` legitimately needed to describe the old
+    `cage graphify` marker string, which is exactly what `tests/test_cli_tiering.py`
+    exists to catch; reworded instead of carving an exception.
+- **Open:** GF-LAUNCHER remains unfixed by design (documents, does not patch) — a fix
+  needs a decision that moves both twins together.
+- **Next step:** the actual next code work is still WIN-CI (push, read the Windows
+  `graphify` CI job) — GF-DEBT was documentation debt paid down first, per the
+  handoff's "before v0.38.0 is committed" instruction.
+
+## 2026-08-01 (Claude Code, Opus) — WIN-GF + CI-GF: graphify is metered on Windows
+
+- **Asked:** execute `docs/win-graphify-shim.prompt.md` — contract → `.cmd` twin → wire
+  → liveness → flip, building CI-GF first as its harness (it was unbuilt).
+- **Done:** all five phases plus CI-GF, in one pass. New: `docs/shim-contract.md`,
+  `cage/data/shims/graphify.cmd`, `tools/cigraphify.py`, `tests/fixtures/cicorpus/`,
+  `tests/test_win_graphify_shim.py`, `.gitattributes`, the `graphify` CI job. Changed:
+  `paths`/`adoptcmd`/`pathshim`/`wiringscan`/`doctorcmd`, README Platforms + What's new,
+  CHANGELOG (v0.38.0), version 0.37.2 → 0.38.0. 962/0 ⇒ **979/0** (+10 Windows-only
+  skips); dummyrepo S1–S18 PASS; `tools.cigraphify` 7/7 on macOS.
+- **Decided:**
+  - **Both twins install on every OS**, mirroring `runshim.write` — a committed `bin/`
+    that is byte-identical everywhere is what survives a cross-OS clone. `refresh_shim`
+    completes the pair when either exists (the POSIX→Windows upgrade path).
+  - **Hand-paired, not templated.** Batch and sh share no syntax subset; `runshim.py`
+    hand-pairs for the same reason. The written *contract* is the shared artifact —
+    which is what TOOL-SDK actually needs to template.
+  - **Contract doc lives in `docs/`, not beside the shims** (the prompt asked for
+    "alongside"): `data/shims/*` is package data and would ship a spec in every wheel.
+    Both twins cite it by path in their headers.
+  - **No python-launcher variant for the interceptor**, in either twin — the sh twin has
+    none, and fixing one side is exactly the drift the contract exists to prevent. Filed
+    as a stated gap, not half-built.
+- **Two handoff claims corrected by contact with reality:** graphify is PyPI
+  (`graphifyy`), not npm — on Windows it is `Scripts\graphify.exe`, so the twin never
+  shares a filename with it, but `.EXE` precedes `.CMD` in PATHEXT so it must never
+  share a directory. And `graphify query` emits its lines in a different order every
+  run, so CI compares content, not bytes.
+- **Open:** the Windows behaviour tier (10 tests) and the Windows CI leg have never
+  executed — they run first on CI. Windows stays CI-asserted, never field-validated.
+- **Next step:** push and read the Windows `graphify` job; then ③ ADOPT.
+
 ## 2026-08-01 (Claude Code, Sonnet) — SYNC-GUARD: name and guard the sync tests' borrowed table
 
 - **Asked:** execute `docs/sync-fixture-guard.prompt.md` — five `test_policysync`
@@ -259,6 +329,277 @@ by milestone) — the worklog is what *happened this session*.
   partitioning). Not filed as new OPEN-WORK items in this pass — flagging here for
   whoever picks up next to triage and file if still red.
 - **Next:** **K — relabel `saved` as gross** (proposal B), OPEN-WORK's next item.
+
+## 2026-08-01 (Cowork) — proposal lifecycle codified; first proposal graduated
+
+- **Asked:** define the lifecycle of a proposal once implemented, archive accordingly,
+  and put the lifecycle in CLAUDE.md.
+- **Applied it first, then wrote it down.** `proposals/windows-graphify-interceptor.md`
+  was already `status: implemented` but still sitting in the directory — the exact bug
+  the rule now forbids. Archived to
+  `archive/v0.38-windows-graphify-interceptor.proposal.md` with a header naming the
+  version **and where the living spec now lives** (`shim-contract.md`), plus an archive
+  index row and a **Graduated** section in `proposals/README.md`.
+- **CLAUDE.md gained the rule**, mirroring the handoff/prompt lifecycle it sits beside.
+  Four states — **proposed → picked up → implemented → archived** — with the
+  picked-up state made explicit (a pair is written; the proposal *stays put* and gains a
+  pointer, because it is still the rationale). Five same-change obligations on
+  implementation: move · header naming the living spec · IMPLEMENTATION entry ·
+  index entry to *Graduated* · carry forward anything unbuilt. Declined and superseded
+  get the same treatment with the decider or successor named.
+- **The clause I think matters most:** *where an archived proposal disagrees with the
+  living spec, the spec wins.* Implementation routinely corrects the proposal that
+  motivated it — WIN-GF's was wrong on the packaging source (PyPI `graphifyy`, not npm)
+  and on the re-entry guard's scope — and that correction is the valuable part. Without
+  the precedence rule an archived proposal reads as authority it never had.
+- **Framing:** an implemented proposal left in `proposals/` is the same class of bug as a
+  ticked-but-present OPEN-WORK item — it inflates the queue of open ideas and makes the
+  directory lie about what is still on the table.
+- **GF-DEBT gained item 7:** when ADR 0007 lands it becomes that archived proposal's
+  living-spec anchor. Also verified the other twelve proposals are genuinely unbuilt
+  (the two CLAUDE.md ones are CMD-SYNC — awaiting Arpit's accept, not implementation).
+- **Next step:** unchanged — run GF-DEBT before committing v0.38.
+
+---
+
+## 2026-08-01 (Cowork) — audited v0.38; filed GF-DEBT (six honesty debts)
+
+- **Asked:** what is missing from the WIN-GF/CI-GF delivery; then file a pair for
+  anything needing implementation.
+- **Audited the artifacts, not the summary.** The code holds up: the 3-copy marker set
+  has a drift test, `paths.GRAPHIFY_SHIMS` is a single enumeration both writer and
+  readers share, the `%ERRORLEVEL%`-expands-at-parse-time trap is pinned by a test that
+  names it, package-data ships `data/shims/*`, and release hygiene (version, changelog,
+  README what's-new, **both** test counts) is complete.
+- **Six gaps, all in the honesty surface rather than the code:**
+  1. **`docs/restricted-environments.md` was deleted** in the v0.36 hookless sweep
+     (`b2c4253`, 129 lines: Tier 1/2/3 + the WDAC caveat) and **8 source files still
+     cite it** — `clicmds`, `doctorcmd` ×2, `paths`, `policy`, `runshim` ×2, CLAUDE.md.
+     Recoverable from git; restore-then-update, never rewrite.
+  2. **GF-LAUNCHER unstated to users.** The README claims Windows graphify works and
+     recommends `--python-launcher` two sentences later — never saying neither twin
+     meters under it (B5). Same failure class as the human-axis README claim, three days
+     on.
+  3. No `cage query` entry for the twin pair, though doctor can now **fail** on it.
+  4. No ADR for three decisions, chiefly **hand-paired, not templated** — the one a
+     future agent will try to "fix" (I proposed templating; Arpit's executor correctly
+     rejected it). Filed with a veto condition gated on a *third* interceptor.
+  5. The cage-lab manual has zero mentions of the twin — the fidelity authority is
+     silent on a newly-claimed platform.
+  6. The CI-corpus lesson is unwritten: too small ⇒ every query honestly
+     `unmeasurable` ⇒ **the leg passed while asserting nothing.**
+- **Corrected my own finding mid-audit:** I first reported *three* broken CLAUDE.md refs.
+  `docs/cli-output-spec.md` is a historical mention of something correctly removed, and
+  `anton/docs/cage.md` belongs to another repo. Only one was real. Recorded in the
+  handoff so the executor doesn't chase two ghosts.
+- **Filed** `graphify-honesty-debts.{handoff,prompt}.md` (**Sonnet** — six explicit
+  targets, no architectural judgement; the ADR records decisions already made). Scoped
+  **before v0.38.0 is committed** — same change, not a follow-up. GF-LAUNCHER stays open:
+  this documents it, the fix must move both twins.
+- **Next step:** run GF-DEBT, then push and read the Windows CI leg.
+
+---
+
+## 2026-08-01 (Cowork) — WIN-GF specced: a `.cmd` twin, and CI-GF confirmed as its harness
+
+- **Asked:** work up `windows-graphify-interceptor.md`, aim for anything other than an
+  `.exe`, produce a handoff + prompt — and does `ci-graphify-matrix.handoff.md` help
+  test it?
+- **Answer to the CI question: yes, it *is* the harness.** CI-GF's Windows `present` leg
+  installs real graphify (npm ⇒ `graphify.cmd`), runs `cage setup`, puts `bin/` first on
+  PATH and invokes **bare `graphify`** — which is exactly WIN-GF's acceptance test, on
+  the only Windows available (the dev machine is macOS). Dependency now stated in both
+  docs: **build CI-GF first**; shipping the twin *flips* its assertion from
+  asserts-the-gap to asserts-the-fix.
+- **Artifact decided: `graphify.cmd`** — plain text bundled data, no `.exe`, nothing
+  compiled, works from `cage.pyz`. **PowerShell ruled out on a hard fact I verified:
+  `.ps1` is not in default PATHEXT** (`.COM;.EXE;.BAT;.CMD;…`), so a `.ps1` shim could
+  never be found by a bare `graphify` — the bug itself. That single fact makes `.cmd`
+  the only artifact satisfying both "no exe" and "resolves by bare name".
+- **Filed the pair** (`win-graphify-shim.{handoff,prompt}.md`; Opus 1–2, Sonnet 3–5) with
+  the six behaviours extracted from the bash source — re-entry guard · PATH scan skipping
+  **all** interceptors · self-identifying marker strings (`pathshim._INTERCEPTOR` greps
+  them) · exit 127 rather than bare-name fallback · meter only if cage answers · exact
+  passthrough.
+- **Traps written in, all real:** **cmd has no `exec`** — `call … & exit /b %ERRORLEVEL%`
+  means a nested process and a `Terminate batch job (Y/N)?` prompt on Ctrl-C, recorded as
+  a **documented divergence** rather than pretended parity; **npm's graphify on Windows is
+  itself `graphify.cmd`**, so the PATH scan must skip cage's copy by *content*, never by
+  filename; both shims may coexist (Git Bash/WSL) and must skip each other.
+- **Phase order defended:** liveness (4) precedes the CI flip (5) — a twin without
+  detection recreates F1's nine-day silent unmetering on a new OS. And Phase 1's contract
+  doc is also TOOL-SDK's first artifact, so the Windows fix lays the paved road's first
+  paver rather than detouring from it.
+- **Next step:** run `ci-graphify-matrix.handoff.md` (①), then `win-graphify-shim.prompt.md` (②).
+
+---
+
+## 2026-08-01 (Cowork) — declined plays removed from the proposal, not just marked
+
+- **Asked:** remove play 1 and play 2 from the market-play file.
+- **Done:** both sections deleted outright, not struck through. The doc is now a
+  single-play proposal, so it was **renamed `market-plays.md` → `otel-genai-export.md`**
+  with its title and frontmatter rewritten to match — a file whose name promises three
+  plays and delivers one is the same class of lie as a stale README claim.
+- **Kept deliberately:** a one-line record of *what* was removed and by whom (a `uvx`
+  instant-trial push and ccusage interop), so a future reader doesn't re-propose them as
+  fresh ideas; and the research context (~10% of orgs can prove agent ROI; the
+  capture-vs-attribution split), which stands independent of the declined plays and
+  still informs ADOPT and HR1's ranking.
+- **OTel export downgraded** from "defer until 1–2 ship" (they never will) to **not
+  scheduled** — it serves the team/enterprise story, and the graphify track comes first.
+- **Forward refs updated** (`proposals/README.md`, `OPEN-WORK.md`); the two earlier
+  WORKLOG entries keep the old filename as written — history is not rewritten, and this
+  entry is the rename record.
+- **Next step:** unchanged — README-FIX commit, then CI-GF.
+
+---
+
+## 2026-08-01 (Cowork) — direction set: graphify works, then a paved road for more tools
+
+- **Asked (direction):** *"not interested in play 1 or play 2 — i want graphify to work
+  and maybe in future more tools."*
+- **Recorded:** market-plays 1–2 (uvx trial, ccusage interop) **DECLINED** in the
+  proposal's own status line; OTel export stays parked unaccepted. The research context
+  is kept — it still informs the moat/entry framing.
+- **Measured the gap the directive implies:** "graphify" appears in **34 of 91 modules**.
+  The receipt substrate (`savings/<tool>/`, pricing ladder, `[tools] order`, roi/attrib/
+  verdict) is already tool-agnostic — a second tool's *reporting* costs zero code — but
+  the *capture* side (shim, `cage data graphify`, `graphifymodel`, transcript patterns,
+  liveness scans, its confidence constant) is bespoke. That asymmetry is the cost of
+  "more tools later" and the reason a contract is worth extracting.
+- **Filed `proposals/tool-integration-contract.md`:** interceptor **template** rendered
+  per tool (the `runshim.py` pattern — WIN-GF's `.cmd` twin renders from the same
+  template) · a generic `cage data meter <tool>` verb (graphify's becomes an alias) ·
+  per-tool detection/confidence **registry as data** (stdlib law: no plugin execution) ·
+  per-tool savings model behind one interface, honest UNPRICED without one.
+  **fux is the second tool** (`fux/cage_receipt.py` already pushes receipts); the
+  contract ships only when two tools use it — a one-consumer abstraction is
+  speculation.
+- **Queue re-ranked into the graphify-works track:** README-FIX (truth first) →
+  **CI-GF** (the green harness everything else refactors under) → **WIN-GF** (phases
+  1–2 write the shim behaviour contract = the tool contract's first artifact) →
+  **ADOPT** (do agents even invoke it) → **NET-1** (does it pay) → **TOOL-SDK**.
+  DOGFOOD/SKILLS/HR1/DEBT queue behind; MKT row removed.
+- **The sequencing insight worth keeping:** WIN-GF and TOOL-SDK share their first
+  deliverable — extracting the bash shim's behaviour into a written contract serves
+  both, so the Windows fix is not a detour from the paved road, it is its first paver.
+- **Next step:** README-FIX commit (Arpit) · then run CI-GF's handoff.
+
+---
+
+## 2026-08-01 (Cowork) — market research pass; three plays filed; queue re-ranked
+
+- **Asked:** research + creative review of all proposals and open items.
+- **Research (web):** only ~10% of orgs can prove agent ROI, and those that can
+  attribute spend **to commits** — HR1 ask #1 in the market's own words. **ccusage**
+  (4.8k★) parses the same Claude Code JSONL cage does, via bare `npx`, across 15+
+  agents — and does zero attribution, no counterfactuals, no method tags. OTel GenAI
+  semantic conventions standardize token telemetry; adoption measurement is an active
+  research area (AISI 177k MCP-tool study). Sources in the session log.
+- **Read:** cage's moat is the half ccusage doesn't have (attribution + honesty);
+  cage's gap is the frictionless entry ccusage has. Compete on neither's turf:
+  **interop**.
+- **Filed `proposals/market-plays.md`:** (1) **uvx instant trial** — cage is stdlib-only,
+  the perfect `uvx` citizen, and never says so; make `uvx cage-flux demo` the README's
+  first command (~zero code, verify entry point). (2) **ccusage interop** — a
+  `format = "ccusage"` custom-tool source (the kiro-cli mechanism) ingests its JSON:
+  15-agent breadth in one parser, rows `estimated`, no receipts, fail-loud on schema
+  drift. Their users are cage's audience, pre-qualified. (3) **OTel GenAI export** —
+  `cage data export --otel`, one-way like CSV; feeds Langfuse/Helicone instead of
+  fighting them. Deferred behind 1–2.
+- **Deliberately not proposed:** proxy/observability platform (infra, not $0) ·
+  per-user enterprise attribution (different axis; per-commit is the defensible one) ·
+  real-time dashboards (determinism law).
+- **Queue re-rank from the research:** ADOPT stays high (timely, nothing ships it);
+  HR1 #1 (tokens/commit) rises — it is the proven-ROI cohort's own vocabulary; the
+  gross-vs-net finding is a Show-HN-grade content play (a draft, not code).
+- **Next step:** verify `uvx cage-flux` works (minutes, dev machine) → README first
+  command; then the standing queue (README-FIX commit · CMD-SYNC · NET-1).
+
+---
+
+## 2026-08-01 (Cowork) — proposal sweep: every open item now has a doc; 2 stale-CLAUDE.md finds
+
+- **Asked:** a plan for WIN-GF · review all proposals (update/archive) · a proposal per
+  open item · a skills proposal. Nothing committed.
+- **WIN-GF** — expanded into a **5-phase plan** inside its proposal: behaviour contract
+  → `.cmd` twin (cmd, not PowerShell — no execution-policy variance) → `cage setup`
+  wiring → wiringscan/pathshim liveness (PATHEXT-aware) → the CI assertion flips.
+  Order rationale recorded: contract before twin (two implementations of an unwritten
+  contract drift), liveness before flip (a twin without detection recreates F1 on a
+  new OS). Opus for phases 1–2.
+- **Proposal review — the significant find:** the two parked CLAUDE.md proposals
+  (`claude-md-prices-file`, `claude-md-sources-authority`, both 2026-07-28) are
+  **still needed, not archivable** — checked against CLAUDE.md: the flow diagram still
+  omits `prices.toml`, and the `[sources]` paragraph still describes the pre-Directive-A
+  extend/replace-with-fallback semantics. CLAUDE.md is the doc every agent loads;
+  both annotated and filed as **CMD-SYNC** (Arpit's accept gates application, per the
+  proposals' own rule). The other three reviewed: `larger-lab-corpus` and
+  `policysync-synthetic-bundle` valid with live triggers; `agent-vs-human-v2` current.
+  **Archived: none** — every parked proposal survived review.
+- **Four new proposals**, one per open item that lacked a doc:
+  `net-positive-evidence-run` (NET-1 — protocol with **pre-committed outcomes**, so no
+  post-hoc reading) · `dogfood-report` (release-checklist refresh so it can't drift
+  stale) · `insights-adoption` (counts only — usage rows stay unpriced or their
+  invariant breaks) · `structural-debt` (split-on-contact with named seams; explicitly
+  NOT proposing to trim the 38 verbs). README-FIX needs none (done in tree); CI-GF
+  already has a handoff (further along than a proposal).
+- **`cage-skills`** — six candidates over existing surfaces, all prompt-only except the
+  adoption-nudge. Governing rule: **a skill never computes a number — it runs cage and
+  quotes it**, method tags verbatim, refusals relayed never smoothed. Start:
+  cage-analyst + cage-task-closer (the latter feeds the closed-task pipeline that
+  NET-1/compare/estimate are all starved by). Three agents always.
+- **Next step:** Arpit's calls — README-FIX commit · CMD-SYNC accept · pick from the
+  proposal queue. Agent-buildable next: CI-GF, ADOPT.
+
+---
+
+## 2026-08-01 (Cowork) — review fallout: README fixed in tree; three plans + two proposals filed
+
+- **Asked:** from the review — fix 1/2/3 with my judgement, a CI with/without-graphify
+  plan (4), what to do on adoption (5) and debt (6); propose an agent-vs-human v2
+  (per-commit: tokens · who did what · suggested-vs-accepted · time); update the README;
+  **commit nothing**.
+- **README (in tree, uncommitted — README-FIX):** the two human-axis claims replaced
+  with real capabilities (gross/net + adoption); a gross-vs-net honesty beat added to
+  the story, linking the finding — the ON-arm-cost-more result presented as proof the
+  discipline works, not hidden; Platforms now states the Windows shim gap; an
+  evidence-status paragraph under the demo matrix says plainly the A/B verdict is
+  still open at n=1 and that `verdict` refuses it. ELI5 rewritten off the
+  robot-vs-you framing (it was the removed axis in disguise).
+- **Judgement calls:** (2) evidence front-running fixed by *stating the evidence
+  state*, not weakening the demo — the matrix stays, labelled as the seeded demo.
+  (3) DOGFOOD cannot be done from here (real ledger lives on the dev machine; ZERO
+  dummy data) — filed with the exact step: `cage report` on cage's own ledger → a
+  "Measured on itself" README section.
+- **CI-GF plan** (`ci-graphify-matrix.handoff.md`): a `graphify: [absent, present]`
+  axis on `python-package.yml`. Key insight making it free: graphify is AST-only —
+  real binary + real queries in CI cost $0; only *agent* traffic is paid, which stays
+  lab-scope. The Windows `present` leg asserts the WIN-GF gap **flip-ready**. Absent
+  legs stay byte-identical (the always-running gate); `present` skips (never fails) on
+  npm flake. CI proves mechanics; the lab keeps fidelity.
+- **ADOPT (5):** filed — `cage insights adoption`, per-agent invoked/receipted/missed
+  from usage rows + receipts; the "never ran vs ran-and-missed" distinction is the
+  product surface leg D proved possible.
+- **DEBT (6):** filed low — `paths.py` splits fix-on-contact (next router change moves
+  routing out, etc.), never big-bang; a bare-`cage` landing flow for the 38-subcommand
+  surface.
+- **HR1 → proposal written** (`agent-vs-human-v2.md`), the four asks graded honestly:
+  tokens/commit = build (reuse `taskgroup`'s join, never a second one) ·
+  authorship/commit = mostly built (provenance aggregation; unknown-rate stated first) ·
+  suggested-vs-accepted = new counts-only capture, `estimated`, enum resolution
+  (proposed/landed/landed-modified/dropped — line-level accept-% not claimable) ·
+  time = agent `measured`, wall-clock `measured`, **human only by attestation** —
+  gap-derived attention is vetoed with an evidence bar for reopening (the v1 killer).
+  Build order #2→#1→#4(agent/wall)→#3→#4(attest).
+- **Fix-on-contact:** WIN-GF's wall-of-text row moved to
+  `proposals/windows-graphify-interceptor.md`; row now one line. OPEN-WORK back to 0
+  rows over budget.
+- **Next step:** Arpit reviews README diff + the HR1 grades; then README-FIX commit is
+  his call, CI-GF is the next agent build.
+
+---
 
 ## 2026-08-01 (Cowork) — archive swept; `docs/` root is clean
 

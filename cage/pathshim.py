@@ -83,17 +83,23 @@ class PathShim(NamedTuple):
 # ── resolution (exactly what the shell does) ────────────────────────────────────
 
 def _candidates(name: str, env: dict[str, str] | None = None) -> list[str]:
-    """`name` plus its PATHEXT variants on Windows.
+    """The file names a bare ``name`` can resolve to, **in this OS's resolution order**.
 
-    UNVERIFIED-LAYOUT (Windows): the `.cmd`/`.exe` wrapper shapes a Windows graphify
-    install actually writes have not been pinned on a real Windows machine. PATHEXT is
-    honoured because ignoring it would resolve nothing at all there, but a Windows
-    classification is unproven rather than wrong-by-design — the standing pattern is to
-    label it, never to guess a layout into a fact."""
+    On Windows that is the PATHEXT list and *only* the PATHEXT list: cmd.exe cannot
+    execute an extensionless file, so including the bare name would let the POSIX twin
+    (`bin/graphify`) be reported as the interceptor that runs when in fact nothing
+    resolves — the exact false ✅ this module exists to prevent. Cage's Windows
+    interceptor is `graphify.cmd` (docs/shim-contract.md); the real graphify is a PyPI
+    console script, so on Windows it is `Scripts\\graphify.exe`.
+
+    Order matters twice over: resolution is **directory-major, extension-minor** (every
+    extension is tried in one PATH directory before moving to the next), and `.EXE`
+    precedes `.CMD` in the default PATHEXT — so a twin sharing a directory with
+    `graphify.exe` would lose to it. `executables()` reproduces both orderings."""
     if os.name != "nt":
         return [name]
     exts = (env or os.environ).get("PATHEXT", ".COM;.EXE;.BAT;.CMD").split(os.pathsep)
-    return [name] + [name + e.lower() for e in exts if e]
+    return [name + e.lower() for e in exts if e]
 
 
 def executables(name: str = "graphify", env: dict[str, str] | None = None) -> list[Path]:
@@ -138,8 +144,8 @@ def is_interceptor(path: Path) -> bool:
 def managed_root(path: Path) -> str:
     """The cage-managed project root owning `path`, or "" if there isn't one.
 
-    Deliberately narrow: exactly the `<root>/bin/graphify` layout `cage setup` (and the
-    removed `cage adopt`) writes, with a `<root>/.cage/` beside it. It does **not** walk
+    Deliberately narrow: exactly the `<root>/bin/graphify[.cmd]` layout `cage setup`
+    (and the removed `cage adopt`) writes, with a `<root>/.cage/` beside it. It does **not** walk
     up looking for any `.cage/`, because `~/.cage` is the *global ledger* — a walk would
     declare the whole home directory a cage-managed root and make an unrelated
     `~/bin/graphify` writable by cage. Narrow-and-sure beats broad-and-sorry when the
@@ -160,7 +166,13 @@ def classify(root: Path, env: dict[str, str] | None = None) -> PathShim:
     Precedence is severity-first: a **dead** winner outranks `shadowed`, because a
     shadowing note about a shim that is itself broken would bury the actual failure."""
     found = executables("graphify", env)
-    shim = root / "bin" / "graphify"
+    # This root's own interceptor is the twin THIS OS can actually resolve. On Windows
+    # the POSIX copy sits right beside it and can never run, so counting it would report
+    # `shadowed` — "put bin/ earlier on PATH" — for a file no PATH order can rescue.
+    # A root carrying only the wrong twin has no live interceptor, and `doctorcmd`
+    # names that case directly.
+    from cage import paths
+    shim = root / "bin" / paths.graphify_shim_name()
     root_shim = str(shim) if shim.exists() else ""
     others = tuple(str(p) for p in found[1:])
     if not found:

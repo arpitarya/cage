@@ -206,6 +206,22 @@ wins on PATH, so the shim you installed here never runs. Advisory, and the messa
 names **both** paths. Not a failure on its own: if the winner is itself dead, that
 outranks it.
 
+**interceptor twin** — one of the two files implementing the graphify interceptor: the
+extensionless POSIX `bin/graphify` and the Windows `bin/graphify.cmd`. Both are
+installed on **every** OS (a committed `bin/` must be byte-identical across machines),
+and each is inert where it cannot run. Windows resolves a bare name only through
+`PATHEXT`, which has no extensionless entry — so on Windows only the `.cmd` can ever
+run, and a root carrying only the other twin is a doctor **failure**, not a green tick.
+Enumerated once in [paths.py](../cage/paths.py) (`GRAPHIFY_SHIMS`) so no read surface
+can see only one.
+
+**shim contract** — the written behaviour spec both interceptor twins implement and are
+tested against ([docs/shim-contract.md](shim-contract.md)): behaviours **B1–B8**
+(binding on every twin) and divergences **D1–D7** (real and permanent — cmd has no
+`exec`, so the real binary runs as a child process). Two implementations of an unwritten
+contract drift; this is the written one, and the first artifact of the
+[tool-integration-contract](proposals/tool-integration-contract.md).
+
 **hook bypass** — an agent hook that invokes graphify by **absolute path**, so the
 command never traverses PATH: cage's interceptor can't see it, and a hook isn't a
 Bash tool call, so the transcript route can't either. **Advisory, never a failure** —

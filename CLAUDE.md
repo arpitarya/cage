@@ -372,6 +372,30 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   parked, not lost; it graduates to a compare doc or plan entry when picked up
   (and keeps a `# v2:` idea out of the code). A settled fork graduates to a plan
   entry and, on ship, an ADR; the compare doc stays as the evidence behind it.
+- **A proposal has a lifecycle too — parked in `proposals/`, ARCHIVED once
+  IMPLEMENTED.** `docs/proposals/` must read as *ideas not yet built*, exactly as
+  `docs/` root reads as *work not yet done*. The four states:
+  **proposed** (`status: proposed`, awaiting accept or a trigger) → **picked up**
+  (a handoff/prompt pair is written; the proposal gains a one-line pointer to it and
+  stays put — it is still the rationale) → **implemented** (the work is built and
+  green) → **archived**.
+  **The change that implements a proposal must, in that same change:** (1) move it to
+  `docs/archive/vX.Y-<name>.proposal.md`, (2) prepend the archive header naming the
+  version and **where the living spec now lives** (contract, ADR, plan section — a
+  built proposal is never the spec), (3) record the outcome in
+  [IMPLEMENTATION.md](docs/IMPLEMENTATION.md), (4) move its index entry in
+  `proposals/README.md` to the **Graduated** list with links to the archived proposal
+  and the living spec, and (5) carry forward anything still unbuilt as its own
+  proposal or OPEN-WORK item. A **declined** proposal is treated the same way, with
+  the decision and decider in the header; a *superseded* one names its successor.
+  **Where an archived proposal disagrees with the living spec, the spec wins** —
+  implementation routinely corrects the proposal that motivated it, and that
+  correction is the valuable part (see
+  [v0.38-windows-graphify-interceptor.proposal.md](docs/archive/v0.38-windows-graphify-interceptor.proposal.md),
+  wrong on both the packaging source and the recursion guard).
+  An implemented proposal still sitting in `proposals/` is a bug of the same class as a
+  ticked-but-present OPEN-WORK item: it inflates the queue of open ideas and makes the
+  directory lie about what is still on the table.
 - **Handoff/prompt docs have a lifecycle — active in `docs/`, archived once
   IMPLEMENTED.** New feature work is specced as a pair: `docs/<feature>.handoff.md`
   + `docs/<feature>.prompt.md`. While the work is unbuilt they live in `docs/` root
@@ -488,6 +512,10 @@ fires a trigger updates the doc *and* bumps its row):
   gate/status — so a reader (or an executing agent) sees the whole shape before
   any detail, and a stale plan is spottable at a glance. Existing plans gain the
   index on contact (the fix-on-contact rule), new plans start with it.
+- **[docs/shim-contract.md](docs/shim-contract.md)** — the graphify interceptor
+  behaviour contract: one spec, two twins. Update in the same change as **any** twin
+  edit, marker-set change, or new tool interceptor (every future one implements this
+  same shape). Two implementations of an unwritten contract drift.
 - **[docs/GLOSSARY.md](docs/GLOSSARY.md)** — every recurring term, defined once
   against the code that owns it.
 - **[docs/DOC-REGISTRY.md](docs/DOC-REGISTRY.md)** — the freshness tracker itself; a
@@ -585,7 +613,7 @@ the worked examples to copy.
 ## Dev
 
 ```bash
-just test          # python -m pytest -q   (962 tests)
+just test          # python -m pytest -q   (983 tests; +10 Windows-only skips)
 just demo          # seed §4.4 + print attrib/matrix
 cage --version
 ```
@@ -780,6 +808,46 @@ each agent only needs thin idiomatic wiring (`agents.py` orchestrates):
   inventory — scope + agent + status (current/stale/dead/foreign) + a per-agent
   fully/partially/not-wired/needs-healing verdict, never forking the liveness logic;
   `cage query wiring-inventory` explains it.
+- **The graphify interceptor is a TWIN PAIR against ONE written contract**
+  ([docs/shim-contract.md](docs/shim-contract.md), v0.38.0) — `data/shims/graphify`
+  (POSIX sh) and `data/shims/graphify.cmd` (Windows). Windows resolves a bare name only
+  through `PATHEXT`, which has **no extensionless entry**, so the sh shim alone could
+  never be *found* there and the shim capture route was structurally absent. The
+  contract is binding on both: **B1–B8** (re-entry guard both directions · PATH scan
+  skipping *every* interceptor · self-identification by **content, never filename** ·
+  no-real-binary ⇒ **127**, never a bare-name fallback · meter only if `cage data
+  graphify --help` succeeds · transparent passthrough · no leaked state · a bounded
+  walk) and **D1–D7**, the divergences that cannot be removed — chiefly **cmd has no
+  `exec`**, so the real binary runs as a *child* (`call` + `exit /b` on its own line;
+  the one-line `& exit /b %ERRORLEVEL%` form expands at parse time and reports the wrong
+  code). **Change a twin ⇒ change the contract, the other twin, and
+  `pathshim._INTERCEPTOR` together** — the marker set has three copies by necessity
+  (sh `grep -E`, cmd `findstr /C:`, Python regex) and drift there silently disables
+  liveness detection *and* re-enables the stacked-shim recursion. `cage setup` installs
+  **both twins on every OS** (a committed `bin/` must be byte-identical across
+  machines); `adoptcmd.refresh_shim` *completes* the pair when either exists — the
+  POSIX→Windows upgrade path. The one enumeration is `paths.GRAPHIFY_SHIMS` /
+  `graphify_shims()`, shared by the writer and every read surface so none can see only
+  one twin. A root carrying only the twin **this OS cannot resolve** is a doctor
+  *failure*, not a green tick: that is F1's lesson applied to a new OS. **Hand-paired,
+  not templated, on purpose** ([ADR 0007](docs/adr/0007-graphify-twin-pair-hand-paired-not-templated.md)
+  — templating stays off the table until a *third* interceptor exists and shares a
+  syntax family with an existing one). Known gap, stated not half-fixed: under
+  `--python-launcher` there is no `cage` on PATH, so **neither** twin meters (contract
+  B5) — `cage doctor`'s `launcher-gap` check names it (GF-LAUNCHER,
+  [docs/restricted-environments.md](docs/restricted-environments.md)); a fix must move
+  both twins together.
+- **CI has a graphify axis (CI-GF, v0.38.0)** — `python-package.yml`'s `build` job is
+  the `absent` leg (cage must never *require* graphify); the `graphify` job is the
+  `present` leg on all three OSes: pinned real graphify (PyPI **`graphifyy`**, not npm),
+  a graph over `tests/fixtures/cicorpus/`, and a **bare `graphify query` through the
+  platform shell** asserting a savings row lands. It costs **$0** — graphify is AST-only.
+  Checks live in `tools/cigraphify.py` (build-time only, never in the wheel). Two rules
+  it encodes: the corpus must stay **large enough that a query is cheaper than the files
+  it cites**, or every run is honestly `unmeasurable` and the leg asserts nothing while
+  passing; and `graphify query` emits its lines in a **different order every run**, so
+  comparisons are by content, never bytes. It skips loudly (never fails) if the pinned
+  install flakes — flake-immunity over coverage; `build` is the gate that always runs.
 - **§8 features:** `quality.py`, `regression.py`, `recommend.py`, `forecast.py`.
 - **Tier-0 savings:** `compress.py`, `responsecache.py` (emit receipts).
 

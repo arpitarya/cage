@@ -97,4 +97,20 @@ you put the log lines, the ledger row, and the arithmetic side by side.
 - The lab wasn't run from its `.venv` with an explicitly-set, proven PATH ⇒ the run
   isn't reproducible.
 
+## 6. A green lab run is not Windows coverage
+
+The interceptor is a **twin pair** since v0.38.0 (`docs/shim-contract.md`, ADR 0007) —
+the POSIX `bin/graphify` and the Windows `bin/graphify.cmd`. **cage-lab has run on
+macOS only**, and its PATH-proof (`command -v graphify`, §01-setup.md) resolves the
+POSIX twin exclusively — a POSIX shell builtin can never invoke, and therefore can
+never prove, the `.cmd` twin. Every PASS/HONEST-LIMIT/UNPROVEN/FAIL verdict recorded by
+this lab is a claim about **POSIX interception only**.
+
+Windows interception coverage lives entirely in CI-GF (`tools/cigraphify.py`, the
+`graphify (windows-latest)` job in `python-package.yml`) — a different harness, a
+different corpus, a $0 leg that installs real graphify and invokes a bare
+`graphify query` through `cmd.exe`. Report the two separately; never fold a green
+cage-lab run into a Windows claim, and never cite cage-lab as evidence that the `.cmd`
+twin resolves, meters, or passes through correctly.
+
 Next: [04-publish.md](04-publish.md).

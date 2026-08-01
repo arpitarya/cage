@@ -471,20 +471,34 @@ def _wiring(scan) -> tuple[str, str]:
 
 
 def _interceptor(root: Path, scan) -> tuple[str, str]:
-    """Existence + PATH + **liveness**. The first two alone reported ✅ for 9 days while
-    the shim's capability probe named a removed verb and every graphify call fell
-    through to the unmetered binary — existence is not liveness (F1)."""
-    shim = root / "bin" / "graphify"
+    """Existence + **the right twin** + PATH + **liveness**. Existence alone reported ✅
+    for 9 days while the shim's capability probe named a removed verb and every graphify
+    call fell through to the unmetered binary — existence is not liveness (F1).
+
+    The twin check is the Windows half of the same lesson: `bin/graphify` is a bash
+    script with no extension, and Windows resolves a bare `graphify` only through
+    PATHEXT — so a project scaffolded on POSIX and opened on Windows has an interceptor
+    file, on PATH, naming live verbs, that **can never run**. Reporting that as ✅ would
+    recreate F1 on a new OS (docs/shim-contract.md)."""
+    from cage import paths
+    shim = root / "bin" / paths.graphify_shim_name()
+    other = next(p for p in paths.graphify_shims(root) if p != shim)
     if not shim.exists():
+        if other.exists():
+            return _FAIL, (f"bin/{other.name} is installed but this OS resolves a bare "
+                           f"`graphify` only to bin/{shim.name}, which is missing — the "
+                           "interceptor can never run, so every graphify call is "
+                           "UNMETERED and silent. Fix: re-run `cage setup` (it writes "
+                           "both twins)")
         return _WARN, "graphify interceptor not installed (ok if you don't use graphify)"
     if scan.interceptor_dead:
-        return _FAIL, ("bin/graphify probes a verb that no longer exists — every "
+        return _FAIL, (f"bin/{shim.name} probes a verb that no longer exists — every "
                        "graphify call falls through UNMETERED and silently; re-run "
                        "`cage setup --wire-only --<agent>` to refresh it")
     import os
     on_path = str(shim.parent) in os.environ.get("PATH", "").split(os.pathsep)
     if not on_path:
-        return _WARN, "bin/graphify exists but bin/ is not on PATH (open a new shell)"
+        return _WARN, f"bin/{shim.name} exists but bin/ is not on PATH (open a new shell)"
     return _OK, "graphify interceptor installed, on PATH, and naming live verbs"
 
 
@@ -527,6 +541,33 @@ def _path_interceptor(root: Path) -> tuple[str, str]:
                        "every graphify call falls through UNMETERED and silently. "
                        f"Fix: {fix}")
     return _OK, f"`graphify` resolves to {ps.winner} — a cage interceptor naming live verbs"
+
+
+def _launcher_gap(root: Path) -> tuple[str, str]:
+    """GF-LAUNCHER: python-launcher mode removes `cage` from PATH entirely, but the
+    graphify interceptor's capability probe (shim-contract.md B5) needs exactly that — it
+    runs `cage data graphify --help` before deciding whether to meter. So **neither twin**
+    can ever meter a graphify call in this mode; both degrade to correct, unmetered
+    passthrough, silently. That combination — launcher mode ON, an interceptor installed
+    — is precisely where the silent gap bites, and it is otherwise invisible: nothing
+    else in this check list looks at both switches at once.
+
+    Advisory, not a failure: launcher mode is a deliberate choice for a locked-down
+    endpoint, and an unmetered interceptor there is a known, accepted trade — the fix
+    would have to move both twins together (a decision, not a patch; tracked as
+    GF-LAUNCHER) — but a silent trade a user never sees is exactly the class of gap this
+    whole checklist exists to surface out loud."""
+    launcher_pol = policy.python_launcher(policy.load(paths.Footprint(root).policy))
+    if not launcher_pol:
+        return _OK, "not in python-launcher mode"
+    shim = next((p for p in paths.graphify_shims(root) if p.exists()), None)
+    if shim is None:
+        return _OK, "python-launcher mode; no graphify interceptor installed"
+    return _WARN, (f"python-launcher mode is on and bin/{shim.name} is installed, but "
+                   "the interceptor's capability probe needs a `cage` command on PATH — "
+                   "under this mode there is none, so graphify runs UNMETERED here "
+                   "(not a bug: a known trade-off of launcher mode). See "
+                   "`cage query graphify-shims` and docs/restricted-environments.md.")
 
 
 def _out_of_root_fix(ps) -> str:
@@ -829,6 +870,7 @@ def run(root: Path) -> dict:
         # the same question at a wider scope (what actually runs, vs what this root
         # installed), and reading them apart invites the false ✅ they exist to kill.
         ("path-interceptor", *_path_interceptor(root)),
+        ("launcher-gap", *_launcher_gap(root)),
         ("hook-bypass", *_hook_bypass(root)),
         ("graph-staleness", *_graph_staleness(root)),
         ("graphify-usage", *_graphify_usage(active)),

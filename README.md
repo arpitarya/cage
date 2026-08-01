@@ -11,7 +11,7 @@ You're paying for an agent, a graph tool, a rules engine, maybe Copilot. At the 
 
 **Named after *John Cage*.** · Python ≥ 3.11 · stdlib only · MIT · sits beside `fux`, `bach`, `wagner`, `orff`.
 
-**Platforms:** macOS is field-validated (real extension sessions, the full manual capture matrix); Linux and Windows are CI-tested across the whole suite + scenario runner. **One honest gap:** the graphify PATH interceptor is a bash shim, so on Windows the shim route doesn't exist yet — graphify savings there arrive via the transcript route only (a Windows-native twin is planned). On Windows, run `cage doctor --paths` first — it shows every log location cage probes on your machine and why any missed. Locked-down endpoint (AppLocker/WDAC blocks the exe, or no pip)? `cage setup --python-launcher` wires everything through the interpreter instead, and every release ships a single-file `cage.pyz`.
+**Platforms:** macOS is field-validated (real extension sessions, the full manual capture matrix); Linux and Windows are CI-tested across the whole suite + scenario runner, plus a graphify leg that installs the real binary and meters real queries. The graphify PATH interceptor now ships as a **twin pair** — the bash shim and a `graphify.cmd` — so a bare `graphify` reaches cage on Windows too (Windows PATH lookup goes through `PATHEXT`, which has no extensionless entry, so the bash shim alone could never be found there). Windows is CI-asserted, not yet field-validated. On Windows, run `cage doctor --paths` first — it shows every log location cage probes on your machine and why any missed. Locked-down endpoint (AppLocker/WDAC blocks the exe, or no pip)? `cage setup --python-launcher` wires everything through the interpreter instead, and every release ships a single-file `cage.pyz` — **note that this turns the graphify shim route off too** (there's no `cage` command left on PATH for it to probe), so a launcher-mode project relies on the transcript route for graphify savings; see [restricted-environments.md](docs/restricted-environments.md).
 
 <p align="center"><em>▶ Demo GIF coming soon.</em></p>
 
@@ -220,7 +220,7 @@ cage data export --csv calls --since 30d -o calls.csv   # raw ledger rows for a 
 
 ## The `$0` guarantee
 
-Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 962 tests; `cage demo` reproduces the worked attribution example against a real ledger.
+Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 983 tests; `cage demo` reproduces the worked attribution example against a real ledger.
 
 **Honest limits.** Marginal-by-fixed-order is defensible and `$0`, but it is an *ordering convention*, not a Shapley value (that's a deferred audit mode). And a counterfactual cell is an honest reconstruction, never an invoice — the `method` column says so on every row, on purpose.
 
@@ -228,7 +228,7 @@ Every derived view is parse / arithmetic over the log — **no LLM call, ever, o
 
 Latest release below — full history and detail in [CHANGELOG.md](CHANGELOG.md).
 
-- **v0.37.2 (2026-08-01) — the README tells the truth.** Docs and repo hygiene only; `cage/` is unchanged from v0.37.1 apart from the version string. The pitch had been selling the Tier-1 human axis ("money *and time* versus a person", chores "in real minutes") — amputated wholesale back in v0.36.0 — so it now describes what cage actually does: per-tool savings gross **and net of what invoking the tool cost you**, counterfactual stacks, tool adoption, plus an honest note that cage's own net-positive verdict is still open at n=1 and the Windows graphify shim gap (**WIN-GF**). The graphify knowledge graph is also now committed (`graphify-out/`) so agents and CI can read it without regenerating. See [CHANGELOG.md](CHANGELOG.md) for the full accounting.
+- **v0.38.0 (2026-08-01) — graphify is metered on Windows.** The PATH interceptor was one extensionless bash script, and Windows resolves a bare `graphify` only through `PATHEXT`, so cage's shim could never be *found* there. It now ships as a twin pair with a `graphify.cmd` — plain text, no `.exe`, nothing compiled — against one written [behaviour contract](docs/shim-contract.md) whose divergences (cmd has no `exec`) are documented rather than pretended away. `cage doctor` learned the matching liveness check, so an interceptor this OS cannot resolve is a failure instead of a green tick, and CI grew a `$0` graphify leg on all three OSes that installs the real binary and asserts a bare `graphify query` files a savings row. See [CHANGELOG.md](CHANGELOG.md) for the full accounting.
 
 ## The name
 

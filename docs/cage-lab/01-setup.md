@@ -84,6 +84,13 @@ command -v graphify   # must resolve inside $LAB, not to a machine-global shim
 command -v cage
 ```
 
+**This proves the POSIX twin only.** `command -v` is a POSIX shell builtin; it
+resolves the extensionless `bin/graphify`, never `bin/graphify.cmd` (Windows'
+twin — `docs/shim-contract.md`, ADR 0007). cage-lab has never run on Windows, so it
+has never proven — and cannot, as written, prove — that the `.cmd` twin resolves
+the way `graphify.exe %*` at a cmd prompt would. That coverage is CI-GF's job
+(`tools/cigraphify.py`, the `graphify (windows-latest)` CI job), not the lab's.
+
 **Which `bin/` — a correction.** `cage setup` writes the metering interceptor
 into **the workspace's own** `<workspace>/bin/graphify`, not a shared
 lab-level `bin/` — and `cage doctor`'s interceptor-liveness check requires

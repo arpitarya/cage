@@ -222,8 +222,10 @@ def _resolve_argv(cmd: list[str]) -> list[str]:
     """On Windows, ``CreateProcess`` never honors a ``#!`` shebang — that's a POSIX
     kernel behavior, not a shell one — so a script with no native-executable extension
     (``.exe``/``.bat``/``.cmd``/``.com``) fails with WinError 193 even though it runs
-    fine everywhere else (a real graphify npm install ships a ``.cmd`` and is
-    unaffected). Peek the shebang and prepend its interpreter so it still runs; a
+    fine everywhere else. (graphify is a **PyPI** distribution — ``graphifyy`` — so on
+    Windows the real binary is a console-script launcher, ``Scripts\\graphify.exe``, and
+    is unaffected; what needs this is a shebang script reached by exact path.)
+    Peek the shebang and prepend its interpreter so it still runs; a
     ``python``/``python3`` shebang resolves to *this* interpreter (``sys.executable``)
     rather than trusting a same-named binary on PATH. Anything else (native
     executables, POSIX) is returned unchanged."""

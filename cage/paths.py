@@ -313,6 +313,32 @@ def active_ledger_source(start: Path | None = None) -> str:
     return "global (~/.cage)"
 
 
+# ── the graphify interceptor twins ──────────────────────────────────────────────
+#
+# One behaviour contract (docs/shim-contract.md), two implementations: the
+# extensionless POSIX `graphify` and the Windows `graphify.cmd`. The names live here,
+# with the rest of "where things live", so the writer (`adoptcmd`) and every read
+# surface (`pathshim`, `wiringscan`, `doctorcmd`) share one enumeration — a read
+# surface that knew about only one twin is precisely how a silently-unmetered
+# interceptor stays invisible (F1).
+
+GRAPHIFY_SHIMS = ("graphify", "graphify.cmd")
+
+
+def graphify_shim_name() -> str:
+    """The twin this OS actually resolves from a bare `graphify`. Windows resolves only
+    through PATHEXT, which has no extensionless entry — so there, only the `.cmd` can
+    ever run."""
+    return "graphify.cmd" if os.name == "nt" else "graphify"
+
+
+def graphify_shims(root: Path) -> list[Path]:
+    """Both twins under `<root>/bin`, **platform-primary first** — so a caller that
+    reports just one reports the one that matters."""
+    order = sorted(GRAPHIFY_SHIMS, key=lambda n: n != graphify_shim_name())
+    return [root / "bin" / n for n in order]
+
+
 def bundled_data():
     """Seed data shipped with the cage package (default policy + skill assets).
 

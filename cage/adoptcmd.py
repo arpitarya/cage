@@ -11,8 +11,13 @@ ships in the `cage-flux` PyPI package:
   3. graphify interceptor  — drop bin/graphify (routes `graphify query…` through
      `cage data graphify`) and add bin/ to the shell rc PATH (unless --no-graphify).
 
-The interceptor shim ships as bundled package data (`data/shims/graphify`), copied
-verbatim. Every step is idempotent. Returns a dict of what was done (for --json).
+The interceptor ships as bundled package data — a **twin pair**, `data/shims/graphify`
+(POSIX sh) and `data/shims/graphify.cmd` (Windows), copied verbatim. Both are installed
+on every OS, mirroring `runshim.write`: the inactive twin is inert (never resolved, never
+executed), and a `bin/` that is byte-identical on every machine is what lets a project
+set up on macOS keep working when it is opened on Windows or under Git Bash. Their one
+shared behaviour spec is docs/shim-contract.md. Every step is idempotent. Returns a dict
+of what was done (for --json).
 """
 from __future__ import annotations
 
@@ -25,47 +30,62 @@ from cage import agents, initcmd, paths
 _PATH_MARK = "# cage adopt: graphify metering interceptor"
 
 
+def _copy_shim(name: str, dst: Path) -> bool:
+    """Copy bundled shim ``name`` onto ``dst`` if the bytes differ; True if written.
+    Byte-compare first, exactly like `runshim.write` — a correct shim is left alone, so
+    re-setup causes no mtime churn. The execute bit is best-effort and meaningless for
+    the `.cmd`, but setting it costs nothing and keeps one code path."""
+    import importlib.resources
+    src = paths.bundled_data() / "shims" / name
+    with importlib.resources.as_file(src) as real:
+        if dst.exists() and dst.read_bytes() == real.read_bytes():
+            return False
+        shutil.copy2(real, dst)
+    try:
+        dst.chmod(dst.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    except OSError:
+        pass  # fileMode=false / FAT — the .cmd needs no bit, and sh can still run the other
+    return True
+
+
 def _install_shim(root: Path) -> str | None:
-    """Copy the bundled graphify interceptor into <root>/bin; return its path."""
+    """Copy both bundled graphify interceptors into <root>/bin; return the path of the
+    twin this OS resolves (the one worth printing)."""
     if not shutil.which("graphify"):
         return None
-    import importlib.resources
-    src = paths.bundled_data() / "shims" / "graphify"
     bin_dir = root / "bin"
     bin_dir.mkdir(parents=True, exist_ok=True)
-    dst = bin_dir / "graphify"
-    with importlib.resources.as_file(src) as real:
-        shutil.copy2(real, dst)
-    dst.chmod(dst.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-    return str(dst)
+    for name in paths.GRAPHIFY_SHIMS:
+        _copy_shim(name, bin_dir / name)
+    return str(bin_dir / paths.graphify_shim_name())
 
 
 def refresh_shim(root: Path) -> bool:
-    """Rewrite an **already-installed** `<root>/bin/graphify` when it differs from the
-    bundled template; return whether it changed. Byte-compare first, exactly like
-    `runshim.write` — a correct shim is left alone, so re-setup causes no mtime churn.
+    """Bring an **already-installed** interceptor up to the bundled template; return
+    whether anything changed.
 
     This is the heal for the F1 shim: the copy installed before v0.28.0 probes `cage
     graphify --help`, which now exits 1, so it silently execs the unmetered binary
-    forever. Only ever *refreshes* — creating the shim stays `_install_shim`'s job
-    (it gates on graphify being installed at all), so this never scaffolds into a
-    project that opted out. Fail-open: an unreadable/unwritable shim is not worth
-    breaking `cage setup` over."""
-    dst = root / "bin" / "graphify"
-    if not dst.exists():
+    forever. Only ever refreshes an **existing** install — creating one from nothing
+    stays `_install_shim`'s job (it gates on graphify being installed at all), so this
+    never scaffolds into a project that opted out.
+
+    Deliberately completes the pair: if *either* twin is present the project has already
+    opted in, so a missing twin is written too. That is the migration path for a project
+    scaffolded on POSIX before the `.cmd` existed and then opened on Windows — without
+    it, `cage setup` there would report success while leaving PATH interception
+    structurally absent. Fail-open: an unreadable/unwritable shim is not worth breaking
+    `cage setup` over."""
+    targets = paths.graphify_shims(root)
+    if not any(p.exists() for p in targets):
         return False
-    import importlib.resources
-    try:
-        src = paths.bundled_data() / "shims" / "graphify"
-        with importlib.resources.as_file(src) as real:
-            want = real.read_bytes()
-            if dst.read_bytes() == want:
-                return False
-            shutil.copy2(real, dst)
-        dst.chmod(dst.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-        return True
-    except OSError:
-        return False
+    changed = False
+    for dst in targets:
+        try:
+            changed |= _copy_shim(dst.name, dst)
+        except OSError:
+            continue
+    return changed
 
 
 def _wire_path(root: Path) -> str | None:

@@ -63,7 +63,35 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
 
 ## In flight + the single next step
 
-**Update 2026-08-01 (latest) — gross vs net savings (K+NET) is BUILT. Read this before
+**Update 2026-08-01 (latest) — WIN-GF + CI-GF are BUILT (v0.38.0, uncommitted). The
+single next step: push and read the Windows `graphify` CI job.**
+
+- **graphify is now metered on Windows.** The interceptor was one extensionless bash
+  script; Windows resolves a bare name only through `PATHEXT`, which has no extensionless
+  entry, so cage's shim could never be *found* there. It now ships as a **twin pair** —
+  `graphify` + `graphify.cmd` — against one written contract,
+  [shim-contract.md](shim-contract.md).
+- **The one thing I could not do is the one thing that matters most: run it on Windows.**
+  10 behaviour tests and the whole CI `present` leg have never executed. Everything on
+  this machine is green (979/0, dummyrepo S1–S18, `tools.cigraphify` 7/7 on macOS), and
+  the POSIX interception path is proven end to end — real bare `graphify query` → shim →
+  cage → one savings row. **Do not describe Windows as validated.** It is CI-asserted.
+  Read that job before believing anything about it (OPEN-WORK **WIN-CI**).
+- **If you touch a twin, you touch three things.** The marker set has three copies by
+  necessity — sh `grep -E`, cmd `findstr /C:`, `pathshim._INTERCEPTOR` — and drift there
+  silently disables liveness detection *and* re-enables the stacked-shim recursion that
+  already cost this project nine days. The contract doc exists to make that unavoidable;
+  update it in the same change.
+- **The contract is the reusable artifact, not the twin.** TOOL-SDK wants a paved road
+  for the next tool: what it should template is the *contract*, not the source. Batch and
+  sh share no syntax subset, which is why the twins are hand-paired (`runshim.py` made
+  the same call).
+- **The residual I deliberately did not fix:** under `--python-launcher` there is no
+  `cage` on PATH, so **neither** twin meters — it degrades to correct unmetered
+  passthrough. Fixing the cmd side alone would have been exactly the drift the contract
+  exists to prevent. Filed as **GF-LAUNCHER**; it needs a decision, not a patch.
+
+**Update 2026-08-01 — gross vs net savings (K+NET) is BUILT. Read this before
 you touch any savings number.**
 
 - **`saved` was never what it read as.** It is a per-query counterfactual — avoided read
@@ -241,6 +269,24 @@ you touch any savings number.**
 
 ## Maintainers
 
+- Claude (Opus 5) — 2026-08-01 — built the Windows graphify twin (WIN-GF) and the CI
+  graphify axis (CI-GF). Lesson for the next model: **when a handoff states a fact about
+  a third-party tool, go look at the tool.** This one said graphify installs via npm and
+  therefore ships its own `graphify.cmd` on Windows, and the whole "skip by content, the
+  filenames collide" trap was built on that. graphify is a **PyPI** distribution
+  (`graphifyy`) — on Windows it is `Scripts\graphify.exe`, the filenames never collide,
+  and the *real* Windows hazard is the opposite one nobody had written down: `.EXE`
+  precedes `.CMD` in the default `PATHEXT`, so a twin sharing a *directory* with the real
+  binary is silently skipped. Thirty seconds of `file $(command -v graphify)` replaced a
+  paragraph of confident fiction. Second lesson: **a green check that asserts nothing is
+  worse than a red one.** My first CI corpus was ~1.2 KB, so every graphify query came
+  back honestly `unmeasurable` (the answer cost more than the files it cited) — the leg
+  passed while proving nothing. Size the fixture until the thing you are measuring
+  actually happens, then assert the number. Third, the one I nearly shipped: the prompt
+  handed me `call "%REAL%" %* & exit /b %ERRORLEVEL%` as the cmd idiom. On one line cmd
+  expands `%ERRORLEVEL%` at *parse* time, before `call` has run, so the shim would have
+  reported the previous command's status — passthrough silently broken, in the file whose
+  entire job is passthrough. A suggested snippet in a prompt is a hypothesis, not a spec.
 - Claude (Opus 5) — 2026-08-01 — built kiro capture routing (K2 + the K3/K4 honesty
   lines). Lesson for the next model: **never `git stash` in this repo.** I used one to
   isolate a failure; it restored every byte, but it flattened the `MM`/`AM` staged-vs-

@@ -61,7 +61,9 @@ def test_every_check_has_a_known_level(proj):
                      "capture-quality", "trace", "interceptor",
                      # the PATH-scoped pair: what actually RUNS, and what reaches
                      # graphify without passing the interceptor at all (B-fix-1/3)
-                     "path-interceptor", "hook-bypass",
+                     "path-interceptor",
+                     # GF-LAUNCHER: launcher mode ∧ an installed interceptor together
+                     "launcher-gap", "hook-bypass",
                      "graph-staleness", "graphify-usage", "receipts", "ledger"}
     assert all(c["level"] in {"ok", "warn", "fail"} for c in res["checks"])
 

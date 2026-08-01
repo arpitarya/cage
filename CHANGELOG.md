@@ -2,6 +2,62 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
+## v0.38.0 (2026-08-01) — graphify is metered on Windows; CI grows a graphify axis
+
+Closes the gap v0.37.2 disclosed. The graphify PATH interceptor was a single
+extensionless bash script, and Windows resolves a bare `graphify` **only** through
+`PATHEXT` — which has no extensionless entry — so on Windows cage's interceptor could
+never be *found*. The shim capture route was structurally absent there, and no amount
+of PATH ordering could rescue it.
+
+Built from: [handoff](docs/archive/v0.38-win-graphify-shim.handoff.md) ·
+[prompt](docs/archive/v0.38-win-graphify-shim.prompt.md) ·
+[CI harness handoff](docs/archive/v0.38-ci-graphify-matrix.handoff.md).
+
+- **A `graphify.cmd` twin ships as bundled data.** Plain text — no `.exe`, nothing
+  compiled, no new dependency, and it works from `cage.pyz`. PowerShell was ruled out on
+  a hard fact: `.ps1` is absent from the default `PATHEXT`, so a `graphify.ps1` could
+  never be found by a bare `graphify` — the exact bug being fixed.
+- **One written behaviour contract, two implementations**
+  ([docs/shim-contract.md](docs/shim-contract.md)). Eight binding behaviours (re-entry
+  guard, PATH scan skipping *every* interceptor, content-based self-identification, the
+  127 rule, the capability probe, transparent passthrough, no leaked state, a bounded
+  walk) and seven documented divergences. **cmd has no `exec`**, so the real binary runs
+  as a child process via `call` + `exit /b` — Ctrl-C prompts `Terminate batch job
+  (Y/N)?`. That is recorded as a divergence, not papered over as parity.
+- **Recursion is impossible by four independent mechanisms**, and the twins are
+  *structurally* incapable of selecting each other: the cmd twin only ever considers
+  `PATHEXT` candidates and the sh twin only ever considers the extensionless name. Both
+  stacked pairings (`bash + cmd`, `cmd + cmd`) are tested.
+- **`cage setup` installs both twins on every OS**, mirroring `runshim.write` — a
+  committed `bin/` that is byte-identical on every machine is what lets a project
+  scaffolded on macOS keep working when it is opened on Windows. `refresh_shim` now
+  *completes* the pair when either twin is present, which is the upgrade path for a
+  project scaffolded before the `.cmd` existed.
+- **Liveness before the flip** (the F1 lesson, on a new OS). `pathshim` no longer treats
+  the extensionless name as a Windows candidate — it could never run there, and counting
+  it produced a false ✅. `cage doctor` gained the twin check: an interceptor that
+  exists, sits on PATH and names live verbs but that **this OS cannot resolve** is now a
+  *failure* with a runnable fix, not a green tick. `wiringscan` scans both committed
+  copies and names the offending file.
+- **CI grows a graphify axis (CI-GF).** `python-package.yml` keeps its `absent` leg
+  byte-identical and adds a `present` job on all three OSes: install real graphify
+  (pinned), build a graph over the new committed `tests/fixtures/cicorpus/`, invoke a
+  **bare `graphify query` through the platform shell**, and assert a savings row lands.
+  Also asserted: passthrough, doctor `live`, a deliberately killed shim reporting `dead`
+  and being healed, and determinism. graphify is AST-only, so the whole leg costs **$0**.
+  It skips loudly (never fails) if the pinned install flakes.
+- **Two handoff assumptions corrected by contact with reality.** graphify is a **PyPI**
+  distribution (`graphifyy`), not npm — on Windows it installs as `Scripts\graphify.exe`,
+  so the twin never shares a filename with the real binary, but `.EXE` precedes `.CMD` in
+  the default `PATHEXT`, so the twin must never share a *directory* with it. And
+  `graphify query` emits its lines in a different order every run, so the CI passthrough
+  check compares content, not bytes — a byte comparison would have flaked forever.
+- **Known gap, stated rather than half-fixed:** under `cage setup --python-launcher`
+  there is no `cage` command on PATH, so the interceptor degrades to correct *unmetered*
+  passthrough. That is true of both twins; fixing one alone is exactly the drift the
+  contract exists to prevent.
+
 ## v0.37.2 (2026-08-01) — README tells the truth; the knowledge graph is committed
 
 A documentation and repo-hygiene release. **No code, substrate, schema, or CLI change**

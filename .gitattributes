@@ -1,0 +1,3 @@
+# The bundled Windows interceptor is a batch file: CRLF line endings, never
+# normalized by git on any platform. cmd.exe is the only consumer.
+cage/data/shims/graphify.cmd -text

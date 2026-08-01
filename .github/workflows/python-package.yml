@@ -2,6 +2,12 @@
 # supported Python versions AND all three OSes — Windows/macOS parity is a CI gate
 # (macOS is field-validated; Windows is CI-tested until a manual run upgrades it,
 # see docs/windows-manual-checklist.md).
+#
+# Two legs on a graphify axis (CI-GF):
+#   absent  — the `build` job below, unchanged. Proves cage never *requires* graphify.
+#   present — the `graphify` job. Real binary, real queries, real ledger. graphify is
+#             AST-only, so this costs $0: no LLM call, no network at query time.
+# The boundary: CI proves capture and derivation; cage-lab proves agent adoption.
 # See: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
 
 name: Python package
@@ -41,3 +47,42 @@ jobs:
       run: pytest -q
     - name: Scenario runner S1–S9 (real-CLI capture, PII, determinism, fleet)
       run: python -m tools.dummyrepo
+
+  # ── the `present` leg ─────────────────────────────────────────────────────────
+  # Pruned to one Python per OS on purpose: this leg proves an *integration surface*,
+  # not interpreter compatibility (that is `build`'s job), and pairing it across every
+  # version would triple CI time for no new signal.
+  graphify:
+    name: graphify present (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # graphifyy declares >=3.10,<3.14 — 3.13 is the newest it accepts.
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ["3.13"]
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: pip
+    - name: Install (stdlib-only package + dev tools)
+      run: pip install -e ".[dev]"
+    # Pinned deliberately: a floating latest makes cage's CI red on graphify's release
+    # day. Bump this line as a decision, never as a side effect.
+    - name: Install real graphify (pinned)
+      id: graphify
+      continue-on-error: true
+      run: pip install "graphifyy==0.5.0"
+    # Flake-immunity over coverage (CI-GF constraint): a PyPI hiccup must not turn the
+    # tree red — `build` is the gate that always runs. The skip is printed loudly so a
+    # silently-uncovered leg cannot pass for a covered one.
+    - name: graphify integration leg (shim interception, receipts, doctor liveness)
+      if: steps.graphify.outcome == 'success'
+      run: python -m tools.cigraphify
+    - name: graphify unavailable — leg skipped
+      if: steps.graphify.outcome != 'success'
+      run: echo "::warning::graphify install failed; the present leg did NOT run. The absent leg (build) still gated this PR."

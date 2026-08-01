@@ -890,6 +890,50 @@ REGISTRY: tuple[Explanation, ...] = (
         "n/a — describes a detection + repair mechanism, not a number.",
         kind="concept", plan_ref="§5"),
     Explanation(
+        # NB: keywords avoid the bare "wiring"/"interceptor" stems already owned by
+        # `stale-wiring` — this entry is specifically about the TWIN PAIR, not the
+        # general dead-verb detector.
+        "graphify-shims", ("graphify-shims", "twin", "twins", "graphify.cmd",
+                           "pathext", "cmd-twin", "windows-graphify",
+                           "windows-interceptor", "shim-contract", "call-not-exec"),
+        "why the graphify interceptor is TWO files, and what each one can't do",
+        "one behaviour contract, two implementations (docs/shim-contract.md): the\n"
+        "  extensionless POSIX `bin/{graphify_shim_posix}` and the Windows\n"
+        "  `bin/{graphify_shim_windows}`. Windows resolves a bare `graphify` ONLY\n"
+        "  through PATHEXT, which has no extensionless entry — so on Windows only the\n"
+        "  .cmd twin can ever run, and the .cmd is a no-op file everywhere else. This\n"
+        "  OS resolves: bin/{graphify_shim_here}. Both twins install on every OS\n"
+        "  regardless (`cage setup`, `adoptcmd.refresh_shim`) — a committed bin/ must\n"
+        "  be byte-identical across machines, so a project scaffolded on one OS keeps\n"
+        "  working when opened on another (ADR 0007).\n"
+        "  A ROOT CARRYING ONLY THE WRONG TWIN is a doctor FAILURE, not a green tick —\n"
+        "  existence + PATH + live verbs is not enough if this OS structurally cannot\n"
+        "  resolve the file (the F1 lesson, applied to a second OS).\n"
+        "  IDENTITY IS CONTENT, NEVER FILENAME: each twin self-identifies via the same\n"
+        "  marker set (`cage data graphify`, its pre-rename bare form with no `data`,\n"
+        "  or the header string \"graphify metering interceptor\") so neither twin can\n"
+        "  ever select the OTHER as the real binary — recursion is impossible by four\n"
+        "  independent mechanisms (content skip, PATHEXT/extensionless structural\n"
+        "  blindness, the CAGE_GRAPHIFY_SHIM re-entry guard, a bounded walk).\n"
+        "  WHERE THE TWINS DIVERGE (documented, never hidden): cmd has no `exec`, so\n"
+        "  the real binary runs as a CHILD process (`call` + `exit /b` on its own\n"
+        "  line — a one-line `& exit /b %ERRORLEVEL%` reports the WRONG exit code,\n"
+        "  because %ERRORLEVEL% expands at parse time before `call` runs); Ctrl-C on\n"
+        "  the cmd twin prompts `Terminate batch job (Y/N)?`; `.EXE` precedes `.CMD`\n"
+        "  in the default PATHEXT, so resolution is directory-major/extension-minor —\n"
+        "  the twin must never share a DIRECTORY with the real graphify.exe, though on\n"
+        "  Windows it never shares a FILENAME (graphify installs from PyPI as\n"
+        "  Scripts\\graphify.exe, not npm).\n"
+        "  THE KNOWN GAP (GF-LAUNCHER, both twins): under `--python-launcher` there is\n"
+        "  no `cage` command on PATH for the capability probe to find, so NEITHER twin\n"
+        "  meters — correct passthrough, silently unmetered. `cage doctor`'s\n"
+        "  launcher-gap check says so when it sees both switches at once. See\n"
+        "  `cage query restricted-env` and docs/restricted-environments.md.",
+        ("cage/paths.py", "cage/adoptcmd.py", "cage/pathshim.py", "cage/wiringscan.py",
+         "cage/doctorcmd.py", "cage/data/shims/graphify", "cage/data/shims/graphify.cmd"),
+        "n/a — describes a wiring mechanism, not a number.",
+        kind="concept", plan_ref="§5"),
+    Explanation(
         # NB: keywords avoid the bare "wiring"/"stale"/"dead" stems already owned by
         # `stale-wiring` — this entry is about the ITEMIZED VIEW, not the detection.
         "wiring-inventory", ("wiring-inventory", "inventory", "installed-artifact",

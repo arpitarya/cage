@@ -16,6 +16,113 @@ Entry format:
 
 ---
 
+## 2026-08-01 — v0.38.0: GF-DEBT — the six honesty debts WIN-GF/CI-GF left behind
+
+- **Implemented, all six, same change as v0.38.0 (never shipped separately):**
+  - **Restored `docs/restricted-environments.md`** (deleted in the v0.36 hookless sweep,
+    `b2c4253`; 8 source files still cited it by path — `clicmds.py`, `doctorcmd.py` ×2,
+    `paths.py`, `policy.py`, `runshim.py` ×2, `CLAUDE.md`). Restore-then-update, not
+    rewrite: fixed the stale "Companion to portable-wiring.md" reference (that file was
+    folded into `cage query portable-wiring` + PLAN §5.3 during the same sweep that
+    deleted this doc), dropped the removed Codex MCP row from the launcher-mode table,
+    and added a new **GF-LAUNCHER** subsection.
+  - **GF-LAUNCHER stated where users are:** one clause in the README Platforms line;
+    the restored doc's new subsection; `cage doctor`'s new `launcher-gap` check
+    (`doctorcmd._launcher_gap`, fires only when python-launcher mode is on **and** an
+    interceptor is installed — the exact combination where the gap bites silently).
+  - **`cage query graphify-shims`** — a new concept entry in `explain_data.py`
+    (inserted between `stale-wiring` and `wiring-inventory`), live-interpolated from
+    three new `_live()` values (`graphify_shim_posix`/`_windows`/`_here`, sourced from
+    `paths.GRAPHIFY_SHIMS`/`graphify_shim_name()`). Covers: why two twins · PATHEXT has
+    no extensionless entry · `.EXE` precedes `.CMD` (directory-major/extension-minor
+    resolution) · content-based identity · D1 (`call` not `exec`) · the GF-LAUNCHER gap.
+  - **ADR 0007** (`docs/adr/0007-graphify-twin-pair-hand-paired-not-templated.md`) —
+    records three decisions as load-bearing: both twins install on every OS,
+    hand-paired not templated, contract lives in `docs/` not package data. Veto
+    condition: templating reopens only on a **third** interceptor sharing a syntax
+    family with an existing one; the written-contract-as-shared-artifact principle is
+    invariant regardless of tool count.
+  - **cage-lab states POSIX-only coverage:** `01-setup.md`'s PATH-proof
+    (`command -v graphify`) now says explicitly it proves the POSIX twin only (a shell
+    builtin can never invoke `.cmd`); `03-verify.md` gained a new §6 stating a green
+    lab run is never Windows coverage — that lives in CI-GF alone.
+  - **The corpus-sizing rule, written AND enforced:** documented in
+    `tools/cigraphify.py`'s module docstring (the actual near-miss: the first
+    `cicorpus` draft was ~1.2 KB and every query came back honestly `unmeasurable`).
+    Not just written down — `check_bare_graphify_is_intercepted` already raised `Fail`
+    on zero new savings rows or a non-positive saving, so a vacuous corpus cannot
+    silently pass; **4 new unit tests** (`tests/test_cigraphify.py`, monkeypatching the
+    shell-call and ledger-read seams, no real graphify needed) pin that as a
+    regression, not an accident of the current corpus size.
+- **Two fixes needed after building the above:**
+  - `tests/test_doctor.py::test_every_check_has_a_known_level` — added `"launcher-gap"`
+    to the expected check-name set.
+  - `tests/test_cli_tiering.py::test_no_stale_old_verb_hints_in_source_or_assets` — the
+    new `graphify-shims` explainer's prose literally contained "cage graphify" (the
+    marker string it was describing), which the stale-verb grep gate correctly flagged
+    since `graphify` is in `verbmap.REMOVED`. Reworded to describe the marker without
+    spelling the two words adjacently, rather than weakening the gate.
+- **Files:** `docs/restricted-environments.md` (restored) ·
+  `docs/adr/0007-graphify-twin-pair-hand-paired-not-templated.md` (new) ·
+  `tests/test_cigraphify.py` (new) · `cage/doctorcmd.py` (`_launcher_gap` + wiring) ·
+  `cage/explain.py` (+3 `_live()` values) · `cage/explain_data.py` (`graphify-shims`
+  entry) · `tools/cigraphify.py` (docstring) · `docs/shim-contract.md` (cross-links) ·
+  `docs/cage-lab/{01-setup,03-verify}.md` · `README.md` · `CLAUDE.md` ·
+  `tests/{test_doctor,test_cli_tiering}.py` (fixes) · docs indexes/trackers.
+- **Tests:** green. `just test` **983 pass / 0 fail / 10 skipped** (979 before — the 4
+  new `test_cigraphify.py` cases). No goldens affected (nothing here touches a golden
+  fixture's output surface — `cage query`/`cage doctor` are not golden-pinned).
+- **Next:** GF-LAUNCHER stays open (documented, not fixed) — needs a decision to move
+  both twins together, not a patch. Then ③ ADOPT.
+
+## 2026-08-01 — v0.38.0: WIN-GF (the `graphify.cmd` twin) + CI-GF (the graphify CI axis)
+
+- **Implemented — CI-GF first, as its harness:**
+  - `tests/fixtures/cicorpus/` — a **new named corpus** (frozen-corpus rule: never
+    mutate an existing one), 3 modules ≈ 13.7 KB. Sized deliberately: the first draft
+    was ~1.2 KB and every query came back `unmeasurable` because the answer cost more
+    than the files it cited, so the leg asserted nothing while passing.
+  - `tools/cigraphify.py` — the `present` leg as one cross-platform runner (7 checks:
+    setup installs both twins · graph builds · **bare `graphify query` is intercepted
+    and files a savings row** · passthrough · doctor live · killed shim ⇒ `dead` ⇒
+    healed · determinism). Every invocation goes through `shell=True` because Python's
+    `CreateProcess` appends only `.exe` and would never find `graphify.cmd` — it would
+    fail the Windows leg for a reason unrelated to cage.
+  - `.github/workflows/python-package.yml` — new `graphify` job, 3 OS × py3.13
+    (graphifyy declares `>=3.10,<3.14`), pinned install, `continue-on-error` + a loud
+    `::warning::` skip. The `build` (absent) job is byte-identical.
+- **Implemented — WIN-GF, five phases:**
+  - `docs/shim-contract.md` — the behaviour contract. B1–B8 binding, D1–D7 divergences.
+    Corrects two handoff claims (npm→PyPI; re-entry skips metering only).
+  - `cage/data/shims/graphify.cmd` — the twin. CRLF, pinned via a new `.gitattributes`.
+    Bounded PATH walk + `where` fallback + `findstr` content skip; no delayed expansion
+    (it eats `!` from `%*`); `exit /b %ERRORLEVEL%` on its **own line** (the one-line
+    `& exit /b` form the prompt suggested expands ERRORLEVEL at parse time and is wrong).
+  - `paths.GRAPHIFY_SHIMS`/`graphify_shim_name()`/`graphify_shims()` — one enumeration
+    the writer and every read surface share. `adoptcmd` installs both twins on every OS;
+    `refresh_shim` now **completes** the pair (the POSIX→Windows upgrade path).
+  - `pathshim._candidates` no longer offers the extensionless name on Windows (it can
+    never run there; counting it was a false ✅). `wiringscan` scans both twins and names
+    the offending file; `doctorcmd._interceptor` fails a root carrying only the twin this
+    OS cannot resolve. `wiringscan._BATCH_COMMENT` strips `rem` lines — without it the
+    twin's own prose reported a dead `cage command` verb.
+- **Files:** `cage/data/shims/graphify.cmd` (new) · `.gitattributes` (new) ·
+  `docs/shim-contract.md` (new) · `tools/cigraphify.py` (new) ·
+  `tests/fixtures/cicorpus/` (new) · `tests/test_win_graphify_shim.py` (new) ·
+  `cage/{paths,adoptcmd,pathshim,wiringscan,doctorcmd}.py` ·
+  `.github/workflows/python-package.yml` · `README.md` · `CHANGELOG.md` ·
+  `cage/__init__.py` (0.37.2 → 0.38.0) · `tests/fixtures/goldens/P1.txt` (re-blessed,
+  version stamp only) · docs (archive pair + indexes + trackers).
+- **Tests:** green. `just test` **979 pass / 0 fail / 10 skipped** (962 before; the 10
+  skips are the Windows-only behaviour tier and run on CI). `python -m tools.dummyrepo`
+  S1–S18 all PASS. `python -m tools.cigraphify` **7/7 on macOS** — real interception
+  proven end to end: bare `graphify query` → shim → cage → one savings row, ~2,562
+  tokens gross.
+- **`cage/data/shims/graphify` is byte-identical** (`git diff` empty) — the POSIX path
+  is unchanged by construction, not by assertion.
+- **Next:** the Windows behaviour tier has never executed — it runs first on CI. Then
+  ③ ADOPT.
+
 ## 2026-08-01 — v0.37.1: Windows dev-CI green (graphify subprocess + test fixes)
 
 - **Implemented:**
