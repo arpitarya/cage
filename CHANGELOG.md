@@ -2,6 +2,47 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
+## v0.37.1 (2026-08-01) — Windows dev-CI: graphify subprocess + test fixes
+
+A second same-day follow-up: v0.37.0 fixed the release-critical Windows crash (a
+malformed `cage.toml`), but the broader dev-CI matrix (`python-package.yml`, which
+runs pytest directly on all three OSes — a surface `publish.yml`'s zipapp-only smoke
+chain doesn't cover) was still red on `windows-latest` across ~15 tests. None of these
+affect the shipped v0.37.0 package; they're either a real subprocess-execution gap or
+Windows-only test-assertion bugs, both exposed by v0.36.0's new graphify-integration
+test files (`test_graphify_copilot.py`/`test_graphify_transcript.py`/
+`test_graphify_usage.py`/`test_hookbypass.py`) running on Windows CI for the first time.
+
+- **Fix: `cage data graphify` crashed on Windows (`WinError 193`) when the target was
+  a shebang script without a native-executable extension.** `subprocess.run`/
+  `CreateProcess` never honors `#!` — that's POSIX kernel behavior — so a non-`.exe`/
+  `.cmd`/`.bat` target failed outright even though a real npm-installed `graphify.cmd`
+  is unaffected. `graphifymeter._resolve_argv` now peeks the shebang on Windows and
+  prepends its interpreter (a `python`/`python3` shebang resolves to `sys.executable`
+  rather than trusting a same-named PATH binary).
+- **Fix: `hookbypass._tokens`' Windows tokenizer left quote marks in a token.**
+  `shlex.split(..., posix=False)` (needed so an unquoted native `C:\...` path keeps its
+  backslashes) doesn't strip surrounding quotes the way posix mode does — a quoted
+  path with a space was never recognized as a graphify hook invocation. Now unquoted
+  after non-posix tokenization.
+- **Two tests asserted an absolute sink path** (`test_kiro_routing.py`,
+  `test_import_unified.py`) where the printed line correctly uses the tilde-relative
+  form (`importcmd._tilde`, deliberately "machine-portable in tests" per its own
+  docstring) — true on Windows CI because `%TEMP%` sits under `%HOME%` there, unlike
+  the POSIX runners' sandbox temp dirs. Both now compare against `_tilde(...)`.
+- **One test wrote a raw Windows path into a TOML string** (`test_kiro_routing.py`'s
+  `test_cli_credits_import_is_scoped_and_stamped`) — the same backslash-escape bug
+  v0.37.0 fixed in `paths.sources_toml`, here in test setup. Fixed with `.as_posix()`.
+- **Filed, not fixed:** `cage`'s own graphify interceptor (`cage/data/shims/graphify`)
+  is a bash script with no extension, so it can never be *found* via a bare `graphify`
+  PATH lookup on Windows (PATHEXT requires a recognized extension) — independent of
+  today's subprocess fix, which only helps once something has already located the
+  shim by an exact path. A real fix needs a Windows-native twin with equivalent
+  PATH-scan/recursion-guard logic — a feature-sized project, tracked as **WIN-GF** in
+  [docs/OPEN-WORK.md](docs/OPEN-WORK.md), not attempted here.
+
+No substrate, schema, or CLI-surface change.
+
 ## v0.37.0 (2026-08-01) — Windows sources.toml crash + dummyrepo sync
 
 A same-day follow-up to v0.36.0: the release-CI smoke chain (which only runs the exact

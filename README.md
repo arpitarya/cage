@@ -1,5 +1,3 @@
-<img src="https://raw.githubusercontent.com/arpitarya/cage/main/docs/assets/cage-lockup.png" alt="Cage — Alpha Forge · Value Ledger" width="460">
-
 # Cage
 
 > **Cost dashboards tell you what your AI stack *spent*. Cage tells you what each tool in it actually *saved* you — **gross and net of the cost of using it** — with a `method` tag on every number.**
@@ -226,7 +224,7 @@ Every derived view is parse / arithmetic over the log — **no LLM call, ever, o
 
 Latest release below — full history and detail in [CHANGELOG.md](CHANGELOG.md).
 
-- **v0.37.0 (2026-08-01) — Windows `cage setup` crash fixed.** A same-day follow-up to v0.36.0: the release-CI zipapp smoke chain (the one surface that exercises the exact built artifact on Windows) caught that `cage setup` wrote an unparseable `cage.toml` on Windows — a materialized default source path went into a TOML string un-escaped, so a raw `\` broke the parse and the first metered call after setup (e.g. `cage demo`) crashed. Fixed at the source: every written `path`/`glob`/`path_globs` value is now normalized to `/`. Also resyncs the out-of-tree `tools/dummyrepo` scenario suite to v0.36.0's actual behavior (config rename, kiro machine-routing, opt-in budgets, the new `import_id` field) — 10 of 18 scenarios were silently stale. No substrate/schema/CLI change. See [CHANGELOG.md](CHANGELOG.md) for the full accounting.
+- **v0.37.1 (2026-08-01) — Windows dev-CI green.** Two same-day follow-ups to v0.36.0: v0.37.0 fixed a release-critical crash (`cage setup` wrote an unparseable `cage.toml` on Windows); v0.37.1 fixes the broader dev-CI matrix, which stayed red on `windows-latest` — `cage data graphify` crashed on a non-`.exe` target (`subprocess`/`CreateProcess` never honors a `#!` shebang; now shebang-resolved), plus a few Windows-only test bugs (quote-stripped tokenization, tilde-relative path assertions, a raw backslash in a test's own TOML write). One deeper gap is filed, not fixed: cage's own graphify interceptor is a bash script with no extension, so it's unreachable via a bare `graphify` PATH lookup on Windows at all — tracked as **WIN-GF** in `docs/OPEN-WORK.md`. No substrate/schema/CLI change. See [CHANGELOG.md](CHANGELOG.md) for the full accounting.
 
 ## The name
 

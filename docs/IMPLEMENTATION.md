@@ -16,6 +16,50 @@ Entry format:
 
 ---
 
+## 2026-08-01 — v0.37.1: Windows dev-CI green (graphify subprocess + test fixes)
+
+- **Implemented:**
+  - `cage/graphifymeter.py` gains `_resolve_argv()`: on Windows, when the subprocess
+    target has no native-executable extension (`.exe`/`.cmd`/`.bat`/`.com`), it peeks
+    the file's `#!` shebang and prepends the interpreter before calling
+    `subprocess.run` — `CreateProcess` never honors a shebang (POSIX-kernel-only
+    behavior), which is why `cage data graphify` crashed with `WinError 193` against
+    any non-native target (a real npm `graphify.cmd` install was unaffected; the six
+    new v0.36.0 graphify-integration test files, which all use a shebang-script
+    stand-in, were not). A `python`/`python3` shebang resolves to `sys.executable`
+    rather than trusting a same-named PATH binary.
+  - `cage/hookbypass.py` `_tokens()`: Windows non-posix `shlex.split` mode (kept so an
+    unquoted native `C:\...` path retains its backslashes) leaves quote marks on a
+    quoted token — added `_unquote()` to strip them after tokenizing, fixing
+    `test_quoted_path_survives_tokenization`.
+  - `tests/test_kiro_routing.py` (×2) + `tests/test_import_unified.py`: both asserted
+    an absolute sink path where the printed line correctly uses `importcmd._tilde`'s
+    tilde-relative form (explicitly "machine-portable in tests" per its own
+    docstring) — only ever a no-op locally because POSIX CI sandboxes aren't under
+    `$HOME`, unlike `%TEMP%` on Windows. Now compare against `_tilde(...)` directly.
+  - `tests/test_kiro_routing.py`'s `test_cli_credits_import_is_scoped_and_stamped`:
+    the test wrote a raw Windows path into a TOML string in its own setup — the same
+    backslash-escape bug v0.37.0 fixed in `paths.sources_toml`. Fixed with
+    `.as_posix()`.
+  - `docs/OPEN-WORK.md` gains **WIN-GF**: cage's own graphify interceptor
+    (`cage/data/shims/graphify`) is a bash script with no extension, so Windows'
+    PATHEXT-based bare-name PATH lookup can never find it at all — independent of
+    today's subprocess fix, which only helps once something has already located the
+    shim by an exact path. Needs a Windows-native twin (feature-sized, not attempted
+    here); filed with a `proposals/` doc as the next action.
+  - `__version__` bumped to 0.37.1; `CHANGELOG.md` + README "What's new" updated;
+    golden `P1.txt` re-blessed for the version string.
+- **Files:** `cage/graphifymeter.py`, `cage/hookbypass.py`, `cage/__init__.py`,
+  `tests/test_kiro_routing.py`, `tests/test_import_unified.py`,
+  `tests/fixtures/goldens/P1.txt`, `docs/OPEN-WORK.md`, `CHANGELOG.md`, `README.md`.
+- **Tests:** green locally (962/962; the Windows-specific branches are verified by
+  code inspection + a safe `os.name`-shim simulation, since there is no local Windows
+  environment — real confirmation is the `python-package.yml` `windows-latest` CI
+  matrix on push).
+- **Next:** confirm `python-package.yml` is green on all three OSes after push; if
+  Windows still shows red, read the new failure closely — don't assume it's the same
+  class of bug twice in a row.
+
 ## 2026-08-01 — v0.37.0: Windows `sources.toml` crash + dummyrepo resync
 
 - **Implemented:**

@@ -184,7 +184,9 @@ def test_summary_never_counts_rows_that_landed_elsewhere(tmp_path, monkeypatch):
     lines = importcmd.run(root, "all", _args())
     text = "\n".join(lines)
     kiro_line = next(l for l in lines if l.startswith("✔ kiro"))
-    assert str(paths.Footprint(paths.global_home()).base) in kiro_line
+    # tilde-relative when under the real home (importcmd._tilde, "machine-portable in
+    # tests") — the sandboxed tmp_path IS on a Windows runner (%TEMP% sits under %HOME%)
+    assert importcmd._tilde(paths.Footprint(paths.global_home()).base) in kiro_line
     assert "machine ledger" in kiro_line
     total = next(l for l in lines if l.strip().startswith("total"))
     assert "100" in total and "1,000" not in total and "2,001" not in total
@@ -355,8 +357,10 @@ def test_cli_credits_import_is_scoped_and_stamped(tmp_path, monkeypatch):
     db = _cli_db(tmp_path / "kiro-cli" / "data.sqlite3",
                  [(str(root.resolve()), "mine"), ("/elsewhere", "theirs")])
     foot = paths.Footprint(root)
+    # .as_posix(): a raw Windows `\` in a TOML basic string is an escape character —
+    # same fix as `paths.sources_toml` (v0.37.0).
     foot.policy.write_text(foot.policy.read_text(encoding="utf-8")
-                           + f'\n[[sources.kirocli]]\npath = "{db}"\n'
+                           + f'\n[[sources.kirocli]]\npath = "{db.as_posix()}"\n'
                              'glob = "*"\nformat = "kiro-cli"\n', encoding="utf-8")
     importcmd.run(root, "all", _args())
     credits = ledger.read_kind(root, "credits")

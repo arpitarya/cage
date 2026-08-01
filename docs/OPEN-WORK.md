@@ -2,10 +2,11 @@
 
 **Next:** **NET-1** — `insights compare`'s A/B answer is already there, n=1 vs a gate
 of 5.
-**Blocked:** the v0.36 release, on your standing no-commit directive.
-**State:** v0.36 built, no tag. `meta`, HUMAN, K2, K3/K4, K+NET, BUD-V, SUITE, CLEAN,
-SYNC-GUARD done. 3 items.
-Suite: **962 pass / 0 fail**.
+**State:** v0.36.0 and v0.37.0 released and published to PyPI (2026-08-01); v0.37.1
+in flight — a real Windows product bug (WIN-GF, below) found by the release-CI
+zipapp smoke chain and the broader dev-CI matrix, neither of which the dev machine
+can reproduce directly.
+Suite: **962 pass / 0 fail** (dev machine, macOS/posix path only).
 
 ## Pending
 
@@ -13,7 +14,7 @@ Suite: **962 pass / 0 fail**.
 |---|---|---|
 | **NET-1** | `insights compare` answers the A/B already — n=1, gate is 5 | **lab task, your hands** — no code |
 | **HR1** | agent-vs-human measurement, **rebuilt from scratch** — a fresh design, not a revert | write a `proposals/` doc first |
-| **H** | release v0.36 | blocked — your call to lift the no-commit directive |
+| **WIN-GF** | the graphify interceptor (`cage/data/shims/graphify`) is a bash script with no extension — Windows PATH lookup for a bare `graphify` command requires a PATHEXT-recognized extension (`.exe`/`.cmd`/`.bat`/…), so cage's own interceptor can never be *found* via PATH on Windows, whether or not `cage data graphify`'s subprocess call can run it. (v0.37.1 fixed the narrower `subprocess.run` WinError-193 crash — `graphifymeter._resolve_argv` now shebang-resolves a non-native-exe target — but that only helps once something has already located the shim by an exact path; ordinary PATH-based invocation of bare `graphify` is still unreachable.) A real fix needs a Windows-native twin (`.cmd`/PowerShell) with the same PATH-scan + recursion-guard logic as the bash shim, wired into `cage setup`'s Windows install path, plus a `wiringscan.py` liveness check for the new artifact — a feature-sized project, not a quick patch. | write a `proposals/` doc first — cross-platform interceptor design, not a bugfix |
 
 **CLEAN closed 2026-08-01** — retention **30 → 90 days**; the auto sweep (piggybacked on
 `cage import`) now only **warns** on stderr — count, reclaimable KB, the exact fix,

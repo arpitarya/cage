@@ -1,5 +1,5 @@
 $ cage prices list
-prices — bundled 2026-07-14 (cage 0.37.0) · project 2026-07-14 (<project>/.cage/prices.toml)
+prices — bundled 2026-07-14 (cage 0.37.1) · project 2026-07-14 (<project>/.cage/prices.toml)
 
 provider   model               in $/M  out $/M  cache $/M  origin  wins
 ---------  ------------------  ------  -------  ---------  ------  -------

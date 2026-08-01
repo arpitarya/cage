@@ -62,13 +62,26 @@ class Bypass(NamedTuple):
         return base
 
 
+def _unquote(tok: str) -> str:
+    """Strip one matching pair of surrounding quotes — `shlex`'s non-posix mode (used on
+    Windows, below) preserves backslashes literally for a native `C:\\...` path, but
+    unlike posix mode it does NOT remove the quote marks themselves."""
+    if len(tok) >= 2 and tok[0] == tok[-1] and tok[0] in ("'", '"'):
+        return tok[1:-1]
+    return tok
+
+
 def _tokens(command: str) -> list[str]:
     """Argv-ish tokens of a hook command. `shlex` so a quoted path stays one token;
-    fail-open to a plain split on unbalanced quotes (a diagnostic never raises)."""
+    fail-open to a plain split on unbalanced quotes (a diagnostic never raises).
+    Non-posix mode on Windows (`os.name == "nt"`) so an unquoted native `C:\\...` path
+    keeps its backslashes — posix mode treats `\\` as an escape and mangles it — but
+    that mode leaves quote marks on a quoted token, so `_unquote` strips them after."""
     try:
-        return shlex.split(command, posix=(os.name != "nt"))
+        toks = shlex.split(command, posix=(os.name != "nt"))
     except ValueError:
-        return command.split()
+        toks = command.split()
+    return [_unquote(t) for t in toks] if os.name == "nt" else toks
 
 
 def _graphify_path(command: str) -> str:

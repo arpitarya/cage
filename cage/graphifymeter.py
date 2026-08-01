@@ -214,6 +214,41 @@ def _graphify_receipt_ids(root: Path) -> set[str] | None:
         return None
 
 
+_NATIVE_EXE_SUFFIXES = (".exe", ".bat", ".cmd", ".com")
+_PY_INTERPRETER = re.compile(r"python3?(\.\d+)?$")
+
+
+def _resolve_argv(cmd: list[str]) -> list[str]:
+    """On Windows, ``CreateProcess`` never honors a ``#!`` shebang — that's a POSIX
+    kernel behavior, not a shell one — so a script with no native-executable extension
+    (``.exe``/``.bat``/``.cmd``/``.com``) fails with WinError 193 even though it runs
+    fine everywhere else (a real graphify npm install ships a ``.cmd`` and is
+    unaffected). Peek the shebang and prepend its interpreter so it still runs; a
+    ``python``/``python3`` shebang resolves to *this* interpreter (``sys.executable``)
+    rather than trusting a same-named binary on PATH. Anything else (native
+    executables, POSIX) is returned unchanged."""
+    if os.name != "nt" or not cmd:
+        return cmd
+    exe = Path(cmd[0])
+    if exe.suffix.lower() in _NATIVE_EXE_SUFFIXES or not exe.is_file():
+        return cmd
+    try:
+        with exe.open("r", encoding="utf-8", errors="ignore") as fh:
+            first = fh.readline()
+    except OSError:
+        return cmd
+    if not first.startswith("#!"):
+        return cmd
+    interpreter = first[2:].strip().split()
+    if interpreter and Path(interpreter[0]).name == "env" and len(interpreter) > 1:
+        interpreter = interpreter[1:]          # `#!/usr/bin/env X` → X (env itself isn't one)
+    if not interpreter:
+        return cmd
+    if _PY_INTERPRETER.match(Path(interpreter[0]).name):
+        interpreter = [sys.executable]
+    return interpreter + cmd
+
+
 def run(root: Path, argv: list[str], task: str = "") -> int:
     """Run `graphify <argv>` transparently; meter on the side. Returns its exit code."""
     cmd = list(argv)
@@ -231,7 +266,7 @@ def run(root: Path, argv: list[str], task: str = "") -> int:
     ah = usagelog.args_hash(cmd)
     t0 = time.monotonic()
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True,
+        proc = subprocess.run(_resolve_argv(cmd), capture_output=True, text=True,
                               env={**os.environ, "CAGE_GRAPHIFY_METERED": "1"})
     except (OSError, ValueError) as exc:
         print(f"cage data graphify: could not run {cmd[0]!r}: {exc}", file=sys.stderr)

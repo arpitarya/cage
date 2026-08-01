@@ -226,7 +226,9 @@ def test_kiro_import_counts_and_idempotent(tmp_path, monkeypatch, capsys):
     assert {c["tokens_in"] for c in calls} == {1200, 13}  # the 0-output line still counts
     out = capsys.readouterr().out
     assert "✔ kiro: imported 2 call(s) from 1 file(s) →" in out
-    assert str(paths.Footprint(machine).base) in out     # the line names the sink
+    # the line names the sink — tilde-relative when under the real home (importcmd._tilde,
+    # "machine-portable in tests"), which the sandboxed tmp_path IS on a Windows runner
+    assert importcmd._tilde(paths.Footprint(machine).base) in out
     before = b"".join(p.read_bytes() for p in paths.Footprint(machine).shards("calls"))
     clicmds.cmd_import(_args(agent="kiro", path=str(log)))  # re-import → idempotent
     assert b"".join(p.read_bytes() for p in paths.Footprint(machine).shards("calls")) == before
