@@ -36,6 +36,16 @@ rem extension is tried in one directory before moving to the next). The
 rem `"%PATH:;=" "%"` idiom splits the semicolon-delimited PATH into a properly quoted,
 rem space-separated list for the outer FOR; an empty segment (a stray `;;`) yields an
 rem empty item that matches nothing and is skipped, same as B2 requires.
+rem
+rem No `rem` line sits INSIDE the parenthesized block below, on purpose: cmd.exe's
+rem parser still tokenizes redirection/pipe/paren characters inside a comment when
+rem that comment is nested inside a multi-line `(...)` block, and a comment here once
+rem read "<candidate>" - the `<`/`>` characters corrupted the block's parsing and
+rem reproduced cmd.exe's own "BATCH RECURSION exceeds STACK limits" abort on every
+rem real Windows CI run, identically across two structurally different walk
+rem implementations, until this comment was moved out here. A candidate is claimed as
+rem the real binary unless it self-identifies as one of ours (B3, content never
+rem filename): `findstr` finds a marker => skip it; no match => claim it.
 set "_CAGE_GF_REAL="
 for %%d in ("%PATH:;=" "%") do (
   if not defined _CAGE_GF_REAL (
@@ -43,8 +53,6 @@ for %%d in ("%PATH:;=" "%") do (
       if not defined _CAGE_GF_REAL (
         set "_CAGE_GF_CAND=%%~d\graphify%%e"
         if exist "!_CAGE_GF_CAND!" (
-          rem "<candidate>" -> claim it as the real binary unless it self-identifies as
-          rem one of ours (B3). Content, never filename.
           findstr /M /C:"cage data graphify" /C:"cage graphify" /C:"graphify metering interceptor" "!_CAGE_GF_CAND!" >nul 2>nul
           if errorlevel 1 set "_CAGE_GF_REAL=!_CAGE_GF_CAND!"
         )
