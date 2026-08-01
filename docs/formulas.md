@@ -385,6 +385,40 @@ outcome}`, [usagelog](../cage/usagelog.py)). **Never priced, never read by a mon
 — it lives in `state/`, so it can't move a reported number (tested byte-identical).
 `args_hash` is a hash, never the query text (counts-never-content).
 
+### 2.12 Adoption — **no method**: counts of recorded rows, never an estimate
+
+`cage insights adoption` ([adoption.py](../cage/adoption.py)) makes no claim that needs a
+method tag. Its only two assertions are *this many rows exist* and *this many join to an
+agent*. Two halves, never blended — they have different precision:
+
+| half | source | precision | agent? |
+|---|---|---|---|
+| **A · invocations** | usage rows (§2.11) | exact, no join | **no** — a usage row has no `agent` field |
+| **B · per-agent** | savings rows → `calls.agent` | exact where a link resolves | only where it resolves |
+
+- **Outcomes are read, never re-derived.** The per-outcome tally reads each row's
+  recorded `outcome` (`usagelog.OUTCOMES`); re-deriving "did a receipt land?" from the
+  receipts would produce a second, disagreeing answer.
+- **Half B's join, in order:** linked `call` id → that call's agent · else a `session`
+  exactly one agent's calls carry. A session shared by two agents stays **unknown** —
+  picking one would invent a fact.
+- **Agent-unknown has two reasons, kept apart:** `no-link` (no call, no session) is the
+  interceptor's *structural* limit — a subprocess cannot know which agent spawned it, so
+  it stamps an empty session on purpose ([graphifymeter](../cage/graphifymeter.py));
+  `unjoined` (a link nothing matches) is a *capture gap*. Never an "other" bucket, never
+  attributed by timestamp proximity.
+- **"Never invoked" has two strengths, and the weaker one is the default when anything
+  is unattributed.** *No evidence of invocation* is sound only when **every** savings row
+  found an agent; otherwise an unattributed row could belong to any agent, so the claim
+  drops to *no savings row attributed to them*. Neither is ever stated as proof of
+  non-use.
+- **No currency anywhere.** Nothing here calls `convert`/`receiptprice`/`prices`; §2.11's
+  diagnostic-only invariant holds unchanged, asserted from this new caller in
+  `tests/test_adoption.py`.
+- CSV column contract: `section` · `dimension` · `key` · `agent` · `tool` · `rows` ·
+  `joined_via` · `reason` · one column per outcome. An inapplicable cell is **empty**,
+  never `0`. Explained by `cage query tool-adoption`.
+
 ## 3. The human axis — **removed in v0.36**
 
 Every formula that lived here (human cost `usd = minutes / 60 × rate`, derived

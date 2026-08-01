@@ -1047,4 +1047,37 @@ REGISTRY: tuple[Explanation, ...] = (
         "  never arrive at a vendor looking measured; calls are the ledger's own\n"
         "  ground truth.",
         kind="concept", plan_ref="otel-export.handoff.md"),
+    Explanation(
+        "tool-adoption", ("adoption", "adopt", "invoked", "invocation", "usage",
+                          "breadcrumb", "never-invoked", "agent-unknown", "uptake",
+                          "do-agents-use", "insights-adoption"),
+        "`cage insights adoption`: which agents actually invoke the tools you wired",
+        "TWO HALVES, never blended into one number, because they have different\n"
+        "  precision:\n"
+        "  A · invocations — straight off the usage breadcrumb (state/, diagnostic).\n"
+        "    Exact, no join, and AGENT-BLIND: a usage row is\n"
+        "    `ts · op · args_hash · exit · ms · outcome · route` and carries no agent\n"
+        "    field at all. Outcomes are READ from the recorded `outcome`\n"
+        "    ({outcomes})\n"
+        "    — 'ran and cage filed nothing' is a written verdict, never re-derived\n"
+        "    from the receipts.\n"
+        "  B · per-agent — a savings row joined to a call's agent, by linked `call`\n"
+        "    id first, else by a `session` that exactly one agent's calls carry. A\n"
+        "    shim/native savings row stamps an EMPTY session ON PURPOSE (the\n"
+        "    interceptor is a subprocess; it genuinely cannot know which agent spawned\n"
+        "    it), so those rows are agent-unknown BY CONSTRUCTION — never an 'other'\n"
+        "    bucket, never attributed by timestamp proximity. When nothing is\n"
+        "    attributable the half still renders, as an explicit refusal: suppressing\n"
+        "    it would make 'cage cannot attribute these' read like 'cage has no\n"
+        "    per-agent answer'.\n"
+        "  'Never invoked' is phrased NO EVIDENCE OF INVOCATION — a run cage never saw\n"
+        "  looks identical to one that never happened.\n"
+        "  NO CURRENCY ANYWHERE: usage rows stay diagnostic-only (never priced, never\n"
+        "  read by a money view, pinned byte-identical); this view only counts them.\n"
+        "  Surface is deliberately not a dimension — claude's CLI and VS Code share one\n"
+        "  store, so splitting by it would invent a fact.",
+        ("cage/adoption.py", "cage/usagelog.py", "cage/graphifymeter.py"),
+        "no method tag: these are COUNTS of recorded rows, not an estimate — the only\n"
+        "  claims are 'this many rows exist' and 'this many join to an agent'.",
+        kind="concept", plan_ref="archive/v0.40-insights-adoption.proposal.md"),
 )

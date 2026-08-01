@@ -1,0 +1,25 @@
+$ cage insights adoption
+Adoption — which tools your agents actually invoke
+  counts only; usage rows are diagnostic and are never priced
+
+A · invocations — graphify usage breadcrumb (exact, agent-blind)
+
+op     runs  receipt  unmeasurable  empty  non measured  error
+-----  ----  -------  ------------  -----  ------------  -----
+query     2        2             0      0             0      0
+
+route       runs  receipt  unmeasurable  empty  non measured  error
+----------  ----  -------  ------------  -----  ------------  -----
+transcript     2        2             0      0             0      0
+
+B · per-agent attribution — savings rows joined to a call's agent
+
+agent   tool      rows  joined via
+------  --------  ----  ----------
+claude  graphify     2  session
+
+· coverage: 2 of 2 savings rows (100%) are agent-attributable
+· no evidence of invocation: copilot, kiro
+    — calls in this window, zero savings rows, and every savings row that exists
+    was attributed. Absence of evidence, not proof of non-use: a run cage never
+    saw looks identical to one that never happened.

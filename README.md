@@ -61,6 +61,7 @@ cage setup                      # guided wizard: defaults to all agents, wires s
 # non-interactively: cage setup --all   (or --claude / … for just one)
 cage demo                       # seed the worked example
 cage insights matrix                     # the counterfactual permutation table
+cage insights adoption                   # do your agents actually invoke the tools?
 cage task quality                    # cost per *successful* task
 cage query "how is attribution calculated"  # explain any number — live formula, $0
 ```
@@ -220,7 +221,7 @@ cage data export --csv calls --since 30d -o calls.csv   # raw ledger rows for a 
 
 ## The `$0` guarantee
 
-Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 995 tests; `cage demo` reproduces the worked attribution example against a real ledger.
+Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 1024 tests; `cage demo` reproduces the worked attribution example against a real ledger.
 
 **Honest limits.** Marginal-by-fixed-order is defensible and `$0`, but it is an *ordering convention*, not a Shapley value (that's a deferred audit mode). And a counterfactual cell is an honest reconstruction, never an invoice — the `method` column says so on every row, on purpose.
 
@@ -228,7 +229,7 @@ Every derived view is parse / arithmetic over the log — **no LLM call, ever, o
 
 Latest release below — full history and detail in [CHANGELOG.md](CHANGELOG.md).
 
-- **v0.39.0 (2026-08-02) — OTel GenAI export; Codex agent residue removed.** `cage data export --otel` writes the ledger as OpenTelemetry GenAI-conformant JSON — a third one-way reporting format beside `--csv`/`--study` — with the pre-stable semconv target pinned in one constant and stamped on every document, and cage-only receipts/savings kept out of the `gen_ai.*` namespace entirely. Separately, the Codex-**agent** residue left behind by v0.33.0's removal is gone (`paths.codex_home()`, the wiring/doctor scans, the env allowlist entry) while the *model ids* Copilot emits (`gpt-5.x-codex`, `codex-mini-latest`) stay byte-identical in `data/prices.toml`, now pinned by a regression guard. See [CHANGELOG.md](CHANGELOG.md) for the full accounting.
+- **v0.40.0 (2026-08-02) — tool-adoption view.** New `cage insights adoption` answers whether the agents you wired actually *invoke* the tools you gave them — the question no cost dashboard asks. It renders **two halves that are never blended**: invocation counts + outcomes are exact but agent-blind (a usage row carries no agent), while per-agent attribution covers only rows whose link to a call resolves — so *never invoked*, *invoked and cage filed nothing*, and *invoked but unattributable* stay three distinct answers instead of one misleading number. Counts only: nothing in this view is ever priced. See [CHANGELOG.md](CHANGELOG.md) for the full accounting.
 
 ## The name
 

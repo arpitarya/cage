@@ -2,7 +2,7 @@
 
 A minimal Model Context Protocol server on stdio: newline-delimited JSON-RPC 2.0,
 hand-rolled so it adds no dependency. Publishes Cage's read paths — report /
-attrib / matrix / budget / roi / why — as MCP *tools*, so an agent (Claude Code,
+attrib / matrix / budget / roi / adoption / why — as MCP *tools*, so an agent (Claude Code,
 Kiro, Copilot) can ask "what did this cost, and what saved me money?" and
 answer from its own ledger. Every tool is deterministic and never calls an LLM.
 
@@ -44,6 +44,12 @@ TOOLS = [
      "inputSchema": {"type": "object", "properties": {"session": {"type": "string"}}}},
     {"name": "cage_roi",
      "description": "Saved $ per tool vs its own cost + added latency.",
+     "inputSchema": {"type": "object", "properties": {"since": {"type": "string"},
+                                                      "format": _FORMAT}}},
+    {"name": "cage_adoption",
+     "description": "Do the agents actually invoke the wired tools? Invocation counts + "
+                    "outcomes, and per-agent attribution where it is derivable. Counts "
+                    "only — never priced.",
      "inputSchema": {"type": "object", "properties": {"since": {"type": "string"},
                                                       "format": _FORMAT}}},
     {"name": "cage_why",
@@ -95,6 +101,10 @@ def _call(name: str, args: dict) -> tuple[str, dict | None]:
     elif name == "cage_roi":
         data = roi.by_tool(root, _pol(root), since=args.get("since"))
         text = roi.render_csv(data) if as_csv else roi.render_roi(data)
+    elif name == "cage_adoption":
+        from cage import adoption
+        data = adoption.summarize(root, since=args.get("since"))
+        text = adoption.render_csv(data) if as_csv else adoption.render_adoption(data)
     elif name == "cage_why":
         cid = args["call_id"]
         text = provenance.render_why(provenance.explain(root, cid), cid)

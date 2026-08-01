@@ -31,8 +31,8 @@ daily:
   query       ask cage how any number or mechanism works
 
 groups (run any group name for its commands):
-  insights    attrib · matrix · roi · verdict · budget · compare · estimate ·
-              calibration · why · forecast · regression · recommend
+  insights    attrib · matrix · roi · adoption · verdict · budget · compare ·
+              estimate · calibration · why · forecast · regression · recommend
   task        outcome · quality
   authorship  origin · verify · notes-sync · ledger-sync
   prices      list · unpriced · set · alias · route-tool · sync
@@ -219,8 +219,8 @@ def build_parser() -> argparse.ArgumentParser:
     # ── group: insights (attribution + money views, the differentiator) ────────
     insights = _group(sub, "insights",
                        "per-tool savings & money views: attrib · matrix · roi · "
-                       "verdict · budget · compare · estimate · calibration · "
-                       "why · forecast · regression · recommend")
+                       "adoption · verdict · budget · compare · estimate · "
+                       "calibration · why · forecast · regression · recommend")
 
     at = insights.add_parser("attrib", help="per-tool marginal savings for a task (§4.2)")
     at.add_argument("--task", help="task id (default: most recent)")
@@ -250,6 +250,15 @@ def build_parser() -> argparse.ArgumentParser:
     _csv_flag(ro)
     _capture_flags(ro)
     ro.set_defaults(fn=clicmds.cmd_roi)
+
+    ad = insights.add_parser("adoption",
+                             help="do your agents actually invoke the tools you wired? "
+                                  "(counts only — nothing here is priced)")
+    ad.add_argument("--since", metavar="WINDOW", help="window like 30d / 2w")
+    _json_flag(ad)
+    _csv_flag(ad)
+    _capture_flags(ad)
+    ad.set_defaults(fn=clicmds.cmd_adoption)
 
     vd = insights.add_parser("verdict",
                              help="one-line answer: is this tool saving or costing? "

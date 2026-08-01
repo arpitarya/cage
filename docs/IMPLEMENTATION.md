@@ -16,6 +16,56 @@ Entry format:
 
 ---
 
+## 2026-08-02 — `cage insights adoption` (ADOPT) built and green
+
+- **Milestone:** the README's third capability claim ("which tools your agents actually
+  adopt") is now a command, not a regression doc. Derived view only — no capture change,
+  no schema change, no new field.
+- **Implemented:**
+  - **`cage/adoption.py`** (new) — two halves that are never blended, because they have
+    different precision. **A · invocations**: the usage breadcrumb, exact and
+    **agent-blind** (a usage row has no `agent` field); per-outcome counts are **read**
+    from the recorded `outcome`, never re-derived. **B · per-agent**: savings rows joined
+    to `calls.agent` — by linked `call` id first (exact, stronger than the session), else
+    by a `session` exactly one agent's calls carry. A session shared by two agents stays
+    unknown rather than resolving to an arbitrary name.
+  - **Agent-unknown is split by cause and never bucketed as "other"**: `no-link` is the
+    interceptor's *structural* limit (a subprocess cannot know its caller, so it stamps
+    an empty session on purpose); `unjoined` is a *capture gap*. Neither is ever
+    attributed by timestamp proximity.
+  - **Correction found during the build — "never invoked" needs two strengths.** *No
+    evidence of invocation* is sound only when **every** savings row found an agent;
+    otherwise an unattributed row could belong to the agent being named, so the claim
+    drops to *no savings row attributed to them* (`NO_EVIDENCE` / `NOT_ATTRIBUTED`, and
+    the distinction survives into CSV). The golden that exposed this (`I9b`) printed "no
+    evidence of invocation: claude" beside two unattributable claude-era rows.
+  - **Decision recorded: an empty half B renders its refusal, it is never suppressed** —
+    suppressing it would make *cage cannot attribute these* read like *cage has no
+    per-agent answer at all*, the exact conflation the view exists to prevent.
+  - **Zero currency anywhere**, in all three output formats — the `state/`
+    diagnostic-only invariant re-asserted from its first-ever reader.
+  - Surface is deliberately **not** a dimension (K4: claude CLI/VS Code share one store).
+  - CSV parity (`section`/`dimension` keep the halves apart when flattened; an
+    inapplicable cell is empty, never `0`), MCP mirror (`cage_adoption`, text + csv),
+    `cage query tool-adoption`, `--since`, `--json`.
+- **Files:** `cage/adoption.py` (new) · `cage/cli.py` · `cage/clicmds.py` ·
+  `cage/mcpserver.py` · `cage/explain.py` · `cage/explain_data.py` ·
+  `tests/test_adoption.py` (new) · `tests/test_output_spec.py` · `tests/goldenseed.py` ·
+  `tests/fixtures/goldens/I9{a,b,c,d}.txt` (new) · `tests/fixtures/cli-help.txt` ·
+  `docs/FORMULAS.md` §2.12 · proposal + handoff/prompt archived to `docs/archive/`.
+- **Coverage on the real dev ledger (the honest number):** 6/6 savings rows are
+  agent-attributable — but only **3 via the session join** (all graphify, all
+  `claude-code`); the other 3 are legacy receipts carrying a `call` id, one of which
+  is a `cage demo` seed row. Graphify alone: 3 of 4 rows by session, 4 of 4 with the
+  call rung. Small-n; the shim-route blind spot is structural, not visible here.
+- **Tests:** green — 1024 passed, 10 skipped (was 995; +25 adoption unit tests,
+  +4 goldens). `just test`'s count and the README's need the new figure at release.
+- **Version:** v0.39.0 was tagged and published *during* this session (another session's
+  release commit), so ADOPT lands **after** it and rides **v0.40.0** — its CHANGELOG
+  entry is written as `## v0.40.0 (unreleased)`, and `__version__` stays `0.39.0` until
+  the release commit bumps it (this repo's standing pattern).
+- **Next:** nothing blocking (the tree is uncommitted by instruction); `cage-lab` can now assert adoption output black-box.
+
 ## 2026-08-02 — shim-contract B8 diagnosis corrected + B8a added (docs-only)
 
 - **Milestone:** the living spec no longer carries a disproved technical claim; the real

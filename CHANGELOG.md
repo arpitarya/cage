@@ -2,6 +2,70 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
+## v0.40.0 (2026-08-02) — tool-adoption view
+
+Does the tool you installed actually get *used*? One new derived view answers it. No
+substrate change, no schema change, no new capture path — and no currency anywhere in
+it.
+
+Built from: [proposal](docs/archive/v0.40-insights-adoption.proposal.md) ·
+[handoff](docs/archive/v0.40-insights-adoption.handoff.md) +
+[prompt](docs/archive/v0.40-insights-adoption.prompt.md).
+
+`cage insights adoption` — do the agents you wired actually **invoke** the tools you
+gave them? A derived view only: no new capture, no schema change, no new field. Its
+whole value is a boundary between three unknowns — *never invoked* · *invoked and cage
+filed nothing* · *invoked and cage cannot say by whom* — so it renders **two halves that
+are never blended into one number**.
+
+#### Added
+
+- **A · invocations + outcomes** — from the usage breadcrumb, exact and **agent-blind**:
+  a usage row is `ts · op · args_hash · exit · ms · outcome · route` and carries no
+  `agent` field. Broken down by `op` and by `route`. The per-outcome tally **reads** each
+  row's recorded `outcome` (`receipt` / `unmeasurable` / `empty` / `non-measured` /
+  `error`); "ran and cage filed nothing" is a written verdict, never re-derived from the
+  receipts — re-deriving it would produce a second, disagreeing answer.
+- **B · per-agent attribution** — savings rows joined to `calls.agent`: a linked `call`
+  id first (exact), else a `session` that **exactly one** agent's calls carry. Each row
+  is labelled with which link carried it, so the two joins are never passed off as one
+  another. A session shared by two agents stays **unknown** rather than resolving to an
+  arbitrary name.
+- `--csv` (the `section`/`dimension` columns keep the halves apart when flattened; a cell
+  that does not apply is **empty**, never a `0`), `--json`, `--since`, an MCP mirror
+  (`cage_adoption`), and `cage query tool-adoption`.
+
+#### Decided — an empty half B renders its refusal, it never vanishes
+
+If every invocation came through the interceptor, nothing is attributable. The half still
+prints, as an explicit refusal naming the count and the cause. Suppressing it would make
+*cage cannot attribute these* indistinguishable from *cage has no per-agent answer at
+all* — the exact conflation the view exists to prevent.
+
+#### Decided — agent-unknown is split by cause, and is never an "other" bucket
+
+`no-link` (no call, no session) is **structural**: the interceptor runs as a subprocess
+and genuinely cannot know which agent spawned it, so it stamps an empty session on
+purpose. `unjoined` (a link nothing in the ledger matches) is a **capture gap**.
+Different facts, different fixes, so they are never merged — and neither is ever
+attributed by timestamp proximity.
+
+#### Decided — "never invoked" is never asserted, and has two strengths
+
+*No evidence of invocation* is sound **only when every savings row found an agent**. With
+even one agent-unknown row on the table, that row could belong to the very agent being
+named, so the claim drops to *no savings row attributed to them*. Neither form is ever
+stated as proof of non-use. (This corrected both the proposal, which said *never
+invoked*, and its handoff, which softened it only one step.)
+
+#### Unchanged — deliberately
+
+- **No currency anywhere in the view.** This is the first reader of the `state/` usage
+  log, so it is the one place a count could quietly become a price. It never does, and
+  the diagnostic-only invariant is now asserted from this new caller too.
+- **Surface is not a dimension.** Claude Code's CLI and its VS Code extension share one
+  store with no marker, so splitting by surface would invent a fact.
+
 ## v0.39.0 (2026-08-02) — OTel GenAI export; Codex agent residue removed
 
 Two independent tracks landed the same day: a new one-way export format, and a

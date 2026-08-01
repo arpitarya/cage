@@ -271,6 +271,26 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   UNPRICED refusal or a non-money unit; `cage.method` always survives. `dependencies
   = []` unchanged — stdlib `json` only, no OTel SDK. `cage query otel-export`
   explains it.
+- **Adoption** ([adoption.py](cage/adoption.py), FORMULAS §2.12) — `cage insights
+  adoption`: do the agents you wired actually *invoke* the tools? A derived view whose
+  entire value is a boundary between three unknowns — **never invoked** · **invoked, cage
+  filed nothing** · **invoked, cage cannot say by whom** — so it is **two halves that are
+  never blended**. **A · invocations**: the usage breadcrumb, exact but **agent-blind** (a
+  usage row is `ts · op · args_hash · exit · ms · outcome · route` — there is no `agent`
+  field); per-outcome counts are **read** from the recorded `outcome`, never re-derived
+  from the receipts. **B · per-agent**: savings rows joined to `calls.agent` — linked
+  `call` id first (exact), else a `session` **exactly one** agent's calls carry (a shared
+  session stays unknown, never resolved to an arbitrary name). Agent-unknown splits by
+  cause and is **never an "other" bucket, never attributed by timestamp proximity**:
+  `no-link` is structural (the interceptor is a subprocess and stamps an empty session on
+  purpose), `unjoined` is a capture gap. **"Never invoked" is never asserted, and has two
+  strengths** — *no evidence of invocation* is sound only at 100% attribution, else the
+  claim drops to *no savings row attributed to them*, because an unattributed row could
+  be theirs. **An empty half B renders its refusal, never vanishes** (suppressing it would
+  make *cannot attribute* read like *no answer exists*). **No currency anywhere** — this
+  is the first reader of the `state/` usage log and the diagnostic-only invariant is
+  re-asserted from it (`tests/test_adoption.py`). Surface is deliberately not a dimension
+  (K4). CSV/MCP/`--since` like report/attrib/roi; `cage query tool-adoption` explains it.
 - **Display honesty** ([display.py](cage/display.py)) — the ONE display-context
   home (plan Phases 1+2). `Display` carries the resolved presentation switches
   (`usd`: tokens are the default, dollars opt-in — flag > env `CAGE_USD` >
@@ -673,7 +693,7 @@ the worked examples to copy.
 ## Dev
 
 ```bash
-just test          # python -m pytest -q   (995 tests; +10 Windows-only skips)
+just test          # python -m pytest -q   (1024 tests; +10 Windows-only skips)
 just demo          # seed §4.4 + print attrib/matrix
 cage --version
 ```

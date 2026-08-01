@@ -129,6 +129,18 @@ def cmd_roi(args) -> int:
     return emit(args, data, roi.render_roi(data))
 
 
+def cmd_adoption(args) -> int:
+    """`cage insights adoption` — counts only; no policy is loaded because nothing in
+    this view prices anything (the diagnostic-only invariant, `adoption.py`'s docstring)."""
+    from cage import adoption
+    r = captured_read_root(args)
+    data = adoption.summarize(r, since=args.since)
+    if (dest := csv_dest(args)) is not None:
+        from cage import csvout
+        return csvout.write(adoption.render_csv(data), dest)
+    return emit(args, data, adoption.render_adoption(data))
+
+
 def cmd_why(args) -> int:
     lr = captured_read_root(args)
     data = provenance.explain(lr, args.call_id, pol=_policy(lr))

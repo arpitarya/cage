@@ -22,6 +22,9 @@ Naming: `<topic>.proposal.md`. Written in short points, not walls of prose.
 
 Active (awaiting Arpit's accept or a trigger):
 
+- [agent-surface-layers.md](agent-surface-layers.md) — **the agent-surface ladder**:
+  L0 hookless (the floor, never optional) → L1 hooks+steering → L2 MCP → L3 skills, each
+  optional and strictly additive. Supersedes `cage-skills.md`.
 - [agent-vs-human-v2.md](agent-vs-human-v2.md) — per-commit rebuild: tokens/commit ·
   authorship (mostly built) · suggested-vs-accepted (counts) · time (attestation only).
 
@@ -29,10 +32,6 @@ Active (awaiting Arpit's accept or a trigger):
   5 closed tasks per arm, outcomes pre-committed. Arpit's hands, no code.
 - [dogfood-report.md](dogfood-report.md) — "Measured on itself" README section from the
   real ledger; refreshed per release via checklist line.
-- [insights-adoption.md](insights-adoption.md) — `cage insights adoption`: per-agent
-  invoked/receipted/missed/never; counts only, usage rows stay unpriced.
-- [cage-skills.md](cage-skills.md) — six skills over existing surfaces; start with
-  cage-analyst + cage-task-closer (feeds the starved closed-task pipeline).
 - [tool-integration-contract.md](tool-integration-contract.md) — the paved road:
   interceptor template · `cage data meter <tool>` · per-tool detection registry.
   **fux is the second tool**; ships only when two tools use it.
@@ -43,9 +42,19 @@ Active (awaiting Arpit's accept or a trigger):
 
 ## Graduated (implemented → archived)
 
+- **cage-skills** → **superseded** 2026-08-02 by `agent-surface-layers` (its premise,
+  "cage already ships a skill", was pre-hookless and false).
+  [archived](../archive/v0.40-cage-skills.proposal.md)
+
 A proposal that gets built is **archived, not left in this directory** — the folder must
 read as *ideas not yet built*. See the lifecycle rule in [`../../CLAUDE.md`](../../CLAUDE.md).
 
+- **insights-adoption** → built as v0.40's `cage insights adoption` (unreleased).
+  [archived proposal](../archive/v0.40-insights-adoption.proposal.md) · living spec:
+  [cage/adoption.py](../../cage/adoption.py) + [FORMULAS.md §2.12](../FORMULAS.md) +
+  `cage query tool-adoption`. The proposal's "per agent × tool" headline was **half-
+  derivable** and its "never invoked" claim needed **two strengths** — both corrections
+  are recorded in the archive header.
 - **windows-graphify-interceptor** → built as v0.38's `graphify.cmd` twin.
   [archived proposal](../archive/v0.38-windows-graphify-interceptor.proposal.md) ·
   living spec: [shim-contract.md](../shim-contract.md)

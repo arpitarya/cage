@@ -200,6 +200,49 @@ def test_I8_matrix_usd_unpriceable(run):
     assert "fix: cage prices route-tool graphify" in out
 
 
+def test_I9_adoption_both_halves(run):
+    go = run(seed.adoption_mixed)
+    out = go("I9a", ["insights", "adoption"])
+    a, b = out.index("A · invocations"), out.index("B · per-agent attribution")
+    assert a < b                                 # two halves, ordered, never blended
+    assert "claude" not in out[a:b]              # half A is agent-blind, by substrate
+    assert "coverage: 3 of 4 savings rows (75%)" in out
+    assert "cannot" in out and "which agent spawned it" in out
+    # one row is agent-unknown, so the STRONG claim is withheld: it could be theirs
+    assert "no savings row attributed to: copilot, kiro" in out
+    assert "NOT evidence they never invoked the tool" in out
+    assert "no evidence of invocation" not in out
+    assert "$" not in out                        # no currency, ever, in this view
+
+
+def test_I9_adoption_no_evidence(run):
+    # every savings row found an agent, so "no evidence of invocation" IS supportable —
+    # and is still stated as absence of evidence, never as proof of non-use.
+    go = run(seed.adoption_attributed)
+    out = go("I9d", ["insights", "adoption"])
+    assert "coverage: 2 of 2 savings rows (100%)" in out
+    assert "no evidence of invocation: copilot, kiro" in out
+    assert "not proof of non-use" in out
+
+
+def test_I9_adoption_half_b_refusal(run):
+    # every invocation came through the shim ⇒ nothing attributable. The half RENDERS
+    # its refusal rather than vanishing — suppressing it would make "cage cannot
+    # attribute these" read like "cage has no per-agent answer at all".
+    go = run(seed.adoption_shim_only)
+    out = go("I9b", ["insights", "adoption"])
+    assert "B · per-agent attribution" in out
+    assert "per-agent attribution unavailable" in out
+    assert "agent   tool" not in out             # and no empty table in its place
+
+
+def test_I9_adoption_empty(run):
+    go = run()
+    out = go("I9c", ["insights", "adoption"])
+    assert "No tool invocations and no savings receipts recorded yet." in out
+    assert "cage import" in out and "cage doctor" in out
+
+
 # ── §3 · cage prices ──────────────────────────────────────────────────────────
 
 def _prices_project(root: Path) -> None:

@@ -21,7 +21,11 @@ spec.
 
 ## Active work
 
-Nothing in flight — `docs/` root carries no loose handoff/prompt pairs right now.
+- [agent-surface.handoff.md](agent-surface.handoff.md) +
+  [agent-surface.prompt.md](agent-surface.prompt.md) — **all four phases of the agent
+  surface**, gated: P0 residue + floor proof (Sonnet) · P1 MCP incl. the ladder's only
+  write tool (Sonnet) · **P2 hooks + steering (Opus)** · P3 skills (Sonnet). Design of
+  record: [agent-surface-layers.md](proposals/agent-surface-layers.md).
 
 ## The lab manual
 

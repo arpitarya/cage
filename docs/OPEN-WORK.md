@@ -1,12 +1,14 @@
 # OPEN-WORK — the one plan of pending work
 
-**Next:** **ADOPT** — do agents actually invoke graphify? Then NET-1 (does it pay).
-Nothing is blocked; v0.38.0 is released.
-**State:** **v0.38.0 tagged, released and on PyPI** (2026-08-02) — the GitHub release
-fired publish.yml: PyPI upload, cross-OS `cage.pyz` smoke, release assets, all green.
-**Two consecutive fully-green CI runs, all 12 jobs**, including the Windows behaviour
-tier that had never executed before.
-Suite: **995 pass / 0 fail / 10 skipped** (dev machine, macOS/posix path only; the 10
+**Next:** **NET-1** — does graphify actually pay? (your hands, n=5 per arm).
+Nothing is blocked; **v0.39.0 is released** (tagged + GitHub release fired publish.yml).
+ADOPT landed *after* that tag, so it rides **v0.40.0 — built, green, unreleased in tree**
+(changelog entry written; `__version__` still `0.39.0`, bumped by the release commit as
+always).
+**State:** v0.38.0 and v0.39.0 both tagged, released and on PyPI — PyPI upload, cross-OS
+`cage.pyz` smoke and release assets all green, including the Windows behaviour tier that
+had never executed before v0.38.
+Suite: **1024 pass / 0 fail / 10 skipped** (dev machine, macOS/posix path only; the 10
 skips are the Windows-only shim behaviour tier and run on CI).
 
 ## Pending
@@ -14,12 +16,62 @@ skips are the Windows-only shim behaviour tier and run on CI).
 | # | what | next action |
 |---|---|---|
 | **GF-LAUNCHER** | under `--python-launcher` neither twin meters (B5) | a decision — must move both twins |
-| **ADOPT** | ③ see whether agents *use* graphify at all | [proposal](proposals/insights-adoption.md) — derived view |
+| **ADOPT-COV** | is half B's per-agent coverage real, or too thin? | measure on a lab run first |
 | **NET-1** | ④ prove graphify pays — n=1, gate 5 | [proposal](proposals/net-positive-evidence-run.md) — **your hands** |
 | **TOOL-SDK** | the paved road: next tool ≠ 34 modules; fux is the proof | [proposal](proposals/tool-integration-contract.md) — builds on [shim-contract](shim-contract.md) |
 | **DOGFOOD** | README shows demo data, not cage's own ledger | [proposal](proposals/dogfood-report.md) — dev machine, ~1h |
-| **SKILLS** | six skill candidates over existing surfaces | [proposal](proposals/cage-skills.md) — analyst + task-closer first |
+| **AGENT-SURFACE** | the 4-tier ladder — L0 floor → L2 MCP → L1 hooks → L3 skills | [prompt](agent-surface.prompt.md) — P2 is **Opus** |
 | **HR1** | agent-vs-human v2, four asks graded | [proposal](proposals/agent-vs-human-v2.md) — after the track |
+
+**AGENT SURFACE re-designed from scratch 2026-08-02 (Arpit: clean slate).** The old
+`cage-skills` proposal is **superseded** — its premise (*"cage already ships one skill"*)
+was pre-hookless and false; no code writes a skill file anywhere. New design of record:
+[agent-surface-layers.md](proposals/agent-surface-layers.md) — a **four-layer ladder**,
+each optional and strictly additive: **L0 hookless** (the floor, must work perfectly
+alone, forever) → **L1 hooks+steering** → **L2 MCP** → **L3 skills**.
+Three findings drove it: **L1 mostly fixes problems that already exist** (auto task-close
+unblocks compare/estimate/calibration/NET-1, all starved because nobody runs
+`cage task outcome`; and a hook *knows which agent fired it* — exactly what ADOPT-COV
+cannot get from a shim subprocess); **L2 ships six read tools but not `verdict`/`compare`,
+the two that answer the product question**; and **only L3 can carry the honesty
+discipline** (MCP hands over a JSON number, nothing makes an agent say *"that's modeled,
+not measured"*). Order: **L0 → L2 → L1 → L3**, and **all four phases are now specced in one program**
+with a gate between each — P0 floor proof · P1 MCP (incl. **the ladder's only write
+tool**, `cage_task_outcome`) · **P2 hooks, Opus** · P3 skills.
+**The gate that matters: removing a layer must change no number** — proven by a floor
+test built in P0, *before* the layers that must not break it.
+[handoff](agent-surface.handoff.md) · [prompt](agent-surface.prompt.md).
+
+**ADOPT closed 2026-08-02 — `cage insights adoption` shipped, 995/0 ⇒ 1024/0.** Two
+halves, never blended: **A** invocations + outcomes (exact, **agent-blind** — a usage row
+has no `agent` field, verified against `usagelog.record` before designing); **B**
+per-agent, from savings rows joined to `calls.agent`. **The spec was corrected twice
+more during the build.** (1) A linked **`call` id** resolves the agent *directly* — a
+stronger join than the session — so it is tried first and labelled per row. (2) **"No
+evidence of invocation" needed a second, weaker strength**: it is sound only at 100%
+attribution, because otherwise an unattributed row could belong to the very agent being
+named; below that the view says *no savings row attributed to them*. Decision recorded:
+**an empty half B renders its refusal, never vanishes.** Living spec:
+[cage/adoption.py](../cage/adoption.py) · [FORMULAS.md §2.12](FORMULAS.md) ·
+`cage query tool-adoption`. Archived:
+[proposal](archive/v0.40-insights-adoption.proposal.md) ·
+[handoff](archive/v0.40-insights-adoption.handoff.md) ·
+[prompt](archive/v0.40-insights-adoption.prompt.md).
+**Residual carried forward → ADOPT-COV** (above); nothing else is open from it.
+
+**ADOPT-COV — the coverage question the build could not answer.** Half B attributes only
+rows whose `call` or `session` resolves; **the shim route can never be one of them**, and
+on the dev ledger the shim route has produced *zero* rows, so the view has never been
+exercised against the path most real invocations take. Measured today: **3 of 6** savings
+rows attributable by session (all graphify, all `claude-code`), **6 of 6** once the
+legacy `call`-linked rows count — one of which is a `cage demo` seed. That is n≈1 and
+proves nothing about the shim.
+**The trigger and the guard rail:** run a lab cell that invokes graphify through the
+**PATH interceptor** for each of the three agents, then read `cage insights adoption`.
+If half B is empty there, the finding is *the shim route is structurally unattributable*
+— report it. **Adding an `agent` field to usage rows (or an env-stamped agent hint on the
+shim) is a capture change and needs its own proposal**; it must not be slipped in as a fix
+to a number nobody has measured yet.
 
 **WIN-CI closed 2026-08-02 — and it earned its keep.** The first-ever Windows run was
 **red**, on two independent bugs neither reasoning nor macOS could have found:

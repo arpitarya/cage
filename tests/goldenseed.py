@@ -222,6 +222,77 @@ def matrix_unpriceable(root: Path) -> None:
              ts=_ts(5, 10))
 
 
+def _usage_row(root: Path, *, op: str, outcome: str, route: str, ts: str) -> None:
+    """One graphify usage breadcrumb, written directly so its `ts` is pinned —
+    `usagelog.record` stamps the wall clock, which a golden cannot have."""
+    f = paths.Footprint(root).usage_log
+    f.parent.mkdir(parents=True, exist_ok=True)
+    with f.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps({"ts": ts, "op": op, "args_hash": "a1b2c3d4e5f60718",
+                             "exit": 0, "ms": 42, "outcome": outcome,
+                             "route": route}) + "\n")
+
+
+def _savings_row(root: Path, sid: str, *, tool: str, ts: str, session: str = "",
+                 call: str = "") -> None:
+    """One row in the dedicated savings tree. `session`/`call` are the two join links
+    `insights adoption` resolves; both empty is exactly what the interceptor writes."""
+    row = schema.make_savings(tool=tool, raw_alternative=22_171, actual=1_660,
+                              op="query", session=session, ts=ts, savings_id=sid)
+    if call:
+        row["call"] = call
+    ledger.append_row(root, ("savings", tool), row)
+
+
+def adoption_mixed(root: Path) -> None:
+    """Spec I9a: both adoption halves populated — graphify invoked through the shim and
+    the transcript route, one shim run that parsed nothing (`unmeasurable`), one agent
+    attributable by session, one shim row agent-unknown by construction, and two wired
+    agents with no evidence of invocation."""
+    _call(root, "c_a1", provider="anthropic", model="claude-sonnet-4-6",
+          agent="claude-code", tin=912_400, tout=61_200, ts=_ts(2), session="s_ad1")
+    _call(root, "c_a2", provider="anthropic", model="copilot/claude-sonnet-4.6",
+          agent="copilot", tin=196_801, tout=9_621, ts=_ts(3), session="s_ad2")
+    _call(root, "c_a3", provider="anthropic", model="claude-sonnet-4-6",
+          agent="kiro", tin=12_000, tout=800, ts=_ts(3), session="s_ad3")
+    for n, (op, outcome, route) in enumerate((
+            ("query", "receipt", "transcript"), ("query", "receipt", "shim"),
+            ("query", "unmeasurable", "shim"), ("explain", "receipt", "shim"),
+            ("update", "non-measured", "shim"))):
+        _usage_row(root, op=op, outcome=outcome, route=route, ts=_ts(4, 9 + n))
+    _savings_row(root, "s_ad01", tool="graphify", ts=_ts(4, 9), session="s_ad1")
+    _savings_row(root, "s_ad02", tool="graphify", ts=_ts(4, 10), session="s_ad1")
+    _savings_row(root, "s_ad03", tool="graphify", ts=_ts(4, 11))  # the shim: no link
+    _savings_row(root, "s_ad04", tool="fux", ts=_ts(4, 12), call="c_a1")
+
+
+def adoption_shim_only(root: Path) -> None:
+    """Spec I9b: every invocation came through the shim, so **nothing** is
+    agent-attributable — the half-B refusal path, which renders rather than vanishing."""
+    _call(root, "c_b1", provider="anthropic", model="claude-sonnet-4-6",
+          agent="claude-code", tin=912_400, tout=61_200, ts=_ts(2), session="s_bd1")
+    _usage_row(root, op="query", outcome="receipt", route="shim", ts=_ts(4, 9))
+    _usage_row(root, op="query", outcome="unmeasurable", route="shim", ts=_ts(4, 10))
+    _savings_row(root, "s_bd01", tool="graphify", ts=_ts(4, 9))
+    _savings_row(root, "s_bd02", tool="graphify", ts=_ts(4, 10))
+
+
+def adoption_attributed(root: Path) -> None:
+    """Spec I9d: every savings row joins to an agent, so the STRONG claim — *no evidence
+    of invocation* — is supportable for the two agents with none. Nothing is left
+    unattributed that could belong to them."""
+    _call(root, "c_c1", provider="anthropic", model="claude-sonnet-4-6",
+          agent="claude-code", tin=912_400, tout=61_200, ts=_ts(2), session="s_cd1")
+    _call(root, "c_c2", provider="anthropic", model="copilot/claude-sonnet-4.6",
+          agent="copilot", tin=196_801, tout=9_621, ts=_ts(3), session="s_cd2")
+    _call(root, "c_c3", provider="anthropic", model="claude-sonnet-4-6",
+          agent="kiro", tin=12_000, tout=800, ts=_ts(3), session="s_cd3")
+    _usage_row(root, op="query", outcome="receipt", route="transcript", ts=_ts(4, 9))
+    _usage_row(root, op="query", outcome="receipt", route="transcript", ts=_ts(4, 10))
+    _savings_row(root, "s_cd01", tool="graphify", ts=_ts(4, 9), session="s_cd1")
+    _savings_row(root, "s_cd02", tool="graphify", ts=_ts(4, 10), session="s_cd1")
+
+
 def fleet(root: Path, complete: int = 5) -> None:
     """Spec S3/S4: `complete` machines with both phases (5 days each), one
     missing the plugin phase, one enrolled with no rows. Markers are written

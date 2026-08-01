@@ -12,6 +12,154 @@ by milestone) — the worklog is what *happened this session*.
 
 ---
 
+## 2026-08-02 (Cowork) — all four agent-surface phases specced as one gated program
+
+- **Asked (mid-turn):** spec *all* the phases/tiers, not just phase 1.
+- **Done:** `agent-surface.{handoff,prompt}.md` now cover **P0 → P1 → P2 → P3** as one
+  gated program, with a **per-phase model tier** — P0/P1/P3 Sonnet, **P2 Opus**, because
+  P2 wires three agents' hook systems into a capture path that must stay fail-open and
+  change no number; a wrong call there re-creates the silent-unmetering class this
+  project has already paid for twice.
+- **The design decision that makes the program safe: P0 builds a *floor test* before any
+  layer exists** — a project with no hooks, no MCP, no steering captures, derives and
+  reports identically. Every later phase is judged against it, and the binding gate is
+  **"removing a layer changes no number"**. Building that proof first, rather than after,
+  is what stops L1 quietly becoming load-bearing.
+- **P1 gained the ladder's only write tool**, `cage_task_outcome` — every starved surface
+  (`compare`/`estimate`/`calibration`/NET-1) is starved for the same reason: nobody closes
+  tasks. Its docstring must say it is the *only* write tool, so the next reader doesn't
+  add a second by analogy.
+- **P2's framing is deliberate:** the prize is **not** real-time capture. It is the two
+  things L0 structurally cannot do — a hook **knows which agent fired it** (exactly what
+  ADOPT-COV cannot get from a shim subprocess; stamp it, never infer it) and session
+  boundaries **auto-close tasks**. Plus `budget.check` finally getting an enforcement
+  site, which it has never had.
+- **P3's governing rule is one line:** *a skill never computes a number — it runs cage
+  and quotes it.* Method tags verbatim, refusals relayed never smoothed. Seven skills in
+  build order, each rendered from **one source into three deliveries** — never three
+  hand-written copies, which is the shim-contract drift lesson applied to prose.
+- **Three stop-and-report triggers written in:** a gate that can't be met without changing
+  a number · P2 needing a second write tool · hooks and pull both recording a turn with
+  dedupe failing. Handback is required **per phase**, with gate *evidence* rather than a
+  claim.
+- **Next step:** run the program from P0; NET-1 remains Arpit's lab session.
+
+---
+
+## 2026-08-02 (Cowork) — agent surface re-designed as a four-layer ladder
+
+- **Asked:** clean slate — ignore what was built, remove old residue; hooks and steering
+  optional on top of a hookless floor; MCP more; skills more. Table, then a pair.
+- **Superseded `cage-skills.md`** rather than editing it: its opening premise —
+  *"cage already ships one skill (`/cage`)"* — is **pre-hookless and false**. Verified:
+  the rebuild deleted the skill/steering machinery and **no code writes a skill file**.
+  Archived naming its successor, per the proposal lifecycle.
+- **New design of record — `proposals/agent-surface-layers.md`:** L0 hookless (the floor,
+  never optional) → L1 hooks+steering → L2 MCP → L3 skills, each opt-in and strictly
+  additive, with the binding rule **L0 must work perfectly alone, forever** and no layer
+  may become a dependency of a lower one.
+- **The three findings that made the ladder worth drawing:**
+  1. **L1 mostly fixes problems we already have, not new ones.** Auto task-close on a
+     session boundary unblocks `compare`/`estimate`/`calibration`/NET-1 — all starved for
+     the same reason, nobody runs `cage task outcome`. And a hook **knows which agent
+     fired it**, which is precisely the attribution ADOPT-COV cannot obtain from a shim
+     subprocess. It also gives `budget.check` its first real caller.
+  2. **L2 already exists and is under-used:** six read tools ship, and **`verdict` and
+     `compare` — the two that answer "is this tool worth it" — are not among them.**
+  3. **Only L3 can carry the honesty discipline.** MCP hands an agent a JSON number;
+     nothing makes it say *"that's modeled, not measured"*. Without L3 the discipline
+     stops at the CLI boundary.
+- **Residue found and scoped for removal:** the README claims a skill **three times**,
+  one of which says **"all four agents"** — wrong twice over (no skill; three agents
+  since v0.33), and live on PyPI. Same class as the human-axis claim. **Kept**
+  `claudewire._strip_stale_hooks` — it strips *old* hook entries from user configs, so
+  it is migration, not residue; deleting it would abandon pre-rebuild machines to dead
+  verbs.
+- **Sequencing decided L0 → L2 → L1 → L3:** L2 is cheap and answers the product
+  question; L1 before L3 because hooks unblock the evidence that makes L3's advice worth
+  taking; a skill interpreting numbers you cannot yet trust is premature.
+- **Phase 1 specced only** (`agent-surface.{handoff,prompt}.md`) — README residue + the
+  two MCP tools, with the emphasis on **refusals crossing the MCP boundary verbatim**
+  (`INSUFFICIENT DATA`, `SAVING (GROSS)`, the min-n block). A tool that silently returns
+  nothing where the CLI would have explained itself is worse than no tool. L1 and L3 are
+  named in both docs but explicitly **not to be built**.
+- **Next step:** run `agent-surface.prompt.md`; NET-1 still Arpit's lab session.
+
+---
+
+## 2026-08-02 (Claude Code) — ADOPT built; "no evidence" needed a second strength
+
+- **Asked:** execute the ADOPT prompt (Opus tier — the honesty
+  boundary, not the rendering).
+- **Verified the premise myself before designing, as the prompt demanded:**
+  `usagelog.record` writes exactly `ts · op · args_hash · exit · ms · outcome · route`.
+  **Confirmed — there is no `agent` field.** Half A is agent-blind by substrate.
+- **Done:** `cage/adoption.py` + `cage insights adoption` (CLI · `--csv` · `--json` ·
+  `--since` · MCP `cage_adoption` · `cage query tool-adoption`), 25 unit tests, 4 goldens
+  (I9a–I9d). Suite 995 → **1024 green**. Proposal + handoff/prompt archived; FORMULAS
+  §2.12 written; every index updated.
+- **Decided (the prompt's open question): an empty half B RENDERS its refusal.** It is
+  never suppressed. Suppressing it makes *cage cannot attribute these* indistinguishable
+  from *cage has no per-agent answer at all* — the exact conflation the view exists to
+  prevent. Golden `I9b` pins it.
+- **Found during the build — a third correction on top of the handoff's two.** The
+  handoff softened the proposal's *never invoked* to *no evidence of invocation*.
+  **That is still too strong whenever any savings row is unattributed**: the unattributed
+  row could belong to the very agent being named. `I9b` printed "no evidence of
+  invocation: claude" beside two unattributable rows that were almost certainly claude's.
+  The view now picks between two claims by coverage — the strong one only at 100%.
+- **Also beyond scope, deliberately:** a linked `call` id resolves the agent *directly*
+  and is a stronger join than the session, so it is tried first and **labelled per row**
+  (`joined via call` / `session`). More precision, no blending.
+- **Coverage on the real ledger (honest number):** 3 of 6 savings rows attributable by
+  session; 6 of 6 once the call rung counts, though 3 of those are legacy rows and one
+  is a `cage demo` seed. Small-n — the shim blind spot is structural, not measurable here.
+- **Version correction, mid-session:** v0.39.0 was tagged and published by another
+  session while this work was in flight, so ADOPT is **not** in v0.39.0. Its CHANGELOG
+  section was lifted out of the v0.39.0 entry into a new `## v0.40.0 (unreleased)`, the
+  archive files renamed `v0.40-insights-adoption.*`, and the README's v0.39.0 *What's
+  new* line restored to what that release actually shipped.
+- **Open:** none. The tree stays uncommitted per instruction; `__version__` stays
+  `0.39.0` until the v0.40.0 release commit bumps it.
+- **Next step:** nothing blocking — the next agent can pick from OPEN-WORK.
+
+## 2026-08-02 (Cowork) — ADOPT specced; the proposal's headline was half-derivable
+
+- **Asked:** handoff + prompt for `insights-adoption.md`.
+- **Verified the premises against code first** — the fourth spec running where an
+  unchecked premise would have shipped. **It was wrong again, and usefully so.**
+- **The finding:** the proposal promises "per agent × tool: invocations · receipted ·
+  missed · never invoked". **Per-agent is not derivable for most invocations.**
+  `usagelog.record` writes `ts · op · args_hash · exit · ms · outcome · route` — **no
+  `agent`**. And shim/native savings rows carry an **empty session**, because a
+  subprocess genuinely cannot know which agent spawned it (`graphifymeter`'s receipt-id
+  deferral exists *for* that reason). Only the **transcript** route yields a session
+  joinable to `calls.agent`.
+- **Uncomfortable corollary, recorded:** leg D's celebrated finding ("claude invoked
+  graphify unprompted; copilot and kiro did not") was **operator-attributed** — one agent
+  per lab cell — not derived from the data. The product view cannot reproduce it as
+  cleanly as the lab did, and the spec says so rather than implying otherwise.
+- **Re-scoped to two halves, kept visibly separate:** **A** totals + outcomes from usage
+  rows — exact, no join, and the distinction the proposal celebrates ("ran but cage
+  missed it") is **already the recorded `outcome` field**, not something to derive.
+  **B** per-agent from transcript-route savings only, with shim/native rendered
+  **agent-unknown and the reason named** — never an "other" bucket, never a timestamp
+  guess.
+- **Two honesty rules written hard:** "never invoked" is phrased as *no evidence of
+  invocation* (absence of evidence, in a view about what capture saw); and **no currency
+  appears anywhere** — usage rows are diagnostic-only with a byte-identical test pinning
+  it, so the view counts them and prices nothing, stated in the docstring so the next
+  reader doesn't think the invariant lapsed.
+- **Left to the executor:** what to print when *every* invocation came via the shim, so
+  half B is entirely agent-unknown — explicit unavailability line or suppress the half.
+  Silently printing an empty table is ruled out.
+- **Opus tier, deliberately** — not for the rendering but for the honesty boundary:
+  never-invoked vs invoked-and-missed vs invoked-and-unattributable. Blur any two and the
+  view is worse than nothing.
+- **Next step:** run the ADOPT prompt; NET-1 remains Arpit's lab session.
+
+---
+
 ## 2026-08-02 (Cowork) — WIN-CI closed; the living spec still held the wrong diagnosis
 
 - **Asked:** v0.38.0 is released after the first-ever Windows CI run went red on two

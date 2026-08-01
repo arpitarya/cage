@@ -1,0 +1,26 @@
+$ cage insights adoption
+Adoption — which tools your agents actually invoke
+  counts only; usage rows are diagnostic and are never priced
+
+A · invocations — graphify usage breadcrumb (exact, agent-blind)
+
+op     runs  receipt  unmeasurable  empty  non measured  error
+-----  ----  -------  ------------  -----  ------------  -----
+query     2        1             1      0             0      0
+
+route  runs  receipt  unmeasurable  empty  non measured  error
+-----  ----  -------  ------------  -----  ------------  -----
+shim      2        1             1      0             0      0
+
+B · per-agent attribution — savings rows joined to a call's agent
+
+  per-agent attribution unavailable — none of the 2 savings rows
+  carry a link cage can resolve to an agent (see the breakdown below)
+
+· coverage: 0 of 2 savings rows (0%) are agent-attributable
+· agent-unknown: 2 graphify row(s) carry no call and no session
+    — the interceptor runs as a subprocess and cannot know which agent spawned it
+    (structural, not a capture gap)
+· no savings row attributed to: claude
+    — this is NOT evidence they never invoked the tool: 2 row(s) above are
+    agent-unknown and could belong to any of them.
