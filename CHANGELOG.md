@@ -65,15 +65,29 @@ Built from: [handoff](docs/archive/v0.38-win-graphify-shim.handoff.md) ·
   coverage, and wrote + regression-tested the CI-corpus sizing rule (a too-small corpus
   makes every query honestly `unmeasurable`, which had let an early draft of the
   `present` leg pass while proving nothing).
-- **A real bug, found by actually running this on Windows CI before release.** The
-  first `graphify.cmd` walked PATH with `call :subroutine` from inside a `for` loop
-  plus a `goto` back-edge to re-enter it — cmd.exe aborted with its own internal
-  safety net (`Recursion Count=335, Stack Usage=90 percent, BATCH PROCESSING IS
-  ABORTED`) on every single invocation, hundreds of hops before this script's own
-  bound was ever reached. Rewritten as a flat nested `for` (directories × PATHEXT
-  entries) with no subroutine call and no backward jump — terminates by construction,
-  nothing left to count. Caught by pushing to CI and reading the Windows job before
-  tagging a release, exactly per plan.
+- **Two real bugs, found by actually running this on Windows CI before release — five
+  pushes to get to a correct diagnosis.** Every attempt hit the identical cmd.exe abort
+  (`Recursion Count=335, Stack Usage=90 percent, BATCH PROCESSING IS ABORTED`), which
+  made the first two hypotheses wrong: rewriting the walk from `call :subroutine` +
+  `goto` back-edge to a flat nested `for` (directories × PATHEXT) is a real correctness
+  improvement — provably terminating, no subroutine call — but did **not** fix the
+  observed failure, and neither did switching the test harness's invocation from an
+  argv list to `shell=True`, nor from a quoted absolute path to bare-name PATH
+  resolution. The actual causes, found by comparing against the `present` CI leg
+  (which passed the whole time, against the identical committed file):
+  1. **In the shim itself:** a `rem` comment sitting *inside* the nested `for` block
+     read `"<candidate>"` — cmd.exe's parser still tokenizes redirection characters
+     inside a comment when that comment is nested inside a multi-line `(...)` block,
+     and the `<`/`>` corrupted the block's parsing. Fixed by moving every comment
+     outside of every parenthesized block.
+  2. **In the test harness, not the shim:** `tests/test_win_graphify_shim.py`'s `_run()`
+     wiped `PATH` down to just the test's tmp directories, so the shim's own calls to
+     `findstr.exe`/`where.exe` (living in `System32`) had nothing to resolve them
+     through. Fixed by prepending the test directories onto just enough real system
+     directories, never the whole inherited `PATH` (which would risk exposing a real
+     `cage` and defeating the tests' "cage absent" assumption) and never nothing.
+  All 12 CI jobs (6 OSes × leg combinations, including the Windows behaviour tier and
+  the `present` axis on all three OSes) are green as of the tag.
 
 ## v0.37.2 (2026-08-01) — README tells the truth; the knowledge graph is committed
 
