@@ -4,12 +4,12 @@ Stage 1 is a *pure move*: the seven modules now import their heuristics from
 `constants.py` instead of inlining them. These guards prove (a) the values are
 the ones the modules used to inline, (b) the demo's §4.4 numbers are unchanged
 (behaviour is byte-identical), and (c) `DEFAULT_CONFIDENCE` is still only a
-*fallback* — policy `[human.confidence]` still wins.
+*fallback* — a row's own `confidence` still wins.
 """
 from __future__ import annotations
 
-from cage import (attribution, compress, constants, graphifymeter, human,
-                  ledger, matrix, policy)
+from cage import (attribution, compress, constants, graphifymeter,
+                  ledger, matrix, origin, policy)
 
 
 # ── the modules read their heuristics from constants (the move actually landed) ─
@@ -55,14 +55,9 @@ def test_demo_matrix_full_stack_cell(seeded):
     assert full_on["source"] == "measured" and full_off["source"] == "modeled"
 
 
-# ── DEFAULT_CONFIDENCE stays a fallback — policy [human.confidence] still wins ──
-def test_default_confidence_is_a_fallback(monkeypatch):
-    pol = policy.load(None)
-    # policy.toml sets [human.confidence].default = 0.3 → it must win over the constant
-    r = {"tool": "human", "unit": "tokens", "raw_alternative": 0, "actual": 0,
-         "saved": 0, "method": "estimated", "meta": {}}
-    assert human.human_alternative_usd(r, pol)[2] == 0.3
-
-    # with the policy block stripped, the resolver falls back to the constant
-    pol["human"] = {**pol["human"], "confidence": {}}
-    assert human.human_alternative_usd(r, pol)[2] == constants.DEFAULT_CONFIDENCE["default"]
+# ── DEFAULT_CONFIDENCE stays a reviewable constant, not a scattered literal ────
+def test_default_confidence_ladder_is_the_one_source():
+    # `origin.explain` is the surviving consumer after the Tier-1 human axis was
+    # removed in v0.36: it reads the ladder, never an inlined 0.7.
+    assert constants.DEFAULT_CONFIDENCE["estimated"] == 0.7
+    assert origin.DEFAULT_CONFIDENCE is constants.DEFAULT_CONFIDENCE

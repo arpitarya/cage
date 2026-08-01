@@ -206,7 +206,14 @@ def _inplace_table_edit(text: str, path: tuple[str, ...], values: dict,
     """Rewrite ``key = value`` lines inside an existing table span; preserve
     every other line; mark the header ``# cage:custom`` (a `policy sync`
     default-update passes ``mark_custom=False`` — a synced default must not
-    start reading as user-owned)."""
+    start reading as user-owned).
+
+    A brand-new key (not already present) is inserted right after the table's
+    **last recognized key line**, never at the span's far end — ``find_table_span``
+    runs to the next header, so a table like ``[meta]`` whose only content is
+    followed by a long prose block introducing the *next* section would otherwise
+    land the new key deep inside that unrelated comment block (still valid TOML —
+    the table stays open until the next header — but confusing to read)."""
     lines = text.splitlines(keepends=True)
     span = find_table_span(lines, path)
     assert span is not None  # caller checked
@@ -214,37 +221,57 @@ def _inplace_table_edit(text: str, path: tuple[str, ...], values: dict,
     if mark_custom and CUSTOM_MARK not in lines[start]:
         lines[start] = lines[start].rstrip("\n") + f"   {CUSTOM_MARK}\n"
     pending = dict(values)
+    last_key_line = start
     for i in range(start + 1, end):
         m = re.match(r"^(\s*)([A-Za-z0-9_-]+|\"[^\"]+\")\s*=", lines[i])
         if not m:
             continue
+        last_key_line = i
         key = m.group(2).strip('"')
         if key in pending:
             lines[i] = f"{m.group(1)}{key} = {_fmt_value(pending.pop(key))}\n"
     if pending:
-        insert = end
-        while insert > start + 1 and lines[insert - 1].strip() == "":
-            insert -= 1
+        insert = last_key_line + 1
         add = [f"{k} = {_fmt_value(v)}\n" for k, v in
                sorted(pending.items(), key=lambda kv: kv[0])]
         lines[insert:insert] = add
     return "".join(lines)
 
 
-def _project_policy(root: Path) -> Path:
+def _require_footprint(root: Path) -> paths.Footprint:
     foot = paths.Footprint(root)
-    base = foot.policy.parent
-    if not base.exists():
-        raise CageError(f"no cage footprint at {base} — run `cage setup` first "
+    if not foot.base.exists():
+        raise CageError(f"no cage footprint at {foot.base} — run `cage setup` first "
                         f"(or point --ledger/CAGE_BASE at one)")
-    return foot.policy
+    return foot
+
+
+def _project_policy(root: Path) -> Path:
+    """The project *policy* file (cage.toml/legacy policy.toml) — the write target for
+    routing decisions ([alias], [tools.<tool>] routes, [wiring], policy [meta])."""
+    return _require_footprint(root).policy
+
+
+def _project_prices(root: Path) -> Path:
+    """The project *prices* file — the write target for vendor facts ([prices]/[credits]
+    and the price [meta] counters). Resolves to prices.toml (creating it on first write),
+    or the legacy in-cage.toml prices file when that is where prices still live
+    (prices-toml plan §3, `paths.resolve_prices_file`)."""
+    return _require_footprint(root).prices
+
+
+_PRICES_HEAD = ("# Cage model prices — vendor rate cards (rows here shadow the bundled "
+                "defaults via\n# policy.load's two-level merge). Replaced wholesale by "
+                "`cage prices sync`.\n\n")
 
 
 def _write_table(root: Path, path: tuple[str, ...], values: dict,
-                 mark_custom: bool = True) -> dict:
-    """Insert-or-update one leaf table; returns
+                 mark_custom: bool = True, *, target: Path | None = None,
+                 created_head: str | None = None) -> dict:
+    """Insert-or-update one leaf table in ``target`` (defaults to the project policy file;
+    a price write passes the prices file); returns
     ``{"mode": "in-place"|"block"|"created"|"unchanged", "before": dict|None, "after": dict}``."""
-    pol_path = _project_policy(root)
+    pol_path = target if target is not None else _project_policy(root)
     result = {"path": pol_path}
     with lockutil.locked(paths.Footprint(root).state / "policy.lock"):
         # parse() already refused a duplicate table declaration (TOML law) — past
@@ -270,7 +297,8 @@ def _write_table(root: Path, path: tuple[str, ...], values: dict,
         if before_vals == values:
             return {**result, "mode": "unchanged", "before": before_vals, "after": values}
         block[path] = dict(values)
-        new_text = _assemble(before_txt, block, after_txt, created=not text)
+        new_text = _assemble(before_txt, block, after_txt, created=not text,
+                             created_head=created_head)
         _atomic_write(pol_path, new_text)
         return {**result, "mode": ("created" if not text else "block"),
                 "before": before_vals, "after": values}
@@ -292,11 +320,11 @@ def _table_values(lines: list[str], span: tuple[int, int]) -> dict:
 
 
 def _assemble(before: str, block: dict[tuple[str, ...], dict], after: str,
-              created: bool = False) -> str:
+              created: bool = False, created_head: str | None = None) -> str:
     head = before
     if created:
-        head = ("# Cage project policy — rows here shadow the bundled defaults "
-                "(policy.load two-level merge).\n\n")
+        head = created_head or ("# Cage project policy — rows here shadow the bundled "
+                                "defaults (policy.load two-level merge).\n\n")
     if head and not head.endswith("\n\n"):
         head = head.rstrip("\n") + "\n\n"
     body = render_block(block).rstrip("\n")
@@ -304,12 +332,23 @@ def _assemble(before: str, block: dict[tuple[str, ...], dict], after: str,
 
 
 def set_price(root: Path, provider: str, model: str, row: dict) -> dict:
-    """Idempotent insert-or-update of ``[prices.<provider>."<model>"]``."""
-    return _write_table(root, ("prices", provider, model), dict(row))
+    """Idempotent insert-or-update of ``[prices.<provider>."<model>"]`` — a vendor fact,
+    so it lands in the **prices** file (prices.toml, or the legacy in-cage.toml prices)."""
+    return _write_table(root, ("prices", provider, model), dict(row),
+                        target=_project_prices(root), created_head=_PRICES_HEAD)
+
+
+def set_credit(root: Path, provider: str, model: str, row: dict) -> dict:
+    """Idempotent insert-or-update of ``[credits.<provider>."<model>"]`` — the AI-credit
+    multiplier table, a vendor fact, so it lands in the **prices** file alongside the
+    rate rows (prices-toml plan §2)."""
+    return _write_table(root, ("credits", provider, model), dict(row),
+                        target=_project_prices(root), created_head=_PRICES_HEAD)
 
 
 def set_alias(root: Path, provider: str, model: str, target: str) -> dict:
-    """Idempotent insert-or-update of ``[alias.<provider>."<model>"] to = ...``."""
+    """Idempotent insert-or-update of ``[alias.<provider>."<model>"] to = ...`` — a routing
+    decision about *your* setup, so it stays in the **policy** file (cage.toml)."""
     return _write_table(root, ("alias", provider, model), {"to": target})
 
 
@@ -351,9 +390,20 @@ def remove_table(root: Path, path: tuple[str, ...]) -> dict:
         return {**result, "mode": "removed", "before": before_vals}
 
 
-def update_meta(root: Path, meta: dict) -> dict:
-    """Stamp ``[meta]`` in the project policy (in-place when it exists)."""
-    return _write_table(root, ("meta",), dict(meta))
+def update_meta(root: Path, meta: dict, *, target: Path | None = None) -> dict:
+    """Stamp ``[meta]`` in-place (in the policy file by default; a prices meta stamp —
+    prices_version/prices_date — passes ``target=_project_prices(root)``). ``[meta]``
+    splits per key across the two files (prices-toml plan §2.1), so callers pass only the
+    keys that belong in ``target`` and never the price keys into the policy file."""
+    return _write_table(root, ("meta",), dict(meta), target=target,
+                        created_head=_PRICES_HEAD if target is not None else None)
+
+
+def prices_meta_target(root: Path) -> Path:
+    """The prices-file path a price [meta] stamp (prices_version/prices_date) writes to —
+    exposed so `cage prices` callers route the price counters without importing the
+    private helper."""
+    return _project_prices(root)
 
 
 def set_wiring(root: Path, values: dict) -> dict:

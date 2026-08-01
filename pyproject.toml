@@ -24,7 +24,7 @@ classifiers = [
     "Topic :: Software Development :: Libraries",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
-dependencies = []  # stdlib only — $0, deterministic, dependency-free (see docs/cage-plan.md §1)
+dependencies = []  # stdlib only — $0, deterministic, dependency-free (see docs/PLAN.md §1)
 
 [project.urls]
 Homepage = "https://github.com/arpitarya/cage"
@@ -49,10 +49,10 @@ where = ["."]
 include = ["cage*"]
 
 [tool.setuptools.package-data]
-cage = ["data/policy.toml", "data/skills/**/*", "data/prompts/*", "data/steering/*", "data/shims/*", "data/assets/*"]
+cage = ["data/cage.toml", "data/prices.toml", "data/shims/*", "data/assets/*"]
 
 [tool.pytest.ini_options]
-# Put the repo root on sys.path so tests can import the build-time `tools.skillgen`
+# Put the repo root on sys.path so tests can import the build-time `tools.dummyrepo`
 # package (which is intentionally not installed/shipped). Invocation-independent:
 # works under bare `pytest` (CI) and `python -m pytest` (justfile) alike.
 pythonpath = ["."]

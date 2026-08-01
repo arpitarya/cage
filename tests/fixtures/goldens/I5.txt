@@ -1,4 +1,4 @@
-$ cage insights compare --label docfix --agent-only
+$ cage insights compare --label docfix
 Stack comparison · closed tasks · measured group totals (tokens = in+out per task)
 
 stack         n                   median tok        IQR tok  median $            IQR $

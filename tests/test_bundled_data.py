@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from cage import adoptcmd, paths, policy, setupcmd
+from cage import adoptcmd, paths, policy
 
 REPO_DATA = Path(__file__).resolve().parents[1] / "cage" / "data"
 
@@ -24,7 +24,7 @@ def test_bundled_data_is_the_package_data_dir():
 
 
 def test_default_toml_is_the_bundled_file_verbatim():
-    assert policy.default_toml() == (REPO_DATA / "policy.toml").read_text(encoding="utf-8")
+    assert policy.default_toml() == (REPO_DATA / "cage.toml").read_text(encoding="utf-8")
 
 
 def test_bundled_policy_loads_with_prices():
@@ -37,17 +37,9 @@ def test_distribution_is_wheel_outside_a_zipapp():
     assert paths.distribution() == "wheel"
 
 
-def test_setup_copies_skill_files_byte_identical(tmp_path, monkeypatch):
-    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "claude_home"))
-    setupcmd.run(("claude",))
-    for skill in ("cage", "cage-doctor"):
-        src_dir = REPO_DATA / "skills" / skill
-        dst_dir = tmp_path / "claude_home" / "skills" / skill
-        copied = sorted(p.name for p in dst_dir.iterdir())
-        expected = sorted(p.name for p in src_dir.iterdir() if p.is_file())
-        assert copied == expected
-        for name in copied:
-            assert (dst_dir / name).read_bytes() == (src_dir / name).read_bytes()
+# NB: the skill-asset copy test was removed with the rendered skill/prompt/steering
+# assets and `setupcmd`. `cage setup` now only scaffolds + wires MCP + the graphify
+# shim (below).
 
 
 def test_graphify_shim_copies_byte_identical_with_exec_bit(tmp_path, monkeypatch):

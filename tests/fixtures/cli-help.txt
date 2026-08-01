@@ -9,8 +9,8 @@ daily:
 
 groups (run any group name for its commands):
   insights    attrib · matrix · roi · verdict · budget · compare · estimate ·
-              calibration · trend · why · forecast · regression · recommend
-  human       show · record · outcome · quality
+              calibration · why · forecast · regression · recommend
+  task        outcome · quality
   authorship  origin · verify · notes-sync · ledger-sync
   prices      list · unpriced · set · alias · route-tool · sync
   study       join · start · stop · report · id
@@ -19,6 +19,6 @@ groups (run any group name for its commands):
 
 $ cage report --since 7d          # the daily number
 $ cage insights verdict graphify  # is this tool paying for itself?
-$ cage human record 12m           # attest human time on the open task
+$ cage task outcome t_9f31        # close a task so compare/estimate can see it
 $ cage study join baseline        # enroll this laptop in the fleet study
 $ cage prices route-tool graphify --to copilot/claude-sonnet-4.6

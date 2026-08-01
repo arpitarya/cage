@@ -31,12 +31,6 @@ posix_only = pytest.mark.skipif(os.name != "posix", reason="sh shim — POSIX ho
 @pytest.mark.parametrize("command, live", [
     # live: every verb cage actually emits into a wiring artifact today
     ("cage import --agent claude --project .", True),
-    ("cage hook-stop", True),
-    ("cage hook-session-start", True),
-    ("cage hook-session-end", True),
-    ("cage hook-post-tool-use", True),
-    ("cage hook-post-commit", True),
-    ('cage hook-prepare-commit-msg "$1"', True),
     ("cage mcp", True),
     ("cage data graphify --help", True),
     ("cage insights attrib", True),
@@ -46,6 +40,12 @@ posix_only = pytest.mark.skipif(os.name != "posix", reason="sh shim — POSIX ho
     ("cage graphify --help", False),
     ("cage export --json", False),
     ("cage matrix", False),
+    # … the hook verbs, removed outright with the hook machinery (empty tail in
+    # verbmap.REMOVED — a pre-removal settings.json still names them) …
+    ("cage hook-stop", False),
+    ("cage hook-session-start", False),
+    ("cage hook-post-commit", False),
+    ('cage hook-prepare-commit-msg "$1"', False),
     # … and removed outright (NOT in verbmap.REMOVED — why the parser is the oracle)
     ("cage adopt", False),
     # foreign commands are never ours to judge
@@ -142,20 +142,16 @@ def _plant_claude(root: Path, session_start: list[str], **events: str) -> None:
 # synthetic ones. `cage import-claude` shipped in claudewire until v0.28.0
 # (048a962); `cage import-codex` until v0.9.0 (26788ff).
 
-def test_import_claude_still_heals(homes):
-    """MUST-PRESERVE: the v0.27 Claude backfill hook heals to the current form.
-
-    Healed today only because `" import-claude"` contains the substring `" import"`.
-    The parser-based predicate must catch it as a *dead verb* instead — same outcome,
-    non-accidental reason."""
+def test_import_claude_stale_hook_is_stripped(homes):
+    """MUST-PRESERVE: a v0.27 Claude backfill/banner hook naming a dead verb must not
+    survive `cage setup`. Hookless heal STRIPS every cage-owned hook entry (capture is
+    pull-based now) rather than rewriting it — foreign hooks are never touched."""
     _plant_claude(homes, ["/old/bin/cage import-claude --project .",
                           "/old/bin/cage hook-session-start"])
     agents.install(homes, ("claude",))
     cmds = _claude_commands(homes)
-    assert not any("import-claude" in c for c in cmds), \
-        f"dead verb `import-claude` survived setup: {cmds}"
-    assert any("import --agent claude --project ." in c for c in cmds), \
-        f"current backfill missing after heal: {cmds}"
+    assert not any(paths.cage_command_tail(c) is not None for c in cmds), \
+        f"a stale cage hook survived setup: {cmds}"
 
 
 def test_codex_import_hook_is_no_longer_managed(homes):
@@ -175,20 +171,19 @@ def test_codex_import_hook_is_no_longer_managed(homes):
     assert path.read_text(encoding="utf-8") == before  # byte-identical, untouched
 
 
-def test_dead_verb_heals_in_a_non_import_slot(homes):
-    """A dead verb that is *not* an import must heal too — the old substring predicate
-    could only ever see `import`-shaped commands."""
+def test_stale_hook_in_a_non_session_slot_is_stripped(homes):
+    """A stale cage hook in any event slot (not just SessionStart) is stripped — the
+    heal walks every event, not one blessed slot."""
     _plant_claude(homes, ["/old/bin/cage import-claude --project ."],
                   SessionEnd="/old/bin/cage export --json")
     agents.install(homes, ("claude",))
     cmds = _claude_commands(homes)
-    assert any("data export --json" in c for c in cmds), cmds
-    assert not any(c.endswith("cage-run\" export --json") for c in cmds), cmds
+    assert not any(paths.cage_command_tail(c) is not None for c in cmds), cmds
 
 
-def test_copilot_stale_entry_is_replaced_not_duplicated(homes):
-    """The duplicate-entry bug: a dead-verb entry matched neither old test, so setup
-    kept it *and* appended a correct one — the dead command still fired every event."""
+def test_copilot_stale_hook_file_is_deleted(homes):
+    """The user-level `~/.copilot/hooks/cage.json` is wholly cage-owned, so the hookless
+    heal deletes it outright (capture is pull-based — no copilot hook is wired)."""
     path = homes / "copilot_home" / "hooks" / "cage.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps({"version": 1, "hooks": {
@@ -198,28 +193,7 @@ def test_copilot_stale_entry_is_replaced_not_duplicated(homes):
         for e in ("agentStop", "sessionStart", "sessionEnd")}}, indent=2),
         encoding="utf-8")
     agents.install(homes, ("copilot",))
-    cmds = _copilot_commands()
-    assert not any("export --agent copilot" in c for c in cmds), \
-        f"dead entry survived alongside the new one: {cmds}"
-    assert len(cmds) == 3 and all("import --agent copilot" in c for c in cmds), cmds
-
-
-def test_healed_backfill_precedes_the_banner(homes):
-    """Ordering must survive the heal: SessionStart runs backfill *then* banner.
-
-    Once the heal rewrites a dead verb in place, `import-claude` becomes byte-identical
-    to the current backfill — so the old drop-then-prepend no longer fires and cannot be
-    what guarantees the order. Planted banner-first to pin it."""
-    _plant_claude(homes, ["/old/bin/cage hook-session-start",
-                          "/old/bin/cage import-claude --project ."])
-    agents.install(homes, ("claude",))
-    start = [h.get("command", "")
-             for e in cfgio.load_json(homes / ".claude" / "settings.json")
-             .get("hooks", {}).get("SessionStart", [])
-             for h in e.get("hooks", [])]
-    backfill = next(i for i, c in enumerate(start) if " import " in c)
-    banner = next(i for i, c in enumerate(start) if "hook-session-start" in c)
-    assert backfill < banner, f"backfill must precede the banner: {start}"
+    assert not path.exists(), "the cage-owned copilot hook file survived heal"
 
 
 # ── detection: exactly the stale set, nothing foreign ───────────────────────────
@@ -387,23 +361,9 @@ def test_doctor_wiring_is_ok_on_a_freshly_wired_project(homes):
     assert _check(doctorcmd.run(homes), "wiring")["level"] == "ok"
 
 
-def test_stale_asset_is_advisory_not_a_failure(homes):
-    """An edited/stale skill file is `·`: the agent sees a wrong verb, errors, and
-    adapts — strictly less severe than capture being silently off."""
-    from cage import doctorcmd, initcmd, setupcmd
-    initcmd.run(homes)
-    setupcmd.run(("claude",), scope="global")
-    skill = paths.claude_home() / "skills" / "cage" / "SKILL.md"
-    skill.write_text(skill.read_text(encoding="utf-8") + "\nstale\n", encoding="utf-8")
-    stale = wiringscan.stale_assets()
-    assert [s.artifact for s in stale] and all(s.agent == "claude" for s in stale)
-    assert _check(doctorcmd.run(homes), "wiring")["level"] == "warn"
-
-
-def test_freshly_installed_assets_are_not_stale(homes):
-    from cage import setupcmd
-    setupcmd.run(("claude", "codex", "copilot", "kiro"), scope="global")
-    assert wiringscan.stale_assets() == []
+# NB: the stale-*asset* tests were removed with the rendered skill/prompt/steering
+# assets and their byte-digest check (`wiringscan.stale_assets`). A dead *wired command*
+# is now the only wiring fault — covered by `test_doctor_fails_on_dead_wiring_*` above.
 
 
 # ── the scan changes no number ──────────────────────────────────────────────────

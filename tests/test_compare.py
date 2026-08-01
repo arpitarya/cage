@@ -51,7 +51,7 @@ def seeded(proj):
     _call(root, "plain-2", 5_500, 250, "2026-06-05T12:00:00Z")
     _call(root, "", 1_000, 0, "2026-06-05T11:00:00Z", session="s-plain-2")  # fallback join
     _close(root, "plain-2", "2026-06-05T18:00:00Z")
-    _receipt(root, "plain-0", "human", "2026-06-10T10:00:00Z")  # Tier-1 anchor ≠ stack tool
+    _receipt(root, "plain-0", "human", "2026-06-10T10:00:00Z")  # legacy Tier-1 row ≠ stack tool
 
     # graphify: totals 4.5k..6.5k; the median task (graph-2) spans June + July shards.
     for i, tin in enumerate((4_000, 4_500, 5_500, 6_000)):
@@ -162,7 +162,7 @@ def test_deterministic_byte_identical(seeded):
 
 def test_no_closed_tasks_explains(proj):
     text = compare.render_compare(compare.summarize(proj, policy.load(None)))
-    assert "No closed tasks to compare" in text and "cage human outcome" in text
+    assert "No closed tasks to compare" in text and "cage task outcome" in text
 
 
 def test_cli_json_envelope(seeded, monkeypatch, capsys):

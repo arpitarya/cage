@@ -34,7 +34,7 @@ def test_help_matches_the_plan_mock_verbatim():
     assert "usage:" not in got and "positional arguments" not in got
     for line in ("  report ", "  import ", "  setup ", "  doctor ", "  query "):
         assert line in got
-    for grp in ("insights", "human", "authorship", "prices", "study", "policy", "data"):
+    for grp in ("insights", "task", "authorship", "prices", "study", "policy", "data"):
         assert f"  {grp} " in got or f"  {grp}  " in got
 
 
@@ -51,7 +51,9 @@ def test_help_hides_plumbing_and_moved_verbs():
 def test_removed_verb_errors_with_direction(old):
     r = _run([old])
     assert r.returncode == 1, (old, r.stdout, r.stderr)
-    assert r.stderr.strip() == f"error: '{old}' is now 'cage {verbmap.REMOVED[old]}'"
+    # `direction()` renders both regimes: a moved verb ("is now 'cage <new>'") and a
+    # removed-outright one (empty tail — the hook verbs — "was removed …").
+    assert r.stderr.strip() == f"error: {verbmap.direction(old)}"
     assert r.stdout == ""  # the moved command never ran
 
 
@@ -63,13 +65,16 @@ def test_removed_verb_with_trailing_args_still_directs():
 
 
 def test_removed_map_never_shadows_a_live_top_level_verb():
-    """`human` is a group, `mcp`/`debug`/`demo` stay callable — none may sit in REMOVED,
-    or the pre-scan would hijack a real command."""
+    """A live group name (`task`, `insights`, …) and the hidden-but-callable
+    `mcp`/`debug`/`demo` must never sit in REMOVED, or the pre-scan would hijack a
+    real command. `human` IS in REMOVED as of v0.36 — and is no longer live, which
+    is exactly the invariant: REMOVED ∩ live == ∅, checked against the parser."""
     parser = cli.build_parser()
     live = set(parser._subparsers._group_actions[0].choices)  # every registered subparser
+    assert not (set(verbmap.REMOVED) & live)
     for old in verbmap.REMOVED:
-        assert old not in {"human", "insights", "authorship", "data", "mcp", "debug", "demo"}
-    for group in ("insights", "human", "authorship", "data"):
+        assert old not in {"mcp", "debug", "demo"}
+    for group in ("insights", "task", "authorship", "data"):
         assert group in live
 
 
@@ -78,8 +83,8 @@ def test_removed_map_never_shadows_a_live_top_level_verb():
 def test_hidden_verbs_still_callable(tmp_path):
     assert _run(["demo"], cwd=tmp_path).returncode == 0
     assert _run(["debug"], cwd=tmp_path).returncode == 0
-    # hook entrypoints resolve (they run fail-open; exit 0)
-    assert _run(["hook-session-start"], cwd=tmp_path).returncode == 0
+    # hook entrypoints are gone (capture is pull-based) — they now direct + exit 1
+    assert _run(["hook-session-start"], cwd=tmp_path).returncode == 1
 
 
 # ── no argparse abbreviation (an old prefix must not accidentally resolve) ───────
@@ -95,7 +100,7 @@ def test_subcommand_abbreviation_is_disabled(prefix):
 _MOVED = "|".join(re.escape(v) for v in sorted(verbmap.REMOVED))
 # an old verb immediately after `cage `, not already grouped
 _STALE = re.compile(rf"cage ({_MOVED})(?![\w-])")
-_GROUPED = re.compile(r"cage (insights|human|authorship|data) ")
+_GROUPED = re.compile(r"cage (insights|task|authorship|data) ")
 
 
 def _scan(paths, exts):
@@ -144,17 +149,15 @@ def test_no_stale_old_verb_hints_in_rendered_skill_assets():
     assert not hits, "stale verbs in rendered agent assets:\n" + "\n".join(hits)
 
 
-def test_committed_wiring_names_only_non_moving_verbs():
-    """The wire modules emit hook-*/import/mcp into committed files — never a moved
-    verb (else a cloned settings.json would break after this release). The claude
-    backfill in particular must have migrated off the removed `import-claude`."""
-    from cage import claudewire, kirowire
-    blob = " ".join([
-        claudewire.BACKFILL(), claudewire.BANNER(),
-        *claudewire._simple().values(),
-        kirowire._import_cmd(),
-    ])
-    # every command word after the shim reference must be a surviving verb
-    for old in verbmap.REMOVED:
-        assert f" {old} " not in f"{blob} ", f"wired command still names removed verb {old!r}"
-    assert "import --agent claude" in claudewire.BACKFILL()  # migrated, not left as import-claude
+def test_committed_wiring_names_only_non_moving_verbs(tmp_path):
+    """The wire modules emit MCP entries into committed files (`.mcp.json`,
+    `.vscode/mcp.json`, `.kiro/hooks` is gone) — every one must name a *live* verb, or
+    a cloned config would break after this release. Checked against the real files
+    `agents.install` writes and the live parser (never a hard-coded verb list)."""
+    from cage import agents, wiringscan
+    agents.install(tmp_path)
+    committed = wiringscan.committed_artifacts(tmp_path)
+    assert committed, "install wrote no committed wiring to check"
+    for display, command in committed:
+        assert not wiringscan.is_dead_cage_command(command), \
+            f"committed wiring {display} names a dead verb: {command!r}"

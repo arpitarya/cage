@@ -1,0 +1,3 @@
+58948469192cae0620e08fa4a46538a818142be13c08b932b6f073238aa0cf4a  2026-07-28-phase-1-benchmark.md
+# sha256 over the body from the newline after '<!-- HASH-COVERS-BELOW -->' to EOF.
+# The header (title + printed hash + marker) is excluded from the hash by definition.

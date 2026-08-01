@@ -18,6 +18,7 @@ from types import SimpleNamespace
 
 from cage import (agents, cleanup, importcmd, ledger, paths, policy, report,
                   schema)
+from srcseed import mkcage
 
 _HOME_ENVS = ("CLAUDE_CONFIG_DIR", "COPILOT_HOME", "KIRO_HOME",
               "KIRO_DATA_DIR", "CAGE_VSCODE_USER")
@@ -29,7 +30,7 @@ def _isolate(tmp_path, monkeypatch):
     for env in _HOME_ENVS:
         monkeypatch.setenv(env, str(tmp_path / f"home-{env.lower()}"))
     root = tmp_path / "proj"
-    (root / ".cage").mkdir(parents=True)
+    mkcage(root)
     monkeypatch.chdir(root)
     return root
 
@@ -148,10 +149,14 @@ def test_self_healing_files_reappear_clears_the_warning(tmp_path, monkeypatch):
 def test_disabled_by_policy_is_silent(tmp_path, monkeypatch):
     root = _isolate(tmp_path, monkeypatch)
     paths.copilot_home().mkdir(parents=True)            # installed…
-    (root / ".cage" / "policy.toml").write_text(       # …but disabled by policy
-        "[sources.copilot]\nreplace = true\npaths = []\n", encoding="utf-8")
+    # …but NOT declared in [sources] (Directive A, §3.6): an agent with no
+    # [sources.<agent>] entry is simply never swept — the new way to "disable" a surface,
+    # replacing the old `replace = true` + empty `paths`. Declare claude only.
+    (root / ".cage" / "cage.toml").write_text(
+        '[[sources.claude]]\npath = "$CLAUDE_CONFIG_DIR/projects"\nglob = "**/*.jsonl"\n',
+        encoding="utf-8")
     _imp(root)
-    assert "copilot" not in _health(root)                # no record ⇒ no warn
+    assert "copilot" not in _health(root)                # no source ⇒ never swept ⇒ no warn
     assert report.capture_warnings(_health(root)) == []
 
 
@@ -173,13 +178,37 @@ def test_kiro_present_but_empty_is_silent_not_broken(tmp_path, monkeypatch):
     # Kiro is a FILE source: `_scan` takes raw=[src] when the file exists, so len(raw)=1
     # even for an empty log. Gate 2 means "no data location", not "no rows" — a
     # present-but-empty kiro log is normal (coarse by design), never a "broken" nag.
+    # Kiro's health now rides the MACHINE ledger, because that is where its rows land
+    # (ADR 0006) — health must be recorded against the sink it actually captured into.
     root = _isolate(tmp_path, monkeypatch)
     log = paths.kiro_token_log()
     log.parent.mkdir(parents=True)
     log.write_text("", encoding="utf-8")                # the file exists but is empty
     _imp(root)
-    assert _health(root)["kiro"]["files"] == 1           # the file counts as matched
-    assert report.capture_warnings(_health(root)) == []  # so kiro never warns
+    gh = _health(paths.global_home())
+    assert gh["kiro"]["files"] == 1                      # the file counts as matched
+    assert report.capture_warnings(gh) == []             # so kiro never warns
+
+
+def test_routed_kiro_leaves_no_health_record_in_the_project(tmp_path, monkeypatch):
+    # The false-⚠ trap: with kiro routed away, a project-root health record for kiro
+    # would say "installed but matched 0 files" forever — kiro is capturing fine, just
+    # elsewhere. So it must be ABSENT here (and a stale pre-0.36 one is dropped), with
+    # the report footer explaining the absence in its place.
+    root = _isolate(tmp_path, monkeypatch)
+    log = paths.kiro_token_log()
+    log.parent.mkdir(parents=True)
+    log.write_text("", encoding="utf-8")
+    # a stale record from before the routing change
+    foot = paths.Footprint(root)
+    foot.state.mkdir(parents=True, exist_ok=True)
+    foot.cursors.write_text(json.dumps({"_health": {"kiro": {"home": True, "files": 0,
+                                                            "captured": False}},
+                                        "kiro": {"/some/log": [1, 2.0]}}), encoding="utf-8")
+    _imp(root)
+    cur = json.loads(foot.cursors.read_text(encoding="utf-8"))
+    assert "kiro" not in cur["_health"] and "kiro" not in cur
+    assert report.capture_warnings(_health(root)) == []
 
 
 def test_single_agent_import_does_not_erase_other_agents_health(tmp_path, monkeypatch):

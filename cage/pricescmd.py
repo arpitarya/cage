@@ -65,11 +65,22 @@ def sync_recommendation(project_meta: dict) -> str | None:
     return None
 
 
-def _project_raw(foot: paths.Footprint) -> dict:
+def _policy_raw(foot: paths.Footprint) -> dict:
     try:
         return policy.load_project_raw(foot.policy)
     except Exception as e:  # noqa: BLE001 — malformed project policy → clean CLI error
         raise CageError(f"{foot.policy}: {e}") from e
+
+
+def _prices_raw(foot: paths.Footprint) -> dict:
+    """The project's *prices* file parsed alone — the source of the project's price rows,
+    credits, and the price `[meta]` counters (prices-toml plan §3). Resolves to prices.toml
+    when present, else the legacy in-cage.toml prices, so `list`/`sync` read the same rows
+    `policy.load` merges. When both files are the legacy one this equals `_policy_raw`."""
+    try:
+        return policy.load_project_raw(foot.prices)
+    except Exception as e:  # noqa: BLE001 — malformed project prices → clean CLI error
+        raise CageError(f"{foot.prices}: {e}") from e
 
 
 def _custom_headers(text: str) -> set[tuple[str, ...]]:
@@ -91,9 +102,10 @@ def _custom_headers(text: str) -> set[tuple[str, ...]]:
 def list_view(root: Path) -> dict:
     foot = paths.Footprint(root)
     bundled = policy.bundled_raw()
-    project = _project_raw(foot)
+    prices_raw = _prices_raw(foot)   # price rows + credits + price [meta] counters
+    policy_raw = _policy_raw(foot)   # aliases (routing decisions) live in cage.toml
     rows = []
-    b_tables, p_tables = _tables(bundled.get("prices", {})), _tables(project.get("prices", {}))
+    b_tables, p_tables = _tables(bundled.get("prices", {})), _tables(prices_raw.get("prices", {}))
     providers = sorted(set(b_tables) | set(p_tables))
     for prov in providers:
         b_rows = b_tables.get(prov, {})
@@ -111,8 +123,8 @@ def list_view(root: Path) -> dict:
             })
     aliases = []
     merged_prices = policy.load(foot.policy).get("prices", {})
-    for prov in sorted(project.get("alias", {}) or {}):
-        for model, entry in sorted((project["alias"][prov] or {}).items()):
+    for prov in sorted(policy_raw.get("alias", {}) or {}):
+        for model, entry in sorted((policy_raw["alias"][prov] or {}).items()):
             target = entry.get("to", "") if isinstance(entry, dict) else str(entry)
             tprov, _, tmodel = target.partition("/")
             aliases.append({"provider": prov, "model": model, "to": target,
@@ -124,19 +136,20 @@ def list_view(root: Path) -> dict:
     dangling = receiptprice.dangling_routes(merged_pol)
     tool_routes = [{"tool": tool, "to": target, "broken": tool in dangling}
                    for tool, target in receiptprice.routes(merged_pol).items()]
-    b_meta, p_meta = bundled.get("meta", {}), project.get("meta", {})
+    b_meta, p_meta = bundled.get("meta", {}), prices_raw.get("meta", {})
+    have_prices = foot.prices.exists()
     return {"rows": rows, "aliases": aliases, "tool_routes": tool_routes,
             "bundled_meta": b_meta, "project_meta": p_meta,
-            "project_policy": str(foot.policy) if foot.policy.exists() else None,
-            # no project policy at all ⇒ the bundle applies directly — nothing stale
-            "recommendation": sync_recommendation(p_meta) if foot.policy.exists() else None}
+            "project_policy": str(foot.prices) if have_prices else None,
+            # no project prices file at all ⇒ the bundle applies directly — nothing stale
+            "recommendation": sync_recommendation(p_meta) if have_prices else None}
 
 
 def render_list(d: dict) -> str:
     b, p = d["bundled_meta"], d["project_meta"]
     head = (f"prices — bundled {_meta_version(b)} (cage {b.get('cage_version', '?')})"
             f" · project {_meta_version(p)}"
-            + (f" ({d['project_policy']})" if d["project_policy"] else " (no project policy.toml)"))
+            + (f" ({d['project_policy']})" if d["project_policy"] else " (no project prices.toml)"))
     table = render.table(
         ["provider", "model", "in $/M", "out $/M", "cache $/M", "origin", "wins"],
         [[r["provider"] or "—", r["model"], _fmt(r["input"]), _fmt(r["output"]),
@@ -219,14 +232,29 @@ _REPRICE_NOTE = ("derived views re-price immediately — the ledger is never rew
                  "(Self-costed rows and receipts keep their stored figures.)")
 
 
-def _stamp_meta_on_create(root: Path, res: dict) -> None:
-    """A freshly-created project policy derives from the installed bundle, so stamp
-    the bundled ``[meta]`` on it (exactly what a `cage setup` copy would carry) —
-    the sync recommendation then measures real staleness, not a missing stamp."""
-    if res.get("mode") == "created":
-        meta = policy.bundled_raw().get("meta", {})
-        if meta:
-            pricestoml.update_meta(root, dict(meta))
+_PRICE_META_KEYS = ("prices_version", "prices_date")
+_POLICY_META_KEYS = ("cage_version", "policy_version")
+
+
+def _stamp_meta_on_create(root: Path, res: dict, kind: str) -> None:
+    """A freshly-created project file derives from the installed bundle, so stamp the
+    matching ``[meta]`` counters on it (exactly what a `cage setup` copy would carry) —
+    the sync recommendation then measures real staleness, not a missing stamp. ``[meta]``
+    splits per key (prices-toml plan §2.1): a created **prices** file gets
+    prices_version/prices_date; a created **policy** file gets cage_version/policy_version.
+    Never cross the price keys into the policy file (a mis-split silently stops the
+    staleness nag firing)."""
+    if res.get("mode") != "created":
+        return
+    meta = policy.bundled_raw().get("meta", {})
+    if kind == "prices":
+        subset = {k: meta[k] for k in _PRICE_META_KEYS if k in meta}
+        if subset:
+            pricestoml.update_meta(root, subset, target=pricestoml.prices_meta_target(root))
+    else:
+        subset = {k: meta[k] for k in _POLICY_META_KEYS if k in meta}
+        if subset:
+            pricestoml.update_meta(root, subset)
 
 
 def set_price(root: Path, args) -> str:
@@ -245,7 +273,7 @@ def set_price(root: Path, args) -> str:
     row = {"input": float(args.input), "output": float(args.output),
            "cache_read": float(cache_read)}
     res = pricestoml.set_price(root, args.provider, args.model, row)
-    _stamp_meta_on_create(root, res)
+    _stamp_meta_on_create(root, res, "prices")
     hdr = pricestoml.table_header("prices", args.provider, args.model)
     lines = []
     if res["mode"] == "unchanged":
@@ -276,7 +304,7 @@ def set_alias(root: Path, pol: dict, args) -> str:
                         f"to a real row, never to another guess (`cage prices set "
                         f"{tprov} '{tmodel}' …` first)")
     res = pricestoml.set_alias(root, provider, args.model, args.to)
-    _stamp_meta_on_create(root, res)
+    _stamp_meta_on_create(root, res, "policy")
     hdr = pricestoml.table_header("alias", provider, args.model)
     if res["mode"] == "unchanged":
         return f"· {hdr} already routes to {args.to} — no change"
@@ -322,7 +350,7 @@ def route_tool(root: Path, pol: dict, args) -> str:
                         "(e.g. anthropic/claude-sonnet-4-6)")
     _, match, key = policy.price_match(pol, tprov, tmodel)
     res = pricestoml.set_tool_route(root, tool, args.to)
-    _stamp_meta_on_create(root, res)
+    _stamp_meta_on_create(root, res, "policy")
     lines = []
     if res["mode"] == "unchanged":
         lines.append(f"· {hdr} already routes to {args.to} — no change")
@@ -349,8 +377,8 @@ def route_tool(root: Path, pol: dict, args) -> str:
 def sync_view(root: Path) -> dict:
     foot = paths.Footprint(root)
     bundled = policy.bundled_raw()
-    project = _project_raw(foot)
-    text = foot.policy.read_text(encoding="utf-8") if foot.policy.exists() else ""
+    project = _prices_raw(foot)   # price rows + price [meta] live in the prices file
+    text = foot.prices.read_text(encoding="utf-8") if foot.prices.exists() else ""
     owned = _custom_headers(text)
     in_sync, customized, drift, bundled_only, project_only = [], [], [], [], []
     b_tables, p_tables = _tables(bundled.get("prices", {})), _tables(project.get("prices", {}))
@@ -375,9 +403,9 @@ def sync_view(root: Path) -> dict:
     return {"bundled_meta": bundled.get("meta", {}), "project_meta": project.get("meta", {}),
             "in_sync": in_sync, "customized": customized, "drift": drift,
             "bundled_only": bundled_only, "project_only": project_only,
-            # no project policy at all ⇒ the bundle applies directly — nothing stale
+            # no project prices file at all ⇒ the bundle applies directly — nothing stale
             "recommendation": (sync_recommendation(project.get("meta", {}))
-                               if foot.policy.exists() else None)}
+                               if foot.prices.exists() else None)}
 
 
 def sync_apply(root: Path, d: dict, yes: list[str]) -> list[str]:
@@ -395,10 +423,13 @@ def sync_apply(root: Path, d: dict, yes: list[str]) -> list[str]:
     missed = wanted - applied - {i["key"] for i in d["drift"]}
     for m in sorted(missed):
         out.append(f"· --yes {m}: not a drifted row — nothing to apply")
-    meta = dict(d["bundled_meta"])
+    # Only the price counters (prices_version/prices_date) restamp, into the prices
+    # file — cage_version/policy_version are the policy brain's business (`cage policy
+    # sync`), and crossing them here would double-own [meta] across two files.
+    meta = {k: d["bundled_meta"][k] for k in _PRICE_META_KEYS if k in d["bundled_meta"]}
     if meta:
-        pricestoml.update_meta(root, meta)
-        out.append(f"✔ [meta] restamped to bundled {_meta_version(meta)}")
+        pricestoml.update_meta(root, meta, target=pricestoml.prices_meta_target(root))
+        out.append(f"✔ [meta] prices_version restamped to bundled {_meta_version(meta)}")
     skipped = [i["key"] for i in d["drift"] if i["key"] not in applied]
     if skipped:
         out.append("· left untouched (confirm each with --yes <provider>/<model>): "

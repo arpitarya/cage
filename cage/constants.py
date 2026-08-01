@@ -5,7 +5,7 @@ place per layer:
 
   · **Contract** — the closed enums ``UNITS`` / ``METHODS`` — live in
     ``schema.py`` (the substrate contract; do not move them here).
-  · **Policy** — user-tunable economics (model prices, the human $/hr rate,
+  · **Policy** — user-tunable economics (model prices,
     default minutes, budgets, pipeline order, confidence overrides) — live in
     ``policy.toml`` (the only place economic numbers live).
   · **Constants** (this file) — heuristics & invariants that are *not* meant as
@@ -13,8 +13,8 @@ place per layer:
     per-million price scale, the matrix ceiling, the provenance ranking, and the
     confidence *fallback*.
 
-``DEFAULT_CONFIDENCE`` is a fallback only — ``human.py`` prefers the policy
-``[human.confidence]`` block and drops to this constant just for an unset key.
+``DEFAULT_CONFIDENCE`` is a fallback ladder only — a row carrying its own
+``confidence`` always wins over it.
 
 NB: the third-party shims (``fux/cage_receipt.py`` and the graphify ``bin`` shim)
 keep their own local ``len(text) / 4`` because they are zero-dependency and
@@ -30,6 +30,18 @@ METHOD_TRUST = {"measured": 2, "modeled": 1, "estimated": 0}  # provenance ranki
 DEFAULT_CONFIDENCE = {"measured": 0.9, "estimated": 0.7,      # fallback ladder when
                       "type_table": 0.5, "default": 0.3}      # policy omits a key
 GRAPHIFY_RECEIPT_CONFIDENCE = 0.6  # a graphify receipt is modeled, never measured
+# A *report-read* receipt (graphify-capture GC2) — the agent read GRAPH_REPORT.md/wiki/**
+# instead of scanning source files — is a weaker inference than a `graphify query` whose
+# answer cites exact files: it can't prove the agent WOULD have read those N files. So it
+# is deliberately lower-confidence, still `modeled`, and footnoted apart from query
+# receipts (never conflated). Reviewable heuristic ⇒ constants, not policy.
+#
+# ⚠️ UNVALIDATED (OPEN-WORK G.1, 2026-07-29): the 0.3 is a *guess*, not a tuned figure.
+# It has never been scored against measured outcomes — `insights calibration` needs
+# report-read receipts with recorded task outcomes to compute an actual hit-rate, and
+# none exist yet. Until it does, 0.3 is a placeholder that surfaces its own weakness in
+# the footnote; do NOT tune it by intuition (that would launder a guess into a number).
+GRAPHIFY_REPORT_READ_CONFIDENCE = 0.3  # UNVALIDATED — see note above (G.1)
 SINCE_WINDOW_DAYS = {"h": 1 / 24, "d": 1, "w": 7}  # `24h` / `7d` / `2w` → days
 
 # Ledger partition granularity (plan §3.6.1). Writers append to `calls-YYYY-MM.jsonl`
@@ -80,12 +92,12 @@ MODEL_EFFORT_SUFFIXES = frozenset({"low", "medium", "high", "max"})
 MODEL_ROUTE_PREFIXES = ("copilot/",)
 
 # State-dir cleanup (plan §3.6.4 remedy, `cage/cleanup.py`). Policy-preferred
-# fallbacks (the DEFAULT_CONFIDENCE pattern): `policy.toml [cleanup] days` wins.
-# 30 days comfortably outlives every consumer of the cleanable classes: a stale
-# provenance buffer's transcript fallback already ran at SessionEnd, a deleted
-# source log's cursor can never match again, and debug.log is observational only.
+# fallbacks (the DEFAULT_CONFIDENCE pattern): `cage.toml [cleanup] days` wins.
+# 90 days: 30 proved tighter than a real usage gap (a project untouched for a
+# month is common, not exceptional), and the auto path only ever warns now — it
+# never deletes — so a longer default costs nothing but a slightly later reminder.
 # The throttle keeps the piggybacked check (one stat per `cage import`) cheap.
-CLEANUP_DEFAULT_DAYS = 30
+CLEANUP_DEFAULT_DAYS = 90
 CLEANUP_THROTTLE_HOURS = 24
 
 # Bundled-prices staleness threshold (plan §3.3, `cage/freshness.py`). Vendor
@@ -151,15 +163,40 @@ MIN_COMPARE_N = 5
 # estimation proves to need deeper history than comparison.
 MIN_ESTIMATE_N = 5
 
-# Derived human-attention idle cap (plan §4.10, `cage/attention.py`). A turn-gap
-# (previous assistant end → next human turn) is supervision time only up to a
-# point: past it the user has plainly walked away (meeting, lunch, overnight),
-# and summing raw gaps would bill idle hours as attention — the exact
-# time-from-timestamps fallacy the human-baseline design bans for commit history
-# (design §9 `cage calibrate`). 10 minutes is a deliberately conservative ceiling:
-# long enough to cover reading a diff and composing the next prompt, short enough
-# that an abandoned session contributes at most one cap per turn. Policy-preferred
-# fallback (the DEFAULT_CONFIDENCE pattern): `policy.toml [human] idle_cap_minutes`
-# wins; this constant covers an unset key. Changing either re-derives the minutes
-# at read time — the ledger stores raw `gap_ms` and is never rewritten.
-IDLE_CAP_MINUTES = 10
+# `cage`'s task-correlation backfill min-n gate (import-ledger plan §4 / Phase 4). The
+# correlation adopts an import-sourced call (session + ts, no task id) into a closed
+# task by the `taskgroup` session-window join — a heuristic, so below this many
+# correlated calls the pass **blocks** (returns nothing) rather than tag noise as task
+# attribution. Its own name (like the other two gates) so it can diverge. The pass is
+# also disabled by default (`policy.task_correlation_enabled`) until validated on real
+# correlated data (handoff §3) — the gate is the second guard, not the first.
+MIN_TASK_CORRELATION_N = 5
+
+# Confidence of a correlated `task` tag — always `estimated` (a session/time-window
+# heuristic, never measured or modeled). Deliberately low: it is the softest signal in
+# the ledger, a best-effort join, never ground truth.
+TASK_CORRELATION_CONFIDENCE = 0.5
+
+# The NET-3 attributable-cost window (net-savings handoff, 2026-08-01). A savings
+# receipt is **call-less** — the graphify/fux shims file a `task` but never a `call` —
+# so the cost of *using* a tool can only be joined to recorded calls by time. A call
+# counts as attributable when its `ts` falls within this many seconds **either side** of
+# any of that tool's receipts on the same task.
+#
+# Symmetric, not forward-only, because both adjacent turns are genuinely cost-of-use:
+# the turn that *invoked* the tool precedes the receipt (the agent's Bash/Read call),
+# and the turn that *consumed* its output follows it (the injected context, paid on the
+# next request). Union per task — a call adjacent to two receipts is counted once, so
+# the subtrahend can never be inflated by receipt volume.
+#
+# 120s is a turn-adjacency bound, not a duration estimate: it is wide enough to survive
+# a slow tool round-trip and narrow enough that an unrelated turn later in the same task
+# never enters. A heuristic, not user economics ⇒ constants, not policy.
+NET_ATTRIB_WINDOW_S = 120
+
+# Confidence of a task-level **net** saving. Below `GRAPHIFY_RECEIPT_CONFIDENCE` (0.6)
+# by construction: net inherits gross's modeled counterfactual *and* adds a time-window
+# join on top of it, so it can never be more credible than the gross it derives from.
+# Not tuned against outcomes — it is an ordering claim (net < gross), not a measurement.
+NET_SAVED_CONFIDENCE = 0.4
+

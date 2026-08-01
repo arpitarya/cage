@@ -133,27 +133,43 @@ def test_list_shows_origin_meta_and_recommendation(root, capsys):
     assert "origin" in out and "bundled" in out
     assert "bundled prices are newer" not in out  # init copy is current
     # backdate the project meta → the one-line recommendation appears
-    pricestoml.update_meta(root, {"prices_version": "2020-01-01"})
+    pricestoml.update_meta(root, {"prices_version": "2020-01-01"},
+                          target=pricestoml.prices_meta_target(root))
     assert cli.main(["prices", "list"]) == 0
     out = capsys.readouterr().out
     assert "bundled prices are newer (" in out and "cage prices sync" in out
 
 
 def test_init_copy_carries_bundled_meta(root):
+    # [meta] splits per key across the two files (prices-toml plan §2.1): the policy
+    # counters ride cage.toml, the price counters ride prices.toml — together they
+    # reconstruct the bundled [meta], and policy.load merges them back into one dict.
     initcmd.run(root)
     from cage import policy
-    project = policy.load_project_raw(Footprint(root).policy)
-    assert project["meta"] == policy.bundled_raw()["meta"]
+    foot = Footprint(root)
+    b_meta = policy.bundled_raw()["meta"]
+    cage_meta = policy.load_project_raw(foot.policy)["meta"]
+    prices_meta = policy.load_project_raw(foot.prices)["meta"]
+    assert cage_meta == {k: b_meta[k] for k in ("cage_version", "policy_version")}
+    assert prices_meta == {k: b_meta[k] for k in ("prices_version", "prices_date")}
+    assert {**cage_meta, **prices_meta} == b_meta
+    assert policy.load(foot.policy)["meta"] == b_meta  # merged dict unchanged
 
 
 def test_sync_classifies_and_updates_only_confirmed_rows(root, capsys):
     # cage-managed rows are customized by definition; hand rows that differ are drift.
+    # Prices live in prices.toml after the split, so scaffold first, then all price
+    # writes/reads route through the prices file (prices-toml plan §3).
+    initcmd.run(root)
     assert cli.main(["prices", "set", "anthropic", "claude-opus-4-8",
                      "--input", "9", "--output", "9", "--cache-read", "0.9"]) == 0
-    pol_path = Footprint(root).policy
-    pol_path.write_text(pol_path.read_text(encoding="utf-8")
-                        + '\n[prices.anthropic."claude-sonnet-4-6"]\ninput = 7.0\n'
-                          'output = 7.0\ncache_read = 0.7\n', encoding="utf-8")
+    # Hand-edit the scaffolded sonnet-4-6 row (bundled 3/15/0.30) to a drifting, UNMARKED
+    # value — the classic "stale copy of an old default" sync must flag (not # cage:custom).
+    prices_path = Footprint(root).prices
+    prices_path.write_text(prices_path.read_text(encoding="utf-8").replace(
+        '[prices.anthropic."claude-sonnet-4-6"]\ninput = 3.00\noutput = 15.00\ncache_read = 0.30',
+        '[prices.anthropic."claude-sonnet-4-6"]\ninput = 7.0\noutput = 7.0\ncache_read = 0.7'),
+        encoding="utf-8")
     capsys.readouterr()
     assert cli.main(["prices", "sync"]) == 0
     out = capsys.readouterr().out
@@ -165,17 +181,20 @@ def test_sync_classifies_and_updates_only_confirmed_rows(root, capsys):
     out = capsys.readouterr().out
     assert "left untouched" in out
     from cage import policy
-    raw = policy.load_project_raw(pol_path)
+    raw = policy.load_project_raw(prices_path)
     assert raw["prices"]["anthropic"]["claude-sonnet-4-6"]["input"] == 7.0
     # --yes applies the bundled values and restamps meta; customized row survives
     assert cli.main(["prices", "sync", "--update",
                      "--yes", "anthropic/claude-sonnet-4-6"]) == 0
     out = capsys.readouterr().out
-    assert "bundled values applied" in out and "[meta] restamped" in out
-    raw = policy.load_project_raw(pol_path)
+    assert "bundled values applied" in out and "[meta] prices_version restamped" in out
+    raw = policy.load_project_raw(prices_path)
     assert raw["prices"]["anthropic"]["claude-sonnet-4-6"]["input"] == 3.0
     assert raw["prices"]["anthropic"]["claude-opus-4-8"]["input"] == 9.0
-    assert raw["meta"] == policy.bundled_raw()["meta"]
+    # prices.toml's [meta] carries the price counters; the merged dict is unchanged
+    b_meta = policy.bundled_raw()["meta"]
+    assert raw["meta"] == {k: b_meta[k] for k in ("prices_version", "prices_date")}
+    assert policy.load(Footprint(root).policy)["meta"] == b_meta
 
 
 def test_prices_json_uses_envelope(root, capsys):
@@ -191,7 +210,8 @@ def test_doctor_prices_meta_check(root, capsys):
     assert cli.main(["doctor"]) == 0 or True  # doctor may warn on unrelated checks
     out = capsys.readouterr().out
     assert "prices-meta" in out or "current with the bundle" in out
-    pricestoml.update_meta(root, {"prices_version": "2020-01-01"})
+    pricestoml.update_meta(root, {"prices_version": "2020-01-01"},
+                          target=pricestoml.prices_meta_target(root))
     cli.main(["doctor"])
     out = capsys.readouterr().out
     assert "bundled prices are newer" in out
@@ -204,7 +224,7 @@ def test_writes_resolve_to_active_ledger_root(proj, monkeypatch, capsys):
     gh = paths.global_home()
     (gh / ".cage").mkdir(parents=True, exist_ok=True)
     assert cli.main(["prices", "set", "x", "m", "--input", "1", "--output", "2"]) == 0
-    assert (gh / ".cage" / "policy.toml").exists()
+    assert (gh / ".cage" / "cage.toml").exists()
     assert not (proj / ".cage").exists()
 
 
@@ -299,11 +319,12 @@ def test_sync_picks_up_new_bundle_rows(root, capsys):
     # recommendation; `sync --update` restamps, and the newly-researched rows
     # (here the load-bearing codex fixture id) resolve through the merge.
     initcmd.run(root)
-    pricestoml.update_meta(root, {"prices_version": "2020-01-01"})
+    pricestoml.update_meta(root, {"prices_version": "2020-01-01"},
+                          target=pricestoml.prices_meta_target(root))
     assert cli.main(["prices", "sync"]) == 0
     assert "bundled prices are newer (" in capsys.readouterr().out
     assert cli.main(["prices", "sync", "--update"]) == 0
-    assert "[meta] restamped" in capsys.readouterr().out
+    assert "[meta] prices_version restamped" in capsys.readouterr().out
     assert cli.main(["prices", "sync"]) == 0
     assert "bundled prices are newer (" not in capsys.readouterr().out
     from cage import policy

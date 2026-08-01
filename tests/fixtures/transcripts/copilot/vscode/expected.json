@@ -22,7 +22,8 @@
       "ok": true,
       "retries": 0,
       "scope": "",
-      "project": ""
+      "project": "",
+      "surface": "vscode"
     }
   ]
 }

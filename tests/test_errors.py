@@ -18,7 +18,7 @@ import io
 
 import pytest
 
-from cage import cli, clicmds, hooks, ledger, mcpserver, metering
+from cage import cli, clicmds, ledger, mcpserver, metering
 from cage.errors import CageError
 
 
@@ -149,13 +149,6 @@ def test_meter_does_not_swallow_user_exception(monkeypatch):
             raise ValueError("user code blew up")
 
 
-def test_hook_stop_failopen_and_traced(monkeypatch):
-    """A capture error inside the Stop hook never breaks the turn (exit 0) and is
-    surfaced via debuglog (reachable under CAGE_DEBUG) — not a silent swallow."""
-    traced = []
-    monkeypatch.setattr(hooks, "_stdin_json", lambda: {})
-    monkeypatch.setattr(hooks, "_capture_calls", _raise(RuntimeError("capture boom")))
-    monkeypatch.setattr(hooks.debuglog, "exception",
-                        lambda *a, **k: traced.append((a, k)))
-    assert hooks.stop() == 0
-    assert traced, "the Stop-hook swallow must be traceable via debuglog, not silent"
+# NB: the Stop-hook fail-open/trace test was removed with the hook machinery. The
+# fail-open-but-traced discipline on the surviving capture paths (import sweep, push
+# sites) is asserted by tests/test_debug_coverage.py.

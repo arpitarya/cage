@@ -4,10 +4,10 @@
 Scaffolds a disposable repo *beside* the cage checkout, sandboxes every agent
 home (env overrides — nothing touches the real machine), plants the sanitized
 fixture corpus (`tests/fixtures/transcripts/`) in each agent's real log
-location, and runs the scenario matrix S1–S17, printing a pass/fail table.
+location, and runs the scenario matrix S1–S18, printing a pass/fail table.
 
-Same rules as `tools/skillgen`: **stdlib-only, never imported by cage at
-runtime, never in the wheel** (`pyproject` packages only `cage*`). It shells
+Build-time only: **stdlib-only, never imported by cage at runtime, never in the
+wheel** (`pyproject` packages only `cage*`). It shells
 out to `python -m cage` exactly as a user would — no in-process shortcuts —
 so what passes here is the CLI contract, not a test double. Clocks are fine
 here (the default sandbox name is timestamped): this is a dev tool, not a
@@ -46,7 +46,7 @@ HOME_ENVS = ("CLAUDE_CONFIG_DIR", "COPILOT_HOME", "KIRO_DATA_DIR", "KIRO_HOME",
              "CAGE_VSCODE_USER")
 # Inherited cage knobs that must never leak into the sandbox.
 STRIP_ENVS = ("CAGE_BASE", "CAGE_LEDGER", "CAGE_DEBUG", "CAGE_DEBUG_LOG", "CAGE_CAPTURE",
-              "CAGE_HUMAN_RATE", "CAGE_NOTES_WRITE")
+              "CAGE_NOTES_WRITE")
 
 # Content-bearing key/marker strings that must never appear in a ledger row
 # (counts-never-content). The fixture logs deliberately carry stripped-content
@@ -399,7 +399,7 @@ def s5_compare(base: Path) -> str:
 
 
 # Seeder for S6 — history first, then the estimate→record→run→close loop happens
-# through the real CLI (`cage insights estimate --record`, `cage human outcome`), so the scenario
+# through the real CLI (`cage insights estimate --record`, `cage task outcome`), so the scenario
 # proves the shipped verbs, not library internals.
 _S6_SEED = """
 import sys
@@ -441,7 +441,7 @@ def s6_estimate(base: Path) -> str:
     if r.returncode != 0:
         raise Fail(f"S6 run-phase seeding failed: {r.stderr.strip()[:300]}")
     for tid in ("new-in-band", "new-over"):
-        expect_ok(repo, env, "human", "outcome", tid, "--label", "bugfix")
+        expect_ok(repo, env, "task", "outcome", tid, "--label", "bugfix")
     cal = expect_ok(repo, env, "insights", "calibration")
     for needle in ("n = 2 closed tasks with estimates",
                    "in-band hit-rate: 50% (1/2", "measured"):
@@ -603,106 +603,6 @@ def s9_fleet(base: Path) -> str:
             "import-never machine self-refreshed via export sweep · re-import idempotent")
 
 
-# Seeder for S10 — 5 closed tasks whose calls carry known gap_ms (2 derived
-# minutes each at the default 10-min cap) + a graphify receipt per task so
-# verdict has a tool to judge. Library-seeded like S5 (historic timestamps);
-# the transcript-capture half goes through the real `cage import`.
-_S10_SEED = """
-import sys
-from pathlib import Path
-from cage import ledger, schema, tasks
-root = Path(sys.argv[1])
-M = dict(route="chat", provider="anthropic", model="claude-opus-4-8", agent="claude-code")
-for i in range(5):
-    tid = f"attn-{i}"
-    call = schema.make_call(
-        tokens_in=1000, tokens_out=100, task=tid, session=f"s-{tid}",
-        ts=f"2026-06-1{i}T10:00:00Z", gap_ms=120000, **M)
-    ledger.append_row(root, "calls", call)
-    ledger.append_row(root, "receipts", schema.make_receipt(
-        tool="graphify", raw_alternative=1000, actual=100, task=tid,
-        call=call["id"], ts=f"2026-06-1{i}T10:00:00Z"))
-    tasks.record(root, tid, outcome="ok", ts=f"2026-06-1{i}T18:00:00Z", snapshot=False)
-"""
-
-# A synthetic Claude transcript with one known 90 s turn gap (user replies 90 s
-# after the previous assistant turn ends) — 1.5 derived minutes once imported.
-_S10_TRANSCRIPT = "\n".join((
-    '{"type":"user","cwd":"/tmp/cage-testbed","timestamp":"2026-06-20T10:00:00Z","message":{"role":"user","content":"[content stripped — counts only]"}}',
-    '{"type":"assistant","uuid":"f1a2b3c4-d5e6-0001-0000-000000000001","timestamp":"2026-06-20T10:00:05Z","cwd":"/tmp/cage-testbed","message":{"role":"assistant","model":"claude-opus-4-8","content":[{"type":"text","text":"[content stripped — counts only]"}],"usage":{"input_tokens":100,"output_tokens":10}}}',
-    '{"type":"user","cwd":"/tmp/cage-testbed","timestamp":"2026-06-20T10:01:35Z","message":{"role":"user","content":"[content stripped — counts only]"}}',
-    '{"type":"assistant","uuid":"e9d8c7b6-a5f4-0002-0000-000000000002","timestamp":"2026-06-20T10:01:40Z","cwd":"/tmp/cage-testbed","message":{"role":"assistant","model":"claude-opus-4-8","content":[{"type":"text","text":"[content stripped — counts only]"}],"usage":{"input_tokens":200,"output_tokens":20}}}',
-)) + "\n"
-
-
-def s10_attention(base: Path) -> str:
-    """S10 — derived human attention (plan §4.10): a seeded transcript with a known
-    turn gap imports to exact derived minutes; seeded gap_ms tasks show exact minutes
-    in human/compare/verdict (with --agent-only suppression); attesting a task proves
-    the attested-beats-derived precedence; calibration --human scores the heuristic
-    exactly; the derived view is byte-identical across runs."""
-    repo, env = make_sandbox(base, "s10-attention")
-    expect_ok(repo, env, "setup", "--project-only", "--no-graphify")
-    # transcript capture through the real import path (90 s gap → 1.5 min)
-    tdir = Path(env["CLAUDE_CONFIG_DIR"]) / "projects" / "-tmp-cage-testbed"
-    tdir.mkdir(parents=True, exist_ok=True)
-    (tdir / "session-s10gap.jsonl").write_text(_S10_TRANSCRIPT, encoding="utf-8")
-    expect_ok(repo, env, "import")
-    r = _sh([sys.executable, "-c", _S10_SEED, str(repo)], cwd=repo, env=env)
-    if r.returncode != 0:
-        raise Fail(f"S10 seeding failed: {r.stderr.strip()[:300]}")
-
-    # derived minutes exact in cage human: 5 tasks × 2 min + 1.5 min transcript
-    hum = expect_ok(repo, env, "human", "show")
-    for needle in ("derived attention", "derived (turn-gaps, capped)", "cap 10 min",
-                   "11.5", "never summed"):
-        if needle not in hum:
-            raise Fail(f"cage human missing {needle!r}")
-    if expect_ok(repo, env, "human", "show") != hum:
-        raise Fail("cage human not byte-identical across two runs")
-
-    # compare: total-cost line over the 5 closed tasks (10 derived min @ $80/hr)
-    cmp_out = expect_ok(repo, env, "insights", "compare")
-    for needle in ("total cost: agent", "human 10 min × $80/hr",
-                   "derived (turn-gaps, capped) 10 min"):
-        if needle not in cmp_out:
-            raise Fail(f"cage insights compare missing {needle!r}")
-    if "total cost" in expect_ok(repo, env, "insights", "compare", "--agent-only"):
-        raise Fail("--agent-only did not suppress the compare total-cost line")
-
-    # verdict: composes the same axis ledger-wide (10 + 1.5 loose transcript minutes)
-    vd = expect_ok(repo, env, "insights", "verdict", "graphify")
-    for needle in ("graphify is SAVING", "human 11.5 min × $80/hr"):
-        if needle not in vd:
-            raise Fail(f"cage insights verdict missing {needle!r}")
-    if "total cost" in expect_ok(repo, env, "insights", "verdict", "graphify", "--agent-only"):
-        raise Fail("--agent-only did not suppress the verdict total-cost line")
-
-    # attest one task → attested (4 min) beats derived (2 min), reference kept
-    expect_ok(repo, env, "human", "outcome", "attn-0", "--minutes", "4")
-    cmp2 = expect_ok(repo, env, "insights", "compare")
-    for needle in ("human 12 min × $80/hr",       # 4 attested + 4×2 derived
-                   "attested 4 min", "never summed",
-                   "derived ref on attested tasks: 2 min (not summed)"):
-        if needle not in cmp2:
-            raise Fail(f"post-attest compare missing {needle!r}")
-
-    # attest the rest → calibration --human scores derived/attested = 2/4 exactly
-    for i in range(1, 5):
-        expect_ok(repo, env, "human", "outcome", f"attn-{i}", "--minutes", "4")
-    cal = expect_ok(repo, env, "insights", "calibration", "--human")
-    for needle in ("n = 5 tasks with both", "derived/attested ratio: median 0.5",
-                   "IQR 0.5–0.5", "measured"):
-        if needle not in cal:
-            raise Fail(f"calibration --human missing {needle!r}")
-    below = expect_ok(repo, env, "insights", "calibration", "--human")
-    if below != cal:
-        raise Fail("calibration --human not byte-identical across two runs")
-    assert_pii_clean(repo)
-    return ("transcript gap → 1.5 min · tasks exact 10 min · attested beats derived · "
-            "ratio 0.5 exact · --agent-only clean")
-
-
 # Seeder for S11 — the field-report shape: an empty-provider router key
 # (`copilot/auto`, what the VS Code Copilot store stamps) and an unknown-vendor
 # model, both genuinely UNPRICED (no est_cost_usd — transcript calls carry none).
@@ -836,10 +736,11 @@ def s8_determinism(base: Path) -> str:
 
 
 def s12_launcher(base: Path) -> str:
-    """S12 — python-launcher wiring mode (docs/restricted-environments.md): the flag
-    persists to policy; nothing exe-shaped in any wired file; a flagless re-run
-    preserves the mode byte-identically; the shim resolves via the interpreter;
-    doctor names the mode."""
+    """S12 — python-launcher wiring mode (restricted endpoints): the flag persists to
+    policy; nothing exe-shaped in any wired file; a flagless re-run preserves the mode
+    byte-identically; the shim resolves via the interpreter; doctor names the mode.
+    (Hookless: only the committed shim + the per-machine kiro MCP entry carry the
+    launcher form now — the copilot/git-hook files are no longer written.)"""
     repo, env = make_sandbox(base, "s12-launcher")
     expect_ok(repo, env, "setup", "--project-only", "--no-graphify")
     expect_ok(repo, env, "setup", "--wire-only", "--all", "--python-launcher")
@@ -848,9 +749,7 @@ def s12_launcher(base: Path) -> str:
         raise Fail("[wiring] python_launcher = true not persisted in policy.toml")
     wired = [repo / ".cage" / "bin" / "cage-run",
              repo / ".cage" / "bin" / "cage-run.cmd",
-             repo / ".kiro" / "settings" / "mcp.json",
-             repo / ".git" / "hooks" / "post-commit",
-             Path(env["COPILOT_HOME"]) / "hooks" / "cage.json"]
+             repo / ".kiro" / "settings" / "mcp.json"]
     for f in wired:
         text = f.read_text(encoding="utf-8")
         for shape in ("cage.exe", "command -v cage", "where cage", ".local/bin/cage"):
@@ -1015,44 +914,44 @@ p.write_text(p.read_text(encoding="utf-8") + '\\n[prices]\\nstale_days = 0\\n',
 
 def s15_freshness(base: Path) -> str:
     """S15 — pricing freshness (plan §3.3): a backdated project [meta] puts the
-    staleness note on the post-commit surface (driven via `cage hook-post-commit`,
-    the exact command the installed git hook runs — S12 covers the hook file
-    itself); `sync --update` silences it; the report footer ages the bundle
-    data-relatively (newest ledger ts, exact N, byte-identical); `stale_days = 0`
-    opts out and, as a scalar under [prices], must never crash provider iteration."""
+    staleness note on the `cage report` footer (the surviving surface — the
+    post-commit hook was removed with the hook machinery); `sync --update` silences
+    it; the footer ages the bundle data-relatively (newest ledger ts, exact N,
+    byte-identical); `stale_days = 0` opts out and, as a scalar under [prices], must
+    never crash provider iteration."""
     repo, env = make_sandbox(base, "s15-freshness")
     expect_ok(repo, env, "setup", "--project-only", "--no-graphify")
 
-    # 1. fresh init → no sync signal on the post-commit surface
-    if "bundled prices are newer (" in expect_ok(repo, env, "hook-post-commit"):
-        raise Fail("post-commit shows a sync note on a freshly-initialized project")
-
-    # 2. backdated [meta] → the note appears, cage:-prefixed and runnable
-    r = _sh([sys.executable, "-c", _S11_BACKDATE, str(repo)], cwd=repo, env=env)
-    if r.returncode != 0:
-        raise Fail(f"S15 meta backdate failed: {r.stderr.strip()[:300]}")
-    hook = expect_ok(repo, env, "hook-post-commit")
-    if "cage: bundled prices are newer (" not in hook or "cage prices sync" not in hook:
-        raise Fail(f"post-commit missing the staleness note: {hook[:200]!r}")
-
-    # 3. sync --update restamps → the note disappears (silent when clean)
-    expect_ok(repo, env, "prices", "sync", "--update")
-    if "bundled prices are newer (" in expect_ok(repo, env, "hook-post-commit"):
-        raise Fail("staleness note survived `prices sync --update`")
-
-    # 4. data-relative bundle age in the report footer: a call 100 days past the
-    # bundled prices_date → exact N=100, no wall clock, byte-identical
+    # Seed a call first — the report footer (the freshness surface now that the
+    # post-commit hook is gone) only renders when the ledger has a table to show.
     r = _sh([sys.executable, "-c", _S15_SEED, str(repo)], cwd=repo, env=env)
     if r.returncode != 0:
         raise Fail(f"S15 seeding failed: {r.stderr.strip()[:300]}")
+
+    # 1. backdated [meta] → the sync note appears on the report footer, ·-prefixed and
+    #    runnable (a fresh, synced project emits none — the footer stays silent).
+    r = _sh([sys.executable, "-c", _S11_BACKDATE, str(repo)], cwd=repo, env=env)
+    if r.returncode != 0:
+        raise Fail(f"S15 meta backdate failed: {r.stderr.strip()[:300]}")
+    rep = expect_ok(repo, env, "report")
+    if "bundled prices are newer (" not in rep or "cage prices sync" not in rep:
+        raise Fail(f"report footer missing the staleness note: {rep[-300:]!r}")
+
+    # 2. sync --update restamps → the note disappears (silent when clean)
+    expect_ok(repo, env, "prices", "sync", "--update")
+    if "bundled prices are newer (" in expect_ok(repo, env, "report"):
+        raise Fail("staleness note survived `prices sync --update`")
+
+    # 3. data-relative bundle age in the report footer: the seeded call is 100 days
+    # past the bundled prices_date → exact N=100, no wall clock, byte-identical
     rep = expect_ok(repo, env, "report")
     if "· bundled prices are 100 days old — check for a newer cage release" not in rep:
         raise Fail(f"report footer missing the data-relative age line: {rep[-300:]!r}")
     if expect_ok(repo, env, "report") != rep:
         raise Fail("report with freshness footer not byte-identical across two runs")
-    # the seeded unpriced call also puts the UNPRICED hint on the hook surface
-    if "UNPRICED" not in expect_ok(repo, env, "hook-post-commit"):
-        raise Fail("post-commit missing the UNPRICED hint for an unpriced call")
+    # the seeded unpriced call surfaces the UNPRICED ⚠ on the money view
+    if "UNPRICED" not in expect_ok(repo, env, "report", "--usd"):
+        raise Fail("report --usd missing the UNPRICED hint for an unpriced call")
 
     # 5. stale_days = 0 opts the age signal out — and, being a scalar under
     # [prices], must not crash prices list/sync (the hardened iteration sites)
@@ -1064,7 +963,7 @@ def s15_freshness(base: Path) -> str:
     expect_ok(repo, env, "prices", "list")   # scalar under [prices] must not crash
     expect_ok(repo, env, "prices", "sync")
     assert_pii_clean(repo)
-    return ("backdated meta → cage:-prefixed note · sync silences it · "
+    return ("backdated meta → report-footer note · sync silences it · "
             "data-relative 100-day footer exact + byte-identical · stale_days=0 opt-out")
 
 
@@ -1135,12 +1034,10 @@ def s16_policy_sync(base: Path) -> str:
         raise Fail("policy diff not byte-identical across two runs")
     if "bundled policy defaults are newer" not in expect_ok(repo, env, "doctor"):
         raise Fail("doctor missing the policy-version recommendation")
-    if "cage policy sync" not in expect_ok(repo, env, "hook-post-commit"):
-        raise Fail("post-commit note missing the policy sync hint")
 
     # 2. behavior-neutrality: --apply changes no derived view by one byte
     views = [("report",), ("report", "--by", "model"), ("insights", "attrib"),
-             ("insights", "budget"), ("human", "show"), ("insights", "trend")]
+             ("insights", "budget"), ("task", "quality")]
     before = [expect_ok(repo, env, *v) for v in views]
     applied = expect_ok(repo, env, "policy", "sync", "--apply")
     for needle in ("✔ [capture] import_before_export = true added",
@@ -1164,11 +1061,9 @@ def s16_policy_sync(base: Path) -> str:
     # 4. hints flip clean; the hand edit survives in the merged view
     if "project policy defaults are current" not in expect_ok(repo, env, "doctor"):
         raise Fail("doctor still stale after apply")
-    if "cage policy sync" in expect_ok(repo, env, "hook-post-commit"):
-        raise Fail("post-commit policy hint survived the apply")
     assert_pii_clean(repo)
     return ("v0.16 shape → add(3) exact · hand edit kept · apply neutral to the "
-            "byte · second apply no-op · doctor/hook hints flip clean")
+            "byte · second apply no-op · doctor hint flips clean")
 
 
 # id → (phase that ships it, callable or None-if-pending)
@@ -1228,13 +1123,14 @@ def s18_stale_wiring(base: Path) -> str:
     expect_ok(repo, env, "setup", "--project-only", "--no-graphify")
     expect_ok(repo, env, "setup", "--wire-only", "--all")
 
-    # Plant the two real historical forms + a stale graphify interceptor, exactly as
-    # v0.27 left them on a real machine.
+    # Plant a pre-removal Claude hook + a stale graphify interceptor, exactly as v0.27
+    # left them on a real machine. Hookless setup no longer writes `.claude/settings.json`
+    # (MCP goes in `.mcp.json`), so create the stale file directly — the heal must strip it.
     settings = repo / ".claude" / "settings.json"
-    data = json.loads(settings.read_text(encoding="utf-8"))
-    data["hooks"]["SessionStart"] = [{"hooks": [
-        {"type": "command", "command": "/old/bin/cage import-claude --project ."}]}]
-    settings.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    settings.parent.mkdir(parents=True, exist_ok=True)
+    settings.write_text(json.dumps({"hooks": {"SessionStart": [{"hooks": [
+        {"type": "command", "command": "/old/bin/cage import-claude --project ."}]}]}},
+        indent=2) + "\n", encoding="utf-8")
     bin_dir = repo / "bin"
     bin_dir.mkdir(exist_ok=True)
     (bin_dir / "graphify").write_text(
@@ -1254,10 +1150,10 @@ def s18_stale_wiring(base: Path) -> str:
 
     expect_ok(repo, env, "setup", "--wire-only", "--all")
     body = settings.read_text(encoding="utf-8")
+    # Hookless heal: a stale cage hook entry is STRIPPED, not rewritten to the current
+    # verb (cage no longer wires hooks) — so the dead verb must be gone entirely.
     if "import-claude" in body:
-        raise Fail("re-running setup did not heal the dead verb")
-    if "import --agent claude" not in body:
-        raise Fail("heal dropped the backfill instead of rewriting it")
+        raise Fail("re-running setup did not strip the dead cage hook")
     shim = (bin_dir / "graphify").read_text(encoding="utf-8")
     if "cage data graphify" not in shim:
         raise Fail("re-running setup did not refresh the stale graphify interceptor")
@@ -1284,7 +1180,6 @@ SCENARIOS: dict[str, tuple[str, object]] = {
     "S8": ("P0", s8_determinism),
     "S11": ("pricing", s11_prices),
     "S9": ("P5", s9_fleet),
-    "S10": ("attention", s10_attention),
     "S12": ("restricted", s12_launcher),
     "S13": ("restricted", s13_pyz),
     "S14": ("pricing", s14_receipt_ladder),
@@ -1295,13 +1190,10 @@ SCENARIOS: dict[str, tuple[str, object]] = {
 }
 
 MANUAL_CHECKLIST = """\
-MANUAL steps (need a live agent — run per docs/archive/v0.16-dummy-repo-test.plan.md §3/§4/§7):
-  [ ] §3 per CLI agent: one real prompt → `cage report` shows the row live (hook fired)
-  [ ] §3 same prompt twice → deduped, no double count
-  [ ] §4 per VS Code extension: one real prompt → NO row before `cage import`
-      (hooks silent under the extension), row appears after `cage import`
-  [ ] §7 agent edit + commit → post-commit resolves a `hooked` provenance row;
-      `cage authorship origin <sha>` names the agent\
+MANUAL steps (need a live agent — capture is pull-based, so a `cage import` is the trigger):
+  [ ] per agent: one real prompt → `cage import` then `cage report` shows the row
+  [ ] same prompt, import twice → deduped, no double count (cursor + id-dedupe)
+  [ ] per VS Code extension: one real prompt → row appears after `cage import`\
 """
 
 

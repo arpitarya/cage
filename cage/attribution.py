@@ -4,6 +4,11 @@ Each receipt already reports its *marginal* saving given the tools upstream of i
 in the canonical order, so the sum of marginals equals the total with no overlap.
 This module orders a task's receipts by `policy.tools.order`, converts token
 savings to USD at the task's model price, and tags each row's `method`.
+
+**Every figure here is GROSS** (`netsaved.GROSS_NOTE`): the avoided read cost, with the
+cost of *using* each tool excluded. Marginality is about overlap *between* tools, not
+about a tool's own cost of use — a marginal saving can be large and the tool still make
+the task more expensive. `cage insights verdict <tool>` carries the net.
 """
 from __future__ import annotations
 
@@ -63,7 +68,7 @@ def attribute(root: Path, task: str, pol: dict, scope: str | None = None,
         if t is not None:
             all_calls, all_receipts = t["calls"], t["receipts"]
     rcpts = [r for r in ledger.by_scope(ledger.by_task(all_receipts, task), scope)
-             if r.get("tool") != "human"]
+             if r.get("tool") != "human" and r.get("unit") != "minutes"]
     rows = receipts_by_tool(rcpts, list(pol.get("tools", {}).get("order", [])))
     calls_by_id = {c.get("id"): c for c in all_calls}
     idx = receiptprice.build(all_calls, all_receipts)  # once per view (§4.5)
@@ -102,7 +107,8 @@ def render_csv(data: dict) -> str:
     two renderers). Per-step method + confidence are columns — the worst-case
     provenance survives into the spreadsheet. Column contract in docs/csv-output.md."""
     from cage import csvout
-    head = ["tool", "saved_tokens", "saved_usd", "method", "confidence", "priced_via"]
+    head = ["tool", "gross_saved_tokens", "gross_saved_usd", "method", "confidence",
+            "priced_via"]
     rows = [[s["tool"], s["saved_tokens"], s["saved_usd"], s["method"], s["confidence"],
              s.get("priced_via", "")]
             for s in data["steps"]]
@@ -126,7 +132,7 @@ def render_attrib(data: dict) -> str:
     if any(s.get("priced_via") == "unpriced" for s in data["steps"]):
         total_usd += " (+ unpriced)"
     rows.append(["TOTAL", render.tok(data["total_saved_tokens"]), total_usd, ""])
-    body = render.table(["tool", "saved tok", "saved $", "method"], rows, rights={1, 2})
+    body = render.table(["tool", "gross tok", "gross $", "method"], rows, rights={1, 2})
     where = f"{data['provider']}/{data['model']}" if data["model"] else "unpriced model"
     out = f"Marginal attribution · task {data['task']!r} · {where}\n\n{body}"
     notes = [receiptprice.footnote(s["priced_via"], s["tool"], s["priced_model"])
@@ -134,4 +140,5 @@ def render_attrib(data: dict) -> str:
              if s.get("priced_via") in (receiptprice.PRICE_AT, receiptprice.TASK_MODEL)]
     if notes:
         out += "\n" + "\n".join(f"  {n}" for n in notes)
-    return out
+    from cage import netsaved  # K: the gross exclusion, in the one shared phrasing
+    return out + "\n" + netsaved.GROSS_NOTE

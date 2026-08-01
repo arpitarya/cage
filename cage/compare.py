@@ -21,7 +21,7 @@ from __future__ import annotations
 import statistics
 from pathlib import Path
 
-from cage import attention, ledger, prices, render, taskgroup
+from cage import ledger, prices, render, taskgroup
 from cage.constants import MIN_COMPARE_N
 from cage.report import unpriced_line
 
@@ -37,13 +37,8 @@ def _dist(vals: list[float]) -> dict:
 
 
 def summarize(root: Path, pol: dict, *, by: tuple[str, ...] = ("stack",),
-              scope: str | None = None, label: str | None = None,
-              agent_only: bool = False) -> dict:
-    """The deterministic data payload behind the table (and ``--json``).
-
-    Unless ``agent_only``, a ``total_cost`` block (plan §4.10) totals the filtered
-    task set as agent $ + human attention minutes × rate — attested beats derived
-    per task (never summed), tagged with the human component's method."""
+              scope: str | None = None, label: str | None = None) -> dict:
+    """The deterministic data payload behind the table (and ``--json``)."""
     rows = taskgroup.stats(root, pol)
     if scope:
         rows = [r for r in rows if r["scope"] == scope]
@@ -84,9 +79,6 @@ def summarize(root: Path, pol: dict, *, by: tuple[str, ...] = ("stack",),
     d = {"by": list(keys), "min_n": MIN_COMPARE_N, "groups": groups,
          "deltas": deltas, "caveat": CAVEAT,
          "unpriced_detail": unpriced_detail(root, pol)}
-    if not agent_only and rows:
-        att = attention.resolve(root, pol, task_ids=[r["task"] for r in rows])
-        d["total_cost"] = attention.total_cost(sum(r["usd"] for r in rows), att, pol)
     return d
 
 
@@ -150,7 +142,7 @@ def render_csv(d: dict) -> str:
 
 def render_compare(d: dict) -> str:
     if not d["groups"]:
-        return ("No closed tasks to compare — close tasks with `cage human outcome <task>` "
+        return ("No closed tasks to compare — close tasks with `cage task outcome <task>` "
                 "(optionally `--label <word>`), then re-run `cage insights compare`.")
     keys = d["by"]
     headers = [*keys, "n", "median tok", "IQR tok", "median $", "IQR $"]
@@ -184,8 +176,6 @@ def render_compare(d: dict) -> str:
                else "no eligible non-baseline group")
         out.append("")
         out.append(f"no delta: {why} (each side needs n ≥ {d['min_n']}).")
-    if "total_cost" in d:  # plan §4.10 — suppressed by --agent-only
-        out += ["", attention.render_total_cost(d["total_cost"])]
     if d.get("unpriced_detail"):
         out += ["", unpriced_line(d["unpriced_detail"])]
     return "\n".join(out)

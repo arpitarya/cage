@@ -81,7 +81,7 @@ def render_estimate(d: dict, recorded: str = "") -> str:
     head = f"Estimate · {_keyline(d['keys'])}"
     if not d["ok"]:
         return (f"{head}\n\n{d['reason']}\n"
-                "close more matching tasks (`cage human outcome <task>`) or widen the keys.")
+                "close more matching tasks (`cage task outcome <task>`) or widen the keys.")
     t, u = d["tokens"], d["usd"]
     lines = [head, "",
              f"  n = {d['n']} matching closed tasks",

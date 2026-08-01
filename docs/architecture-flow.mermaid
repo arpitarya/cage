@@ -1,0 +1,60 @@
+%% cage — the one-way data flow (capture → append-only ledger → deterministic derive → read/export)
+%% Maintained: update when a stage, sink, or read surface changes (see DOC-REGISTRY.md).
+%% Mirrors the Architecture section of CLAUDE.md and docs/cage-plan.md §3–§5.
+flowchart TD
+    subgraph capture["Capture — pull-based & global (ADR 0002)"]
+        agents["Agent logs<br/>Claude Code · Copilot · Kiro"]
+        meter["meter() / proxy / transcript<br/>(fail-open, best-effort)"]
+        imp["cage import / export<br/>(resolved ledger, incremental cursors)"]
+        agents --> meter
+        agents --> imp
+    end
+
+    subgraph ledger["Append-only ledger — .cage/ (month-partitioned JSONL; counts, never prompt text)"]
+        calls["calls-YYYY-MM.jsonl"]
+        receipts["receipts-YYYY-MM.jsonl"]
+        tasks["tasks-YYYY-MM.jsonl"]
+        credits["credits-YYYY-MM.jsonl<br/>(kiro CLI — cwd-scoped)"]
+        prov["provenance.jsonl<br/>(local buffer)"]
+    end
+
+    machine["Machine ledger — ~/.cage<br/>kiro IDE rows only (ADR 0006)<br/>one copy per machine"]
+
+    meter --> calls
+    meter --> receipts
+    imp --> calls
+    imp --> receipts
+    imp --> tasks
+    imp --> credits
+    imp -. "kiro IDE: no project in the source<br/>(unless --ledger names a sink)" .-> machine
+
+    policy["cage.toml<br/>order · budgets · routing<br/>+ prices.toml"]
+
+    subgraph derive["Derive — $0, deterministic, no model, no network"]
+        d1["report · attrib · matrix · budget · roi"]
+        d2["compare · verdict · why · origin"]
+        d3["--scope · --project · --team · compare · verdict"]
+    end
+
+    calls --> derive
+    receipts --> derive
+    tasks --> derive
+    policy --> derive
+
+    subgraph read["Read / export surfaces"]
+        cli["CLI (typed errors, exit 1)"]
+        mcp["MCP server (every agent)"]
+        csv["--csv / data export"]
+    end
+
+    derive --> read
+
+    subgraph ci["CI-sole-writer aggregation (union-by-id)"]
+        nledger["refs/notes/cage-ledger — team view (ADR 0001)"]
+        nprov["refs/notes/cage-provenance — authorship"]
+    end
+
+    calls -. ledger-sync (CI only) .-> nledger
+    receipts -. ledger-sync (CI only) .-> nledger
+    prov -. notes-sync (CI only) .-> nprov
+    nledger -. --team .-> derive

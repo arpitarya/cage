@@ -1,9 +1,12 @@
-"""`cage human outcome` / `cage human quality` — quality-adjusted cost (plan §8.2).
+"""`cage task outcome` / `cage task quality` — quality-adjusted cost (plan §8.2).
 
 Cost is dishonest alone — you can "save" by degrading answers and paying for the
-human redo. Pair every task with the `quality.signal` (did it succeed without a
-redo?) and report **cost per *successful* task** — the metric that stops false
-economies. Outcomes live in `.cage/outcomes.json` (task → ok | redo).
+redo. Pair every task with the `quality.signal` (did it succeed without a redo?)
+and report **cost per *successful* task** — the metric that stops false economies.
+Outcomes live in `.cage/outcomes.json` (task → ok | redo).
+
+Nothing here belongs to the removed Tier-1 human axis; these two verbs merely
+lived under the `human` command group until v0.36 (see `cli.py`'s `task` group).
 """
 from __future__ import annotations
 

@@ -1,83 +1,24 @@
-"""Wire Cage into Claude Code: Stop/SessionStart/SessionEnd hooks + the MCP server.
+"""Wire Cage into Claude Code: the MCP read server (`.mcp.json`).
 
-Hooks go in the project `.claude/settings.json`. Three complementary capture paths,
-all idempotent (`cage import` dedupes by turn uuid), so running them together never
-double-counts:
+Hook wiring was removed with the hook machinery — capture is **pull-based**
+(`cage import` / capture-on-read), which needs no hooks and works identically
+under the CLI and the VS Code extension. `install` still *heals*: any stale
+cage hook entries a previous version wrote into `.claude/settings.json` are
+stripped (foreign hooks are never touched), so old wiring can't fire dead
+`cage hook-*` verbs.
 
-- **Stop** (`cage hook-stop`) is the **real-time** path: it fires when Claude finishes
-  each turn and imports that turn's tokens immediately — no wait for session end.
-- **SessionStart** backfills the previous Claude session (`cage import --agent
-  claude --project .`), then prints the spend banner (`cage hook-session-start`). Claude only —
-  each agent captures its own data via its own wire file; this never imports another
-  agent's logs.
-- **SessionEnd** (`cage hook-session-end`) stays wired too, but it is best-effort:
-  Claude Code only fires it on certain clean terminations, never on a kill/crash/idle.
-
-The MCP read server goes in the project `.mcp.json`. All edits are idempotent.
-
-**Portability (plan §5):** both files this module writes are committed to git, so
-neither may carry the wiring machine's absolute cage path — commands reference the
-committed shim `.cage/bin/cage-run` (`cage/runshim.py`) instead. Per-host mechanism,
-verified against the Claude Code docs (hooks.md / mcp.md, 2026-07):
-
-- hooks: `"$CLAUDE_PROJECT_DIR/.cage/bin/cage-run"` — `${CLAUDE_PROJECT_DIR}` is a
-  documented hook path placeholder (hook cwd is only "Claude Code's working
-  directory", NOT guaranteed to be the project root — the placeholder is the
-  reliable form). Shell-form commands run via `sh`, so the quoting is POSIX.
-- `.mcp.json`: `${CLAUDE_PROJECT_DIR:-.}/.cage/bin/cage-run` — env expansion in
-  `command` is documented, and the docs *require* the `:-.` default here because
-  the variable is set in the spawned server's env, not the config parser's.
-
-A bare `cage` (the pre-shim reason for absolute paths) still fails in GUI-launched
-agents whose PATH omits ~/.local/bin — the shim carries that resolution at runtime
-now, identically on every clone. `_heal` migrates legacy absolute/bare entries to
-the shim form on re-setup and reports the count.
+**Portability (plan §5):** `.mcp.json` is committed to git, so it never carries
+the wiring machine's absolute cage path — the command references the committed
+shim `.cage/bin/cage-run` (`cage/runshim.py`) via the documented
+`${CLAUDE_PROJECT_DIR:-.}` env expansion (the `:-.` default is required: the
+variable is set in the spawned server's env, not the config parser's).
 """
 from __future__ import annotations
 
 import json
 from pathlib import Path
 
-from cage import paths, runshim, wiringscan
-
-
-def _shim() -> str:
-    # Quoted whole: $CLAUDE_PROJECT_DIR may expand to a path with spaces.
-    return f'"$CLAUDE_PROJECT_DIR/{runshim.SHIM_REL}"'
-
-
-# SessionStart runs in order: backfill the previous Claude session, *then* print
-# the banner.
-def BACKFILL() -> str:  # noqa: N802 — kept callable-named for the wiring it feeds
-    return f"{_shim()} import --agent claude --project ."
-
-
-def BANNER() -> str:  # noqa: N802
-    return f"{_shim()} hook-session-start"
-
-
-# Stop = real-time per-turn capture; SessionEnd = clean-exit backstop; PostToolUse =
-# provenance edit buffer. All additive and idempotent (deduped by command/uuid).
-def _simple() -> dict:
-    c = _shim()
-    return {"Stop": f"{c} hook-stop",
-            "SessionEnd": f"{c} hook-session-end",
-            "PostToolUse": f"{c} hook-post-tool-use"}
-
-
-def _reref(command: str) -> str | None:
-    """A cage command (binary or shim form) rewritten to the current shim reference
-    **and the current verb**; None for a foreign hook. Idempotent on the current form —
-    healing a healed file changes nothing.
-
-    Two migrations in one pass: the executable becomes the committed shim (plan §5),
-    and a verb renamed in v0.28.0 becomes its replacement (`wiringscan.heal_tail`, via
-    `verbmap.REMOVED`). A dead verb with no known replacement is left exactly as it is —
-    heal never guesses a tail; `cage doctor` reports it instead."""
-    tail = paths.cage_command_tail(command)
-    if tail is None:
-        return None
-    return f"{_shim()} {wiringscan.heal_tail(tail)}".rstrip()
+from cage import paths, runshim
 
 
 def _load(path: Path) -> dict:
@@ -94,122 +35,60 @@ def _save(path: Path, data: dict) -> None:
     path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
 
 
-def _has(entries: list, command: str) -> bool:
-    return any(h.get("command") == command
-              for e in entries for h in e.get("hooks", []))
-
-
-def _entry(command: str) -> dict:
-    return {"hooks": [{"type": "command", "command": command}]}
-
-
-def _is_ours(command: str) -> bool:
-    """A cage backfill entry this slot owns: a live `import …` in any form, **or** any
-    cage command whose verb the parser rejects (a v0.28-orphaned `import-claude`).
-
-    The union replaces the old `" import" in command` substring test, which healed
-    `import-claude` only because that string happens to contain `" import"`. Same
-    commands healed, non-accidental reason — see tests/test_wiringscan.py."""
-    return (paths.is_cage_import_command(command)
-            or wiringscan.is_dead_cage_command(command))
-
-
-def _wire_session_start(entries: list) -> None:
-    """Ensure the backfill precedes the banner, idempotently.
-
-    Drops **every** cage backfill entry — current ones included — then re-inserts one
-    at the front. Dropping unconditionally is what makes the order deterministic: once
-    `_reref` heals a dead verb in place, a stale `import-claude` becomes byte-identical
-    to the current backfill, so a "drop only if superseded" rule would leave it wherever
-    it sat (after the banner, if that's where it was) and silently invert the order."""
-    bf = BACKFILL()
-    for e in entries:
-        e["hooks"] = [h for h in e.get("hooks", [])
-                      if not _is_ours(h.get("command", ""))]
-    entries[:] = [e for e in entries if e.get("hooks")]
-    entries.insert(0, _entry(bf))
-    if not _has(entries, BANNER()):
-        entries.append(_entry(BANNER()))
-
-
-def _heal(hooks: dict) -> int:
-    """Rewrite any legacy cage hook command (bare `cage …` or a machine-absolute
-    path) to the committed shim reference, and drop duplicate cage entries so
-    re-running setup never accumulates them. Returns how many commands were
-    migrated (0 on an already-portable file — setup twice stays byte-identical).
-    Foreign (non-cage) hooks are never touched."""
-    migrated = 0
-    for event, entries in hooks.items():
-        seen: set[str] = set()
+def _strip_stale_hooks(root: Path) -> int:
+    """Remove every cage-owned hook entry from `.claude/settings.json` (previous
+    versions wired Stop/SessionStart/SessionEnd/PostToolUse there). Foreign hooks
+    are never touched; an empty `hooks` table is left as `{}` (harmless).
+    Returns how many entries were removed. Fail-open: an unreadable file is
+    left alone."""
+    settings = root / ".claude" / "settings.json"
+    if not settings.exists():
+        return 0
+    data = _load(settings)
+    hooks = data.get("hooks")
+    if not isinstance(hooks, dict):
+        return 0
+    removed = 0
+    for event, entries in list(hooks.items()):
         kept = []
         for e in entries:
-            new = []
-            for h in e.get("hooks", []):
-                fixed = _reref(h.get("command", ""))
-                if fixed is not None:
-                    if fixed in seen:
-                        continue
-                    seen.add(fixed)
-                    if fixed != h.get("command"):
-                        migrated += 1
-                    h["command"] = fixed
-                new.append(h)
-            if new or not e.get("hooks"):
-                e["hooks"] = new
+            cmds = [h for h in e.get("hooks", [])
+                    if paths.cage_command_tail(h.get("command", "")) is None]
+            removed += len(e.get("hooks", [])) - len(cmds)
+            if cmds:
+                e["hooks"] = cmds
                 kept.append(e)
         hooks[event] = kept
-    return migrated
+        if not kept:
+            del hooks[event]
+    if removed:
+        _save(settings, data)
+    return removed
 
 
 def install(root: Path, *, python_launcher: bool = False) -> dict:
     # python_launcher is accepted for the uniform wire-module contract but unused:
-    # every Claude file here is committed and references the committed shim — the
-    # shim variant (written by agents.install) *is* the mode.
+    # the committed `.mcp.json` references the committed shim — the shim variant
+    # (written by agents.install) *is* the mode.
     del python_launcher
-    settings = root / ".claude" / "settings.json"
-    data = _load(settings)
-    hooks = data.setdefault("hooks", {})
-    migrated = _heal(hooks)
-    _wire_session_start(hooks.setdefault("SessionStart", []))
-    for event, command in _simple().items():
-        entries = hooks.setdefault(event, [])
-        if not _has(entries, command):
-            entries.append(_entry(command))
-    _save(settings, data)
-
     mcp = root / ".mcp.json"
     mdata = _load(mcp)
     # Documented `.mcp.json` env expansion; the `:-.` default is required (the var is
     # set in the *server's* env, not the config parser's — see the module docstring).
     portable = f"${{CLAUDE_PROJECT_DIR:-.}}/{runshim.SHIM_REL}"
     old = mdata.get("mcpServers", {}).get("cage", {}).get("command")
-    if old is not None and old != portable:
-        migrated += 1
+    migrated = 1 if (old is not None and old != portable) else 0
     mdata.setdefault("mcpServers", {})["cage"] = {"command": portable, "args": ["mcp"]}
     _save(mcp, mdata)
-    out = {"settings": str(settings), "mcp": str(mcp)}
+    stripped = _strip_stale_hooks(root)
+    out = {"mcp": str(mcp)}
     if migrated:
-        out["migrated"] = f"migrated {migrated} legacy entr{'y' if migrated == 1 else 'ies'} → shim"
+        out["migrated"] = "migrated 1 legacy entry → shim"
+    if stripped:
+        out["hooks-removed"] = f"removed {stripped} stale cage hook entr{'y' if stripped == 1 else 'ies'}"
     return out
 
 
-def _session_start(root: Path) -> list:
-    return _load(root / ".claude" / "settings.json").get("hooks", {}).get("SessionStart", [])
-
-
-def backfill_status(root: Path) -> bool:
-    """Is the reliable SessionStart-backfill capture path wired?"""
-    return _has(_session_start(root), BACKFILL())
-
-
-def realtime_status(root: Path) -> bool:
-    """Is the real-time per-turn Stop hook wired?"""
-    events = _load(root / ".claude" / "settings.json").get("hooks", {})
-    return _has(events.get("Stop", []), _simple()["Stop"])
-
-
 def status(root: Path) -> bool:
-    events = _load(root / ".claude" / "settings.json").get("hooks", {})
-    start = events.get("SessionStart", [])
-    return (_has(start, BACKFILL()) or _has(start, BANNER())
-            or any(_has(events.get(e, []), c) for e, c in _simple().items()))
+    mcp = _load(root / ".mcp.json")
+    return "cage" in mcp.get("mcpServers", {})

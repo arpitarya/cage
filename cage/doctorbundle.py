@@ -35,7 +35,7 @@ DEFAULT_NAME = "cage-doctor-bundle.zip"
 # Every env override cage honors — recorded name=value when set (none carry
 # secrets; values are paths/flags/rates the user themselves configured).
 _CAGE_ENVS = ("CAGE_BASE", "CAGE_LEDGER", "CAGE_HOME", "CAGE_DEBUG", "CAGE_DEBUG_LOG",
-              "CAGE_CAPTURE", "CAGE_HUMAN_RATE", "CAGE_NOTES_WRITE", "CAGE_PYTHON",
+              "CAGE_CAPTURE", "CAGE_NOTES_WRITE", "CAGE_PYTHON",
               "CLAUDE_CONFIG_DIR", "CODEX_HOME", "COPILOT_HOME", "KIRO_HOME",
               "KIRO_DATA_DIR", "CAGE_VSCODE_USER")
 
@@ -77,9 +77,16 @@ def _policy_provenance_text(active: Path) -> str:
     """Which policy file won + which env overrides are set — provenance, not contents."""
     foot = paths.Footprint(active)
     project = foot.policy
+    prices = foot.prices
     lines = ["policy resolution (project merged over bundled default):",
-             f"  bundled default: {paths.bundled_data() / 'policy.toml'}",
-             f"  project policy:  {project} ({'present' if project.exists() else 'absent'})"]
+             f"  bundled default: {paths.bundled_data() / 'cage.toml'}",
+             f"  project config:  {project} ({'present' if project.exists() else 'absent'})",
+             f"  project prices:  {prices} ({'present' if prices.exists() else 'absent'})"]
+    if (shadowed := foot.shadowed_config) is not None:
+        lines.append(f"  ⚠ ignored leftover: {shadowed} (cage.toml wins — delete it)")
+    if (shadowed_p := foot.shadowed_prices) is not None:
+        lines.append(f"  ⚠ ignored [prices]/[credits] in {shadowed_p} "
+                     f"(prices.toml wins — remove those tables)")
     try:
         pol = policy.load(project)
         lines.append(f"  loads ok: {len(pol.get('prices', {}))} provider price table(s)")

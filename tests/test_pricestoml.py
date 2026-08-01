@@ -16,7 +16,7 @@ def root(proj):
 
 
 def _policy(root):
-    return root / ".cage" / "policy.toml"
+    return root / ".cage" / "cage.toml"
 
 
 def test_set_price_creates_file_with_managed_block(root):
@@ -87,6 +87,26 @@ def test_update_meta_inplace_outside_block(root):
     pricestoml.update_meta(root, {"prices_version": "2026-07-11"})
     _, data = pricestoml.parse(_policy(root))
     assert data["meta"]["prices_version"] == "2026-07-11"
+
+
+def test_new_key_lands_after_the_tables_own_last_line_not_before_the_next_header(root):
+    # A brand-new key inserted into an existing table must land next to its own
+    # table's content, never inside an unrelated comment block that happens to sit
+    # between the last real key and the next header (still valid TOML either way —
+    # `[meta]` stays open until `[capture]` — but confusing to read; a real cage.toml
+    # shape triggered this: `[meta]` is followed by ~20 lines of routing-decision
+    # prose introducing `[alias]`/`[capture]`).
+    _policy(root).write_text(
+        "[meta]\npolicy_version = \"0.26.0\"\n\n"
+        "# a long comment block that has nothing to do with [meta] itself\n"
+        "# describing the section below\n\n"
+        "[capture]\nenabled = true\n", encoding="utf-8")
+    pricestoml.set_table(root, ("meta",), {"cage_version": "9.9.9"}, mark_custom=False)
+    text = _policy(root).read_text()
+    lines = text.splitlines()
+    assert lines[0:3] == ["[meta]", 'policy_version = "0.26.0"', 'cage_version = "9.9.9"']
+    _, data = pricestoml.parse(_policy(root))
+    assert data["meta"] == {"policy_version": "0.26.0", "cage_version": "9.9.9"}
 
 
 def test_parse_failure_raises_cageerror(root):

@@ -90,7 +90,10 @@ def run(root: Path, *, graphify: bool = True,
     Agent wiring is opt-in: ``out["hooks"]`` appears only when ``surfaces`` names
     at least one agent. With no surface flag this scaffolds + (optionally) the
     graphify shim, but touches no agent config."""
-    out: dict[str, object] = {"init": initcmd.run(root)["footprint"]}
+    info = initcmd.run(root)
+    out: dict[str, object] = {"init": info["footprint"],
+                              "migrated_config": info.get("migrated_config"),
+                              "migrated_prices": info.get("migrated_prices")}
     if surfaces:
         out["hooks"] = agents.install(root, surfaces)
     if graphify:

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from cage import cli, demo, display, humanview, metering as meter, policy, report
+from cage import cli, demo, display, ledger, metering as meter, policy, report, schema
 
 DEMO_SPENT = 0.0483
 DEMO_SAVED = 0.1242
@@ -42,6 +42,44 @@ def test_report_by_task_render_shows_signed_net(seeded):
     assert "+$0.0759" in out         # net carries an explicit sign
 
 
+# ── G4 — the graphify day-one repo ceiling in the report footer ──────────────
+
+def _bounded_ceiling():
+    return {"ok": True, "method": "modeled", "bounded": True, "files": 249,
+            "corpus_tokens": 552159, "communities": 707, "ceiling_files": 22,
+            "ceiling_tokens": 89853, "typical_tokens": 3007}
+
+
+def test_ceiling_footer_line_shapes():
+    from cage import graphifymodel
+    assert graphifymodel.ceiling_footer_line({"ok": False}) == ""       # silent, no graph
+    line = graphifymodel.ceiling_footer_line(_bounded_ceiling())
+    assert "repo ceiling" in line and "modeled" in line
+    assert "89,853" in line and "typical ≈ 3,007" in line               # bounded band
+    unb = graphifymodel.ceiling_footer_line(
+        {"ok": True, "bounded": False, "ceiling_tokens": 552159, "typical_tokens": 552159})
+    assert "UNBOUNDED" in unb                                           # loud fallback
+
+
+def test_report_footer_shows_ceiling_when_present(seeded):
+    root, _ = seeded
+    rep = report.summarize(root, _pol(), dim="task")
+    with_c = report.render_report(rep, ceiling=_bounded_ceiling())
+    without = report.render_report(rep, ceiling=None)
+    assert "graphify repo ceiling" in with_c and "89,853" in with_c
+    assert "graphify repo ceiling" not in without                       # silent by default
+    # token-native: the ceiling shows even in the default (non-$) view
+    assert "$" not in with_c.split("graphify repo ceiling")[1].split("\n")[0]
+
+
+def test_report_csv_never_shows_ceiling(seeded):
+    """G4 recommendation implemented: the ceiling is not a row-level fact — CSV omits it
+    (render_csv takes no ceiling arg and is byte-identical regardless)."""
+    root, _ = seeded
+    rep = report.summarize(root, _pol(), dim="task")
+    assert "ceiling" not in report.render_csv(rep).lower()
+
+
 def test_report_tokens_default_no_dollars(seeded):
     """Tokens are the default view (plan Phase 2.5): no $ anywhere, saved tok
     gated in, dollars appear only under --usd/[display]."""
@@ -49,7 +87,7 @@ def test_report_tokens_default_no_dollars(seeded):
     rep = report.summarize(root, _pol(), dim="task")
     out = report.render_report(rep)
     assert "$" not in out
-    assert "saved tok" in out and "41,400" in out  # token savings still shown
+    assert "gross tok" in out and "41,400" in out  # token savings still shown (K: gross)
     assert "usd" not in out.splitlines()[0]
     usd_out = report.render_report(rep, disp=USD)
     assert usd_out.splitlines()[0].endswith("· usd")
@@ -74,16 +112,23 @@ def test_report_by_agent_attributes_and_dash_bucket(proj):
     assert rep["total"]["saved_usd"] == pytest.approx(15.0, abs=1e-6)  # both counted
 
 
-# ── §6.5 — human receipts excluded from report, but visible in `cage human` ──
+# ── §6.5 — a LEGACY human/minutes receipt is excluded AND visibly footnoted ───
 
-def test_human_receipt_excluded_from_report_but_shown_in_human(seeded):
+def test_legacy_human_receipt_excluded_from_report_and_footnoted(seeded):
+    """v0.36 removed the Tier-1 axis; ledgers are append-only, so a pre-0.36
+    `tool="human"` row still arrives. It must not move a total — and must not
+    vanish silently either (the removal decision, made visible)."""
     root, _ = seeded
     pol = _pol()
-    meter.record_human(task=demo.TASK, minutes=60, agent="claude-code", root=root)
+    row = schema.make_receipt(tool="human", raw_alternative=60.0, actual=0.0,
+                              unit="usd", task=demo.TASK, method="estimated")
+    row["unit"] = "minutes"  # the removed unit, as a v0.35 ledger holds it
+    assert ledger.append_row(root, "receipts", row)
     rep = report.summarize(root, pol, dim="task")
     assert rep["total"]["saved_usd"] == pytest.approx(DEMO_SAVED, abs=1e-6)  # unmoved
-    human = humanview.rollup(root, pol)
-    assert human["agents"]["claude-code"]["tasks"] == 1  # but it does show here
+    assert rep["legacy_human"] == 1
+    text = report.render_report(rep, disp=display.Display(usd=True))
+    assert "legacy human-axis receipt(s) excluded" in text
 
 
 # ── §6.2 / §6.6 — non-attributing dims are untouched (byte-identical, no keys) ─

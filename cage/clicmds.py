@@ -5,10 +5,10 @@ import re
 from pathlib import Path
 
 from cage import (adoptcmd, agents, attribution, budget, compare, demo, doctorcmd,
-                  explain, exportcmd, forecast, graphifymeter, humanview, importcmd, initcmd,
+                  explain, exportcmd, forecast, graphifymeter, importcmd, initcmd,
                   ledger, ledgersync, matrix, mcpserver, metercmd, metering, notessync,
                   origin, paths, policy, provenance, proxy, quality, recommend, regression,
-                  render, report, roi, serve, tasks, trend, verifycmd, watchcmd, wizard)
+                  render, report, roi, serve, tasks, verifycmd, watchcmd)
 from cage.cliutil import captured_read_root, csv_dest, emit, ledger_root, root
 from cage.errors import CageError
 
@@ -28,10 +28,25 @@ def _policy(r=None):
     clean ``CageError`` (``cli.main`` → ``error: …`` + exit 1) instead of leaking a raw
     ``TOMLDecodeError`` traceback at the read boundary. Write paths call ``policy.load``
     directly and stay fail-open; only this CLI read chokepoint converts."""
-    path = paths.Footprint(r or root()).policy
+    import sys
+    foot = paths.Footprint(r or root())
+    if (shadowed := foot.shadowed_config) is not None:
+        # Both cage.toml and the legacy policy.toml on disk: cage.toml wins, the other
+        # is silently ignored. Name it once on stderr (stdout stays byte-identical) so
+        # the user isn't editing a file cage never reads. `cage doctor` explains it fully.
+        print(f"⚠ cage: {shadowed.name} is ignored — {foot.policy.name} takes precedence "
+              f"(delete {shadowed.name} to silence this)", file=sys.stderr)
+    if foot.shadowed_prices is not None:
+        # prices.toml exists AND the policy file still declares [prices…]/[credits…]:
+        # prices.toml wins, the in-cage.toml block is ignored (prices-toml plan §3). Name
+        # it once on stderr; `cage doctor` / `cage query prices-file` explain it.
+        print(f"⚠ cage: the [prices]/[credits] block in {foot.shadowed_prices.name} is "
+              f"ignored — {paths.PRICES_FILENAME} takes precedence (remove those tables "
+              f"from {foot.shadowed_prices.name} to silence this)", file=sys.stderr)
+    path = foot.policy
     try:
         return policy.load(path)
-    except Exception as e:  # noqa: BLE001 — malformed policy.toml → clean CLI error, not a traceback
+    except Exception as e:  # noqa: BLE001 — malformed config → clean CLI error, not a traceback
         raise CageError(f"{path.name}: {e}") from e
 
 
@@ -50,10 +65,16 @@ def cmd_report(args) -> int:
                            team=getattr(args, "team", False))
     if (dest := csv_dest(args)) is not None:
         from cage import csvout
-        return csvout.write(report.render_csv(rep), dest)
+        return csvout.write(report.render_csv(rep), dest)  # CSV never sees the ceiling (G4)
+    from cage import graphifymodel
+    # G4: the graphify day-one repo ceiling (modeled) surfaces in the footer. Read here
+    # (I/O) so render_report stays pure; silent in non-graphify projects. Uses cwd's
+    # graphify-out/, not the ledger root — the graph describes the working project.
+    ceiling = graphifymodel.repo_ceiling(r)
     return emit(args, rep, report.render_report(
         rep, last_import=importcmd.last_import(r), disp=display.resolve(args, pol),
-        stale_hours=policy.import_stale_hours(pol), health=importcmd.capture_health(r)))
+        stale_hours=policy.import_stale_hours(pol), health=importcmd.capture_health(r),
+        ceiling=ceiling, kiro_route=report.kiro_routed_line(r, pol)))
 
 
 def cmd_overview(args) -> int:
@@ -83,51 +104,10 @@ def cmd_matrix(args) -> int:
     r = captured_read_root(args)
     pol = _policy(r)
     task = args.task or _latest_task(r)
-    data = matrix.matrix(r, task, pol, human=getattr(args, "human", False),
-                         scope=getattr(args, "scope", None))
-    # --human implies the $ view: the anchor row and vs-human columns are dollars.
-    usd = display.resolve(args, pol).usd or getattr(args, "human", False)
-    text = matrix.render_matrix(data, usd=usd)
+    data = matrix.matrix(r, task, pol, scope=getattr(args, "scope", None))
+    text = matrix.render_matrix(data, usd=display.resolve(args, pol).usd)
     if getattr(args, "html", None):
         serve.write_html(args.html, f"Matrix · {task}", {f"Matrix · {task}": text})
-        print(f"✔ wrote {args.html}")
-        return 0
-    return emit(args, data, text)
-
-
-def cmd_human(args) -> int:
-    r = captured_read_root(args)
-    data = humanview.rollup(r, _policy(r), since=args.since, agent=args.agent, task=args.task)
-    if (dest := csv_dest(args)) is not None:
-        from cage import csvout
-        return csvout.write(humanview.render_csv(data), dest)
-    text = humanview.render_human(data)
-    if getattr(args, "html", None):
-        serve.write_html(args.html, "Agent vs human", {"Agent vs human": text})
-        print(f"✔ wrote {args.html}")
-        return 0
-    return emit(args, data, text)
-
-
-def cmd_human_record(args) -> int:
-    rid = metering.record_human(task=args.task, minutes=args.minutes, usd=args.usd,
-                                task_type=args.task_type or "", rate_usd_per_hr=args.rate,
-                                call=args.call, agent=args.agent, measured=args.measured,
-                                root=ledger_root())
-    print(f"✔ recorded human alternative for {args.task!r}." if rid
-          else f"· {args.task!r} already has a human receipt for that call (no double count).")
-    return 0
-
-
-def cmd_trend(args) -> int:
-    r = captured_read_root(args)
-    data = trend.series(r, _policy(r), by=args.by, since=args.since)
-    if (dest := csv_dest(args)) is not None:
-        from cage import csvout
-        return csvout.write(trend.render_csv(data), dest)
-    text = trend.render_trend(data, metric=args.metric)
-    if getattr(args, "html", None):
-        serve.write_html(args.html, "Savings trend", {"Savings trend": text})
         print(f"✔ wrote {args.html}")
         return 0
     return emit(args, data, text)
@@ -222,14 +202,6 @@ def cmd_outcome(args) -> int:
     tasks.record(r, args.task, outcome="ok" if not args.redo else "redo", label=label)
     tag = f" (label: {label})" if label else ""
     print(f"✔ recorded {args.task!r} as {'redo' if args.redo else 'ok'}{tag}.")
-    minutes = getattr(args, "minutes", None)
-    if minutes is not None:
-        # The §6 attestation friction-drop: same fail-open, idempotent receipt path
-        # as `cage human record --minutes` — attested minutes outrank derived
-        # turn-gap minutes for this task (never summed).
-        rid = metering.record_human(task=args.task, minutes=minutes, root=r)
-        print(f"✔ attested {minutes:g} human minute(s) for {args.task!r}." if rid
-              else f"· {args.task!r} already has a human receipt (no double count).")
     return 0
 
 
@@ -239,8 +211,7 @@ def cmd_compare(args) -> int:
     bad = [k for k in by if k not in ("stack", "scope", "label")]
     if bad:
         raise CageError(f"unknown --by key(s) {bad}; choose from stack, scope, label")
-    d = compare.summarize(r, _policy(r), by=by, scope=args.scope, label=args.label,
-                          agent_only=getattr(args, "agent_only", False))
+    d = compare.summarize(r, _policy(r), by=by, scope=args.scope, label=args.label)
     if (dest := csv_dest(args)) is not None:
         from cage import csvout
         return csvout.write(compare.render_csv(d), dest)
@@ -271,13 +242,6 @@ def cmd_estimate(args) -> int:
 def cmd_calibration(args) -> int:
     from cage import calibration
     r = captured_read_root(args)
-    if getattr(args, "human", False):  # plan §4.10 — score the turn-gap heuristic
-        d = calibration.summarize_human(r, _policy(r))
-        if (dest := csv_dest(args)) is not None:
-            from cage import csvout
-            return csvout.write(calibration.render_csv_human(d), dest)
-        return emit(args, render.envelope("calibration", d) if args.json else d,
-                    calibration.render_calibration_human(d))
     d = calibration.summarize(r, _policy(r))
     if (dest := csv_dest(args)) is not None:
         from cage import csvout
@@ -289,8 +253,7 @@ def cmd_calibration(args) -> int:
 def cmd_verdict(args) -> int:
     from cage import verdict
     r = captured_read_root(args)
-    d = verdict.compose(r, _policy(r), args.tool, since=args.since,
-                        agent_only=getattr(args, "agent_only", False))
+    d = verdict.compose(r, _policy(r), args.tool, since=args.since)
     return emit(args, render.envelope("verdict", d) if args.json else d,
                 verdict.render_verdict(d))
 
@@ -324,6 +287,16 @@ def cmd_cleanup(args) -> int:
     return emit(args, render.envelope("cleanup", payload) if args.json else payload, text)
 
 
+def cmd_migrate_savings(args) -> int:
+    """`cage data migrate-savings` — consolidate historical graphify receipts into the
+    savings tree, precisely (plan §3). Dry-run print by default (house pattern), --apply
+    copies; refuses to apply on a reconciliation conflict."""
+    from cage import migratecmd
+    r = ledger_root()
+    payload, text = migratecmd.run_cli(r, do_apply=args.apply)
+    return emit(args, render.envelope("migrate-savings", payload) if args.json else payload, text)
+
+
 def cmd_study(args) -> int:
     """Fleet-study verbs (plan §4.9). Markers/report act on the *active* ledger
     (capture lands there); `join` additionally wires this project's agents."""
@@ -348,7 +321,7 @@ def cmd_study(args) -> int:
         print("✔ phase stopped — rows after this marker are unphased until the next start")
         return 0
     if args.action == "report":
-        d = study.summarize(r, _policy(r), agent_only=getattr(args, "agent_only", False))
+        d = study.summarize(r, _policy(r))
         if (dest := csv_dest(args)) is not None:
             from cage import csvout
             return csvout.write(study.render_csv(d), dest)
@@ -407,6 +380,20 @@ def cmd_mcp(_args) -> int:
     return mcpserver.serve()
 
 
+def _note_config_migration(migrated) -> None:
+    """One-line notice when `cage setup` renamed a legacy `policy.toml` → `cage.toml`
+    (initcmd does the rename; this just reports it). Silent when nothing moved."""
+    if migrated:
+        print(f"  ✔ migrated legacy policy.toml → {migrated}")
+
+
+def _note_prices_migration(migrated) -> None:
+    """One-line notice when `cage setup` moved a legacy in-cage.toml price block out to
+    `prices.toml` (money-neutral; initcmd does the move). Silent when nothing moved."""
+    if migrated:
+        print(f"  ✔ moved model prices → {migrated} (routing decisions stay in cage.toml)")
+
+
 def cmd_setup(args) -> int:
     import sys
 
@@ -418,9 +405,28 @@ def cmd_setup(args) -> int:
     if getattr(args, "global_ledger", False):
         info = initcmd.run(paths.global_home(), pointer=False)
         print(f"✔ Global ledger initialised at {info['footprint']}")
+        _note_config_migration(info.get("migrated_config"))
+        _note_prices_migration(info.get("migrated_prices"))
         print(f"  policy   → {info['policy']}")
+        print(f"  prices   → {info['prices']}")
         print(f"  ledger   → {info['ledger']}/  (append-only)")
         print("Capture into it from anywhere: `cage import` · read it: `cage report`.")
+        return 0
+
+    # Handle --sync-sources: refresh the cage-managed [sources] block (Directive A) and
+    # exit. Materializes the current built-in defaults into project + global cage.toml,
+    # preserving any user-added [[sources.<name>]] entries outside the managed markers.
+    if getattr(args, "sync_sources", False):
+        did = False
+        for label, r in (("project", paths.resolve_root()), ("global", paths.global_home())):
+            fp = paths.Footprint(r)
+            if not fp.policy.exists():
+                initcmd.run(r, pointer=(label == "project"))
+            changed = initcmd.sync_sources(fp)
+            did = did or changed
+            print(f"  {'✔ refreshed' if changed else '· already current'}  "
+                  f"{label}: {fp.policy}")
+        print("Sources synced." if did else "Sources already up to date.")
         return 0
 
     # Handle --status: report current wiring and exit
@@ -454,14 +460,13 @@ def cmd_setup(args) -> int:
         print("✔ Cage wired into:")
         for surface, where in agents.install(here, flagged).items():
             print(f"  {surface:<8} → {', '.join(where.values())}")
-        print("Metering: claude=transcript hook · others=`cage data meter -- <cmd>` or `cage data proxy`.")
+        print("Metering: pull-based — `cage import` (or `cage data meter -- <cmd>` / `cage data proxy`).")
         return 0
 
-    # Handle --project-only: scaffold + graphify + PATH, no global skill
+    # Handle --project-only: scaffold + graphify + PATH, no MCP wiring
     project_only = getattr(args, "project_only", False)
     if project_only:
         # Override the flags for project-only mode
-        args.skill = False
         args.project = True
         args.graphify = getattr(args, "graphify", True)
         # `--project-only` is agent-independent scaffolding (its --help: "scaffold
@@ -472,6 +477,8 @@ def cmd_setup(args) -> int:
             res = adoptcmd.run(here, graphify=args.graphify, surfaces=None)
             print("\n▸ cage setup — project scaffold")
             print(f"  ✔ .cage/ ready → {res['init']}")
+            _note_config_migration(res.get("migrated_config"))
+            _note_prices_migration(res.get("migrated_prices"))
             if "shim" in res:
                 print(f"  ✔ graphify interceptor → {res['shim']}")
                 if res.get("path"):
@@ -483,33 +490,37 @@ def cmd_setup(args) -> int:
             return 0
 
     # init merged into setup (plan Phase 3 §2): ensure .cage/ exists first — the old
-    # `init` verb's job, now unconditional step one of onboarding. Idempotent, so the
-    # wizard's adopt step (when --project/--graphify also scaffold) re-runs it
-    # harmlessly; this closes the skill-only (`--no-project --no-graphify`) gap.
-    initcmd.run(here)
+    # `init` verb's job, now unconditional step one of onboarding. Idempotent.
+    _setup_info = initcmd.run(here)
+    _note_config_migration(_setup_info.get("migrated_config"))
+    _note_prices_migration(_setup_info.get("migrated_prices"))
 
-    # Standard setup: interactive wizard, --all, or per-agent flags
+    # Standard setup: --all or per-agent flags (the interactive wizard was removed
+    # with the hook machinery — setup is now three deterministic steps).
     flagged = tuple(s for s in agents.SURFACES if getattr(args, s, False))
-    scope = "project" if getattr(args, "repo_skill", False) else "global"
-    if all_agents:  # one plan that fans out to every agent (wizard.apply handles "all")
-        plans = [{"agent": "all", "skill": args.skill, "skill_scope": scope,
-                  "project": args.project, "graphify": args.graphify}]
-    elif not flagged:
-        if not sys.stdin.isatty():
-            print("Pick an agent: " + " | ".join(agents.SURFACES) + " | all")
-            print("e.g. `cage setup --claude` or `cage setup --all`  (or run `cage setup` "
-                  "in a terminal for the guided wizard)")
-            return 2
-        plans = [wizard.interactive_plan()]
-    else:
-        plans = [{"agent": a, "skill": args.skill, "skill_scope": scope,
-                  "project": args.project, "graphify": args.graphify} for a in flagged]
+    if all_agents:
+        flagged = agents.SURFACES
+    if not flagged:
+        print("Pick an agent: " + " | ".join(agents.SURFACES) + " | all")
+        print("e.g. `cage setup --claude` or `cage setup --all`")
+        return 2
 
-    for plan in plans:
-        print(f"\n▸ cage setup — {plan['agent']}")
-        for line in wizard.apply(here, **plan):
-            print(f"  {line}")
-    print("\nDone. Verify with `cage doctor`; then `cage report`.")
+    for agent in flagged:
+        print(f"\n▸ cage setup — {agent}")
+        if getattr(args, "project", True):
+            res = adoptcmd.run(here, graphify=getattr(args, "graphify", True),
+                               surfaces=(agent,))
+            print(f"  ✔ .cage/ ready → {res['init']}")
+            if "shim" in res:
+                print(f"  ✔ graphify interceptor → {res['shim']}")
+                if res.get("path"):
+                    print(f"  ✔ bin/ added to PATH in {res['path']} — open a new shell")
+            for surface, where in res.get("hooks", {}).items():
+                print(f"  ✔ {surface:<8} → {', '.join(where.values())}")
+        else:
+            for surface, where in agents.install(here, (agent,)).items():
+                print(f"  ✔ {surface:<8} → {', '.join(where.values())}")
+    print("\nDone. Verify with `cage doctor`; capture with `cage import`; then `cage report`.")
     return 0
 
 
@@ -660,8 +671,16 @@ def cmd_import(args) -> int:
 def cmd_import_claude(args) -> int:
     """Meter Claude Code with no hooks/MCP — pull the transcripts it already writes
     to disk. Idempotent (append_new dedupes on the per-turn call id), fail-open per
-    file (an unreadable transcript is skipped, never raised), $0/offline."""
-    n, m = importcmd.import_claude(ledger_root(), args)
+    file (an unreadable transcript is skipped, never raised), $0/offline.
+
+    The policy is threaded in because `--path`/`--project` now take their discovery
+    patterns from ``cage.toml``'s ``[sources] path_globs`` (path-globs handoff §5) — with
+    no policy this command would resolve zero patterns and scan nothing."""
+    r = ledger_root()
+    pol = _policy(r)
+    n, m = importcmd.import_claude(r, args, pol=pol)
+    for line in importcmd.missing_path_globs(args, ("claude",), pol):
+        print(line)
     print(f"✔ imported {n} Claude call(s) from {m} transcript(s).")
     return 0
 

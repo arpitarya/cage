@@ -13,6 +13,7 @@ import zipfile
 from pathlib import Path
 
 from cage import doctorbundle, importcmd, lockutil, pathprobe, paths, render
+from srcseed import mkcage
 
 
 # ── per-OS path candidates: env override wins; APPDATA adds the Windows candidate ──
@@ -45,11 +46,17 @@ def test_kiro_candidates_appdata_and_override(monkeypatch, tmp_path):
     assert paths.kiro_token_log() == tmp_path / "kd" / "dev_data" / "tokens_generated.jsonl"
 
 
-def test_agent_log_sources_covers_all_four_agents():
+def test_sources_seed_covers_all_agents_and_kirocli():
     from cage import agents
+    # Directive A: the built-in registry is a SEED cage materializes into [sources].
+    seed = paths.sources_seed()
     for a in agents.SURFACES:
-        assert paths.agent_log_sources(a), f"{a} has no registered log sources"
-    assert len(paths.agent_log_sources("copilot")) == 2  # CLI + VS Code chatSessions
+        assert [e for e in seed if e["name"] == a], f"{a} missing from the sources seed"
+    assert len([e for e in seed if e["name"] == "copilot"]) == 2  # CLI + VS Code chatSessions
+    assert [e for e in seed if e["name"] == "kirocli" and e.get("format") == "kiro-cli"]
+    # With a materialized [sources] table, the per-agent accessor resolves them again.
+    pol = {"sources": {"claude": {"paths": [e["path"] for e in seed if e["name"] == "claude"]}}}
+    assert paths.agent_log_sources("claude", pol)
 
 
 # ── Windows-shaped hook commands: quoting + heal-matching ──────────────────────
@@ -117,7 +124,7 @@ def _isolated(monkeypatch, tmp_path):
                 "CAGE_VSCODE_USER"):
         monkeypatch.setenv(env, str(tmp_path / f"home-{env.lower()}"))
     root = tmp_path / "proj"
-    (root / ".cage").mkdir(parents=True)
+    mkcage(root)
     return root
 
 
@@ -145,10 +152,14 @@ def test_doctor_paths_counts_rows_and_cursor_state(tmp_path, monkeypatch):
     from cage import clicmds
     assert clicmds.cmd_import(SimpleNamespace(agent="kiro", path=None, project=None,
                                               since=None)) == 0
-    before = paths.Footprint(root).cursors.read_bytes()
+    # kiro's cursor rides its rows into the machine ledger (ADR 0006) — the probe reads
+    # it from there, or it would report "not yet imported" for a file it imports every run.
+    sink = paths.Footprint(paths.global_home())
+    before = sink.cursors.read_bytes()
     out2 = pathprobe.run(root)
     assert "cursor: already imported" in out2
-    assert paths.Footprint(root).cursors.read_bytes() == before   # read-only
+    assert str(sink.base) in out2                                 # and names the sink
+    assert sink.cursors.read_bytes() == before                    # read-only
     assert not paths.Footprint(root).debug_log.exists()           # no debug writes
 
 

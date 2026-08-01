@@ -13,6 +13,7 @@ import json
 from types import SimpleNamespace
 
 from cage import agents, capturelog, cleanup, debuglog, importcmd, paths, policy
+from srcseed import mkcage
 
 _HOME_ENVS = ("CLAUDE_CONFIG_DIR", "COPILOT_HOME", "KIRO_HOME",
               "KIRO_DATA_DIR", "CAGE_VSCODE_USER")
@@ -22,7 +23,7 @@ def _isolate(tmp_path, monkeypatch):
     for env in _HOME_ENVS:
         monkeypatch.setenv(env, str(tmp_path / f"home-{env.lower()}"))
     root = tmp_path / "proj"
-    (root / ".cage").mkdir(parents=True)
+    mkcage(root)
     monkeypatch.chdir(root)
     return root
 
@@ -48,11 +49,15 @@ def _copilot_log(root):
 # ── one line per swept agent per real run ──────────────────────────────────────
 
 def test_real_import_appends_one_line_per_swept_agent(tmp_path, monkeypatch):
+    # One breadcrumb per agent, in the ledger that agent actually captured INTO: kiro's
+    # rows route to the machine ledger (ADR 0006), so its proof-of-capture lives there.
+    # A kiro line in the project's capture.log would claim a capture that didn't happen.
     root = _isolate(tmp_path, monkeypatch)
     _imp(root, "all")
     rows = _rows(root)
-    assert {r["agent"] for r in rows} == set(agents.SURFACES)
-    for r in rows:
+    assert {r["agent"] for r in rows} == set(agents.SURFACES) - {"kiro"}
+    assert {r["agent"] for r in _rows(paths.global_home())} == {"kiro"}
+    for r in rows + _rows(paths.global_home()):
         assert set(r) >= {"ts", "agent", "files_seen", "rows_new", "rows_total", "src"}
 
 
@@ -110,7 +115,7 @@ def test_no_op_throttled_read_appends_nothing(tmp_path, monkeypatch):
     pol = policy.load(None)
     importcmd.ensure_captured(root, args, pol=pol)  # first sweep — real, appends
     n_after_first = len(_rows(root))
-    assert n_after_first == len(agents.SURFACES)
+    assert n_after_first == len(agents.SURFACES) - 1  # kiro's breadcrumb is in ~/.cage
     summary = importcmd.ensure_captured(root, args, pol=pol)  # throttled — no sweep at all
     assert summary is None
     assert len(_rows(root)) == n_after_first  # not a single new line

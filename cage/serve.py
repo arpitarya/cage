@@ -6,7 +6,7 @@ import http.server
 from functools import partial
 from pathlib import Path
 
-from cage import budget, humanview, paths, policy, report, roi, trend
+from cage import budget, paths, policy, report, roi
 
 _CSS = ("body{font:14px ui-monospace,SFMono-Regular,monospace;background:#0e1116;"
         "color:#e6edf3;max-width:900px;margin:2rem auto;padding:0 1rem}"
@@ -24,7 +24,7 @@ def _page(title: str, blocks: dict[str, str]) -> str:
 
 
 def write_html(path: str, title: str, blocks: dict[str, str]) -> None:
-    """Write a standalone page to ``path`` (used by `--html` on human/matrix/trend)."""
+    """Write a standalone page to ``path`` (used by `--html` on matrix)."""
     Path(path).write_text(_page(title, blocks), encoding="utf-8")
 
 
@@ -34,8 +34,6 @@ def dashboard_html(root: Path) -> str:
         "Spend by route": report.render_report(report.summarize(root, pol, "route")),
         "Spend by model": report.render_report(report.summarize(root, pol, "model")),
         "ROI by tool": roi.render_roi(roi.by_tool(root, pol)),
-        "Agent vs human": humanview.render_human(humanview.rollup(root, pol)),
-        "Savings trend": trend.render_trend(trend.series(root, pol)),
         "Budget": budget.render_budget(budget.check(root, pol)),
     }
     return _page("LLM cost ledger", blocks)

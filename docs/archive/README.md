@@ -2,9 +2,33 @@
 
 **History, not spec. The living design of record is in `docs/` root and [`docs/cage-plan.md`](../cage-plan.md).**
 
-Every file here drove work that has since shipped (or was superseded). Files keep
-their original text verbatim plus a one-line archive header; names sort by the
-release that shipped the work: `vX.Y-<feature>.{handoff,prompt}.md`.
+Every file here drove work that has since been **implemented** (or was superseded).
+Files keep their original text verbatim plus a one-line archive header; names sort
+by the release that carries the work: `vX.Y-<feature>.{handoff,prompt}.md`.
+
+**Archive trigger is implementation, not release** (rule amended 2026-07-25): a pair
+moves here once its work is built and green, tagged with the version it rides. The
+v0.36 pairs were archived while that release was still pending — their header says
+so. This keeps `docs/` root as a true list of *work not yet done*.
+
+## 2026-07-28 — the v0.36 consolidation
+
+The whole v0.36 cycle (24 files: import-ledger · cage-lab · capture-precision ·
+golden-set · phase1-closeout · report-per-run · graphify-ab-steering ·
+graphify-capture, plus their handoffs and prompts) was archived in one sweep and
+replaced by a single living plan, **[`docs/OPEN-WORK.md`](../OPEN-WORK.md)**.
+
+Each archived file carries the standard header naming what was built and where its
+*pending* remainder went. Durable rules from those plans were **promoted into
+OPEN-WORK.md** rather than left here — the archive stays history, never spec.
+
+**Those 24 files are indexed by this section, deliberately, not by rows in the table
+below** — they were one sweep with one outcome (replaced by `OPEN-WORK.md`), and 24
+near-identical rows would bury the pairs that carry distinct work. Everything archived
+*after* 2026-07-28 gets its own row. If you are looking for a v0.36 cycle plan
+(import-ledger · cage-lab · capture-precision · golden-set · phase1-closeout ·
+report-per-run · graphify-ab-steering · graphify-capture), it is here on disk with its
+header intact.
 
 ## Handoff / prompt pairs by release
 
@@ -51,6 +75,24 @@ release that shipped the work: `vX.Y-<feature>.{handoff,prompt}.md`.
 | v0.33 | Codex removal (cage is claude/copilot/kiro) | [handoff](v0.33-codex-removal.handoff.md) | [prompt](v0.33-codex-removal.prompt.md) | [v0.33.0](../../CHANGELOG.md#v0330-2026-07-24--codex-removed-cage-is-claude-code--copilot--kiro) |
 | v0.34 | Installed-artifact inventory (`cage doctor --wiring`) | [handoff](v0.34-wiring-inventory.handoff.md) | — | [v0.34.0](../../CHANGELOG.md#v0340-2026-07-24--cage-doctor---wiring-the-installed-artifact-inventory) |
 | v0.35 | Capture-report follow-ups (F3 Kiro visibility, F5 cache split, F7 gap_ms observability) | [handoff](v0.35-phase3-deferred-findings.handoff.md) | [prompt](v0.35-phase3-deferred-findings.prompt.md) | [v0.35.0](../../CHANGELOG.md#v0350-2026-07-24--capture-report-follow-ups-kiro-visibility-cache-honesty-gap_ms-observability) |
+| v0.36 | Hookless rebuild + import ledger (Phases 0–4: pull-only capture, loud import summary, savings tree, capture manifest, gated task correlation) | [handoff](v0.36-hookless-rebuild.handoff.md) | [prompt](v0.36-hookless-rebuild.prompt.md) | [v0.36.0](../../CHANGELOG.md#v0360-2026-07-25--hookless-rebuild--import-ledger-phases-04) |
+| v0.36 | Session names always-on (+ `session_uid`, per-session manifest rows) + precise savings migration (`cage data migrate-savings`, id-deduped `receipts()` union) | [handoff](v0.36-names-and-savings-migration.handoff.md) | [prompt](v0.36-names-and-savings-migration.prompt.md) | [v0.36.0](../../CHANGELOG.md#v0360-2026-07-25--hookless-rebuild--import-ledger-phases-04) |
+| v0.36 | Config surfaces + `cage.toml` rename (`[sources] surface` restamp key; `policy.toml` → `cage.toml` with read fallback + `cage setup` migration) | [handoff](v0.36-config-surfaces-and-rename.handoff.md) | [prompt](v0.36-config-surfaces-and-rename.prompt.md) | [v0.36.0](../../CHANGELOG.md#v0360-2026-07-25--hookless-rebuild--import-ledger-phases-04) |
+| v0.36 | Model prices split into `prices.toml` (vendor rate card apart from policy; money byte-identical; `cage setup` migration money-neutral; `[meta]` splits per key; plan of record: [plan](v0.36-prices-toml.plan.md)) | [handoff](v0.36-prices-toml.handoff.md) | [prompt](v0.36-prices-toml.prompt.md) | [v0.36.0](../../CHANGELOG.md#v0360-2026-07-25--hookless-rebuild--import-ledger-phases-04) |
+| v0.36 | Phase 1 BENCHMARK — *what cage captures, how correct* (the third artifact type, one phase; closes golden-set Phase 1). Deliverable: [PHASE-1-BENCHMARK](../regression/2026-07-28-phase-1-benchmark.md) (sha256 `58948469192c`) | — | [prompt](v0.36-phase1-benchmark.prompt.md) | benchmark doc (unreleased; no changelog anchor — see mapping note) |
+| v0.36 | Shim integrity — the PATH-**winning** graphify interceptor (`live`/`dead`/`shadowed`/`foreign`, dead = doctor failure), the heal boundary (cage-managed root only), and the absolute-path hook bypass (advisory). Also published the three Phase-I lab artifacts, hashed | [handoff](v0.36-shim-integrity.handoff.md) | [prompt](v0.36-shim-integrity.prompt.md) | unreleased (tree uncommitted) — see mapping note |
+| v0.36 | `[sources] path_globs` — the **root-agnostic** `--path`/`--project` discovery patterns, declared in `cage.toml` beside the anchored `glob` (two keys, two jobs). Closes leg-D finding K1 (copilot `--path` could never reach the VS Code `chatSessions` store); no glob literal survives in any import branch (AST-gated), absent patterns are a **loud** no-op, and the zero-match ⚠ now names what it tried | [handoff](v0.36-path-globs.handoff.md) | [prompt](v0.36-path-globs.prompt.md) | unreleased (tree uncommitted) — see mapping note |
+| v0.36 | `[meta] cage_version` drift — the bundled value was a hand-maintained literal, eleven releases stale (`0.25.0` vs package `0.36.0`), printed by `cage prices list` and copied into every new project. Now derived live from `cage.__version__` (`policy._bundled`); a scaffolded project's copy stays a historical stamp, never rewritten. `policy_version` untouched (a content counter, not a release counter) | — | [prompt](v0.36-meta-version.prompt.md) | unreleased (tree uncommitted) — see mapping note |
+| v0.36 | OPEN-WORK A→I runner — executed the consolidated queue (A ceiling · B VS Code probe + B-fix-1/2/3 · C folded into I · F capture reach · G honesty debts + G4 · I scripted legs and published artifacts), leaving only leg D and the release | — | [prompt](v0.36-open-work-runner.prompt.md) | unreleased (tree uncommitted) — see mapping note |
+| v0.36 | cage-lab three-agent parity — `cage setup --all` in both workspaces plus all three graphify installers, so Claude · Copilot · Kiro are first-class in the lab. Law 0 now lives in [`docs/cage-lab/`](../cage-lab/README.md) | — | [prompt](v0.36-three-agent-parity.prompt.md) | unreleased (tree uncommitted) — see mapping note |
+| v0.36 | Leg D publication — six manual VS Code/IDE cells turned into published evidence: the run report, five finding docs (incl. the blocking gross-vs-net finding) and the phase benchmark superseding 07-29, all hashed into [`regression/`](../regression/) | — | [prompt](v0.36-legd-publish.prompt.md) | unreleased (tree uncommitted) — see mapping note |
+| v0.36 | Budget opt-in **verification** — confirmed the bundle change needs no code fix and that `cage policy sync` does not re-add `[budgets]` (an active table buckets as `project_own`). Verdict: keep as-is; goldens P5/P6a/P6b re-blessed | — | [prompt](v0.36-budget-optin-verify.prompt.md) | unreleased (tree uncommitted) — see mapping note |
+| v0.36 | **Removed** the Tier-1 agent-vs-human axis, substrate included (`human.py`/`humanview.py`/`trend.py`/`attention.py`, the `cage human` group, `cage insights trend`, `--human`/`--agent-only` flags, `gap_ms`, the `minutes` unit, `[human.*]`, `CAGE_HUMAN_RATE`, `IDLE_CAP_MINUTES`). A clean amputation — no stub, no revert path. `cage human outcome`/`quality` **moved** to the new `task` group (never part of the axis); provenance `origin="human"` untouched; legacy rows read and are excluded with a counted footnote | [handoff](v0.36-human-removal.handoff.md) | [prompt](v0.36-human-removal.prompt.md) | unreleased (tree uncommitted) — see mapping note |
+| v0.36 | **Kiro capture routing (K2)** — two stores, two *opposite* fixes. IDE `tokens_generated.jsonl` (one global file, no project/session/ts) routes to the machine ledger, so a turn exists once per machine; CLI `conversations_v2` (keyed by cwd) is scoped to the project tree and stamps `project`. `--ledger`/`CAGE_BASE` wins for both; pre-existing rows are never rewritten. Also placed the two HONEST-LIMITs (K3 kiro time/session/project · K4 blank surface ≠ "cli"). Decision: [ADR 0006](../adr/0006-kiro-rows-are-machine-facts-not-project-facts.md) | [handoff](v0.36-kiro-routing.handoff.md) | [prompt](v0.36-kiro-routing.prompt.md) | unreleased (tree uncommitted) — see mapping note |
+| v0.36 | **Gross vs net savings (K · NET-2 · NET-3)** — `saved` is a per-query counterfactual that excludes the cost of *using* a tool, so graphify's self-declared `$0` own cost made `verdict` print a bare **SAVING** on sessions leg D measured costing ~31% more. Relabelled GROSS on every surface (text + CSV, one phrasing in `netsaved.GROSS_NOTE`); `verdict` now reads `SAVING (GROSS)` and names the exclusion when the cost of use is unknown, while **COSTING stays assertible** (the omitted term is ≥ 0); new `netsaved.by_tool` nets it at task level via the ±120s receipt-window union, refusing rather than reporting `net = gross`. Evidence: [finding](../regression/2026-08-01-finding-saved-is-gross.md) | [handoff](v0.36-net-savings.handoff.md) | [prompt](v0.36-net-savings.prompt.md) | unreleased (tree uncommitted) — see mapping note |
+| v0.36 | **SUITE — green the last two red causes (G-SAV + BUD-V-TEST)** — `savings.record()` was missing `ts` from its signature (`**_ignore` silently swallowed a caller's value, stamping every row *now* regardless of the work's real date); added and forwarded, plus a kwarg-parity guard test so the next such drop fails loudly. Five `test_policysync` mechanics tests (keep-customized, marked/block-owned, update-stale-default, update-known-version-customized, confirm-bucket) had borrowed `[budgets]` as their worked example; re-pointed at `[quality] signal` — a table the bundle actually ships — same mechanics, different example. 949/6 ⇒ 956/0. Neither cause was a shipped-behaviour regression. Follow-up (a synthetic bundle fixture so these tests stop coupling to product content) filed as `SYNC-FIXTURE` in [OPEN-WORK.md](../OPEN-WORK.md) | [handoff](v0.36-suite-green.handoff.md) | [prompt](v0.36-suite-green.prompt.md) | unreleased (tree uncommitted) — see mapping note |
+| v0.36 | **Cleanup becomes advisory (CLEAN)** — cage no longer deletes state on its own. Retention default 30 → 90 days; the auto sweep (piggybacked on `cage import`) now only warns on stderr (count, reclaimable size, the runnable fix — silent when nothing's eligible, throttled), never deletes; deletion is `cage data cleanup --apply` only, which runs regardless of `[cleanup] enabled` (an explicit command is always honored). New `[cleanup] warn` switch (env `CAGE_CLEANUP_WARN`) silences just the reminder. Tool savings (`ledger/savings/<tool>/`) get an explicit never-per-tool invariant, tested surviving `prune` at `days=0`. 956/0 ⇒ 961/0 | [handoff](v0.36-cleanup-safety.handoff.md) | [prompt](v0.36-cleanup-safety.prompt.md) | unreleased (tree uncommitted) — see mapping note |
+| v0.36 | **Sync-tests guard (SYNC-GUARD)** — the five `test_policysync` mechanics tests that borrow `[quality] signal` as their generic worked example now derive it from one named constant (`_EXAMPLE_TABLE, _EXAMPLE_KEY`), so a future re-point (after `[budgets]`, `[quality]` is a **second** occurrence) is a one-line edit. Added a guard test asserting the key still exists in `policy.bundled_raw()`, failing with the exact fix. The synthetic-bundle fixture stays parked as a [proposal](../proposals/policysync-synthetic-bundle.md) behind a third-occurrence trigger. 961/0 ⇒ 962/0 | — | [prompt](v0.36-sync-guard.prompt.md) | unreleased (tree uncommitted) — see mapping note |
 
 ## Superseded drafts & research inputs
 
@@ -63,6 +105,26 @@ release that shipped the work: `vX.Y-<feature>.{handoff,prompt}.md`.
 | v0.7 | [v0.7-org-gateway-zero-setup.prompt.md](v0.7-org-gateway-zero-setup.prompt.md) | The org-gateway phase was never shipped as specced — superseded by the proxy + universal capture (v0.12) |
 
 ## Mapping notes (where the version was ambiguous)
+
+- **v0.36-phase1-benchmark** — a *doc deliverable*, not a code feature, so it has
+  no CHANGELOG anchor. The reference is the published, hashed benchmark itself
+  ([PHASE-1-BENCHMARK](../regression/2026-07-28-phase-1-benchmark.md), sha256
+  `58948469192c`) plus the IMPLEMENTATION.md entry. Archived under v0.36 as the
+  in-flight (unreleased) tree it rode; solo prompt, no handoff pair.
+
+- **v0.36-shim-integrity** — no CHANGELOG anchor yet: implemented and green
+  (2026-07-30) while the cage tree stays uncommitted under Arpit's standing
+  no-commit directive, so the release entry is written at the v0.36 cut. Archived
+  on *implement*, per the lifecycle rule — the archive date is not the release date.
+
+- **v0.36-meta-version** — no CHANGELOG anchor yet, same reason as shim-integrity:
+  implemented and green (2026-08-01) under the standing no-commit directive; the
+  release entry is written at the v0.36 cut. Solo prompt, no handoff pair — the
+  diagnosis was small enough that the prompt carried the full change-map.
+
+- **v0.36-sync-guard** — no CHANGELOG anchor yet, same reason as meta-version:
+  implemented and green (2026-08-01) under the standing no-commit directive. Solo
+  prompt, no handoff pair — CLAUDE.md's pair rule exempts a change this small.
 
 - **v0.34-wiring-inventory** — no archived prompt: the executing prompt
   self-declared itself throwaway ("delete this file when done") and was deleted

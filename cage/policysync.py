@@ -52,12 +52,10 @@ _DELEGATED = ("prices", "credits", "alias")
 # Maintenance rule: any release that CHANGES a bundled non-pricing default
 # appends (changed_in_policy_version, old_value) here — ascending — and any
 # release that REMOVES a bundled key records it in REMOVED_KEYS; both releases
-# bump [meta] policy_version in data/policy.toml. Empty today: no non-pricing
-# default value has ever changed and no key was ever removed (v0.2 → v0.25,
-# verified against the git history of data/policy.toml). Empty is load-bearing:
-# it lets a differing un-marked value classify as the user's own edit
-# (old default == current default), never as clobber-able drift.
-DEFAULT_CHANGES: dict[tuple[str, ...], tuple[tuple[str, object], ...]] = {}
+# bump [meta] policy_version in data/cage.toml.
+DEFAULT_CHANGES: dict[tuple[str, ...], tuple[tuple[str, object], ...]] = {
+    ("cleanup", "days"): (("0.27.0", 30),),  # cleanup-safety: 30 -> 90 default retention
+}
 #   (section, ..., key) -> ((changed_in_policy_version, old_value), ...)
 REMOVED_KEYS: dict[tuple[str, ...], str] = {}
 #   (section, ..., key) -> removed_in_policy_version
@@ -311,7 +309,7 @@ def sync_apply(root: Path, d: dict, yes: list[str]) -> list[str]:
 
 def render(d: dict, updated: list[str] | None = None) -> str:
     if d.get("no_project"):
-        return (f"policy sync — no project policy.toml at {d['policy_path']}\n"
+        return (f"policy sync — no project config at {d['policy_path']}\n"
                 f"the bundled defaults apply directly — nothing can be stale.\n"
                 f"run `cage setup` to materialize one.")
     out = [f"policy sync — bundled {_meta_version(d['bundled_meta'])} vs project "
@@ -368,8 +366,8 @@ def render(d: dict, updated: list[str] | None = None) -> str:
         else:
             out += ["", "✔ nothing to do — project policy matches the installed bundle."]
     if d["git_tracked"]:
-        out.append("· policy.toml is git-tracked — review any applied change with "
-                   "git; cage writes no .bak files.")
+        out.append(f"· {Path(d['policy_path']).name} is git-tracked — review any applied "
+                   "change with git; cage writes no .bak files.")
     return "\n".join(out)
 
 

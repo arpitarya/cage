@@ -56,8 +56,8 @@ class _ImportArgs:
 
 
 def sweep(root: Path, since: str | None) -> tuple[bool, int]:
-    """The all-agent import refresh export runs before emitting/bundling, so a
-    capture-only machine (hooks don't fire under a VS Code extension) still ships a
+    """The all-agent import refresh export runs before emitting/bundling, so a machine
+    that never ran an explicit `cage import` (capture is pull-based) still ships a
     complete artifact. Always ``"all"`` — an ``--agent`` filter narrows the *output*,
     never the capture. Fail-open: ``(ran, new_calls)``; a failed sweep is warned to
     stderr and export proceeds with the pre-sweep ledger — a broken parser must

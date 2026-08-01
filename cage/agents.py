@@ -1,27 +1,28 @@
 """Multi-agent integration orchestrator (plan §5, §6, §9.5-6).
 
 One ledger contract, three surfaces. Cage targets the wire protocol, so the *meter*
-is universal (transcript import) and the *read* surface is universal (MCP) — each agent
-has **its own wire file** that wires that agent's idiomatic config to those universals:
+is universal (transcript import — pull-based, no hooks) and the *read* surface is
+universal (MCP) — each agent has **its own wire file** that wires that agent's
+idiomatic config to those universals:
 
-  claude  → claudewire.py   (.claude/settings.json hooks + .mcp.json)
-  copilot → copilotwire.py  (~/.copilot/hooks/cage.json + .vscode/mcp.json + instructions)
-  kiro    → kirowire.py     (.kiro/hooks/cage.kiro.hook + .kiro/settings/mcp.json + steering)
+  claude  → claudewire.py   (.mcp.json)
+  copilot → copilotwire.py  (.vscode/mcp.json)
+  kiro    → kirowire.py     (.kiro/settings/mcp.json)
 
 **Convention: one `<agent>wire.py` per agent** — a new agent gets its own wire file
-exposing `install` / `status` / `backfill_status` / `realtime_status`, and is added to
-`SURFACES` + the dispatch maps below. Each agent's hook imports **only its own** on-disk
-log (`cage import --agent <itself>`) — cage never sweeps another agent's data from a hook.
+exposing `install` / `status`, and is added to `SURFACES` + the dispatch map below.
+Hook wiring was removed with the hook machinery; each wire module's `install` heals
+(strips/deletes) any hook artifacts a previous version wrote.
 
-Codex support was removed completely (a product/scope call, not a capture-quality one —
-see docs/archive/*-codex-removal.handoff.md); a pre-existing `.codex/hooks.json` on an
-upgraded machine is now orphaned wiring, not a supported surface.
+Codex support was removed completely (a product/scope call, not a capture-quality one
+— see docs/archive/*-codex-removal.handoff.md); a pre-existing `.codex/hooks.json` on
+an upgraded machine is now orphaned wiring, not a supported surface.
 """
 from __future__ import annotations
 
 from pathlib import Path
 
-from cage import claudewire, copilotwire, gitcommithook, kirowire, runshim
+from cage import claudewire, copilotwire, kirowire, runshim
 
 SURFACES = ("claude", "copilot", "kiro")
 
@@ -46,9 +47,9 @@ _WIRE = {"claude": claudewire, "copilot": copilotwire, "kiro": kirowire}
 def install(root: Path, surfaces: tuple[str, ...] | None = None) -> dict:
     from cage import paths, policy
     picked = surfaces or SURFACES
-    # The wiring mode is project policy (`[wiring] python_launcher`, docs/
-    # restricted-environments.md) — re-read on every install so a plain re-run of
-    # `cage setup` preserves the persisted mode with no flag repeated.
+    # The wiring mode is project policy (`[wiring] python_launcher`, restricted
+    # endpoints) — re-read on every install so a plain re-run of `cage setup`
+    # preserves the persisted mode with no flag repeated.
     launcher = policy.python_launcher(policy.load(paths.Footprint(root).policy))
     # Every surface's committed wiring references the committed shim instead of an
     # absolute cage path (plan §5) — write it first so the references always resolve.
@@ -56,10 +57,6 @@ def install(root: Path, surfaces: tuple[str, ...] | None = None) -> dict:
     out: dict[str, dict] = {}
     for name in (s for s in SURFACES if s in picked):
         out[name] = _WIRE[name].install(root, python_launcher=launcher)
-    if "claude" in out:
-        gh = gitcommithook.install(root, python_launcher=launcher)  # PostToolUse capture buffer → sha resolution (plan §3.5)
-        if gh["installed"]:
-            out["claude"]["git-hooks"] = ", ".join(gh["installed"])
     # Heal an already-installed graphify interceptor whose capability probe names a
     # verb removed in v0.28.0 (it would exec the real binary unmetered, silently —
     # the F1 root cause). Refresh-only: never scaffolds a shim into a project that
@@ -68,19 +65,25 @@ def install(root: Path, surfaces: tuple[str, ...] | None = None) -> dict:
     from cage import adoptcmd
     if adoptcmd.refresh_shim(root):
         out.setdefault("graphify", {})["shim"] = "refreshed bin/graphify → current verb"
+    # B-fix-2: the interceptor that actually RUNS is whichever `graphify` PATH resolves
+    # first, and an adopt-era one can sit in a *different* project's bin/ — dead, silent,
+    # and invisible to the root-scoped refresh above. Heal it only when it is dead AND
+    # lives in a cage-managed root (`pathshim.healable`); outside one cage never writes,
+    # because silently editing another project's files is the one thing this fix must not
+    # become. Fail-open — a write path never raises on a diagnostic's account.
+    try:
+        from cage import pathshim
+        ps = pathshim.classify(root)
+        if ps.healable and ps.managed_root != str(root) \
+                and adoptcmd.refresh_shim(Path(ps.managed_root)):
+            out.setdefault("graphify", {})["path_shim"] = (
+                f"refreshed {ps.winner} → current verb "
+                "(PATH-winning interceptor, cage-managed root)")
+    except Exception as exc:  # noqa: BLE001
+        from cage import debuglog
+        debuglog.exception(root, "agents.install: PATH-winning shim heal", exc)
     return out
 
 
 def status(root: Path) -> dict:
     return {name: wire.status(root) for name, wire in _WIRE.items()}
-
-
-def backfill_status(root: Path) -> dict:
-    """Per-agent: is a SessionStart-backfill capture hook wired? All four support one."""
-    return {name: wire.backfill_status(root) for name, wire in _WIRE.items()}
-
-
-def realtime_status(root: Path) -> dict:
-    """Per-agent: is a real-time per-turn hook wired? Claude/Kiro fire `Stop`,
-    Copilot fires `agentStop` — all three have one."""
-    return {name: wire.realtime_status(root) for name, wire in _WIRE.items()}

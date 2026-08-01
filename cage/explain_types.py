@@ -14,4 +14,4 @@ class Explanation:
     code_refs: tuple[str, ...]
     method_note: str           # which method tag this produces & why
     kind: str = "calculation"  # "calculation" | "concept"
-    plan_ref: str = ""         # docs/cage-plan.md § — required for concept entries
+    plan_ref: str = ""         # docs/PLAN.md § — required for concept entries

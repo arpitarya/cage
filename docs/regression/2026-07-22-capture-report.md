@@ -1,3 +1,18 @@
+> ## ⚠ SUPERSEDED — split into [lab-run-001](2026-07-22-lab-run-001.md) + 8 finding docs
+>
+> This file layered three questions in one document (what the run observed · each
+> finding's lifecycle · later resolutions baked into headings), which the
+> report-per-run model forbids. It has been split, **nothing deleted**:
+> - the run's **observations** → [`2026-07-22-lab-run-001.md`](2026-07-22-lab-run-001.md) (no later status);
+> - each finding's **current status + history** → the eight
+>   `2026-07-22-finding-<slug>.md` docs (linked from lab-run-001's findings table).
+>
+> The body below is preserved verbatim as the original published evidence — read
+> it as *history*, never as current status. For "what is F1's status **now**?",
+> read [its finding doc](2026-07-22-finding-receipts-empty.md).
+
+---
+
 # Cage Capture Report — real-machine findings
 
 **Source:** the real cage ledger on `arpits-macbook-local` (`~/.cage`), 36,451 calls

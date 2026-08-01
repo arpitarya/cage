@@ -247,13 +247,13 @@ def test_printed_hint_is_runnable_end_to_end(proj, monkeypatch, capsys):
     assert cmd == "prices route-tool graphify --to <provider>/<model>"
     assert cli.main(cmd.replace("<provider>/<model>", SONNET).split()) == 0
     capsys.readouterr()
-    pol = policy.load(proj / ".cage" / "policy.toml")
+    pol = policy.load(proj / ".cage" / "cage.toml")
     t = roi.by_tool(proj, pol)["tools"]["graphify"]
     assert t["saved_usd"] == 0.03 and t["priced_via"] == ["price_at"]
     # --remove returns the receipt to UNPRICED (rung 3), the loud state
     assert cli.main(["prices", "route-tool", "graphify", "--remove"]) == 0
     capsys.readouterr()
-    pol = policy.load(proj / ".cage" / "policy.toml")
+    pol = policy.load(proj / ".cage" / "cage.toml")
     assert roi.by_tool(proj, pol)["tools"]["graphify"]["priced_via"] == ["unpriced"]
 
 

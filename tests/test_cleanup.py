@@ -98,34 +98,86 @@ def test_dry_run_touches_nothing(root, capsys):
     assert after == before
 
 
-def test_apply_flag_and_env_toggle(root, capsys, monkeypatch):
+def test_apply_ignores_cleanup_enabled_env(root, capsys, monkeypatch):
+    """--apply is an explicit command — since v0.37 it always executes, regardless
+    of [cleanup] enabled / CAGE_CLEANUP (which now gates only the *automatic*
+    reminder, `maybe_run`). An explicitly-typed command is never silently ignored."""
     _seed_state(root)
     monkeypatch.setenv("CAGE_CLEANUP", "0")
     assert cli.main(["data", "cleanup", "--apply"]) == 0
-    assert "DISABLED" in capsys.readouterr().out
-    assert (Footprint(root).state / "junk.tmp").exists()  # env off ⇒ nothing applied
-    monkeypatch.delenv("CAGE_CLEANUP")
-    assert cli.main(["data", "cleanup", "--apply"]) == 0
-    assert "✔ applied" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "auto-reminder off" in out
+    assert "✔ applied" in out
     assert not (Footprint(root).state / "junk.tmp").exists()
 
 
-def test_maybe_run_throttles_and_fails_open(root, monkeypatch):
+def test_dry_run_also_ignores_cleanup_enabled_env(root, capsys, monkeypatch):
+    _seed_state(root)
+    monkeypatch.setenv("CAGE_CLEANUP", "0")
+    assert cli.main(["data", "cleanup"]) == 0
+    out = capsys.readouterr().out
+    assert "auto-reminder off" in out and "dry-run" in out
+    assert (Footprint(root).state / "junk.tmp").exists()  # dry-run: nothing touched
+
+
+def test_maybe_run_warns_but_never_deletes(root, monkeypatch, capsys):
+    """The auto path (v0.37): a reminder on stderr, never a deletion. The reminder
+    names the count, the reclaimable size, and the exact runnable fix."""
     _seed_state(root)
     pol = policy.load(None)
     cleanup.maybe_run(root, pol)
     stamp = Footprint(root).state / "cleanup.stamp"
     assert stamp.exists()
-    assert not (Footprint(root).state / "junk.tmp").exists()
-    # within the throttle window: prune must not run again
+    assert (Footprint(root).state / "junk.tmp").exists()   # never deleted by auto
+    out, err = capsys.readouterr()
+    assert out == ""                                        # never stdout
+    assert "state/ item(s)" in err and "KB reclaimable" in err
+    assert "cage data cleanup" in err and "--apply" in err
+    # within the throttle window: a second call must not re-scan or re-print
     calls = []
-    monkeypatch.setattr(cleanup, "prune", lambda *a, **k: calls.append(1) or {})
+    monkeypatch.setattr(cleanup, "scan", lambda *a, **k: calls.append(1) or [])
     cleanup.maybe_run(root, pol)
     assert calls == []
-    # and a raising prune never propagates (fail-open)
+    assert capsys.readouterr().err == ""
+    # and a raising scan never propagates (fail-open)
     stamp.unlink()
-    monkeypatch.setattr(cleanup, "prune", lambda *a, **k: 1 / 0)
+    monkeypatch.setattr(cleanup, "scan", lambda *a, **k: 1 / 0)
     cleanup.maybe_run(root, pol)  # must not raise
+
+
+def test_maybe_run_silent_when_nothing_stale(root, capsys):
+    """A '0 items' reminder trains people to ignore it — so there must be none."""
+    cleanup.maybe_run(root, policy.load(None))  # freshly-created, empty state/
+    out, err = capsys.readouterr()
+    assert out == "" and err == ""
+    assert (Footprint(root).state / "cleanup.stamp").exists()  # throttle still ticks
+
+
+def test_cleanup_warn_switch_suppresses_reminder_not_the_gate(root, monkeypatch, capsys):
+    """[cleanup] warn / CAGE_CLEANUP_WARN silences the reminder text but the auto
+    path still runs its (no-op) sweep and still ticks the throttle stamp."""
+    _seed_state(root)
+    monkeypatch.setenv("CAGE_CLEANUP_WARN", "0")
+    cleanup.maybe_run(root, policy.load(None))
+    assert capsys.readouterr().err == ""
+    assert (Footprint(root).state / "junk.tmp").exists()
+    assert (Footprint(root).state / "cleanup.stamp").exists()
+
+
+def test_cleanup_enabled_false_disables_the_auto_path_entirely(root, monkeypatch, capsys):
+    """enabled=false ⇒ no automatic anything (the decided semantics) — not even the
+    throttle stamp is touched. A manual `cage data cleanup --apply` still works
+    (proven by test_apply_ignores_cleanup_enabled_env)."""
+    _seed_state(root)
+    monkeypatch.setenv("CAGE_CLEANUP", "0")
+    cleanup.maybe_run(root, policy.load(None))
+    assert capsys.readouterr().err == ""
+    assert not (Footprint(root).state / "cleanup.stamp").exists()
+
+
+def test_cleanup_warn_default_and_env_precedence():
+    assert policy.cleanup_warn({}) is True
+    assert policy.cleanup_warn({"cleanup": {"warn": False}}) is False
 
 
 def test_import_run_piggybacks_cleanup(root, monkeypatch):

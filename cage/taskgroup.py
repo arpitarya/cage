@@ -38,7 +38,7 @@ GROUP_KEYS = ("stack", "scope", "label")
 
 def closed_tasks(root: Path) -> dict[str, dict]:
     """Latest row per task id, filtered to *closed* tasks (an ``outcome`` recorded
-    via `cage human outcome` / SessionEnd). Open tasks never enter a comparison."""
+    via `cage task outcome` / SessionEnd). Open tasks never enter a comparison."""
     return {tid: row for tid, row in tasks.read(root).items() if row.get("outcome")}
 
 
@@ -90,7 +90,7 @@ def join_rows(calls: list[dict], receipts: list[dict]) -> dict[str, dict]:
 def signature(receipts: list[dict]) -> str:
     """The observed stack: sorted joined receipt tools, ``human`` excluded;
     ``agent-only`` when no tool receipt joined."""
-    tools = sorted({r.get("tool", "") for r in receipts} - {"", "human"})
+    tools = sorted({r.get("tool", "") for r in receipts} - {"", "human"})  # "human" = legacy
     return "+".join(tools) if tools else AGENT_ONLY
 
 

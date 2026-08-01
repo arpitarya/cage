@@ -1,3 +1,13 @@
+> ## ⚠ SUPERSEDED — absorbed into [finding: receipts-empty](2026-07-22-finding-receipts-empty.md)
+>
+> This correction's four corrections now live as *history* inside the F1 finding
+> doc, which owns F1's current (unambiguous) status and shows the superseded first
+> diagnosis as superseded. **This file is kept, unedited, as the cited published
+> evidence** — it is the original 2026-07-24 root-cause record. For "what is F1's
+> status **now**?", read the finding doc.
+
+---
+
 # 2026-07-24 — Correction to F1 (tool-savings receipts are effectively absent)
 
 This is a correction to a finding in

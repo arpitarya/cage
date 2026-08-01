@@ -1,6 +1,9 @@
 """Shared fixtures — an isolated project root with the demo ledger seeded."""
 from __future__ import annotations
 
+import os
+from pathlib import Path
+
 import pytest
 
 from cage import demo, metering
@@ -40,6 +43,15 @@ def _bare_cage_in_hooks(monkeypatch, tmp_path):
     # `cage --ledger` sets `CAGE_BASE` via os.environ (process-scoped in production); clear
     # it per test so a `--ledger` test can't re-base a later test's Footprint.
     monkeypatch.delenv("CAGE_BASE", raising=False)
+    # Strip every PATH entry holding a `graphify` — the same reason the agent homes are
+    # redirected above, one step sharper. `agents.install` now heals the PATH-WINNING
+    # interceptor when it sits in a cage-managed root (B-fix-2), and the developer's own
+    # machine has exactly that, in a DIFFERENT repo. Without this, any test that calls
+    # `agents.install` would rewrite another project's shim from inside the suite. Tests
+    # that need a graphify on PATH build their own (tests/test_pathshim.py).
+    monkeypatch.setenv("PATH", os.pathsep.join(
+        d for d in os.environ.get("PATH", "").split(os.pathsep)
+        if d and not (Path(d) / "graphify").exists()))
 
 
 @pytest.fixture

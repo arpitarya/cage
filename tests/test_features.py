@@ -26,10 +26,9 @@ def _token_only_call(root, task, ts):
 
 
 def test_token_only_calls_reprice_in_quality_regression_forecast(proj):
-    # The 2026-07 manual validation found quality/regression/forecast (and the human
-    # axis, below) summing the stored est_cost_usd (0.0 for every transcript-sourced
-    # call) — a $3,800 ledger rendered as $0 drift / "no spend". All must route
-    # through prices.call_usd.
+    # The 2026-07 manual validation found quality/regression/forecast summing the
+    # stored est_cost_usd (0.0 for every transcript-sourced call) — a $3,800 ledger
+    # rendered as $0 drift / "no spend". All must route through prices.call_usd.
     pol = policy.load(None)
     _token_only_call(proj, "t1", "2000-01-01T00:00:00Z")
     _token_only_call(proj, "t2", "2099-01-01T00:00:00Z")
@@ -38,17 +37,6 @@ def test_token_only_calls_reprice_in_quality_regression_forecast(proj):
     r = regression.detect(proj, since="7d", tolerance=0.2, pol=pol)
     assert r["recent_mean"] > 0 and r["base_mean"] > 0
     assert forecast.project(proj, pol)["total_usd"] > 0
-
-
-def test_token_only_calls_reprice_on_the_human_axis(proj):
-    from cage import humanview, trend
-    pol = policy.load(None)
-    _token_only_call(proj, "t1", "2026-06-14T00:00:00Z")
-    metering.record_human(task="t1", minutes=30, root=proj)
-    agents = humanview.rollup(proj, pol)["agents"]
-    assert sum(a["agent_usd"] for a in agents.values()) > 0
-    buckets = trend.series(proj, pol, by="week")["buckets"]
-    assert sum(b["agent_usd"] for b in buckets.values()) > 0
 
 
 def test_quality_cost_per_successful_task(proj):

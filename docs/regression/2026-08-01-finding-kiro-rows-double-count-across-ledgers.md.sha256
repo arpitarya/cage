@@ -1,0 +1,4 @@
+23567b07971c41cc52b9f78ea61e96404601499d3c0385832e4560db42da3d38  2026-08-01-finding-kiro-rows-double-count-across-ledgers.md
+# sha256 over the WHOLE file (all bytes, byte 0 to EOF).
+# Verify with:
+#   shasum -a 256 -c 2026-08-01-finding-kiro-rows-double-count-across-ledgers.md.sha256

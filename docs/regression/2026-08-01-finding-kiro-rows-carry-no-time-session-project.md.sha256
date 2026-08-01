@@ -1,0 +1,4 @@
+3d9cac3950daedd43a371b736764a862700a68841b0a1aada1590f15ffa6d150  2026-08-01-finding-kiro-rows-carry-no-time-session-project.md
+# sha256 over the WHOLE file (all bytes, byte 0 to EOF).
+# Verify with:
+#   shasum -a 256 -c 2026-08-01-finding-kiro-rows-carry-no-time-session-project.md.sha256

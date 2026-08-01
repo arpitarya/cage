@@ -1,0 +1,4 @@
+be1c5c348d126df96ccfc685ea680d01b698f5d5cc24b5ce71a78cf9ae5d5299  2026-08-01-finding-saved-is-gross.md
+# sha256 over the WHOLE file (all bytes, byte 0 to EOF).
+# Verify with:
+#   shasum -a 256 -c 2026-08-01-finding-saved-is-gross.md.sha256

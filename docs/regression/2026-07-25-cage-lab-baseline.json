@@ -1,0 +1,112 @@
+{
+  "date": "2026-07-25",
+  "cage_version": "0.36.0",
+  "pass": 16,
+  "total": 16,
+  "scenarios": [
+    {
+      "id": "M1",
+      "verdict": "pass",
+      "proves": "claude solo (shared store, honest surface=\"\")",
+      "failures": []
+    },
+    {
+      "id": "M2",
+      "verdict": "pass",
+      "proves": "copilot solo (cli+vscode split, premium, customTitle ladder)",
+      "failures": []
+    },
+    {
+      "id": "M3",
+      "verdict": "pass",
+      "proves": "kiro solo (surface=ide, volatile ts, priced via kiro proxy)",
+      "failures": []
+    },
+    {
+      "id": "M4a",
+      "verdict": "pass",
+      "proves": "claude CLI alone \u2014 still surface=\"\" (honest, WHY in eyeball)",
+      "failures": []
+    },
+    {
+      "id": "M4b",
+      "verdict": "pass",
+      "proves": "copilot CLI alone \u2014 surface=cli, premium present",
+      "failures": []
+    },
+    {
+      "id": "M4c",
+      "verdict": "pass",
+      "proves": "kiro has NO CLI surface \u2014 assert the honest gap, fabricate nothing",
+      "failures": []
+    },
+    {
+      "id": "M5a",
+      "verdict": "pass",
+      "proves": "claude VS Code alone \u2014 the one honest blank surface",
+      "failures": []
+    },
+    {
+      "id": "M5b",
+      "verdict": "pass",
+      "proves": "copilot VS Code alone \u2014 surface=vscode, customTitle ladder, UNPRICED",
+      "failures": []
+    },
+    {
+      "id": "M5c",
+      "verdict": "pass",
+      "proves": "kiro IDE \u2014 kiro's only surface",
+      "failures": []
+    },
+    {
+      "id": "M6",
+      "verdict": "pass",
+      "proves": "kiro+copilot combined \u2014 one sweep, manifest per (agent,surface,session)",
+      "failures": []
+    },
+    {
+      "id": "G1",
+      "verdict": "pass",
+      "proves": "graphify solo \u2014 one saving, no calls",
+      "failures": []
+    },
+    {
+      "id": "G2",
+      "verdict": "pass",
+      "proves": "graphify + claude \u2014 saving coexists with calls",
+      "failures": []
+    },
+    {
+      "id": "G3",
+      "verdict": "pass",
+      "proves": "graphify + copilot \u2014 UNPRICED calls don't poison savings",
+      "failures": []
+    },
+    {
+      "id": "G4",
+      "verdict": "pass",
+      "proves": "graphify + kiro \u2014 saving on the thinnest log",
+      "failures": []
+    },
+    {
+      "id": "G5",
+      "verdict": "pass",
+      "proves": "graphify+kiro+copilot \u2014 native-shim dedupe \u21d2 EXACTLY ONE saving",
+      "failures": []
+    },
+    {
+      "id": "MIG",
+      "verdict": "pass",
+      "proves": "savings migration precision \u2014 NOT WRONG, NOT DUPLICATED",
+      "failures": []
+    }
+  ],
+  "findings": [
+    {
+      "id": "kiro-priced-not-unpriced",
+      "severity": "spec-correction",
+      "summary": "cage-lab-plan.md M3/M5b call kiro 'agent' UNPRICED; the shipped bundle PRICES it via [prices.kiro.agent] (sonnet 3/15/0.3). cage is correct; the spec line is stale. Lab references corrected to $0.0201 for the kiro fixture.",
+      "cage_bug": false
+    }
+  ]
+}

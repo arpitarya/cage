@@ -96,14 +96,23 @@ def _grouping_calls(root: Path, since: str | None, team_calls):
     return ledger.since(ledger.calls(root, since=since), since)
 
 
+def _is_legacy_human(r: dict) -> bool:
+    """A pre-0.36 Tier-1 row: the removed human axis's tool, or its removed unit.
+    The ONE predicate every money view shares — see `_nonhuman_savings`."""
+    return r.get("tool") == "human" or r.get("unit") == "minutes"
+
+
 def _nonhuman_savings(all_calls: list[dict], receipts: list[dict], pol: dict,
                       scope: str | None = None):
     """Yield ``(receipt, call, saved_usd, rung, model_key)`` per non-human receipt
     (already window-filtered). ``all_calls`` is the *unfiltered* join table so an
     in-window receipt can still find its (possibly older) call.
 
-    Tier-1 ``tool="human"`` receipts are a *different axis* (`cage human show`); counting
-    them here would double-count and mix axes — skip them, matching `roi.by_tool` (§4.4).
+    **Legacy Tier-1 rows are excluded, never priced.** The agent-vs-human axis was
+    removed in v0.36, but ledgers are append-only: a pre-0.36 ``tool="human"`` receipt
+    (and any ``unit="minutes"`` row) has no USD route left. Skipping it here is a
+    *decision*, so it is COUNTED and footnoted (``legacy_human`` below) rather than
+    silently dropped from a total — `cage query savings-axis` explains it.
     USD comes only through the one unit→USD dispatch (`convert.saved_usd`); a call-less
     token receipt prices via the resolution ladder (`receiptprice`, plan §4.5) —
     ``rung`` names its path (``"unpriced"`` when rung 3 refused; ``""`` off-ladder)
@@ -114,7 +123,7 @@ def _nonhuman_savings(all_calls: list[dict], receipts: list[dict], pol: dict,
     by_id = {c.get("id"): c for c in all_calls}
     idx = receiptprice.build(all_calls, receipts)  # once per view, never per receipt
     for r in ledger.by_scope(receipts, scope):
-        if r.get("tool") == "human":
+        if _is_legacy_human(r):
             continue
         call = by_id.get(r.get("call"), {})
         if receiptprice.eligible(r, by_id):
@@ -220,10 +229,16 @@ def summarize(root: Path, pol: dict, dim: str = "route", since: str | None = Non
             "alias": alias, "unpriced_detail": dict(sorted(unpriced.items())),
             "unpriced_receipts": unpriced_receipts, "freshness": fresh,
             "rung_models": sorted(rung_models),
-            "has_receipts": any(r.get("tool") != "human"
+            "has_receipts": any(not _is_legacy_human(r)
                                 for r in ledger.by_scope(windowed_receipts, scope)),
+            "legacy_human": sum(1 for r in ledger.by_scope(windowed_receipts, scope)
+                                if _is_legacy_human(r)),
             "kiro_input_only": bool(kiro["calls"] and kiro["tokens_in"]
                                     and not kiro["tokens_out"]),
+            # K3: any kiro row in the view triggers the no-time/session/project limit —
+            # a wider gate than `kiro_input_only`, because that limit holds even when
+            # kiro does report output tokens.
+            "kiro_rows": kiro["calls"],
             "any_calls": bool(raw_calls)}
 
 
@@ -264,7 +279,13 @@ def capture_warnings(health: dict | None) -> list[str]:
     only the passed-in ``_health`` record (`importcmd.capture_health`), never the
     filesystem — so `render_report`/`cage doctor` share one verdict. One ⚠ block per gated
     agent, in SURFACES order, each carrying a runnable fix (`cage doctor --paths`) and the
-    documented opt-out for an agent you don't use."""
+    documented opt-out for an agent you don't use.
+
+    The warning **names the patterns it tried** when the health record carries them
+    (path-globs handoff §5): a "matched 0 files" that hides its glob cannot be acted on —
+    the wrong-glob bug that produced this exact line cost twenty minutes precisely because
+    the message never said what it was looking for. Older records with no ``pattern``
+    render as before."""
     from cage import agents
     out: list[str] = []
     for a in agents.SURFACES:
@@ -274,12 +295,85 @@ def capture_warnings(health: dict | None) -> list[str]:
         if rec.get("home") and rec.get("files", 0) == 0 and not rec.get("captured"):
             home_path = rec.get("home_path") or f"~/.{a}"
             src = rec.get("src") or "its log location"
+            tried = f" (tried: {rec['pattern']})" if rec.get("pattern") else ""
             out.append(
-                f"⚠ {a}: {home_path} exists but {src} matched 0 files — capture is off "
+                f"⚠ {a}: {home_path} exists but {src} matched 0 files{tried} — capture is off "
                 f"for this agent.\n"
                 f"  cage doctor --paths      (if you don't use {a}: "
                 f"[sources.{a}] replace=true, paths=[] )")
     return out
+
+
+def kiro_routed_line(root: Path, pol: dict | None = None) -> str:
+    """The footer line explaining why a **project** report shows no kiro (ADR 0006): its
+    IDE rows are a machine fact and live in the machine ledger. ``""`` when kiro is not
+    routed away (the machine ledger's own report, or an explicit ``--ledger``), or when
+    kiro isn't a configured source here — nothing to explain in either case.
+
+    Silence would be the one unacceptable outcome: an agent that shows no rows is
+    indistinguishable from an agent whose capture is broken, which is the failure cage
+    exists to prevent. Impure (it resolves paths), so it is read at the CLI boundary and
+    passed into the pure `render_report`, like `health` and `ceiling`. Deliberately does
+    **not** read the machine ledger to count rows: a per-report cross-ledger read to
+    decorate a footnote is not worth it, and the line is true either way."""
+    from cage import paths
+    sink = paths.kiro_routed(root)
+    if sink is None:
+        return ""
+    try:
+        if not any(s.agent == "kiro" for s in paths.resolve_log_sources(pol).sources):
+            return ""
+    except Exception:  # noqa: BLE001 — a broken [sources] table is reported elsewhere
+        return ""
+    return (f"· kiro is not counted here — its IDE log carries no project, so its rows "
+            f"are a machine fact and live in {paths.Footprint(sink).base}\n"
+            f"  (`cage query kiro-routing`; read them with "
+            f"`cage --ledger {paths.Footprint(sink).base} report`)")
+
+
+def _kiro_limits_caveat(rep: dict, usd: bool) -> str:
+    """The kiro HONEST-LIMIT line (K3, [finding](docs/regression/2026-08-01-finding-kiro-rows-carry-no-time-session-project.md)),
+    stated where a kiro number could be misread. Kiro's IDE log records **no per-turn
+    timestamp, no session id and no project**: its `ts` is stamped at import, `session` is
+    the constant ``"kiro"``, and `project` is absent. So kiro rows cannot be ordered,
+    windowed, or attributed — and the `--since` case is called out by name, because a time
+    window silently *includes or excludes* them by when the import ran rather than when the
+    work happened, which is the reading that would be wrong rather than merely coarse."""
+    if not rep.get("kiro_rows"):
+        return ""
+    if rep.get("kiro_input_only"):
+        base = ("· kiro: input-only log — cost understated" if usd
+                else "· kiro: input-only log — tok out not recorded")
+        base += "; its rows also carry"
+    else:
+        base = "· kiro: its rows carry"
+    base += " no per-turn time, session or project (`cage query kiro-routing`)"
+    if rep.get("since"):
+        base += ("\n  ⚠ kiro rows are timestamped at IMPORT, not at the turn — this "
+                 "window neither includes nor excludes them reliably")
+    return base
+
+
+def _surface_caveat(rep: dict) -> str:
+    """The `--by surface` HONEST-LIMIT line (K4, [finding](docs/regression/2026-08-01-finding-surface-attribution-is-agent-dependent.md)).
+
+    Claude Code's CLI and its VS Code extension write the **same** store with no marker
+    distinguishing them, so cage cannot know which surface produced a claude row. The empty
+    cell means *the source does not say* — the alternative, defaulting to ``cli``, would
+    invent a fact. Fires only on the surface view, and only when claude rows are actually
+    in it: the misreading needs the blank cell to be on screen."""
+    from cage import agents as _a
+    if rep.get("dim") != "surface":
+        return ""
+    blank = rep["groups"].get("—") or rep["groups"].get("")
+    # `row_surface`, not a literal: a claude row's `agent` field is `claude-code`, so a
+    # bare `"claude" in agents` check would never fire on a real ledger — a caveat that
+    # silently never prints is worse than none.
+    if not (blank and "claude" in {_a.row_surface(x) for x in (blank.get("agents") or [])}):
+        return ""
+    return ("· blank surface = the source does not say, never \"cli\" — Claude Code's CLI "
+            "and VS Code extension\n  share one store with no marker; only copilot's "
+            "stores are genuinely separate")
 
 
 _EMPTY = """No calls recorded yet.
@@ -343,7 +437,7 @@ def overview(root: Path, pol: dict, since: str | None = None) -> dict:
             "spent_usd": spent, "saved_usd": saved, "net_usd": saved - spent,
             "tokens": tokens, "unpriced_calls": unpriced_calls,
             "unpriced_tokens": unpriced_tokens,
-            "has_receipts": any(r.get("tool") != "human" for r in rcpts)}
+            "has_receipts": any(not _is_legacy_human(r) for r in rcpts)}
 
 
 def _cost_cell(g: dict, total: bool = False) -> str:
@@ -394,7 +488,8 @@ def _row(name: str, g: dict, savings_cols: bool, usd_view: bool, total: bool = F
 
 
 def render_report(rep: dict, last_import: str | None = None, disp=None,
-                  stale_hours: int | None = None, health: dict | None = None) -> str:
+                  stale_hours: int | None = None, health: dict | None = None,
+                  ceiling: dict | None = None, kiro_route: str = "") -> str:
     """The text report (spec §1, R1–R6): tokens by default, dollars on ``disp.usd``
     (plan Phase 2.5); saved columns signal-gate on receipts-in-window
     (``disp.all_columns`` restores the full grid); pricing footnotes and the full
@@ -404,7 +499,16 @@ def render_report(rep: dict, last_import: str | None = None, disp=None,
     ``health`` is the per-agent capture-health record (`importcmd.capture_health`, read
     at the CLI boundary and passed in — this function stays a **pure** function of its
     args): a triple-gated "installed but capturing nothing" ⚠ per silent agent
-    (:func:`capture_warnings`). Never enters CSV."""
+    (:func:`capture_warnings`). Never enters CSV.
+
+    ``kiro_route`` is the already-computed kiro-routing footer line
+    (:func:`kiro_routed_line`, also read at the CLI boundary): why a *project* report shows
+    no kiro at all (ADR 0006). Empty in every other case. Never enters CSV.
+
+    ``ceiling`` is the already-computed graphify day-one repo ceiling
+    (`graphifymodel.repo_ceiling`, also read at the CLI boundary so this stays pure) —
+    G4: a **modeled**, token-native advisory line in the footer, silent in non-graphify
+    projects, never blended into report's measured $ total. CSV never sees it."""
     from cage import display as _d
     disp = disp or _d.DEFAULT
     if not rep["groups"]:
@@ -417,11 +521,11 @@ def render_report(rep: dict, last_import: str | None = None, disp=None,
     rows.append(_row("TOTAL", rep["total"], savings_cols, disp.usd, total=True))
     head = [rep["dim"], "calls", "tok in", "tok out"]
     if not disp.usd and savings_cols:
-        head.append("saved tok")
+        head.append("gross tok")  # K: gross, never bare "saved" (net-savings handoff)
     if disp.usd:
         head.append("cost")
         if savings_cols:
-            head += ["saved", "net"]
+            head += ["gross", "net vs spend"]
     title = f"Ledger by {rep['dim']}"
     if rep.get("project"):
         title += f" · project {rep['project']}"
@@ -454,9 +558,20 @@ def render_report(rep: dict, last_import: str | None = None, disp=None,
             foot.caveat(f"· cache: {cache_tok_pct} of input tokens were cache reads, "
                         f"{cache_usd_pct} of cost ({render.usd(t.get('cache_usd', 0.0))} "
                         f"of {render.usd(t['usd'])})")
-    if rep.get("kiro_input_only"):
-        foot.caveat("· kiro: input-only log — cost understated" if disp.usd
-                    else "· kiro: input-only log — tok out not recorded")
+    # K3/K4: the two HONEST-LIMITs, each stated where its number could be misread.
+    if (kiro_caveat := _kiro_limits_caveat(rep, disp.usd)):
+        foot.caveat(kiro_caveat)
+    if (surf := _surface_caveat(rep)):
+        foot.caveat(surf)
+    if kiro_route:  # ADR 0006: why this project report has no kiro rows to caveat
+        foot.caveat(kiro_route)
+    if rep.get("legacy_human"):
+        # The removal decision, made visible: these rows are excluded from every
+        # money total rather than priced at a rate that no longer exists. Silence
+        # here would be the one thing the removal was not allowed to do.
+        foot.caveat(f"· {rep['legacy_human']} legacy human-axis receipt(s) excluded "
+                    "from savings — the agent-vs-human axis was removed in v0.36 and "
+                    "these rows have no price route (`cage query savings-axis`)")
     if rep.get("project"):
         foot.caveat("· project view is exact for Claude only — Copilot/Kiro/Codex logs "
                     "carry no project, so their spend is excluded from this filter.")
@@ -466,6 +581,10 @@ def render_report(rep: dict, last_import: str | None = None, disp=None,
             foot.warn(_unpriced_block(rep["unpriced_detail"]))
         if rep.get("unpriced_receipts", {}).get("receipts"):
             foot.warn(receiptprice.unpriced_receipts_line(rep["unpriced_receipts"]))
+    if savings_cols:  # K: what the gross column excludes, in the ONE shared phrasing
+        from cage import netsaved
+        foot.caveat(netsaved.GROSS_NOTE + "\n  net vs spend = gross − this window's "
+                    "spend, not net of the tools' cost of use.")
     if savings and not rep.get("has_receipts", True):
         foot.gap("· no savings receipts in this window — wire a tool to measure savings\n"
                  "  (`cage query receipts` explains)")
@@ -475,6 +594,9 @@ def render_report(rep: dict, last_import: str | None = None, disp=None,
                  f"view $ (`--usd`; cage prices unpriced)")
     for w in capture_warnings(health):  # installed-but-capturing-nothing (docs/capture-health)
         foot.warn(w)
+    if ceiling:  # G4: graphify day-one repo ceiling (modeled, token-native, footer-only)
+        from cage import graphifymodel
+        foot.advice(graphifymodel.ceiling_footer_line(ceiling))
     foot.advice(_last_import_line(last_import, stale_hours))
     for l in rep.get("freshness") or []:  # actionable-only — silent when clean (§3.3)
         if l.startswith("bundled prices are"):
@@ -491,12 +613,14 @@ def render_csv(rep: dict) -> str:
     (spend-descending) + a TOTAL row. Raw numbers, not $-formatted strings; the
     per-group UNPRICED gap keeps the understatement visible in a spreadsheet.
     `method` column: measured — recorded tokens repriced at derive time (the
-    `repricing` query entry); spend is never a projection. Column contract in
-    docs/csv-output.md."""
+    `repricing` query entry); spend is never a projection. The savings columns are
+    named for what they are — `gross_saved_usd` excludes the cost of *using* the tool,
+    and `net_vs_spend_usd` nets it against this window's spend, not against that cost
+    (net-savings handoff, K). Column contract in docs/formulas.md §2."""
     from cage import csvout
     savings = "saved_usd" in rep["total"]
     head = [rep["dim"], "calls", "tokens_in", "tokens_out", "cached_in", "cost_usd",
-            *(("saved_usd", "net_usd") if savings else ()),
+            *(("gross_saved_usd", "net_vs_spend_usd") if savings else ()),
             "unpriced_calls", "unpriced_tokens", "method"]
     def cells(name, g):
         return [name, g["calls"], g["tokens_in"], g["tokens_out"], g["cached_in"],
@@ -521,7 +645,8 @@ def render_overview(o: dict, last_import: str | None = None, disp=None) -> str:
     if not disp.usd:
         head = f"{render.tok(o['tokens'])} tokens  ·  {o['calls']} calls   {win}"
     elif o.get("has_receipts", True):
-        head = (f"spent {render.usd(o['spent_usd'])}  ·  saved {render.usd(o['saved_usd'])}"
+        head = (f"spent {render.usd(o['spent_usd'])}  ·  gross saved "
+                f"{render.usd(o['saved_usd'])}"
                 f"  ·  net {render.signed_usd(o['net_usd'])}  ·  {render.tok(o['tokens'])} tokens"
                 f"   {win}")
     else:
@@ -539,6 +664,9 @@ def render_overview(o: dict, last_import: str | None = None, disp=None) -> str:
             n = o["unpriced_calls"]
             foot.gap(f"· {n} call{'s' if n != 1 else ''} unpriced — matters when you "
                      f"view $ (`--usd`; cage prices unpriced)")
+    if disp.usd and o.get("has_receipts", True):  # K: the gross exclusion, one phrasing
+        from cage import netsaved
+        foot.caveat(netsaved.GROSS_NOTE)
     if disp.usd and not o.get("has_receipts", True):
         foot.gap("· no savings receipts in this window — wire a tool to measure savings\n"
                  "  (`cage query receipts` explains)")

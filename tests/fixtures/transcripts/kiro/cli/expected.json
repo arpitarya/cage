@@ -23,7 +23,8 @@
       "ok": true,
       "retries": 0,
       "scope": "",
-      "project": ""
+      "project": "",
+      "surface": "ide"
     },
     {
       "id": "c_kiro000013a9a2e5e",
@@ -41,7 +42,8 @@
       "ok": true,
       "retries": 0,
       "scope": "",
-      "project": ""
+      "project": "",
+      "surface": "ide"
     }
   ]
 }

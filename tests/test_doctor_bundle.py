@@ -9,6 +9,7 @@ import pytest
 
 from cage import clicmds, doctorbundle, importcmd
 from cage.errors import CageError
+from srcseed import mkcage
 
 ALWAYS = {"manifest.json", "doctor.txt", "doctor.json", "version.txt",
           "footprint.txt", "policy-provenance.txt"}
@@ -20,9 +21,9 @@ PII_MARKERS = (b"content stripped", b'"prompt"', b'"raw_alternative"')
 
 
 def _seeded_root(tmp_path, monkeypatch, debug: bool):
-    (tmp_path / ".cage").mkdir()
     for env in ("CLAUDE_CONFIG_DIR", "CODEX_HOME", "COPILOT_HOME", "KIRO_DATA_DIR"):
         monkeypatch.setenv(env, str(tmp_path / f"home-{env.lower()}"))
+    mkcage(tmp_path)  # Directive A: materialize [sources] so the pathless sweep resolves homes
     if debug:
         monkeypatch.setenv("CAGE_DEBUG", "1")
     home = tmp_path / "home-claude_config_dir" / "projects" / "p"

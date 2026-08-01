@@ -1,0 +1,4 @@
+7e5d80a473d9df2d0524a488afb56cbddc4ac78fa896502229f572bfd170edb8  2026-08-01-phase-benchmark.md
+# sha256 over the WHOLE file (all bytes, byte 0 to EOF).
+# Verify with:
+#   shasum -a 256 -c 2026-08-01-phase-benchmark.md.sha256

@@ -9,6 +9,7 @@ What may be cleaned is closed **by construction** — `scan` only ever looks at:
 
 - ``debug-log``      — `debug.log` rows older than the window (current rows kept);
 - ``capture-log``    — `capture.log` rows older than the window (current rows kept);
+- ``usage-log``      — `graphify-usage.jsonl` rows older than the window (GC1 breadcrumb);
 - ``hooks-seen``     — `hooks-seen.jsonl` rows older than the window;
 - ``pending-buffer`` — `pending-*.jsonl` session buffers untouched for the window;
 - ``cursor-orphan``  — `cursors.json` entries whose source log no longer exists
@@ -16,29 +17,46 @@ What may be cleaned is closed **by construction** — `scan` only ever looks at:
 - ``tmp``            — `state/*.tmp` older than the window.
 
 Never cleanable — enforced by the allowlist, not convention: anything in
-``ledger/``, ``policy.toml``, ``outcomes``, the machine id (fleet pairing breaks
-without it), ``study.jsonl``, ``limits.json``. State files are never read by
+``ledger/``, ``cage.toml`` (and ``prices.toml`` + the legacy ``policy.toml``),
+``outcomes``, the machine id (fleet pairing breaks without it), ``study.jsonl``,
+``limits.json``.
+State files are never read by
 derived views, so cleanup cannot change a single reported number.
 
-Two paths: **auto** (`maybe_run`, piggybacked on `cage import` — cage installs no
-scheduler — throttled to one real check per `CLEANUP_THROTTLE_HOURS`, entirely
-fail-open: an error is debug-logged under ``cleanup.prune`` and never blocks
-capture) and **manual** (`cage data cleanup`, dry-run print by default, ``--apply`` to
-execute). Retention: policy ``[cleanup] days`` (`constants.CLEANUP_DEFAULT_DAYS`
-fallback); the whole feature gates on `policy.cleanup_enabled` (env
-``CAGE_CLEANUP`` beats policy).
+Two paths, and since v0.37 they are no longer symmetric:
+
+- **auto** (`maybe_run`, piggybacked on `cage import` — cage installs no scheduler —
+  throttled to one real check per `CLEANUP_THROTTLE_HOURS`) **only ever warns**. It
+  computes what would go and prints one stderr reminder (silent when nothing is
+  eligible); it never deletes. Gated by `policy.cleanup_enabled` (env `CAGE_CLEANUP`
+  beats policy) — `enabled=false` silences the reminder entirely — and, when
+  enabled, further by `policy.cleanup_warn` (env `CAGE_CLEANUP_WARN`). Entirely
+  fail-open: an error is debug-logged under ``cleanup.prune`` and never blocks
+  capture.
+- **manual** (`cage data cleanup`, dry-run print by default, ``--apply`` to execute)
+  is the only path that ever deletes, and runs regardless of `cleanup_enabled` —
+  an explicitly-typed command is always honored, never silently ignored because a
+  switch happens to be off.
+
+Retention: policy ``[cleanup] days`` (`constants.CLEANUP_DEFAULT_DAYS` fallback,
+90 days). Deletion is unrecoverable, so this module never automates it — the
+accepted trade-off is that `state/` grows unbounded for anyone who ignores the
+reminder; the reminder keeps firing (every throttle interval, while items remain)
+rather than warning once and going quiet.
 """
 from __future__ import annotations
 
 import datetime as _dt
 import json
 import os
+import sys
 from pathlib import Path
 
 from cage import debuglog, lockutil, paths, policy
 from cage.constants import CLEANUP_THROTTLE_HOURS
 
-CLASSES = ("debug-log", "capture-log", "hooks-seen", "pending-buffer", "cursor-orphan", "tmp")
+CLASSES = ("debug-log", "capture-log", "usage-log", "hooks-seen", "pending-buffer",
+           "cursor-orphan", "tmp")
 
 # Temp suffix for the atomic line-file rewrites below — deliberately NOT `.tmp`,
 # so a crash mid-rewrite can never leave a file the next run classifies as
@@ -60,10 +78,12 @@ def _age_days(path: Path) -> float:
     return max(0.0, (_now().timestamp() - path.stat().st_mtime) / 86400.0)
 
 
-def _aged_rows(path: Path, cutoff: str) -> tuple[int, int]:
-    """(stale, total) JSON rows by their own ``ts`` field; unparseable rows and
-    rows with no ts are kept (never delete what can't be dated)."""
-    stale = total = 0
+def _aged_rows(path: Path, cutoff: str) -> tuple[int, int, int]:
+    """(stale, total, stale_bytes) JSON rows by their own ``ts`` field; unparseable
+    rows and rows with no ts are kept (never delete what can't be dated).
+    ``stale_bytes`` feeds the reclaimable-size estimate shown in the reminder/dry-run
+    — it is the line bytes, not a claim about post-rewrite file size."""
+    stale = total = stale_bytes = 0
     for line in path.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line:
@@ -75,7 +95,8 @@ def _aged_rows(path: Path, cutoff: str) -> tuple[int, int]:
             continue
         if ts and ts < cutoff:
             stale += 1
-    return stale, total
+            stale_bytes += len(line.encode("utf-8")) + 1
+    return stale, total, stale_bytes
 
 
 def scan(root: Path, pol: dict, days: int | None = None) -> list[dict]:
@@ -89,14 +110,14 @@ def scan(root: Path, pol: dict, days: int | None = None) -> list[dict]:
     found: list[dict] = []
 
     for cls, path in (("debug-log", foot.debug_log), ("capture-log", foot.capture_log),
-                      ("hooks-seen", foot.hooks_seen)):
+                      ("usage-log", foot.usage_log), ("hooks-seen", foot.hooks_seen)):
         try:
             if path.exists() and path.is_file():
-                stale, total = _aged_rows(path, cutoff)
+                stale, total, stale_bytes = _aged_rows(path, cutoff)
                 if stale:
                     found.append({"path": str(path), "cls": cls,
                                   "age_days": round(_age_days(path), 1),
-                                  "action": "rewrite",
+                                  "action": "rewrite", "bytes": stale_bytes,
                                   "detail": f"drop {stale} of {total} rows > {window}d"})
         except OSError:
             continue
@@ -107,6 +128,7 @@ def scan(root: Path, pol: dict, days: int | None = None) -> list[dict]:
             if age > window:
                 found.append({"path": str(buf), "cls": "pending-buffer",
                               "age_days": round(age, 1), "action": "delete",
+                              "bytes": buf.stat().st_size,
                               "detail": "stale session buffer (transcript fallback "
                                         "already ran at SessionEnd)"})
         except OSError:
@@ -123,7 +145,7 @@ def scan(root: Path, pol: dict, days: int | None = None) -> list[dict]:
             if orphans:
                 found.append({"path": str(foot.cursors), "cls": "cursor-orphan",
                               "age_days": round(_age_days(foot.cursors), 1),
-                              "action": "rewrite",
+                              "action": "rewrite", "bytes": 0,  # a few bytes; not worth counting
                               "detail": f"drop {len(orphans)} cursor(s) whose source "
                                         f"log is gone (next import re-reads; id-dedupe "
                                         f"absorbs it)"})
@@ -136,6 +158,7 @@ def scan(root: Path, pol: dict, days: int | None = None) -> list[dict]:
             if age > window:
                 found.append({"path": str(tmp), "cls": "tmp",
                               "age_days": round(age, 1), "action": "delete",
+                              "bytes": tmp.stat().st_size,
                               "detail": "leftover temp file"})
         except OSError:
             continue
@@ -157,7 +180,7 @@ def _apply_item(foot: paths.Footprint, item: dict, cutoff: str) -> None:
     if item["action"] == "delete":
         path.unlink(missing_ok=True)
         return
-    if item["cls"] in ("debug-log", "capture-log", "hooks-seen"):
+    if item["cls"] in ("debug-log", "capture-log", "usage-log", "hooks-seen"):
         def keep(line: str) -> bool:
             line = line.strip()
             if not line:
@@ -201,10 +224,24 @@ def prune(root: Path, pol: dict, days: int | None = None,
     return counts
 
 
+def _reminder_line(items: list[dict], window: int) -> str:
+    """The auto path's one stderr line: count, window, reclaimable size, and the
+    exact runnable fix — never printed when `items` is empty (the caller's job)."""
+    total_bytes = sum(i.get("bytes", 0) for i in items)
+    return (f"cage: {len(items)} state/ item(s) older than {window}d "
+            f"(~{total_bytes / 1024:.0f} KB reclaimable) — "
+            f"`cage data cleanup` to review, `--apply` to prune.")
+
+
 def maybe_run(root: Path, pol: dict) -> None:
-    """The auto path, piggybacked on `cage import`/hook sweeps (cage installs no
-    scheduler): a cheap staleness check (one stat on the throttle stamp), then a
-    fail-open prune. Never raises — capture must survive a broken cleanup."""
+    """The auto path, piggybacked on `cage import`/read sweeps (cage installs no
+    scheduler): a cheap staleness check (one stat on the throttle stamp), then —
+    since v0.37 — a **warning, never a deletion**. Deletion is unrecoverable; only
+    an explicit `cage data cleanup --apply` performs it. Silent when nothing is
+    eligible; keeps reminding every throttle interval while something is. Gated by
+    `policy.cleanup_enabled` (auto path off entirely) and, when enabled, by
+    `policy.cleanup_warn` (the reminder specifically). Never raises — capture must
+    survive a broken cleanup."""
     try:
         if not policy.cleanup_enabled(pol):
             return
@@ -216,7 +253,10 @@ def maybe_run(root: Path, pol: dict) -> None:
             fresh = (_now().timestamp() - stamp.stat().st_mtime) < CLEANUP_THROTTLE_HOURS * 3600
             if fresh:
                 return
-        prune(root, pol)
+        if policy.cleanup_warn(pol):
+            items = scan(root, pol)
+            if items:
+                print(_reminder_line(items, policy.cleanup_days(pol)), file=sys.stderr)
         stamp.write_text(_now().isoformat(), encoding="utf-8")
     except Exception as e:  # noqa: BLE001 — fail-open, but never silent
         debuglog.exception(root, "cleanup.prune", e, pol=pol)
@@ -225,26 +265,25 @@ def maybe_run(root: Path, pol: dict) -> None:
 def run_cli(root: Path, pol: dict, apply: bool = False,
             days: int | None = None) -> tuple[dict, str]:
     """`cage data cleanup` — dry-run table by default (house pattern), ``--apply``
-    executes. ``(payload, text)`` for the emit helper."""
-    enabled = policy.cleanup_enabled(pol)
+    executes. ``(payload, text)`` for the emit helper. Runs regardless of
+    `policy.cleanup_enabled` — that switch gates only the *automatic* reminder
+    (`maybe_run`); a command the user typed is always honored, never silently
+    ignored because a policy switch happens to be off."""
+    auto_reminder = policy.cleanup_enabled(pol)
     window = days if days is not None else policy.cleanup_days(pol)
     items = scan(root, pol, days)
-    payload = {"enabled": enabled, "days": window, "items": items,
+    payload = {"auto_reminder": auto_reminder, "days": window, "items": items,
                "applied": None}
     if not items:
         return payload, (f"✔ nothing stale in state/ (window: {window}d) — the "
                          "ledger, policy, machine id, study markers and limits are "
                          "never cleanup's to touch.")
     lines = [f"cleanup — {len(items)} candidate(s), window {window}d "
-             f"({'enabled' if enabled else 'DISABLED by policy/env'}):", ""]
+             f"(auto-reminder {'on' if auto_reminder else 'off'}):", ""]
     lines += [f"  {i['cls']:<15} {i['action']:<8} age {i['age_days']:>6.1f}d  "
               f"{Path(i['path']).name}  — {i['detail']}" for i in items]
     if not apply:
         lines += ["", "dry-run (house pattern) — `cage data cleanup --apply` to execute."]
-        return payload, "\n".join(lines)
-    if not enabled:
-        lines += ["", "· cleanup is disabled ([cleanup] enabled=false or CAGE_CLEANUP=0) "
-                      "— nothing applied."]
         return payload, "\n".join(lines)
     counts = prune(root, pol, days, items=items)
     payload["applied"] = counts
@@ -255,5 +294,16 @@ def run_cli(root: Path, pol: dict, apply: bool = False,
 
 # The never-list, adjacent to the allowlist it guards. Documentation + tests
 # assert it; `scan` enforces it by construction (it never looks at these).
-NEVER = ("ledger/", "policy.toml", "machine.json", "study.jsonl", "limits.json",
-         "outcomes")
+#
+# Tool savings (`ledger/savings/<tool>/savings-*.jsonl`) are covered here ONLY because
+# they sit under `ledger/` — there is no dedicated savings entry. That is deliberate:
+# a per-tool cleanup class must NEVER be added. Savings rows are unrecoverable and
+# nothing else reconstructs them (unlike a cursor or a debug-log row); moving the
+# savings tree out from under `ledger/` without adding it back here would silently
+# make it cleanable, with no test failing until `test_cleanup.py`'s
+# `ledger/savings/<tool>/` survival case is the one that catches it.
+NEVER = ("ledger/", "cage.toml", "prices.toml", "policy.toml", "machine.json",
+         "study.jsonl", "limits.json", "outcomes")  # both config names — the legacy
+                                     # `policy.toml` survives on machines that never
+                                     # re-ran setup; `prices.toml` is the split-out
+                                     # vendor rate card, protected alongside cage.toml

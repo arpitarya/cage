@@ -47,9 +47,15 @@ def test_saving_verdict(proj):
     _seed_saving(proj)
     d = verdict.compose(proj, pol, "graphify")
     assert d["verdict"] == "SAVING" and d["method"] == "modeled"
-    # composer honesty: the net equals roi's numbers exactly — nothing recomputed
+    # composer honesty: still nothing recomputed here — the headline is roi's net
+    # minus the cost-of-use view's own total (NET-3), both pulled, neither derived.
     t = roi.by_tool(proj, pol, None)["tools"]["graphify"]
-    assert d["net_usd"] == round(t["saved_usd"] - t["cost_usd"], 6)
+    u = d["inputs"]["net_of_use"]
+    assert u["available"] and u["complete"]  # every receipt has an in-window call
+    assert d["gross_of_use"] is False and d["cost_of_use_usd"] == u["attributable_usd"]
+    assert u["attributable_usd"] > 0  # the tool is never free just because it declares $0
+    assert d["net_usd"] == round(t["saved_usd"] - t["cost_usd"]
+                                 - u["attributable_usd"], 6)
     assert d["inputs"]["roi"]["receipts"] == t["receipts"] == 8
     assert d["span_days"] == 7.0 and "net_per_month" in d
     assert d["net_per_month"] == round(d["net_usd"] / 7 * 30, 4)

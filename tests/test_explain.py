@@ -22,27 +22,28 @@ def test_query_makes_no_network_call(proj, monkeypatch, capsys):
     monkeypatch.setattr(socket, "socket", _boom)
     monkeypatch.chdir(proj)
     metering._policy_for.cache_clear()
-    assert cli.main(["query", "how is human cost calculated"]) == 0
-    assert "human-cost" in capsys.readouterr().out
+    assert cli.main(["query", "how is marginal attribution calculated"]) == 0
+    assert "marginal-attribution" in capsys.readouterr().out
 
 
-# ── live numbers: the printed rate tracks CAGE_HUMAN_RATE, proving interpolation ─
-def test_printed_rate_tracks_env_override(proj, monkeypatch, capsys):
+# ── live numbers: the printed pipeline order IS policy's, proving interpolation ──
+def test_printed_order_tracks_policy(proj, monkeypatch, capsys):
     monkeypatch.chdir(proj)
-    monkeypatch.setenv("CAGE_HUMAN_RATE", "250")
     metering._policy_for.cache_clear()
-    assert cli.main(["query", "how do you cost a human"]) == 0
+    assert cli.main(["query", "marginal-attribution"]) == 0
     out = capsys.readouterr().out
-    assert "$250/hr" in out and "source: env" in out
-    assert "$80/hr" not in out  # the policy default must NOT be hard-coded
-
-
-def test_live_rate_in_payload(monkeypatch):
     pol = policy.load(None)
-    e = explain._BY_ID["human-cost"]
-    assert "$80/hr" in explain.payload(e, pol)["formula"]   # policy default
-    monkeypatch.setenv("CAGE_HUMAN_RATE", "175")
-    assert "$175/hr" in explain.payload(e, pol)["formula"]  # re-priced in place
+    assert " → ".join(policy.tool_order(pol)) in out
+
+
+def test_live_order_in_payload():
+    """A formula interpolates the LIVE policy value, never a frozen literal —
+    change the policy, the printed formula changes with it."""
+    pol = policy.load(None)
+    e = explain._BY_ID["marginal-attribution"]
+    assert " → ".join(policy.tool_order(pol)) in explain.payload(e, pol)["formula"]
+    edited = {**pol, "tools": {**pol.get("tools", {}), "order": ["zeta", "alpha"]}}
+    assert "zeta → alpha" in explain.payload(e, edited)["formula"]
 
 
 # ── --json carries the same content as the text render ─────────────────────────
@@ -83,9 +84,8 @@ def test_unmatched_suggests_not_guesses(proj, monkeypatch, capsys):
 # ── exact-id and natural-language both resolve deterministically ───────────────
 @pytest.mark.parametrize("q,expected", [
     ("cost", "cost"),
-    ("human-cost", "human-cost"),
-    ("how is human cost calculated", "human-cost"),
-    ("how do you cost a human", "human-cost"),
+    ("savings-axis", "savings-axis"),
+    ("what happened to the human axis", "savings-axis"),
     ("how is the value getting calculated", "cost"),
     ("counterfactual permutation table", "matrix"),
     ("what are the method tags", "method-tags"),
@@ -107,10 +107,10 @@ def test_every_concept_entry_has_code_refs_and_plan_ref():
 
 
 def test_calculation_entries_unchanged_kind():
-    calc_ids = {"cost", "saved", "marginal-attribution", "matrix", "human-cost",
-                "attention-minutes", "time-saved", "roi", "token-heuristic",
+    calc_ids = {"cost", "saved", "gross-vs-net", "marginal-attribution", "matrix",
+                "roi", "token-heuristic",
                 "confidence", "method-tags",
-                "trend", "budget", "compare-delta", "estimate-band", "calibration-hit-rate",
+                "budget", "compare-delta", "estimate-band", "calibration-hit-rate",
                 "verdict-composition", "study-pairing",
                 "pricing-match", "unpriced", "repricing", "receipt-pricing"}
     for e in explain.REGISTRY:

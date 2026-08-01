@@ -1,0 +1,4 @@
+ec16e4ab38ce9445de611e9a2c29a946e7a7fad9b40d021599d2aedfda41823f  2026-08-01-finding-surface-attribution-is-agent-dependent.md
+# sha256 over the WHOLE file (all bytes, byte 0 to EOF).
+# Verify with:
+#   shasum -a 256 -c 2026-08-01-finding-surface-attribution-is-agent-dependent.md.sha256

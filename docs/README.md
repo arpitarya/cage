@@ -1,85 +1,76 @@
 # Cage docs — start here
 
-The living design of record plus operations docs live in this directory's root;
-everything that drove already-shipped work lives in [`archive/`](archive/README.md).
-A doc here is **current spec**; a doc in the archive is **history** and must never
-be cited as current spec.
+**2026-07-25: doc sweep.** Cage is being rebuilt hookless (pull-only capture, MCP
+read surface). Most operational/subsystem docs were removed with the hook machinery
+and rendered assets — they described the pre-removal world and will be rebuilt on
+the new base. What remains here is **current spec**; everything in
+[`archive/`](archive/README.md) is **history** and must never be cited as current
+spec.
 
-## Start here
+## Current spec
 
-- [cage-plan.md](cage-plan.md) — the design of record: substrate contract,
-  attribution engine, every plan-§ referenced from code and CLAUDE.md.
-- [maintainers-interview.md](maintainers-interview.md) — the maintainer
-  handoff: an outgoing model's exit interview (intent, scar tissue, working
-  with the human). Context for every future maintainer, never spec; departing
-  maintainers append their own lessons.
-- [formulas.md](formulas.md) — the formula catalogue: every computed number's
-  shape, method tag, and knobs. **Generated** from the explain registry
-  (`python -m tools.docgen --target formulas`; CI `--check` gates drift —
-  the CLAUDE.md rule, now mechanical).
-- [cli-output-spec.md](cli-output-spec.md) — per-command, per-state output
-  contracts (LIVE BEHAVIOR since output-honesty; README-linked). Code blocks
-  **generate** from the golden-test fixtures (`tools.docgen --target spec`,
-  CI `--check`) — documented and tested output are one artifact.
-
-## Subsystem design docs
-
-- [human-baseline.design.md](human-baseline.design.md) — the Tier-1 human axis
-  (agent vs human, rates, confidence ladder, derived attention).
-- [portable-wiring.md](portable-wiring.md) — the committed runtime-resolving shim;
-  no absolute paths in committed files.
-- [restricted-environments.md](restricted-environments.md) — locked-down endpoints:
-  python-launcher mode, `cage.pyz`, internal mirrors.
-- [debugging-capture.md](debugging-capture.md) — `CAGE_DEBUG`, heartbeats, the
-  fail-open-but-never-silent contract.
-- [csv-output.md](csv-output.md) — per-view CSV column contracts (plan §3.9).
-- [pricing.md](pricing.md) — how a call prices: family matching, the unpriced
-  workflow, policy versioning/sync, fleet repricing, credits vs prices.
-- [sources.md](sources.md) — `[sources]` in policy.toml: configurable import paths
-  per agent + custom tools, provenance, the portability guard (plan Phase 4).
-- [skillgen.md](skillgen.md) — the rendered skill/prompt/steering assets
-  (edit fragments, never the rendered files).
-- [agents.md](agents.md) — per-agent wiring and capture surfaces.
-- [adr/](adr/) — architecture decision records.
-
-## Operations
-
-- [full-test-plan-sibling-repo.md](full-test-plan-sibling-repo.md) — the evergreen
-  manual test plan (last executed: v0.22.1; run record archived).
-- [cage-claude-code-prompt-full-test-run.md](cage-claude-code-prompt-full-test-run.md) —
-  the reusable Claude Code driver prompt that executes the plan end-to-end
-  (version-agnostic; pairs with the plan above).
-- [windows-manual-checklist.md](windows-manual-checklist.md) — upgrade Windows from
-  CI-tested to field-validated.
+- [PLAN.md](PLAN.md) — the design of record: substrate contract, attribution
+  engine, every plan-§ referenced from code and CLAUDE.md.
+- **[OPEN-WORK.md](OPEN-WORK.md) — the ONE plan of pending work, and ONLY that.**
+  A completed item is **removed, never left ticked** — legal only once its outcome is
+  in [IMPLEMENTATION.md](IMPLEMENTATION.md) and any evidence is published to
+  [regression/](regression/), with residual limits carried forward as their own
+  items. So its length is a truthful measure of what is left. It also carries the
+  durable rules promoted out of the archived cycle plans, including the **ZERO dummy
+  data** law.
 
 ## Active work
 
-Unshipped handoff/prompt pairs live here until their release ships them into the
-archive (the lifecycle rule in `CLAUDE.md`).
+**None.** `docs/` root carries no handoff/prompt pairs — a pair is created only when an
+item in [OPEN-WORK.md](OPEN-WORK.md) is picked up, and archived the moment its work is
+built and green. Everything from the v0.36 cycle is in
+[archive/](archive/README.md).
 
-- [output-and-simplification.plan.md](output-and-simplification.plan.md) — the
-  plan of record for the current cycle. Phases 1–4 (output honesty → CLI tiering →
-  `[sources]`) shipped in **v0.28.0**; the backlog sweep remains.
-- [capture-architecture.plan.md](capture-architecture.plan.md) — design of record for
-  the capture rework: capture-on-read replaces hooks as the correctness path, push
-  (graphify/fux/proxy) and pull converge on one canonical ledger, and capture becomes
-  visible. Built as [capture-architecture.handoff.md](capture-architecture.handoff.md)
-  + [capture-architecture.prompt.md](capture-architecture.prompt.md). **Phase 1
-  (additive — no hook touched) shipped in v0.31.0**; the pair stays here (not archived)
-  until **Phase 2** (deleting the token-capture hooks) ships in a later release. Phase 2 is
-  blocked on a field gate, now a concrete procedure:
-  [phase2-field-gate.md](phase2-field-gate.md) (hooks-on vs hooks-off ledger, compared by
-  row id; pass = capture-on-read is a superset).
-- [capture-health.handoff.md](capture-health.handoff.md) +
-  [capture-health.prompt.md](capture-health.prompt.md) — make silent zero-capture loud
-  (an installed agent that matched no files warns on `cage report`). Sequence **after**
-  capture-on-read, which makes its `_health` data fresher.
+What remains is not agent work: **NET-1** (a lab session, Arpit's hands), **HR1** (a
+proposal doc before any rebuild), and **H**, the release — blocked on the standing
+no-commit directive.
 
-*(Phases 1–4 handoff/prompt pairs archived with the v0.28.0 release, the
-`[sources]` visibility + globs follow-on with **v0.29.0**, and capture-health
-with **v0.30.0** — see the [archive index](archive/README.md).)*
+## The lab manual
 
-## Archive
+- **[cage-lab/](cage-lab/README.md) — how to build `../cage-lab` from scratch.** The
+  lab is a **disposable** sibling repo; this directory is what recreates it, versioned
+  in cage alongside the tool it tests. Setup (`.venv` + explicit PATH · the two
+  workspaces · tool-owned installers) · run protocol (manifest-before-first-call ·
+  repeats where they buy something) · verification (per-agent bars · the three-way
+  reconciliation · four verdicts) · publishing (three artifact types, never merged) ·
+  the manual VS Code/IDE cells. **The lab is scaffolding; the evidence in
+  [regression/](regression/) is permanent.**
 
+## Living process docs (always current)
+
+The maintained doc set, governed by the *Documentation discipline* section of
+[`../CLAUDE.md`](../CLAUDE.md). Freshness is tracked in
+[DOC-REGISTRY.md](DOC-REGISTRY.md).
+
+- [doc-size-discipline.md](doc-size-discipline.md) — ⏳ **TRIAL to 2026-09-01**: the
+  four doc-size rules (lead with the answer · one audience · evidence elsewhere ·
+  hard budget), the fix procedure, and the retain/remove criteria.
+- [GLOSSARY.md](GLOSSARY.md) — every recurring term, defined once against the code.
+- [FORMULAS.md](FORMULAS.md) — every computed number: formula · code home ·
+  method tag · the knobs that move it.
+- [WORKLOG.md](WORKLOG.md) — the running per-session handoff (append every
+  exchange, Claude Code and Cowork/chat alike).
+- [INTERVIEW.md](INTERVIEW.md) — the **exit interview**: notes from the outgoing
+  maintainer-model to every future one. Read it after CLAUDE.md.
+- [DOC-REGISTRY.md](DOC-REGISTRY.md) — the doc freshness tracker (triggers +
+  last-verified).
+- [architecture-flow.mermaid](architecture-flow.mermaid) — the one-way data flow as
+  a diagram (also linked from the README).
+- [example/](example/) — copy-from contracts: cli · debug · setup · toml-config.
+- [IMPLEMENTATION.md](IMPLEMENTATION.md) — the build log.
+
+## Standing records
+
+- [adr/](adr/) — architecture decision records (the durable *why*; each ends with a
+  veto condition). Author new ones from [adr/TEMPLATE.md](adr/TEMPLATE.md).
+- [compare/](compare/) — decision records for forks (debate + matrix + verdict +
+  reopen-trigger); [proposals/](proposals/) — parked ideas (`status: proposed`).
+- [regression/](regression/) — dated cage-lab capture/regression reports (data, not
+  spec).
 - [archive/README.md](archive/README.md) — every shipped handoff/prompt/build-prompt
-  and superseded draft, indexed version · feature · CHANGELOG. History, not spec.
+  and superseded draft. History, not spec.

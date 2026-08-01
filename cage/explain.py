@@ -8,9 +8,9 @@ read **live** from `policy` + `constants` (and, for concept entries, `paths` /
 the code. Matching is stdlib token-overlap — no embeddings, no network, no LLM
 (mirrors `fux explain` / `graphify query` for family UX).
 
-The whole point is self-verification: the printed rate *is* the policy rate, the
-printed divisor *is* `constants.CHARS_PER_TOKEN`. Set `CAGE_HUMAN_RATE` and the
-`human-cost` formula re-prices in place — proof the number isn't a literal.
+The whole point is self-verification: the printed divisor *is*
+`constants.CHARS_PER_TOKEN` and the printed pipeline order *is* `policy.tool_order`
+— proof the numbers aren't literals.
 """
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ import re
 from dataclasses import asdict
 from pathlib import Path
 
-from cage import agents, attention, constants, paths, policy, receiptprice, schema
+from cage import agents, constants, paths, policy, receiptprice, schema
 from cage.explain_data import REGISTRY
 from cage.explain_types import Explanation
 
@@ -29,21 +29,18 @@ __all__ = ["Explanation", "REGISTRY", "match", "closest_ids", "payload",
 
 def _live(pol: dict) -> dict:
     """Current values pulled from policy + constants — the source of every number."""
-    rate, src = policy.human_rate_source(pol)
-    conf = {**constants.DEFAULT_CONFIDENCE, **policy.human_rates(pol).get("confidence", {})}
+    conf = dict(constants.DEFAULT_CONFIDENCE)
     foot = paths.Footprint(paths.find_project_root() or Path.cwd())
     return {
-        "rate": f"{rate:g}", "rate_src": src,
         "chars_per_token": constants.CHARS_PER_TOKEN,
         "per_million": f"{constants.TOKENS_PER_MILLION:,}",
         "max_tools": constants.MAX_MATRIX_TOOLS,
         "min_compare_n": constants.MIN_COMPARE_N,
         "min_estimate_n": constants.MIN_ESTIMATE_N,
-        "default_minutes": policy.human_rates(pol).get("default_minutes", 60),
-        "idle_cap": f"{attention.idle_cap_minutes(pol):g}",
+        "net_window_s": constants.NET_ATTRIB_WINDOW_S,
+        "net_confidence": constants.NET_SAVED_CONFIDENCE,
         "order": " → ".join(policy.tool_order(pol)),
         "c_measured": conf.get("measured"), "c_estimated": conf.get("estimated"),
-        "c_type": conf.get("type_table"), "c_default": conf.get("default"),
         "trust": " · ".join(f"{m} {n}" for m, n in constants.METHOD_TRUST.items()),
         "methods": " | ".join(schema.METHODS),
         # Show the month-partitioned shard glob (calls-YYYY-MM.jsonl), not the legacy
@@ -53,6 +50,9 @@ def _live(pol: dict) -> dict:
         "receipts_path": str(foot.ledger / "receipts-*.jsonl"),
         "tasks_path": str(foot.tasks),
         "agent_surfaces": " · ".join(agents.SURFACES),
+        # The machine ledger kiro's IDE rows route to (ADR 0006) — interpolated live from
+        # the resolver, never a hard-coded `~/.cage`, so `CAGE_HOME` shows the truth.
+        "global_base": str(paths.global_base()),
         "partition": constants.PARTITION_GRANULARITY,
         "warn_mb": f"{constants.LEDGER_WARN_BYTES / 1_000_000:.0f}",
         "n_subcommands": len(_subcommand_names()),
@@ -63,8 +63,9 @@ def _live(pol: dict) -> dict:
                             if isinstance(v, dict)),
         "prices_version_bundled": str(policy.bundled_raw().get("meta", {})
                                       .get("prices_version") or "?"),
-        "prices_version_project": str((policy.load_project_raw(foot.policy)
-                                       if foot.policy.exists() else {})
+        # prices_version rides the prices file after the split (prices-toml plan §2.1)
+        "prices_version_project": str((policy.load_project_raw(foot.prices)
+                                       if foot.prices.exists() else {})
                                       .get("meta", {}).get("prices_version")
                                       or "unknown (pre-0.19)"),
         "effort_suffixes": " · ".join(sorted(constants.MODEL_EFFORT_SUFFIXES)),
@@ -72,6 +73,7 @@ def _live(pol: dict) -> dict:
         "family_min_segments": constants.MODEL_FAMILY_MIN_SEGMENTS,
         "cleanup_days": policy.cleanup_days(pol),
         "cleanup_on": "on" if policy.cleanup_enabled(pol) else "off",
+        "cleanup_warn_on": "on" if policy.cleanup_warn(pol) else "off",
         "import_before_export": "on" if policy.import_before_export(pol) else "off",
         # tool-receipt pricing ladder (plan §4.5) — live from the resolved policy
         "tool_routes": (", ".join(f"{t} → {v}"
@@ -105,7 +107,7 @@ def _sources_live(pol: dict) -> str:
 
 def _subcommand_names() -> list[str]:
     """Every leaf view (an actual derived command), read live from the parser (no
-    literal list). Descends into the Phase-3 command groups (insights/human/
+    literal list). Descends into the Phase-3 command groups (insights/task/
     authorship/data) so their subcommands count as the views they are; the group
     name itself is not a view. `hook-*` plumbing is excluded."""
     from cage import cli  # local: cli → clicmds → explain would otherwise cycle

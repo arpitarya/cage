@@ -19,7 +19,7 @@ def root(proj, monkeypatch):
 
 
 def _policy_path(root):
-    return root / ".cage" / "policy.toml"
+    return root / ".cage" / "cage.toml"
 
 
 def _strip_to_v016(root):
@@ -48,13 +48,38 @@ def v016(root):
     return root
 
 
+# The tests below don't care about `[quality] signal` specifically — they borrow
+# it as a stand-in for "some bundle-shipped, active, scalar-keyed table" to
+# exercise generic sync mechanics (keep-customized, update-stale-default,
+# confirm-bucket, orphan-warning). Naming it here once means a bundle removal
+# is a one-line re-point instead of a five-test rewrite; see
+# docs/proposals/policysync-synthetic-bundle.md.
+_EXAMPLE_TABLE, _EXAMPLE_KEY = "quality", "signal"
+_EXAMPLE_DEFAULT = "task_ok"
+
+
+def test_borrowed_example_table_still_in_bundle():
+    """Guard for the coupling above: if `[quality] signal` is ever removed from
+    the bundle, the tests that borrow it as their worked example fail for a
+    reason unrelated to whatever removed it. This names the fix directly."""
+    bundled = policy.bundled_raw()
+    assert bundled.get(_EXAMPLE_TABLE, {}).get(_EXAMPLE_KEY) == _EXAMPLE_DEFAULT, (
+        f"test_policysync borrows [{_EXAMPLE_TABLE}] {_EXAMPLE_KEY} as its worked "
+        "example for generic sync mechanics. That key is no longer in the bundled "
+        "cage.toml, so those tests are testing nothing. Re-point them at another "
+        "actively-shipped scalar key (it must also survive _strip_to_v016, which "
+        "removes [meta], [cleanup] and import_before_export). See "
+        "docs/proposals/policysync-synthetic-bundle.md."
+    )
+
+
 # ── the two safety invariants (never skipped — the safety story) ─────────────
 
 def test_neutrality_apply_keeps_every_derived_view_byte_identical(v016, seeded, capsys):
     """Zero-customization project: --apply must not change one byte of any
     derived view — adds only pin defaults `policy.load` was already using."""
     views = [["report"], ["report", "--by", "model"], ["insights", "attrib"],
-             ["insights", "budget"], ["human", "show"], ["insights", "trend"],
+             ["insights", "budget"], ["task", "quality"],
              ["insights", "matrix"]]
 
     def snap():
@@ -85,16 +110,17 @@ def test_apply_is_idempotent_second_run_byte_identical_noop(v016, capsys):
 def test_v016_shape_lists_exact_adds_then_applies_them(v016, capsys):
     assert cli.main(["policy", "diff"]) == 0
     out = capsys.readouterr().out
-    assert "add (3)" in out
+    assert "add (4)" in out
     assert "+ [capture] import_before_export = true" in out
-    assert "+ [cleanup] days = 30" in out and "+ [cleanup] enabled = true" in out
+    assert "+ [cleanup] days = 90" in out and "+ [cleanup] enabled = true" in out
+    assert "+ [cleanup] warn = true" in out
     assert "bundled policy defaults are newer" in out
     assert cli.main(["policy", "sync", "--apply"]) == 0
     applied = capsys.readouterr().out
     assert "✔ [cleanup] added" in applied
     assert "✔ [meta] policy_version stamped" in applied
     proj_raw = policy.load_project_raw(_policy_path(v016))
-    assert proj_raw["cleanup"] == {"enabled": True, "days": 30}
+    assert proj_raw["cleanup"] == {"enabled": True, "warn": True, "days": 90}
     assert proj_raw["capture"]["import_before_export"] is True
     assert proj_raw["meta"]["policy_version"] == \
         policy.bundled_raw()["meta"]["policy_version"]
@@ -103,56 +129,67 @@ def test_v016_shape_lists_exact_adds_then_applies_them(v016, capsys):
 
 def test_hand_edited_value_is_kept_customized_never_clobbered(v016, capsys):
     """The pre-mortem killer: an un-marked hand edit (the documented way to set
-    budgets) must classify as customized — `--apply` and even `--yes all` must
-    never flip it back to the bundled default."""
+    a tunable) must classify as customized — `--apply` and even `--yes all`
+    must never flip it back to the bundled default. `[quality] signal` is the
+    worked example — a bundle-shipped, active, scalar-keyed table that survives
+    `_strip_to_v016` (`[budgets]` is opt-in/commented-out and can't demonstrate
+    this)."""
     p = _policy_path(v016)
-    p.write_text(p.read_text().replace("daily_usd = 25.00", "daily_usd = 50.00"))
+    p.write_text(p.read_text().replace(f'{_EXAMPLE_KEY} = "{_EXAMPLE_DEFAULT}"',
+                                       f'{_EXAMPLE_KEY} = "task_custom"'))
     assert cli.main(["policy", "sync", "--apply", "--yes", "all"]) == 0
     out = capsys.readouterr().out
-    assert "keep (1)" in out and "[budgets] daily_usd = 50.0 (bundled 25.0)" in out
-    assert policy.load_project_raw(p)["budgets"]["daily_usd"] == 50.0
+    assert "keep (1)" in out
+    assert (f'[{_EXAMPLE_TABLE}] {_EXAMPLE_KEY} = "task_custom" '
+            f'(bundled "{_EXAMPLE_DEFAULT}")') in out
+    assert policy.load_project_raw(p)[_EXAMPLE_TABLE][_EXAMPLE_KEY] == "task_custom"
 
 
 def test_marked_and_block_owned_tables_stay_customized(v016, capsys):
     p = _policy_path(v016)
     p.write_text(p.read_text().replace(
-        "[human]", f"[human]   {pricestoml.CUSTOM_MARK}").replace(
-        "rate_usd_per_hr = 80", "rate_usd_per_hr = 80"))
-    p.write_text(p.read_text().replace("rate_usd_per_hr = 80", "rate_usd_per_hr = 120"))
+        f"[{_EXAMPLE_TABLE}]", f"[{_EXAMPLE_TABLE}]   {pricestoml.CUSTOM_MARK}"))
+    p.write_text(p.read_text().replace(f'{_EXAMPLE_KEY} = "{_EXAMPLE_DEFAULT}"',
+                                       f'{_EXAMPLE_KEY} = "task_custom"'))
     d = policysync.sync_view(v016)
     marked = [c for c in d["customized"] if c["reason"] == "marked"]
-    assert [(c["table"], c["key"]) for c in marked] == [("human", "rate_usd_per_hr")]
+    assert [(c["table"], c["key"]) for c in marked] == [(_EXAMPLE_TABLE, _EXAMPLE_KEY)]
     assert cli.main(["policy", "sync", "--apply", "--yes", "all"]) == 0
-    assert policy.load_project_raw(p)["human"]["rate_usd_per_hr"] == 120
+    assert policy.load_project_raw(p)[_EXAMPLE_TABLE][_EXAMPLE_KEY] == "task_custom"
 
 
 def test_update_category_refreshes_stale_old_default(v016, monkeypatch, capsys):
     """A project stamped with an era whose recorded old default it still carries
     → update, old→new, applied without confirmation."""
     monkeypatch.setattr(policysync, "DEFAULT_CHANGES",
-                        {("human", "rate_usd_per_hr"): (("0.25.0", 60),)})
+                        {(_EXAMPLE_TABLE, _EXAMPLE_KEY): (("0.25.0", "task_finished"),)})
     p = _policy_path(v016)
-    p.write_text(p.read_text().replace("rate_usd_per_hr = 80", "rate_usd_per_hr = 60"))
+    p.write_text(p.read_text().replace(f'{_EXAMPLE_KEY} = "{_EXAMPLE_DEFAULT}"',
+                                       f'{_EXAMPLE_KEY} = "task_finished"'))
     pricestoml.update_meta(v016, {"policy_version": "0.20.0"})
     assert cli.main(["policy", "diff"]) == 0
     out = capsys.readouterr().out
-    assert "update (1)" in out and "~ [human] rate_usd_per_hr: 60 → 80" in out
+    assert "update (1)" in out
+    assert (f'~ [{_EXAMPLE_TABLE}] {_EXAMPLE_KEY}: "task_finished" → '
+            f'"{_EXAMPLE_DEFAULT}"') in out
     assert cli.main(["policy", "sync", "--apply"]) == 0
     capsys.readouterr()
-    assert policy.load_project_raw(p)["human"]["rate_usd_per_hr"] == 80
+    assert policy.load_project_raw(p)[_EXAMPLE_TABLE][_EXAMPLE_KEY] == _EXAMPLE_DEFAULT
     # the refresh must NOT mark the table user-owned — it stays sync-updatable
-    assert pricestoml.CUSTOM_MARK not in p.read_text().split("[human]")[1].split("[")[0]
+    assert pricestoml.CUSTOM_MARK not in p.read_text().split(
+        f"[{_EXAMPLE_TABLE}]")[1].split("[")[0]
 
 
 def test_update_known_version_differing_from_old_default_is_customized(v016, monkeypatch):
     monkeypatch.setattr(policysync, "DEFAULT_CHANGES",
-                        {("human", "rate_usd_per_hr"): (("0.25.0", 60),)})
+                        {(_EXAMPLE_TABLE, _EXAMPLE_KEY): (("0.25.0", "task_finished"),)})
     p = _policy_path(v016)
-    p.write_text(p.read_text().replace("rate_usd_per_hr = 80", "rate_usd_per_hr = 95"))
+    p.write_text(p.read_text().replace(f'{_EXAMPLE_KEY} = "{_EXAMPLE_DEFAULT}"',
+                                       f'{_EXAMPLE_KEY} = "task_custom"'))
     pricestoml.update_meta(v016, {"policy_version": "0.20.0"})
     d = policysync.sync_view(v016)
     assert not d["update"] and not d["confirm"]
-    assert any(c["key"] == "rate_usd_per_hr" and c["reason"] == "edited"
+    assert any(c["key"] == _EXAMPLE_KEY and c["reason"] == "edited"
                for c in d["customized"])
 
 
@@ -160,50 +197,55 @@ def test_confirm_bucket_pre_version_needs_yes(v016, monkeypatch, capsys):
     """Pre-policy_version file + a key whose default actually changed: not
     reconstructable → listed, applied only per --yes (matching prices sync)."""
     monkeypatch.setattr(policysync, "DEFAULT_CHANGES",
-                        {("human", "rate_usd_per_hr"): (("0.25.0", 60),)})
+                        {(_EXAMPLE_TABLE, _EXAMPLE_KEY): (("0.25.0", "task_finished"),)})
     p = _policy_path(v016)
-    p.write_text(p.read_text().replace("rate_usd_per_hr = 80", "rate_usd_per_hr = 60"))
+    p.write_text(p.read_text().replace(f'{_EXAMPLE_KEY} = "{_EXAMPLE_DEFAULT}"',
+                                       f'{_EXAMPLE_KEY} = "task_finished"'))
     assert cli.main(["policy", "sync"]) == 0
     out = capsys.readouterr().out
     assert "confirm (1)" in out
-    assert "cage policy sync --apply --yes human.rate_usd_per_hr" in out
+    assert (f"cage policy sync --apply --yes "
+            f"{_EXAMPLE_TABLE}.{_EXAMPLE_KEY}") in out
     assert cli.main(["policy", "sync", "--apply"]) == 0  # no --yes → untouched
     out = capsys.readouterr().out
     assert "left untouched (confirm each with --yes" in out
     # the stamp must wait for the confirm bucket — else next run reclassifies
     # the pending rows as customized (undecided ≠ decided)
     assert "policy_version not stamped" in out
-    assert policy.load_project_raw(p)["human"]["rate_usd_per_hr"] == 60
+    assert policy.load_project_raw(p)[_EXAMPLE_TABLE][_EXAMPLE_KEY] == "task_finished"
     assert cli.main(["policy", "sync", "--apply", "--yes",
-                     "human.rate_usd_per_hr"]) == 0
+                     f"{_EXAMPLE_TABLE}.{_EXAMPLE_KEY}"]) == 0
     capsys.readouterr()
-    assert policy.load_project_raw(p)["human"]["rate_usd_per_hr"] == 80
+    assert policy.load_project_raw(p)[_EXAMPLE_TABLE][_EXAMPLE_KEY] == _EXAMPLE_DEFAULT
 
 
 def test_orphan_warned_with_version_context_never_deleted(v016, monkeypatch, capsys):
     monkeypatch.setattr(policysync, "REMOVED_KEYS",
-                        {("quality", "old_signal"): "0.25.0"})
+                        {(_EXAMPLE_TABLE, "old_signal"): "0.25.0"})
     p = _policy_path(v016)
-    p.write_text(p.read_text().replace('signal = "task_ok"',
-                                       'signal = "task_ok"\nold_signal = "x"'))
+    p.write_text(p.read_text().replace(
+        f'{_EXAMPLE_KEY} = "{_EXAMPLE_DEFAULT}"',
+        f'{_EXAMPLE_KEY} = "{_EXAMPLE_DEFAULT}"\nold_signal = "x"'))
     assert cli.main(["policy", "sync", "--apply", "--yes", "all"]) == 0
     out = capsys.readouterr().out
     assert "orphan (1)" in out
-    assert '⚠ [quality] old_signal = "x" (dropped in v0.25.0)' in out
-    assert policy.load_project_raw(p)["quality"]["old_signal"] == "x"
+    assert f'⚠ [{_EXAMPLE_TABLE}] old_signal = "x" (dropped in v0.25.0)' in out
+    assert policy.load_project_raw(p)[_EXAMPLE_TABLE]["old_signal"] == "x"
 
 
 def test_users_own_sections_invisible_own_keys_listed_untouched(v016, capsys):
     p = _policy_path(v016)
     p.write_text(p.read_text() + '\n[my-own-section]\nfoo = 1\n')
-    p.write_text(p.read_text().replace('signal = "task_ok"',
-                                       'signal = "task_ok"\nmy_note = "hi"'))
+    p.write_text(p.read_text().replace(
+        f'{_EXAMPLE_KEY} = "{_EXAMPLE_DEFAULT}"',
+        f'{_EXAMPLE_KEY} = "{_EXAMPLE_DEFAULT}"\nmy_note = "hi"'))
     assert cli.main(["policy", "sync", "--apply"]) == 0
     out = capsys.readouterr().out
     assert "my-own-section" not in out  # unknown section: invisible to sync
-    assert "your own keys (not in the bundle) — untouched: quality.my_note" in out
+    assert (f"your own keys (not in the bundle) — untouched: "
+            f"{_EXAMPLE_TABLE}.my_note") in out
     raw = policy.load_project_raw(p)
-    assert raw["my-own-section"]["foo"] == 1 and raw["quality"]["my_note"] == "hi"
+    assert raw["my-own-section"]["foo"] == 1 and raw[_EXAMPLE_TABLE]["my_note"] == "hi"
 
 
 def test_tools_order_add_roundtrips_and_routes_stay_delegated(v016, capsys):
@@ -248,14 +290,14 @@ def test_already_in_sync_message_on_current_file(root, capsys):
 def test_no_project_policy_points_at_init(root, capsys):
     assert cli.main(["policy", "sync", "--apply"]) == 0
     out = capsys.readouterr().out
-    assert "no project policy.toml" in out and "cage setup" in out
+    assert "no project config" in out and "cage setup" in out
 
 
 def test_corrupt_project_policy_is_a_typed_error(root, capsys):
     _policy_path(root).write_text("not = valid = toml [", encoding="utf-8")
     assert cli.main(["policy", "diff"]) == 1
     err = capsys.readouterr().err
-    assert "error:" in err and "policy.toml" in err
+    assert "error:" in err and "cage.toml" in err
 
 
 @pytest.mark.skipif(os.name == "nt",
@@ -278,10 +320,10 @@ def test_git_tracked_policy_prints_the_review_with_git_note(v016, capsys):
     """No .bak files — git is the backup, and the output says so."""
     import subprocess
     subprocess.run(["git", "init", "-q"], cwd=v016, check=True)
-    subprocess.run(["git", "add", ".cage/policy.toml"], cwd=v016, check=True)
+    subprocess.run(["git", "add", ".cage/cage.toml"], cwd=v016, check=True)
     assert cli.main(["policy", "diff"]) == 0
     out = capsys.readouterr().out
-    assert "policy.toml is git-tracked — review any applied change with git" in out
+    assert "cage.toml is git-tracked — review any applied change with git" in out
     assert ".bak" in out  # "cage writes no .bak files"
 
 
@@ -294,7 +336,7 @@ def test_json_envelope(v016, capsys):
     assert cli.main(["policy", "diff", "--json"]) == 0
     d = json.loads(capsys.readouterr().out)
     assert d["schemaVersion"] == "cage.v1" and d["command"] == "policy"
-    assert len(d["data"]["add"]) == 3 and d["data"]["updated"] is None
+    assert len(d["data"]["add"]) == 4 and d["data"]["updated"] is None
 
 
 def test_ver_tuple_orders_versions_not_strings():
@@ -362,7 +404,7 @@ def test_writes_resolve_to_active_ledger_root(v016, tmp_path, monkeypatch, capsy
     capsys.readouterr()
     raw = policy.load_project_raw(gbase / "policy.toml")
     assert raw["budgets"]["daily_usd"] == 9.0          # customized — kept
-    assert raw["cleanup"] == {"enabled": True, "days": 30}  # added
+    assert raw["cleanup"] == {"enabled": True, "warn": True, "days": 90}  # added
     assert raw["meta"]["policy_version"]
     # the *project* policy in cwd was never touched by the --ledger run
     assert "policy_version" not in policy.load_project_raw(

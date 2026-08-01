@@ -125,11 +125,21 @@ def probe(root: Path, pol: dict | None = None) -> dict:
     resolver's ``problems``/``disabled``, cross-agent path overlaps, and — for a
     committed *project* policy — machine-absolute source paths that break clones."""
     cursors = _cursor_map(root)
+    # kiro's IDE rows — and therefore its import cursor — live in the machine ledger
+    # (ADR 0006). Reading its cursor from `root` would report "not yet imported" forever
+    # for a file cage imports on every run: a diagnostic that lies about the thing it
+    # exists to diagnose.
+    kiro_sink = paths.kiro_routed(root)
+    kiro_cursors = _cursor_map(kiro_sink) if kiro_sink is not None else cursors
+    if pol is None:  # Directive A: sources live in cage.toml — load the project's policy
+        from cage import policy
+        pol = policy.load(paths.Footprint(root).policy)
     res = paths.resolve_log_sources(pol)
     groups: dict[str, list] = {a: [] for a in agents.SURFACES}  # SURFACES first, in order
     for s in res.sources:
-        d = _probe_source(s.fmt, s.agent, s.path, s.glob, cursors)
-        d.update(provenance=s.provenance, raw=s.raw, fmt=s.fmt,
+        d = _probe_source(s.fmt, s.agent, s.path, s.glob,
+                          kiro_cursors if s.agent == "kiro" else cursors)
+        d.update(provenance=s.provenance, raw=s.raw, fmt=s.fmt, surface=s.surface,
                  custom=s.agent not in agents.SURFACES)
         groups.setdefault(s.agent, []).append(d)
 
@@ -154,9 +164,24 @@ def probe(root: Path, pol: dict | None = None) -> dict:
                         "committed project policy — teammates' clones will probe a path "
                         "that doesn't exist; move it to ~/.cage/policy.toml or use ~/…")
 
+    # Directive A mitigations: drift vs the built-in seed (a cage upgrade's new/corrected
+    # default paths don't reach a frozen table until `cage setup --sync-sources`), and the
+    # legacy home-env vars that are now IGNORED for path resolution — announced so an
+    # invisible override never silently defeats the directive.
+    missing, stale = paths.sources_drift(pol)
+    ignored_env = sorted(v for _a, vs in paths._AGENT_ENV.items() for v in vs
+                         if os.environ.get(v))
+    # Same class of silent staleness, one key down: a table materialized before
+    # `path_globs` existed imports fine and only loses `--path`/`--project`, which would
+    # otherwise surface as a mystery at the moment someone reaches for the escape hatch.
+    no_path_globs = paths.path_globs_missing(pol)
+
     return {"platform": sys.platform, "agents": groups,
             "problems": res.problems, "disabled": res.disabled,
             "overlaps": overlaps, "portability": port_warns,
+            "drift_missing": missing, "drift_stale": stale, "ignored_env": ignored_env,
+            "no_path_globs": no_path_globs,
+            "kiro_sink": str(paths.Footprint(kiro_sink).base) if kiro_sink is not None else "",
             "active_root": str(paths.resolve_root(root)),
             "active_source": src_from,
             "precedence": "override (--ledger/CAGE_BASE) → project (.cage/) → global (~/.cage)"}
@@ -165,18 +190,21 @@ def probe(root: Path, pol: dict | None = None) -> dict:
 def render_paths(root: Path, data: dict) -> str:
     lines = [f"Path probe · {data['platform']} · per agent × candidate log location", ""]
     from cage import agents
-    disabled = set(data.get("disabled", []))
     for agent, sources in data["agents"].items():
         custom = bool(sources) and sources[0].get("custom")
         label = f"{agent}  (custom tool, format={sources[0]['fmt']})" if custom else agent
         lines.append(label)
-        if agent in disabled:
-            lines.append("  · disabled by policy ([sources] replace = true, paths = []) "
-                         "— capture silenced for this agent")
+        if not sources and agent in agents.SURFACES:
+            # Directive A (§3.6): no [sources.<agent>] entry ⇒ cage sweeps nothing for it.
+            # Say so loudly — a silent absence looks exactly like broken capture.
+            lines.append("  · not declared in [sources] — cage captures NOTHING for this "
+                         "agent. Add [sources." + agent + "] or run `cage setup "
+                         "--sync-sources` to materialize the defaults.")
         for s in sources:
             mark = "✔" if s["exists"] and s["rows"] else ("·" if s["exists"] else "✗")
+            surf = f"surface={s['surface']}" if s.get("surface") else "surface=parser"
             head = (f"  {mark} {s['src']}  ({s['pattern']})  [{s['provenance']}]  "
-                    f"{s['files']} file(s) · {s['rows']} parseable row(s) · "
+                    f"{surf}  {s['files']} file(s) · {s['rows']} parseable row(s) · "
                     f"{s['fresh_files']} not yet imported")
             lines.append(head)
             if s["why"]:
@@ -189,6 +217,9 @@ def render_paths(root: Path, data: dict) -> str:
             lines.extend(_candidate_lines("Kiro user data", "KIRO_DATA_DIR",
                                           paths.kiro_data_candidates(),
                                           _kiro_chosen(), _UNVERIFIED_WINDOWS_KIRO))
+            if data.get("kiro_sink"):  # ADR 0006 — the probe must name where kiro lands
+                lines.append(f"    → IDE rows are written to {data['kiro_sink']} "
+                             "(machine fact, not a project fact — `cage query kiro-routing`)")
     if data.get("overlaps"):
         lines.append("")
         for p, ags in sorted(data["overlaps"].items()):
@@ -200,8 +231,28 @@ def render_paths(root: Path, data: dict) -> str:
     if data.get("problems"):
         lines.append("")
         lines.extend(f"⚠ ignored: {p}" for p in data["problems"])
-    lines += ["", "provenance: built-in (registry) · env (a home an env override "
-              "redirected) · policy ([sources] in policy.toml)",
+    if data.get("drift_missing") or data.get("drift_stale"):
+        lines.append("")
+        lines.append("⚠ [sources] drift vs the built-in defaults — run "
+                     "`cage setup --sync-sources` to refresh (user entries preserved):")
+        lines.extend(f"    + missing default: {m}" for m in data.get("drift_missing", []))
+        lines.extend(f"    - no longer shipped: {s}" for s in data.get("drift_stale", []))
+    if data.get("no_path_globs"):
+        lines.append("")
+        lines.append("· note: no `path_globs` declared for "
+                     + ", ".join(data["no_path_globs"])
+                     + " — normal imports are unaffected, but `cage import --path` / "
+                       "`--project` will scan nothing. Run `cage setup --sync-sources`.")
+    if data.get("ignored_env"):
+        lines.append("")
+        lines.append("· note: these home-env vars are set but NO LONGER used for path "
+                     "resolution (Directive A) — declare paths in [sources] instead: "
+                     + ", ".join(data["ignored_env"]))
+    lines += ["", "provenance: policy ([sources] in cage.toml) — the SOLE path authority "
+              "(Directive A). The built-in registry is a seed `cage setup` materializes; "
+              "env home vars are no longer consulted for path resolution.",
+              "surface: the declared [sources] client-surface, or `parser` when the "
+              "row's surface comes from the log's own format",
               f"active ledger: {data['active_source']} → {data['active_root']}",
               f"precedence:    {data['precedence']}"]
     return "\n".join(lines)

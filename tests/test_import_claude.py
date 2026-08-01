@@ -5,6 +5,7 @@ import json
 from types import SimpleNamespace
 
 from cage import clicmds, ledger, paths
+from srcseed import mkcage
 
 
 def _claude_line(uuid: str, tin: int, tout: int) -> str:
@@ -18,7 +19,10 @@ def _args(path=None, project=None, since=None):
 
 
 def _init_root(d, monkeypatch):
-    (d / ".cage").mkdir(parents=True)
+    # `mkcage`, not a bare `.cage` mkdir: `--path`/`--project` now take their discovery
+    # patterns from `cage.toml`'s `[sources] path_globs` (path-globs handoff §5), so a
+    # footprint with no materialized table scans nothing — deliberately, and loudly.
+    mkcage(d)
     monkeypatch.chdir(d)
     return d
 

@@ -3,4 +3,4 @@ prices sync — bundled 2026-07-14 vs project 2020-01-01
 
 · 51 project rows equal to the bundle — in sync
 
-✔ [meta] restamped to bundled 2026-07-14
+✔ [meta] prices_version restamped to bundled 2026-07-14

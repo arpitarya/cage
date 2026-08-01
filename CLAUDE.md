@@ -4,14 +4,23 @@
 tool savings. In the family alongside **fux** (decisions→rules). `$0`, stdlib-only,
 deterministic, independent of any AI tool.
 
-Design of record: [docs/cage-plan.md](docs/cage-plan.md). Read it before changing
+Design of record: [docs/PLAN.md](docs/PLAN.md). Read it before changing
 the substrate contract or the attribution engine.
 
-Maintainer handoff: [docs/maintainers-interview.md](docs/maintainers-interview.md)
+Maintainer handoff: [docs/INTERVIEW.md](docs/INTERVIEW.md)
 — the outgoing model's exit interview (intent, scar tissue, how to work with the
 human). **Every agent maintaining this repo reads it after this file; a departing
 maintainer appends its own lessons there.** It is context, never spec — where it
 disagrees with this file or the plan, this file and the plan win.
+
+**Build log: [IMPLEMENTATION.md](docs/IMPLEMENTATION.md) — always maintained.** After
+**every small milestone** (a green checkpoint, a commit, a phase step — not just a
+release), append an entry: date · milestone · what was implemented · files touched ·
+test status · next step. Create the file if absent; newest entries first. It is a
+running log of *what is actually built*, never spec — where it disagrees with this
+file or the plan, they win. An agent ending a work session without updating
+IMPLEMENTATION.md has left the milestone unrecorded — treat that like a missing
+changelog entry.
 
 ## Architecture (the one-way data flow)
 
@@ -19,8 +28,8 @@ disagrees with this file or the plan, this file and the plan win.
 record_call / record_receipt  →  .cage/ledger/{calls,receipts,tasks}-YYYY-MM.jsonl  (+ legacy *.jsonl)
         (meter, plan §5)                      │           · provenance.jsonl (unpartitioned buffer)
                                               ▼  derive ($0, no model)
-  policy.toml (prices/order/budgets/human) → report · attrib · matrix · budget · roi
-                                             · human · trend · why · origin
+  cage.toml (prices/order/budgets)       → report · attrib · matrix · budget · roi
+                                             · compare · verdict · why · origin
                                              + --scope (monorepo slice) · --team · ledger-sync (§3.6)
 ```
 
@@ -29,7 +38,8 @@ the row's own `ts`; readers glob + concatenate, legacy single files still read; 
 skips below-cutoff months). provenance.jsonl is a local buffer only — canonical storage
 is refs/notes/cage-provenance, written by CI alone (plan §3.5). The calls/receipts/tasks
 rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team view
-(`--team`, plan §3.6.3).
+(`--team`, plan §3.6.3; [ADR 0001](docs/adr/0001-ledger-team-aggregation-notes-not-external-sink.md)
+— why a git ref, not an external sink).
 
 - **Substrate** ([schema.py](cage/schema.py)) — `make_call` / `make_receipt` stamp
   ids + validate the closed enums. Rows are plain JSON. Prompt bodies are never a
@@ -38,32 +48,38 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   guard as tasks; empty = the legacy contract, plan §3.6.2); calls additionally carry an
   additive optional `project` (working-dir basename, same PII guard; empty = legacy) — a
   *derived* `cage report --project` view, deliberately distinct from `scope`'s monorepo
-  axis (plan §3.7). Calls also carry an additive optional `gap_ms` (turn gap →
-  derived human attention, plan §4.10; absent = legacy contract, never part of an
-  id). The long-lived logs are month-partitioned behind
+  axis (plan §3.7). The long-lived logs are month-partitioned behind
   `ledger.append_row`/`read_kind` (plan §3.6.1).
+- **Config file** ([paths.py](cage/paths.py) `Footprint.policy`) — the project config
+  is `.cage/cage.toml` (the policy layer). It was `policy.toml` through v0.35; the
+  rename is **non-breaking** — `policy.toml` is still read as a fallback and migrated
+  to `cage.toml` on `cage setup` (idempotent, non-destructive), and with both present
+  `cage.toml` wins (`cage doctor` names the ignored leftover; a one-line stderr warning
+  fires at load). The resolved name lives in **ONE place**, `Footprint.policy`; writers
+  (`pricestoml`/`policysync`) and `cleanup.NEVER` (which protects **both** names) follow
+  it. Bundled default `data/cage.toml`, read-only at runtime. `cage query config-file`
+  explains it.
 - **Constants** ([constants.py](cage/constants.py)) — the *third audit layer*. Cage
   keeps its numbers in three places, never mixed: **contract** = the enums in
-  `schema.py`; **policy** = user-economics in `policy.toml`; **constants** = code
+  `schema.py`; **policy** = user-economics in `cage.toml`; **constants** = code
   heuristics not meant as config but that must be reviewable (`CHARS_PER_TOKEN`,
   `TOKENS_PER_MILLION`, `MAX_MATRIX_TOOLS`, `METHOD_TRUST`, `DEFAULT_CONFIDENCE`,
-  `GRAPHIFY_RECEIPT_CONFIDENCE`, `SINCE_WINDOW_DAYS`, `IDLE_CAP_MINUTES` (a
-  policy-preferred fallback like `DEFAULT_CONFIDENCE` — `policy.toml [human]
-  idle_cap_minutes` wins), `PARTITION_GRANULARITY`, and the
+  `GRAPHIFY_RECEIPT_CONFIDENCE`, `SINCE_WINDOW_DAYS`,
+  `PARTITION_GRANULARITY`, and the
   ledger-size threshold `LEDGER_WARN_BYTES` — derived from `LEDGER_ROW_BYTES` ×
   `LEDGER_HEAVY_ROWS_PER_DAY` × `LEDGER_WARN_MONTHS`, a policy-preferred fallback like
-  `DEFAULT_CONFIDENCE` (`policy.toml [ledger] warn_mb` wins)). `compress`/`prices`/
-  `matrix`/`attribution`/`human`/`ledger`/`graphifymeter` import from here.
-  `DEFAULT_CONFIDENCE` is a *fallback* — `human.py` still prefers policy `[human.confidence]`. The
+  `DEFAULT_CONFIDENCE` (`cage.toml [ledger] warn_mb` wins)). `compress`/`prices`/
+  `matrix`/`attribution`/`origin`/`ledger`/`graphifymeter` import from here.
+  `DEFAULT_CONFIDENCE` is a *fallback ladder* — a row's own `confidence` wins. The
   third-party shims (`fux/cage_receipt.py`, graphify) keep a local `len/4` copy
   because they're zero-dep; it's an intentional duplicate of `CHARS_PER_TOKEN`.
 - **Explain** ([explain.py](cage/explain.py) engine,
   [explain_data.py](cage/explain_data.py) registry) — `cage query` answers both
-  "how is X calculated" (`kind="calculation"`, the original 12 — formulas
-  interpolate **live** values from policy + constants; set `CAGE_HUMAN_RATE` ⇒ the
-  printed rate changes, never a hard-coded literal) and "how does cage work"
+  "how is X calculated" (`kind="calculation"` — formulas interpolate **live**
+  values from policy + constants; reorder `[tools] order` ⇒ the printed pipeline
+  changes, never a hard-coded literal) and "how does cage work"
   (`kind="concept"` — `overview`/`data-flow`/`metering`/`attribution`/
-  `matrix-concept`/`method-law`/`receipts`/`human-axis`/`determinism`/
+  `matrix-concept`/`method-law`/`receipts`/`savings-axis`/`determinism`/
   `pii-safety`/`numbers-layers`; structural facts interpolate live too — ledger
   paths from `paths.Footprint`, pipeline order from `policy.tool_order(pol)`,
   agent surfaces from `agents.SURFACES`, subcommand count from the CLI parser —
@@ -71,14 +87,6 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   stdlib token-overlap across both kinds; **no LLM, no network** (cage law). No
   match ⇒ suggest closest ids, never guess. `--list --kind concept|calculation`
   filters; `cage --help` groups subcommands and points at `cage query`.
-  **The formula catalogue [docs/formulas.md](docs/formulas.md) is generated
-  from the calculation entries** by `tools/docgen` (`--target formulas`;
-  README links it): edit the registry, run the generator — never hand-edit the
-  catalogue. CI's `python -m tools.docgen --check` fails on drift, and a new
-  calculation entry with no anchored `<!-- formula: id -->` block fails the same
-  gate (the "catalogue in the same change" rule, now mechanical — plan
-  `docs/output-and-simplification.plan.md` Phase 5.6). Hand-written prose
-  between the anchored blocks survives regeneration.
 - **Ledger** ([ledger.py](cage/ledger.py)) — the only mutation is append; reads
   tolerate a truncated tail. Everything else derives.
 - **Meter** ([metering.py](cage/metering.py)) — the library adapter. **Fail-open**:
@@ -98,9 +106,27 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   — the differentiator (plan §4). Marginal-by-fixed-order; a reconstructed
   counterfactual cell is `modeled`/`estimated`, never `measured` (only the recorded
   run is an invoice). `cage demo` must keep reproducing the plan's §4.4 tables.
+- **Gross vs net savings** ([netsaved.py](cage/netsaved.py)) — **every `saved` in the
+  ledger is GROSS**: `raw_alternative − actual` is the *avoided read cost* and excludes
+  the cost of **using** the tool (the invoking turn, a hook's injected context), so a big
+  `saved` and a session that cost more are both true
+  ([finding](docs/regression/2026-08-01-finding-saved-is-gross.md)). Two rules follow.
+  (a) The word `gross` appears on every surface that prints the number — report/attrib/
+  roi/overview/ceiling, text **and** CSV (`gross_saved_*`) — from ONE phrasing,
+  `netsaved.GROSS_NOTE`; never re-word it per view. (b) `netsaved.by_tool` nets it at
+  **task level only** — per-query is impossible, shim receipts carry a `task` but no
+  `call`, and inventing that link is forbidden. The attributable-cost rule is the **±120s
+  receipt-window union** (`constants.NET_ATTRIB_WINDOW_S`; symmetric because the invoking
+  turn precedes the receipt and the consuming turn follows it), a deliberate *lower
+  bound*. Net is `modeled` at `NET_SAVED_CONFIDENCE` — **never `measured`** — and a task
+  with no in-window call is *uncovered*: its net reads unavailable, never `= gross`.
+  `cage insights verdict` therefore prints **`SAVING (GROSS)`** when no complete
+  cost-of-use figure exists, but still asserts a bare **COSTING** — the omitted term is
+  ≥ 0, so only the positive side can be wiped out by it. `cage query gross-vs-net`
+  explains it; FORMULAS §2.1/§2.1a is the spec.
 - **Unit→USD** ([convert.py](cage/convert.py)) — the single dispatch for a receipt's
-  `saved` in dollars: `usd` passthrough · `tokens` at model price · `minutes` at the
-  human rate · `ms`/`gco2` → `$0`. `roi`/`attribution` route through it (one place
+  `saved` in dollars: `usd` passthrough · `tokens` at model price · `ms`/`gco2` → `$0`
+  (`minutes` was a unit through v0.35 and is now excluded, never priced). `roi`/`attribution` route through it (one place
   unit semantics live). A **call-less token receipt** (graphify/fux shims — a `task`
   but no `call`) prices via the ladder in [receiptprice.py](cage/receiptprice.py)
   (plan §4.5): `[tools.<tool>] price_at` (managed by `cage prices route-tool <tool>
@@ -117,29 +143,24 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   self-costing provider Cage can't tokenize keeps its figure. Derive-time only — the
   ledger is never rewritten. A call prices only if `(provider, model)` is in the
   table; the transcript meter stamps `provider="anthropic"`, so that key must carry
-  the Claude rows (the bundled `data/policy.toml` does; a project policy must too).
-- **Tier-1 human axis** ([human.py](cage/human.py), [humanview.py](cage/humanview.py),
-  [trend.py](cage/trend.py)) — *agent vs human* (design doc `docs/human-baseline.design.md`).
-  A human receipt is just `tool="human"`; `human.py` resolves minutes/type/usd → USD
-  by a fixed precedence + confidence ladder. **Human cost is `estimated` by default**
-  (never `measured` unless a real timesheet/quote, never `modeled`). Rates live in
-  `[human]` in `policy.toml`; `CAGE_HUMAN_RATE` overrides at derive time and its
-  provenance prints in the `cage human show` header. `matrix --human` adds the anchor row
-  behind the flag (no flag ⇒ byte-identical). `cage human show`/`cage insights trend` show **saved
-  $ and saved hrs** (time can go negative — the metric can embarrass the agent).
-  The passive side of the axis (plan §4.10): call rows carry an additive
-  optional `gap_ms` (previous assistant end → the human turn that led to the
-  call), stamped at import only where the log has per-turn timestamps (claude
-  yes; copilot/kiro no — absence explicit, never fabricated; never in an
-  id). [attention.py](cage/attention.py) is the ONE place gap math lives —
-  derived minutes = Σ min(gap_ms, idle cap), always `estimated`, labelled
-  `derived (turn-gaps, capped)`; the cap is policy `[human] idle_cap_minutes`
-  with the `constants.IDLE_CAP_MINUTES` fallback. Attested minutes
-  (`human-record`, `cage human outcome --minutes N`) beat derived per task — never
-  summed. `compare`/`verdict`/`study report` print a total-cost line (agent $ +
-  human minutes × rate, `--agent-only` suppresses); `cage insights calibration --human`
-  is the measured accuracy of the heuristic (refuses below `MIN_ESTIMATE_N`).
-  No watcher-shaped capture, ever: transcript timestamps only.
+  the Claude rows (the bundled `data/cage.toml` does; a project policy must too).
+- **The Tier-1 human axis is GONE (v0.36)** — `human.py`/`humanview.py`/`trend.py`/
+  `attention.py`, `cage human`, `cage insights trend`, `matrix --human`,
+  `calibration --human`, `[human.*]`, `CAGE_HUMAN_RATE`, `IDLE_CAP_MINUTES`, the
+  `gap_ms` call field and the `minutes` unit were all removed together, substrate
+  included — a clean amputation, reconsidered from scratch after the release, never a
+  `# v2:` stub. **Do not reintroduce any part of it without a proposal doc.** Two
+  things survive and must not be confused with it: (a) provenance `origin="human"`
+  ([origin.py](cage/origin.py), `schema.ORIGINS`) is *authorship*, a different
+  question and a different enum; (b) `cage task outcome` / `cage task quality` never
+  belonged to the axis — they sat in the `human` command group by filing accident and
+  moved to the `task` group; `outcome` is the **task-close verb** the whole
+  cost-impact surface (`compare`/`estimate`/`calibration`) depends on. **Old ledgers
+  still read**: a pre-0.36 `gap_ms` call or `tool="human"`/`unit="minutes"` receipt
+  parses fine and is excluded from money views by `report._is_legacy_human`, with the
+  exclusion **counted and footnoted** on `cage report` — silently dropping it from a
+  total was the one option ruled out. `cage query savings-axis` explains it;
+  `tests/test_legacy_ledger.py` pins it.
 - **Task record** ([tasks.py](cage/tasks.py)) — `tasks.jsonl`, one row per task
   (last-write-wins by `id`), git-snapshotted at task close (SessionEnd / `cage
   outcome`). **Shelled out to git, never imported; fail-open** (non-repo/detached ⇒
@@ -157,13 +178,11 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   row** — a sha with no signal has no row at all; `origin.explain` derives unknown
   from absence. `origin="human"` is reachable only via explicit attestation
   (`cage authorship origin <sha> --attest human`), always paired with `method="heuristic"`
-  (enforced at `make_provenance` construction). Captured by a `PostToolUse` hook
-  (buffers edits per session) resolved at a `post-commit` git hook
-  ([gitcommithook.py](cage/gitcommithook.py), installed by `cage setup`/`agents.install`
-  alongside the Claude Code hooks) into the highest-trust `hooked` row, with a
-  `SessionEnd`-time transcript fallback ([transcript.py](cage/transcript.py)
-  `parse_provenance`) for what the live hook missed. The local jsonl is a **buffer
-  only**; canonical storage is `refs/notes/cage-provenance`, merged by row id
+  (enforced at `make_provenance` construction). Captured at `SessionEnd` from the
+  transcript ([transcript.py](cage/transcript.py) `parse_provenance`); the
+  hook-based `post-commit` capture path was removed in the hookless rebuild, so
+  `hooked` rows are legacy-only and new capture is `transcript`. The local jsonl is
+  a **buffer only**; canonical storage is `refs/notes/cage-provenance`, merged by row id
   (never overwritten) and **written only by CI** (`CAGE_NOTES_WRITE=1`) — a dev
   machine's `cage authorship notes-sync` defaults to a dry-run print. `cage authorship verify` is
   **report-only and always exits 0** (never a CI gate). Widens the PII surface to
@@ -181,10 +200,10 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   token band bounds** on the *open* task row (plan §3.4) so `cage insights calibration` can
   score in-band hits against the band as recorded — that **measured hit-rate is the
   only confidence source; the estimator never self-reports**. `cage insights verdict <tool>`:
-  a pure composer over attrib/roi/trend/regression/quality + break-even — computes
+  a pure composer over attrib/roi/regression/quality + break-even — computes
   no new statistics, refuses (`INSUFFICIENT DATA`) over approximating. The min-n
   gates `MIN_COMPARE_N`/`MIN_ESTIMATE_N` live in `constants.py` and **block** —
-  below them the command explains, never numbers. Task `label` (via `cage human outcome
+  below them the command explains, never numbers. Task `label` (via `cage task outcome
   --label`) is one validated token, never a path or free text. Diagnostics: `cage
   doctor --bundle` ([doctorbundle.py](cage/doctorbundle.py)) writes one redacted,
   counts-never-content archive; every capture-path swallow-site logs under
@@ -192,7 +211,7 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   silent" is tested, not aspirational). Validation harness: the fixture corpus
   `tests/fixtures/transcripts/` (4 agents × cli/vscode, exact expected rows,
   VS Code stand-ins flagged `UNVERIFIED-FORMAT`) + `python -m tools.dummyrepo`
-  (S1–S9 scenario runner; build-time only, skillgen rules, never in the wheel).
+  (S1–S18 scenario runner, S10 retired with the human axis; build-time only, never in the wheel).
   P5 fleet study ([machine.py](cage/machine.py), [study.py](cage/study.py), plan
   §4.9): opaque random machine id (**opt-in by enrollment** — unenrolled ledgers
   stamp nothing, byte-identical legacy), recorded phase markers in
@@ -202,25 +221,21 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   survive), the **machine-day** as sample unit, paired delta `estimated` with the
   work-mix caveat, gate = `MIN_COMPARE_N` machines-with-both-phases (blocking).
 - **CSV output (plan §3.9)** ([csvout.py](cage/csvout.py)) — `--csv` on
-  report/attrib/roi/compare/`study report`/calibration (incl. `--human`)/human/
-  trend, plus raw rows via `cage data export --csv calls|receipts|tasks`
+  report/attrib/roi/compare/`study report`/calibration, plus raw rows via
+  `cage data export --csv calls|receipts|tasks`
   (`exportcmd.RAW_CSV_FIELDS`; `--format csv` = legacy `--csv calls`). One shared
   data structure per view feeds text AND csv (`render_csv` beside each
   `render_*`) — never compute twice. LF pinned (`lineterminator="\n"` +
   `newline=""` writes), RFC-4180, method/match tags are columns, refusals/
   caveats/UNPRICED survive into rows. CSV is one-way REPORTING — never an import
   source; the fleet bundle stays jsonl. MCP mirrors it (`format: csv` on
-  report/attrib/roi); the rendered skills teach the recipes (skillgen fragments
-  only). Column contracts: `docs/csv-output.md`; `cage query csv-output`.
-  **Text-output contracts: [docs/cli-output-spec.md](docs/cli-output-spec.md)**
-  — LIVE behavior since output-honesty (README-linked). The per-command,
-  per-state code blocks are **generated** from the golden fixtures
-  (`tests/fixtures/goldens/`, asserted by `tests/test_output_spec.py`) via
-  `tools/docgen --target spec`; CI's `--check` gates drift. Change a rendered
-  shape ⇒ re-bless the golden (`CAGE_BLESS_GOLDENS=1 pytest
-  tests/test_output_spec.py`) and regenerate; never hand-edit the spec's
-  blocks. A shipped output change without a regenerated spec is a release bug,
-  same as a missing changelog entry.
+  report/attrib/roi).
+  **Text-output contracts: the golden fixtures** (`tests/fixtures/goldens/`,
+  asserted by `tests/test_output_spec.py`) are the per-command, per-state output
+  contract. Change a rendered shape ⇒ re-bless the golden (`CAGE_BLESS_GOLDENS=1
+  pytest tests/test_output_spec.py`). (The generated `docs/cli-output-spec.md` and
+  its `tools/docgen` generator were removed in the hookless rebuild; the goldens
+  remain the contract.)
 - **Display honesty** ([display.py](cage/display.py)) — the ONE display-context
   home (plan Phases 1+2). `Display` carries the resolved presentation switches
   (`usd`: tokens are the default, dollars opt-in — flag > env `CAGE_USD` >
@@ -242,6 +257,10 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
 - **Determinism** — no clocks/random in derived views; ids carry the only entropy.
   Same ledger + same policy ⇒ same tables. Tests assert exact plan numbers.
 - **`method` is sacred** — never let a projection read as `measured`. Tag every cell.
+- **Usage rows are diagnostic-only** ([usagelog.py](cage/usagelog.py)) — one row per
+  graphify run in `state/`, never priced and never read by a derived money view (like
+  all `state/`, they cannot move a reported number — tested byte-identical); `args_hash`
+  never carries the query text.
 - **Three agents, always** — Cage supports **Claude Code · Copilot · Kiro**
   (`agents.SURFACES = ("claude", "copilot", "kiro")`). Never drop or silently
   break one: every wiring/read surface (`agents.py`, `mcpserver.py`, `cage
@@ -253,21 +272,30 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   Renaming/removing a top-level verb must add an entry to `verbmap.REMOVED`
   ([verbmap.py](cage/verbmap.py)) so the old spelling prints a direction instead of
   exiting 1 silently — and it must be swept everywhere the old spelling could still be
-  hard-coded: every wire module, `install.sh`, `justfile`, docs/skills (skillgen),
-  and `tools/dummyrepo`. `just demo` and `install.sh` shipped broken from v0.28.0 to
+  hard-coded: every wire module, `install.sh`, `justfile`, and `tools/dummyrepo`. `just demo` and `install.sh` shipped broken from v0.28.0 to
   v0.32.0 because the rename touched the CLI and nothing else, and nothing checked.
   `tests/test_cli_tiering.py` grep-gates source, assets, **and dev tooling**
   (`justfile`/`install.sh`) for a stale `cage <old-verb>` spelling — treat a failure
   there as a wiring bug, not a lint nit. See the wiring-liveness paragraph above: a
   verb deleted outright (never added to `REMOVED`) is the harder case the live-parser
   detector exists to catch.
+- **`[meta] cage_version` is the package version, always** — it is *printed* by
+  `cage prices list` and *copied into every newly scaffolded project*, so a stale literal
+  propagates. Derive it from `cage.__version__` (the `manifest.py` pattern), never
+  hand-maintain it; a project's existing stamp is history and is never rewritten.
+  **`policy_version` is deliberately NOT coupled to the release** — it is a content
+  counter driving the `cage policy sync` recommendation, and bumping it per release would
+  tell every project its defaults are stale when nothing changed.
 - **Every release updates the changelog** — bump `__version__`, add the full release
   notes to `CHANGELOG.md` (newest first, don't skip versions) and a **1–2 line**
   summary to the README "What's new" section — which keeps **only the latest
   version's entry** (replace, don't append; the README points at `CHANGELOG.md` for
   history — full prose lives in the changelog), and refresh the
   "N tests passing" count in the README `$0` section + this file's `just test`
-  comment. A shipped version with no changelog entry is a release bug.
+  comment. A shipped version with no changelog entry is a release bug. Nothing to
+  hand-edit for `[meta] cage_version` — it derives from `__version__` at read time
+  (`policy._bundled`); just confirm `tests/test_prices_split.py`'s drift-guard test is
+  still green (the checklist item that was missing when it drifted eleven releases).
 - **Never publish from local. Every release ships a GitHub release, and the GitHub
   release *is* the publish trigger.** The one true release flow: bump `__version__`
   + changelog, commit + push `main`, tag `vX.Y.Z`, push the tag, then
@@ -287,23 +315,6 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   (`(zipapp)`); bundled data reads via `paths.bundled_data()`
   (importlib.resources Traversable — never `Path(__file__)`), so it works from
   inside the archive; `paths.distribution()` is the detector.
-- **Skill/prompt/steering assets are rendered — never hand-edit them.** The flagship
-  `cage` skill's per-host files (`cage/data/skills/cage/SKILL.md`,
-  `cage/data/prompts/cage.prompt.md`, `cage/data/steering/cage.md`,
-  `cage/data/skills/agents/cage/SKILL.md`) are generated by `tools/skillgen` from
-  `tools/skillgen/fragments/`. Edit fragments, then `python -m tools.skillgen &&
-  python -m tools.skillgen --bless`; CI's `--check` fails on hand-edit drift. Build-time
-  only: stdlib-only, never imported at runtime, never in the wheel. See `docs/skillgen.md`.
-  **`tools/docgen` follows the same law** (plan Phase 5.6): the three generated
-  doc surfaces — `docs/cli-output-spec.md` (from the golden fixtures),
-  `docs/formulas.md` (from the `explain_data.py` registry), and the bundled
-  policy.toml, whose `--target policy` owns **two** regions: the `# formula:`
-  comment lines (from the registry) and the inert, `~`-relative `[sources]`
-  documentation block between the `# cage:sources-start` / `# cage:sources-end`
-  sentinels (from `paths.builtin_source_docs()`, a comment block — the defaults
-  stay in code). Regenerated with `python -m tools.docgen
-  [--target spec|formulas|policy]`, CI's `--check` gates drift, and the tree is
-  build-time only (never imported at runtime, never in the wheel).
 - **Two error regimes, never mixed.** Write paths stay **fail-open** (return `False` /
   swallow, traceable under `CAGE_DEBUG`, never raise into a request/turn). The read/CLI
   boundary is **typed**: an expected user-facing failure raises the single `CageError`
@@ -319,7 +330,7 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   plan §3.3) — `cage prices list|unpriced|set|alias|sync` manages the project
   `[prices]`/`[alias]` tables; writes are text surgery (in-place value edits marked
   `# cage:custom`, or a deterministic cage-managed block) — never a whole-file rewrite,
-  and the bundled `data/policy.toml` is read-only at runtime. `policy.price_match`
+  and the bundled `data/cage.toml` is read-only at runtime. `policy.price_match`
   resolves exact → alias → family over *normalized* ids (`copilot/` route-prefix strip —
   a closed list; `.`↔`-` folding; effort suffixes low/medium/high/max drop); a normalized
   match renders `family`, an alias renders `alias`, **never `exact`** (method law), and a
@@ -333,25 +344,51 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   runs the full all-agent sweep before emitting (`--agent` filters output only);
   `--no-import` flag > `CAGE_CAPTURE` env > `[capture] import_before_export` policy;
   fail-open; the study manifest records `refresh: {ran, new_calls}`.
-- **State cleanup is a closed allowlist** ([cleanup.py](cage/cleanup.py), plan §3.6.4) —
-  aged debug.log/hooks-seen rows, stale `pending-*` buffers, orphan cursors, `*.tmp`;
-  never ledger/, policy.toml, machine.json, study.jsonl, limits.json (by construction).
-  `[cleanup] enabled/days` (`CAGE_CLEANUP` overrides); auto path piggybacks on
-  `importcmd.run`/session-end (throttled, fail-open, `cleanup.prune` debug context);
-  `cage data cleanup` is dry-run until `--apply`. State files are never read by derived
-  views — cleanup can't change a reported number (tested byte-identical).
-- **Handoff/prompt docs have a lifecycle — active in `docs/`, archived on ship.**
-  New feature work is specced as a pair: `docs/<feature>.handoff.md` +
-  `docs/<feature>.prompt.md`. While unshipped they live in `docs/` root and are
-  listed under *Active work* in `docs/README.md`. **The release that ships the
-  work must, in the same change: (1) move the pair to
-  `docs/archive/vX.Y-<feature>.{handoff,prompt}.md`, (2) link them from that
-  version's CHANGELOG entry ("Built from: …"), (3) update the `docs/README.md`
-  and `docs/archive/README.md` indexes, and (4) promote any still-true design
-  content into the living design doc or plan section — the archive is history
-  and must never be cited as current spec.** A shipped feature whose
-  handoff/prompt still sits in `docs/` root is a release bug, same as a missing
-  changelog entry.
+- **State cleanup is a closed allowlist, and deletion is manual-only (v0.37)**
+  ([cleanup.py](cage/cleanup.py), plan §3.6.4) — aged debug.log/hooks-seen rows, stale
+  `pending-*` buffers, orphan cursors, `*.tmp`; never ledger/ (tool savings included —
+  see below), cage.toml (and legacy policy.toml), machine.json, study.jsonl, limits.json
+  (by construction). **Deletion only ever happens via an explicit `cage data cleanup
+  --apply`**, which runs regardless of `[cleanup] enabled` — an explicitly-typed command
+  is always honored. The auto path (piggybacked on `importcmd.run`/session-end,
+  throttled, fail-open, `cleanup.prune` debug context) only ever **warns**, once per
+  throttle interval, on stderr — count, reclaimable size, and the runnable fix, silent
+  when nothing is eligible — and never deletes. `[cleanup] enabled` (`CAGE_CLEANUP`
+  overrides) gates the auto path outright — `false` means no automatic anything, not
+  even the reminder; `[cleanup] warn` (`CAGE_CLEANUP_WARN`) silences just the reminder
+  text without disabling the gate. Retention default is `[cleanup] days = 90`
+  (`constants.CLEANUP_DEFAULT_DAYS`; 30 proved tighter than a real usage gap). State
+  files are never read by derived views — cleanup can't change a reported number (tested
+  byte-identical), and stdout never carries the reminder (stderr only, also tested).
+  **Tool savings (`ledger/savings/<tool>/`) may never get a dedicated cleanup class** —
+  today they're unreachable only because they sit under `ledger/`; a per-tool class must
+  never be added, since a savings row is unrecoverable (tested at `days=0`).
+- **Compare on a fork; propose an idea — before the plan.** When a decision has
+  multiple viable options, write a *compare doc* in [docs/compare/](docs/compare/)
+  **first** — debate, matrix, grounded references, a proposed verdict Arpit accepts
+  or overrides, and a reopen-trigger — before committing to a plan. This is a
+  standing rule. An idea worth keeping but not being built now gets a *proposal
+  doc* in [docs/proposals/](docs/proposals/) (`status: proposed`, same rigor) —
+  parked, not lost; it graduates to a compare doc or plan entry when picked up
+  (and keeps a `# v2:` idea out of the code). A settled fork graduates to a plan
+  entry and, on ship, an ADR; the compare doc stays as the evidence behind it.
+- **Handoff/prompt docs have a lifecycle — active in `docs/`, archived once
+  IMPLEMENTED.** New feature work is specced as a pair: `docs/<feature>.handoff.md`
+  + `docs/<feature>.prompt.md`. While the work is unbuilt they live in `docs/` root
+  and are listed under *Active work* in `docs/README.md`. **The change that
+  completes the work (suite green — NOT necessarily a release; cage often builds
+  several features before committing/tagging) must, in that same change: (1) move
+  the pair to `docs/archive/vX.Y-<feature>.{handoff,prompt}.md` naming the version
+  the work rides, (2) prepend the one-line archive header — say "implemented for
+  vX.Y (unreleased)" when the release is still pending, (3) link them from that
+  version's CHANGELOG entry ("Built from: …"), (4) update the `docs/README.md` and
+  `docs/archive/README.md` indexes, and (5) promote any still-true design content
+  into the living design doc or plan section — the archive is history and must
+  never be cited as current spec.** An implemented feature whose handoff/prompt
+  still sits in `docs/` root is a bug, same class as a missing changelog entry:
+  `docs/` root must read as *work not yet done*, so the next agent can trust it as
+  the live queue. Archive-on-implement (not on release) is deliberate — it keeps
+  that queue honest across the long uncommitted stretches this repo works in.
 - **Every prompt doc declares the model tier that should execute it.** A
   `docs/*.prompt.md` starts with a `**Model:**` line naming the tier and the
   one-line reason. Work in this repo spans mechanical git hygiene to
@@ -375,10 +412,180 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   prompt to a human, too — not just in the file.
 - Keep modules small and single-purpose (fux spirit). Tests live in `tests/`.
 
+## Documentation discipline (required)
+
+**Every change updates the docs in the same change** — this holds whether or not
+the change touched code; a decision, a scope change, or a plan is documentation
+too. A task is not done until the docs are true. When a doc goes stale, fix it on
+contact, not later. The maintained set, each with a standing owner-trigger (the
+freshness tracker is [docs/DOC-REGISTRY.md](docs/DOC-REGISTRY.md) — a change that
+fires a trigger updates the doc *and* bumps its row):
+
+- **[docs/OPEN-WORK.md](docs/OPEN-WORK.md)** — the **single plan of pending work**, and
+  the only place unfinished work is tracked. `docs/` root carries no loose
+  handoff/prompt pairs; a pair is created only when a phase there is picked up, and
+  archived on implement.
+  **Maintained continuously — always up to date, never rebuilt from memory later.**
+  It is updated in the *same* change as the work, on every one of these triggers:
+  an item is finished (remove it) · new work is discovered or a defect is found
+  (add it, the moment it's known, even mid-task) · scope, verdict, owner, or
+  priority changes · an item is blocked or unblocked · the order changes · a
+  standing constraint is added or lifted. **Discovering work and not filing it is
+  the same defect as finishing work and not removing it** — both make the file lie
+  about what is left. A session that changed the shape of pending work and ended
+  without touching this file has left the queue stale; treat that like a missing
+  changelog entry.
+  **A completed item is REMOVED from OPEN-WORK, never left ticked** — the file must read
+  as *what is still to do*, so a reader can trust its length. Removal is only legal once
+  the work is recorded elsewhere: **before deleting an item, append its outcome to
+  [IMPLEMENTATION.md](docs/IMPLEMENTATION.md)** (what was built · files · tests · next
+  step) **and, if it produced evidence, publish it to [regression/](docs/regression/)**.
+  Carry forward anything still live — a residual limit, an open decision, a follow-up —
+  as its own item rather than losing it with the parent. A ticked-but-present item and a
+  deleted-but-unrecorded one are the same bug in opposite directions: the first inflates
+  the queue, the second loses the history.
+  **Never trust its own status markers as ground truth when reconciling** — a ✅ in a
+  plan file is an assertion, not evidence. Verify against `docs/regression/`,
+  `docs/archive/`, `IMPLEMENTATION.md`, and the code before declaring an item
+  pending or done. On 2026-08-01 this file listed two already-built items as
+  pending precisely because its markers had gone stale.
+- **[docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)** — the build log. Append at
+  **every small milestone** (green checkpoint, commit, phase step): date ·
+  milestone · what was built · files · test status · next step. Green/in-progress/
+  failed/blocked all get an entry — an execution that skips it left the milestone
+  unrecorded. Newest first. It lives under `docs/` alongside the plan and the other
+  maintained docs.
+- **[docs/WORKLOG.md](docs/WORKLOG.md)** — the running per-session handoff. Append
+  every substantive exchange: asked · done · decided/open · single next step.
+  Newest first. **This covers every working surface — Claude Code executions AND
+  Cowork/chat strategy sessions alike**: a decision made in conversation (a scope
+  call, a directive, a plan revision) is worklog material even when no code moved;
+  the agent in that conversation appends the entry before the session ends.
+- **[docs/INTERVIEW.md](docs/INTERVIEW.md)** — the **exit interview**: notes from
+  the outgoing maintainer-model to every future one (read it after this file).
+  Write it the way a departing engineer briefs their replacement — not a status
+  page, but *what I learned, what I'd warn you about, what I'd do next and why*.
+  Four standing sections: **state of play** (where things actually are, including
+  the uncommitted/in-flight truth) · **in-flight work + the single next step** ·
+  **standing constraints** (the human's active directives) · **lessons / scar
+  tissue** (the traps that cost time, written so the next model doesn't re-pay).
+  **Maintained continuously, not just at departure** — any session can be the
+  last one before a model switch, so it must always read as if handed over right
+  now. Update it in the same session whenever direction, strategy, standing
+  constraints, or state of play change, and add yourself to the maintainer line
+  with the one lesson you'd want inherited. A model handing off with a stale
+  INTERVIEW.md has broken succession — treat it like a missing changelog entry.
+- **[docs/FORMULAS.md](docs/FORMULAS.md)** — every computed number in one place:
+  formula · code home · method tag · the knobs that move it. Update in the same
+  change as any formula, constant, or method-tag change; it must agree with the
+  live explainer registry ([explain_data.py](cage/explain_data.py)), which is the
+  copy that ships in the binary.
+- **[docs/PLAN.md](docs/PLAN.md)** — the design of record (the PLAN).
+  Update before building; keep its status truthful when scope or a contract changes.
+- **Every plan doc opens with a phase index.** The first section after the title
+  block of any plan (`docs/*plan*.md`, and PLAN.md's own major sections) is a
+  numbered list of every phase/step with **one line each** — what it does and its
+  gate/status — so a reader (or an executing agent) sees the whole shape before
+  any detail, and a stale plan is spottable at a glance. Existing plans gain the
+  index on contact (the fix-on-contact rule), new plans start with it.
+- **[docs/GLOSSARY.md](docs/GLOSSARY.md)** — every recurring term, defined once
+  against the code that owns it.
+- **[docs/DOC-REGISTRY.md](docs/DOC-REGISTRY.md)** — the freshness tracker itself; a
+  new maintained doc gets a new row, same change.
+- **[docs/architecture-flow.mermaid](docs/architecture-flow.mermaid)** — the
+  one-way data flow as a diagram; update when a stage/sink/read-surface changes.
+  Linked from the README's *How it works*.
+- **ADRs** authored from **[docs/adr/TEMPLATE.md](docs/adr/TEMPLATE.md)** — see
+  *Decision records* below.
+- **[docs/example/](docs/example/)** — copy-from contracts (cli · debug · setup ·
+  toml-config), one per file; update the matching one when that surface changes.
+
+Note: ALL-CAPS entry-point/tracker files (CLAUDE.md, CHANGELOG.md, README.md and
+AGENTS.md at root; IMPLEMENTATION.md, PLAN.md, INTERVIEW.md, GLOSSARY.md, WORKLOG.md,
+DOC-REGISTRY.md under `docs/`) carry no frontmatter; lowercase docs may.
+
+**Documentation style — no large paragraphs.** Authored docs (guides, handoffs,
+prompts, examples, ADRs, compare/proposal docs) are written in **short points**,
+one idea each, roomy, takeaway first; keep paragraphs to 3–4 lines and use tables
+for option/field comparisons. Fix a wall of text on contact — the docs law applies
+to *form*, not just facts. (CLAUDE.md, the plan, and the design docs are the
+deliberate exception: dense reference prose, packed on purpose.)
+
+**Document size discipline — ⏳ TRIAL, expires 2026-09-01.** Four composing rules on
+every authored doc. Full spec, worked examples and the fix procedure:
+[docs/doc-size-discipline.md](docs/doc-size-discipline.md).
+
+1. **Lead with the answer** — first ~5 lines say what's next, what's blocked, what
+   changed. A reader who stops there has the useful part.
+2. **One audience per doc** — a plan carries only what the *decider* needs; build
+   detail → handoff/prompt, rationale → ADR/design doc, evidence → `regression/`.
+3. **Evidence lives elsewhere, always** — state the claim, link the proof. Never
+   inline the numbers or reasoning; `regression/`, `archive/`, `IMPLEMENTATION.md`
+   and the ADRs already hold them.
+4. **A hard budget** — a plan fits one screen (~40 lines); a table row is *genuinely*
+   one line (≤120 chars). Over budget ⇒ move content out, never compress in place.
+   **Reference docs (this file, PLAN.md, the design docs) are exempt from rule 4
+   only** — dense on purpose; 1–3 still bind them.
+
+**On 2026-09-01 this rule must be explicitly retained, amended, or removed — it
+lapses if unreviewed**, so it cannot become permanent by neglect. Review criteria and
+the retain/remove call live in the spec doc. Tracked in
+[docs/DOC-REGISTRY.md](docs/DOC-REGISTRY.md).
+
+**Every prompt/handoff also names the model tier** that should execute it — see the
+prompt-doc rule and the Haiku/Sonnet/Opus rubric in *Must-Know Rules* above; don't
+restate it, apply it.
+
+## Decision records (ADRs)
+
+Architecturally load-bearing decisions live as numbered ADRs in
+[docs/adr/](docs/adr/), authored from [docs/adr/TEMPLATE.md](docs/adr/TEMPLATE.md)
+— the durable *why* behind a design that a future agent would otherwise "fix" back. They are the standing record; cite them inline in this
+file and in the plan at the rule they explain, the way a `plan §` reference is
+cited. Current set: [0001](docs/adr/0001-ledger-team-aggregation-notes-not-external-sink.md)
+(team aggregation via `refs/notes`, not an external sink) ·
+[0002](docs/adr/0002-universal-capture-global-ledger-explicit-import-export.md)
+(universal pull-based capture, global ledger, no OS scheduler). An ADR-worthy
+decision is one where a wrong call is expensive to reverse and the reasoning isn't
+obvious from the code — the substrate contract, the determinism/method law, the
+`$0`/no-infra wedge, a capture-architecture choice. A one-line dated call goes in
+the plan's decisions log instead.
+
+**Every ADR carries a reference** (fux's rule) — a plan section, a paper, or a
+concrete example that grounds *why*. An ADR that only asserts is incomplete.
+
+**Every ADR ends with a `## Veto condition (when to revisit)`** — cage's own
+device, and the anti-rot mechanism the rest of the fleet lacks. Three parts, each
+load-bearing:
+
+- **A falsifiable trigger, numbered where the decision is volume- or
+  measurement-gated.** 0001's is the model: "single-digit GB/yr is fine; 100s of
+  GB is not… **only then, and only with a named volume number**." A veto you can
+  only reopen with a *measurement*, never an *argument*, pre-empts a future agent
+  re-litigating a rejected option from first principles. Name **where** the change
+  lands, too (0001: a new `export` command, notes stays default), so revisiting
+  can't quietly become a redesign.
+- **Contingent vs. invariant, labelled.** Split the parts that auto-revisit on
+  evidence from the parts that are product values and move only by ratified
+  reversal. 0002 does this explicitly: `project` capture returns when a client
+  exposes the cwd; "no OS scheduler" is *not* volume-gated and changes only by
+  reversing the ADR. Pretending every decision is revisitable-on-evidence lies
+  about the ones that are values.
+- **A "deliberately not taken" record** where there's meaningful negative space —
+  an option considered and declined but *not* dogmatically rejected, with its own
+  future threshold (0001's write-path size block). Records the omission as a
+  choice, so the next agent doesn't mistake it for an oversight and doesn't ship it
+  as a `# v2:` half-build.
+
+Author every ADR from [docs/adr/TEMPLATE.md](docs/adr/TEMPLATE.md), which bakes in
+the three veto devices; the two existing records ([0001](docs/adr/0001-ledger-team-aggregation-notes-not-external-sink.md),
+[0002](docs/adr/0002-universal-capture-global-ledger-explicit-import-export.md)) are
+the worked examples to copy.
+
 ## Dev
 
 ```bash
-just test          # python -m pytest -q   (902 passing)
+just test          # python -m pytest -q   (962 tests)
 just demo          # seed §4.4 + print attrib/matrix
 cage --version
 ```
@@ -390,6 +597,23 @@ regression suite + per-agent capture labs (it installs the shipped `cage` and ne
 imports it; the in-tree suite can't see packaging, entry points, or bundled data).
 Its numbers are validated against a hand-derived reference, and its labs slice the
 **real** `~/.cage` ledger per agent to surface capture gaps.
+
+**Rebuild manual: [docs/cage-lab/](docs/cage-lab/README.md)** — cage-lab is disposable;
+that directory is what recreates it from nothing (setup · run · verify · publish ·
+manual cells).
+
+**Standing rule: every lab runs in its own `.venv`, always.** A lab whose `cage`/
+`graphify` come from whatever is globally installed is not reproducible, and its PATH
+order is decided by the machine's shell rc rather than the experiment — a stale
+interceptor in an unrelated project once won on PATH from *inside* cage-lab and
+silently unmetered every graphify run. So: `python3 -m venv .venv`, install cage +
+graphify into it (pinned; local `-e ../cage` only while a release is pending, recorded
+as a declared deviation from the black-box rule), and **set PATH explicitly in the
+driver** — `export PATH="$LAB/bin:$LAB/.venv/bin:$PATH"` — never relying on shell
+activation. The run **proves its own PATH** (`command -v graphify` written into the run
+manifest) and `SETUP.md` names the exact builds. This does **not** cover VS Code
+extension subprocesses, which inherit VS Code's launch environment — those stay
+per-machine-verified. (docs/OPEN-WORK.md §I.2a)
 
 **Standing rule: after every cage-lab testing/capture run, publish the findings into
 [`docs/regression/`](docs/regression/) here, dated** — so they live with cage, are
@@ -416,7 +640,26 @@ each agent only needs thin idiomatic wiring (`agents.py` orchestrates):
   is coarse so the proxy stays its higher-fidelity fallback). Capture is **pull-based and
   global** (plan §3.7): `cage import`/`cage data export` over a **resolved** ledger
   (`--ledger`/`CAGE_BASE` → project `.cage/` → global `~/.cage`, via `paths.resolve_root`)
-  is the universal path that works with no hooks and no project; hooks are an optional
+  is the universal path that works with no hooks and no project.
+  **Kiro is the ONE exception to one-sink-per-sweep** ([ADR 0006](docs/adr/0006-kiro-rows-are-machine-facts-not-project-facts.md)):
+  its *IDE* log is a single global file with no project/session/ts, so those rows are a
+  **machine fact** and route to `~/.cage` — `paths.kiro_routed(root)` is the one predicate
+  (`None` ⇒ no routing; an explicit `--ledger`/`CAGE_BASE` or `CAGE_LEDGER` collapses the
+  two sinks, so the override wins for free). The leg (`importcmd._kiro_leg`) rebuilds every
+  per-root object against the sink — own `seen`, cursors, lock, health, capture-log,
+  manifest, `import_id` — and **completes before the sweep's own lock is taken**, so no
+  process ever holds two import locks; it deliberately does *not* write the sink's
+  `_last_import` (a partial leg is not a sweep, and it would throttle a later global
+  capture-on-read) and does not run cleanup there. Capture switches compose as **AND**
+  (project's *and* sink's). The summary line names the sink and the rollup counts only
+  local rows — a total never includes a row that landed elsewhere. Kiro's *CLI* store gets
+  the **opposite** fix: `conversations_v2` is keyed by cwd, so it is read scoped to the
+  project **tree** (`paths.kiro_cli_workspace`, prefix-matched on a separator boundary,
+  symlink-resolved — the real store keys `/tmp/x` as `/private/tmp/x`) and stamps the
+  additive-optional `project` on the credit row. Pre-existing duplicated rows are never
+  rewritten (append-only); the read side says why kiro is absent
+  (`report.kiro_routed_line`, doctor's timeline, `--paths`, `cage query kiro-routing`)
+  rather than showing nothing. Hooks are an optional
   CLI-only real-time add-on (they don't fire under a VS Code extension). **Capture-on-read**
   (capture-architecture Phase 1) makes a *read* the primary trigger: `report`/`insights *`/
   the MCP read tools call `importcmd.ensure_captured` before rendering (throttled on
@@ -429,12 +672,13 @@ each agent only needs thin idiomatic wiring (`agents.py` orchestrates):
   diagnoses capture) but gains a per-source, per-**mode** (pull/push) timeline. Phase 1 is
   additive — **no hook file touched**; deleting the token-capture hooks is Phase 2. `importcmd.run`
   honors the **consumer capture switch** — `policy.capture_enabled(pol)`: env `CAGE_CAPTURE`
-  (0/1) overrides `policy.toml [capture] enabled` (default on), so a consumer can pause
+  (0/1) overrides `cage.toml [capture] enabled` (default on), so a consumer can pause
   metering without unwiring hooks. It **no longer guards on a cwd `.cage/`**: a hook firing
   outside any project lands in the global ledger (the resolver prevents stray local
   footprints), and a per-agent high-water cursor (`state/cursors.json`, last-seen
   `(size, mtime)`) keeps re-imports incremental (the shared `seen` set bounds the ledger
-  read to once per run). **cage installs no OS scheduler** — no launchd/systemd/cron/
+  read to once per run). **cage installs no OS scheduler** ([ADR 0002](docs/adr/0002-universal-capture-global-ledger-explicit-import-export.md)
+  — a product invariant, not volume-gated) — no launchd/systemd/cron/
   schtasks, no `cage scheduler`; hands-off automation is the user's own cron/schtasks
   line calling `cage import` (the hint `render.scheduler_hint()` prints is OS-aware,
   never installed), and `cage data watch` is an optional foreground `sleep` loop they
@@ -442,18 +686,22 @@ each agent only needs thin idiomatic wiring (`agents.py` orchestrates):
   `paths.agent_log_sources()` — per-OS candidates behind it (env overrides always
   win; the Windows Kiro layout is labeled UNVERIFIED-LAYOUT until pinned on a real
   install), probed read-only by `cage doctor --paths` ([pathprobe.py](cage/pathprobe.py),
-  exported in the doctor bundle as `paths.txt`). A project `policy.toml [sources]`
-  table extends/replaces it (`paths` + optional per-source `glob`, or the
-  `[[sources.<x>]]` array-of-tables form; `resolve_log_sources` is the one
-  resolution point) — additive, empty/absent = the built-in registry byte-for-byte.
-  The built-in defaults are also emitted into every project's `.cage/policy.toml`
-  as an **inert generated comment block** (docgen; the bundle ships no active
+  exported in the doctor bundle as `paths.txt`). A project `cage.toml [sources]`
+  table extends/replaces it (`paths` + optional per-source `glob` + optional
+  `surface` (`cli|vscode|ide`, table-level or per-entry; `importcmd._surface_restamp`
+  restamps the imported rows' surface **only when declared** — so a non-IDE store
+  isn't left with the parser's hardcoded value, e.g. Kiro's `ide`; absent ⇒ the
+  parser's own value, byte-identical), or the `[[sources.<x>]]` array-of-tables form;
+  `resolve_log_sources` is the one resolution point) — additive, empty/absent = the
+  built-in registry byte-for-byte.
+  The built-in defaults are also emitted into every project's `.cage/cage.toml`
+  as an **inert comment block** (the bundle ships no active
   `[sources]` table — defaults live in code and upgrade with the package).
   Cross-process locking is the single
   fail-open helper [lockutil.py](cage/lockutil.py) (fcntl → msvcrt → proceed-unlocked,
   debug-logged) — never hand-roll another `fcntl` block.
 - **Read:** `mcpserver.py` (MCP, every agent), `report/attrib/matrix/budget/roi`,
-  plus the Tier-1 human axis (`human`/`trend`, `matrix --human`), authorship
+  plus `task outcome`/`task quality`, authorship
   (`origin`/`notes-sync`/`verify`, plan §3.5), and the ledger-scale surface
   (`--scope` / `--team` filters, `ledger-sync` into refs/notes/cage-ledger via the
   shared `mergeutil.union_by_id` core, plan §3.6).
@@ -500,9 +748,8 @@ each agent only needs thin idiomatic wiring (`agents.py` orchestrates):
   entries. Doctor's `portability` check names the mode + warns on policy↔shim
   drift; `cage query restricted-env` explains the tiers.
   `pointers.py` is now just the shared steering
-  *pointer text* both copilot/kiro embed. Plus `setupcmd.py` (`/cage` skill) and
-  `gitcommithook.py` (local `post-commit`/`prepare-commit-msg` git hooks, riding along
-  with `claudewire.py` inside `agents.install`). All idempotent. Every agent's hook runs
+  *pointer text* both copilot/kiro embed. Plus `setupcmd.py` (`/cage` skill). All
+  idempotent. Every agent's hook runs
   the same all-agent sweep (`paths.cage_import_all`) so any agent captures the whole stack.
 - **Wiring liveness** ([wiringscan.py](cage/wiringscan.py), v0.32.0) — is an installed
   artifact's cage command still a command? A wiring artifact written before a verb was
@@ -549,7 +796,7 @@ This project meters LLM traffic into `.cage/` (a *flux*: $0, deterministic).
 
 - Spend so far: `cage report` · per-tool savings: `cage insights attrib` · budget: `cage insights budget`
 - The ledger carries token *counts*, never prompt text — PII-safe by construction.
-- Edit prices / budgets / pipeline order in `.cage/policy.toml`.
+- Edit prices / budgets / pipeline order in `.cage/cage.toml`.
 <!-- cage:end -->
 
 ## graphify

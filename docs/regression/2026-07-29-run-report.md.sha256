@@ -1,0 +1,7 @@
+a5d1056b75bc74ec487202103eadb5afaa8a9fb4c7abd2dbe4fbaef7d1a99b5a  2026-07-29-run-report.md
+# sha256 over the WHOLE file (all bytes, byte 0 to EOF).
+# This run report was published without an in-body '<!-- HASH-COVERS-BELOW -->' header and
+# has never been edited, so the marker-range convention does not apply to it. Verify with:
+#   shasum -a 256 -c 2026-07-29-run-report.md.sha256
+# (Note: the two sibling 2026-07-29 artifacts — phase benchmark and adoption finding — DID
+# gain marker headers on 2026-08-01; their digests are unchanged, see their own sidecars.)

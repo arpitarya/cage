@@ -2,6 +2,292 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
+## v0.36.0 (2026-07-25) — hookless rebuild + import ledger (Phases 0–4)
+
+A two-part release: **finish the conversion to pull-only capture** (remove all hook
+machinery and rendered agent assets), then build the **import-ledger plan** on the
+simplified base. Every new row field is additive-optional (absent ⇒ byte-identical
+legacy row); the determinism/method laws are untouched.
+
+Built from: [docs/archive/v0.36-hookless-rebuild.handoff.md](docs/archive/v0.36-hookless-rebuild.handoff.md)
++ [docs/archive/v0.36-hookless-rebuild.prompt.md](docs/archive/v0.36-hookless-rebuild.prompt.md)
+· and [docs/archive/v0.36-names-and-savings-migration.handoff.md](docs/archive/v0.36-names-and-savings-migration.handoff.md)
++ [docs/archive/v0.36-names-and-savings-migration.prompt.md](docs/archive/v0.36-names-and-savings-migration.prompt.md)
+· plan of record [docs/archive/v0.36-import-ledger-savings.plan.md](docs/archive/v0.36-import-ledger-savings.plan.md).
+
+### Phase 0 — hookless (the removal, finished)
+
+- **Capture is pull-only.** All hook writers (`hooks.py`, `gitcommithook.py`), the agent
+  hook wiring, the rendered skill/prompt/steering assets, `tools/skillgen`/`tools/docgen`,
+  and the wizard/`setupcmd` are gone. `cage import` + capture-on-read is the universal
+  path; **MCP is the only wired surface** (`.mcp.json` / `.vscode/mcp.json` /
+  `.kiro/settings/mcp.json`). `cage setup` now scaffolds + wires MCP + the graphify shim.
+- **A stale hook is healed, not left firing.** Old `cage hook-*` invocations print a
+  direction and exit 1 (`verbmap.REMOVED`); `cage setup` strips stale cage hook entries
+  from `.claude/settings.json` and deletes cage-owned copilot/kiro hook files (foreign
+  hooks untouched). The three dead-wiring mitigations (verbmap entries, wire-module
+  heal-by-removal, `wiringscan` leftover detection) are kept.
+
+### Phase 1 — enriched call row + loud import summary
+
+- **`cage import` prints the numbers.** A per-agent×surface rollup — calls, tokens_in,
+  cached, tokens_out, **cost** — with rows the price table can't match (`copilot/auto`,
+  kiro `agent`) surfaced as **UNPRICED**, never a silent `$0`.
+- **Additive call-row fields:** `surface` (`cli`/`vscode`/`ide`/`""` — derivable for
+  copilot & kiro, honestly empty for claude's shared store), `cache_write_in` (Claude's
+  cache-creation tokens split out; `tokens_in` semantics unchanged), `premium` (copilot
+  CLI `totalPremiumRequests`), `import_id` (the capture-manifest FK).
+
+### Phase 2 — dedicated savings tree
+
+- Tool savings now land in **`savings/<tool>/savings-YYYY-MM.jsonl`** (graphify first),
+  written through `savings.record()`. `ledger.receipts()` reads the tree unioned with
+  legacy `receipts.jsonl`, so every attribution/roi/report surface reads them unchanged.
+  (Revised below to an **id-deduped** union so a migrated row in both stores counts once.)
+
+### Phase 3 — capture manifest
+
+- A new **`imports.jsonl`** records one audit row per import sweep and per graphify run —
+  what cage captured, when, from where (tilde-relative, PII-safe), and how much.
+  `import_id` is threaded onto every call/savings row it produced. (Revised below: the
+  import row is now **per-session** and **always** carries the session name.)
+
+### Phase 4 — task correlation (gated, disabled-by-default)
+
+- A best-effort `task` backfill (`cage/taskcorr.py`) correlates import-sourced calls to
+  closed tasks by the `taskgroup` session-window join, tagged `estimated` — **derive-time
+  only, never mutating the ledger.** Ships **disabled** (`[capture] task_correlation`)
+  behind a blocking min-n gate until validated on real data (plan §7 decisions log).
+
+### Revisions (Arpit, 2026-07-25) — session names always-on + precise savings migration
+
+- **Session names are always captured.** The `[capture] session_names` opt-in (and
+  `policy.session_names_enabled` / `CAGE_SESSION_NAMES`) is **removed** — `imports.jsonl`
+  now emits **one row per (agent, surface, session)**, each with a cage-minted
+  `session_uid` and the best-available `session_name`: claude ← the transcript `summary`
+  record (fallback the cwd basename); copilot VS Code ← the chat `customTitle` (else the
+  auto `generatedTitle`); copilot CLI / kiro ← `""` (honest empty, never fabricated);
+  graphify ← the task. The name is a deliberate PII widening for this **local audit file
+  only** — it never touches a call/receipt/savings row and is never read by a derived view.
+- **`cage data migrate-savings`** consolidates historical graphify receipts into
+  `savings/graphify/` **precisely — not wrong, not duplicated.** Dry-run by default (prints
+  per-store row count + Σ`saved` and exactly what would copy); `--apply` **copies** each
+  `tool="graphify"` row verbatim (original id, own-`ts` shard) and **refuses** if the two
+  stores disagree on a shared id's `saved`. `receipts.jsonl` is never rewritten.
+  `ledger.receipts()` is now an **id-deduped union** (tree wins), so a row in both stores
+  counts exactly once: re-runs are no-ops, a half-completed migration still reads correct
+  totals, and attrib/report/roi are byte-identical before/after. `cage query
+  migrate-savings` explains why the number stays exact.
+
+### Config surfaces + `cage.toml` rename (2026-07-27)
+
+Two config changes, each additive and byte-identical when unused. Built from:
+[docs/config-surfaces-and-rename.handoff.md](docs/archive/v0.36-config-surfaces-and-rename.handoff.md)
++ [docs/config-surfaces-and-rename.prompt.md](docs/archive/v0.36-config-surfaces-and-rename.prompt.md).
+
+- **A source can now declare its `surface`.** `[sources.<x>] surface = "cli|vscode|ide"`
+  (both the table and array-of-tables shapes) restamps every imported row's `surface` —
+  so pointing cage at a **non-IDE** store no longer inherits the parser's hardcoded value
+  (a Kiro CLI log was silently stamped `ide`). Validated against the closed set; an
+  out-of-set value is a `problems` entry (the sweep stays fail-open), and **absent ⇒ the
+  parser's own value stands, byte-identical**. `cage doctor --paths` gains a `surface`
+  column (declared / `parser`); `cage query sources` documents the key.
+- **The config file is now `cage.toml`** (was `policy.toml`). **Never a breaking rename:**
+  `policy.toml` is still read as a fallback (releases ≤ v0.35 wrote it), `cage setup`
+  migrates a lone legacy file (idempotent, non-destructive if both exist), and when both
+  sit side by side **`cage.toml` wins** — `cage doctor` names the ignored leftover and a
+  one-line stderr warning fires at load (stdout unchanged). One resolution point
+  (`paths.Footprint.policy`); `cleanup` never touches either name.
+
+### Model prices split into `prices.toml` (2026-07-28)
+
+Vendor prices get their own file, apart from your policy. Built from:
+[docs/archive/v0.36-prices-toml.handoff.md](docs/archive/v0.36-prices-toml.handoff.md)
++ [docs/archive/v0.36-prices-toml.prompt.md](docs/archive/v0.36-prices-toml.prompt.md)
+· plan of record [docs/archive/v0.36-prices-toml.plan.md](docs/archive/v0.36-prices-toml.plan.md).
+**The money does not move** — `report`/`insights attrib`/`insights roi` are
+byte-identical before and after, verified on a real 40k-row ledger.
+
+- **`.cage/prices.toml`** now holds every `[prices.<provider>.<model>]` row, `[credits]`,
+  and the `[meta] prices_version/prices_date` counters — the **vendor rate card**, which a
+  wholesale `cage prices sync` can replace without touching your policy. `cage.toml` keeps
+  everything else, including the **routing decisions** (`[alias]`, `[tools.<tool>]
+  price_at`) and `[meta] cage_version/policy_version`. The governing rule: **vendor facts
+  move, routing decisions stay.** `[meta]` splits *per key* so a staleness check can't
+  quietly stop firing.
+- **Never a breaking change.** A legacy project with prices still inline in `cage.toml`
+  is **read untouched** via the fallback; `cage setup` **migrates** it to `prices.toml`
+  **money-neutrally** (rows equal to the bundle drop and re-resolve from it; customizations
+  become `# cage:custom` overrides), idempotent and non-destructive. With both carrying
+  prices, **`prices.toml` wins** — `cage doctor` names the ignored in-`cage.toml` block and
+  a one-line stderr warning fires at load. Applies to the global `~/.cage` config too.
+- **One resolution point** (`paths.Footprint.prices`), one merged dict from `policy.load`
+  (no consumer changed), the bundle split into `data/cage.toml` + `data/prices.toml` (both
+  resolve from the zipapp), and `cleanup` now protects `prices.toml` alongside `cage.toml`.
+  `cage prices set`/`sync` write `prices.toml`; `alias`/`route-tool` write `cage.toml`.
+  `cage query prices-file` explains the split.
+
+### Removed — the Tier-1 agent-vs-human axis, substrate included (2026-08-01) ⚠ BREAKING
+
+The whole-task *agent vs human* baseline is **gone**, deliberately and completely —
+not deprecated. It will be reconsidered from scratch after this release
+(a proposal doc, not a `# v2:` stub in the tree).
+
+Built from: [docs/archive/v0.36-human-removal.handoff.md](docs/archive/v0.36-human-removal.handoff.md)
++ [docs/archive/v0.36-human-removal.prompt.md](docs/archive/v0.36-human-removal.prompt.md).
+
+**Note the *other* "human" is untouched.** Provenance `origin="human"`
+(`cage authorship origin|verify`, `schema.ORIGINS`) answers *who wrote a commit*,
+never *what a person would have cost*. It shares a word and nothing else.
+
+- **Commands removed:** `cage human show` · `cage human record` · `cage insights trend`
+  · `--human` on `insights matrix` and `insights calibration` · `--agent-only` on
+  `insights compare` / `insights verdict` / `study report` (it suppressed a line that
+  no longer exists). The `Agent vs human` and `Savings trend` blocks leave the
+  `cage data serve` dashboard.
+- **Commands MOVED, not removed:** `cage human outcome` → **`cage task outcome`** and
+  `cage human quality` → **`cage task quality`**. Neither was ever the human axis —
+  they lived in that group by filing accident. `outcome` is the **task-close verb**
+  every cost-impact view depends on (`compare`/`estimate`/`calibration` read only
+  closed tasks) and `quality` is cost-per-successful-task (§8.2); deleting them would
+  have amputated the §4.7–§4.8 surface. A new `task` group replaces `human` in the
+  front door. `cage task outcome` loses only its `--minutes` attestation flag.
+- **Modules deleted:** `human.py` · `humanview.py` · `trend.py` · `attention.py`.
+- **Substrate contract change (plan §3.1, §4.10):** call rows no longer carry
+  `gap_ms` (turn-gap capture is out of `transcript.py`), `"minutes"` is out of
+  `schema.UNITS`, `IDLE_CAP_MINUTES` is out of `constants.py`, and every `[human.*]`
+  table is out of the bundled `cage.toml`. `policy.human_rates` /
+  `policy.human_rate_source` / `metering.record_human` / `cage.record_human` are gone,
+  and `CAGE_HUMAN_RATE` is no longer read.
+- **Old ledgers still read — and the exclusion is *stated*, never silent.** Rows are
+  append-only and are never rewritten, so pre-0.36 `gap_ms` calls and
+  `tool="human"` / `unit="minutes"` receipts are still on disk. They parse fine and are
+  **excluded from every money view**, because there is no longer a rate to price them
+  at. That exclusion is a decision, so `cage report` **counts and footnotes it**:
+  `· N legacy human-axis receipt(s) excluded from savings …`. Dropping them quietly
+  from a total was the one option ruled out. `cage query savings-axis` explains it;
+  `tests/test_legacy_ledger.py` pins the whole contract.
+- **Wiring migration:** `cage human`, `cage human-record` and `cage trend` print a
+  written direction and exit 1 (`verbmap.REMOVED` + the new `_BODIES` map, for verbs
+  whose removal needs a sentence rather than a "is now" tail); `cage outcome` /
+  `cage quality` redirect to their `task` spellings. `tests/test_cli_tiering.py`'s
+  grouped-verb allowlist dropped `human` — which immediately surfaced five stale
+  `cage human …` strings the looser pattern had been hiding.
+- Dummyrepo scenario **S10** (derived attention) is removed with the feature.
+
+### Kiro capture routing — two stores, two opposite fixes (2026-08-01) ⚠ BEHAVIOUR CHANGE
+
+Kiro is a paid tool and its cost was being counted more than once. Decision + veto
+condition: [ADR 0006](docs/adr/0006-kiro-rows-are-machine-facts-not-project-facts.md).
+Built from: [docs/archive/v0.36-kiro-routing.handoff.md](docs/archive/v0.36-kiro-routing.handoff.md)
++ [docs/archive/v0.36-kiro-routing.prompt.md](docs/archive/v0.36-kiro-routing.prompt.md).
+Evidence: [the double-count finding](docs/regression/2026-08-01-finding-kiro-rows-double-count-across-ledgers.md).
+
+- **Kiro IDE rows now land in the machine ledger (`~/.cage`), never a project `.cage/`.**
+  `tokens_generated.jsonl` is ONE global append-only file carrying no project, no session
+  and no timestamp, so every ledger that imported it read the same turns — a per-project
+  kiro cost was never a fact. One copy now exists per machine, so double-counting is
+  impossible **by construction** rather than by warning. An explicit `--ledger`/`CAGE_BASE`
+  still wins (cage never routes around a sink you named), which is what keeps cage-lab
+  isolated.
+- **Kiro CLI credits get the opposite fix: scoped, not routed.** `conversations_v2` is
+  keyed by the cwd it ran in and carries a real conversation id, so it *is*
+  project-attributable. It is now read **scoped to the project's directory tree** (the
+  tree, so a conversation started in `repo/sub` still counts) and stamps the additive
+  optional `project` on the credit row. The double-count there came from the opposite
+  defect — the importer read with no workspace filter at all.
+- **Already-recorded rows are NOT rewritten.** Append-only holds: a project ledger that
+  collected duplicated kiro rows before this change keeps every one of them and simply
+  gains no new ones. **This fixes the future only** — if you read "kiro double-counting
+  fixed" and your old numbers look unchanged, that is the fix working as specified, not
+  failing.
+- **A project report explains kiro's absence rather than showing nothing** — silence is
+  indistinguishable from broken capture. New footer line naming the machine ledger,
+  `cage doctor`'s capture timeline and `cage doctor --paths` name kiro's sink, and
+  `cage query kiro-routing` explains the whole split.
+- **The two HONEST-LIMITs are now stated where they could be misread** — kiro rows carry
+  no per-turn time, session or project (called out by name under `--since`, where the
+  import-time `ts` makes a window *wrong* rather than merely coarse), and a blank
+  `surface` reads as "the source does not say", never "cli".
+- **Internals:** `paths.kiro_ledger`/`kiro_routed`/`kiro_cli_workspace` are the single
+  home of both rules. The routed leg is fully contained (own lock, `seen`, cursors,
+  health, capture-log breadcrumb and manifest) and completes before the sweep's own lock
+  is taken, so no process ever holds two import locks. The capture switches compose as
+  **AND** — the project's and the machine ledger's must both be on. claude/copilot capture
+  is asserted byte-identical, and the import summary is asserted never to count a row that
+  landed in another ledger (`tests/test_kiro_routing.py`).
+
+### Gross vs net savings — `saved` says what it is (2026-08-01) ⚠ OUTPUT + CSV CHANGE
+
+Cage's headline number was labelled more broadly than it was computed, in the one
+direction that flatters the tools cage exists to evaluate. Built from:
+[docs/archive/v0.36-net-savings.handoff.md](docs/archive/v0.36-net-savings.handoff.md)
++ [docs/archive/v0.36-net-savings.prompt.md](docs/archive/v0.36-net-savings.prompt.md).
+Evidence: [the gross-vs-net finding](docs/regression/2026-08-01-finding-saved-is-gross.md).
+
+- **`saved` is GROSS, and now says so everywhere.** `saved = raw_alternative − actual`
+  is a per-query counterfactual — the *avoided read cost*. It never subtracted the cost
+  of **using** the tool (the invoking turn, the round-trip, a hook's injected context),
+  so cage could truthfully print "27,658 tokens saved" for a session that cost more than
+  its unassisted twin. **No arithmetic changed**; the label did. Columns: `report`
+  `gross tok` / `gross` / `net vs spend`, `attrib` `gross tok` / `gross $`, `roi`
+  `gross saved` / `net of own cost`, the bare-`cage` headline `gross saved`, and
+  graphify's repo ceiling + history band. One phrasing for all of them
+  (`netsaved.GROSS_NOTE`) — they cannot drift apart.
+- **CSV column renames** (one-way reporting, no importer reads these): `saved_usd` →
+  `gross_saved_usd` · report `net_usd` → `net_vs_spend_usd` · roi `net_usd` →
+  `net_of_own_cost_usd` · attrib `saved_tokens` → `gross_saved_tokens`.
+- **`cage insights verdict` no longer over-claims.** graphify is AST-only and honestly
+  declares `tool_cost_usd = 0`, so `net = gross − 0` printed a bare **SAVING**. A
+  non-negative net with no complete cost-of-use figure now reads **`SAVING (GROSS)`** /
+  **`BREAK-EVEN (GROSS)`** with a ⚠ naming the exclusion and pointing at
+  `cage insights compare`. **COSTING is still asserted plainly** — the omitted term is
+  ≥ 0, so it can only make a negative net more negative. `verdict` remains a pure
+  composer: this is a refusal rule, not a new statistic.
+- **New: task-level net saved** (`cage/netsaved.py`), rendered *beside* gross in
+  `verdict`, never instead of it. `net = gross − attributable cost of use`, where
+  attributable = the **distinct** calls joined to the receipt's task whose `ts` falls
+  within **±120s** of any of that tool's receipts on it (union per task, so an adjacent
+  call is charged once). Symmetric because the invoking turn precedes the receipt and the
+  consuming turn follows it. Per-query netting is **impossible** — shim receipts carry a
+  `task` but no `call` — and is not faked.
+- **It refuses rather than approximates.** A task with no in-window call is *uncovered*:
+  its net reads unavailable, never `= gross`. `verdict` subtracts the cost of use only
+  when it covers every receipt in the window. Net is `modeled` at its own lower
+  confidence (`NET_SAVED_CONFIDENCE = 0.4`) — never `measured`; the subtrahend alone is.
+- **Explained live:** `cage query gross-vs-net`. Spec:
+  [FORMULAS §2.1 / §2.1a / §2.6](docs/formulas.md). Constants:
+  `NET_ATTRIB_WINDOW_S`, `NET_SAVED_CONFIDENCE`.
+- **Still open (NET-1):** whether graphify actually made those sessions more expensive.
+  `cage insights compare` already answers it and only lacks data (`MIN_COMPARE_N = 5`;
+  leg D produced 1) — a lab run, deliberately not a second comparison path in code.
+
+### Cleanup becomes advisory — 90d default, warn-only, never per-tool (2026-08-01) ⚠ BEHAVIOUR CHANGE
+
+Cage no longer deletes state automatically. Built from:
+[docs/archive/v0.36-cleanup-safety.handoff.md](docs/archive/v0.36-cleanup-safety.handoff.md)
++ [docs/archive/v0.36-cleanup-safety.prompt.md](docs/archive/v0.36-cleanup-safety.prompt.md).
+
+- **The auto sweep (piggybacked on `cage import`) only ever warns.** It computes what
+  would go and prints one stderr reminder — count, reclaimable size, and the runnable
+  fix — silent when nothing is eligible, throttled to one check per 24h. It never
+  deletes. Deletion now only ever happens via an explicit `cage data cleanup --apply`.
+- **Retention default: 30 → 90 days** (`constants.CLEANUP_DEFAULT_DAYS`, `cage.toml
+  [cleanup] days`) — 30 proved tighter than a real usage gap.
+- **New switch `[cleanup] warn`** (env `CAGE_CLEANUP_WARN`), default on — silences the
+  reminder text without disabling the gate.
+- **`[cleanup] enabled` semantics decided:** `false` means no automatic anything, not
+  even the reminder — but a manually-typed `cage data cleanup` / `--apply` always runs
+  regardless. An explicit command is never silently ignored because a switch is off.
+- **Never a per-tool cleanup class.** Tool savings (`ledger/savings/<tool>/`) are
+  unreachable today only because they sit under `ledger/`, which is on the never-list —
+  now stated explicitly in code and tested surviving `prune` at `days=0`.
+- **Accepted trade-off:** `state/` can grow unbounded for anyone who ignores the
+  reminder — unrecoverable deletion is the worse failure. The reminder keeps firing
+  every throttle interval while items remain, rather than warning once and going quiet.
+- stdout is untouched (the reminder is stderr-only); derived views stay byte-identical.
+  `cage query cleanup` explains the new shape.
+
 ## v0.35.0 (2026-07-24) — capture-report follow-ups: Kiro visibility, cache honesty, gap_ms observability
 
 Closes the three low-priority findings the 2026-07-22 capture report parked (F3,

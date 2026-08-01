@@ -56,7 +56,8 @@ def test_files_one_modeled_receipt(proj, capsys):
     r = rcpts[0]
     assert r["tool"] == "graphify" and r["unit"] == "tokens"
     assert r["method"] == "modeled" and r["confidence"] == 0.6
-    assert r["task"] == "t1" and r["meta"] == {"op": "query"}     # criterion 7
+    assert r["task"] == "t1" and r["op"] == "query"     # savings row: op is top-level
+    assert r["source_files"] == 1                        # a COUNT, never the cited paths
     assert r["raw_alternative"] == 1000 and r["actual"] == gm.toks(answer)
     assert r["saved"] == r["raw_alternative"] - r["actual"] > 0
 
@@ -145,5 +146,5 @@ def test_explain_source_line_parses(proj):
     answer = f"Node: run()\n  Source:    {f} L71\n  Type: code\n"
     gm.run(proj, [*_stub(proj, answer, "", 0), "explain", "run"], task="t2")
     rcpts = ledger.receipts(proj)
-    assert len(rcpts) == 1 and rcpts[0]["meta"] == {"op": "explain"}
+    assert len(rcpts) == 1 and rcpts[0]["op"] == "explain"
     assert rcpts[0]["raw_alternative"] == 2000

@@ -1,9 +1,9 @@
-"""Transcript metering: Claude Code + Codex parsing, idempotent recording."""
+"""Transcript metering: Claude Code + Copilot parsing, idempotent recording."""
 from __future__ import annotations
 
 import json
 
-from cage import hooks, ledger, transcript
+from cage import ledger, transcript
 
 
 def _claude_line(uuid: str, tin: int, tout: int, cached: int = 0) -> str:
@@ -24,12 +24,224 @@ def test_parse_claude_transcript(tmp_path):
     assert rows[0]["agent"] == "claude-code" and rows[0]["tokens_out"] == 50
 
 
+def _claude_line_cache_make(uuid, tin, tout, cache_read, cache_make):
+    return json.dumps({"type": "assistant", "uuid": uuid, "timestamp": "2026-06-14T10:00:00Z",
+                       "message": {"model": "claude-opus-4-8",
+                                   "usage": {"input_tokens": tin, "output_tokens": tout,
+                                             "cache_read_input_tokens": cache_read,
+                                             "cache_creation_input_tokens": cache_make}}})
+
+
+def test_claude_splits_cache_write_without_changing_tokens_in(tmp_path):
+    # Phase 1 (plan §2.1): cache_creation is split into `cache_write_in`, but tokens_in
+    # semantics are unchanged (still inp + cache_read + cache_make). surface stays "".
+    tp = tmp_path / "s.jsonl"
+    tp.write_text(_claude_line_cache_make("u1", 100, 50, cache_read=20, cache_make=30) + "\n",
+                  encoding="utf-8")
+    (row,) = transcript.parse_calls(tp, session="s")
+    assert row["tokens_in"] == 150 and row["cached_in"] == 20  # unchanged semantics
+    assert row["cache_write_in"] == 30                          # split out, additive
+    assert "surface" not in row                                 # claude: shared store, omitted
+
+
+def test_no_cache_make_omits_cache_write_in(tmp_path):
+    # Additive-optional: a turn with no cache creation is byte-identical to the legacy row.
+    tp = tmp_path / "s.jsonl"
+    tp.write_text(_claude_line("u1", 100, 50) + "\n", encoding="utf-8")
+    (row,) = transcript.parse_calls(tp, session="s")
+    assert "cache_write_in" not in row and "surface" not in row and "premium" not in row
+
+
+def test_copilot_cli_surface_and_premium():
+    # copilot CLI rows carry surface="cli"; `totalPremiumRequests` lands on the first row.
+    import tempfile
+    from pathlib import Path as _P
+    d = _P(tempfile.mkdtemp())
+    ev = d / "sess" / "events.jsonl"
+    ev.parent.mkdir(parents=True)
+    ev.write_text(json.dumps({"type": "session.shutdown", "timestamp": "2026-06-14T10:00:00Z",
+                              "data": {"totalPremiumRequests": 3, "modelMetrics": {
+                                  "gpt-5": {"usage": {"inputTokens": 100, "outputTokens": 5}},
+                                  "claude-sonnet-5": {"usage": {"inputTokens": 200, "outputTokens": 7}}}}})
+                  + "\n", encoding="utf-8")
+    rows = sorted(transcript.parse_copilot_calls(ev, session="sess"), key=lambda r: r["id"])
+    assert all(r["surface"] == "cli" for r in rows)
+    assert sum(r.get("premium", 0) for r in rows) == 3  # session total, counted once
+
+
+def _copilot_shutdown(cum_in: int, cum_out: int, cum_cached: int = 0, premium: int = 0,
+                      ts: str = "2026-06-14T10:00:00Z", model: str = "claude-haiku-4.5") -> str:
+    """One `session.shutdown` line whose modelMetrics are CUMULATIVE (Copilot's real shape)."""
+    return json.dumps({"type": "session.shutdown", "timestamp": ts,
+                       "data": {"totalPremiumRequests": premium, "modelMetrics": {
+                           model: {"usage": {"inputTokens": cum_in, "outputTokens": cum_out,
+                                             "cacheReadTokens": cum_cached}}}}})
+
+
+def test_copilot_two_shutdowns_sum_to_cumulative(tmp_path):
+    # (a) A resumed session with two cumulative shutdowns yields delta rows that SUM to
+    # the last cumulative — no undercount. Real V3 numbers (session 8073abba).
+    ev = tmp_path / "8073abba-9855-414b" / "events.jsonl"
+    ev.parent.mkdir(parents=True)
+    ev.write_text(_copilot_shutdown(70071, 643, 51260, premium=1) + "\n"
+                  + _copilot_shutdown(107581, 830, 86521, premium=2) + "\n", encoding="utf-8")
+    rows = transcript.parse_copilot_calls(ev)
+    assert len(rows) == 2
+    assert sum(r["tokens_in"] for r in rows) == 107581   # not 70071 (the pre-fix undercount)
+    assert sum(r["tokens_out"] for r in rows) == 830
+    assert sum(r["cached_in"] for r in rows) == 86521
+    ids = {r["id"] for r in rows}
+    sid = "8073abba-9855-414b".replace("-", "")[:12]
+    assert f"c_cop{sid}000" in ids                       # ordinal 0 keeps the legacy id
+    assert f"c_cop{sid}000s001" in ids                   # ordinal 1 is a distinct delta row
+
+
+def test_copilot_reimport_adds_zero(tmp_path):
+    # (b) Re-importing the same grown file adds nothing — deterministic ids dedupe.
+    ev = tmp_path / "sess" / "events.jsonl"
+    ev.parent.mkdir(parents=True)
+    ev.write_text(_copilot_shutdown(70071, 643, 51260) + "\n"
+                  + _copilot_shutdown(107581, 830, 86521) + "\n", encoding="utf-8")
+    assert ledger.append_new(tmp_path, transcript.parse_copilot_calls(ev)) == 2
+    assert ledger.append_new(tmp_path, transcript.parse_copilot_calls(ev)) == 0
+    assert sum(c["tokens_in"] for c in ledger.calls(tmp_path)) == 107581
+
+
+def test_copilot_legacy_session_self_heals(tmp_path):
+    # (c) THE SELF-HEAL CASE. A ledger already holds the ordinal-0 row written by the
+    # pre-fix parser (byte-identical: a 1-shutdown file's row == the legacy row). Growing
+    # the file to two shutdowns and re-importing must dedupe ordinal 0 and append ONLY the
+    # ordinal-1 delta — reaching the exact cumulative with NO double count.
+    d = tmp_path / "sess"
+    d.mkdir()
+    ev = d / "events.jsonl"
+    ev.write_text(_copilot_shutdown(70071, 643, 51260) + "\n", encoding="utf-8")  # legacy state
+    assert ledger.append_new(tmp_path, transcript.parse_copilot_calls(ev)) == 1
+    assert sum(c["tokens_in"] for c in ledger.calls(tmp_path)) == 70071
+    # session resumes; a second cumulative shutdown is appended to the same file
+    ev.write_text(_copilot_shutdown(70071, 643, 51260) + "\n"
+                  + _copilot_shutdown(107581, 830, 86521) + "\n", encoding="utf-8")
+    assert ledger.append_new(tmp_path, transcript.parse_copilot_calls(ev)) == 1  # only the delta
+    assert sum(c["tokens_in"] for c in ledger.calls(tmp_path)) == 107581          # exact, no 70071×2
+    assert ledger.append_new(tmp_path, transcript.parse_copilot_calls(ev)) == 0  # idempotent
+
+
+def test_copilot_premium_delta_not_multi_counted(tmp_path):
+    # (d) `totalPremiumRequests` is cumulative too — the per-shutdown delta is stamped, so
+    # the recorded premium sums to the last cumulative, never premium_1 + premium_2.
+    ev = tmp_path / "sess" / "events.jsonl"
+    ev.parent.mkdir(parents=True)
+    ev.write_text(_copilot_shutdown(70071, 643, premium=2) + "\n"
+                  + _copilot_shutdown(107581, 830, premium=5) + "\n", encoding="utf-8")
+    rows = transcript.parse_copilot_calls(ev)
+    assert sum(r.get("premium", 0) for r in rows) == 5   # last cumulative, not 2 + 5 = 7
+
+
+def _kiro_cli_db(tmp_path, conversations):
+    """Build a minimal kiro-cli SQLite store. `conversations` = list of
+    (key/cwd, conversation_id, value_dict, created_at, updated_at)."""
+    import sqlite3
+    db = tmp_path / "data.sqlite3"
+    con = sqlite3.connect(db)
+    con.execute("CREATE TABLE conversations_v2 (key TEXT, conversation_id TEXT, "
+                "value TEXT, created_at INTEGER, updated_at INTEGER)")
+    con.execute("CREATE TABLE auth_kv (k TEXT, v TEXT)")  # the sensitive sibling table
+    con.execute("INSERT INTO auth_kv VALUES ('token', 'SECRET-AUTH-DO-NOT-LEAK')")
+    for key, cid, val, ca, ua in conversations:
+        con.execute("INSERT INTO conversations_v2 VALUES (?,?,?,?,?)",
+                    (key, cid, json.dumps(val), ca, ua))
+    con.commit()
+    con.close()
+    return db
+
+
+def _kiro_conv(turns: int, credits: list, model="claude-haiku-4.5", secret="SECRET-PROMPT"):
+    """A conversation value dict with `turns` history entries carrying embedded prompt/
+    response text (the content the parser must never read) plus the usage metadata."""
+    return {
+        "conversation_id": "ignored",
+        "model_info": {"model_id": model, "model_name": model},
+        "user_turn_metadata": {"usage_info": [{"value": c, "unit": "credit"} for c in credits]},
+        "history": [{"user": {"content": secret + f"-USER-{i}"},
+                     "assistant": {"content": secret + f"-ASSISTANT-{i}"},
+                     "request_metadata": {"request_id": f"req{i}", "context_usage_percentage": 1.5 + i}}
+                    for i in range(turns)],
+        "next_message": secret + "-NEXT", "transcript": secret + "-TRANSCRIPT",
+    }
+
+
+def test_kiro_cli_credits_are_not_call_rows(tmp_path):
+    # Kiro CLI records no tokens — the parser yields a distinct CREDITS row, never a
+    # call row with tokens_in=0 (which would poison every average).
+    db = _kiro_cli_db(tmp_path, [("/w", "c1-2-3-4", _kiro_conv(2, [0.06, 0.10]), 1000, 2000)])
+    rows = transcript.parse_kiro_cli_credits(db)
+    assert len(rows) == 1
+    r = rows[0]
+    assert r["unit"] == "credits" and "tokens_in" not in r and "tokens_out" not in r
+    assert abs(r["credits"] - 0.16) < 1e-9 and r["turns"] == 2
+    assert r["method"] == "estimated"          # a proxy, never measured
+    assert r["model"] == "claude-haiku-4.5" and r["surface"] == "cli"
+    assert r["session"] == "c1-2-3-4"
+
+
+def test_kiro_cli_parser_never_leaks_content(tmp_path):
+    # THE COUNTS-NEVER-CONTENT GUARD (§3.3). Content and metadata share the row; assert
+    # no prompt/response/auth text can reach any credits row.
+    db = _kiro_cli_db(tmp_path, [("/w", "cA", _kiro_conv(3, [0.05], secret="TOPSECRET"), 1, 9)])
+    rows = transcript.parse_kiro_cli_credits(db)
+    blob = json.dumps(rows)
+    assert "TOPSECRET" not in blob            # no prompt/response body
+    assert "SECRET-AUTH-DO-NOT-LEAK" not in blob  # auth_kv never read
+    assert "TRANSCRIPT" not in blob and "NEXT" not in blob
+
+
+def test_kiro_cli_parser_is_read_only(tmp_path):
+    # The store is opened read-only — the DB bytes are unchanged after parsing.
+    db = _kiro_cli_db(tmp_path, [("/w", "cA", _kiro_conv(2, [0.05]), 1, 9)])
+    before = db.read_bytes()
+    transcript.parse_kiro_cli_credits(db)
+    assert db.read_bytes() == before
+
+
+def test_kiro_cli_credits_resume_no_double_count(tmp_path):
+    from cage import ledger, schema
+    # A conversation captured at 2 turns, then resumed to 4 turns. Append-only: both rows
+    # land, but `ledger.credits` keeps the latest per session — never summed.
+    (tmp_path / "a").mkdir(exist_ok=True)
+    (tmp_path / "b").mkdir(exist_ok=True)
+    db2 = _kiro_cli_db(tmp_path / "a", [("/w", "cX", _kiro_conv(2, [0.06]), 1, 2)])
+    r2 = transcript.parse_kiro_cli_credits(db2)
+    for row in r2:
+        ledger.append_row(tmp_path, "credits", row)
+    # re-import unchanged → same id, no new distinct row
+    assert {x["id"] for x in transcript.parse_kiro_cli_credits(db2)} == {x["id"] for x in r2}
+    db4 = _kiro_cli_db(tmp_path / "b", [("/w", "cX", _kiro_conv(4, [0.06, 0.11]), 1, 5)])
+    for row in transcript.parse_kiro_cli_credits(db4):
+        ledger.append_row(tmp_path, "credits", row)
+    latest = ledger.credits(tmp_path)
+    assert len(latest) == 1                       # one row per session
+    assert abs(latest[0]["credits"] - 0.17) < 1e-9  # the 4-turn total, not 0.06 + 0.17
+    assert latest[0]["turns"] == 4
+
+
+def test_kiro_cli_parser_missing_db_is_empty(tmp_path):
+    assert transcript.parse_kiro_cli_credits(tmp_path / "nope.sqlite3") == []
+
+
+def test_kiro_surface_is_ide(tmp_path):
+    log = tmp_path / "tokens_generated.jsonl"
+    log.write_text(json.dumps({"model": "agent", "provider": "kiro",
+                               "promptTokens": 50, "generatedTokens": 0}) + "\n", encoding="utf-8")
+    (row,) = transcript.parse_kiro_calls(log)
+    assert row["surface"] == "ide"
+
+
 def test_append_new_is_idempotent(tmp_path):
     tp = tmp_path / "s.jsonl"
     tp.write_text(_claude_line("u1", 100, 50) + "\n", encoding="utf-8")
     rows = transcript.parse_calls(tp)
-    assert hooks.append_new(tmp_path, rows) == 1
-    assert hooks.append_new(tmp_path, transcript.parse_calls(tp)) == 0  # same uuid → skipped
+    assert ledger.append_new(tmp_path, rows) == 1
+    assert ledger.append_new(tmp_path, transcript.parse_calls(tp)) == 0  # same uuid → skipped
     assert len(ledger.calls(tmp_path)) == 1
 
 
@@ -61,55 +273,9 @@ def test_no_uuid_id_is_deterministic_and_dedupes(tmp_path):
     r2 = transcript.parse_calls(tp, session="s")
     assert r1[0]["id"] == r2[0]["id"]          # stable across re-parse
     assert r1[0]["id"].startswith("c_") and len(r1[0]["id"]) == 17  # c_ + 15 hex
-    assert hooks.append_new(tmp_path, r1) == 1
-    assert hooks.append_new(tmp_path, r2) == 0  # re-import dedupes (no random id)
+    assert ledger.append_new(tmp_path, r1) == 1
+    assert ledger.append_new(tmp_path, r2) == 0  # re-import dedupes (no random id)
     assert len(ledger.calls(tmp_path)) == 1
-
-
-def test_capture_calls_serializes_across_processes(tmp_path):
-    """Two hook processes firing on one event (user-level + project-level wiring both
-    exist in the field) must not double-append. `_capture_calls` holds
-    ``state/import.lock`` across its read-check-append, so a peer that loaded its
-    ``seen`` set first (modeled by the parent's stale-seen append below) finishes
-    before the hook's own load happens — the hook then dedupes to 0 (found in the
-    v0.22.1 manual run: every live turn double-appended, spend double-counted)."""
-    import os
-    import subprocess
-    import sys
-    import time
-    from pathlib import Path
-
-    from cage import lockutil, paths
-
-    (tmp_path / ".cage").mkdir()
-    tp = tmp_path / "s.jsonl"
-    tp.write_text(_claude_line("u1", 100, 50) + "\n" + _claude_line("u2", 200, 60) + "\n",
-                  encoding="utf-8")
-    rows = transcript.parse_calls(tp, session="s")
-    stale_seen: set = set()  # loaded before any write — the race's ingredient
-
-    child_code = (
-        "import json, sys\n"
-        "from cage import hooks\n"
-        "payload = json.loads(sys.argv[1])\n"
-        "print(hooks._capture_calls(payload))\n"
-    )
-    payload = json.dumps({"transcript_path": str(tp), "session_id": "s",
-                          "cwd": str(tmp_path)})
-    env = {k: v for k, v in os.environ.items() if not k.startswith("CAGE_")}
-    env["PYTHONPATH"] = str(Path(__file__).resolve().parents[1])
-
-    lock = paths.Footprint(tmp_path).state / "import.lock"
-    with lockutil.locked(lock):
-        child = subprocess.Popen([sys.executable, "-c", child_code, payload],
-                                 cwd=tmp_path, env=env, stdout=subprocess.PIPE)
-        time.sleep(1.0)  # unfixed, the child appends here; fixed, it blocks on the lock
-        assert hooks.append_new(tmp_path, rows, seen=stale_seen) == 2
-    out, _ = child.communicate(timeout=30)
-    assert child.returncode == 0
-    assert out.strip() == b"0"  # the hook re-loaded seen after the lock and deduped
-    calls = ledger.calls(tmp_path)
-    assert len(calls) == 2 and len({c["id"] for c in calls}) == 2  # no duplicate rows
 
 
 def test_no_uuid_id_varies_with_content(tmp_path):
@@ -159,41 +325,8 @@ def test_copilot_vscode_chat_sessions_parse_and_rewrite_merge(tmp_path):
     assert transcript.parse_copilot_vscode_calls(tp)[0]["id"] == rows[0]["id"]  # deterministic
 
 
-def test_session_end_hook_records(tmp_path, monkeypatch):
-    import io
-    (tmp_path / ".cage").mkdir()  # a project root — a no-project cwd captures globally now
-    tp = tmp_path / "t.jsonl"
-    tp.write_text(_claude_line("u9", 300, 100) + "\n", encoding="utf-8")
-    payload = json.dumps({"transcript_path": str(tp), "cwd": str(tmp_path),
-                          "session_id": "sess"})
-    monkeypatch.setattr("sys.stdin", io.StringIO(payload))
-    assert hooks.session_end() == 0
-    (call,) = ledger.calls(tmp_path)
-    assert call["tokens_in"] == 300
-
-
-def test_stop_hook_records_per_turn_and_is_idempotent(tmp_path, monkeypatch):
-    # Stop is the real-time path: it captures the turn the moment it ends, and
-    # re-firing on the next turn never double-records the earlier one (uuid dedup).
-    import io
-    # isolate other-agent homes so the Stop sweep finds no real machine logs
-    for env in ("CODEX_HOME", "COPILOT_HOME", "KIRO_DATA_DIR", "CLAUDE_CONFIG_DIR"):
-        monkeypatch.setenv(env, str(tmp_path / f"empty-{env.lower()}"))
-    (tmp_path / ".cage").mkdir()  # a project root — a no-project cwd captures globally now
-    tp = tmp_path / "live.jsonl"
-
-    def fire():
-        payload = json.dumps({"transcript_path": str(tp), "cwd": str(tmp_path),
-                              "session_id": "sess"})
-        monkeypatch.setattr("sys.stdin", io.StringIO(payload))
-        assert hooks.stop() == 0
-
-    tp.write_text(_claude_line("t1", 100, 40) + "\n", encoding="utf-8")
-    fire()
-    assert len(ledger.calls(tmp_path)) == 1          # turn 1 recorded immediately
-    tp.write_text(_claude_line("t1", 100, 40) + "\n"
-                  + _claude_line("t2", 200, 60) + "\n", encoding="utf-8")
-    fire()
-    calls = ledger.calls(tmp_path)
-    assert len(calls) == 2                            # only the new turn added
-    assert {c["tokens_in"] for c in calls} == {100, 200}
+# NB: the SessionEnd / Stop hook entry points were removed with the hook machinery;
+# capture is pull-based now. The equivalent "parse a live transcript → record calls,
+# idempotently" behavior is covered end-to-end through `importcmd.run` in
+# tests/test_import_unified.py (the universal sweep), and the id-dedupe backstop by
+# `test_append_new_is_idempotent` above.

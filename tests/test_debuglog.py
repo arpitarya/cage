@@ -11,7 +11,9 @@ import json
 
 import pytest
 
-from cage import agents, debuglog, doctorcmd, hooks, importcmd, initcmd, paths, schema
+from types import SimpleNamespace
+
+from cage import agents, debuglog, doctorcmd, importcmd, initcmd, ledger, paths, schema
 
 
 def _events(root) -> list[dict]:
@@ -22,6 +24,24 @@ def _events(root) -> list[dict]:
 def _row(**kw) -> dict:
     return schema.make_call(route="direct", provider="anthropic", model="claude-x",
                             tokens_in=10, tokens_out=5, **kw)
+
+
+def _import_args(**kw) -> SimpleNamespace:
+    return SimpleNamespace(agent=kw.pop("agent", "claude"), path=kw.pop("path", None),
+                           project=None, since=None, **kw)
+
+
+def _claude_transcript(path, *, tin=100, tout=50, secret=None) -> str:
+    """A one-turn Claude transcript. ``secret`` (if given) is stashed in a message-body
+    field the parser must never read — a live PII tripwire for the debug log."""
+    msg = {"model": "claude-opus-4-8",
+           "usage": {"input_tokens": tin, "output_tokens": tout}}
+    rec = {"type": "assistant", "uuid": "u1", "timestamp": "2026-06-14T10:00:00Z",
+           "message": msg}
+    if secret is not None:
+        rec["message"]["content"] = secret
+    path.write_text(json.dumps(rec) + "\n", encoding="utf-8")
+    return str(path)
 
 
 # --- the logger itself -------------------------------------------------------
@@ -126,32 +146,28 @@ def test_heartbeat_last_write_wins_per_key(proj, monkeypatch):
     assert seen[("codex", "import")]["cwd"] == "/second"
 
 
-# --- hook instrumentation ----------------------------------------------------
+# --- import instrumentation (the surviving capture path) ---------------------
 
-def _wire_stop(proj, monkeypatch, parse):
-    payload = {"cwd": str(proj), "transcript_path": str(proj / "t.jsonl"), "session_id": "s1"}
-    monkeypatch.setattr(hooks, "_stdin_json", lambda: payload)
-    monkeypatch.setattr("cage.transcript.parse_calls", parse)
-
-
-def test_stop_hook_logs_event_and_heartbeat(proj, monkeypatch):
+def test_import_logs_events_under_debug(proj, monkeypatch):
     initcmd.run(proj)
     monkeypatch.setenv("CAGE_DEBUG", "1")
-    _wire_stop(proj, monkeypatch, lambda p, session="": [])
-    assert hooks.stop() == 0
-    assert any(e["event"] == "stop" for e in _events(proj))
-    assert ("claude", "stop") in debuglog.last_seen(proj)
+    tp = _claude_transcript(proj / "t.jsonl")
+    importcmd.run(proj, "claude", _import_args(path=tp))
+    events = _events(proj)
+    assert events, "an import under CAGE_DEBUG must leave a breadcrumb"
+    assert any(e.get("agent") == "claude" for e in events)
 
 
-def test_parser_exception_is_recorded_and_hook_still_returns_0(proj, monkeypatch):
+def test_parser_exception_is_recorded_and_import_still_returns(proj, monkeypatch):
     initcmd.run(proj)
     monkeypatch.setenv("CAGE_DEBUG", "1")
 
     def boom(*a, **k):
         raise RuntimeError("parser blew up")
 
-    _wire_stop(proj, monkeypatch, boom)
-    assert hooks.stop() == 0  # fail-open preserved
+    monkeypatch.setattr("cage.transcript.parse_calls", boom)
+    tp = _claude_transcript(proj / "t.jsonl")
+    importcmd.run(proj, "claude", _import_args(path=tp))  # fail-open: never raises
     exc = [e for e in _events(proj) if e.get("event") == "exception"]
     assert exc and exc[-1]["error"] == "RuntimeError"
     assert "traceback" in exc[-1] and "parser blew up" in exc[-1]["traceback"]
@@ -161,18 +177,17 @@ def test_debug_log_carries_no_prompt_or_response_bodies(proj, monkeypatch):
     initcmd.run(proj)
     monkeypatch.setenv("CAGE_DEBUG", "1")
     sentinel = "SECRET_PROMPT_BODY_DO_NOT_LOG"
-    payload = {"cwd": str(proj), "transcript_path": str(proj / "t.jsonl"),
-               "session_id": "s1", "prompt": sentinel, "response": sentinel}
-    monkeypatch.setattr(hooks, "_stdin_json", lambda: payload)
-    monkeypatch.setattr("cage.transcript.parse_calls", lambda p, session="": [_row(call_id="c1")])
-    hooks.stop()
+    # the secret lives in a message-body field the parser never reads
+    tp = _claude_transcript(proj / "t.jsonl", secret=sentinel)
+    importcmd.run(proj, "claude", _import_args(path=tp))
     text = paths.Footprint(proj).debug_log.read_text()
     assert sentinel not in text  # no body ever reaches the log
     allowed = {"ts", "agent", "event", "cwd", "resolved_root", "cage_present",
                "transcript_path_present", "result", "appended", "context", "error",
                "traceback", "tool_name", "files_buffered", "skip", "sha_present",
                "buffers", "rows_written", "banner_shown", "src", "files", "parsed",
-               "deduped", "note", "capture_enabled", "candidates"}
+               "deduped", "note", "capture_enabled", "candidates",
+               "exists", "pattern", "files_matched"}
     for e in _events(proj):
         assert set(e).issubset(allowed), f"unexpected keys logged: {set(e) - allowed}"
 
@@ -188,9 +203,12 @@ class _Args:
 
 @pytest.mark.parametrize("agent", list(agents.SURFACES))
 def test_every_agent_import_logs_a_structured_event(proj, monkeypatch, tmp_path, agent):
-    """Four-agent coverage is provable, not implied: driven off `agents.SURFACES`, every
+    """Three-agent coverage is provable, not implied: driven off `agents.SURFACES`, every
     surface must emit a metadata-only import event (agent, src, files, parsed/appended/
-    deduped) — a newly added agent that doesn't log fails this test."""
+    deduped) — a newly added agent that doesn't log fails this test.
+
+    The event lands in the log of the ledger that agent captured INTO, which for kiro is
+    the machine ledger (ADR 0006) — same guarantee, one hop away."""
     initcmd.run(proj)
     monkeypatch.setenv("CAGE_DEBUG", "1")
     empty = tmp_path / "src"
@@ -202,7 +220,8 @@ def test_every_agent_import_logs_a_structured_event(proj, monkeypatch, tmp_path,
         since = None
 
     importcmd.run(proj, agent, A())
-    detail = [e for e in _events(proj)
+    logged_in = paths.global_home() if paths.kiro_routed(proj) and agent == "kiro" else proj
+    detail = [e for e in _events(logged_in)
               if e.get("agent") == agent and e.get("result") == "ok" and "src" in e]
     assert detail, f"no structured import event recorded for {agent}"
     d = detail[-1]
@@ -251,27 +270,23 @@ def test_doctor_trace_off_says_how_to_enable(proj):
     assert "capture debug off" in detail and "CAGE_DEBUG=1" in detail
 
 
-def test_doctor_shows_per_agent_last_fired_including_never(proj, monkeypatch):
+def test_doctor_shows_per_agent_last_event_including_never(proj, monkeypatch):
     initcmd.run(proj)
     monkeypatch.setenv("CAGE_DEBUG", "1")
-    debuglog.heartbeat(proj, "claude", "stop", str(proj))
+    debuglog.heartbeat(proj, "claude", "import", str(proj))
     detail = next(c["detail"] for c in doctorcmd.run(proj)["checks"] if c["name"] == "trace")
     assert "capture debug ON" in detail
-    assert "claude" in detail and "last fired" in detail
-    assert "never fired" in detail  # copilot / kiro have no heartbeat yet
+    assert "claude" in detail and "last event" in detail
+    assert "no capture events seen yet" in detail  # copilot / kiro have no heartbeat yet
 
 
 # --- the core invariant: debug never changes capture -------------------------
 
 def test_ledger_byte_identical_with_debug_on_vs_off(tmp_path, monkeypatch):
-    row = _row(call_id="c1", ts="2026-06-01T00:00:00+00:00")
-
     def capture(root):
         initcmd.run(root)
-        payload = {"cwd": str(root), "transcript_path": str(root / "t.jsonl"), "session_id": "s"}
-        monkeypatch.setattr(hooks, "_stdin_json", lambda: payload)
-        monkeypatch.setattr("cage.transcript.parse_calls", lambda p, session="": [dict(row)])
-        assert hooks.stop() == 0
+        tp = _claude_transcript(root / "t.jsonl", tin=100, tout=50)
+        importcmd.run(root, "claude", _import_args(path=tp))
 
     a, b = tmp_path / "a", tmp_path / "b"
     a.mkdir(); b.mkdir()
@@ -281,9 +296,12 @@ def test_ledger_byte_identical_with_debug_on_vs_off(tmp_path, monkeypatch):
     monkeypatch.setenv("CAGE_DEBUG", "1")
     capture(b)
 
-    shard_a = paths.Footprint(a).shard("calls", row["ts"])
-    shard_b = paths.Footprint(b).shard("calls", row["ts"])
-    assert shard_a.read_bytes() == shard_b.read_bytes()  # capture is byte-identical
+    # Normalize out the per-sweep `import_id` (a fresh random capture-manifest FK each
+    # run, plan §4) — it varies by run, not by the debug switch under test.
+    def _rows(root):
+        return [{k: v for k, v in c.items() if k != "import_id"}
+                for c in ledger.calls(root)]
+    assert _rows(a) and _rows(a) == _rows(b)             # capture unchanged by debug
     assert not paths.Footprint(a).debug_log.exists()     # off ⇒ no debug file
     assert paths.Footprint(b).debug_log.exists()         # on  ⇒ events recorded
 

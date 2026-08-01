@@ -1,8 +1,16 @@
-"""`cage insights roi` — saved $ per tool vs the tool's own cost + added latency (plan §7, §8).
+"""`cage insights roi` — **gross** saved $ per tool vs the tool's own cost + added
+latency (plan §7, §8).
 
 ROI per tool, not just a total: a deterministic tool (fux, graphify) saves at $0
 of its own cost; an optional ML tool may save more but adds latency. A tool's own
 cost / added latency ride in its receipt `meta` (`tool_cost_usd`, `added_latency_ms`).
+
+**The saved column is GROSS** (`netsaved.GROSS_NOTE`, footnoted on every render): it is
+the avoided read cost and excludes the cost of *using* the tool — the invoking turn, the
+context a hook injected. `net` here is therefore net of the tool's **own** cost only,
+which is why the column says so. The task-level net-of-use lives in `cage insights
+verdict <tool>`, where its partial coverage can be stated per task instead of being
+folded into a window-wide rollup row.
 
 Call-less token receipts price via the resolution ladder (`receiptprice`, plan
 §4.5): each row's `priced_via` names every path its receipts priced through
@@ -26,7 +34,9 @@ def by_tool(root: Path, pol: dict, since: str | None = None) -> dict:
     tools: dict[str, dict] = {}
     unpriced = {"receipts": 0, "tokens": 0, "tools": set()}
     for r in rcpts:
-        if r.get("tool") == "human":  # Tier-1 baseline, not a within-agent tool (§4.4)
+        if r.get("tool") == "human" or r.get("unit") == "minutes":
+            # Legacy Tier-1 row (axis removed v0.36) — no price route; report.py
+            # counts and footnotes the exclusion (`cage query savings-axis`).
             continue
         t = tools.setdefault(r["tool"], {"receipts": 0, "saved_usd": 0.0,
                                          "cost_usd": 0.0, "added_ms": 0,
@@ -70,9 +80,11 @@ def render_csv(data: dict) -> str:
     """CSV over the same `by_tool()` payload as the text table (one structure, two
     renderers). `method` = the least-trusted receipt behind the row (worst-case
     provenance); `priced_via` = every pricing path the row's token receipts took.
-    Column contract in docs/csv-output.md."""
+    `gross_saved_usd`/`net_of_own_cost_usd` are named for what they are — the cost of
+    *using* the tool is in neither (net-savings handoff, K). Column contract in
+    docs/formulas.md §2.5."""
     from cage import csvout
-    head = ["tool", "receipts", "saved_usd", "own_cost_usd", "net_usd",
+    head = ["tool", "receipts", "gross_saved_usd", "own_cost_usd", "net_of_own_cost_usd",
             "added_latency_ms", "method", "priced_via"]
     rows = [[name, t["receipts"], round(t["saved_usd"], 6), round(t["cost_usd"], 6),
              round(t["saved_usd"] - t["cost_usd"], 6), t["added_ms"], t["method"],
@@ -100,10 +112,17 @@ def render_roi(data: dict) -> str:
         notes += [receiptprice.footnote(rung, name, key) for rung, key in t["rung_models"]]
     title = "ROI by tool" + (f" (since {data['since']})" if data["since"] else "")
     out = f"{title}\n\n" + render.table(
-        ["tool", "saved", "own cost", "net", "added lat"], rows, rights={1, 2, 3, 4})
+        ["tool", "gross saved", "own cost", "net of own cost", "added lat"], rows,
+        rights={1, 2, 3, 4})
     if notes:
         out += "\n" + "\n".join(f"  {n}" for n in notes)
     if data.get("unpriced_receipts", {}).get("receipts"):
         block = receiptprice.unpriced_receipts_line(data["unpriced_receipts"])
         out += "\n" + "\n".join(f"  {ln}" for ln in block.splitlines())
+    # K (net-savings handoff): the gross exclusion, in the ONE phrasing every view
+    # shares — a tool with $0 own cost otherwise reads as pure profit.
+    from cage import netsaved
+    out += "\n" + netsaved.GROSS_NOTE
+    out += (f"\n  net of own cost = gross − the tool's own spend; the cost of USING it "
+            f"is in neither.\n  `cage insights verdict <tool>` nets it at task level.")
     return out

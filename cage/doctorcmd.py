@@ -47,48 +47,41 @@ def _footprint(active: Path, source: str) -> tuple[str, str]:
 
 
 def _policy(root: Path) -> tuple[str, str]:
+    foot = paths.Footprint(root)
+    active = foot.policy
     try:
-        pol = policy.load(paths.Footprint(root).policy)
-        return _OK, f"policy loads ({len(pol.get('prices', {}))} model prices)"
+        pol = policy.load(active)
     except Exception as exc:  # noqa: BLE001 — surface the parse error, don't raise
-        return _FAIL, f"policy.toml failed to load: {exc}"
-
-
-def _hooks(root: Path) -> tuple[str, str]:
-    """Hooks are an *optional* real-time add-on, not the capture contract: they fire only
-    under a CLI client — a VS Code extension of Codex/Kiro/Copilot never runs them. So a
-    missing/wired hook is informational, never a failure; the universal path is `cage
-    import`/`cage data export`."""
-    wired = [s for s, on in agents.status(root).items() if on]
-    if not wired:
-        return _OK, ("no agent hooks wired (optional) — capture via `cage import` / "
-                     "`cage data export`; wire real-time CLI hooks with `cage setup --wire-only --<agent>`")
-    return _OK, (f"real-time hooks wired (CLI-only, optional): {', '.join(wired)} — "
-                 "they don't fire under a VS Code extension; `cage import` is the universal path")
+        return _FAIL, f"{active.name} failed to load: {exc}"
+    name = active.name if active.exists() else "no project config (bundled defaults apply)"
+    n_prices = sum(len(r) for r in pol.get("prices", {}).values() if isinstance(r, dict))
+    prices_name = foot.prices.name if foot.prices.exists() else "bundled default"
+    prices_note = f"prices from {prices_name} ({n_prices} rows)"
+    shadowed = foot.shadowed_config
+    shadowed_prices = foot.shadowed_prices
+    if shadowed is not None:
+        return _WARN, (f"config: {name} loads, {prices_note} "
+                       f"— but a legacy {shadowed.name} sits beside it and is ignored; "
+                       f"delete it (cage.toml wins)")
+    if shadowed_prices is not None:
+        return _WARN, (f"config: {name} loads, {prices_note} — but a legacy "
+                       f"[prices]/[credits] block in {shadowed_prices.name} is ignored "
+                       f"({paths.PRICES_FILENAME} wins); remove those tables")
+    return _OK, f"config: {name} loads, {prices_note}"
 
 
 def _metering(active: Path) -> tuple[str, str]:
-    """Honest four-agent capture matrix (plan §3.7). Capture is **pull-based**: explicit
-    `cage import` / `cage data export` (and the optional foreground `cage data watch`) is the universal,
-    client-independent path for every surface in ``agents.SURFACES``. Hooks are an optional
-    real-time add-on that fire only under a CLI client — never under a VS Code extension —
-    so a *wired* hook is not the same as a *firing* one. When capture-debug is on, the
-    per-agent heartbeat shows whether a hook has actually fired (and when); otherwise the
-    row honestly says the hook is wired but may not fire. No hook is ever labelled
-    'capture wired'. Surfaces the pull-based **last import: N ago** staleness signal."""
+    """Honest three-agent capture matrix (plan §3.7). Capture is **pull-based and the
+    only path**: explicit `cage import` / `cage data export` (and the optional foreground
+    `cage data watch`) capture every surface in ``agents.SURFACES``, client-independent —
+    no hooks, so nothing depends on which client wrote the log. MCP is the wired *read*
+    surface; whether it's installed says nothing about whether capture ran. Surfaces the
+    **last import: N ago** staleness signal."""
     wired = agents.status(active)
-    seen = debuglog.last_seen(active)  # only populated when CAGE_DEBUG is on
     rows = []
     for a in agents.SURFACES:
-        recs = [r for (ag, _ev), r in seen.items() if ag == a]
-        if recs:
-            latest = max(recs, key=lambda r: r.get("ts", ""))
-            state = f"hook fired {render.ago(latest.get('ts', ''))} (real-time)"
-        elif wired.get(a, False):
-            state = "hook wired — CLI-only, may not fire (e.g. a VS Code extension)"
-        else:
-            state = "no hook (capture via import)"
-        rows.append(f"\n      · {a:<8} {state:<48} | universal: cage import --agent {a}")
+        state = "MCP read wired" if wired.get(a, False) else "MCP read not wired"
+        rows.append(f"\n      · {a:<8} {state:<48} | capture: cage import --agent {a}")
     li = importcmd.last_import(active)
     rel = render.ago(li) if li else ""
     foot = (f"\n      last import: {rel}" if rel
@@ -125,16 +118,15 @@ def _metering(active: Path) -> tuple[str, str]:
     else:
         foot += "\n      capture health: every installed agent is capturing"
         level = _OK
-    head = ("capture is pull-based — `cage import`/`cage data export` is the universal path; "
-            "hooks are an optional CLI-only real-time add-on (they don't fire under a VS "
-            "Code extension):")
+    head = ("capture is pull-based — `cage import`/`cage data export` is the only path "
+            "(no hooks); MCP is the wired read surface:")
     return level, head + "".join(rows) + foot
 
 
 def _capture_timeline(active: Path) -> tuple[str, str]:
     """Per-source, per-**mode** (pull/push) last-seen + counts (capture-architecture
     §12.4) — the one place that answers "what has cage captured, how, and when" across
-    the whole pull+push model, symmetric for every agent (not just the ones with hooks).
+    the whole pull+push model, symmetric for every agent.
 
     Built **read-only** from the ledger it already holds — doctor deliberately does NOT
     sweep first (a sweep would mask the very breakage this diagnoses, §8/§10), so the
@@ -160,16 +152,26 @@ def _capture_timeline(active: Path) -> tuple[str, str]:
     push_ts: dict[str, str] = {}
     for r in receipts:
         if r.get("tool") == "human":
-            continue  # a different axis (`cage human show`), not a capture mode
+            continue  # a legacy Tier-1 row (axis removed v0.36), not a capture mode
         tool = r.get("tool") or "?"
         push_n[tool] = push_n.get(tool, 0) + 1
         ts = r.get("ts", "")
         if ts > push_ts.get(tool, ""):
             push_ts[tool] = ts
+    # ADR 0006: kiro's IDE rows route to the machine ledger, so on a project ledger its
+    # row here is legitimately empty. Naming the sink is the difference between "kiro
+    # captures elsewhere" and "kiro capture is broken" — which is the whole job of this
+    # check. Cheap and read-only: a path resolution, never a second ledger read.
+    kiro_sink = paths.kiro_routed(active)
     rows = []
     for a in agents.SURFACES:
         seen = render.ago(pull_ts[a]) if pull_ts[a] else "never"
         cnt = f"{pull_n[a]:,} rows" if pull_n[a] else "—"
+        if a == "kiro" and kiro_sink is not None:
+            rows.append(f"\n      · {a:<9} pull   {'→ ' + str(paths.Footprint(kiro_sink).base)}"
+                        f"\n        (IDE rows are a machine fact — ADR 0006; "
+                        f"`cage query kiro-routing`)")
+            continue
         rows.append(f"\n      · {a:<9} pull   {seen:<10} {cnt}")
     for tool in ("graphify", "fux", *sorted(t for t in push_n if t not in ("graphify", "fux"))):
         seen = render.ago(push_ts.get(tool, "")) if push_ts.get(tool) else "never"
@@ -260,11 +262,14 @@ def _bundled_prices(root: Path) -> tuple[str, str]:
     only, never auto-applied (`cage prices sync` is the user's move)."""
     try:
         from cage import pricescmd
-        if not paths.Footprint(root).policy.exists():
-            return _OK, "no project policy.toml — the installed bundle's prices apply directly"
-        project = policy.load_project_raw(paths.Footprint(root).policy)
-    except Exception:  # noqa: BLE001 — a broken policy is reported by the policy check
-        return _OK, "project policy unreadable — see the policy check"
+        foot = paths.Footprint(root)
+        # prices_version lives in the prices file after the split (prices-toml plan §2.1):
+        # read it there, not the policy file, or a migrated project reads as pre-0.19.
+        if not foot.prices.exists():
+            return _OK, "no project config — the installed bundle's prices apply directly"
+        project = policy.load_project_raw(foot.prices)
+    except Exception:  # noqa: BLE001 — a broken prices file is reported by the policy check
+        return _OK, "project prices unreadable — see the policy check"
     bundled_v = str(policy.bundled_raw().get("meta", {}).get("prices_version") or "?")
     rec = pricescmd.sync_recommendation(project.get("meta", {}))
     if rec:
@@ -280,7 +285,7 @@ def _policy_version(root: Path) -> tuple[str, str]:
     try:
         from cage import policysync
         if not paths.Footprint(root).policy.exists():
-            return _OK, "no project policy.toml — the bundled defaults apply directly"
+            return _OK, "no project config — the bundled defaults apply directly"
         project = policy.load_project_raw(paths.Footprint(root).policy)
     except Exception:  # noqa: BLE001 — a broken policy is reported by the policy check
         return _OK, "project policy unreadable — see the policy check"
@@ -456,20 +461,13 @@ def _wiring(scan) -> tuple[str, str]:
 
     User-level artifacts are scanned deliberately (both real failures were user-level);
     `_portability` above stays committed-only because it answers a different question.
-    Severity is tiered: a dead *wired* command is `✗` (capture is silently off), a stale
-    *asset* is `·` (the agent sees a wrong verb, errors, and adapts)."""
+    A dead *wired* command is `✗` (capture is silently off) — the only fault class left
+    now that the rendered assets (and their staleness check) were removed with hooks."""
     problems = [d.line for d in scan.dead]
-    if scan.stale_assets:
-        agents_ = ", ".join(sorted({s.agent for s in scan.stale_assets}))
-        problems.append(f"{len(scan.stale_assets)} stale agent asset(s) ({agents_}) — "
-                        "their bytes differ from this cage version's; re-run "
-                        "`cage setup --<agent>` to refresh")
     if not problems:
-        return _OK, "all wired commands name live verbs; agent assets current"
-    fix = ("re-run `cage setup --wire-only --<agent>` to heal the wiring"
-           if scan.dead else "")
-    level = _FAIL if scan.dead else _WARN
-    return level, "; ".join(problems + ([fix] if fix else []))
+        return _OK, "all wired commands name live verbs"
+    fix = "re-run `cage setup --wire-only --<agent>` to heal the wiring"
+    return _FAIL, "; ".join(problems + [fix])
 
 
 def _interceptor(root: Path, scan) -> tuple[str, str]:
@@ -488,6 +486,135 @@ def _interceptor(root: Path, scan) -> tuple[str, str]:
     if not on_path:
         return _WARN, "bin/graphify exists but bin/ is not on PATH (open a new shell)"
     return _OK, "graphify interceptor installed, on PATH, and naming live verbs"
+
+
+def _path_interceptor(root: Path) -> tuple[str, str]:
+    """The graphify that **actually runs** — resolved the way the shell does, first
+    executable on PATH wins (`cage/pathshim.py`, B-fix-1).
+
+    `_interceptor` above can only see this root's `bin/graphify`. The shim that runs may
+    belong to a *different* project, and that is not hypothetical: an adopt-era shim in
+    another repo won on PATH, probed a removed verb, and ran graphify unmetered for nine
+    days while doctor — run here — reported ✅.
+
+    `foreign` is deliberately **ok**-level: "no interceptor anywhere" is the same
+    condition `_interceptor` already warns about, and a second warn naming the same
+    absence is noise. `dead` is a failure because capture is silently off; `shadowed`
+    warns because it is a fact no root-scoped check can see. Nothing is executed."""
+    from cage import pathshim
+    try:
+        ps = pathshim.classify(root)
+    except Exception as exc:  # noqa: BLE001 — a diagnostic never crashes doctor
+        return _OK, f"PATH interceptor check skipped: {exc}"
+
+    if ps.state == "absent":
+        return _OK, "no `graphify` on PATH — nothing to intercept"
+    if ps.state == "foreign":
+        return _OK, (f"the graphify on PATH is {ps.winner} — not a cage interceptor, so "
+                     "graphify runs unmetered (see the interceptor check above)")
+    if ps.state == "shadowed":
+        return _WARN, (f"`graphify` resolves to {ps.winner}, NOT this project's "
+                       f"{ps.root_shim} — the shim you installed here never runs. Fix: "
+                       f"put {Path(ps.root_shim).parent} earlier on PATH, or remove "
+                       f"{ps.winner}")
+    if ps.state == "dead":
+        verb = " ".join(ps.verbs)
+        fix = (f"`cage setup --wire-only --claude` (cage refreshes it — "
+               f"{ps.managed_root} is cage-managed)" if ps.healable
+               else _out_of_root_fix(ps))
+        return _FAIL, (f"the graphify that runs is {ps.winner} — a cage interceptor "
+                       f"probing `cage {verb}`, which this CLI no longer accepts, so "
+                       "every graphify call falls through UNMETERED and silently. "
+                       f"Fix: {fix}")
+    return _OK, f"`graphify` resolves to {ps.winner} — a cage interceptor naming live verbs"
+
+
+def _out_of_root_fix(ps) -> str:
+    """The fix line for a dead interceptor cage must **not** write to. Cage never edits a
+    file outside a cage-managed root, so the remedy is handed to the user — but it has to
+    be runnable, or the finding is noise people learn to ignore."""
+    win = Path(ps.winner)
+    if win.parent.name == "bin":
+        return (f"run `cage setup --project-only` in {win.parent.parent} (adopts it and "
+                f"rewrites the shim), or delete {ps.winner}")
+    return (f"delete {ps.winner} (graphify then runs unmetered but unbroken), or replace "
+            "its `cage " + " ".join(ps.verbs) + "` probe with `cage "
+            + (ps.fix_tail or "data graphify") + "`")
+
+
+def _hook_bypass(root: Path) -> tuple[str, str]:
+    """An agent hook invoking graphify by absolute path (`cage/hookbypass.py`, B-fix-3).
+
+    **Advisory by design, never a failure.** graphify's hook is working exactly as
+    designed; cage merely cannot observe that path. Reporting it at the same severity as
+    a dead cage shim would cry failure on a correct third-party integration — the surest
+    way to train people to ignore the check that catches real silent data loss."""
+    from cage import hookbypass
+    try:
+        found = hookbypass.scan(root)
+    except Exception as exc:  # noqa: BLE001 — a diagnostic never crashes doctor
+        return _OK, f"hook-bypass check skipped: {exc}"
+    if not found:
+        return _OK, "no agent hook reaches graphify past the interceptor"
+    note = ("cage never modifies these — graphify owns them; `cage query stale-wiring` "
+            "explains what stays visible")
+    return _WARN, "; ".join([b.line for b in found] + [note])
+
+
+def _graph_staleness(root: Path) -> tuple[str, str]:
+    """GC4 (graphify-capture): is `graphify-out/graph.json` older than HEAD? A stale graph
+    answers architecture questions about code that has since changed — a wrong answer, and
+    the saving GC2 attributes to a report-read is then reading a stale map. Shelled out to
+    git (never imported), cwd-oriented like the other project checks, fully fail-open:
+    non-repo / no graph / git error all degrade to an OK informational line, never a raise."""
+    gj = root / "graphify-out" / "graph.json"
+    if not gj.exists():
+        return _OK, "no graphify-out/graph.json — graphify not used in this project (ok)"
+    try:
+        graph_mtime = gj.stat().st_mtime
+    except OSError:
+        return _OK, "graphify-out/graph.json present (unreadable — staleness not checked)"
+    import subprocess
+    try:
+        r = subprocess.run(["git", "-C", str(root), "log", "-1", "--format=%ct", "HEAD"],
+                           capture_output=True, text=True, timeout=10)
+    except Exception as exc:  # noqa: BLE001 — a diagnostic never crashes doctor
+        return _OK, f"graph.json present (git staleness check skipped: {exc})"
+    if r.returncode != 0 or not r.stdout.strip():
+        return _OK, "graphify-out/graph.json present (not a git repo — staleness not checked)"
+    try:
+        head_ct = int(r.stdout.strip())
+    except ValueError:
+        return _OK, "graphify-out/graph.json present (unparseable HEAD time)"
+    if graph_mtime < head_ct:
+        days = int((head_ct - graph_mtime) / 86_400)
+        span = f" by ~{days}d" if days else ""
+        return _WARN, (f"graphify-out/graph.json predates HEAD{span} — code changed after "
+                       "the graph was built; its answers (and report-read savings) may be "
+                       "stale. Rebuild: `graphify update .`")
+    return _OK, "graphify-out/graph.json is current with HEAD"
+
+
+def _graphify_usage(active: Path) -> tuple[str, str]:
+    """The GC1 usage breadcrumb, read back as one sentence: *"graphify ran N×, R
+    receipts, U unmeasurable"* — the distinction the 0-real-receipts mystery lacked.
+    Read-only from `state/graphify-usage.jsonl` (never a money view); informational,
+    never fails doctor. Silent-shaped when graphify has never run here."""
+    try:
+        from cage import usagelog
+        s = usagelog.summary(active)
+    except Exception as exc:  # noqa: BLE001 — a diagnostic never crashes doctor
+        return _OK, f"graphify usage check skipped: {exc}"
+    if not s["runs"]:
+        return _OK, ("graphify usage: no runs recorded yet (state/graphify-usage.jsonl) "
+                     "— runs are logged by the shim and by transcript detection at import")
+    o = s["outcomes"]
+    other = o["non-measured"] + o["error"]
+    detail = (f"graphify ran {s['runs']}× — {o['receipt']} receipt(s), "
+              f"{o['unmeasurable']} unmeasurable, {o['empty']} empty")
+    if other:
+        detail += f", {other} non-measured/error"
+    return _OK, detail
 
 
 def _receipts(active: Path, scan) -> tuple[str, str]:
@@ -539,16 +666,18 @@ def _last_problem(root: Path) -> str:
 
 
 def _capture_trace(root: Path) -> tuple[str, str]:
-    """Per-agent capture heartbeat + last error, from the metadata-only debug log.
+    """Per-agent capture event + last error, from the metadata-only debug log.
     Off by default: when debug is disabled this row just says how to turn it on; it
-    never writes anything (the heartbeat/log only exist under `CAGE_DEBUG=1`)."""
+    never writes anything (the log only exists under `CAGE_DEBUG=1`). The events are
+    the import/push produce/skip breadcrumbs (`cage/capturelog.py` + the CAGE_DEBUG
+    push-site logs), not hooks — capture is pull-based."""
     try:
         pol = policy.load(paths.Footprint(root).policy)
     except Exception:  # noqa: BLE001
         pol = {}
     if not policy.debug_enabled(pol):
         return _OK, ("capture debug off — set CAGE_DEBUG=1 (or [debug] enabled=true) to record a "
-                     "metadata-only per-hook heartbeat + errors to .cage/state/debug.log; "
+                     "metadata-only per-agent capture breadcrumb + errors to .cage/state/debug.log; "
                      "then `cage debug` to read them")
     seen = debuglog.last_seen(root)
     rows = []
@@ -556,13 +685,13 @@ def _capture_trace(root: Path) -> tuple[str, str]:
         recs = [r for (ag, _ev), r in seen.items() if ag == a]
         if recs:
             latest = max(recs, key=lambda r: r.get("ts", ""))
-            rows.append(f"\n      · {a:<8} last fired: {latest.get('event', '?'):<14} {_ago(latest.get('ts', ''))}")
+            rows.append(f"\n      · {a:<8} last event: {latest.get('event', '?'):<14} {_ago(latest.get('ts', ''))}")
         else:
-            rows.append(f"\n      · {a:<8} never fired (no hook heartbeat seen)")
+            rows.append(f"\n      · {a:<8} no capture events seen yet")
     problem = _last_problem(root)
     if problem:
         rows.append(f"\n      ⚠ last issue: {problem}")
-    return _OK, "capture debug ON — per-agent last hook fired (`cage debug` for full events):" + "".join(rows)
+    return _OK, "capture debug ON — per-agent last capture event (`cage debug` for full events):" + "".join(rows)
 
 
 def _ledger_roundtrip() -> tuple[str, str]:
@@ -659,7 +788,7 @@ def _rollup_line(r: dict) -> str:
     if v == "partially wired" and r["missing"]:
         v += f" (missing: {', '.join(r['missing'])})"
     elif v == "needs healing":
-        v += f" ({r['dead']} dead, {r['stale']} stale)"
+        v += f" ({r['dead']} dead)"
     return v
 
 
@@ -687,7 +816,6 @@ def run(root: Path) -> dict:
         ("prices-age", *_prices_age(active)),
         ("policy-version", *_policy_version(active)),
         ("state", *_state_dir(active)),
-        ("hooks", *_hooks(root)),
         ("portability", *_portability(root)),
         # `wiring` must render ABOVE `receipts`: a dead verb is the *reason* receipts
         # can be empty, and the receipts line points back up at it.
@@ -697,6 +825,13 @@ def run(root: Path) -> dict:
         ("capture-quality", *_capture_quality(active)),
         ("trace", *_capture_trace(active)),
         ("interceptor", *_interceptor(root, scan)),
+        # The PATH-winning pair must render directly below `interceptor`: they answer
+        # the same question at a wider scope (what actually runs, vs what this root
+        # installed), and reading them apart invites the false ✅ they exist to kill.
+        ("path-interceptor", *_path_interceptor(root)),
+        ("hook-bypass", *_hook_bypass(root)),
+        ("graph-staleness", *_graph_staleness(root)),
+        ("graphify-usage", *_graphify_usage(active)),
         ("receipts", *_receipts(active, scan)),
         ("ledger", *_ledger_roundtrip()),
     ]

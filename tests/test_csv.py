@@ -10,8 +10,8 @@ import io
 import pytest
 
 from cage import (attribution, calibration, cli, compare, csvout, exportcmd,
-                  humanview, ledger, metering, policy, report, roi, schema,
-                  study, tasks, trend)
+                  ledger, metering, policy, report, roi, schema,
+                  study, tasks)
 
 POL = policy.load(None)
 
@@ -23,20 +23,20 @@ REPORT_GOLDEN = (
     "TOTAL,1,8600,1500,0,0.0483,0,0,measured\n")
 
 REPORT_TASK_GOLDEN = (
-    "task,calls,tokens_in,tokens_out,cached_in,cost_usd,saved_usd,net_usd,"
+    "task,calls,tokens_in,tokens_out,cached_in,cost_usd,gross_saved_usd,net_vs_spend_usd,"
     "unpriced_calls,unpriced_tokens,method\n"
     "fix-handover-bug,1,8600,1500,0,0.0483,0.1242,0.0759,0,0,measured\n"
     "TOTAL,1,8600,1500,0,0.0483,0.1242,0.0759,0,0,measured\n")
 
 ATTRIB_GOLDEN = (
-    "tool,saved_tokens,saved_usd,method,confidence,priced_via\n"
+    "tool,gross_saved_tokens,gross_saved_usd,method,confidence,priced_via\n"
     "graphify,27000,0.081,modeled,1,\n"
     "fux,6400,0.0192,modeled,1,\n"
     "compressor,8000,0.024,measured,1,\n"
     "TOTAL,41400,0.1242,,,\n")
 
 ROI_GOLDEN = (
-    "tool,receipts,saved_usd,own_cost_usd,net_usd,added_latency_ms,method,"
+    "tool,receipts,gross_saved_usd,own_cost_usd,net_of_own_cost_usd,added_latency_ms,method,"
     "priced_via\n"
     "graphify,1,0.081,0,0.081,0,modeled,call\n"
     "compressor,1,0.024,0,0.024,0,measured,call\n"
@@ -76,9 +76,6 @@ def test_csv_determinism_double_run(seeded):
         lambda: roi.render_csv(roi.by_tool(root, POL)),
         lambda: compare.render_csv(compare.summarize(root, POL)),
         lambda: calibration.render_csv(calibration.summarize(root, POL)),
-        lambda: calibration.render_csv_human(calibration.summarize_human(root, POL)),
-        lambda: humanview.render_csv(humanview.rollup(root, POL)),
-        lambda: trend.render_csv(trend.series(root, POL)),
         lambda: study.render_csv(study.summarize(root, POL)),
     ]
     for fn in renders:
@@ -103,7 +100,7 @@ def test_text_and_csv_same_numbers(seeded):
 
     data = attribution.attribute(root, "fix-handover-bug", POL)
     arows = list(_csv.reader(io.StringIO(attribution.render_csv(data))))
-    saved = float(arows[-1][arows[0].index("saved_usd")])
+    saved = float(arows[-1][arows[0].index("gross_saved_usd")])
     assert saved == pytest.approx(data["total_saved_usd"], abs=1e-9)
     assert f"${saved:,.4f}" in attribution.render_attrib(data)
 
@@ -117,9 +114,6 @@ def test_method_tag_column_on_every_view(seeded):
         roi.render_csv(roi.by_tool(root, POL)),
         compare.render_csv(compare.summarize(root, POL)),
         calibration.render_csv(calibration.summarize(root, POL)),
-        calibration.render_csv_human(calibration.summarize_human(root, POL)),
-        humanview.render_csv(humanview.rollup(root, POL)),
-        trend.render_csv(trend.series(root, POL)),
         study.render_csv(study.summarize(root, POL)),
     ]
     for out in headers:
@@ -238,79 +232,6 @@ def test_calibration_csv_summary_and_tasks(proj):
     assert summary[head.index("method")] == "measured"
 
 
-def test_calibration_human_csv_refusal_note(proj):
-    d = calibration.summarize_human(proj, POL)
-    rows = list(_csv.reader(io.StringIO(calibration.render_csv_human(d))))
-    head, summary = rows[0], rows[-1]
-    assert "insufficient data" in summary[head.index("note")]
-    assert summary[head.index("median_ratio")] == ""
-
-
-def test_human_and_trend_csv_keep_sources_apart(proj):
-    cid = metering.record_call(route="r", provider="anthropic",
-                               model="claude-sonnet-4-6", tokens_in=100,
-                               task="h-1", agent="claude-code", root=proj)
-    metering.record_human(task="h-1", minutes=90, call=cid, agent="claude-code",
-                          root=proj)
-    ledger.append_row(proj, "calls", schema.make_call(
-        route="chat", provider="anthropic", model="claude-opus-4-8", tokens_in=10,
-        tokens_out=1, session="s", agent="claude-code", gap_ms=120000,
-        ts="2026-06-01T10:00:00Z"))
-    for out in (humanview.render_csv(humanview.rollup(proj, POL)),
-                trend.render_csv(trend.series(proj, POL))):
-        rows = list(_csv.reader(io.StringIO(out)))
-        head = rows[0]
-        kinds = {r[0] for r in rows[1:]}
-        assert {"attested", "derived"} <= kinds  # never blended into one number
-        derived = next(r for r in rows[1:] if r[0] == "derived")
-        assert derived[head.index("method")] == "estimated"
-        assert "never summed" in derived[head.index("note")]
-
-
-# ── UNPRICED visibility survives into the spreadsheet ─────────────────────────
-
-def test_report_csv_unpriced_columns(proj):
-    ledger.append_row(proj, "calls", schema.make_call(
-        route="chat", provider="mystery", model="who-knows", tokens_in=1000,
-        tokens_out=200, session="s", ts="2026-06-01T10:00:00Z"))
-    rep = report.summarize(proj, POL, dim="route")
-    rows = list(_csv.reader(io.StringIO(report.render_csv(rep))))
-    head, total = rows[0], rows[-1]
-    assert total[head.index("unpriced_calls")] == "1"
-    assert total[head.index("unpriced_tokens")] == "1200"
-
-
-def test_csv_never_gates_and_never_dashes(proj):
-    """The output-honesty escape hatch (plan Phase 2.4): CSV always carries the
-    full schema — signal-gating and the `—` glyph are text-view affordances, and
-    the new text-only payload keys (saved_tokens/agents/kiro flag) never leak
-    into a CSV column."""
-    ledger.append_row(proj, "calls", schema.make_call(
-        route="chat", provider="mystery", model="who-knows", tokens_in=1000,
-        tokens_out=200, agent="kiro", task="t1", ts="2026-06-01T10:00:00Z"))
-    rep = report.summarize(proj, POL, dim="task")  # savings dim, zero receipts
-    out = report.render_csv(rep)
-    head = out.splitlines()[0].split(",")
-    assert "saved_usd" in head and "net_usd" in head   # full schema despite gating
-    assert "—" not in out                              # the glyph never enters data
-    assert not {"saved_tokens", "agents", "kiro_input_only"} & set(head)
-    from cage import display
-    assert "—" in report.render_report(rep, disp=display.Display(usd=True,
-                                                                 all_columns=True))
-
-
-def test_compare_csv_unpriced_row(proj):
-    _seed_compare(proj)
-    ledger.append_row(proj, "calls", schema.make_call(
-        route="chat", provider="mystery", model="who-knows", tokens_in=7,
-        tokens_out=0, session="s-x", ts="2026-06-30T10:00:00Z"))
-    rows = list(_csv.reader(io.StringIO(compare.render_csv(compare.summarize(proj, POL)))))
-    unpriced = next(r for r in rows[1:] if r[0] == "unpriced")
-    assert "UNPRICED" in unpriced[rows[0].index("note")]
-
-
-# ── RFC-4180 + the no-commas-by-validation guarantee ──────────────────────────
-
 def test_rfc4180_quoting_round_trips(proj):
     """A meta dict with commas/quotes must round-trip through the csv module."""
     meta = {"note a": 'x,"y', "n": 3}
@@ -329,7 +250,7 @@ def test_rfc4180_quoting_round_trips(proj):
 def test_label_and_phase_commas_rejected(proj, monkeypatch, capsys):
     """Labels/phases are single validated tokens — a comma can't reach a CSV cell."""
     monkeypatch.chdir(proj)
-    assert cli.main(["human", "outcome", "t1", "--label", "a,b"]) == 1
+    assert cli.main(["task", "outcome", "t1", "--label", "a,b"]) == 1
     assert cli.main(["study", "start", "a,b"]) == 1
     err = capsys.readouterr().err
     assert "label must be one short token" in err
@@ -387,7 +308,6 @@ def test_view_csv_file_write_pins_lf(seeded, tmp_path, monkeypatch):
 
 @pytest.mark.parametrize("argv", [
     ["report", "--csv", "--json"],
-    ["human", "show", "--csv", "--html", "x.html"],
     ["study", "id", "--csv"],
     ["study", "start", "phase1", "--csv"],
     ["data", "export", "--no-import", "--csv", "calls", "--format", "json"],
@@ -407,8 +327,7 @@ def test_cli_csv_views_exit_zero_and_match_library(seeded, monkeypatch, capsys):
     metering._policy_for.cache_clear()
     for argv in (["report", "--csv"], ["insights", "attrib", "--csv"], ["insights", "roi", "--csv"],
                  ["insights", "compare", "--csv"], ["insights", "calibration", "--csv"],
-                 ["insights", "calibration", "--human", "--csv"], ["human", "show", "--csv"],
-                 ["insights", "trend", "--csv"], ["study", "report", "--csv"]):
+                 ["study", "report", "--csv"]):
         assert cli.main(argv) == 0, argv
     # stdout is pure CSV data — the last command's output starts with its header
     assert capsys.readouterr().out.startswith("route,calls,")
@@ -443,17 +362,6 @@ def test_query_csv_output_answers():
     assert "never an import source" in body and "merge-by-id" in body
 
 
-def test_rendered_skills_teach_reporting_recipes():
-    """All four hosts' rendered assets carry the recipes + summarization rules
-    (edited via skillgen fragments only — --check guards hand-edit drift)."""
-    from pathlib import Path
-    repo = Path(__file__).resolve().parents[1]
-    for rel in ("cage/data/skills/cage/SKILL.md",
-                "cage/data/prompts/cage.prompt.md",
-                "cage/data/steering/cage.md",
-                "cage/data/skills/agents/cage/SKILL.md"):
-        body = (repo / rel).read_text(encoding="utf-8")
-        assert "Reporting recipes" in body, rel
-        assert "cage report --csv --since 7d" in body, rel
-        assert "verbatim" in body and "INSUFFICIENT DATA" in body, rel
-        assert "never blur the two" in body, rel
+# NB: the rendered skill/prompt/steering assets were removed with the hook machinery
+# (capture is pull-based; MCP is the sole wired surface). The CSV column contracts they
+# used to teach are covered by the golden/round-trip tests above and `docs/csv-output.md`.

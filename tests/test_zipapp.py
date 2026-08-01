@@ -54,10 +54,23 @@ def test_version_carries_the_zipapp_label(pyz, tmp_path):
 
 
 def test_init_writes_the_bundled_policy_from_the_zip(pyz, tmp_path):
+    from cage import paths
     r = _run(pyz, "setup", "--project-only", "--no-graphify", cwd=tmp_path)
     assert r.returncode == 0, r.stderr
-    written = (tmp_path / ".cage" / "policy.toml").read_text(encoding="utf-8")
-    assert written == (REPO_DATA / "policy.toml").read_text(encoding="utf-8")
+    written = (tmp_path / ".cage" / "cage.toml").read_text(encoding="utf-8")
+    bundle = (REPO_DATA / "cage.toml").read_text(encoding="utf-8")
+    # Directive A: setup writes the bundled policy but MATERIALIZES the active [sources]
+    # table (env-dependent paths) in place of the inert comment block. So the body before
+    # the sources marker is byte-identical to the bundle, EXCEPT for one stamped line:
+    # the bundle carries no `[meta] cage_version` literal (policy._bundled derives it
+    # live), so a freshly scaffolded project gets it stamped as a historical fact
+    # (initcmd._stamp_cage_version) — the one place that value is ever written to disk.
+    written_body = written.split(paths.SOURCES_START)[0]
+    bundle_body = bundle.split(paths.SOURCES_START)[0]
+    stamp = f'cage_version = "{__version__}"\n'
+    assert stamp in written_body
+    assert written_body.replace(stamp, "", 1) == bundle_body
+    assert "[[sources.claude]]" in written and paths.SOURCES_START in written
 
 
 def test_doctor_reports_zipapp_and_priced_policy(pyz, tmp_path):
@@ -74,16 +87,9 @@ def test_doctor_reports_zipapp_and_priced_policy(pyz, tmp_path):
     assert "0 model prices" not in checks["policy"]["detail"]
 
 
-def test_setup_extracts_skill_assets_from_the_zip(pyz, tmp_path):
-    r = _run(pyz, "setup", "--claude", "--no-project", "--no-graphify", cwd=tmp_path)
-    assert r.returncode == 0, r.stderr
-    for skill in ("cage", "cage-doctor"):
-        src_dir = REPO_DATA / "skills" / skill
-        dst_dir = tmp_path / "fake-homes" / "claude" / "skills" / skill
-        expected = sorted(p.name for p in src_dir.iterdir() if p.is_file())
-        assert sorted(p.name for p in dst_dir.iterdir()) == expected
-        for name in expected:
-            assert (dst_dir / name).read_bytes() == (src_dir / name).read_bytes()
+# NB: the skill-asset extraction test was removed with the rendered assets. The zipapp's
+# bundled-data access (importlib.resources over the archive) is still exercised by the
+# policy-loads and determinism checks around it.
 
 
 def test_derived_view_is_deterministic_under_the_zip(pyz, tmp_path):

@@ -28,8 +28,11 @@ def append(path: Path, row: dict) -> bool:
         return False
 
 
-def append_row(root: Path, kind: str, row: dict) -> bool:
+def append_row(root: Path, kind, row: dict) -> bool:
     """Append a ``calls``/``receipts``/``tasks`` row to its month shard (plan §3.6.1).
+
+    ``kind`` is normally a string; a ``("savings", tool)`` tuple routes the row into the
+    per-source savings tree (`savings/<tool>/savings-<month>.jsonl`, plan §3).
 
     The shard is chosen from the row's own ``ts`` (`paths.Footprint.shard`), so writes
     are deterministic and the append-only past is never rewritten — new writes simply
@@ -52,28 +55,34 @@ def append_row(root: Path, kind: str, row: dict) -> bool:
     if not ok:
         try:
             from cage import debuglog  # local import keeps the write hot path light
+            kind_str = "/".join(kind) if isinstance(kind, tuple) else kind
             debuglog.event(root, event="ledger.append", result="write-failed",
-                           kind=kind, shard=str(shard), row_id=row.get("id", ""))
+                           kind=kind_str, shard=str(shard), row_id=row.get("id", ""))
         except Exception:  # noqa: BLE001 — tracing must never break the write path
             pass
     return ok
 
 
-def append_new(root: Path, rows: list[dict], seen: set | None = None) -> int:
+def append_new(root: Path, rows: list[dict], seen: set | None = None,
+               collect: list | None = None) -> int:
     """Append only call rows whose id isn't already in the ledger. Returns #added.
 
     The **correctness backstop** for capture: every capture path (the pull import
     sweep, capture-on-read, a real-time hook) funnels through here, so a call seen by
     two paths is appended once — id-dedupe makes the paths idempotent and safe to run
     together (plan capture-architecture §2). Lives in ``ledger.py`` (not an agent's
-    hook module) precisely because the universal import path must not depend on one
-    agent's Claude-specific hook code; `hooks.append_new` is a compatibility re-export.
+    module) precisely because the universal import path must not depend on one agent's
+    Claude-specific code — the sole home now that the hook capture path is gone.
 
     ``seen`` is an optional caller-owned set of already-known call ids: pass it to skip
     the per-call ledger reload and amortize the dedupe across a multi-file run (the
     ledger is 22k+ rows — re-reading it per file/call is the import hot path, plan
     §3.7). It is mutated in place with each appended id so later batches see them.
-    Omit it and the legacy self-contained behavior holds (reload once here)."""
+    Omit it and the legacy self-contained behavior holds (reload once here).
+
+    ``collect`` is an optional caller-owned list: each row actually appended is pushed
+    onto it, so a caller can roll up the run's real delta (per-agent×surface tokens/
+    cost, import-ledger plan §2.2) without a second ledger read."""
     if seen is None:
         seen = {c.get("id") for c in calls(root)}
     added = 0
@@ -82,6 +91,8 @@ def append_new(root: Path, rows: list[dict], seen: set | None = None) -> int:
             if append_row(root, "calls", row):
                 seen.add(row.get("id"))
                 added += 1
+                if collect is not None:
+                    collect.append(row)
     return added
 
 
@@ -187,8 +198,65 @@ def calls(root: Path, since: str | None = None) -> list[dict]:
     return read_kind(root, "calls", since=since)
 
 
+def credits(root: Path, since: str | None = None) -> list[dict]:
+    """Kiro-CLI **credits** usage rows (capture-precision §3.4), collapsed
+    **last-write-wins per session**. A resumed conversation appends a fresh row whose id
+    folds in a higher turn count (`schema.make_credit`), so the shard is append-only and
+    a re-import adds zero rows — but a grown conversation's credits must never be *summed*
+    with its earlier partial row. This reader keeps only the highest-turn row per
+    `session` (ties broken by id), the append-only analogue of `_latest_task`. Read by no
+    call-based view, so it can never perturb a token/cost number (determinism preserved);
+    an empty ledger with no credits shard returns []."""
+    rows = read_kind(root, "credits", since=since)
+    latest: dict[str, dict] = {}
+    for r in rows:
+        sess = r.get("session", "")
+        cur = latest.get(sess)
+        if cur is None or (r.get("turns", 0), r.get("id", "")) >= (cur.get("turns", 0), cur.get("id", "")):
+            latest[sess] = r
+    return sorted(latest.values(), key=lambda x: x.get("id", ""))
+
+
+def savings(root: Path, since: str | None = None) -> list[dict]:
+    """The dedicated per-source savings tree (`savings/*/savings-*.jsonl`, plan §3).
+    Globbed + concatenated across every tool sub-dir, deterministic order. ``since``
+    drops dated shards whose whole month predates the cutoff (same partition win as
+    `read_kind`). Empty when no tool has ever recorded a saving."""
+    foot = paths.Footprint(root)
+    cut = since_cutoff(since)
+    rows: list[dict] = []
+    for sh in foot.savings_shards():
+        if cut is not None and _month_entirely_below(sh.name, cut):
+            continue
+        rows.extend(read(sh))
+    return rows
+
+
 def receipts(root: Path, since: str | None = None) -> list[dict]:
-    return read_kind(root, "receipts", since=since)
+    """Every savings receipt: an **id-deduped union** of the legacy `receipts.jsonl`
+    shards with the dedicated `savings/<tool>/` tree (plan §3), the tree winning on a
+    duplicate id. Savings rows are receipt-compatible, so every attribution/roi/report
+    surface reads them unchanged.
+
+    Why a union, not a concatenation: `cage data migrate-savings` **copies** historical
+    graphify rows (keeping their original id) from `receipts.jsonl` into the tree, so the
+    same id can legitimately sit in both stores. Deduping by id — ids carry the only
+    entropy, so identity dedupe is exact — makes the number precise regardless: an
+    idempotent re-run, a half-completed migration, or a crash mid-copy all still read each
+    row exactly once. Row order is stable and deterministic (legacy order, then any
+    tree-only rows), so derived views are byte-identical before/after a migration. An
+    empty tree (no migration, no native shim) makes this byte-identical to the legacy
+    concatenation.
+
+    A row without an `id` can't be merged by identity, so — unlike `union_by_id`, which
+    drops it — it is **preserved** here (concatenation kept it; dropping it would silently
+    change a money total). It can never collide, so appending it is safe."""
+    from cage.mergeutil import union_by_id
+    legacy = read_kind(root, "receipts", since=since)
+    tree = savings(root, since=since)
+    idless = [r for r in legacy if not r.get("id")] + [r for r in tree if not r.get("id")]
+    merged = union_by_id(legacy, tree, on_collision=lambda _prior, row: row)  # tree wins
+    return merged + idless
 
 
 def receipts_for(root: Path, call_id: str) -> list[dict]:

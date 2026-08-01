@@ -16,6 +16,7 @@ from types import SimpleNamespace
 
 from cage import (clicmds, exportcmd, importcmd, initcmd, ledger, paths, policy,
                   report, transcript, watchcmd)
+from srcseed import mkcage
 
 
 def _imp_args(agent="all", path=None, project=None, since=None):
@@ -76,6 +77,7 @@ def test_import_with_no_project_lands_in_global_ledger(tmp_path, monkeypatch, ca
     fresh.mkdir()
     monkeypatch.chdir(fresh)
     _isolate_agent_homes(tmp_path, monkeypatch)
+    mkcage(paths.global_home())  # `--path` reads its patterns from the resolved ledger's cage.toml
     tp = tmp_path / "s.jsonl"
     tp.write_text(_claude_line("u1", 100, 50) + "\n", encoding="utf-8")
 
@@ -91,6 +93,7 @@ def test_report_reads_global_ledger_for_no_project_user(tmp_path, monkeypatch, c
     fresh.mkdir()
     monkeypatch.chdir(fresh)
     _isolate_agent_homes(tmp_path, monkeypatch)
+    mkcage(paths.global_home())  # `--path` reads its patterns from the resolved ledger's cage.toml
     tp = tmp_path / "s.jsonl"
     tp.write_text(_claude_line("u1", 100, 50) + "\n", encoding="utf-8")
     clicmds.cmd_import(_imp_args(agent="claude", path=str(tp)))
@@ -140,8 +143,7 @@ def test_report_project_filter(tmp_path, monkeypatch):
 # ── incremental file-stat cursor ──────────────────────────────────────────────
 
 def test_cursor_skips_unchanged_files(tmp_path, monkeypatch):
-    root = tmp_path / "proj"
-    (root / ".cage").mkdir(parents=True)
+    root = mkcage(tmp_path / "proj")  # `--path` needs a materialized `path_globs`
     monkeypatch.setenv("CAGE_DEBUG", "1")
     tp = tmp_path / "s.jsonl"
     tp.write_text(_claude_line("u1", 100, 50) + "\n", encoding="utf-8")
@@ -302,4 +304,12 @@ def test_capture_failopen_on_malformed_policy(tmp_path, monkeypatch, capsys):
     tp = tmp_path / "s.jsonl"
     tp.write_text(_claude_line("u1", 100, 50) + "\n", encoding="utf-8")
     assert clicmds.cmd_import(_imp_args(agent="claude", path=str(tp))) == 0
-    assert len(ledger.calls(root)) == 1  # imported despite the broken policy
+    # Fail-open still holds where it is defined to: exit 0, no traceback, capture never
+    # raises into the caller. What a broken policy now costs is the `--path` sweep itself:
+    # its patterns live in `[sources] path_globs` (path-globs handoff §5), and an
+    # unreadable config declares none — so cage scans nothing rather than guessing at a
+    # glob. That is the deliberate no-code-fallback rule, and it is announced, not silent.
+    out = capsys.readouterr().out
+    assert len(ledger.calls(root)) == 0
+    assert "no `path_globs` declared for claude" in out
+    assert "cage setup --sync-sources" in out

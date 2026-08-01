@@ -1,4 +1,4 @@
-$ cage study report --agent-only
+$ cage study report
 Fleet study · phases: baseline → plugin
 
 coverage (days with rows — gaps kill studies, so they print first):

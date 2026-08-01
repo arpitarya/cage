@@ -1,0 +1,7 @@
+555073bf63e25985cb36912853c8dd650877236a52599750f45ff537b1efe7f4  2026-07-29-phase-benchmark.md
+# sha256 covers all bytes from the newline after '<!-- HASH-COVERS-BELOW -->' to EOF.
+# The digest is UNCHANGED from publication: this file was originally published without a
+# marker (whole-file digest), and on 2026-08-01 a header was prepended above a marker so
+# the bytes below it are byte-identical to the original whole file. Verify with:
+#   python3 -c "import hashlib,sys;b=open('2026-07-29-phase-benchmark.md','rb').read();m=b'<!-- HASH-COVERS-BELOW -->\n';print(hashlib.sha256(b[b.find(m)+len(m):]).hexdigest())"
+# (header = the SUPERSEDED banner pointing at 2026-08-01-phase-benchmark.md)

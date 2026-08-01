@@ -15,15 +15,14 @@ deleted outright rather than renamed, so it is dead, still installed on real mac
 and **not in `REMOVED`** — a grep against `REMOVED` would miss it. Detector = parser,
 fix-hint = verbmap.
 
-Three artifact classes, three checks:
+Two artifact classes, two checks (the rendered skill/prompt/steering assets were
+removed with the hook machinery — leftover copies surface as leftover rows):
 
-  1. **commands** — hook/MCP entries, git hooks, the committed shim references. Tail via
-     `paths.cage_verb_path`, verb checked against the parser.
+  1. **commands** — MCP entries, leftover hook/git-hook entries from pre-removal
+     installs, the committed shim references. Tail via `paths.cage_verb_path`,
+     verb checked against the parser.
   2. **`bin/graphify`** — a shell script, not a config: regex its `cage <tail>`
      occurrences out of the text, then the same parser check.
-  3. **assets** (skills / prompts / steering) — prose telling an agent which verbs to
-     run, so a stale copy makes the agent issue dead commands. Not parseable as a
-     command; hash-compared against `paths.bundled_data()` instead.
 
 Scanning is **read-only and side-effect-free by construction**: no artifact is ever
 executed, no `cage import` runs, nothing is written. Executing a probe could not
@@ -39,12 +38,15 @@ PII: paths, verbs and hashes only — never file contents, never a diff.
 """
 from __future__ import annotations
 
-import hashlib
 import re
 from pathlib import Path
 from typing import NamedTuple
 
 from cage import cfgio, paths, verbmap
+
+# The marker the (removed) git-commit-hook writer stamped into `.git/hooks/*` —
+# kept as a literal so leftover cage-managed git hooks are still recognized.
+_GIT_HOOK_MARKER = "# cage-managed-hook"
 
 # `cage <verb>` inside a shell script (the graphify interceptor) — this is what finds
 # the `cage data graphify --help` capability probe that gates the whole shim.
@@ -69,20 +71,18 @@ class Dead(NamedTuple):
         return f"{self.artifact}: `cage {self.command}` is not a command{fix}"
 
 
-class Stale(NamedTuple):
-    """One installed asset whose bytes differ from the bundled original."""
-    artifact: str
-    agent: str
-
-
 class Scan(NamedTuple):
     dead: list[Dead]
-    stale_assets: list[Stale]
+    # Retained as an always-empty field so doctor code and `Scan(...)` construction
+    # keep their shape after the rendered skill/prompt/steering assets (and their
+    # byte-digest staleness check) were removed with the hook machinery. Nothing
+    # populates it anymore — a stale *asset* is no longer a concept.
+    stale_assets: list  # always []
     interceptor_dead: bool   # bin/graphify probes a verb that no longer exists
 
     @property
     def clean(self) -> bool:
-        return not self.dead and not self.stale_assets
+        return not self.dead
 
 
 # ── the liveness oracle ─────────────────────────────────────────────────────────
@@ -112,7 +112,7 @@ def _parser_verbs() -> frozenset[tuple[str, ...]]:
 
 
 def _groups() -> frozenset[str]:
-    """Top-level verbs that own subcommands (`insights`, `data`, `human`, …) — for
+    """Top-level verbs that own subcommands (`insights`, `data`, `task`, …) — for
     those the *pair* must be valid; for a leaf verb a trailing token is just a
     positional argument and says nothing about liveness."""
     return frozenset(v[0] for v in _parser_verbs() if len(v) == 2)
@@ -164,16 +164,23 @@ def heal_tail(tail: str) -> str:
 
 # ── artifact enumeration ────────────────────────────────────────────────────────
 
-def _display(path: Path) -> str:
-    """Render a path with the home prefix as `~` (PII: no user name in output)."""
+def display_path(path: Path) -> str:
+    """Render a path with the home prefix as `~` (PII: no user name in output).
+
+    Public because `hookbypass` renders the same user-level paths; one renderer keeps
+    the home-redaction rule in a single place."""
     try:
         return "~/" + str(path.relative_to(Path.home()))
     except ValueError:
         return str(path)
 
 
-def _hook_commands(path: Path, key: str = "command") -> list[str]:
-    """Commands from a `{"hooks": {<event>: [{"hooks": [...]}]}}` config."""
+def hook_commands(path: Path, key: str = "command") -> list[str]:
+    """Commands from a `{"hooks": {<event>: [{"hooks": [...]}]}}` config.
+
+    Public because `hookbypass` reads the same artifacts for a different question — is a
+    *third-party* command in there bypassing cage's interceptor — and the enumeration
+    must not be forked."""
     out = []
     for entries in cfgio.load_json(path).get("hooks", {}).values():
         for e in entries:
@@ -190,7 +197,7 @@ def committed_artifacts(root: Path) -> list[tuple[str, str]]:
     question is "what ships to a teammate", not "does this still run"."""
     out: list[tuple[str, str]] = []
     for rel in (".claude/settings.json", ".codex/hooks.json"):
-        out += [(rel, c) for c in _hook_commands(root / rel)]
+        out += [(rel, c) for c in hook_commands(root / rel)]
     for rel, key in ((".mcp.json", "mcpServers"), (".vscode/mcp.json", "servers")):
         srv = cfgio.load_json(root / rel).get(key, {}).get("cage", {})
         if srv.get("command"):
@@ -206,13 +213,13 @@ def user_artifacts(root: Path) -> list[tuple[str, str]]:
     deliberately included (both real F1 failures were user-level)."""
     out: list[tuple[str, str]] = []
     claude = paths.claude_home() / "settings.json"
-    out += [(_display(claude), c) for c in _hook_commands(claude)]
+    out += [(display_path(claude), c) for c in hook_commands(claude)]
     copilot = paths.copilot_home() / "hooks" / "cage.json"
-    out += [(_display(copilot), c) for c in _hook_commands(copilot, key="bash")]
+    out += [(display_path(copilot), c) for c in hook_commands(copilot, key="bash")]
     kiro_mcp = paths.kiro_home() / "settings" / "mcp.json"
     srv = cfgio.load_json(kiro_mcp).get("mcpServers", {}).get("cage", {})
     if srv.get("command"):
-        out.append((_display(kiro_mcp), " ".join([srv["command"], *srv.get("args", [])])))
+        out.append((display_path(kiro_mcp), " ".join([srv["command"], *srv.get("args", [])])))
     codex_cfg = paths.codex_home() / "config.toml"
     if codex_cfg.exists():
         try:
@@ -223,7 +230,7 @@ def user_artifacts(root: Path) -> list[tuple[str, str]]:
                       text)
         if m:
             args = " ".join(a.strip().strip('"') for a in m.group(2).split(","))
-            out.append((_display(codex_cfg), f"{m.group(1)} {args}".strip()))
+            out.append((display_path(codex_cfg), f"{m.group(1)} {args}".strip()))
     git_hooks = root / ".git" / "hooks"
     for name in ("post-commit", "prepare-commit-msg"):
         path = git_hooks / name
@@ -233,7 +240,7 @@ def user_artifacts(root: Path) -> list[tuple[str, str]]:
             body = path.read_text(encoding="utf-8", errors="ignore")
         except OSError:
             continue
-        if "# cage-managed-hook" not in body:
+        if _GIT_HOOK_MARKER not in body:
             continue     # a foreign git hook — never ours to judge
         out += [(f".git/hooks/{name}", ln.strip())
                 for ln in body.splitlines()
@@ -241,10 +248,24 @@ def user_artifacts(root: Path) -> list[tuple[str, str]]:
     return out
 
 
+def verbs_in_shell(text: str) -> list[tuple[str, ...]]:
+    """The `cage <verb>` invocations in a shell script's **executable** lines.
+
+    Split out from `interceptor_verbs` so `pathshim` can apply the identical scan to a
+    shim found anywhere on PATH rather than re-deriving one — the detector must have a
+    single implementation, or the PATH-winning check and the root check could disagree
+    about the same file."""
+    return [tuple(m.split())
+            for m in _SHELL_CAGE.findall(_SHELL_COMMENT.sub("", text))]
+
+
 def interceptor_verbs(root: Path) -> list[tuple[str, ...]]:
     """The `cage <verb>` invocations inside `<root>/bin/graphify`. The shim is a shell
     script, so its verbs are text, not a config value — but the same parser check
-    applies, and this is what replaces doctor's existence+PATH false ✅."""
+    applies, and this is what replaces doctor's existence+PATH false ✅.
+
+    Root-scoped by design; the shim that actually *runs* is whichever `graphify` PATH
+    resolves first, which can live outside every scanned root — that is `pathshim`."""
     shim = root / "bin" / "graphify"
     if not shim.exists():
         return []
@@ -252,53 +273,7 @@ def interceptor_verbs(root: Path) -> list[tuple[str, ...]]:
         text = shim.read_text(encoding="utf-8", errors="ignore")
     except OSError:
         return []
-    return [tuple(m.split())
-            for m in _SHELL_CAGE.findall(_SHELL_COMMENT.sub("", text))]
-
-
-# ── assets ──────────────────────────────────────────────────────────────────────
-
-def _digest(path: Path) -> str:
-    try:
-        return hashlib.sha256(path.read_bytes()).hexdigest()
-    except OSError:
-        return ""
-
-
-def _bundled_digest(rel: tuple[str, ...]) -> str:
-    """sha256 of a bundled asset addressed by its path parts (importlib Traversable —
-    never `Path(__file__)`, so this still works from inside `cage.pyz`)."""
-    node = paths.bundled_data()
-    for part in rel:
-        node = node / part
-    try:
-        return hashlib.sha256(node.read_bytes()).hexdigest()
-    except (OSError, FileNotFoundError):
-        return ""
-
-
-def stale_assets() -> list[Stale]:
-    """Installed skill/prompt/steering copies whose bytes differ from the bundled
-    original — the surface `cage setup` overwrites but nothing ever *detected*. Prose,
-    not commands, so a hash-compare (not a parser check) is the right instrument; a
-    user who hand-edited their own copy is reported advisory, never as a failure."""
-    out: list[Stale] = []
-    for name, base in (("claude", paths.claude_home()), ("codex", paths.codex_home())):
-        for skill in ("cage", "cage-doctor"):
-            installed = base / "skills" / skill / "SKILL.md"
-            if installed.exists() and _digest(installed) != _bundled_digest(
-                    ("skills", skill, "SKILL.md")):
-                out.append(Stale(_display(installed), name))
-    for stem in ("cage", "cage-doctor"):
-        prompt = paths.vscode_user_dir() / "prompts" / f"{stem}.prompt.md"
-        if prompt.exists() and _digest(prompt) != _bundled_digest(
-                ("prompts", f"{stem}.prompt.md")):
-            out.append(Stale(_display(prompt), "copilot"))
-        steer = paths.kiro_home() / "steering" / f"{stem}.md"
-        if steer.exists() and _digest(steer) != _bundled_digest(
-                ("steering", f"{stem}.md")):
-            out.append(Stale(_display(steer), "kiro"))
-    return out
+    return verbs_in_shell(text)
 
 
 # ── the scan ────────────────────────────────────────────────────────────────────
@@ -307,7 +282,12 @@ def run(root: Path, *, assets: bool = True) -> Scan:
     """Scan every artifact for a dead verb. Read-only; never executes anything.
 
     Fail-open on a per-artifact basis: an unreadable or malformed file contributes
-    nothing rather than raising — a diagnostic must never be the thing that breaks."""
+    nothing rather than raising — a diagnostic must never be the thing that breaks.
+
+    ``assets`` is accepted for call-site compatibility but inert: the rendered
+    skill/prompt/steering assets were removed with the hook machinery, so there is
+    no longer a stale-*asset* concept — ``Scan.stale_assets`` is always ``[]``."""
+    del assets
     dead: list[Dead] = []
     for artifact, command, committed in (
             [(a, c, True) for a, c in committed_artifacts(root)]
@@ -322,9 +302,7 @@ def run(root: Path, *, assets: bool = True) -> Scan:
             interceptor_dead = True
             dead.append(Dead("bin/graphify", " ".join(verbs), remediation(verbs), True))
 
-    return Scan(dead=dead,
-                stale_assets=stale_assets() if assets else [],
-                interceptor_dead=interceptor_dead)
+    return Scan(dead=dead, stale_assets=[], interceptor_dead=interceptor_dead)
 
 
 # ── inventory (`cage doctor --wiring`) ───────────────────────────────────────────
@@ -339,8 +317,7 @@ def run(root: Path, *, assets: bool = True) -> Scan:
 class Artifact(NamedTuple):
     """One inventory row."""
     agent: str      # "claude" | "copilot" | "kiro" | "codex" (orphaned) | "" (shared)
-    kind: str       # "hook" | "mcp" | "instructions" | "steering" | "git-hook" |
-                     # "shim" | "skill" | "prompt" | "other"
+    kind: str       # "mcp" | "git-hook" (foreign only) | "shim" | "other"
     scope: str      # "project" | "global"
     display: str
     status: str     # "current" | "stale" | "dead" | "foreign"
@@ -365,8 +342,8 @@ class Inventory(NamedTuple):
 class _Spec(NamedTuple):
     """One artifact a full `cage setup --wire-only --<agent>` writes. `required=False`
     marks a piece that's normal to be missing — Kiro's project `.kiro/settings/mcp.json`
-    is gitignore-advised (kirowire.py), and the git-hooks are best-effort by design
-    (gitcommithook.py) — so its absence must never read as a partial install (handoff §8)."""
+    is gitignore-advised (kirowire.py) — so its absence must never read as a partial
+    install (handoff §8)."""
     kind: str
     scope: str
     display: str
@@ -376,8 +353,8 @@ class _Spec(NamedTuple):
 
 
 def _spec_status(display: str, commands: tuple[str, ...], committed: bool) -> tuple[str, str]:
-    """(status, detail) for a *present* artifact — dead beats current; staleness for a
-    hook/mcp command isn't tracked (only asset bytes are, via `stale_assets()`)."""
+    """(status, detail) for a *present* artifact — dead beats current; an MCP command's
+    prose is not byte-tracked, so the only non-current status a spec can carry is dead."""
     for c in commands:
         verbs = paths.cage_verb_path(c)
         if verbs and not is_live_verb(verbs):
@@ -386,81 +363,50 @@ def _spec_status(display: str, commands: tuple[str, ...], committed: bool) -> tu
 
 
 # Each `_<agent>_specs` is the one place that agent's expected artifact shape lives —
-# built from the wire module's own `status`/`backfill_status`/`realtime_status`
-# (never a re-derived presence check), so it can't drift from what `install()` writes.
-# A new agent needs a row here too (mirrors the "add a row" convention in
-# `agents.py`/`_WIRE`) — but the AGENT LIST itself always comes from `agents.SURFACES`,
-# never from this table's keys (see `inventory()`).
+# built from the wire module's own `status`/config presence (never a re-derived
+# presence check), so it can't drift from what `install()` writes. A new agent needs a
+# row here too (mirrors the "add a row" convention in `agents.py`/`_WIRE`) — but the
+# AGENT LIST itself always comes from `agents.SURFACES`, never from this table's keys
+# (see `inventory()`).
+
+# Capture is pull-based and MCP is the only wired surface (hooks/steering/instructions
+# were removed with the hook machinery), so each agent's expected set is a single MCP
+# entry. Pre-removal hook artifacts still on a real machine are never in the expected
+# set — they surface via `_leftover`/`user_artifacts` as leftover/dead rows instead.
 
 def _claude_specs(root: Path) -> list[_Spec]:
-    from cage import gitcommithook
-    settings = root / ".claude" / "settings.json"
-    # A verb check (`cage_verb_path` truthy), not `claudewire.status()` — that
-    # function matches only the *current* canonical command form, so a hook whose
-    # only entry is a legacy dead verb would read as "not wired" instead of "dead"
-    # and hide exactly the class of bug this inventory exists to surface.
-    cage_cmds = tuple(c for c in _hook_commands(settings) if paths.cage_verb_path(c))
-    specs = [_Spec("hook", "project", ".claude/settings.json", True,
-                    bool(cage_cmds), cage_cmds)]
     mcp = root / ".mcp.json"
     mcp_cmd = cfgio.load_json(mcp).get("mcpServers", {}).get("cage", {}).get("command", "")
-    specs.append(_Spec("mcp", "project", ".mcp.json", True, bool(mcp_cmd),
-                        (mcp_cmd,) if mcp_cmd else ()))
-    for name in ("post-commit", "prepare-commit-msg"):
-        path = root / ".git" / "hooks" / name
-        try:
-            text = path.read_text(encoding="utf-8", errors="ignore") if path.exists() else ""
-        except OSError:
-            text = ""
-        specs.append(_Spec("git-hook", "project", f".git/hooks/{name}", False,
-                            gitcommithook._MARKER in text))
-    return specs
+    return [_Spec("mcp", "project", ".mcp.json", True, bool(mcp_cmd),
+                  (mcp_cmd,) if mcp_cmd else ())]
 
 
 def _copilot_specs(root: Path) -> list[_Spec]:
-    from cage import copilotwire
-    specs = [_Spec("instructions", "project", ".github/copilot-instructions.md", True,
-                    copilotwire.status(root))]
     mcp = root / ".vscode" / "mcp.json"
     mcp_cmd = cfgio.load_json(mcp).get("servers", {}).get("cage", {}).get("command", "")
-    specs.append(_Spec("mcp", "project", ".vscode/mcp.json", True, bool(mcp_cmd),
-                        (mcp_cmd,) if mcp_cmd else ()))
-    hook_path = paths.copilot_home() / "hooks" / "cage.json"
-    # Same verb-truthy present-check as claude's hook, not `backfill_status`/
-    # `realtime_status` (exact-match to the *current* command form only).
-    cage_cmds = tuple(c for c in _hook_commands(hook_path, key="bash")
-                      if paths.cage_verb_path(c))
-    specs.append(_Spec("hook", "global", _display(hook_path), True,
-                        bool(cage_cmds), cage_cmds))
-    return specs
+    return [_Spec("mcp", "project", ".vscode/mcp.json", True, bool(mcp_cmd),
+                  (mcp_cmd,) if mcp_cmd else ())]
 
 
 def _kiro_specs(root: Path) -> list[_Spec]:
-    from cage import kirowire
-    steering = root / ".kiro" / "steering" / "cage.md"
-    specs = [_Spec("steering", "project", ".kiro/steering/cage.md", True, steering.exists())]
-    hook = root / ".kiro" / "hooks" / "cage.kiro.hook"
-    hook_cmd = cfgio.load_json(hook).get("then", {}).get("command", "") if hook.exists() else ""
-    # Verb-truthy present-check (see `_claude_specs`), not `backfill_status` (exact
-    # match to the current command only — would miss a dead-verb-only hook).
-    specs.append(_Spec("hook", "project", ".kiro/hooks/cage.kiro.hook", True,
-                        bool(paths.cage_verb_path(hook_cmd)), (hook_cmd,) if hook_cmd else ()))
+    # `required=False` — Kiro's `.kiro/settings/mcp.json` keeps a per-machine absolute
+    # path (kirowire.py) and is gitignore-advised, so its absence is normal, never a
+    # partial install (handoff §8).
     mcp = root / ".kiro" / "settings" / "mcp.json"
     srv = cfgio.load_json(mcp).get("mcpServers", {}).get("cage", {})
     mcp_cmd = " ".join([srv.get("command", ""), *srv.get("args", [])]).strip()
-    specs.append(_Spec("mcp", "project", ".kiro/settings/mcp.json", False,
-                        kirowire.status(root), (mcp_cmd,) if mcp_cmd else ()))
-    return specs
+    from cage import kirowire
+    return [_Spec("mcp", "project", ".kiro/settings/mcp.json", False,
+                  kirowire.status(root), (mcp_cmd,) if mcp_cmd else ())]
 
 
 _SPECS = {"claude": _claude_specs, "copilot": _copilot_specs, "kiro": _kiro_specs}
 
 
-def _agent_inventory(agent: str, specs: list[_Spec], stale: int) -> tuple[list[Artifact], AgentRollup]:
-    """Build this agent's rows + rollup. ``stale`` is its stale-**asset** count
-    (`scan.stale_assets`, computed once for the whole scan) — folded into the same
-    verdict as a dead command, since both mean "re-run `cage setup`" (doctorcmd._wiring
-    tiers them the same way)."""
+def _agent_inventory(agent: str, specs: list[_Spec], stale: int = 0) -> tuple[list[Artifact], AgentRollup]:
+    """Build this agent's rows + rollup. ``stale`` is retained (always 0 now that the
+    rendered assets are gone) so the "needs healing" verdict keeps its shape; a dead
+    command still drives it."""
     items: list[Artifact] = []
     missing: list[str] = []
     dead = 0
@@ -491,44 +437,11 @@ def _agent_inventory(agent: str, specs: list[_Spec], stale: int) -> tuple[list[A
                               dead, stale)
 
 
-def _asset_rows(root: Path, scan: Scan) -> list[Artifact]:
-    """Skill/prompt/steering asset copies — informational only, never gates a rollup
-    verdict: `cage setup` (assets) and `cage setup --wire-only` (the specs above) are
-    separate invocations, so folding asset presence into the wiring verdict would
-    misreport someone who deliberately ran only one of them. Kiro's project steering
-    doc is skipped here — it's already the `steering` row in `_kiro_specs` (kirowire
-    and `cage setup` write the same file for two different reasons)."""
-    from cage import setupcmd
-    stale = {s.artifact for s in scan.stale_assets}
-    out: list[Artifact] = []
-
-    def add(agent: str, kind: str, scope: str, path: Path) -> None:
-        if not path.exists():
-            return
-        if scope == "project":
-            try:
-                display = str(path.relative_to(root))
-            except ValueError:
-                display = str(path)
-        else:
-            display = _display(path)
-        out.append(Artifact(agent, kind, scope, display,
-                            "stale" if display in stale else "current"))
-
-    for skill, prompt, _steer in setupcmd._ASSETS:
-        add("claude", "skill", "global", paths.claude_home() / "skills" / skill / "SKILL.md")
-        add("claude", "skill", "project", root / ".claude" / "skills" / skill / "SKILL.md")
-        add("copilot", "prompt", "global", paths.vscode_user_dir() / "prompts" / f"{prompt}.prompt.md")
-        add("copilot", "prompt", "project", root / ".github" / "prompts" / f"{prompt}.prompt.md")
-        add("kiro", "steering", "global", paths.kiro_home() / "steering" / f"{_steer}.md")
-    return out
-
-
 def _git_hook_foreign(root: Path) -> list[Artifact]:
     """A `.git/hooks/{post-commit,prepare-commit-msg}` that exists but isn't cage's —
     `user_artifacts()` deliberately never returns these (never ours to judge), so this
-    is the one place they're surfaced: shown, never acted on."""
-    from cage import gitcommithook
+    is the one place they're surfaced: shown, never acted on. (Cage no longer writes
+    git hooks; a marked one is a pre-removal leftover, handled by `user_artifacts`.)"""
     out: list[Artifact] = []
     for name in ("post-commit", "prepare-commit-msg"):
         path = root / ".git" / "hooks" / name
@@ -538,7 +451,7 @@ def _git_hook_foreign(root: Path) -> list[Artifact]:
             text = path.read_text(encoding="utf-8", errors="ignore")
         except OSError:
             continue
-        if gitcommithook._MARKER not in text:
+        if _GIT_HOOK_MARKER not in text:
             out.append(Artifact("", "git-hook", "project", f".git/hooks/{name}",
                                 "foreign", "not cage-managed"))
     return out
@@ -593,13 +506,11 @@ def inventory(root: Path) -> Inventory:
     for agent in agents.SURFACES:
         build = _SPECS.get(agent)
         specs = build(root) if build else []
-        stale_n = sum(1 for s in scan.stale_assets if s.agent == agent)
-        agent_items, rollup = _agent_inventory(agent, specs, stale_n)
+        agent_items, rollup = _agent_inventory(agent, specs)
         items += agent_items
         rollups.append(rollup)
         covered |= {s.display for s in specs if s.present}
 
-    items += _asset_rows(root, scan)
     items += _git_hook_foreign(root)
     items += _leftover(root, covered)
 
@@ -609,5 +520,34 @@ def inventory(root: Path) -> Inventory:
                               "dead" if scan.interceptor_dead else "current",
                               "probes a removed verb — every graphify call falls "
                               "through UNMETERED and silently" if scan.interceptor_dead else ""))
+    items += _path_winner(root, shim)
 
     return Inventory(items=items, rollups=rollups)
+
+
+def _path_winner(root: Path, shim: Path) -> list[Artifact]:
+    """The graphify PATH resolves first, when it is **not** this root's own shim.
+
+    An inventory that lists only in-root artifacts would omit the single file that
+    decides whether graphify is metered at all — and that omission is precisely how a
+    dead interceptor in another project stayed invisible. Lazy import: `pathshim`
+    imports this module for its liveness oracle. Read-only, like everything here."""
+    from cage import pathshim
+    try:
+        ps = pathshim.classify(root)
+    except Exception:  # noqa: BLE001 — an inventory row is never worth a crash
+        return []
+    if not ps.winner or ps.winner == str(shim):
+        return []
+    status, detail = {
+        "dead": ("dead", "PATH-winning interceptor probes a removed verb — every "
+                         "graphify call falls through UNMETERED and silently"),
+        "live": ("current", "PATH-winning interceptor, naming live verbs"),
+        # A shadowing winner may be another cage interceptor or the real binary — the
+        # status must follow which, or the inventory would call an unmetered binary
+        # "current" simply because it happens to win.
+        "shadowed": ("current" if ps.interceptor else "foreign",
+                     f"wins on PATH over this project's {shim}"),
+        "foreign": ("foreign", "not a cage interceptor — graphify runs unmetered"),
+    }[ps.state]
+    return [Artifact("", "shim", "global", display_path(Path(ps.winner)), status, detail)]

@@ -219,6 +219,72 @@ def canonical_ledger(start: Path | None = None, *, pol: dict | None = None) -> P
     return root
 
 
+def kiro_ledger(root: Path) -> Path:
+    """THE sink for kiro **IDE** rows ([ADR 0006](docs/adr/0006-kiro-rows-are-machine-facts-not-project-facts.md)).
+
+    Kiro's IDE log (`dev_data/tokens_generated.jsonl`) is ONE global append-only file
+    carrying no project, no session and no timestamp, so every ledger that imports it
+    reads the same turns — a per-project kiro cost was never a fact. Kiro-IDE rows
+    therefore belong to the **machine**: they land in the global ledger (`~/.cage`), so
+    one copy exists per machine and double-counting is impossible by construction rather
+    than by warning.
+
+    The ONE exception is an explicit ``--ledger``/``CAGE_BASE`` override: the user named a
+    sink, and cage never routes around an explicit instruction (cage-lab's isolation
+    depends on it). This is the only place the rule lives — callers ask
+    :func:`kiro_routed`, they never re-derive it.
+
+    Scope: the **IDE** store only. Kiro's *CLI* store (`conversations_v2`) is keyed by cwd
+    and carries a real conversation id and timestamp, so it is genuinely
+    project-attributable and gets the opposite treatment (scoped by cwd, `project`
+    stamped) — see `transcript.parse_kiro_cli_credits`."""
+    if os.environ.get("CAGE_BASE"):
+        return root  # explicit override wins (ADR 0006, "Decision")
+    return global_home()
+
+
+def kiro_routed(root: Path) -> Path | None:
+    """The kiro-IDE sink when it **differs** from ``root``'s ledger, else ``None`` (kiro is
+    just part of the normal sweep). The one predicate the import sweep branches on, so the
+    "does kiro route elsewhere?" question is answered in exactly one place.
+
+    Compared on the resolved **ledger dir**, not the root: that collapses both overrides
+    for free — ``CAGE_BASE`` re-bases the whole footprint and ``CAGE_LEDGER`` re-points the
+    ledger dir alone, and under either the two sinks are the same files, so there is
+    nothing to route and no second lock to take (which is also what keeps a same-process
+    double-lock impossible)."""
+    sink = kiro_ledger(root)
+    if Footprint(sink).ledger.resolve() == Footprint(root).ledger.resolve():
+        return None
+    return sink
+
+
+def kiro_cli_workspace(root: Path) -> str:
+    """The cwd **tree** that scopes kiro *CLI* credits for a sweep into ``root``, or ``""``
+    for "read every conversation on the machine".
+
+    The exact opposite of :func:`kiro_ledger`, on purpose (ADR 0006 *Scope*). Kiro's CLI
+    store keys every conversation by the cwd it ran in and carries a real conversation id
+    and timestamp, so it **is** project-attributable — routing it to the machine ledger
+    would destroy attribution the source genuinely supports. Its double-count came from
+    the opposite defect: the importer read with no workspace filter at all, so every
+    ledger pulled every conversation on the machine.
+
+    Precedence: a project root (the tree the conversations belong to) → an explicitly
+    named sink's own tree (``--ledger``/``CAGE_BASE``: you ran the import from here, so
+    scope to here — this is what keeps cage-lab's ledger isolated) → ``""`` for the
+    machine ledger, whose job **is** the whole machine.
+
+    The tree, not the directory: a conversation started in ``repo/sub`` is still that
+    project's work (`transcript.parse_kiro_cli_credits` prefix-matches)."""
+    proj = find_project_root(root)
+    if proj is not None:
+        return str(proj.resolve())
+    if os.environ.get("CAGE_BASE"):
+        return str(Path(root).resolve())
+    return ""
+
+
 def routing_key(root: Path) -> str:
     """A stable, **non-PII** project routing key: a hash of the resolved ledger-root path,
     **not** the basename (capture-architecture §9.6 Q1). Stamped on pushed receipts so a
@@ -342,6 +408,30 @@ def kiro_data_candidates() -> list[Path]:
     return cands
 
 
+def kiro_cli_db_candidates() -> list[Path]:
+    """Kiro **CLI** SQLite store (`kiro-cli/data.sqlite3`) candidates, in probe order:
+    ``CAGE_KIRO_CLI_DB`` override → macOS → Linux → Windows ``%APPDATA%`` (the last two
+    **UNVERIFIED-LAYOUT**, inferred from the macOS layout — the CLI store is distinct
+    from the IDE `kiro.kiroagent` globalStorage). Distinct from `kiro_data_candidates`
+    (the IDE token log); this is the CLI's per-directory conversation DB."""
+    env = os.environ.get("CAGE_KIRO_CLI_DB")
+    if env:
+        return [Path(env)]
+    name = Path("kiro-cli") / "data.sqlite3"
+    cands = [Path.home() / "Library" / "Application Support" / name,
+             Path.home() / ".local" / "share" / name]
+    appdata = os.environ.get("APPDATA")
+    if appdata:
+        cands.append(Path(appdata) / name)
+    return cands
+
+
+def kiro_cli_db() -> Path:
+    """The first existing Kiro CLI SQLite store, else the top candidate (so a doctor probe
+    still names a concrete path). Read **read-only** by `transcript.parse_kiro_cli_credits`."""
+    return _first_existing(kiro_cli_db_candidates())
+
+
 def kiro_token_log() -> Path:
     """Kiro's per-call usage log (`kiro.kiroagent/dev_data/tokens_generated.jsonl`):
     one JSON object per LLM call, `{model, provider, promptTokens, generatedTokens}`.
@@ -350,20 +440,132 @@ def kiro_token_log() -> Path:
     return _first_existing(kiro_data_candidates()) / "dev_data" / "tokens_generated.jsonl"
 
 
-def _builtin_log_sources(agent: str) -> list[tuple[Path, str]]:
-    """The hard-coded ``(source, glob)`` candidate log locations per agent — one list
-    per agent so a new location (like Copilot's VS Code chat-session store) is added
-    exactly once. For claude/copilot the source is a directory + glob; for kiro
-    it is the token log file itself (glob ``*`` — `_scan` treats a file source as
-    itself). The policy-aware, provenance-tagged form is :func:`resolve_log_sources`."""
+def _builtin_log_sources(agent: str) -> list[tuple[Path, str, tuple[str, ...]]]:
+    """The **seed** ``(source, glob, path_globs)`` log locations per agent
+    (capture-precision §3.6, Directive A). No longer a runtime fallback — `cage setup`
+    freezes these into an active ``[sources]`` table via :func:`sources_seed`, and
+    :func:`resolve_log_sources` reads ONLY that table. One list per agent so a new
+    location is added exactly once. For claude/copilot the source is a directory + glob;
+    for kiro it is the token-log file (glob ``*`` — `_scan` treats a file source as
+    itself).
+
+    Two globs, two jobs (path-globs handoff §5). ``glob`` is **anchored** to the declared
+    ``path`` and drives every normal import. ``path_globs`` is **root-agnostic**
+    (``**/…``) and is used ONLY when `cage import --path`/`--project` replaces the
+    location with a user-provided root: an anchored pattern reused there matches nothing
+    (`*/chatSessions/*.jsonl` under a `chatSessions` directory), which was the copilot
+    `--path` bug. Copilot names both known store shapes explicitly rather than a blanket
+    ``**/*.jsonl`` — only copilot-shaped files can match, safe by construction rather
+    than by the accident of a foreign file parsing to zero rows."""
     if agent == "claude":
-        return [(claude_home() / "projects", "**/*.jsonl")]
+        return [(claude_home() / "projects", "**/*.jsonl", ("**/*.jsonl",))]
     if agent == "copilot":
-        return [(copilot_home() / "session-state", "*/events.jsonl"),
-                (vscode_user_dir() / "workspaceStorage", "*/chatSessions/*.jsonl")]
+        return [(copilot_home() / "session-state", "*/events.jsonl",
+                 ("**/events.jsonl",)),
+                (vscode_user_dir() / "workspaceStorage", "*/chatSessions/*.jsonl",
+                 ("**/chatSessions/*.jsonl",))]
     if agent == "kiro":
-        return [(kiro_token_log(), "*")]
+        return [(kiro_token_log(), "*", ("*",))]
     return []
+
+
+def _portable(p: str) -> str:
+    """Render a path home-relative (``~/…``) when it sits under ``$HOME`` — so a
+    materialized ``[sources]`` table is portable across machines (same discipline as the
+    committed-wiring shim). Paths outside home are left absolute."""
+    home = str(Path.home())
+    if p == home:
+        return "~"
+    if p.startswith(home + os.sep):
+        return "~" + p[len(home):]
+    return p
+
+
+def sources_seed() -> list[dict]:
+    """The default sources cage materializes into an active ``[sources]`` table (Directive
+    A, capture-precision §3.6). The built-in registry is a **seed**, not a runtime
+    fallback: `cage setup` freezes these into ``cage.toml`` and `resolve_log_sources`
+    reads only that. Each entry: ``{name, path (portable ~), glob, path_globs, format?}``.
+    Includes the Kiro-CLI SQLite credits store as a ``format="kiro-cli"`` custom source
+    (§3.2) — it carries no ``path_globs`` because ``--path`` never reaches a custom tool,
+    so the key's absence there is a statement, not an omission."""
+    from cage import agents  # lazy: agents imports paths
+    seed: list[dict] = []
+    for agent in agents.SURFACES:
+        for path, glob, path_globs in _builtin_log_sources(agent):
+            seed.append({"name": agent, "path": _portable(str(path)), "glob": glob,
+                         "path_globs": list(path_globs)})
+    seed.append({"name": "kirocli", "path": _portable(str(kiro_cli_db())),
+                 "glob": "*", "format": "kiro-cli"})
+    return seed
+
+
+SOURCES_START = "# cage:sources-start"
+SOURCES_END = "# cage:sources-end"
+
+
+def sources_drift(pol: dict | None = None) -> tuple[list[str], list[str]]:
+    """Compare the project's declared ``[sources]`` against the built-in seed — the
+    **mandatory mitigation** for Directive A's cost (capture-precision §3.6): freezing
+    defaults into a user's file means a cage upgrade that adds or corrects a default path
+    no longer reaches them (the silent-staleness class the dead-verb bug was). Returns
+    ``(missing, stale)``: seed paths the project lacks (a new/changed default not yet
+    picked up), and declared paths cage no longer ships. `cage doctor` reports both;
+    `cage setup --sync-sources` refreshes. Empty/empty ⇒ in sync."""
+    def _norm(name: str, path, glob) -> tuple:
+        return (name, str(Path(_expand_source(str(path)))), glob or _FORMAT_GLOB.get(name, "*"))
+    seed = {_norm(e["name"], e["path"], e.get("glob")) for e in sources_seed()}
+    declared = {_norm(s.agent, s.path, s.glob) for s in resolve_log_sources(pol).sources}
+    missing = [f"{n}: {p} ({g})" for (n, p, g) in sorted(seed - declared)]
+    stale = [f"{n}: {p} ({g})" for (n, p, g) in sorted(declared - seed)]
+    return missing, stale
+
+
+def sources_toml(seed: list[dict] | None = None) -> str:
+    """Render the active ``[sources]`` table cage materializes into ``cage.toml`` — a
+    cage-managed marker block (`# cage:sources-start … end`) of ``[[sources.<name>]]``
+    array-of-tables entries. `cage setup --sync-sources` regenerates ONLY this block, so
+    user-added ``[[sources.<name>]]`` entries outside it are preserved."""
+    seed = sources_seed() if seed is None else seed
+    lines = [SOURCES_START,
+             "# [sources] — the ONLY place cage looks for agent logs (Directive A, §3.6).",
+             "# Materialized by `cage setup`; refresh with `cage setup --sync-sources`.",
+             "# An empty/absent [sources] table captures NOTHING — by design; `cage doctor`",
+             "# reports it (a silent 'no sources' would look exactly like broken capture).",
+             "# `glob` is anchored to `path` (normal imports); `path_globs` is root-agnostic",
+             "# and is used ONLY by `cage import --path`/`--project` (path-globs handoff §5)."]
+    for e in seed:
+        lines.append("")
+        lines.append(f"[[sources.{e['name']}]]")
+        lines.append(f'path = "{e["path"]}"')
+        if e.get("glob"):
+            lines.append(f'glob = "{e["glob"]}"')
+        if e.get("path_globs"):
+            pg = ", ".join(f'"{p}"' for p in e["path_globs"])
+            lines.append(f"path_globs = [{pg}]")
+        if e.get("format"):
+            lines.append(f'format = "{e["format"]}"')
+    lines.append(SOURCES_END)
+    return "\n".join(lines) + "\n"
+
+
+def materialize_sources(text: str, seed: list[dict] | None = None) -> str:
+    """Return ``text`` with its cage-managed sources block replaced by (or, if absent,
+    with the freshly rendered block appended after) the active table. Idempotent — the
+    marker block is regenerated wholesale, so re-running produces stable bytes."""
+    block = sources_toml(seed)
+    start = text.find(SOURCES_START)
+    if start != -1:
+        end = text.find(SOURCES_END, start)
+        if end != -1:
+            end += len(SOURCES_END)
+            # swallow a trailing newline so we don't accrete blank lines on re-sync
+            tail = text[end:]
+            if tail.startswith("\n"):
+                tail = tail[1:]
+            return text[:start] + block + tail
+    sep = "" if text.endswith("\n") else "\n"
+    return text + sep + "\n" + block
 
 
 # ── configurable import paths: the `[sources]` policy table (plan Phase 4) ──────
@@ -382,13 +584,23 @@ class LogSource(NamedTuple):
     ``fmt`` is the parser format ∈ ``agents.SURFACES``. ``raw`` is the original
     policy string before ``~``/env expansion (``str(path)`` for built-ins) — the
     portability check reads it to tell a machine-absolute path from a ``~``/``$VAR``
-    one."""
+    one. ``surface`` is the optional ``[sources]`` declaration (``cli`` | ``vscode``
+    | ``ide`` | ``""``): when non-empty, `importcmd` restamps every imported row's
+    ``surface`` to it (a non-IDE Kiro store, say, must not inherit the parser's
+    hardcoded ``ide``); ``""`` ⇒ the parser-derived value stands, byte-identical.
+    ``path_globs`` is the **root-agnostic** counterpart of ``glob`` (path-globs handoff
+    §5), used only when `cage import --path`/`--project` replaces this entry's ``path``
+    with a user-provided root — :func:`path_globs_for` unions an agent's entries into
+    the pattern list `importcmd` scans with. Empty ⇒ ``--path`` matches nothing for this
+    agent, said loudly: there is no code fallback, by design."""
     path: Path
     glob: str
     provenance: str
     agent: str
     fmt: str
     raw: str
+    surface: str = ""
+    path_globs: tuple = ()  # tuple[str, ...] — root-agnostic, `--path` only
 
 
 class SourcesResolution(NamedTuple):
@@ -405,7 +617,15 @@ class SourcesResolution(NamedTuple):
 # copilot has two globs; a policy path uses the dominant CLI form). A file source is
 # taken directly (`_scan` ignores the glob for a file).
 _FORMAT_GLOB = {"claude": "**/*.jsonl",
-                "copilot": "*/events.jsonl", "kiro": "*"}
+                "copilot": "*/events.jsonl", "kiro": "*",
+                # kiro-cli is a SQLite store, not jsonl — its parser
+                # (`transcript.parse_kiro_cli_credits`) yields *credits* rows, not calls
+                # (capture-precision §3.2–§3.4). A file source: the glob is `*`.
+                "kiro-cli": "*"}
+# The closed set a `[sources.<x>] surface = …` may declare — the same enum
+# `schema.make_call` validates (cli/vscode/ide/""). Absent ⇒ "" ⇒ the parser's
+# own value stands (no restamp), so an unset surface is byte-identical.
+_SURFACE_SET = frozenset({"cli", "vscode", "ide", ""})
 # Per-agent home env overrides — a built-in candidate is tagged ``env`` when any is set.
 _AGENT_ENV = {"claude": ("CLAUDE_CONFIG_DIR",),
               "copilot": ("COPILOT_HOME", "CAGE_VSCODE_USER"),
@@ -442,8 +662,11 @@ def resolve_log_sources(pol: dict | None = None) -> SourcesResolution:
     table-level ``glob`` applied to every path) or a ``list``
     (``[[sources.<x>]]``, an array-of-tables — each entry ``{path, glob?}``, additive,
     no ``replace``). An absent ``glob`` ⇒ today's ``_FORMAT_GLOB[fmt]``; an empty
-    ``glob = ""`` ⇒ a problem (never a silent fallback). Fully additive: an
-    empty/absent ``[sources]`` returns exactly the built-in registry."""
+    ``glob = ""`` ⇒ a problem (never a silent fallback). An optional ``surface``
+    (``cli|vscode|ide``, table-level or per-entry) restamps the imported rows'
+    surface — an out-of-set value is a problem, an absent one keeps the parser's
+    own value (byte-identical). Fully additive: an empty/absent ``[sources]``
+    returns exactly the built-in registry."""
     from cage import agents  # lazy: agents imports paths (avoid the cycle)
     surfaces = agents.SURFACES
     src_tables = (pol or {}).get("sources", {}) if isinstance(pol, dict) else {}
@@ -464,7 +687,38 @@ def resolve_log_sources(pol: dict | None = None) -> SourcesResolution:
             return None
         return glob
 
-    def _emit(key: str, raw, glob, fmt: str, seen: set) -> None:
+    def _resolve_surface(key: str, surface) -> str | None:
+        """The client-surface stamp for one entry: absent ⇒ ``""`` (the parser's own
+        value stands downstream — byte-identical). A set value must be in the closed
+        set (cli/vscode/ide); anything else is a problem (``None`` return, entry
+        skipped) — the sweep stays fail-open, never raises (§ acceptance)."""
+        if surface is None:
+            return ""
+        if not isinstance(surface, str) or surface not in _SURFACE_SET:
+            problems.append(f"[sources.{key}] surface must be one of cli/vscode/ide "
+                            f"(or drop the key) — got {surface!r}")
+            return None
+        return surface
+
+    def _resolve_path_globs(key: str, value) -> tuple | None:
+        """The root-agnostic ``--path`` patterns for one entry: absent ⇒ ``()`` (this
+        entry contributes nothing to `--path`). A set value must be a list of non-empty
+        strings; anything else is a problem (``None`` return, entry skipped) — never a
+        silent fallback to the anchored ``glob``, which is exactly the bug this key
+        exists to close. Windows separators are normalised to ``/`` so a hand-authored
+        ``**\\chatSessions\\*.jsonl`` still matches (``Path.glob`` is ``/``-only)."""
+        if value is None:
+            return ()
+        if (not isinstance(value, list) or not value
+                or any(not isinstance(p, str) or not p for p in value)):
+            problems.append(f"[sources.{key}] path_globs must be a non-empty list of "
+                            "non-empty strings (drop the key if this source should not "
+                            "be reachable by `cage import --path`)")
+            return None
+        return tuple(p.replace("\\", "/") for p in value)
+
+    def _emit(key: str, raw, glob, fmt: str, seen: set, surface=None,
+              path_globs=None) -> None:
         """Validate + append one policy source (path + resolved glob). A glob char in
         the ``path`` is rejected with the fix (put it in ``glob =``); a bad glob is
         rejected; a ``(path, glob)`` already seen is deduped (keeps the earlier —
@@ -480,11 +734,36 @@ def resolve_log_sources(pol: dict | None = None) -> SourcesResolution:
         g = _resolve_glob(key, fmt, glob)
         if g is None:
             return
+        sf = _resolve_surface(key, surface)
+        if sf is None:
+            return
+        pg = _resolve_path_globs(key, path_globs)
+        if pg is None:
+            return
         p = Path(_expand_source(raw))
-        if (p, g) in seen:  # policy path == a built-in path → keep the built-in tag (§8)
+        if (p, g) in seen:  # policy path == a built-in path
+            # Silent-surface-loss fix (capture-precision §3.5): a declared `surface` on a
+            # path that collides with a built-in used to be dropped with the whole entry,
+            # so the explicit config value vanished. Now the **declared value wins** — it
+            # upgrades the colliding built-in that carried no surface (an already-declared
+            # surface is left as the earlier winner; declaring two conflicting surfaces for
+            # one path is a config error, not something to silently reorder).
+            # `path_globs` follows the same rule for the same reason: the colliding entry
+            # is dropped wholesale, so its declared `--path` patterns would vanish with
+            # it. They are merged onto the winner (order-preserving, deduped) rather than
+            # lost — a duplicated path declaring an extra pattern is additive, never a
+            # silent drop.
+            for idx, s in enumerate(sources):
+                if (s.path, s.glob) == (p, g) and s.agent == key:
+                    if sf and not s.surface:
+                        s = sources[idx] = s._replace(surface=sf)
+                    extra = tuple(x for x in pg if x not in s.path_globs)
+                    if extra:
+                        sources[idx] = s._replace(path_globs=s.path_globs + extra)
+                    break
             return
         seen.add((p, g))
-        sources.append(LogSource(p, g, "policy", key, fmt, raw))
+        sources.append(LogSource(p, g, "policy", key, fmt, raw, sf, pg))
 
     def _dict_paths(key: str, table: dict, fmt: str) -> None:
         raw_paths = table.get("paths", [])
@@ -492,14 +771,17 @@ def resolve_log_sources(pol: dict | None = None) -> SourcesResolution:
             problems.append(f"[sources.{key}] paths must be a list of strings")
             return
         table_glob = table.get("glob")  # optional; one glob for every path in the table
+        table_surface = table.get("surface")  # optional; one surface for every path in the table
+        table_pg = table.get("path_globs")  # optional; one `--path` pattern set for the table
         seen = {(s.path, s.glob) for s in sources if s.agent == key}
         for raw in raw_paths:
-            _emit(key, raw, table_glob, fmt, seen)
+            _emit(key, raw, table_glob, fmt, seen, table_surface, table_pg)
 
     def _list_paths(key: str, entries: list, default_fmt: str | None) -> None:
-        """The ``[[sources.<x>]]`` array-of-tables form — each entry ``{path, glob?}``.
-        A built-in agent's format is implicit (``default_fmt``); a custom tool has no
-        table level, so each entry declares its own ``format``."""
+        """The ``[[sources.<x>]]`` array-of-tables form — each entry
+        ``{path, glob?, surface?}``. A built-in agent's format is implicit
+        (``default_fmt``); a custom tool has no table level, so each entry declares
+        its own ``format``."""
         seen = {(s.path, s.glob) for s in sources if s.agent == key}
         for i, entry in enumerate(entries):
             if not isinstance(entry, dict):
@@ -517,24 +799,21 @@ def resolve_log_sources(pol: dict | None = None) -> SourcesResolution:
                 problems.append(f"[[sources.{key}]] format is implicit for the {key} "
                                 "agent — drop the `format` key")
                 continue
-            _emit(key, entry.get("path"), entry.get("glob"), fmt, seen)
+            _emit(key, entry.get("path"), entry.get("glob"), fmt, seen,
+                  entry.get("surface"), entry.get("path_globs"))
 
-    # Built-in agents first, in SURFACES order: built-in/env candidates, then adds.
+    # Built-in agents, in SURFACES order. **Directive A (capture-precision §3.6): no
+    # built-in fallback, no env.** Sources come ONLY from the `[sources]` table cage
+    # materializes into `cage.toml`. An agent with no `[sources.<agent>]` entry captures
+    # nothing (surfaced loudly by the import sweep + `cage doctor`, never silent).
     for agent in surfaces:
         table = src_tables.get(agent)
-        replace = bool(isinstance(table, dict) and table.get("replace"))
         if isinstance(table, dict) and table.get("format") not in (None, agent):
             problems.append(f"[sources.{agent}] is the {agent} agent table — its "
                             "format is implicit; drop the `format` key (a custom tool "
                             "uses a different name)")
-        if not replace:
-            prov = "env" if _agent_env_set(agent) else "built-in"
-            for path, glob in _builtin_log_sources(agent):
-                sources.append(LogSource(path, glob, prov, agent, agent, str(path)))
         if isinstance(table, dict):
             _dict_paths(agent, table, agent)
-            if replace and not any(s.agent == agent for s in sources):
-                disabled.append(agent)
         elif isinstance(table, list):
             _list_paths(agent, table, agent)
 
@@ -563,6 +842,42 @@ def agent_log_sources(agent: str, pol: dict | None = None) -> list[LogSource]:
     view over the single resolver so the import sweep and doctor share one resolution.
     Byte-identical to the legacy built-in list when ``pol`` carries no ``[sources]``."""
     return [s for s in resolve_log_sources(pol).sources if s.agent == agent]
+
+
+def path_globs_for(agent: str, pol: dict | None = None) -> list[str]:
+    """THE lookup `cage import --path`/`--project` scans with (path-globs handoff §5):
+    the **root-agnostic** patterns declared for ``agent``, unioned across its
+    ``[sources.<agent>]`` entries in declaration order, deduped.
+
+    Why a second key rather than reusing ``glob``: ``glob`` is anchored to its declared
+    ``path`` (``*/chatSessions/*.jsonl`` under ``workspaceStorage``), so pointing
+    ``--path`` at a ``chatSessions`` directory with it matches nothing — the reported
+    copilot bug, relocated rather than fixed. Two keys, two jobs.
+
+    Empty list ⇒ ``--path`` scans nothing for this agent. That is deliberate and must be
+    said out loud by the caller: sources come only from ``cage.toml`` (Directive A), so a
+    project that has never run `cage setup --sync-sources` has no patterns, and a silent
+    code fallback here would recreate the two-places problem the key exists to close.
+    ``replace = true`` on a ``[sources.<agent>]`` therefore replaces that agent's
+    ``path_globs`` too — same table, same entries, same semantics."""
+    out: list[str] = []
+    for s in resolve_log_sources(pol).sources:
+        if s.agent != agent:
+            continue
+        out += [p for p in s.path_globs if p not in out]
+    return out
+
+
+def path_globs_missing(pol: dict | None = None) -> list[str]:
+    """Agents that declare ``[sources]`` entries but no ``path_globs`` on any of them —
+    the **stale-materialization** advisory (`cage doctor --paths`, handoff §10). Same
+    class as :func:`sources_drift`: a project materialized before this key existed keeps
+    importing normally and only loses `--path`, which would otherwise be a silent
+    surprise at the moment someone reaches for the escape hatch."""
+    from cage import agents
+    declared = {s.agent for s in resolve_log_sources(pol).sources}
+    return [a for a in agents.SURFACES
+            if a in declared and not path_globs_for(a, pol)]
 
 
 def custom_tool_sources(pol: dict | None = None) -> list[LogSource]:
@@ -631,10 +946,43 @@ def builtin_source_docs() -> list[dict]:
                 "descriptor in cage/paths.py, then regenerate the [sources] block "
                 "(`python -m tools.docgen --target policy`)")
         srcs = [(path, glob, meaning)
-                for (path, meaning), (_bp, glob) in zip(docs, builtin)]
+                for (path, meaning), (_bp, glob, _pg) in zip(docs, builtin)]
         out.append({"agent": agent, "env": _AGENT_ENV.get(agent, ()),
                     "sources": srcs, "other_os": _SOURCE_DOC_OTHER_OS.get(agent, ())})
     return out
+
+
+# THE prices-file name — the single project-prices filename literal (prices-toml
+# plan §3, mirror of the ``cage.toml`` rename). `Footprint.prices` /
+# `Footprint.shadowed_prices` and `resolve_prices_file` are the only places it lives;
+# the bundled-seed name (`data/prices.toml`) is a separate literal in `policy.py`,
+# exactly as the bundled `data/cage.toml` name sits beside `Footprint.policy`.
+PRICES_FILENAME = "prices.toml"
+_PRICE_HEADER = re.compile(r"^\s*\[(prices|credits)\b")
+
+
+def resolve_prices_file(base: Path, policy_file: Path) -> Path:
+    """THE project price-overrides resolver (prices-toml plan §3) — the one place the
+    ``prices.toml`` name is chosen. ``prices.toml`` if it sits beside ``policy_file``,
+    else the resolved ``policy_file`` itself (legacy in-``cage.toml`` prices — releases
+    ≤ v0.35 wrote prices inline, and they are on PyPI, so those must keep resolving
+    untouched). The bundled default is layered underneath by `policy.load`, never here.
+    Mirrors `Footprint.policy`'s ``cage.toml`` → ``policy.toml`` fallback exactly."""
+    prices = base / PRICES_FILENAME
+    return prices if prices.exists() else policy_file
+
+
+def _file_declares_prices(path: Path) -> bool:
+    """True if ``path`` on disk actually declares a ``[prices…]``/``[credits…]`` table
+    (a real header, not a `# moved to prices.toml` pointer comment). A cheap text scan —
+    paths.py stays tomllib-free and never raises; a read error ⇒ False (nothing shadowed)."""
+    try:
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if _PRICE_HEADER.match(line):
+                return True
+    except OSError:
+        return False
+    return False
 
 
 class Footprint:
@@ -674,12 +1022,51 @@ class Footprint:
     def provenance(self) -> Path:
         return self.ledger / "provenance.jsonl"
 
+    @property
+    def imports(self) -> Path:
+        """The capture manifest (import-ledger plan §4): one append-only row per import
+        sweep (per agent×surface) and per graphify run — an audit trail of what cage
+        captured, when, from where, and how much. Unpartitioned like `provenance.jsonl`
+        (an audit buffer, not a long-lived derived source); never read by a derived view."""
+        return self.ledger / "imports.jsonl"
+
+    @property
+    def savings_dir(self) -> Path:
+        """The dedicated per-source savings tree (import-ledger plan §3):
+        ``ledger/savings/<tool>/savings-<month>.jsonl``. A directory, not a shard — one
+        sub-dir per savings source (graphify first; human/other tools later)."""
+        return self.ledger / "savings"
+
+    def savings_shard(self, tool: str, ts: str) -> Path:
+        """Month-partition path for a savings row of ``tool``, from the row's own ``ts``
+        (`savings/<tool>/savings-2026-07.jsonl`). Same determinism as `shard`: the name
+        comes from the row, never a write-time clock. ``tool`` is a validated path-safe
+        token (`schema.make_savings`), so it is safe as a directory name."""
+        month = ts[:7] if (ts and len(ts) >= 7 and ts[4] == "-") else ""
+        name = f"savings-{month}.jsonl" if month else "savings.jsonl"
+        return self.savings_dir / tool / name
+
+    def savings_shards(self) -> list[Path]:
+        """Every readable savings shard across the whole tree (`savings/*/savings-*.jsonl`
+        + legacy `savings/*/savings.jsonl`), sorted for a deterministic concatenated
+        read. Only existing files are returned."""
+        base = self.savings_dir
+        if not base.is_dir():
+            return []
+        legacy = sorted(base.glob("*/savings.jsonl"))
+        return legacy + sorted(base.glob("*/savings-*.jsonl"))
+
     def shard(self, kind: str, ts: str) -> Path:
         """Month-partition path for ``kind`` (``calls``/``receipts``/``tasks``) derived
         from a row's own ``ts`` — ``calls-2026-06.jsonl`` (plan §3.6.1). Determinism:
         the name comes from the row, never a write-time clock. A missing/unparseable
         ``ts`` falls back to the legacy unpartitioned file so a malformed row still lands
-        somewhere readable. ``provenance`` is intentionally never partitioned (buffer)."""
+        somewhere readable. ``provenance`` is intentionally never partitioned (buffer).
+
+        ``kind`` may be a ``("savings", tool)`` tuple, which routes into the per-source
+        savings tree via `savings_shard` (import-ledger plan §3)."""
+        if isinstance(kind, tuple) and kind and kind[0] == "savings":
+            return self.savings_shard(kind[1], ts)
         month = ts[:7] if (ts and len(ts) >= 7 and ts[4] == "-") else ""
         return self.ledger / (f"{kind}-{month}.jsonl" if month else f"{kind}.jsonl")
 
@@ -706,7 +1093,54 @@ class Footprint:
 
     @property
     def policy(self) -> Path:
-        return self.base / "policy.toml"
+        """THE single project-config path resolver — never a second place that knows
+        the filename (CLAUDE.md law). ``cage.toml`` is canonical; ``policy.toml`` is
+        read as a back-compat fallback (releases ≤ v0.35 wrote it, and they are on
+        PyPI — a real user's on-disk `policy.toml` must keep working untouched).
+        Resolution: ``cage.toml`` if present → else ``policy.toml`` if present →
+        else ``cage.toml`` (the name a fresh scaffold writes). Both present ⇒
+        ``cage.toml`` wins; :attr:`shadowed_config` names the ignored file so doctor
+        and the load boundary can warn."""
+        new = self.base / "cage.toml"
+        if new.exists():
+            return new
+        old = self.base / "policy.toml"
+        if old.exists():
+            return old
+        return new
+
+    @property
+    def shadowed_config(self) -> Path | None:
+        """The legacy ``policy.toml`` when it sits *beside* a ``cage.toml`` that wins —
+        the ignored leftover doctor flags and the load path warns about. ``None``
+        unless both files exist (the only case where a config is silently ignored)."""
+        new = self.base / "cage.toml"
+        old = self.base / "policy.toml"
+        return old if (new.exists() and old.exists()) else None
+
+    @property
+    def prices(self) -> Path:
+        """THE project price-overrides path (prices-toml plan §3) — model rate rows,
+        ``[credits]``, and the ``[meta] prices_version/prices_date`` counters. Vendor
+        facts, split from ``cage.toml`` (routing decisions) so a wholesale price sync
+        can't damage user policy. Resolution: ``prices.toml`` if present → else the
+        resolved policy file (legacy in-``cage.toml`` prices) → (bundled default is
+        layered by `policy.load`). Both present ⇒ ``prices.toml`` wins;
+        :attr:`shadowed_prices` names the ignored legacy block."""
+        return resolve_prices_file(self.base, self.policy)
+
+    @property
+    def shadowed_prices(self) -> Path | None:
+        """The legacy in-``cage.toml`` (or ``policy.toml``) price block that a present
+        ``prices.toml`` overrides — the ignored leftover doctor flags and the load path
+        warns about. ``None`` unless a ``prices.toml`` exists *and* the policy file still
+        declares real ``[prices…]``/``[credits…]`` tables (a migrated policy file, whose
+        prices are gone, shadows nothing)."""
+        prices = self.base / PRICES_FILENAME
+        pol = self.policy
+        if not prices.exists() or not pol.exists() or prices == pol:
+            return None
+        return pol if _file_declares_prices(pol) else None
 
     @property
     def out(self) -> Path:
@@ -738,6 +1172,16 @@ class Footprint:
         `CAGE_DEBUG` — it's the standing proof-of-capture. Override the path with
         `CAGE_CAPTURE_LOG`; size-managed by the `capture-log` cleanup class."""
         return Path(os.environ.get("CAGE_CAPTURE_LOG", self.state / "capture.log"))
+
+    @property
+    def usage_log(self) -> Path:
+        """Always-on graphify usage breadcrumb (`cage/usagelog.py`, graphify-capture
+        plan GC1) — one line per graphify run (shim / native / transcript-detected),
+        `{op, args_hash, exit, ms, outcome}`, counts-never-content. Diagnostic only:
+        never priced, never read by a derived money view (so a usage row can't move a
+        reported number — the same invariant the `state/` home guarantees by
+        construction). Size-managed by the `usage-log` cleanup class."""
+        return Path(os.environ.get("CAGE_USAGE_LOG", self.state / "graphify-usage.jsonl"))
 
     @property
     def hooks_seen(self) -> Path:

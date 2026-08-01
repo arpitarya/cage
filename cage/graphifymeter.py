@@ -22,6 +22,7 @@ receipt wins. Either side deduping is enough; both together converge on one rece
 """
 from __future__ import annotations
 
+import hashlib
 import os
 import re
 import subprocess
@@ -52,6 +53,41 @@ def _op_of(argv: list[str]) -> str:
     return ""
 
 
+# ── deterministic receipt ids + cross-route dedupe (graphify-capture plan GC3, ADR 0005)
+# The id folds in `session` so the SAME query in two sessions is two receipts (per-session
+# attribution is a requirement, not a nicety). Cross-route convergence (shim + transcript
+# capturing one run) is NOT solved by id-collision — it can't be, the shim honestly can't
+# know the session — but by the content-key **deferral** that already dedupes the native
+# shim: the transcript route computes the shim's session-empty id and defers if it's
+# already filed. Ordering makes the deferral unidirectional and sufficient: the shim runs
+# synchronously at query time, `cage import` always strictly later, so the shim always
+# files first and the transcript always defers to it.
+
+
+def content_signature(argv: list[str], answer: str) -> tuple[str, str, str]:
+    """Route-independent ``(op, args_hash, answer_hash)`` for one graphify run. The
+    binary spelling (``argv[0]``) is dropped, so `graphify query X`,
+    `/venv/bin/graphify query X`, and `bin/graphify query X` all sign identically — the
+    shim and the transcript-parsed command reach the same signature. ``answer_hash`` is
+    over the stripped answer text (counts-never-content: a hash, never the words). A
+    transcript that truncates a very long tool result would sign differently → the
+    deferral can miss and double-count; that residual is the ADR 0005 veto metric."""
+    tail = [str(a) for a in (argv[1:] if argv else [])]
+    op = _op_of(tail)
+    args_hash = hashlib.sha1("\x00".join(tail).encode("utf-8")).hexdigest()[:16]
+    answer_hash = hashlib.sha1((answer or "").strip().encode("utf-8")).hexdigest()[:16]
+    return op, args_hash, answer_hash
+
+
+def receipt_id(session: str, op: str, args_hash: str, answer_hash: str) -> str:
+    """The deterministic savings-row id: ``s_`` + sha1 of
+    ``session | op | args_hash | answer_hash`` (plan §4 / GC3). Session-inclusive for
+    per-session attribution; re-import of the same transcript reproduces it exactly, so
+    `ledger.receipts`' `union_by_id` collapses re-imports with no growth in derived rows."""
+    key = f"{session}|{op}|{args_hash}|{answer_hash}"
+    return "s_" + hashlib.sha1(key.encode("utf-8")).hexdigest()[:15]
+
+
 def _cited_files(answer: str, op: str) -> list[str]:
     if op == "explain":
         paths = _SRC_EXPLAIN.findall(answer)
@@ -60,12 +96,17 @@ def _cited_files(answer: str, op: str) -> list[str]:
     return [p.strip() for p in paths if p.strip()]
 
 
-def _raw_alternative(files: list[str]) -> int:
-    """Sum toks() over the deduped, whole, present-on-disk cited files (CWD- or
-    project-relative). Files that don't resolve are skipped — bounded to touched."""
+def _raw_alternative(files: list[str], roots=None) -> int:
+    """Sum toks() over the deduped, whole, present-on-disk cited files (resolved against
+    ``roots``). Files that don't resolve are skipped — bounded to touched.
+
+    ``roots`` defaults to CWD (the shim runs in the repo). The GC2 transcript route
+    passes the transcript's own recorded ``cwd`` instead, so cited files resolve against
+    the repo the query actually ran in, not wherever `cage import` happened to fire."""
     seen: set[str] = set()
     total = 0
-    roots = (Path.cwd(), Path.cwd() / "graphify-out" / "..")  # repo root fallbacks
+    if roots is None:
+        roots = (Path.cwd(), Path.cwd() / "graphify-out" / "..")  # repo root fallbacks
     for f in files:
         if f in seen:
             continue
@@ -80,37 +121,63 @@ def _raw_alternative(files: list[str]) -> int:
     return total
 
 
-def _meter(root: Path, answer: str, argv: list[str], task: str) -> int:
-    """File one graphify receipt from the captured answer. Fully fail-open. Returns the
-    saved token count when a receipt was filed (for the confirmation line), else 0."""
+def _meter(root: Path, answer: str, argv: list[str], task: str) -> tuple[int, str]:
+    """File one graphify receipt from the captured answer. Fully fail-open. Returns
+    ``(saved_tokens, outcome)`` — ``saved_tokens`` is the saving when a receipt was filed
+    (for the confirmation line), else 0; ``outcome`` is the GC1 usage verdict
+    (:data:`usagelog.OUTCOMES`) so `run` can breadcrumb every route with one honest word."""
     try:
         op = _op_of(argv)
         if not op:
             debuglog.event(root, event="receipt", tool="graphify", produced=False,
                            skip_reason="non-measured-op")
-            return 0
+            return 0, "non-measured"
+        if not (answer or "").strip():    # empty result — nothing ran to save (handoff §8)
+            debuglog.event(root, event="receipt", tool="graphify", produced=False,
+                           skip_reason="empty-answer", op=op)
+            return 0, "empty"
         files = _cited_files(answer, op)
         raw = _raw_alternative(files)
         if raw <= 0:                      # nothing parsed/resolved → unmeasurable
             debuglog.event(root, event="receipt", tool="graphify", produced=False,
                            skip_reason="no-source-file-parsed", op=op)
-            return 0
+            return 0, "unmeasurable"
         actual = toks(answer)
         if actual >= raw:                 # no saving to claim — stay honest
             debuglog.event(root, event="receipt", tool="graphify", produced=False,
                            skip_reason="no-saving-to-claim", op=op)
-            return 0
-        from cage import record_receipt
-        rid = record_receipt(tool="graphify", unit="tokens", raw_alternative=raw,
+            return 0, "unmeasurable"
+        # Route into the dedicated per-source savings tree (`savings/graphify/`,
+        # plan §3), not the shared receipts.jsonl. `source_files` is a COUNT only
+        # (never the cited paths — PII guard). It stays receipt-compatible, so
+        # attribution/roi/report read it through `ledger.receipts`'s union unchanged.
+        from cage import manifest, savings
+        gid = manifest.new_graphify_id()   # FK linking the savings row ↔ its manifest row
+        # Deterministic id with an HONEST-EMPTY session (GC3 root-cause fix): the shim
+        # genuinely cannot know the agent's session id, so it stamps "" rather than a cwd
+        # basename masquerading as one. That empty-session id is exactly what the
+        # transcript route recomputes to defer to this receipt (ADR 0005).
+        op_s, ah, anh = content_signature(argv, answer)
+        sid = receipt_id("", op_s or op, ah, anh)
+        rid = savings.record(root, tool="graphify", unit="tokens", raw_alternative=raw,
                              actual=actual, method="modeled",
                              confidence=GRAPHIFY_RECEIPT_CONFIDENCE,
-                             task=task, root=root, meta={"op": op})
+                             task=task, op=op, source_files=len(files), import_id=gid,
+                             savings_id=sid)
         debuglog.event(root, event="receipt", tool="graphify", produced=bool(rid),
                        skip_reason="" if rid else "ledger-write-failed", op=op)
-        return int(raw - actual) if rid else 0
+        if rid:  # capture-manifest row for this graphify run (plan §4), fail-open
+            import datetime as _dt
+            now = _dt.datetime.now(_dt.timezone.utc).isoformat()
+            manifest.record_graphify(root, import_id=gid, op=op, session=task,
+                                     source_path=Path.cwd().name,  # basename only (PII guard)
+                                     saving_id=rid, saved=int(raw - actual),
+                                     source_files=len(files), ts=now,
+                                     session_name=task)  # graphify's name = the task (plan §4)
+        return (int(raw - actual), "receipt") if rid else (0, "unmeasurable")
     except Exception as e:                # any metering error → graphify result intact
         debuglog.exception(root, "graphify.meter", e)
-        return 0
+        return 0, "error"
 
 
 def _quiet() -> bool:
@@ -159,15 +226,26 @@ def run(root: Path, argv: list[str], task: str = "") -> int:
     # (each a full receipts-shard scan) for install/--help/unknown-verb runs.
     op = _op_of(cmd)
     before = _graphify_receipt_ids(root) if op else None
+    import time
+    from cage import usagelog
+    ah = usagelog.args_hash(cmd)
+    t0 = time.monotonic()
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True,
                               env={**os.environ, "CAGE_GRAPHIFY_METERED": "1"})
     except (OSError, ValueError) as exc:
         print(f"cage data graphify: could not run {cmd[0]!r}: {exc}", file=sys.stderr)
+        usagelog.record(root, op=op, args_hash=ah, exit=127,
+                        ms=int((time.monotonic() - t0) * 1000), outcome="error",
+                        route="shim")
         return 127
+    ms = int((time.monotonic() - t0) * 1000)
     sys.stdout.write(proc.stdout)         # passthrough — byte-identical to bare graphify
     sys.stderr.write(proc.stderr)
-    if proc.returncode == 0 and op:
+    outcome, route = "non-measured", "shim"
+    if proc.returncode != 0:
+        outcome = "error"
+    elif op:
         after = _graphify_receipt_ids(root) if before is not None else None
         if after is not None and (new_ids := after - before):
             # The child self-metered — surface the same confirmation off its own receipt
@@ -179,6 +257,12 @@ def run(root: Path, argv: list[str], task: str = "") -> int:
             debuglog.event(root, event="receipt", tool="graphify", produced=False,
                            skip_reason="linked-receipt-skipped", op=op)
             _confirm(root, saved)
-            return proc.returncode        # the child self-metered — one saving, one receipt
-        _confirm(root, _meter(root, proc.stdout, cmd, task or Path.cwd().name))
+            outcome, route = "receipt", "native"
+        else:
+            saved, outcome = _meter(root, proc.stdout, cmd, task or Path.cwd().name)
+            _confirm(root, saved)
+    # GC1: one usage row per graphify run, every route — proves usage even on a parse
+    # miss (the F1 blind spot). Counts-never-content; never read by a money view.
+    usagelog.record(root, op=op, args_hash=ah, exit=proc.returncode, ms=ms,
+                    outcome=outcome, route=route)
     return proc.returncode

@@ -18,14 +18,31 @@ REGISTRY: tuple[Explanation, ...] = (
         "  recompute from tokens × policy when the model is priced; else fall back to\n"
         "  the stored est_cost_usd (a provider cage can't tokenize). Derive-time only —\n"
         "  the ledger is never rewritten.",
-        ("cage/prices.py", "cage/policy.py", "policy.toml [prices]"),
+        ("cage/prices.py", "cage/policy.py", "cage.toml [prices]"),
         "measured — it costs the call that actually ran, from its recorded tokens."),
     Explanation(
         "saved", ("saved", "savings", "reduction", "shrink", "avoided"),
-        "the tokens/USD a tool kept out of the prompt",
-        "saved = raw_alternative − actual   (USD via the call's model price)",
-        ("cage/convert.py", "cage/attribution.py"),
+        "the tokens/USD a tool kept out of the prompt (GROSS)",
+        "saved = raw_alternative − actual   (USD via the call's model price)\n"
+        "  GROSS: the cost of USING the tool — the invoking turn, the context a hook\n"
+        "  injected — is NOT subtracted. `cage query gross-vs-net` for the net.",
+        ("cage/convert.py", "cage/attribution.py", "cage/netsaved.py"),
         "inherits the receipt's method — measured only if the tool truly measured it."),
+    Explanation(
+        "gross-vs-net", ("gross", "net", "cost-of-use", "net-saved", "attributable",
+                         "over-claim", "excluded", "using", "adjacent", "window"),
+        "why `saved` is gross, and how the task-level net subtracts the cost of use",
+        "gross    = raw_alternative − actual          (the avoided read — excludes using it)\n"
+        "  cost of use = Σ call_usd(c) over the DISTINCT calls joined to the receipt's task\n"
+        "                whose ts lies within ±{net_window_s}s of ANY of that tool's receipts\n"
+        "                on that task (union per task — an adjacent call counts once)\n"
+        "  net      = gross − cost of use     (covered tasks only; confidence {net_confidence})\n"
+        "  A task with no in-window call is UNCOVERED: net says unavailable, never = gross.\n"
+        "  Per-query netting is impossible — shim receipts carry a task but no call.",
+        ("cage/netsaved.py", "cage/verdict.py", "cage/constants.py"),
+        "gross is modeled (a counterfactual); the subtrahend is measured (recorded tokens\n"
+        "  repriced); net is modeled at its own, lower confidence — it stacks a time-window\n"
+        "  join on top of gross's counterfactual, so it can never be the more credible of the two."),
     Explanation(
         "marginal-attribution", ("marginal", "attribution", "attribute", "attrib",
                                  "per-tool", "fixed", "order", "overlap", "credit",
@@ -33,7 +50,7 @@ REGISTRY: tuple[Explanation, ...] = (
         "how per-tool savings sum to the total with no double-count",
         "walk tools in policy order ({order}); each receipt is its marginal saving\n"
         "  given the tools upstream of it, so Σ(marginals) = total, no overlap.",
-        ("cage/attribution.py", "cage/matrix.py", "policy.toml [tools.order]"),
+        ("cage/attribution.py", "cage/matrix.py", "cage.toml [tools.order]"),
         "per-row method = the least-trusted receipt for that tool (honest worst-case)."),
     Explanation(
         "matrix", ("matrix", "counterfactual", "permutation", "stack",
@@ -83,14 +100,17 @@ REGISTRY: tuple[Explanation, ...] = (
         "verdict-composition", ("verdict", "saving-or-costing", "worth-it", "keep",
                                 "drop", "net", "break-even", "breakeven", "compose"),
         "how `cage insights verdict <tool>` reaches SAVING / COSTING / INSUFFICIENT DATA",
-        "a pure composer — no new statistics: net = roi.saved − roi.own_cost over the\n"
+        "a pure composer — no new statistics: net = roi.gross − roi.own_cost over the\n"
         "  window (verdict = its sign); marginal saving from attribution's latest task;\n"
-        "  direction from trend; drift from regression; redo-rate from quality;\n"
+        "  drift from regression; redo-rate from quality;\n"
         "  break-even = net / receipts. ≈$/mo scales net by the receipts' own time-span\n"
-        "  (≥7 days, no clock). Missing input ⇒ INSUFFICIENT DATA, never an approximation.",
-        ("cage/verdict.py", "cage/roi.py", "cage/attribution.py", "cage/regression.py"),
+        "  (≥7 days, no clock). Missing input ⇒ INSUFFICIENT DATA, never an approximation.\n"
+        "  NET-2: the cost of USING the tool is excluded unless `netsaved` covers every\n"
+        "  receipt in the window. That term is ≥ 0, so COSTING stays safe to assert but a\n"
+        "  non-negative net reads SAVING (GROSS) / BREAK-EVEN (GROSS), naming the exclusion.",
+        ("cage/verdict.py", "cage/roi.py", "cage/netsaved.py", "cage/regression.py"),
         "the headline is modeled (it inherits the receipts' modeled savings); every\n"
-        "  input line renders its own tag — measured drift/redo, estimated trend."),
+        "  input line renders its own tag — measured drift, measured redo-rate."),
     Explanation(
         "study-pairing", ("study", "fleet", "machines", "laptops", "paired", "pairing",
                           "phase", "enrollment", "bundle", "week-over-week"),
@@ -106,46 +126,13 @@ REGISTRY: tuple[Explanation, ...] = (
         "per-machine-day totals are measured; the paired delta is estimated —\n"
         "  recorded phase intent across different weeks, never a randomized experiment."),
     Explanation(
-        "human-cost", ("human", "person", "salary", "labor", "wage", "people",
-                       "engineer", "manually", "cost-a-human", "alternative"),
-        "how a human alternative is priced",
-        "usd = minutes / 60 × rate     (rate = ${rate}/hr, source: {rate_src})\n"
-        "  chain: explicit usd > per-receipt minutes > task-type table > global default\n"
-        "  confidence: measured {c_measured} · estimated {c_estimated} · "
-        "type-table {c_type} · default {c_default}",
-        ("cage/human.py", "cage/convert.py", "policy.toml [human]"),
-        "estimated — a labor guess; never 'measured' unless a real timesheet/quote."),
-    Explanation(
-        "attention-minutes", ("attention", "gap", "gaps", "turn-gap", "gap_ms", "idle",
-                              "supervision", "derived-minutes", "babysit", "watching",
-                              "human-minutes", "how-are-human-minutes-derived"),
-        "how human-attention minutes are derived from turn gaps",
-        "minutes = Σ min(gap_ms, idle cap) / 60000    (cap = {idle_cap} min; policy\n"
-        "  [human] idle_cap_minutes wins, constants.IDLE_CAP_MINUTES is the fallback)\n"
-        "  gap_ms = wall-clock between the previous assistant turn's end and the human\n"
-        "  turn that led to the call — stamped at import only where the log carries\n"
-        "  per-turn timestamps (claude today; copilot/kiro lack the signal ⇒ no\n"
-        "  field, never fabricated). Read-time derive: changing the cap re-prices the\n"
-        "  backlog, the ledger is never rewritten. Attested minutes (`human-record`,\n"
-        "  `cage human outcome --minutes`) beat derived for a task — never summed;\n"
-        "  `cage insights calibration --human` measures the heuristic's derived/attested ratio.",
-        ("cage/attention.py", "cage/transcript.py", "policy.toml [human]"),
-        "estimated, always — labelled 'derived (turn-gaps, capped)'; only attested\n"
-        "  minutes can ever read differently, and only as a real timesheet ('measured')."),
-    Explanation(
-        "time-saved", ("time", "hours", "minutes", "time-saved", "hours-saved", "clock"),
-        "the hours an agent saved a human (can go negative)",
-        "saved_minutes = human_minutes − agent_active_minutes\n"
-        "  (negative when the agent took longer than a person would have — honest).",
-        ("cage/humanview.py", "cage/trend.py", "cage/human.py"),
-        "estimated — the human leg is a labor estimate; the metric can embarrass the agent."),
-    Explanation(
         "roi", ("roi", "return", "worth", "tool-cost", "latency", "investment"),
-        "saved $ per tool vs that tool's own cost + latency",
-        "per tool: Σ saved_usd  vs  Σ meta.tool_cost_usd  and  Σ meta.added_latency_ms\n"
-        "  (a deterministic tool saves at $0 of its own cost).",
-        ("cage/roi.py", "cage/convert.py"),
-        "inherits each receipt's method; the saved-$ side is only as trusted as its receipts."),
+        "GROSS saved $ per tool vs that tool's own cost + latency",
+        "per tool: Σ gross_saved_usd  vs  Σ meta.tool_cost_usd  and  Σ meta.added_latency_ms\n"
+        "  net of own cost = gross − own cost (a deterministic tool declares $0 own cost —\n"
+        "  which is NOT the same as free: the cost of USING it is in neither column).",
+        ("cage/roi.py", "cage/convert.py", "cage/netsaved.py"),
+        "inherits each receipt's method; the gross-$ side is only as trusted as its receipts."),
     Explanation(
         "token-heuristic", ("token", "tokens", "chars", "divisor", "heuristic",
                             "tokenize", "tokenizer", "approx"),
@@ -156,10 +143,9 @@ REGISTRY: tuple[Explanation, ...] = (
     Explanation(
         "confidence", ("confidence", "ladder", "credibility", "trust", "credible"),
         "how credible a figure is, on a 0–1 ladder",
-        "measured {c_measured} · estimated {c_estimated} · "
-        "type-table {c_type} · default {c_default}\n"
-        "  policy [human.confidence] wins; constants.DEFAULT_CONFIDENCE is the fallback.",
-        ("cage/human.py", "cage/constants.py", "policy.toml [human.confidence]"),
+        "measured {c_measured} · estimated {c_estimated}\n"
+        "  constants.DEFAULT_CONFIDENCE is the ladder; a receipt may carry its own.",
+        ("cage/constants.py", "cage/origin.py", "cage/schema.py"),
         "orthogonal to method: a low confidence flags a round guess, not a wrong tag."),
     Explanation(
         "method-tags", ("method", "measured", "modeled", "estimated", "provenance",
@@ -170,16 +156,10 @@ REGISTRY: tuple[Explanation, ...] = (
         ("cage/constants.py", "cage/schema.py", "cage/matrix.py"),
         "method is sacred — a projection never reads as measured (cage's core honesty rule)."),
     Explanation(
-        "trend", ("trend", "over-time", "weekly", "monthly", "drift", "history"),
-        "cost + time savings bucketed over time",
-        "group receipts/calls by week or month; show saved $ and saved hours per bucket.",
-        ("cage/trend.py", "cage/human.py"),
-        "carries each bucket's underlying receipt methods; the time leg is estimated."),
-    Explanation(
         "budget", ("budget", "ceiling", "cap", "session", "daily", "exceed", "limit"),
         "session/day spend vs the policy ceilings",
         "Σ call_usd over the window vs [budgets] session_usd / daily_usd; on_exceed = warn|block.",
-        ("cage/budget.py", "cage/prices.py", "policy.toml [budgets]"),
+        ("cage/budget.py", "cage/prices.py", "cage.toml [budgets]"),
         "measured — totals real recorded calls; the ceiling is policy, not a guess."),
 
     # ── concept entries — how cage itself works, not how a value is computed ───
@@ -216,28 +196,108 @@ REGISTRY: tuple[Explanation, ...] = (
         "sources",
         ("sources", "source", "import-path", "import-paths", "log-path",
          "custom-tool", "custom", "network-home", "nonstandard", "config-paths"),
-        "add or replace the log locations cage imports from ([sources] in policy.toml)",
+        "add or replace the log locations cage imports from ([sources] in cage.toml)",
         "[sources] adds candidate import paths beyond the built-in registry — for a\n"
         "  nonstandard install, a network home, or a side-by-side log copy. Additive\n"
         "  by default (empty/absent [sources] = the built-in registry, byte-identical).\n"
         "    [sources.<agent>] paths = [\"~/alt/logs\", ...]   # one of the three agents\n"
         "    [sources.<agent>] glob  = \"usage-*.ndjson\"      # optional; absent ⇒ format default\n"
+        "    [sources.<agent>] path_globs = [\"**/usage-*.ndjson\"]  # `--path` only (`cage query path-globs`)\n"
         "    [sources.<agent>] replace = true                 # ignore that agent's built-ins\n"
         "                                                     #   (empty paths ⇒ disabled)\n"
-        "    [[sources.<agent>]] path = \"~/x\", glob = \"...\"   # array form: one glob per path\n"
+        "    [sources.<agent>] surface = \"cli\"                # cli|vscode|ide; restamps imported rows\n"
+        "    [[sources.<agent>]] path = \"~/x\", glob = \"...\", surface = \"cli\"  # array form: per entry\n"
         "    [sources.<name>]  paths = [...], format = \"claude|copilot|kiro\"\n"
         "                                                     # a custom tool; rows stamp agent=<name>\n"
         "  Precedence: env home override > policy > built-in. ~ and $VARs expand; a glob\n"
         "  char (*?[) in a `path` is rejected (put it in `glob =`); empty glob=\"\" is an error.\n"
+        "  `surface` (optional) stamps which client wrote the rows — set it for a non-IDE\n"
+        "  store the parser would otherwise mislabel (a Kiro CLI log defaults to `ide`);\n"
+        "  an out-of-set value is ignored (a `problems` entry), absent ⇒ the parser's value.\n"
         "  Capture-side only — no derived view changes.\n"
         "  Verify with `cage doctor --paths` (glob + provenance column: built-in|env|policy).\n"
         "  A committed project policy with a machine-absolute path warns — prefer\n"
-        "  ~/.cage/policy.toml or a ~/… path. `policy sync` never touches [sources]; the\n"
+        "  ~/.cage/cage.toml or a ~/… path. `policy sync` never touches [sources]; the\n"
         "  bundle ships the defaults as a COMMENT block (cage:sources-start), inert.\n"
         "  current sources:\n{sources_live}",
         ("cage/paths.py", "cage/importcmd.py", "cage/pathprobe.py"),
         "n/a — describes a capture-config mechanism, not a number.",
         kind="concept", plan_ref="output-and-simplification.plan.md Phase 4"),
+    Explanation(
+        "path-globs",
+        ("path-globs", "path_globs", "path-glob", "import-path-flag", "path-flag",
+         "root-agnostic", "anchored-glob", "two-globs", "chatsessions"),
+        "why `--path` uses `path_globs`, not the anchored `[sources] glob`",
+        "a [sources] entry carries TWO patterns, doing two different jobs:\n"
+        "    glob        ANCHORED to that entry's `path` — drives every normal import\n"
+        "    path_globs  ROOT-AGNOSTIC (**/…) — read ONLY by `cage import --path`\n"
+        "                and `--project`, where the location is one YOU name\n"
+        "  Why two: `--path` replaces the root, and an anchored pattern cannot survive\n"
+        "  that. `*/chatSessions/*.jsonl` matches nothing when you point --path AT a\n"
+        "  chatSessions directory — reusing `glob` would relocate the bug, not fix it.\n"
+        "  (That was the real fault: copilot's --path branch hardcoded */events.jsonl,\n"
+        "  the CLI shape only, so it could never reach the VS Code chatSessions store\n"
+        "  even though the parser handles both.)\n"
+        "  Directive A applies: code holds the SEED, `cage setup` MATERIALIZES it into\n"
+        "  cage.toml, and import reads cage.toml. There is NO code fallback — an\n"
+        "  unmaterialized project gets a loud no-op naming `cage setup --sync-sources`,\n"
+        "  because a fallback would put the patterns back in two places.\n"
+        "  Rules: `replace = true` replaces path_globs along with paths/glob (same\n"
+        "  table, same semantics); extra entries union theirs in declaration order;\n"
+        "  overlapping patterns never scan a file twice; a custom tool has none\n"
+        "  (--path never reaches one); the zero-match warning NAMES the patterns tried.\n"
+        "  copilot's seed names both shapes explicitly (**/events.jsonl,\n"
+        "  **/chatSessions/*.jsonl) so a foreign .jsonl under your --path is never\n"
+        "  matched — safe by construction, not by it happening to parse to zero rows.\n"
+        "  Verify with `cage doctor --paths` (it flags a table with no path_globs).",
+        ("cage/paths.py", "cage/importcmd.py"),
+        "n/a — describes a capture-config mechanism, not a number.",
+        kind="concept", plan_ref="path-globs.handoff.md §5"),
+    Explanation(
+        "config-file",
+        ("config-file", "config", "toml", "policy-toml", "rename", "filename",
+         "fallback", "migrate-config"),
+        "which config file cage reads, and the policy.toml → cage.toml rename",
+        "the project config is `.cage/cage.toml` — user-economics the derived views\n"
+        "  read at compute time (prices, budgets, pipeline order, capture\n"
+        "  switches). It was `policy.toml` through v0.35; the rename is NON-breaking:\n"
+        "    · a lone legacy `policy.toml` is still READ (fallback) and MIGRATED to\n"
+        "      `cage.toml` on the next `cage setup` (idempotent, never destructive);\n"
+        "    · with BOTH on disk, `cage.toml` wins — `cage doctor` names the ignored\n"
+        "      `policy.toml`, and a one-line stderr warning fires at load;\n"
+        "    · the resolved name lives in ONE place (`paths.Footprint.policy`); writers\n"
+        "      and `cleanup` follow it (cleanup never touches either name).\n"
+        "  the bundled default (`data/cage.toml`) is read-only at runtime.",
+        ("cage/paths.py", "cage/initcmd.py", "cage/cleanup.py"),
+        "n/a — describes the config-file contract, not a number.",
+        kind="concept", plan_ref="config-surfaces-and-rename.handoff.md"),
+    Explanation(
+        "prices-file",
+        ("prices-file", "prices-toml", "prices.toml", "vendor-prices", "rate-card",
+         "split", "credits", "where-prices-live"),
+        "which file holds model prices, and why they split out of cage.toml",
+        "model prices are a VENDOR rate card — researched at build time, shipped in the\n"
+        "  bundle, replaced wholesale by `cage prices sync`. Your policy (budgets,\n"
+        "  pipeline order, sources, and ROUTING decisions — [alias],\n"
+        "  [tools.<tool>] price_at) is hand-edited and preserved. Opposite lifecycles,\n"
+        "  so they live in separate files: **vendor facts move, routing decisions stay**.\n"
+        "    · `.cage/prices.toml` holds every [prices.<provider>.<model>] row, [credits],\n"
+        "      and the [meta] prices_version/prices_date counters (project {prices_version_project}).\n"
+        "    · `.cage/cage.toml` keeps everything else — including [alias] and tool routes,\n"
+        "      and [meta] cage_version/policy_version.\n"
+        "  Resolution mirrors the cage.toml rename (one place, `paths.Footprint.prices`):\n"
+        "    · a legacy project with prices still inline in `cage.toml` is READ untouched\n"
+        "      (fallback) and MIGRATED to `prices.toml` on the next `cage setup` —\n"
+        "      money-neutral (rows equal to the bundle drop, customizations become\n"
+        "      overrides), idempotent, never destructive;\n"
+        "    · with BOTH carrying prices, `prices.toml` wins — `cage doctor` names the\n"
+        "      ignored in-cage.toml block and a one-line stderr warning fires at load;\n"
+        "    · `cage prices set`/`sync` write `prices.toml`; `alias`/`route-tool` write\n"
+        "      `cage.toml`; `policy.load` still returns ONE merged dict, so the money\n"
+        "      resolves identically either way. `cleanup` protects both files.",
+        ("cage/paths.py", "cage/policy.py", "cage/initcmd.py"),
+        "n/a — describes the prices-file contract, not a number.",
+        kind="concept", plan_ref="prices-toml.plan.md §3"),
     Explanation(
         "capture-on-read",
         ("capture-on-read", "on-read", "lazy", "sweep", "read-sweep", "hookless",
@@ -285,7 +345,7 @@ REGISTRY: tuple[Explanation, ...] = (
         "record_call/record_receipt append rows to {partition}-partitioned shards of:\n"
         "    {calls_path}\n    {receipts_path}\n    {tasks_path}\n"
         "  i.e. calls-YYYY-MM.jsonl etc., named from each row's ts. Every read\n"
-        "  (report/attrib/matrix/budget/roi/human/trend) globs the shards (+ any legacy\n"
+        "  (report/attrib/matrix/budget/roi) globs the shards (+ any legacy\n"
         "  single file) and derives at read time — nothing is ever rewritten in place;\n"
         "  new writes target dated files (plan §3.6.1).",
         ("cage/ledger.py", "cage/paths.py"),
@@ -297,11 +357,10 @@ REGISTRY: tuple[Explanation, ...] = (
         "the four ways a call gets recorded, and why none can break a request",
         "surfaces: library (metering.py context manager) · proxy (usageparse.py,\n"
         "  any client you point a base URL at) · transcript (transcript.py, Claude\n"
-        "  Code/Codex session logs) · MCP (mcpserver.py, read-only).\n"
-        "  reliable default for the transcript agents is SessionStart-backfill: import\n"
-        "  the previous session on the next start (the transcript is always on disk).\n"
-        "  SessionEnd is best-effort — it doesn't fire on a kill/crash/idle session;\n"
-        "  running both is safe because cage import dedupes by call id.\n"
+        "  Code / Copilot / Kiro session logs) · MCP (mcpserver.py, read-only).\n"
+        "  the transcript agents capture pull-based: `cage import` (and capture-on-\n"
+        "  read) sweep the on-disk session logs — no hooks, so nothing depends on which\n"
+        "  client wrote the log; re-imports dedupe by call id.\n"
         "  fail-open: a metering error is swallowed, never raised into the request path.",
         ("cage/metering.py", "cage/proxy.py", "cage/transcript.py", "cage/mcpserver.py"),
         "n/a — describes a mechanism, not a number.",
@@ -314,7 +373,7 @@ REGISTRY: tuple[Explanation, ...] = (
         "  sum exactly to the total — no double-count, no negotiation between tools.\n"
         "  Shapley-style fair-division is deferred to an optional audit mode, not the\n"
         "  default, because fixed-order is $0 and reproducible; Shapley is combinatorial.",
-        ("cage/attribution.py", "policy.toml [tools.order]"),
+        ("cage/attribution.py", "cage.toml [tools.order]"),
         "n/a — describes the attribution mechanism, not a single number.",
         kind="concept", plan_ref="§4.2"),
     Explanation(
@@ -352,22 +411,69 @@ REGISTRY: tuple[Explanation, ...] = (
         "n/a — describes two receipt-filing strategies, not a number.",
         kind="concept", plan_ref="§4.5"),
     Explanation(
-        "human-axis", ("tier-1", "tier-2", "agent-vs-human", "tool-vs-tool", "whole-task",
-                       "attested", "derived-attention"),
-        "the two axes cage measures savings on",
-        "Tier-1 (human.py, matrix --human): agent vs human, the whole task — what\n"
-        "  would a person have cost, in $ and hours, vs what the agent actually cost.\n"
-        "  Tier-2 (attribution.py, matrix): tool vs tool, inside one agent run — what\n"
-        "  did each tool in the pipeline save vs that tool being off.\n"
-        "  The Tier-1 axis also tracks what the agent COSTS in human time (plan §4.10):\n"
-        "  attested minutes (`human-record`, `cage human outcome --minutes N`) are ground\n"
-        "  truth; derived minutes (turn-gaps capped at {idle_cap} min, attention.py)\n"
-        "  are the passive estimate. Attested beats derived per task — never summed;\n"
-        "  `cage insights calibration --human` measures the heuristic against the attested\n"
-        "  ground truth (see `attention-minutes` for the formula).",
-        ("cage/human.py", "cage/matrix.py", "cage/attention.py"),
-        "n/a — describes two measurement axes, not a number.",
-        kind="concept", plan_ref="§4.6, §4.10"),
+        "migrate-savings", ("migrate-savings", "migrate", "migration", "consolidate",
+                            "union", "dedupe", "duplicate", "savings-tree"),
+        "how `cage data migrate-savings` moves graphify savings without changing a number",
+        "graphify savings used to land in the shared receipts.jsonl; they now belong in\n"
+        "  the savings/graphify/ tree. `cage data migrate-savings` (dry-run by default,\n"
+        "  --apply to execute) COPIES each historical tool=\"graphify\" receipt into the\n"
+        "  tree, keeping its ORIGINAL id and sharding by its OWN ts. receipts.jsonl is\n"
+        "  never rewritten (append-only law — the only ledger mutation is append).\n"
+        "  Precision is read-side: `ledger.receipts()` is an id-deduped UNION of both\n"
+        "  stores (tree wins on a duplicate id — ids carry the only entropy, so identity\n"
+        "  dedupe is exact). So a row now present in both stores counts exactly once: a\n"
+        "  re-run is a no-op, a half-completed migration still reads correct totals, and\n"
+        "  attrib/report/roi are byte-identical before and after. --apply refuses when the\n"
+        "  two stores disagree on a shared id's saved value — the totals can't reconcile,\n"
+        "  so it stops rather than guess. graphify only; human/fux stay in receipts.jsonl.",
+        ("cage/migratecmd.py", "cage/ledger.py", "cage/mergeutil.py"),
+        "n/a — describes why the migrated number stays exact, not a number.",
+        kind="concept", plan_ref="§3"),
+    Explanation(
+        "kiro-routing", ("kiro", "kiro-ide", "kiro-cli", "machine-ledger", "double-count",
+                         "why-no-kiro", "tokens-generated", "conversations-v2",
+                         "machine-fact", "adr-0006", "credits-scope"),
+        "why kiro's rows land in the machine ledger, and what they can't tell you",
+        "kiro has TWO stores with OPPOSITE properties, so they get opposite treatment:\n"
+        "  · IDE (tokens_generated.jsonl) — ONE global append-only file with no project,\n"
+        "    no session and no per-turn timestamp. Every ledger that imported it read the\n"
+        "    same turns, so a per-project kiro cost was never a fact. These rows are a\n"
+        "    MACHINE fact and are written to the global ledger only ({global_base}), so\n"
+        "    one copy exists per machine and double-counting is impossible by\n"
+        "    construction. A project report says so rather than showing nothing.\n"
+        "  · CLI (conversations_v2, SQLite) — keyed by the cwd it ran in, with a real\n"
+        "    conversation id and timestamp. That IS project-attributable, so it gets the\n"
+        "    opposite fix: scoped to the project's directory tree and stamped with\n"
+        "    `project`. Routing it to the machine ledger would destroy real attribution.\n"
+        "  An explicit --ledger/CAGE_BASE always wins for both — cage never routes around\n"
+        "  a sink you named.\n"
+        "  THE LIMITS, stated plainly: an IDE row's `ts` is stamped at IMPORT, `session` is\n"
+        "  the constant \"kiro\", `project` is absent and `tokens_out` is usually 0. So kiro\n"
+        "  rows cannot be ordered, windowed or attributed, and no kiro ON/OFF token delta\n"
+        "  may ever be reported. Cage can never be more precise than its source.\n"
+        "  Already-recorded rows are never rewritten (append-only): a project ledger that\n"
+        "  collected duplicated kiro rows before v0.36 keeps them, and gains no new ones.",
+        ("cage/paths.py", "cage/importcmd.py", "cage/transcript.py", "cage/report.py"),
+        "n/a — describes where rows are stored and what they can't say, not a number.",
+        kind="concept", plan_ref="§3.7 · ADR 0006"),
+    Explanation(
+        "savings-axis", ("tier-1", "tier-2", "agent-vs-human", "human", "human-axis",
+                         "tool-vs-tool", "whole-task", "attested", "derived-attention",
+                         "minutes", "human-cost", "hours-saved", "removed"),
+        "the axis cage measures savings on (and the human axis it no longer does)",
+        "cage measures ONE savings axis: tool vs tool, inside one agent run\n"
+        "  (attribution.py / matrix.py) — what did each tool in the pipeline save\n"
+        "  versus that tool being off, marginal-by-fixed-order.\n"
+        "  The Tier-1 agent-vs-human axis (the `human` verb group, $/hr rates,\n"
+        "  attested and turn-gap-derived minutes) was REMOVED in v0.36, substrate\n"
+        "  included: calls no longer carry a turn gap, `minutes` is not a unit.\n"
+        "  Legacy ledgers still read: a pre-0.36 `tool=\"human\"` receipt (or any\n"
+        "  `unit=\"minutes\"` row) is EXCLUDED from every money view and counted in a\n"
+        "  footnote on `cage report` — never silently folded into a total, never\n"
+        "  priced. Rows are append-only and are never rewritten.",
+        ("cage/attribution.py", "cage/matrix.py", "cage/report.py"),
+        "n/a — describes the measurement axis, not a number.",
+        kind="concept", plan_ref="§4.6"),
     Explanation(
         "determinism", ("reproducible", "byte-identical", "same-ledger", "offline"),
         "why the same ledger always renders the same tables",
@@ -393,11 +499,11 @@ REGISTRY: tuple[Explanation, ...] = (
                            "constants-vs-policy", "audit-layer"),
         "the three places cage keeps its numbers, never mixed",
         "contract = the closed enums in schema.py ({methods}) · policy = user\n"
-        "  economics in policy.toml (prices, human rate, budgets, pipeline order) ·\n"
+        "  economics in cage.toml (prices, budgets, pipeline order) ·\n"
         "  constants = code heuristics that must stay reviewable but aren't config\n"
         "  (chars-per-token, the matrix ceiling, the method trust ranking, the\n"
         "  confidence fallback) — see constants.py.",
-        ("cage/schema.py", "cage/constants.py", "policy.toml"),
+        ("cage/schema.py", "cage/constants.py", "cage.toml"),
         "n/a — describes where numbers live, not a number itself.",
         kind="concept", plan_ref="§3.3"),
     Explanation(
@@ -487,7 +593,7 @@ REGISTRY: tuple[Explanation, ...] = (
         "pricing is derive-time: report/budget/compare/study recompute every call\n"
         "  as tokens × the *current* policy row on each run — the ledger stores\n"
         "  counts, not conclusions, and is never rewritten. So an analyst fixing\n"
-        "  policy.toml re-prices every imported bundle row retroactively: same\n"
+        "  cage.toml re-prices every imported bundle row retroactively: same\n"
         "  ledger + same policy ⇒ same tables; new policy ⇒ honestly new tables.\n"
         "  Exceptions that do NOT re-derive: self-costed calls (their stored\n"
         "  est_cost_usd was the provider's own figure) and receipts' recorded values.",
@@ -508,11 +614,12 @@ REGISTRY: tuple[Explanation, ...] = (
         "  cage prices list — every visible row, bundled vs project, which wins.\n"
         "  cage prices sync — diff vs the installed bundle (dry-run; --update + --yes).\n"
         "  Research: cage never fetches a price — check the vendor's pricing page (or\n"
-        "  search \"<vendor> <model> API pricing\"), then paste the fix line. Writes land\n"
-        "  in the project policy.toml ({prices_version_project}); the bundled table\n"
+        "  search \"<vendor> <model> API pricing\"), then paste the fix line. `set`/`sync`\n"
+        "  write the project prices.toml ({prices_version_project}); alias/route-tool\n"
+        "  write cage.toml (routing decisions — see `prices-file`). The bundled table\n"
         "  ({prices_version_bundled}) is read-only at runtime. Derived views re-price\n"
         "  immediately — the ledger is never rewritten.",
-        ("cage/pricescmd.py", "cage/pricestoml.py", "policy.toml [prices]"),
+        ("cage/pricescmd.py", "cage/pricestoml.py", "prices.toml [prices]"),
         "n/a — describes the command surface, not a number.",
         kind="concept", plan_ref="§3.3"),
     Explanation(
@@ -535,25 +642,25 @@ REGISTRY: tuple[Explanation, ...] = (
         "policy-versioning", ("policy-versioning", "meta", "prices-version",
                               "stale-prices", "bundle-newer", "sync-recommendation"),
         "how cage knows your price table is stale ([meta] + prices sync)",
-        "the bundled policy carries [meta] prices_version {prices_version_bundled};\n"
-        "  `cage setup` (and the first `cage prices set`) stamp the project copy with\n"
-        "  the bundle it derived from (this project: {prices_version_project}).\n"
+        "the bundled prices carry [meta] prices_version {prices_version_bundled};\n"
+        "  `cage setup` (and the first `cage prices set`) stamp the project prices.toml\n"
+        "  with the bundle it derived from (this project: {prices_version_project}).\n"
         "  `cage doctor` and `cage prices list` compare the two — a newer bundle\n"
         "  prints one recommendation line to run `cage prices sync`, never\n"
         "  auto-applied. sync classifies each row: in-sync (equal), customized\n"
         "  (cage-managed/marked — never clobbered), or drift (provenance unknown —\n"
         "  cage can't reconstruct which old bundle a row came from, so it lists the\n"
         "  diff and applies only rows you confirm per --yes).",
-        ("cage/pricescmd.py", "cage/data/policy.toml [meta]", "cage/doctorcmd.py"),
+        ("cage/pricescmd.py", "cage/data/prices.toml [meta]", "cage/doctorcmd.py"),
         "n/a — describes version bookkeeping, not a number.",
         kind="concept", plan_ref="§3.3"),
     Explanation(
         "policy-sync", ("policy-sync", "policy-upgrade", "policy-diff", "tunables",
                         "sync-categories", "neutrality", "policy-defaults",
                         "add-update-keep-orphan"),
-        "upgrading an old project policy.toml to the installed bundle's defaults",
+        "upgrading an old project cage.toml to the installed bundle's defaults",
         "`cage policy sync` (dry-run; `cage policy diff` is the same view) compares\n"
-        "  the project policy.toml against the installed bundle's non-pricing\n"
+        "  the project cage.toml against the installed bundle's non-pricing\n"
         "  defaults (bundled policy_version {policy_version_bundled}, this project:\n"
         "  {policy_version_project}) and buckets every key: **add** (in the bundle,\n"
         "  missing here — --apply writes it with one provenance comment), **update**\n"
@@ -566,14 +673,13 @@ REGISTRY: tuple[Explanation, ...] = (
         "  byte — adds only pin defaults policy.load was already merging in. Pricing\n"
         "  tables delegate to `cage prices sync` (one merge brain); nothing ever\n"
         "  auto-applies either sync.",
-        ("cage/policysync.py", "cage/pricestoml.py", "cage/data/policy.toml [meta]"),
+        ("cage/policysync.py", "cage/pricestoml.py", "cage/data/cage.toml [meta]"),
         "n/a — describes the upgrade verb; it never changes a derived number.",
         kind="concept", plan_ref="§3.10"),
     Explanation(
         "prices-freshness", ("prices-freshness", "freshness", "stale", "staleness",
-                             "stale-days", "prices-date", "age", "outdated",
-                             "post-commit-note", "commit-note"),
-        "the three local freshness signals behind the per-commit pricing note",
+                             "stale-days", "prices-date", "age", "outdated"),
+        "the three local freshness signals behind the pricing staleness note",
         "cage never fetches a price, so \"are my prices current?\" is answered from\n"
         "  local evidence only — three signals, one implementation (freshness.py):\n"
         "  1. sync drift — project [meta] older than the installed bundle\n"
@@ -585,12 +691,11 @@ REGISTRY: tuple[Explanation, ...] = (
         "     faithfully synced project can still be confidently stale.\n"
         "  3. UNPRICED presence — calls or call-less token receipts billing $0 →\n"
         "     the existing runnable hints ({unpriced_hint}).\n"
-        "  Three surfaces render the same lines: the git post-commit hook (print-\n"
-        "  only, fail-open, silent when clean — never gates a commit), `cage doctor`\n"
-        "  (always shown), and the `cage report` footer (actionable-only). Clocks:\n"
-        "  the report footer anchors age on the newest ledger ts (data-relative —\n"
-        "  derived views stay deterministic); hook and doctor may use today.",
-        ("cage/freshness.py", "cage/hooks.py", "cage/doctorcmd.py"),
+        "  Two surfaces render the same lines: `cage doctor` (always shown) and the\n"
+        "  `cage report` footer (actionable-only). Clocks: the report footer anchors\n"
+        "  age on the newest ledger ts (data-relative — derived views stay\n"
+        "  deterministic); doctor may use today.",
+        ("cage/freshness.py", "cage/doctorcmd.py"),
         "n/a — describes the check; the ⚠/· lines it prints are advisory, never a gate.",
         kind="concept", plan_ref="§3.3"),
     Explanation(
@@ -609,25 +714,32 @@ REGISTRY: tuple[Explanation, ...] = (
         "  tokens. The bare router id copilot/auto matches nothing by design: route\n"
         "  it explicitly (`cage prices alias - copilot/auto --to …`) — a router\n"
         "  priced silently would be a wrong number.",
-        ("cage/transcript.py", "cage/credits.py", "cage/data/policy.toml"),
+        ("cage/transcript.py", "cage/policy.py", "cage/data/cage.toml"),
         "n/a — describes a billing approximation and its provenance.",
         kind="concept", plan_ref="§3.3, §3.8"),
     Explanation(
-        "cleanup", ("cleanup", "state-dir", "prune", "stale", "retention",
+        "cleanup", ("cleanup", "state-dir", "prune", "stale", "retention", "warn",
                     "debug-log-growth", "cursors", "pending-buffers"),
         "what `cage data cleanup` may touch — and what it never may",
         "a CLOSED allowlist over .cage/state/ only: aged debug.log / capture.log /\n"
         "  hooks-seen.jsonl rows, stale pending-* provenance buffers, cursors whose\n"
         "  source log is gone (safe: the next import re-reads and id-dedupe absorbs\n"
-        "  it), *.tmp. Never —\n"
-        "  by construction, not convention: ledger/, policy.toml, the machine id\n"
-        "  (fleet pairing breaks without it), study.jsonl, limits.json. Window:\n"
-        "  [cleanup] days = {cleanup_days} (currently {cleanup_on}; env CAGE_CLEANUP\n"
-        "  overrides). Auto path piggybacks on `cage import`/hook sweeps, throttled\n"
-        "  and fail-open (cage installs no scheduler); manual `cage data cleanup` is a\n"
-        "  dry-run until --apply. State files are never read by derived views, so\n"
-        "  cleanup cannot change a single reported number.",
-        ("cage/cleanup.py", "cage/policy.py", "policy.toml [cleanup]"),
+        "  it), *.tmp. (hooks-seen.jsonl is a legacy file cleaned on real machines —\n"
+        "  cage no longer writes hooks.) Never — by construction, not convention:\n"
+        "  ledger/ (tool savings included — a per-tool cleanup class must never be\n"
+        "  added, savings are unrecoverable), cage.toml, the machine id (fleet\n"
+        "  pairing breaks without it), study.jsonl, limits.json. Window: [cleanup]\n"
+        "  days = {cleanup_days}. Deletion only ever happens via an\n"
+        "  explicit `cage data cleanup --apply`, which runs regardless of [cleanup]\n"
+        "  enabled — an explicitly-typed command is always honored. The auto path\n"
+        "  (piggybacked on `cage import`/read sweeps, throttled, fail-open — cage\n"
+        "  installs no scheduler) only ever WARNS on stderr, silent when nothing is\n"
+        "  eligible, never deletes: gated by [cleanup] enabled (currently\n"
+        "  {cleanup_on}; env CAGE_CLEANUP — off means no automatic anything, not even\n"
+        "  the reminder) and, when enabled, by [cleanup] warn (currently\n"
+        "  {cleanup_warn_on}; env CAGE_CLEANUP_WARN). State files are never read by\n"
+        "  derived views, so cleanup cannot change a single reported number.",
+        ("cage/cleanup.py", "cage/policy.py", "cage.toml [cleanup]"),
         "n/a — describes state maintenance, not a number.",
         kind="concept", plan_ref="§3.6.4"),
     Explanation(
@@ -635,15 +747,15 @@ REGISTRY: tuple[Explanation, ...] = (
                                  "self-refreshing", "snapshot", "bundle-freshness"),
         "why `cage data export` imports first (and how to get a frozen snapshot)",
         "export runs the all-agent import sweep before emitting/bundling, so a\n"
-        "  capture-only machine (hooks don't fire under a VS Code extension) still\n"
-        "  ships a complete bundle — one `cage data export --study` is enough. Currently\n"
+        "  machine that never ran an explicit `cage import` still ships a complete\n"
+        "  bundle (capture is pull-only) — one `cage data export --study` is enough. Currently\n"
         "  {import_before_export}. Precedence: the --no-import flag wins per\n"
         "  invocation > env CAGE_CAPTURE=0 (pauses all capture, sweep included) >\n"
         "  policy [capture] import_before_export. The sweep is fail-open — a broken\n"
         "  parser warns and export proceeds with the pre-sweep ledger — and the\n"
         "  study bundle's manifest records whether it ran and how many rows it added\n"
         "  (counts only), so the analyst can tell self-refreshed from snapshot.",
-        ("cage/exportcmd.py", "cage/study.py", "policy.toml [capture]"),
+        ("cage/exportcmd.py", "cage/study.py", "cage.toml [capture]"),
         "n/a — describes capture freshness, not a number.",
         kind="concept", plan_ref="§3.7"),
     Explanation(
@@ -665,7 +777,7 @@ REGISTRY: tuple[Explanation, ...] = (
         "  pricing always computes underneath (budget guards, UNPRICED detection),\n"
         "  money-native views (budget/roi/verdict/compare/estimate) always show\n"
         "  dollars, and CSV never gates (full schema, always).",
-        ("cage/display.py", "cage/report.py", "cage/matrix.py", "policy.toml [display]"),
+        ("cage/display.py", "cage/report.py", "cage/matrix.py", "cage.toml [display]"),
         "n/a — a presentation rule; every dollar that does render keeps its method tag.",
         kind="concept", plan_ref="output-and-simplification.plan.md Phase 2"),
     Explanation(
@@ -674,7 +786,7 @@ REGISTRY: tuple[Explanation, ...] = (
                        "report-csv", "one-way"),
         "the CSV reporting surface: which views, the column law, csv-vs-bundle",
         "`--csv` on report · attrib · roi · compare · study report · calibration\n"
-        "  (incl. --human) · human · trend — stdout by default (pipe-friendly),\n"
+        "  — stdout by default (pipe-friendly),\n"
         "  `--csv <path>` writes a file. Raw rows: `cage data export --csv\n"
         "  calls|receipts|tasks` (flat ledger rows for pivot tables; the ledger's\n"
         "  own PII surface — counts and ids, never content). MCP mirrors it: a\n"
@@ -698,20 +810,15 @@ REGISTRY: tuple[Explanation, ...] = (
                             "clone", "teammate", "committed", "broken-wiring",
                             "team-share", "gitignore"),
         "why committed wiring references .cage/bin/cage-run, never an absolute path",
-        "wired files that are committed to git (.claude/settings.json, .mcp.json,\n"
-        "  .vscode/mcp.json, .kiro/hooks/*.kiro.hook) used to embed\n"
+        "the committed MCP wiring (.mcp.json, .vscode/mcp.json) used to embed\n"
         "  the wiring machine's absolute cage path — one dev's filesystem shipped to\n"
         "  the team, breaking every clone. They now reference the committed shim\n"
         "  .cage/bin/cage-run (identical bytes on every machine), which resolves cage\n"
         "  at RUNTIME: cage on PATH → ~/.local/bin / pipx / active $VIRTUAL_ENV →\n"
-        "  python3 -m cage → exit 0 silently. cage absent ⇒ working agents, no noise,\n"
-        "  no capture (fail-open extended to wiring; `cage doctor` diagnoses, never\n"
-        "  the hook path). Per host: Claude hooks use the documented\n"
-        "  $CLAUDE_PROJECT_DIR placeholder; .mcp.json uses ${{CLAUDE_PROJECT_DIR:-.}}\n"
-        "  expansion; .vscode/mcp.json uses ${{workspaceFolder}}; kiro hooks\n"
-        "  self-locate via git rev-parse (its host guarantees neither variable nor\n"
-        "  cwd). User-level files (~/.copilot/hooks,\n"
-        "  .git/hooks) stay absolute — per-machine by nature, never cloned. The ONE\n"
+        "  python3 -m cage → exit 0 silently. cage absent ⇒ a working (unmetered)\n"
+        "  editor, no noise (fail-open extended to wiring; `cage doctor` diagnoses).\n"
+        "  Per host: .mcp.json uses the documented ${{CLAUDE_PROJECT_DIR:-.}}\n"
+        "  expansion; .vscode/mcp.json uses ${{workspaceFolder}}. The ONE\n"
         "  exception: .kiro/settings/mcp.json must stay absolute (Kiro spawns MCP\n"
         "  servers from its install dir, no workspace variable) — gitignore it.\n"
         "  Re-running `cage setup` migrates legacy absolute entries and prints what\n"
@@ -730,7 +837,8 @@ REGISTRY: tuple[Explanation, ...] = (
         # steal queries from `overview`/`portable-wiring` — same discipline as above.
         "stale-wiring", ("stale-wiring", "stale", "orphaned", "dead-verb", "liveness",
                          "renamed", "silently", "unmetered", "interceptor",
-                         "false-ok", "heal"),
+                         "false-ok", "heal", "shadowed", "path-winning", "bypass",
+                         "hook-bypass"),
         "how cage detects and heals an installed artifact whose verb no longer exists",
         "a wiring artifact written before a verb was renamed still names the OLD\n"
         "  verb, so it exits 1 — and because hook/shim output goes nowhere and both\n"
@@ -746,19 +854,39 @@ REGISTRY: tuple[Explanation, ...] = (
         "  tail. The distinction matters: a verb deleted outright rather than renamed\n"
         "  is dead and absent from REMOVED, so a grep against it would miss the\n"
         "  artifact entirely. User-level files are scanned too (~/.copilot/hooks,\n"
-        "  ~/.codex/config.toml, .git/hooks, the global skill copies) — the real\n"
-        "  failures were user-level. Agent assets are prose, not commands, so they\n"
-        "  are hash-compared against the bundled originals instead.\n"
+        "  ~/.codex/config.toml, .git/hooks) — the real failures were user-level, and\n"
+        "  these hold pre-removal hook leftovers cage no longer writes.\n"
         "  HEALING: `cage setup` rewrites a dead verb to its current form via\n"
         "  verbmap.REMOVED, alongside the absolute-path→shim migration it already\n"
         "  does, and refreshes a stale bin/graphify interceptor. Idempotent; foreign\n"
         "  (non-cage) hooks are never touched; a dead verb with no known replacement\n"
         "  is reported, never guessed at.\n"
-        "  Severity: a dead WIRED command is a failure (capture is silently off); a\n"
-        "  stale ASSET is advisory (the agent sees a wrong verb, errors, adapts).\n"
-        "  See `cage doctor` — the wiring check names each fault and its fix.",
-        ("cage/wiringscan.py", "cage/doctorcmd.py", "cage/claudewire.py",
-         "cage/verbmap.py", "cage/paths.py"),
+        "  Severity: a dead WIRED command is a failure (capture is silently off).\n"
+        "  See `cage doctor` — the wiring check names each fault and its fix.\n"
+        "  THE PATH-WINNING INTERCEPTOR (cage/pathshim.py): the graphify shim that\n"
+        "  actually RUNS is whichever `graphify` PATH resolves first, which can live\n"
+        "  in a DIFFERENT project's bin/ — outside every root cage scans. That is how\n"
+        "  a dead adopt-era shim ran unmetered for nine days while doctor, run in\n"
+        "  cage, reported OK. So cage resolves graphify the way the shell does (walk\n"
+        "  PATH, first executable wins) and classifies that one file: live · dead (a\n"
+        "  cage interceptor naming a removed verb — a doctor FAILURE, capture is\n"
+        "  silently off) · shadowed (this root has a shim but a different file wins —\n"
+        "  advisory, names BOTH paths) · foreign (not cage-written — reported, never\n"
+        "  touched; metering is off by absence, a different message from a dead shim).\n"
+        "  HEALING THAT WINNER: `cage setup` refreshes it only when it is dead AND\n"
+        "  sits in a cage-managed root (a <root>/bin/graphify beside a <root>/.cage/).\n"
+        "  Outside one, cage NEVER writes — doctor names the file and prints the fix.\n"
+        "  THE HOOK BYPASS (cage/hookbypass.py): the mirror image — an agent hook that\n"
+        "  invokes graphify by ABSOLUTE PATH never traverses PATH at all, so the\n"
+        "  interceptor cannot see it, and a hook is not a Bash tool call so the\n"
+        "  transcript route cannot either. Both capture routes are blind. This is\n"
+        "  ADVISORY, never a failure: graphify works as designed and cage merely\n"
+        "  cannot observe that path — savings from an explicit `graphify query` are\n"
+        "  unaffected. With --strict (or GRAPHIFY_HOOK_STRICT) the read hook DENIES\n"
+        "  the first raw read, so the avoided read is a real saving unmeterable by any\n"
+        "  current route, and the wording escalates. The hook is never modified.",
+        ("cage/wiringscan.py", "cage/pathshim.py", "cage/hookbypass.py",
+         "cage/doctorcmd.py", "cage/verbmap.py", "cage/paths.py"),
         "n/a — describes a detection + repair mechanism, not a number.",
         kind="concept", plan_ref="§5"),
     Explanation(
@@ -771,22 +899,18 @@ REGISTRY: tuple[Explanation, ...] = (
         "  scope (project vs global/user) and agent (claude/copilot/kiro — always\n"
         "  `agents.SURFACES`, never a hand-written list). It renders wiringscan's\n"
         "  enumeration + liveness (see `stale-wiring`) — it does not fork them.\n"
-        "  STATUS per row: current (a live verb / asset hash matches the bundle) ·\n"
-        "  stale (an installed skill/prompt/steering copy differs from the bundled\n"
-        "  original) · dead (a wiring command names a removed verb) · foreign (a\n"
-        "  non-cage artifact at a cage location — shown, never judged, e.g. a git\n"
-        "  post-commit hook without the cage marker).\n"
-        "  PER-AGENT VERDICT: needs healing (any dead command or stale asset for\n"
-        "  that agent — takes priority) > not wired (nothing present — purely\n"
-        "  informational, never a warning) > partially wired (some but not all of\n"
-        "  the agent's REQUIRED pieces present — names what's missing) > fully\n"
-        "  wired. 'Required' excludes a known gitignore exception (Kiro's project\n"
-        "  .kiro/settings/mcp.json must stay absolute, see `portable-wiring`) and\n"
-        "  the best-effort git hooks — their absence is normal, never a partial\n"
-        "  install. Skill/prompt/steering asset copies are shown informationally\n"
-        "  but never gate the verdict: `cage setup` (assets) and `cage setup\n"
-        "  --wire-only` (hooks/MCP) are separate invocations, so folding one into\n"
-        "  the other would misreport someone who deliberately ran only one.\n"
+        "  STATUS per row: current (a live verb) · dead (a wiring command names a\n"
+        "  removed verb) · foreign (a non-cage artifact at a cage location — shown,\n"
+        "  never judged, e.g. a git post-commit hook without the cage marker).\n"
+        "  PER-AGENT VERDICT: needs healing (any dead command for that agent — takes\n"
+        "  priority) > not wired (nothing present — purely informational, never a\n"
+        "  warning) > partially wired (some but not all of the agent's REQUIRED\n"
+        "  pieces present — names what's missing) > fully wired. Each agent's only\n"
+        "  wired surface now is its MCP entry; 'Required' excludes the known gitignore\n"
+        "  exception (Kiro's project .kiro/settings/mcp.json must stay absolute, see\n"
+        "  `portable-wiring`), whose absence is normal, never a partial install.\n"
+        "  Pre-removal hook/skill leftovers surface as separate leftover/dead rows,\n"
+        "  never as part of an agent's expected set.\n"
         "  No per-artifact VERSION is shown — artifacts are stampless, so a\n"
         "  fabricated version would be worse than none; the version footer (running\n"
         "  cage, bundled [meta], project [meta]) is the honest answer instead.\n"
@@ -803,7 +927,7 @@ REGISTRY: tuple[Explanation, ...] = (
                            "no-exe", "blocked", "enterprise", "finance", "mirror",
                            "airgap", "offline"),
         "running cage where exes are blocked or pip is unavailable",
-        "three tiers (docs/restricted-environments.md). 1) python-launcher wiring\n"
+        "three tiers. 1) python-launcher wiring\n"
         "  mode: `cage setup --python-launcher` persists [wiring] python_launcher =\n"
         "  true and (re)writes the shim + user-level wiring to resolve cage through\n"
         "  the interpreter only (python3 -m cage / py -3 -m cage) — nothing\n"
@@ -816,8 +940,8 @@ REGISTRY: tuple[Explanation, ...] = (
         "  pip, run `py cage.pyz import/export/report` through the approved\n"
         "  interpreter; `--version`/doctor label the run `(zipapp)`; derived views\n"
         "  are byte-identical to a wheel install over the same ledger. Shims never\n"
-        "  embed a pyz path (machine-specific) — hooks need an importable install;\n"
-        "  the pyz story is pull-based capture. 3) internal mirror: dependencies =\n"
+        "  embed a pyz path (machine-specific); the pyz story is pull-based capture,\n"
+        "  run explicitly. 3) internal mirror: dependencies =\n"
         "  [] and OIDC trusted publishing are the review answers. Honest caveat:\n"
         "  WDAC can also constrain script hosts — check your policy; doctor cannot\n"
         "  detect a blocked interpreter.",
@@ -825,4 +949,34 @@ REGISTRY: tuple[Explanation, ...] = (
          ".github/workflows/publish.yml"),
         "n/a — describes distribution/wiring tiers, not a number.",
         kind="concept", plan_ref="§5"),
+    Explanation(
+        "graphify-capture", ("graphify", "usage-row", "usage", "report-read",
+                             "repo-ceiling", "ceiling", "transcript-detection",
+                             "invocation-less", "forward-model"),
+        "how cage sees graphify use it can't miss, and models graphify's future savings",
+        "Every existing route (PATH/native shim, hook) is invocation-gated, so it\n"
+        "  misses the invocation-less saving: the agent READS graphify-out/GRAPH_REPORT.md\n"
+        "  instead of scanning files. Four fixes: (GC1) a usage row per run in\n"
+        "  state/graphify-usage.jsonl — {{op, args_hash, exit, ms, outcome}}, never priced,\n"
+        "  never in a money view — so doctor can say 'graphify ran N×, R receipts'. (GC2)\n"
+        "  at `cage import`, detect graphify in CLAUDE transcripts: a Bash\n"
+        "  `graphify query|explain` (anchored on command position — `grep graphify`\n"
+        "  never matches) reuses the shim's counterfactual on the in-transcript result\n"
+        "  → modeled receipt; a Read of the report/wiki → a distinct, lower-confidence\n"
+        "  report-read receipt (op=report-read, 0.3 — UNVALIDATED, a placeholder not yet\n"
+        "  scored by `insights calibration`), footnoted apart, never conflated.\n"
+        "  copilot/kiro are HONEST-LIMIT (GC0). (GC3, ADR 0005) deterministic ids\n"
+        "  s_=sha1(session|op|args_hash|answer_hash) keep per-session attribution; the\n"
+        "  shim+transcript converge via a content-key DEFERRAL, not id-collision, so one\n"
+        "  query files exactly one receipt. (GC5) a forward model: a history band\n"
+        "  (median+IQR, refuses < 5) and a deterministic day-one repo ceiling from\n"
+        "  graph.json — BOUNDED to the largest community's corpus (a graph answer stands\n"
+        "  in for one concern, not every file; the whole-corpus sum over-claims on a real\n"
+        "  repo) — both modeled bands, composed into `insights verdict graphify`,\n"
+        "  never a measured total.",
+        ("cage/graphifytx.py", "cage/graphifymodel.py", "cage/repoceiling.py",
+         "cage/usagelog.py", "cage/graphifymeter.py"),
+        "usage rows carry NO method (diagnostic); receipts + forward model are modeled,\n"
+        "  never measured — report-reads visibly weaker than query receipts.",
+        kind="concept", plan_ref="archive/v0.36-graphify-capture.plan.md GC0–GC5 (pending: OPEN-WORK.md)"),
 )

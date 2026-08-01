@@ -1,0 +1,8 @@
+c491e214009365770da7d556a22a6ff36cdc7c70068f019b7ee4f4d33ce87ca7  2026-08-01-finding-copilot-path-glob.md
+# sha256 covers all bytes from the newline after '<!-- HASH-COVERS-BELOW -->' to EOF.
+# The digest is UNCHANGED from publication: this file was originally published without a
+# marker (whole-file digest), and on 2026-08-01 a RESOLVED banner was prepended above a
+# marker so the bytes below it are byte-identical to the original whole file.
+# Verify with:
+#   python3 -c "import hashlib;b=open('2026-08-01-finding-copilot-path-glob.md','rb').read();m=b'<!-- HASH-COVERS-BELOW -->\n';print(hashlib.sha256(b[b.find(m)+len(m):]).hexdigest())"
+# (header = the RESOLVED banner; the fix is `[sources] path_globs`)

@@ -18,6 +18,7 @@ from types import SimpleNamespace
 import pytest
 
 from cage import agents, clicmds, ledger, paths
+from srcseed import mkcage
 
 CORPUS = Path(__file__).parent / "fixtures" / "transcripts"
 SURFACES_TESTED = ("cli", "vscode")
@@ -35,7 +36,7 @@ def _plant(fixture: Path, spec: dict, home: Path) -> None:
 
 
 def _isolated_root(d, monkeypatch):
-    (d / ".cage").mkdir(parents=True)
+    mkcage(d)
     # Isolate every agent home so the default (pathless) scan never reads real machine data.
     for env in ("CLAUDE_CONFIG_DIR", "COPILOT_HOME", "KIRO_DATA_DIR",
                 "CAGE_VSCODE_USER"):
@@ -51,6 +52,10 @@ def _comparable(rows: list[dict], volatile: list[str]) -> list[dict]:
         r = dict(r)
         for v in volatile:
             assert r.pop(v), f"volatile field {v!r} missing/empty on {r.get('id')}"
+        # `import_id` is the per-sweep capture-manifest FK (plan §4) — a fresh random id
+        # each import run, so it is non-deterministic by nature (like `ts`) and stripped
+        # before the exact-row comparison. Its presence is asserted separately.
+        r.pop("import_id", None)
         out.append(r)
     return sorted(out, key=lambda r: r["id"])
 
@@ -73,14 +78,21 @@ def test_import_parses_fixture_to_exact_rows(fixture, tmp_path, monkeypatch, cap
     assert clicmds.cmd_import(args) == 0
     assert f"✔ {agent}: imported {len(spec['rows'])} call(s)" in capsys.readouterr().out
 
-    actual = _comparable(ledger.calls(root), spec["volatile"])
+    # The rows are asserted in the ledger the agent captured INTO. That is `root` for
+    # claude/copilot and the machine ledger for kiro (ADR 0006) — routing moves *where*
+    # rows land, never *what* is parsed, which is exactly what this exact-row corpus pins.
+    sink = paths.kiro_routed(root) if agent == "kiro" else None
+    sink = sink or root
+    actual = _comparable(ledger.calls(sink), spec["volatile"])
     expected = sorted(spec["rows"], key=lambda r: r["id"])
     assert actual == expected  # exact rows: ids, tokens, provider/model, session, project
+    if sink is not root:
+        assert ledger.calls(root) == []  # and never a duplicate in the project ledger
 
     # Idempotency: a re-import (cursor + id-dedupe) leaves the shards byte-identical.
-    before = b"".join(p.read_bytes() for p in paths.Footprint(root).shards("calls"))
+    before = b"".join(p.read_bytes() for p in paths.Footprint(sink).shards("calls"))
     assert clicmds.cmd_import(args) == 0
-    assert b"".join(p.read_bytes() for p in paths.Footprint(root).shards("calls")) == before
+    assert b"".join(p.read_bytes() for p in paths.Footprint(sink).shards("calls")) == before
 
 
 def test_unverified_stand_ins_are_flagged_not_silent():

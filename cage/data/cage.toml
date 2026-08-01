@@ -1,0 +1,175 @@
+# Cage policy — the only place your project numbers live. Versioned, deterministic
+# (plan §3.3). This file holds your DECISIONS — budgets, pipeline order,
+# capture switches, import sources, and routing (aliases, tool routes). Model PRICES
+# (vendor rate cards) live in a separate file, prices.toml, because they have the
+# opposite lifecycle: yours are preserved on upgrade, prices are replaced wholesale
+# by `cage prices sync` (prices-toml plan §3). Vendor facts there; your decisions here.
+
+# policy_version tracks the *non-pricing* defaults: it bumps only when a release
+# adds/changes/removes a bundled tunable, and `cage policy sync` compares it.
+# (The price-research provenance — prices_version/prices_date — lives in prices.toml,
+# next to the rows it dates.) `cage setup` copies this file verbatim.
+# cage_version is deliberately NOT declared here — it is derived live from
+# cage.__version__ (`policy._bundled`), never a hand-maintained literal (a stale
+# copy drifted for eleven releases). A scaffolded project's cage.toml still gets
+# a cage_version stamp (initcmd.run) — that one IS historical and is never rewritten.
+[meta]
+policy_version = "0.27.0"
+
+# Routing decisions (aliases + tool routes) live here — they describe YOUR setup,
+# not a vendor's rate card, so a wholesale `cage prices sync` never touches them.
+#
+# An alias routes a router pseudo-model (or a bare id) to a real price row. The bare
+# Copilot router id `copilot/auto` stays UNPRICED until you route it (a router priced
+# silently is a wrong number). Add one with (this writes cage.toml, not prices.toml):
+#   cage prices alias - copilot/auto --to anthropic/claude-sonnet-4-6
+# or uncomment (the empty-string table is the empty provider Copilot stamps):
+# [alias.""."copilot/auto"]
+# to = "anthropic/claude-sonnet-4-6"
+
+# Auto-capture switch. Each agent's hook runs `cage import --agent <itself>` to meter
+# its own on-disk usage log; set enabled=false to pause that without unwiring any hooks
+# (the hooks still fire, the import is a no-op). Env CAGE_CAPTURE (0/1) overrides.
+# import_before_export: `cage data export` (plain and --study) runs the all-agent import
+# sweep first, so a capture-only machine (hooks don't fire under a VS Code extension)
+# still ships a complete bundle. Set false for as-is snapshots; the `--no-import`
+# flag wins per invocation (precedence: flag > env CAGE_CAPTURE > policy).
+[capture]
+enabled = true
+import_before_export = true
+# Staleness gate (hours) for the report footer's "last import: N ago" advice line —
+# it renders only when the last import is older than this (it's advice, not a
+# banner). Uncomment to override the constants.IMPORT_STALE_HOURS fallback (24);
+# 0 restores the always-on line.
+# import_stale_hours = 24
+
+# Display defaults (plan Phase 2.5). Tokens are the measurement and the default;
+# dollars are an interpretation you ask for. usd = true makes `cage report`,
+# `cage insights matrix`, and the bare `cage` headline render their dollar columns without
+# the --usd flag (per-invocation flag > env CAGE_USD > this). Display-only:
+# pricing always computes underneath (budget guards, UNPRICED detection), the
+# money-native views (budget/roi/verdict/compare/estimate) always show dollars,
+# and CSV always carries the full column set.
+[display]
+usd = false
+
+# State-dir maintenance (.cage/state/ only — a CLOSED allowlist: aged debug.log and
+# hooks-seen.jsonl rows, stale pending-* provenance buffers, cursors whose source log
+# is gone, *.tmp). Never touches ledger/ (tool savings included — a per-tool cleanup
+# class must never be added), cage.toml, prices.toml, machine.json, study.jsonl, or
+# limits.json — fleet pairing and the audit trail are not cleanup's to lose.
+# Deletion only ever happens via an explicit `cage data cleanup --apply`: the auto
+# path (piggybacked on `cage import`, throttled, fail-open; cage installs no
+# scheduler) only ever WARNS on stderr, silent when nothing is eligible — never
+# deletes. `enabled` gates that automatic reminder only (env CAGE_CLEANUP overrides);
+# `warn` (env CAGE_CLEANUP_WARN) turns the reminder itself off without disabling the
+# gate. An explicitly-typed `cage data cleanup` / `--apply` always runs regardless of
+# either switch. State files are never read by derived views, so cleanup can't change
+# a single reported number.
+[cleanup]
+enabled = true
+warn = true
+days = 90
+
+# Capture-path observability (off by default, $0, metadata-only — never prompt bodies).
+# When on, hooks/imports write a structured debug log + per-hook heartbeat to
+# .cage/state/ so you can tell whether a hook fired, was guard-skipped, or raised. It is
+# strictly observational: the ledger is byte-identical with it on or off. Env CAGE_DEBUG
+# (0/1) overrides; CAGE_DEBUG_LOG sets the log path. Read it with `cage debug`.
+[debug]
+enabled = false
+
+# Canonical pipeline order. Marginal attribution walks this once; each tool's
+# receipt is the delta it produced *given the tools upstream of it* (plan §4.2).
+[tools]
+order = ["graphify", "fux", "router", "compressor", "cache", "response-cache"]
+
+# Budget ceilings (plan §8.1) — **opt-in, and shipped OFF**. No key ⇒ no ceiling:
+# `cage insights budget` renders `—` for the cap, `budget.check` never reports `over`
+# and always returns proceed=True. A cap that nobody asked for is a false alarm, and
+# there is no defensible default spend for someone else's project — so unlike
+# `[ledger] warn_mb` there is deliberately **no constant fallback**.
+# Uncomment and set your own to turn enforcement on. on_exceed: warn | block.
+# formula: Σ call_usd over the window vs [budgets] session_usd / daily_usd.
+# [budgets]
+# session_usd = 2.00
+# daily_usd = 25.00
+# on_exceed = "warn"
+
+# Ledger-size warning (plan §3.6.4). When the partitioned shards together exceed
+# warn_mb (in MB), `cage` prints ONE hint to stderr (never stdout — stdout is the
+# deterministic table surface) pointing at the remedy (archive old *-YYYY-MM.jsonl
+# shards / `cage authorship ledger-sync` then prune). Warn-only, never blocks a read or write.
+# Uncomment to override the derived default (constants.LEDGER_WARN_BYTES, ≈418 MB ≈
+# 2 heavy solo-years); the constant is the fallback when this key is absent.
+# [ledger]
+# warn_mb = 418
+
+# Cost is only honest paired with outcome (plan §8.2). `task_ok` = task succeeded
+# without a redo; cost-per-*successful*-task is the metric that matters.
+[quality]
+signal = "task_ok"
+
+
+# cage:sources-start
+# [sources] — the ONLY place cage looks for each agent's session log (Directive A,
+# capture-precision §3.6). The bundle ships this as a COMMENT block; `cage setup`
+# MATERIALIZES it into an active [[sources.<agent>]] table (the built-in registry in
+# cage/paths.py is a seed, frozen here at setup time). `resolve_log_sources` reads ONLY
+# the active table — there is no built-in runtime fallback and env home vars are not
+# consulted. An empty/absent [sources] captures NOTHING (loudly — `cage doctor`).
+# Refresh after a cage upgrade with `cage setup --sync-sources` (preserves your entries);
+# `cage doctor` reports drift vs the current defaults. Full contract: docs/sources.md.
+#
+# Schema:
+#   [sources.<agent>]    paths = ["~/dir", ...]   add locations (built-ins kept)
+#                        glob  = "**/*.jsonl"     optional; default = the format's
+#                        path_globs = ["**/x.jsonl"]   optional; `--path` only (below)
+#                        replace = true           drop the built-ins first
+#   [[sources.<agent>]]  path = "~/dir"           array form: one glob per path
+#                        glob = "usage-*.ndjson"
+#                        path_globs = ["**/usage-*.ndjson"]
+#   [sources.<tool>]     format = "claude|copilot|kiro"   custom tool (name
+#                        paths  = [...]           ∉ the three); rows stamp agent=<tool>
+#   A glob char (*?[) in a `path` is rejected — put the pattern in `glob = `.
+#   An empty `glob = ""` is an error (drop the key to use the format default).
+#
+# TWO GLOBS, TWO JOBS:
+#   glob        ANCHORED to this entry's `path`. Drives every normal import.
+#   path_globs  ROOT-AGNOSTIC (**/…). Read ONLY when `cage import --path` / `--project`
+#               replaces the location with a directory YOU name. An anchored pattern
+#               cannot work there — `*/chatSessions/*.jsonl` matches nothing when you
+#               point --path AT a chatSessions dir — which is why this is a second key
+#               and not a reuse of the first.
+#   Absent path_globs ⇒ --path scans NOTHING for that agent, and says so (there is no
+#   code fallback: the patterns live here, in one place, or nowhere).
+#   `replace = true` replaces an agent's path_globs along with its paths/glob — same
+#   table, same entries, same semantics. Without it, extra entries are additive and
+#   their path_globs union (in declaration order, deduped). Overlapping patterns never
+#   scan a file twice. A custom tool has no path_globs: `--path` never reaches one.
+#
+# claude   (redirect home: CLAUDE_CONFIG_DIR)
+#   ~/.claude/projects
+#     glob **/*.jsonl   — every session transcript under the tree, recursively
+#     path_globs **/*.jsonl
+#
+# copilot   (redirect home: COPILOT_HOME, CAGE_VSCODE_USER)
+#   ~/.copilot/session-state
+#     glob */events.jsonl   — Copilot CLI usage events (one dir per session)
+#     path_globs **/events.jsonl
+#   ~/Library/Application Support/Code/User/workspaceStorage
+#     glob */chatSessions/*.jsonl   — VS Code Copilot chat sessions (macOS location shown; other OS below)
+#     path_globs **/chatSessions/*.jsonl   — both copilot shapes are named EXPLICITLY
+#       rather than a blanket **/*.jsonl, so only copilot-shaped files can ever match
+#     other OS:
+#       Linux VS Code:   ~/.config/Code/User/workspaceStorage
+#       Windows VS Code: %APPDATA%\Code\User\workspaceStorage
+#
+# kiro   (redirect home: KIRO_HOME, KIRO_DATA_DIR)
+#   ~/Library/Application Support/Kiro/User/globalStorage/kiro.kiroagent/dev_data/tokens_generated.jsonl
+#     glob *   — per-call token log — a FILE source, so the glob is ignored (macOS shown)
+#     path_globs *
+#     other OS:
+#       Linux:   ~/.config/Kiro/User/globalStorage/kiro.kiroagent/dev_data/tokens_generated.jsonl
+#       Windows: %APPDATA%\Kiro\User\globalStorage\kiro.kiroagent\...\tokens_generated.jsonl  (UNVERIFIED-LAYOUT — inferred from VS Code-family, not pinned on a real Windows Kiro)
+# cage:sources-end

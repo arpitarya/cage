@@ -79,8 +79,9 @@ def test_csv_gains_no_new_column(proj):
     rep = report.summarize(proj, _pol(), dim="agent")
     csv = report.render_csv(rep)
     header = csv.splitlines()[0]
-    assert header == ("agent,calls,tokens_in,tokens_out,cached_in,cost_usd,saved_usd,"
-                      "net_usd,unpriced_calls,unpriced_tokens,method")
+    assert header == ("agent,calls,tokens_in,tokens_out,cached_in,cost_usd,"
+                      "gross_saved_usd,net_vs_spend_usd,unpriced_calls,unpriced_tokens,"
+                      "method")
     assert "cache_usd" not in header
 
 

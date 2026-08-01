@@ -1,4 +1,6 @@
-"""Load `.cage/policy.toml` — prices, pipeline order, budgets, quality (plan §3.3)."""
+"""Load `.cage/cage.toml` (legacy `policy.toml` read as a fallback) — prices,
+pipeline order, budgets, quality (plan §3.3). The resolved filename lives in one
+place, `paths.Footprint.policy`; this module never hard-codes it for the project."""
 from __future__ import annotations
 
 import os
@@ -17,14 +19,43 @@ DEFAULT_ORDER = ["graphify", "fux", "router", "compressor", "cache", "response-c
 _ZERO_PRICE = {"input": 0.0, "output": 0.0, "cache_read": 0.0}
 
 
-def _bundled() -> dict:
+# The bundled-seed filenames (the ONLY place these literals live — parallel to
+# `Footprint.policy`/`Footprint.prices`, the project-side resolvers). Prices are split
+# into `data/prices.toml`; everything else stays in `data/cage.toml` (prices-toml plan §3).
+_BUNDLED_POLICY = "cage.toml"
+_BUNDLED_PRICES = "prices.toml"
+
+
+def _parse_bundled(name: str) -> dict:
     # is_file(), not exists(): bundled_data() is a Traversable (no .exists() in the
-    # ABC) so the bundled prices keep loading when cage runs from cage.pyz.
-    src = paths.bundled_data() / "policy.toml"
+    # ABC) so the bundled data keeps loading when cage runs from cage.pyz.
+    src = paths.bundled_data() / name
     if tomllib is None or not src.is_file():
         return {}
     with src.open("rb") as fh:
         return tomllib.load(fh)
+
+
+def _bundled() -> dict:
+    """The bundled default, reassembled from its two files: `data/cage.toml` (policy)
+    + `data/prices.toml` (vendor facts). The merged shape is byte-identical to the
+    pre-split single-file bundle — this is a *file* split, not a contract change, so
+    every consumer of `policy.load` reads exactly the dict it read before.
+
+    ``[meta] cage_version`` is derived here, never read from a file: the bundle ships
+    no such key (a hand-maintained literal drifted eleven releases before this), so
+    every caller of `bundled_raw()`/`load()` always sees the *running* package version
+    — `cage prices list`'s header and a freshly scaffolded project's stamp both derive
+    from this one point. A project's own stamp (once scaffolded) is history and is
+    never rewritten (`initcmd.run`)."""
+    base = _parse_bundled(_BUNDLED_POLICY)
+    prices = _parse_bundled(_BUNDLED_PRICES)
+    for section in _SECTIONS:
+        if section in prices:
+            _merge_section(base, prices, section)
+    from cage import __version__  # deferred: avoid any import-order coupling
+    base.setdefault("meta", {})["cage_version"] = __version__
+    return base
 
 
 # Sections whose values are per-provider tables of rows: merge one level deeper so
@@ -34,31 +65,65 @@ def _bundled() -> dict:
 # provider. Nothing legitimate relied on it: removing a row only ever meant falling
 # back to family/none, and `cage setup` copies carry the full table anyway.)
 _TWO_LEVEL = ("prices", "credits", "alias")
-_SECTIONS = ("prices", "tools", "budgets", "quality", "human", "ledger",
+_SECTIONS = ("prices", "tools", "budgets", "quality", "ledger",
              "capture", "debug", "credits", "alias", "meta", "cleanup", "wiring",
              "display", "sources")
 
+# The vendor-fact sections that live in `prices.toml` (prices-toml plan §2): the rate
+# rows and the credit table. Everything else in `_SECTIONS` (routing decisions +
+# tunables, incl. `[alias]`) stays in `cage.toml`. `[meta]` is neither — it splits
+# per key: `prices_version`/`prices_date` follow the price file, the rest the policy
+# file, so a mis-split can't silently stop the staleness nag firing (plan §2.1).
+_PRICE_SECTIONS = ("prices", "credits")
+_PRICE_META_KEYS = ("prices_version", "prices_date")
+
+
+def _merge_section(pol: dict, data: dict, section: str) -> None:
+    """Merge one section of ``data`` onto ``pol`` in place — two-level deep for the
+    per-provider row tables, a flat overlay otherwise. No-op when ``data`` lacks it."""
+    if section not in data:
+        return
+    if section in _TWO_LEVEL:
+        merged = dict(pol.get(section, {}))
+        for prov, table in data[section].items():
+            base = merged.get(prov)
+            if isinstance(table, dict) and isinstance(base, dict):
+                merged[prov] = {**base, **table}
+            else:
+                merged[prov] = table
+        pol[section] = merged
+    else:
+        pol[section] = {**pol.get(section, {}), **data[section]}
+
 
 def load(policy_path: Path | None = None) -> dict:
-    """Project policy merged over the bundled default. Tolerant of a missing file."""
+    """Project policy merged over the bundled default, returned as ONE merged dict —
+    the same shape (and, for equal inputs, the same values) every consumer read before
+    the price split. Non-price sections come from the policy file (``cage.toml``); the
+    price sections (``[prices]``/``[credits]``/the price ``[meta]`` keys) come from the
+    resolved *prices* file beside it (``prices.toml`` if present, else the policy file
+    itself for a legacy in-``cage.toml`` project — `paths.resolve_prices_file`). Tolerant
+    of missing files; a no-project load returns the bundled default unchanged."""
     pol = _bundled()
-    if policy_path and policy_path.exists() and tomllib is not None:
-        with policy_path.open("rb") as fh:
-            data = tomllib.load(fh)
-        for section in _SECTIONS:
-            if section not in data:
-                continue
-            if section in _TWO_LEVEL:
-                merged = dict(pol.get(section, {}))
-                for prov, table in data[section].items():
-                    base = merged.get(prov)
-                    if isinstance(table, dict) and isinstance(base, dict):
-                        merged[prov] = {**base, **table}
-                    else:
-                        merged[prov] = table
-                pol[section] = merged
-            else:
-                pol[section] = {**pol.get(section, {}), **data[section]}
+    if tomllib is None or policy_path is None:
+        return pol
+    pdata = load_project_raw(policy_path)                       # cage.toml (policy)
+    prices_path = paths.resolve_prices_file(policy_path.parent, policy_path)
+    xdata = load_project_raw(prices_path) if prices_path != policy_path else pdata
+    for section in _SECTIONS:
+        if section == "meta":
+            continue  # split per key below, never wholesale
+        _merge_section(pol, xdata if section in _PRICE_SECTIONS else pdata, section)
+    # [meta] splits per key: the non-price counters (cage_version/policy_version) from
+    # the policy file, the price counters (prices_version/prices_date) from the price
+    # file. In a legacy project xdata is pdata, so all four come from cage.toml — same
+    # as today. When prices.toml wins, its price keys override any stale ones in a
+    # still-present legacy [meta] (price file merged last).
+    meta = dict(pol.get("meta", {}))
+    meta.update({k: v for k, v in pdata.get("meta", {}).items() if k not in _PRICE_META_KEYS})
+    meta.update({k: v for k, v in xdata.get("meta", {}).items() if k in _PRICE_META_KEYS})
+    if meta:
+        pol["meta"] = meta
     return pol
 
 
@@ -171,25 +236,6 @@ def price(pol: dict, provider: str, model: str) -> dict:
     return price_match(pol, provider, model)[0]
 
 
-def human_rates(pol: dict) -> dict:
-    """The `[human]` block (rate, default minutes, per-type table, confidence)."""
-    return pol.get("human", {})
-
-
-def human_rate_source(pol: dict) -> tuple[float, str]:
-    """Resolved default $/hr and its provenance: env override beats policy (§3.2).
-
-    Env is explicit config, not entropy — `(ledger, policy, env) ⇒ tables` holds.
-    """
-    env = os.environ.get("CAGE_HUMAN_RATE")
-    if env:
-        try:
-            return (float(env), "env")
-        except ValueError:
-            pass
-    return (float(pol.get("human", {}).get("rate_usd_per_hr", 0.0)), "policy")
-
-
 def budgets(pol: dict) -> dict:
     b = pol.get("budgets", {})
     return {"session_usd": b.get("session_usd"), "daily_usd": b.get("daily_usd"),
@@ -259,12 +305,32 @@ def debug_enabled(pol: dict) -> bool:
     return _flag("CAGE_DEBUG", pol, "debug", "enabled", False)
 
 
+def task_correlation_enabled(pol: dict) -> bool:
+    """Whether the best-effort `task` backfill (plan §4 / Phase 4) runs — correlating an
+    import against `tasks.jsonl` by session/time window. Default **off**: it ships
+    disabled until validated against real correlated data (handoff §3), and its output is
+    always its own `method`/confidence-tagged, never ground truth. Env
+    `CAGE_TASK_CORRELATION` overrides policy `[capture] task_correlation`."""
+    return _flag("CAGE_TASK_CORRELATION", pol, "capture", "task_correlation", False)
+
+
 def cleanup_enabled(pol: dict) -> bool:
-    """Whether the state-dir maintenance sweep (`cage/cleanup.py`) may run — auto
-    (piggybacked on import) and manual `cage data cleanup --apply` both honor it. Env
-    `CAGE_CLEANUP` overrides policy `[cleanup] enabled`; default on. Cleanup only
-    ever touches the closed state/ allowlist — never the ledger or policy."""
+    """Whether the **automatic** state-dir sweep (`cleanup.maybe_run`, piggybacked on
+    import) may run at all. Env `CAGE_CLEANUP` overrides policy `[cleanup] enabled`;
+    default on. `enabled=false` means the auto path does nothing — no reminder — but
+    is deliberately NOT consulted by a manually-typed `cage data cleanup` /
+    `--apply`: an explicit command is always honored (the safer of the two readings —
+    see `cleanup.py`'s module docstring). Cleanup only ever touches the closed
+    state/ allowlist — never the ledger or policy — and since v0.37 the auto path
+    never deletes anything either way; see `cleanup_warn`."""
     return _flag("CAGE_CLEANUP", pol, "cleanup", "enabled", True)
+
+
+def cleanup_warn(pol: dict) -> bool:
+    """Whether the auto sweep prints its stderr reminder when `cleanup_enabled` is
+    true (it never deletes — `cage data cleanup --apply` is the only path that does).
+    Env `CAGE_CLEANUP_WARN` overrides policy `[cleanup] warn`; default on."""
+    return _flag("CAGE_CLEANUP_WARN", pol, "cleanup", "warn", True)
 
 
 def cleanup_days(pol: dict) -> int:
@@ -324,6 +390,14 @@ def import_before_export(pol: dict) -> bool:
 
 
 def default_toml() -> str:
-    """The policy.toml `cage setup` writes — a copy of the bundled default."""
-    src = paths.bundled_data() / "policy.toml"
+    """The `cage.toml` `cage setup` writes — a copy of the bundled default (policy only;
+    vendor prices live in `prices.toml`, see :func:`default_prices_toml`)."""
+    src = paths.bundled_data() / _BUNDLED_POLICY
+    return src.read_text(encoding="utf-8")
+
+
+def default_prices_toml() -> str:
+    """The `prices.toml` `cage setup` writes — a copy of the bundled price table
+    (the model rate rows, `[credits]`, and the price `[meta]` counters)."""
+    src = paths.bundled_data() / _BUNDLED_PRICES
     return src.read_text(encoding="utf-8")

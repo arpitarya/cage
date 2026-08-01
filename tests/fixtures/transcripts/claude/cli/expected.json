@@ -22,7 +22,8 @@
       "ok": true,
       "retries": 0,
       "scope": "",
-      "project": "cage-testbed"
+      "project": "cage-testbed",
+      "cache_write_in": 600
     },
     {
       "id": "c_bbbbbbbb5555666",
@@ -41,8 +42,7 @@
       "ok": true,
       "retries": 0,
       "scope": "",
-      "project": "cage-testbed",
-      "gap_ms": 37000
+      "project": "cage-testbed"
     }
   ]
 }

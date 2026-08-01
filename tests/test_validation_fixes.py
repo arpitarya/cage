@@ -128,21 +128,18 @@ def test_real_home_cage_is_not_a_project_root_under_cage_home(tmp_path, monkeypa
     assert paths.resolve_root(sandbox) == tmp_path / "iso"     # the redirect wins
 
 
-def test_hook_in_no_project_dir_writes_global_not_a_stray_footprint(tmp_path, monkeypatch):
-    """A hook firing in a dir with no project `.cage/` must capture into the global
-    ledger — the old `find_project_root or cwd` fallback scaffolded a stray `.cage/`
-    in the session's cwd and split the ledger (2026-07 manual validation: a Claude
-    session in a fresh dir left `.cage/ledger/` there and 0 rows in `~/.cage`)."""
-    import json
-    from cage import hooks
+def test_capture_in_no_project_dir_writes_global_not_a_stray_footprint(tmp_path, monkeypatch):
+    """Capture in a dir with no project `.cage/` must land in the global ledger — the
+    old `find_project_root or cwd` fallback scaffolded a stray `.cage/` in the session's
+    cwd and split the ledger (2026-07 manual validation: a Claude session in a fresh dir
+    left `.cage/ledger/` there and 0 rows in `~/.cage`). Now that capture is pull-based,
+    `metering.record_call`'s library default is the surviving guarantee."""
     home = tmp_path / "home"
     (home / ".cage").mkdir(parents=True)
     monkeypatch.setenv("CAGE_HOME", str(home))
     monkeypatch.delenv("CAGE_BASE", raising=False)
     nowhere = tmp_path / "no-project-session-dir"
     nowhere.mkdir()
-    assert hooks._root({"cwd": str(nowhere)}) == home          # global, not cwd
-    # And metering's library default follows the same precedence.
     from cage import ledger, metering
     monkeypatch.chdir(nowhere)
     assert metering.record_call(route="chat", provider="anthropic",

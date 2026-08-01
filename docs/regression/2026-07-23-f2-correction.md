@@ -1,3 +1,12 @@
+> ## ⚠ SUPERSEDED — absorbed into [finding: health-contradiction](2026-07-22-finding-health-contradiction.md)
+>
+> This correction's substance now lives as *history* inside the F2 finding doc,
+> which owns F2's current status. **This file is kept, unedited, as the cited
+> published evidence** — it is where the correction was first recorded (2026-07-23).
+> For "what is F2's status **now**?", read the finding doc.
+
+---
+
 # 2026-07-23 — Correction to F2 (`captured:false` while rows exist)
 
 This is a correction to a finding in

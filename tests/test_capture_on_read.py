@@ -15,6 +15,7 @@ from types import SimpleNamespace
 import pytest
 
 from cage import importcmd, ledger, paths, report
+from srcseed import mkcage
 
 
 @pytest.fixture(autouse=True)
@@ -41,7 +42,7 @@ def _claude_log(d, uuid, tin, tout):
 
 def _proj(tmp_path):
     root = tmp_path / "proj"
-    (root / ".cage").mkdir(parents=True)
+    mkcage(root)
     return root
 
 

@@ -50,9 +50,13 @@ def sync_line(root: Path) -> str | None:
     policy (no ``[meta]``) reads as older-than-bundle and fires the hint."""
     from cage import pricescmd  # deferred: CLI-layer module, keep import light
     foot = paths.Footprint(root)
-    if not foot.policy.exists():
+    # prices_version lives in the prices file after the split (prices-toml plan §2.1) —
+    # read it there, not the policy file, or a migrated project reads as pre-0.19 and
+    # the staleness hint fires falsely. `foot.prices` is the legacy cage.toml for an
+    # un-split project, so this stays correct across both layouts.
+    if not foot.prices.exists():
         return None
-    meta = policy.load_project_raw(foot.policy).get("meta", {})
+    meta = policy.load_project_raw(foot.prices).get("meta", {})
     return pricescmd.sync_recommendation(meta)
 
 
@@ -113,7 +117,8 @@ def unpriced_lines(root: Path, pol: dict, calls: list[dict] | None = None,
     idx = receiptprice.build(calls, receipt_rows)  # once per view, never per receipt
     agg = {"receipts": 0, "tokens": 0, "tools": set()}
     for r in receipt_rows:
-        if r.get("tool") == "human":  # Tier-1 axis — never a pricing gap (§4.10)
+        if r.get("tool") == "human" or r.get("unit") == "minutes":
+            # Legacy Tier-1 row — excluded by decision, not a pricing gap
             continue
         if receiptprice.eligible(r, by_id) and receiptprice.resolve(r, idx, pol) is None:
             agg["receipts"] += 1

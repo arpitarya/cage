@@ -1,0 +1,4 @@
+4b3567fa5fe4a608a45a17b0e9ccc5f2f83980f375580e84a2420fa4b34b03cc  2026-08-01-leg-d-run-report.md
+# sha256 over the WHOLE file (all bytes, byte 0 to EOF).
+# Verify with:
+#   shasum -a 256 -c 2026-08-01-leg-d-run-report.md.sha256

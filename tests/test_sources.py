@@ -53,25 +53,21 @@ def _write_policy(root, body: str):
     (base / "policy.toml").write_text(body, encoding="utf-8")
 
 
-# ── MUST-NEVER-SKIP 1: empty/absent [sources] is byte-identical to the built-ins ──
+# ── MUST-NEVER-SKIP 1: [sources] is the ONLY authority (Directive A, §3.6) ──
 
-def test_empty_sources_is_byte_identical_to_builtin_registry(monkeypatch):
+def test_empty_sources_captures_nothing(monkeypatch):
+    # Directive A: the built-in registry is a SEED, not a runtime fallback. With no
+    # [sources] table, resolution yields NOTHING (and the import sweep says so loudly).
     _no_env(monkeypatch)
     for pol in ({}, {"sources": {}}):  # no key, and an empty [sources] table
         res = paths.resolve_log_sources(pol)
-        assert res.problems == [] and res.disabled == []
-        for agent in agents.SURFACES:
-            got = [(s.path, s.glob) for s in res.sources if s.agent == agent]
-            assert got == paths._builtin_log_sources(agent), agent
-            assert all(s.provenance == "built-in"
-                       for s in res.sources if s.agent == agent)
-    # The legacy per-agent accessor is unchanged with no policy.
-    assert len(paths.agent_log_sources("copilot")) == 2
+        assert res.problems == [] and res.sources == []
+    assert paths.agent_log_sources("copilot") == []  # nothing resolves without [sources]
 
 
-def test_empty_sources_import_is_identical_to_no_sources_key(monkeypatch, tmp_path):
+def test_no_sources_captures_nothing_loudly(monkeypatch, tmp_path):
     _isolate_homes(tmp_path, monkeypatch)
-    # Plant one claude log in the isolated claude home so a real sweep captures it.
+    # Plant a claude log in the isolated home — with no [sources] it is NOT captured.
     cl = tmp_path / "home-claude_config_dir" / "projects" / "p"
     cl.mkdir(parents=True)
     (cl / "session-x.jsonl").write_text(_claude_line("u1", 100, 50) + "\n", encoding="utf-8")
@@ -80,53 +76,50 @@ def test_empty_sources_import_is_identical_to_no_sources_key(monkeypatch, tmp_pa
         root = tmp_path / body[:4]
         _write_policy(root, body)
         monkeypatch.chdir(root)
-        importcmd.run(root, "all", _imp_args())
-        return paths.Footprint(root).calls.read_bytes() if paths.Footprint(root).calls.exists() \
-            else b"".join(p.read_bytes() for p in paths.Footprint(root).shards("calls"))
+        lines = importcmd.run(root, "all", _imp_args())
+        return ledger.calls(root), lines
 
-    no_key = _capture("# no sources table\n")
-    empty = _capture("[sources]\n")
-    assert no_key and no_key == empty  # same rows, byte-for-byte
+    no_key_rows, no_key_lines = _capture("# no sources table\n")
+    empty_rows, _ = _capture("[sources]\n")
+    assert no_key_rows == [] and empty_rows == []               # nothing captured
+    assert any("no [sources]" in ln for ln in no_key_lines)     # …and it is loud
 
 
-# ── MUST-NEVER-SKIP 2: the full precedence matrix ─────────────────────────────
+# ── MUST-NEVER-SKIP 2: [sources] is the sole authority; env is not consulted ──
 
-def test_precedence_env_beats_policy_beats_builtin(monkeypatch, tmp_path):
+def test_sources_are_the_only_authority_env_ignored(monkeypatch, tmp_path):
     _no_env(monkeypatch)
-    # env home override on copilot only → its built-in candidates are tagged `env`;
-    # claude keeps `built-in`.
+    # An env home override is NO LONGER consulted for path resolution (Directive A):
+    # copilot has no [sources.copilot], so it resolves nothing despite COPILOT_HOME being set.
     monkeypatch.setenv("COPILOT_HOME", str(tmp_path / "copilot-redirected"))
     add = tmp_path / "extra-claude"
     pol = {"sources": {"claude": {"paths": [str(add)]}}}
     res = paths.resolve_log_sources(pol)
 
     claude = [s for s in res.sources if s.agent == "claude"]
-    assert [s.provenance for s in claude] == ["built-in", "policy"]  # built-in first, add second
-    assert claude[1].path == add and claude[1].fmt == "claude"
-    copilot = [s for s in res.sources if s.agent == "copilot"]
-    assert copilot and all(s.provenance == "env" for s in copilot)  # redirected home ⇒ env
+    assert [s.path for s in claude] == [add]  # only the declared path — no built-in prepended
+    assert all(s.provenance == "policy" for s in claude) and claude[0].fmt == "claude"
+    assert [s for s in res.sources if s.agent == "copilot"] == []  # env ignored, undeclared
 
 
-def test_replace_drops_builtins_and_empty_disables(monkeypatch, tmp_path):
+def test_undeclared_agent_has_no_sources(monkeypatch, tmp_path):
+    # `replace`/`disabled` are gone: an agent is captured iff it has a [sources.<agent>]
+    # entry. Declaring copilot leaves kiro (undeclared) with nothing — the new "disable".
     _isolate_homes(tmp_path, monkeypatch)
     only = tmp_path / "only-copilot"
-    pol = {"sources": {
-        "copilot": {"paths": [str(only)], "replace": True},   # replace built-ins
-        "kiro": {"paths": [], "replace": True},                # disable entirely
-    }}
+    pol = {"sources": {"copilot": {"paths": [str(only)]}}}
     res = paths.resolve_log_sources(pol)
     copilot = [s for s in res.sources if s.agent == "copilot"]
     assert [s.path for s in copilot] == [only] and copilot[0].provenance == "policy"
-    assert not [s for s in res.sources if s.agent == "kiro"]
-    assert res.disabled == ["kiro"]
+    assert [s for s in res.sources if s.agent == "kiro"] == []  # undeclared ⇒ silent
 
 
-def test_policy_path_equal_to_builtin_dedupes_to_builtin(monkeypatch):
+def test_duplicate_policy_paths_dedupe(monkeypatch, tmp_path):
     _no_env(monkeypatch)
-    builtin_dir = paths._builtin_log_sources("claude")[0][0]  # ~/.claude/projects
-    pol = {"sources": {"claude": {"paths": [str(builtin_dir)]}}}
+    d = tmp_path / "logs"
+    pol = {"sources": {"claude": {"paths": [str(d), str(d)]}}}  # same path twice
     claude = [s for s in paths.resolve_log_sources(pol).sources if s.agent == "claude"]
-    assert len(claude) == 1 and claude[0].provenance == "built-in"  # deduped, keeps built-in
+    assert len(claude) == 1 and claude[0].provenance == "policy"  # deduped by (path, glob)
 
 
 # ── expansion, validation ─────────────────────────────────────────────────────
@@ -233,19 +226,17 @@ def test_portability_never_warns_for_global_policy(monkeypatch, tmp_path):
     assert not _probe(fresh, abs_pol, monkeypatch, committed=True)["portability"]
 
 
-def test_doctor_paths_shows_provenance_and_disabled(monkeypatch, tmp_path):
+def test_doctor_paths_shows_policy_authority_and_undeclared(monkeypatch, tmp_path):
     _isolate_homes(tmp_path, monkeypatch)
     root = tmp_path / "proj"
     (root / ".cage").mkdir(parents=True)
     monkeypatch.chdir(root)
-    pol = {"sources": {"claude": {"paths": ["~/alt"]},
-                       "kiro": {"paths": [], "replace": True}}}
+    # Directive A: only [sources] declares paths. claude declared; kiro/copilot undeclared.
+    pol = {"sources": {"claude": {"paths": ["~/alt"]}}}
     out = pathprobe.run(root, pol)
-    # homes are env-redirected here, so built-ins read as [env]; the point is that
-    # every candidate carries *a* provenance tag and the policy add reads [policy].
-    assert "[policy]" in out and ("[built-in]" in out or "[env]" in out)
-    assert "disabled by policy" in out
-    assert "provenance: built-in" in out  # the legend line
+    assert "[policy]" in out                       # the declared source's provenance tag
+    assert "not declared in [sources]" in out      # kiro/copilot swept nothing — loud
+    assert "SOLE path authority" in out            # the legend line reflects the new model
 
 
 # ── policy sync ownership ─────────────────────────────────────────────────────
@@ -343,3 +334,135 @@ def test_doctor_paths_shows_the_declared_glob(monkeypatch, tmp_path):
     monkeypatch.chdir(root)
     pol = {"sources": {"claude": {"paths": ["~/alt"], "glob": "usage-*.ndjson"}}}
     assert "usage-*.ndjson" in pathprobe.run(root, pol)  # the pattern column
+
+
+# ── surface key: restamp the client-surface only when declared (both shapes) ──
+
+def test_surface_absent_defaults_empty_and_is_byte_identical(monkeypatch, tmp_path):
+    _no_env(monkeypatch)
+    # No surface key anywhere ⇒ every LogSource.surface is "" (parser value stands).
+    pol = {"sources": {"claude": {"paths": [str(tmp_path / "a")]}}}
+    for s in paths.resolve_log_sources(pol).sources:
+        assert s.surface == ""
+
+
+def test_surface_dict_shape_restamps_imported_rows(monkeypatch, tmp_path):
+    _isolate_homes(tmp_path, monkeypatch)
+    logs = tmp_path / "kiro-cli-logs"
+    logs.mkdir()
+    (logs / "session-k1.jsonl").write_text(_claude_line("cs1", 120, 30) + "\n",
+                                           encoding="utf-8")
+    root = tmp_path / "proj"
+    # A built-in agent (claude here) whose parser leaves surface="" — declaring
+    # surface="cli" must restamp the row (the exact fix for a non-IDE store).
+    _write_policy(root, f'[sources.claude]\npaths = ["{logs.as_posix()}"]\nsurface = "cli"\n')
+    monkeypatch.chdir(root)
+    importcmd.run(root, "all", _imp_args())
+    rows = ledger.calls(root)
+    assert rows and all(r.get("surface") == "cli" for r in rows)
+
+
+def test_surface_array_shape_restamps_per_entry(monkeypatch, tmp_path):
+    _isolate_homes(tmp_path, monkeypatch)
+    logs = tmp_path / "alt"
+    logs.mkdir()
+    (logs / "s.jsonl").write_text(_claude_line("ca1", 10, 5) + "\n", encoding="utf-8")
+    root = tmp_path / "proj"
+    _write_policy(root, f'[[sources.claude]]\npath = "{logs.as_posix()}"\nsurface = "vscode"\n')
+    monkeypatch.chdir(root)
+    importcmd.run(root, "all", _imp_args())
+    rows = ledger.calls(root)
+    assert rows and all(r.get("surface") == "vscode" for r in rows)
+
+
+def test_declared_surface_wins_on_builtin_collision(monkeypatch, tmp_path):
+    # capture-precision §3.5: declaring a surface on a path that EQUALS a built-in used
+    # to be silently dropped (the built-in, with no surface, won). Now the declared value
+    # wins — it upgrades the colliding built-in instead of vanishing.
+    _no_env(monkeypatch)
+    monkeypatch.setenv("KIRO_DATA_DIR", str(tmp_path / "kd"))
+    builtin = paths.kiro_token_log()  # the exact built-in kiro path
+    pol = {"sources": {"kiro": {"paths": [str(builtin)], "surface": "cli"}}}
+    ksrcs = [s for s in paths.resolve_log_sources(pol).sources if s.agent == "kiro"]
+    assert ksrcs, "the kiro source must still resolve (not dropped)"
+    assert all(s.surface == "cli" for s in ksrcs)  # declared value applied, not lost
+
+
+def test_surface_out_of_set_is_a_problem_not_a_raise(monkeypatch, tmp_path):
+    _no_env(monkeypatch)
+    res = paths.resolve_log_sources(
+        {"sources": {"claude": {"paths": [str(tmp_path / "a")], "surface": "phone"}}})
+    assert res.problems and any("surface must be one of" in p for p in res.problems)
+    # the bad entry is skipped, never crashes the sweep (fail-open)
+    assert not [s for s in res.sources
+                if s.agent == "claude" and s.provenance == "policy"]
+
+
+def test_custom_tool_surface_restamps_alongside_agent(monkeypatch, tmp_path):
+    _isolate_homes(tmp_path, monkeypatch)
+    logs = tmp_path / "router-logs"
+    logs.mkdir()
+    (logs / "r.jsonl").write_text(_claude_line("cx1", 50, 10) + "\n", encoding="utf-8")
+    root = tmp_path / "proj"
+    _write_policy(root, f'[sources.myrouter]\npaths = ["{logs.as_posix()}"]\n'
+                        f'format = "claude"\nsurface = "cli"\n')
+    monkeypatch.chdir(root)
+    importcmd.run(root, "all", _imp_args())
+    rows = ledger.calls(root)
+    assert rows and all(r["agent"] == "myrouter" and r.get("surface") == "cli"
+                        for r in rows)
+
+
+def test_doctor_paths_shows_surface(monkeypatch, tmp_path):
+    _isolate_homes(tmp_path, monkeypatch)
+    root = tmp_path / "proj"
+    (root / ".cage").mkdir(parents=True)
+    monkeypatch.chdir(root)
+    pol = {"sources": {"claude": [{"path": "~/alt", "surface": "cli"},
+                                   {"path": "~/alt2"}]}}  # one declares surface, one doesn't
+    out = pathprobe.run(root, pol)
+    assert "surface=cli" in out       # declared surface shown
+    assert "surface=parser" in out    # the undeclared-surface source shows the fallback
+
+
+# ── Directive A: materialization, --sync-sources, and drift ────────────────────
+
+def test_setup_materializes_active_sources_table(monkeypatch, tmp_path):
+    # `cage setup` (initcmd.run) freezes the built-in seed into an ACTIVE [sources] table
+    # (not the inert comment block the bundle ships).
+    from cage import initcmd
+    root = tmp_path / "proj"
+    initcmd.run(root, pointer=False)
+    text = (root / ".cage" / "cage.toml").read_text(encoding="utf-8")
+    assert "[[sources.claude]]" in text and paths.SOURCES_START in text
+    pol = policy.load(paths.Footprint(root).policy)
+    assert [s for s in paths.resolve_log_sources(pol).sources if s.agent == "claude"]
+
+
+def test_sync_sources_preserves_user_entries(monkeypatch, tmp_path):
+    from cage import initcmd
+    root = tmp_path / "proj"
+    initcmd.run(root, pointer=False)
+    fp = paths.Footprint(root)
+    # A user pins an extra source OUTSIDE the managed marker block.
+    fp.policy.write_text(fp.policy.read_text(encoding="utf-8")
+                         + '\n[[sources.myrouter]]\npath = "~/mine"\nformat = "claude"\n',
+                         encoding="utf-8")
+    initcmd.sync_sources(fp)  # refresh managed block
+    text = fp.policy.read_text(encoding="utf-8")
+    assert "[[sources.myrouter]]" in text          # user entry survives the refresh
+    assert "[[sources.claude]]" in text            # managed block regenerated
+
+
+def test_sources_drift_reports_missing_and_in_sync(monkeypatch, tmp_path):
+    _no_env(monkeypatch)
+    # A materialized (seed) table has no drift; a table missing an agent shows it missing.
+    full = {"sources": {}}
+    for e in paths.sources_seed():
+        full["sources"].setdefault(e["name"], []).append(
+            {k: v for k, v in e.items() if k != "name"})
+    missing, stale = paths.sources_drift(full)
+    assert missing == [] and stale == []            # a full seed is in sync
+    partial = {"sources": {"claude": full["sources"]["claude"]}}  # only claude declared
+    missing, _ = paths.sources_drift(partial)
+    assert any(m.startswith("copilot") for m in missing)  # copilot default is missing

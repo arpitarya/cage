@@ -77,7 +77,7 @@ def test_R1_report_tokens_default(run):
     go = run(seed.wmh)
     seed.set_last_import(go.root, _now())
     out = go("R1", ["report", "--by", "agent"])
-    assert "$0" not in out and "saved tok" in out  # no dollar figures by default
+    assert "$0" not in out and "gross tok" in out  # no dollar figures by default
     assert "kiro: input-only log — tok out not recorded" in out
     assert "unpriced — matters when you view $" in out
 
@@ -163,7 +163,7 @@ def test_I4_verdict_insufficient(run):
 
 def test_I5_compare_groups_and_refusal(run):
     go = run(seed.compare_estimate)
-    out = go("I5", ["insights", "compare", "--label", "docfix", "--agent-only"])
+    out = go("I5", ["insights", "compare", "--label", "docfix"])
     assert "agent-only" in out and "graphify" in out
     assert "insufficient data (n=2 < 5)" in out
     assert "observed difference" in out  # the observational caveat renders
@@ -254,7 +254,10 @@ def test_P4_prices_sync(run, capsys):
     from cage import initcmd, pricestoml
     go = run()
     initcmd.run(go.root)
-    pricestoml.update_meta(go.root, {"prices_version": "2020-01-01"})
+    # prices_version lives in prices.toml after the split — backdate it there so the
+    # staleness path renders (prices-toml plan §2.1).
+    pricestoml.update_meta(go.root, {"prices_version": "2020-01-01"},
+                           target=pricestoml.prices_meta_target(go.root))
     capsys.readouterr()
     go("P4a", ["prices", "sync"])
     go("P4b", ["prices", "sync", "--update"])
@@ -280,14 +283,14 @@ def test_S1_S2_study_join_start_shapes(run, capsys):
 
 def test_S3_study_report_healthy(run):
     go = run(seed.fleet)
-    out = go("S3", ["study", "report", "--agent-only"])
+    out = go("S3", ["study", "report"])
     assert "estimated" in out
     assert "not a controlled experiment" in out or "work mix" in out
 
 
 def test_S4_study_report_refusal(run):
     go = run(lambda r: seed.fleet(r, complete=3))
-    out = go("S4", ["study", "report", "--agent-only"])
+    out = go("S4", ["study", "report"])
     assert "insufficient machines with both phases (n=3 < 5)" in out
 
 

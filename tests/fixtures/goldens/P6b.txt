@@ -1,7 +1,7 @@
 $ cage policy sync
-policy sync — bundled v0.26.0 vs project v0.26.0
+policy sync — bundled v0.27.0 vs project v0.27.0
 
-· 29 project keys equal to the bundle — in sync
+· 9 project keys equal to the bundle — in sync
 
 pricing tables — delegated to `cage prices sync`:
   prices sync — bundled 2026-07-14 vs project 2026-07-14

@@ -1,0 +1,2 @@
+adee80650612d939ab7312aa9970f08e2599a169bc910a5fe0b3af1ec39c2b61  VALIDATION-REPORT.md
+# sha256 covers all bytes from the newline after `<!-- HASH-COVERS-BELOW -->` to EOF (the header above the marker, which prints this hash, is excluded).

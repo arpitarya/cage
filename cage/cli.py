@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import argparse
 
-from cage import __version__, clicmds, errors, hooks, verbmap
+from cage import __version__, clicmds, errors, verbmap
 from cage.agents import SURFACES
 from cage.report import DIMENSIONS
 
@@ -30,8 +30,8 @@ daily:
 
 groups (run any group name for its commands):
   insights    attrib · matrix · roi · verdict · budget · compare · estimate ·
-              calibration · trend · why · forecast · regression · recommend
-  human       show · record · outcome · quality
+              calibration · why · forecast · regression · recommend
+  task        outcome · quality
   authorship  origin · verify · notes-sync · ledger-sync
   prices      list · unpriced · set · alias · route-tool · sync
   study       join · start · stop · report · id
@@ -40,7 +40,7 @@ groups (run any group name for its commands):
 
 $ cage report --since 7d          # the daily number
 $ cage insights verdict graphify  # is this tool paying for itself?
-$ cage human record 12m           # attest human time on the open task
+$ cage task outcome t_9f31        # close a task so compare/estimate can see it
 $ cage study join baseline        # enroll this laptop in the fleet study
 $ cage prices route-tool graphify --to copilot/claude-sonnet-4.6
 """
@@ -88,7 +88,7 @@ def _capture_flags(p: argparse.ArgumentParser) -> None:
 
 
 def _group(sub, name: str, help_text: str):
-    """A command group (insights/human/authorship/data) — a subparser holding nested
+    """A command group (insights/task/authorship/data) — a subparser holding nested
     subparsers that dispatch to the same run functions. Bare `cage <group>` prints the
     group's help (its command list); a chosen subcommand's own `fn` default wins."""
     g = sub.add_parser(name, help=help_text)
@@ -154,31 +154,33 @@ def build_parser() -> argparse.ArgumentParser:
     im.add_argument("--since", metavar="WINDOW", help="only transcripts modified within a window like 7d / 24h / 2w")
     im.set_defaults(fn=clicmds.cmd_import)
 
-    st = sub.add_parser("setup", help="make this project (or --global) metered: scaffold .cage/ + skill + per-project wiring + graphify (interactive, or drive it with --<agent>)",
+    st = sub.add_parser("setup", help="make this project (or --global) metered: scaffold .cage/ + MCP wiring + graphify (capture is pull-based — `cage import`)",
                         epilog="examples:\n"
-                               "  cage setup                      # interactive: scaffold, then pick an agent, y/n each step\n"
-                               "  cage setup --claude             # non-interactive: all steps for claude\n"
-                               "  cage setup --project-only --claude  # scaffold + graphify only, no global skill\n"
-                               "  cage setup --wire-only --claude     # agent wiring only, no scaffold\n"
+                               "  cage setup --claude             # scaffold + MCP wiring + graphify for claude\n"
+                               "  cage setup --all                # all three agents\n"
+                               "  cage setup --project-only --claude  # scaffold + graphify only, no MCP wiring\n"
+                               "  cage setup --wire-only --claude     # MCP wiring only, no scaffold\n"
                                "  cage setup --status             # show which agents are wired\n"
                                "  cage setup --python-launcher --all  # no-exe wiring for locked-down endpoints",
                         formatter_class=argparse.RawDescriptionHelpFormatter)
     for _s in SURFACES:
-        st.add_argument(f"--{_s}", action="store_true", help=f"set up the {_s} agent non-interactively (skips the wizard)")
-    st.add_argument("--all", dest="all_agents", action="store_true", help="set up all three agents non-interactively (capture works for any of them)")
-    st.add_argument("--project-only", action="store_true", help="scaffold .cage/ + graphify + PATH only; skip the global skill")
+        st.add_argument(f"--{_s}", action="store_true", help=f"set up the {_s} agent")
+    st.add_argument("--all", dest="all_agents", action="store_true", help="set up all three agents (capture works for any of them)")
+    st.add_argument("--project-only", action="store_true", help="scaffold .cage/ + graphify + PATH only; skip MCP wiring")
     st.add_argument("--wire-only", action="store_true", help="wire agent(s) only; skip scaffold and graphify")
     st.add_argument("--status", action="store_true", help="report which agents are wired (no changes)")
     st.add_argument("--global", dest="global_ledger", action="store_true",
                     help="initialize the global ledger (~/.cage) for project-less capture, then exit")
-    st.add_argument("--no-skill", dest="skill", action="store_false", help="skip installing the /cage skill")
-    st.add_argument("--repo-skill", dest="repo_skill", action="store_true", help="install the /cage skill into this repo (committed, team-shared) instead of the machine-wide home")
-    st.add_argument("--no-project", dest="project", action="store_false", help="skip per-project .cage/ scaffold + hook wiring")
+    st.add_argument("--no-project", dest="project", action="store_false", help="skip per-project .cage/ scaffold + MCP wiring")
     st.add_argument("--no-graphify", dest="graphify", action="store_false", help="skip the graphify interceptor")
     st.add_argument("--python-launcher", action="store_true",
                     help="persist [wiring] python_launcher=true and wire everything "
                          "via `python3 -m cage` / `py -3 -m cage` — no exe probed or "
                          "executed (restricted endpoints; `cage query restricted-env`)")
+    st.add_argument("--sync-sources", dest="sync_sources", action="store_true",
+                    help="refresh the cage-managed [sources] block in cage.toml from the "
+                         "built-in defaults (Directive A) — preserves user-added entries; "
+                         "run after upgrading cage to pick up new/corrected default paths")
     st.set_defaults(fn=clicmds.cmd_setup)
 
     dr = sub.add_parser("doctor", help="verify this project's Cage setup is correct and working")
@@ -200,7 +202,7 @@ def build_parser() -> argparse.ArgumentParser:
     qy = sub.add_parser("query", help="explain how a value is calculated, or how cage itself works ($0, deterministic)",
                         epilog="examples:\n"
                                "  cage query \"how does cage work\"      # concept: the front door\n"
-                               "  cage query \"how is human cost calculated\"\n"
+                               "  cage query \"how is attribution calculated\"\n"
                                "  cage query cost                      # exact topic id\n"
                                "  cage query --list --kind concept     # just the how-it-works topics\n"
                                "  cage query roi --json                # structured, for an agent",
@@ -215,7 +217,7 @@ def build_parser() -> argparse.ArgumentParser:
     # ── group: insights (attribution + money views, the differentiator) ────────
     insights = _group(sub, "insights",
                        "per-tool savings & money views: attrib · matrix · roi · "
-                       "verdict · budget · compare · estimate · calibration · trend · "
+                       "verdict · budget · compare · estimate · calibration · "
                        "why · forecast · regression · recommend")
 
     at = insights.add_parser("attrib", help="per-tool marginal savings for a task (§4.2)")
@@ -228,13 +230,10 @@ def build_parser() -> argparse.ArgumentParser:
     at.set_defaults(fn=clicmds.cmd_attrib)
 
     mx = insights.add_parser("matrix", help="counterfactual permutation table for a task (§4.4)",
-                             epilog="example:\n  cage insights matrix --human   # add a human-baseline row + vs-human columns",
+                             epilog="example:\n  cage insights matrix --usd     # add the cost column",
                              formatter_class=argparse.RawDescriptionHelpFormatter)
     mx.add_argument("--task", help="task id (default: most recent)")
     mx.add_argument("--scope", metavar="DIR", help="filter to one monorepo top-level dir (§3.6.2)")
-    mx.add_argument("--human", action="store_true",
-                    help="add the Tier-1 human anchor row + vs-human columns "
-                         "(a $ view — implies --usd)")
     mx.add_argument("--usd", action="store_true",
                     help="add the cost column (the token grid is the default and "
                          "always renders; `[display] usd = true` for always-on)")
@@ -252,11 +251,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     vd = insights.add_parser("verdict",
                              help="one-line answer: is this tool saving or costing? "
-                                  "(pure composer over attrib/roi/trend/regression/quality)")
+                                  "(pure composer over attrib/roi/regression/quality)")
     vd.add_argument("tool", help="tool name as it appears on receipts (e.g. graphify)")
     vd.add_argument("--since", metavar="WINDOW", help="window like 30d / 2w (default: all history)")
-    vd.add_argument("--agent-only", action="store_true",
-                    help="suppress the total-cost line (agent $ + human attention minutes × rate)")
     _json_flag(vd)
     _capture_flags(vd)
     vd.set_defaults(fn=clicmds.cmd_verdict)
@@ -272,11 +269,9 @@ def build_parser() -> argparse.ArgumentParser:
                              help="measured comparison of closed tasks grouped by stack "
                                   "(n · median · IQR; the delta is estimated, observational)")
     cp.add_argument("--scope", metavar="DIR", help="filter to one monorepo top-level dir")
-    cp.add_argument("--label", metavar="WORD", help="filter to tasks labelled via `cage human outcome --label`")
+    cp.add_argument("--label", metavar="WORD", help="filter to tasks labelled via `cage task outcome --label`")
     cp.add_argument("--by", default="stack", metavar="KEYS",
                     help="comma-separated grouping keys from stack,scope,label (stack always included)")
-    cp.add_argument("--agent-only", action="store_true",
-                    help="suppress the total-cost line (agent $ + human attention minutes × rate)")
     _json_flag(cp)
     _csv_flag(cp)
     _capture_flags(cp)
@@ -286,7 +281,7 @@ def build_parser() -> argparse.ArgumentParser:
                              help="pre-task cost band (median + IQR) from matching closed "
                                   "tasks — modeled, refuses thin history")
     es.add_argument("--scope", metavar="DIR", help="match tasks in one monorepo top-level dir")
-    es.add_argument("--label", metavar="WORD", help="match tasks labelled via `cage human outcome --label`")
+    es.add_argument("--label", metavar="WORD", help="match tasks labelled via `cage task outcome --label`")
     es.add_argument("--agent", metavar="NAME", help="match tasks a given agent worked")
     es.add_argument("--record", metavar="TASK",
                     help="stamp the band onto this OPEN task row (est_tokens/est_usd/est_n "
@@ -298,23 +293,10 @@ def build_parser() -> argparse.ArgumentParser:
     cb = insights.add_parser("calibration",
                              help="measured hit-rate of recorded estimates vs actuals — the "
                                   "estimator's empirical confidence level")
-    cb.add_argument("--human", action="store_true",
-                    help="score the derived-attention heuristic instead: derived/attested "
-                         "minute ratio over tasks carrying both (refuses thin data)")
     _json_flag(cb)
     _csv_flag(cb)
     _capture_flags(cb)
     cb.set_defaults(fn=clicmds.cmd_calibration)
-
-    tr = insights.add_parser("trend", help="cost+time savings over time, by week or month (§5b.4)")
-    tr.add_argument("--by", choices=["week", "month"], default="week")
-    tr.add_argument("--metric", choices=["cost", "time", "both"], default="both")
-    tr.add_argument("--since", metavar="WINDOW")
-    _json_flag(tr)
-    _html_flag(tr)
-    _csv_flag(tr)
-    _capture_flags(tr)
-    tr.set_defaults(fn=clicmds.cmd_trend)
 
     wy = insights.add_parser("why", help="full provenance: a call + every receipt against it")
     wy.add_argument("call_id")
@@ -340,48 +322,22 @@ def build_parser() -> argparse.ArgumentParser:
     _capture_flags(rc)
     rc.set_defaults(fn=clicmds.cmd_recommend)
 
-    # ── group: human (agent-vs-human axis) ─────────────────────────────────────
-    human = _group(sub, "human", "agent-vs-human savings: show · record · outcome · quality")
+    # ── group: task (the task-outcome axis the cost-impact views read) ─────────
+    # These two lived under the `human` group until v0.36 purely by filing accident:
+    # neither is the removed Tier-1 human-cost axis. `outcome` is the task-CLOSE verb
+    # every cost-impact view depends on (compare/estimate/calibration read only closed
+    # tasks); `quality` is cost-per-successful-task (§8.2). They moved, they did not go.
+    task = _group(sub, "task", "task outcomes and quality-adjusted cost: outcome · quality")
 
-    hu = human.add_parser("show", help="agent-vs-human savings: $ and hours saved (§4.1)")
-    hu.add_argument("--since", metavar="WINDOW", help="window like 30d / 2w")
-    hu.add_argument("--task", help="single task id")
-    hu.add_argument("--agent", help="filter to one agent")
-    _json_flag(hu)
-    _html_flag(hu)
-    _csv_flag(hu)
-    _capture_flags(hu)
-    hu.set_defaults(fn=clicmds.cmd_human)
-
-    hr = human.add_parser("record", help="record a Tier-1 human alternative for a task (§5)",
-                          epilog="examples:\n"
-                                 "  cage human record --task T --type feature   # price by task-type table\n"
-                                 "  cage human record --task T --minutes 90      # or by explicit minutes\n"
-                                 "  cage human record --task T --usd 150 --measured  # a real quote",
-                          formatter_class=argparse.RawDescriptionHelpFormatter)
-    hr.add_argument("--task", required=True)
-    hr.add_argument("--type", dest="task_type", help="task type (feature/bugfix/refactor/research/review)")
-    hr.add_argument("--minutes", type=float, help="human-minutes the task would have taken")
-    hr.add_argument("--usd", type=float, help="a directly-quoted dollar alternative")
-    hr.add_argument("--rate", type=float, help="override $/hr for this receipt")
-    hr.add_argument("--call", default="", help="the agent call this is the alternative to")
-    hr.add_argument("--agent", default="", help="attribute the saving to this agent")
-    hr.add_argument("--measured", action="store_true", help="a real timesheet/quote (not an estimate)")
-    hr.set_defaults(fn=clicmds.cmd_human_record)
-
-    oc = human.add_parser("outcome", help="record a task's outcome (ok / redo) for quality cost")
+    oc = task.add_parser("outcome", help="close a task with its outcome (ok / redo)")
     oc.add_argument("task")
-    oc.add_argument("--redo", action="store_true", help="mark the task as needing a human redo")
+    oc.add_argument("--redo", action="store_true", help="mark the task as needing a redo")
     oc.add_argument("--label", metavar="WORD",
                     help="tag the task with one short token (letters/digits/._-, ≤32 chars) "
                          "for `cage insights compare --by label` grouping — never a path or free text")
-    oc.add_argument("--minutes", type=float, metavar="N",
-                    help="attest the human minutes this task actually took (writes the same "
-                         "tool=\"human\" receipt as `cage human record --minutes`; attested "
-                         "beats derived turn-gap minutes, never summed)")
     oc.set_defaults(fn=clicmds.cmd_outcome)
 
-    ql = human.add_parser("quality", help="quality-adjusted cost: cost per successful task (§8.2)")
+    ql = task.add_parser("quality", help="quality-adjusted cost: cost per successful task (§8.2)")
     _json_flag(ql)
     _capture_flags(ql)
     ql.set_defaults(fn=clicmds.cmd_quality)
@@ -482,9 +438,6 @@ def build_parser() -> argparse.ArgumentParser:
                      help="join=enroll+wire+start · start/stop=phase markers · "
                           "report=coverage+paired delta · id=print the opaque machine id")
     st2.add_argument("phase", nargs="?", help="phase label for join/start (one short token)")
-    st2.add_argument("--agent-only", action="store_true",
-                     help="report: suppress the total-cost line (agent $ + human "
-                          "attention minutes × rate)")
     _json_flag(st2)
     _csv_flag(st2)
     st2.set_defaults(fn=clicmds.cmd_study)
@@ -558,14 +511,31 @@ def build_parser() -> argparse.ArgumentParser:
                                 "  cage data cleanup --days 7  # tighter window for this run only\n"
                                 "Cleanable (allowlist, by construction): aged debug.log/hooks-seen.jsonl rows,\n"
                                 "stale pending-* provenance buffers, cursors whose source log is gone, *.tmp.\n"
-                                "Never: ledger/, policy.toml, machine.json, study.jsonl, limits.json. State files\n"
-                                "are never read by derived views — cleanup cannot change a reported number.",
+                                "Never: ledger/ (tool savings included), policy.toml, machine.json, study.jsonl,\n"
+                                "limits.json. State files are never read by derived views — cleanup cannot\n"
+                                "change a reported number. The auto sweep (piggybacked on `cage import`) only\n"
+                                "ever warns on stderr — this command's --apply is the only path that deletes.",
                          formatter_class=argparse.RawDescriptionHelpFormatter)
     cu.add_argument("--apply", action="store_true", help="execute (default: dry-run print)")
     cu.add_argument("--days", type=int, metavar="N",
-                    help="retention window for this run (default: [cleanup] days, else 30)")
+                    help="retention window for this run (default: [cleanup] days, else 90)")
     _json_flag(cu)
     cu.set_defaults(fn=clicmds.cmd_cleanup)
+
+    ms = data.add_parser("migrate-savings",
+                         help="consolidate historical graphify receipts into savings/graphify/ (dry-run by default)",
+                         epilog="examples:\n"
+                                "  cage data migrate-savings          # dry-run: per-store row count + Σ saved + what would copy\n"
+                                "  cage data migrate-savings --apply  # copy graphify rows into savings/graphify/ (original ids, own-ts shard)\n"
+                                "receipts.jsonl is NEVER rewritten (append-only). `ledger.receipts()` id-dedupes the\n"
+                                "union of both stores, so a row in both counts exactly once — re-runs are no-ops, a\n"
+                                "half-done migration still reads correct totals, and attrib/report/roi stay byte-identical.\n"
+                                "Refuses --apply if the stores disagree on a shared id's saved value. graphify only\n"
+                                "(human/fux rows stay in receipts.jsonl until their sources get tree dirs).",
+                         formatter_class=argparse.RawDescriptionHelpFormatter)
+    ms.add_argument("--apply", action="store_true", help="execute the copy (default: dry-run print)")
+    _json_flag(ms)
+    ms.set_defaults(fn=clicmds.cmd_migrate_savings)
 
     wt = data.add_parser("watch", help="foreground poll loop: import every interval until Ctrl-C (no OS job)",
                          epilog="example:\n"
@@ -609,16 +579,10 @@ def build_parser() -> argparse.ArgumentParser:
     dbg.add_argument("--json", action="store_true", help="one JSON event per line")
     dbg.set_defaults(fn=clicmds.cmd_debug)
 
-    # Internal hook entrypoints (wired by `cage setup --wire-only`, not for direct use).
-    sub.add_parser("hook-session-start", help=argparse.SUPPRESS).set_defaults(fn=lambda a: hooks.session_start())
-    sub.add_parser("hook-stop", help=argparse.SUPPRESS).set_defaults(fn=lambda a: hooks.stop())
-    sub.add_parser("hook-session-end", help=argparse.SUPPRESS).set_defaults(fn=lambda a: hooks.session_end())
-    sub.add_parser("hook-post-tool-use", help=argparse.SUPPRESS).set_defaults(fn=lambda a: hooks.post_tool_use())
-    sub.add_parser("hook-post-commit", help=argparse.SUPPRESS).set_defaults(fn=lambda a: hooks.post_commit())
-    pcm = sub.add_parser("hook-prepare-commit-msg", help=argparse.SUPPRESS)
-    pcm.add_argument("msg_path")
-    pcm.set_defaults(fn=lambda a: hooks.prepare_commit_msg(a.msg_path))
-
+    # Hook entrypoints were removed with the hook machinery (capture is pull-based
+    # now — `cage import` / capture-on-read). The old `hook-*` verbs live in
+    # `verbmap.REMOVED` so stale wiring prints a direction instead of exiting 1
+    # silently.
     return p
 
 

@@ -9,7 +9,7 @@ import datetime as dt
 
 import pytest
 
-from cage import (cli, freshness, hooks, ledger, paths, policy, pricescmd,
+from cage import (cli, freshness, ledger, paths, policy, pricescmd,
                   pricestoml, receiptprice, report, schema)
 
 _META = {"meta": {"prices_version": "2026-01-01", "prices_date": "2026-01-01"}}
@@ -141,38 +141,10 @@ def test_freshness_clean_is_empty(root, bundle_meta):
     assert freshness.freshness(root, policy.load(None)) == []
 
 
-# ── surface: post-commit (print-only, fail-open, cage:-prefixed) ─────────────
-
-def test_post_commit_prints_prefixed_notes_and_exits_zero(root, capsys):
-    pricestoml.update_meta(root, {"prices_version": "2020-01-01"})
-    assert hooks.post_commit() == 0
-    out = capsys.readouterr().out
-    assert "cage: bundled prices are newer (" in out
-    assert "cage prices sync" in out
-
-
-def test_post_commit_silent_when_clean(root, bundle_meta, capsys, monkeypatch):
-    # freeze the hook's clock inside the stale window so the age signal is clean
-    class _D(dt.date):
-        @classmethod
-        def today(cls):
-            return dt.date(2026, 1, 10)
-    monkeypatch.setattr("datetime.date", _D)
-    assert hooks.post_commit() == 0
-    assert capsys.readouterr().out == ""
-
-
-def test_post_commit_freshness_failure_swallowed_and_logged(root, monkeypatch, capsys):
-    from cage import debuglog
-    monkeypatch.setenv("CAGE_DEBUG", "1")
-
-    def _boom(*_a, **_k):
-        raise RuntimeError("forced failure (audit)")
-    monkeypatch.setattr("cage.freshness.freshness", _boom)
-    assert hooks.post_commit() == 0  # fail-open holds
-    contexts = {e.get("context", "") for e in debuglog.tail(root, 0)
-                if e.get("event") == "exception"}
-    assert "hook.post_commit.freshness" in contexts  # …but never silent
+# NB: the post-commit hook surface for these freshness notes was removed with the hook
+# machinery. The note logic (age line, sync recommendation, opt-out) is asserted above
+# via `freshness.freshness()` / `freshness.age_line()` directly; the surviving render
+# surfaces are `cage report`'s footer and `cage doctor` (see test_report / test_doctor).
 
 
 # ── surface: report footer (actionable-only, deterministic, never in CSV) ────

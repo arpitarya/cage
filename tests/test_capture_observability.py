@@ -15,6 +15,7 @@ from types import SimpleNamespace
 import pytest
 
 from cage import graphifymeter as gm
+from srcseed import mkcage
 from cage import importcmd, ledger, mcpserver, schema
 
 
@@ -65,7 +66,7 @@ def test_graphify_confirmation_carries_no_content(proj, capsys, monkeypatch):
 
 def test_zero_new_is_silent(tmp_path, monkeypatch):
     root = tmp_path / "proj"
-    (root / ".cage").mkdir(parents=True)
+    mkcage(root)
     monkeypatch.setenv("CAGE_CAPTURE_ON_READ", "1")
     for env in ("CLAUDE_CONFIG_DIR", "COPILOT_HOME", "KIRO_DATA_DIR"):
         monkeypatch.setenv(env, str(tmp_path / f"empty-{env.lower()}"))
@@ -81,7 +82,7 @@ def test_zero_new_is_silent(tmp_path, monkeypatch):
 def test_no_confirmation_text_in_csv(tmp_path, monkeypatch, capsys):
     from cage import cli
     root = tmp_path / "proj"
-    (root / ".cage").mkdir(parents=True)
+    mkcage(root)
     monkeypatch.chdir(root)
     monkeypatch.setenv("CAGE_CAPTURE_ON_READ", "1")
     for env in ("CLAUDE_CONFIG_DIR", "COPILOT_HOME", "KIRO_DATA_DIR"):
@@ -127,6 +128,7 @@ def test_mcp_capture_summary_is_a_structured_field(seeded, monkeypatch):
     monkeypatch.setenv("CAGE_CAPTURE_ON_READ", "1")
     for env in ("CLAUDE_CONFIG_DIR", "COPILOT_HOME", "KIRO_DATA_DIR"):
         monkeypatch.setenv(env, str(root / f"h-{env.lower()}"))
+    mkcage(root)  # Directive A: materialize [sources] so the pathless MCP sweep resolves homes
     # Plant a claude turn so the MCP read captures something and surfaces the field.
     slug = root / "h-claude_config_dir" / "projects" / "repo"
     slug.mkdir(parents=True)
