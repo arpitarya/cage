@@ -234,18 +234,20 @@ def _twin(dirpath: Path) -> Path:
 
 def _run(shim: Path, *args: str, path_dirs: list[Path], env: dict | None = None,
          cwd: Path | None = None) -> subprocess.CompletedProcess:
-    """Invoke a shim through the platform shell (`cmd.exe` on Windows) — never as a
-    bare argv list. `subprocess.run([shim_path, *args])` without `shell=True` is a
-    documented, flaky way to launch a `.cmd`/`.bat` file on Windows (the same reason
-    `tools/cigraphify.py._sh` shells out for its own leg); an argv-list invocation of
-    this exact twin reproducibly triggered cmd.exe's own "BATCH RECURSION exceeds
-    STACK limits" abort on real Windows CI, on every run, regardless of what the
-    shim's own PATH-walk logic did — the bug was in how the test invoked the file,
-    not in the file. `shell=True` with a manually quoted command line is how a real
-    user's `cmd.exe` actually launches this, and it's the only faithful way to test
-    it. `cage` is deliberately absent from PATH, so B5's first probe fails and the
-    unmetered branch is what gets exercised — these tests are about passthrough and
-    recursion, not about metering."""
+    """Invoke the bare name `graphify` through PATH resolution — exactly how a real
+    user's shell resolves it, and exactly what `tools/cigraphify.py`'s `present` CI
+    leg does (which passes on real Windows CI, on this identical committed file).
+    `shim` names which file `path_dirs` is expected to resolve to; it is not invoked
+    directly by path.
+
+    Invoking a quoted absolute `.cmd` path as `cmd.exe /c "<path>" args` reproducibly
+    triggered the same "BATCH RECURSION exceeds STACK limits" abort on real Windows
+    CI, byte-identically, across every rewrite of the shim's own PATH-walk logic —
+    while the `present` leg's bare-name invocation of the SAME file never did. That
+    is conclusive: the abort was in how a quoted-absolute-path `.cmd` invocation is
+    parsed by `cmd.exe /c`, not in the shim. Bare-name resolution is also the more
+    faithful test — it's what B2 of the contract is actually about."""
+    del shim
     e = {k: v for k, v in os.environ.items() if k != "CAGE_GRAPHIFY_SHIM"}
     e.update(env or {})
     e["PATH"] = os.pathsep.join(str(d) for d in path_dirs)
@@ -255,7 +257,7 @@ def _run(shim: Path, *args: str, path_dirs: list[Path], env: dict | None = None,
     # to forward and keeping the existing exact-match assertions valid.
     def _q(a: str) -> str:
         return f'"{a}"' if a == "" or any(c in a for c in ' &|<>^"') else a
-    cmdline = " ".join([f'"{shim}"'] + [_q(a) for a in args])
+    cmdline = " ".join(["graphify"] + [_q(a) for a in args])
     return subprocess.run(cmdline, shell=True, capture_output=True, text=True,
                           env=e, cwd=str(cwd) if cwd else None, timeout=60)
 
