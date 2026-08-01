@@ -2,6 +2,44 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
+## v0.37.0 (2026-08-01) — Windows sources.toml crash + dummyrepo sync
+
+A same-day follow-up to v0.36.0: the release-CI smoke chain (which only runs the exact
+built `cage.pyz` against three OSes, never the wheel) caught a real Windows-only crash
+in the config materialized by `cage setup`, plus a batch of stale assertions in the
+out-of-tree `tools/dummyrepo` scenario suite that v0.36.0's own pytest-suite update
+never propagated to. `just test` (962 tests) was green through both — this class of
+gap only shows up in the black-box smoke chain, which is exactly why it exists.
+
+- **Fix: `cage setup` wrote an unparseable `cage.toml` on Windows.** `paths.sources_toml`
+  rendered a built-in agent log path straight into a TOML basic string — a raw Windows
+  `\` there is an escape character (`\A`, `\U`… aren't valid TOML escapes), so every
+  fresh Windows project's materialized `[sources]` block failed to parse. Because
+  `metering.record_call`'s policy load isn't wrapped for this (a separate, narrower gap
+  than the write-path fail-open law — tracked, not touched here), the first metered call
+  after `cage setup` — e.g. `cage demo` — crashed outright. Fixed by normalizing every
+  written `path`/`glob`/`path_globs` value to `/` (the same normalization `path_globs`
+  already applies on *read*; Python's `pathlib`/`Path.glob` accept `/` on every OS).
+- **`tools/dummyrepo` resynced to v0.36.0's actual behavior** (10 of 18 scenarios were
+  failing): the `cage.toml` rename (6 literal `policy.toml` paths), kiro's IDE-log rows
+  now routing to the machine ledger instead of the project one (ADR 0006 — `assert_exact_rows`
+  now asserts kiro's rows against `$CAGE_HOME` instead of folding them into the project
+  comparison), Directive A's "no `[sources]` ⇒ captures nothing" (a fleet-simulation
+  machine that never ran `cage setup` now does, before the scenario exercises its import
+  sweep), the `[prices]`/`[meta] prices_version` split (a stray write landed in the wrong
+  file), `[budgets]` going opt-in/commented-out (BUD-V — the sync-mechanics scenario now
+  exercises `[quality] signal`, mirroring `tests/test_policysync.py`'s own re-point), and
+  the new `import_id` manifest FK (minted fresh every sweep — now always volatile in the
+  row-equality check, not just fixture-declared fields).
+- **`imports.jsonl`'s scenario PII scan false-positived on a documented, deliberate
+  design decision** (import-ledger plan §7): the manifest always captures a
+  best-available human-authored session title now, a conscious widening scoped to that
+  one local audit file. `assert_pii_clean` excludes it from the generic
+  counts-never-content marker scan.
+
+No substrate, schema, or CLI-surface change — every fix above is either a Windows
+write-path correctness fix or test-scaffold debt from v0.36.0's own changes.
+
 ## v0.36.0 (2026-07-25) — hookless rebuild + import ledger (Phases 0–4)
 
 A two-part release: **finish the conversion to pull-only capture** (remove all hook

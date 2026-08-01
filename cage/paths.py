@@ -534,14 +534,22 @@ def sources_toml(seed: list[dict] | None = None) -> str:
              "# reports it (a silent 'no sources' would look exactly like broken capture).",
              "# `glob` is anchored to `path` (normal imports); `path_globs` is root-agnostic",
              "# and is used ONLY by `cage import --path`/`--project` (path-globs handoff §5)."]
+    # A raw Windows `\` is a TOML basic-string escape (`\A`, `\U`… are invalid
+    # sequences) — normalise every written path to `/` first, same as `path_globs`
+    # on read (`_resolve_path_globs`); Path.glob()/pathlib accept `/` on every OS.
+    slash = "\\"
+
+    def _p(s: str) -> str:
+        return s.replace(slash, "/")
+
     for e in seed:
         lines.append("")
         lines.append(f"[[sources.{e['name']}]]")
-        lines.append(f'path = "{e["path"]}"')
+        lines.append(f'path = "{_p(e["path"])}"')
         if e.get("glob"):
-            lines.append(f'glob = "{e["glob"]}"')
+            lines.append(f'glob = "{_p(e["glob"])}"')
         if e.get("path_globs"):
-            pg = ", ".join(f'"{p}"' for p in e["path_globs"])
+            pg = ", ".join(f'"{_p(p)}"' for p in e["path_globs"])
             lines.append(f"path_globs = [{pg}]")
         if e.get("format"):
             lines.append(f'format = "{e["format"]}"')

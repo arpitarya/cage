@@ -16,6 +16,42 @@ Entry format:
 
 ---
 
+## 2026-08-01 — v0.37.0: Windows `sources.toml` crash + dummyrepo resync
+
+- **Implemented:**
+  - `cage/paths.py` `sources_toml()` now normalizes every written `path`/`glob`/
+    `path_globs` value to `/` before embedding it in a TOML basic string. A raw
+    Windows `\` there is a TOML escape character — `\A`, `\U`… aren't valid
+    escapes — so `cage setup` on Windows was writing an unparseable `cage.toml`;
+    `metering.record_call`'s (unguarded) policy load then crashed the first
+    metered call after setup, which is exactly what the v0.36.0 release-CI zipapp
+    smoke chain caught on `windows-latest` (`pyz demo` exit 1) while macOS/Ubuntu
+    and the full `just test` (962 tests) stayed green — this class of gap only
+    shows on the exact-artifact, per-OS smoke chain.
+  - `tools/dummyrepo/run.py` resynced to v0.36.0's actual behavior — 10 of 18
+    scenarios (S1, S2, S3, S9, S11, S12, S13, S15, S16, S17) were silently stale
+    against changes v0.36.0 shipped but never propagated into this out-of-tree
+    suite: the `policy.toml` → `cage.toml` rename (6 literal paths), kiro's
+    IDE-log rows now routing to the machine ledger (ADR 0006 — `assert_exact_rows`
+    takes `env` and asserts kiro's rows against `$CAGE_HOME` separately),
+    Directive A ("no `[sources]` ⇒ captures nothing" — S9's fleet-simulation
+    machine now runs `cage setup` before its import-sweep test), the `[prices]`/
+    `[meta] prices_version` file split (a stray backdate write landed in
+    `cage.toml` instead of `prices.toml`), `[budgets]` going opt-in/commented-out
+    (BUD-V — S16 now exercises `[quality] signal`, mirroring
+    `tests/test_policysync.py`'s own re-point), the new `import_id` manifest FK
+    (now always volatile in the row-equality check), and `imports.jsonl`'s
+    documented, deliberate session-title PII widening (import-ledger plan §7 —
+    `assert_pii_clean` now excludes that one file from the generic marker scan).
+  - `__version__` bumped to 0.37.0; `CHANGELOG.md` + README "What's new" updated.
+- **Files:** `cage/paths.py`, `cage/__init__.py`, `tools/dummyrepo/run.py`,
+  `CHANGELOG.md`, `README.md`.
+- **Tests:** green — `just test` (962 tests) and the full `python -m
+  tools.dummyrepo` (18/18 scenarios) both pass locally.
+- **Next:** watch the v0.37.0 release-CI pyz smoke chain on all three OSes to
+  confirm the Windows fix holds on real Windows CI (only reproducible there —
+  no local Windows environment to verify against directly).
+
 ## 2026-08-01 — SYNC-GUARD: name the sync tests' borrowed table, guard its removal
 
 - **Implemented:**

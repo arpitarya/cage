@@ -141,24 +141,42 @@ def plant(specs: list[dict], env: dict) -> None:
         shutil.copyfile(spec["dir"] / spec["log"], dst)
 
 
-def ledger_rows(repo: Path) -> list[dict]:
+def _ledger_rows_at(ledger_dir: Path) -> list[dict]:
     rows = []
-    for shard in sorted((repo / ".cage" / "ledger").glob("calls*.jsonl")):
+    for shard in sorted(ledger_dir.glob("calls*.jsonl")):
         for line in shard.read_text(encoding="utf-8").splitlines():
             if line.strip():
                 rows.append(json.loads(line))
     return rows
 
 
-def assert_exact_rows(repo: Path, specs: list[dict]) -> None:
+def ledger_rows(repo: Path) -> list[dict]:
+    return _ledger_rows_at(repo / ".cage" / "ledger")
+
+
+def global_ledger_rows(env: dict) -> list[dict]:
+    """Kiro's IDE log is a machine fact and routes to $CAGE_HOME's ledger, never the
+    project one (ADR 0006) — read it the same way `ledger_rows` reads a project."""
+    return _ledger_rows_at(Path(env["CAGE_HOME"]) / ".cage" / "ledger")
+
+
+# Minted fresh every `cage import` sweep (the manifest-row FK, import-ledger plan §4) —
+# volatile on every row regardless of what a fixture's own `volatile` list declares, and
+# never itself a fixture field, so it is stripped rather than presence-checked.
+_ALWAYS_VOLATILE = ("import_id",)
+
+
+def _assert_rows_at(actual_rows: list[dict], specs: list[dict], where: str) -> None:
     expected, volatile = [], {}
     for spec in specs:
         expected.extend(spec["rows"])
         for r in spec["rows"]:
             volatile[r["id"]] = spec["volatile"]
     actual = []
-    for row in ledger_rows(repo):
+    for row in actual_rows:
         row = dict(row)
+        for v in _ALWAYS_VOLATILE:
+            row.pop(v, None)
         for v in volatile.get(row["id"], ()):
             if not row.pop(v, None):
                 raise Fail(f"row {row['id']} missing volatile field {v!r}")
@@ -166,13 +184,32 @@ def assert_exact_rows(repo: Path, specs: list[dict]) -> None:
     a = sorted(actual, key=lambda r: r["id"])
     e = sorted(expected, key=lambda r: r["id"])
     if a != e:
-        raise Fail(f"imported rows != fixture expectation ({len(a)} vs {len(e)} rows; "
-                   "first diff: " + next((f"{x} != {y}" for x, y in zip(a, e) if x != y),
-                                         "row-count mismatch")[:400])
+        raise Fail(f"imported rows != fixture expectation in the {where} ledger "
+                   f"({len(a)} vs {len(e)} rows; first diff: " +
+                   next((f"{x} != {y}" for x, y in zip(a, e) if x != y),
+                        "row-count mismatch")[:400])
+
+
+def assert_exact_rows(repo: Path, specs: list[dict], env: dict) -> None:
+    """Every non-kiro spec's rows must land exactly in the project ledger; kiro's IDE
+    log routes to the machine ledger instead (ADR 0006), so its rows are asserted
+    against $CAGE_HOME rather than folded into the same local comparison."""
+    local_specs = [s for s in specs if s["agent"] != "kiro"]
+    kiro_specs = [s for s in specs if s["agent"] == "kiro"]
+    _assert_rows_at(ledger_rows(repo), local_specs, "project")
+    if kiro_specs:
+        _assert_rows_at(global_ledger_rows(env), kiro_specs, "machine (kiro, ADR 0006)")
 
 
 def assert_pii_clean(repo: Path) -> None:
+    # imports.jsonl (cage/manifest.py) is a DELIBERATE, documented exception (import-ledger
+    # plan §7, Arpit 2026-07-25): it always captures a best-available human-authored
+    # session_name/title, a conscious PII widening scoped to this one local audit file —
+    # never a call/receipt/savings row, never read by a derived view. The generic
+    # counts-never-content scan below is for those rows; it must not flag a title.
     for f in sorted((repo / ".cage" / "ledger").glob("*.jsonl")):
+        if f.name == "imports.jsonl":
+            continue
         text = f.read_text(encoding="utf-8")
         for marker in PII_MARKERS:
             if marker in text:
@@ -200,7 +237,7 @@ def s1_cli(base: Path) -> str:
     specs = fixture_specs("cli")
     plant(specs, env)
     expect_ok(repo, env, "import")
-    assert_exact_rows(repo, specs)
+    assert_exact_rows(repo, specs, env)
     assert_pii_clean(repo)
     expect_ok(repo, env, "doctor")
     clone_note = _clone_simulation(base, repo, env)
@@ -242,7 +279,7 @@ def s2_vscode(base: Path) -> str:
     specs = fixture_specs("vscode")
     plant(specs, env)
     expect_ok(repo, env, "import")
-    assert_exact_rows(repo, specs)
+    assert_exact_rows(repo, specs, env)
     before = shard_bytes(repo)
     expect_ok(repo, env, "import")
     if shard_bytes(repo) != before:
@@ -264,12 +301,12 @@ def s3_broken_setups(base: Path) -> str:
     policy is flagged by doctor (exit 1)."""
     checks = []
 
-    # (a) malformed policy.toml — import degrades to the bundled default + logs it;
+    # (a) malformed cage.toml — import degrades to the bundled default + logs it;
     #     doctor flags the policy check as FAIL (exit 1).
     repo, env = make_sandbox(base, "s3-bad-policy")
     env["CAGE_DEBUG"] = "1"
     expect_ok(repo, env, "setup", "--project-only", "--no-graphify")
-    (repo / ".cage" / "policy.toml").write_text("[debug]\n[debug]\n", encoding="utf-8")
+    (repo / ".cage" / "cage.toml").write_text("[debug]\n[debug]\n", encoding="utf-8")
     plant(fixture_specs("cli")[:1], env)  # one claude log is enough
     expect_ok(repo, env, "import")
     if "import.policy" not in _debug_contexts(repo):
@@ -575,6 +612,10 @@ def s9_fleet(base: Path) -> str:
     out8 = str(base / "s9-bundle-8.zip")
     menv8 = {**env, "CAGE_BASE": str(mroot8 / ".cage"),
              "CLAUDE_CONFIG_DIR": str(claude8)}
+    # Directive A (capture-precision plan §3.6): no materialized `[sources]` in cage.toml
+    # means import captures nothing, loudly — a real machine gets this from `cage setup`
+    # at some point in its life, so make that true here too before exercising the sweep.
+    expect_ok(mroot8, menv8, "setup", "--project-only", "--no-graphify")
     swept = expect_ok(mroot8, menv8, "data", "export", "--study", out8)
     if "self-refreshed: +2 call(s)" not in swept:
         raise Fail(f"machine-8 export did not self-refresh: {swept.strip()[:200]}")
@@ -625,7 +666,9 @@ _S11_BACKDATE = """
 import sys
 from pathlib import Path
 from cage import pricestoml
-pricestoml.update_meta(Path(sys.argv[1]), {"prices_version": "2020-01-01"})
+root = Path(sys.argv[1])
+pricestoml.update_meta(root, {"prices_version": "2020-01-01"},
+                       target=pricestoml.prices_meta_target(root))
 """
 
 
@@ -698,7 +741,7 @@ def s11_prices(base: Path) -> str:
         raise Fail("doctor did not recommend sync for a stale [meta]")
     if "bundled prices are newer (" not in expect_ok(repo, env, "prices", "sync"):
         raise Fail("prices sync dry-run did not carry the recommendation")
-    if "[meta] restamped" not in expect_ok(repo, env, "prices", "sync", "--update"):
+    if "prices_version restamped" not in expect_ok(repo, env, "prices", "sync", "--update"):
         raise Fail("prices sync --update did not restamp [meta]")
     lst2 = expect_ok(repo, env, "prices", "list")
     if "bundled prices are newer (" in lst2:
@@ -744,9 +787,9 @@ def s12_launcher(base: Path) -> str:
     repo, env = make_sandbox(base, "s12-launcher")
     expect_ok(repo, env, "setup", "--project-only", "--no-graphify")
     expect_ok(repo, env, "setup", "--wire-only", "--all", "--python-launcher")
-    pol = (repo / ".cage" / "policy.toml").read_text(encoding="utf-8")
+    pol = (repo / ".cage" / "cage.toml").read_text(encoding="utf-8")
     if "python_launcher = true" not in pol:
-        raise Fail("[wiring] python_launcher = true not persisted in policy.toml")
+        raise Fail("[wiring] python_launcher = true not persisted in cage.toml")
     wired = [repo / ".cage" / "bin" / "cage-run",
              repo / ".cage" / "bin" / "cage-run.cmd",
              repo / ".kiro" / "settings" / "mcp.json"]
@@ -906,7 +949,9 @@ ledger.append_row(root, "calls", schema.make_call(
 _S15_OPTOUT = """
 import sys
 from pathlib import Path
-p = Path(sys.argv[1]) / ".cage" / "policy.toml"
+# [prices] is a price section: `policy.load` reads it from prices.toml when that file
+# exists beside cage.toml (prices-toml plan §2.1) — cage.toml would be silently ignored.
+p = Path(sys.argv[1]) / ".cage" / "prices.toml"
 p.write_text(p.read_text(encoding="utf-8") + '\\n[prices]\\nstale_days = 0\\n',
              encoding="utf-8")
 """
@@ -987,7 +1032,7 @@ for i in range(2):
 _S16_STRIP = """
 import sys
 from pathlib import Path
-p = Path(sys.argv[1]) / ".cage" / "policy.toml"
+p = Path(sys.argv[1]) / ".cage" / "cage.toml"
 out, skip = [], False
 for ln in p.read_text(encoding="utf-8").splitlines(keepends=True):
     s = ln.strip()
@@ -999,7 +1044,11 @@ for ln in p.read_text(encoding="utf-8").splitlines(keepends=True):
     if skip or s.startswith("import_before_export"):
         continue
     out.append(ln)
-p.write_text("".join(out).replace("daily_usd = 25.00", "daily_usd = 50.00"),
+# [budgets] is opt-in/commented-out in the bundle now (BUD-V, docs/archive/
+# v0.36-suite-green.handoff.md) and can't demonstrate a customized hand edit — this
+# mirrors tests/test_policysync.py's re-point to `[quality] signal`, a bundle-shipped,
+# active, scalar-keyed table that survives the v0.16 strip.
+p.write_text("".join(out).replace('signal = "task_ok"', 'signal = "task_custom"'),
              encoding="utf-8")
 """
 
@@ -1020,12 +1069,13 @@ def s16_policy_sync(base: Path) -> str:
 
     # 1. dry-run: exact categories, deterministic, recommendation on the surfaces
     diff = expect_ok(repo, env, "policy", "diff")
-    for needle in ("add (3)",
+    for needle in ("add (4)",
                    "+ [capture] import_before_export = true",
-                   "+ [cleanup] days = 30",
+                   "+ [cleanup] days = 90",
                    "+ [cleanup] enabled = true",
+                   "+ [cleanup] warn = true",
                    "keep (1)",
-                   "[budgets] daily_usd = 50.0 (bundled 25.0)",
+                   '[quality] signal = "task_custom" (bundled "task_ok")',
                    "bundled policy defaults are newer",
                    "pricing tables — delegated to `cage prices sync`"):
         if needle not in diff:
@@ -1041,7 +1091,7 @@ def s16_policy_sync(base: Path) -> str:
     before = [expect_ok(repo, env, *v) for v in views]
     applied = expect_ok(repo, env, "policy", "sync", "--apply")
     for needle in ("✔ [capture] import_before_export = true added",
-                   "✔ [cleanup] added (days = 30, enabled = true)",
+                   "✔ [cleanup] added (days = 90, enabled = true, warn = true)",
                    "✔ [meta] policy_version stamped"):
         if needle not in applied:
             raise Fail(f"policy sync --apply missing {needle!r}")
@@ -1049,20 +1099,20 @@ def s16_policy_sync(base: Path) -> str:
         raise Fail("--apply changed a derived view — neutrality invariant broken")
 
     # 3. idempotent apply: second run is a byte-identical no-op
-    pol_file = repo / ".cage" / "policy.toml"
+    pol_file = repo / ".cage" / "cage.toml"
     first = pol_file.read_bytes()
     if "already in sync" not in expect_ok(repo, env, "policy", "sync", "--apply"):
         raise Fail("second apply did not report already-in-sync")
     if pol_file.read_bytes() != first:
         raise Fail("second apply rewrote the file — idempotency broken")
-    if "daily_usd = 50.00" not in pol_file.read_text(encoding="utf-8"):
-        raise Fail("hand-edited budget was clobbered — customized must be kept")
+    if 'signal = "task_custom"' not in pol_file.read_text(encoding="utf-8"):
+        raise Fail("hand-edited [quality] signal was clobbered — customized must be kept")
 
     # 4. hints flip clean; the hand edit survives in the merged view
     if "project policy defaults are current" not in expect_ok(repo, env, "doctor"):
         raise Fail("doctor still stale after apply")
     assert_pii_clean(repo)
-    return ("v0.16 shape → add(3) exact · hand edit kept · apply neutral to the "
+    return ("v0.16 shape → add(4) exact · hand edit kept · apply neutral to the "
             "byte · second apply no-op · doctor hint flips clean")
 
 
@@ -1084,10 +1134,14 @@ def s17_sources(base: Path) -> str:
 
     # Append a custom tool + a rejected glob entry to the project policy. as_posix()
     # keeps the path a valid TOML basic string on Windows (a raw `\` is a TOML escape).
-    pol = repo / ".cage" / "policy.toml"
+    # A fresh key (not `claude`) for the rejected entry — `cage setup` now materializes
+    # `[[sources.claude]]` as an active array-of-tables by default, and redeclaring the
+    # same dotted key in a different shape is a TOML parse error, not an override.
+    pol = repo / ".cage" / "cage.toml"
     pol.write_text(pol.read_text(encoding="utf-8")
                    + f'\n[sources.myrouter]\npaths = ["{logs.as_posix()}"]\nformat = "claude"\n'
-                   + f'\n[sources.claude]\npaths = ["{repo.as_posix()}/glob-*.jsonl"]\n',
+                   + f'\n[sources.badglob]\npaths = ["{repo.as_posix()}/glob-*.jsonl"]\n'
+                   + 'format = "claude"\n',
                    encoding="utf-8")
 
     expect_ok(repo, env, "import")
