@@ -2,6 +2,40 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
+## v0.37.2 (2026-08-01) — README tells the truth; the knowledge graph is committed
+
+A documentation and repo-hygiene release. **No code, substrate, schema, or CLI change**
+— `cage/` is byte-identical to v0.37.1 apart from the version string, so upgrading
+changes nothing you run. It ships because the README *is* the PyPI project description,
+and the old one was selling a capability that no longer exists.
+
+- **README no longer sells the removed Tier-1 human axis.** The pitch claimed cage
+  shows "how much money *and time* the agent saved versus a person" and that it
+  measures chores "in real minutes" — the axis was amputated wholesale in v0.36.0
+  (`human.py`/`trend.py`/`[human.*]`/the `minutes` unit, substrate included) and is
+  not coming back without a proposal doc. The lede and the plain-language section now
+  describe what cage actually does: per-tool savings **gross and net of what invoking
+  the tool cost you**, counterfactual stacks, and which tools agents actually adopt.
+- **The gross-vs-net honesty is now in the pitch, not just the code.** The story
+  section states outright that cage's own paired run came back with the graph-tool arm
+  costing *more*, and that it printed that rather than burying it, linking
+  [the finding](docs/regression/2026-08-01-finding-saved-is-gross.md). A new
+  parenthetical under the worked table marks it as seeded demo data and says where
+  cage's own evidence actually stands — lab-validated capture on macOS across all
+  three agents, and a net-positive verdict that is honestly **still open at n=1**,
+  which `cage insights verdict` refuses to call a saving.
+- **The Windows graphify gap is disclosed in the platform line**, not only in the
+  changelog and OPEN-WORK: the interceptor is a bash shim, so on Windows the shim
+  route does not exist and graphify savings arrive via the transcript route only.
+  Tracked as **WIN-GF**; a `.cmd` twin is specced.
+- **The graphify knowledge graph is now committed** (`graphify-out/`,
+  `docs/graphify-out/`). `.gitignore` narrowed from the whole tree to
+  `**/graphify-out/cache/`, so `GRAPH_REPORT.md` + `graph.json` + the manifests are
+  tracked and any agent or CI job can read the graph without regenerating it —
+  which is what this repo's `CLAUDE.md` already instructs agents to do before
+  answering architecture questions. Deliberate trade: ~10 MB of generated blobs
+  enter history, and `graphify update .` will produce large diffs.
+
 ## v0.37.1 (2026-08-01) — Windows dev-CI: graphify subprocess + test fixes
 
 A second same-day follow-up: v0.37.0 fixed the release-critical Windows crash (a

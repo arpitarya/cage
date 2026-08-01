@@ -1,0 +1,1672 @@
+{
+  "/Users/arpitarya/my_programs/cage/.claude/settings.json": {
+    "mtime": 1784181306.8493273,
+    "ast_hash": "5c511cbdc7fcda005c8112e781c563bd",
+    "semantic_hash": "5c511cbdc7fcda005c8112e781c563bd"
+  },
+  "/Users/arpitarya/my_programs/cage/.claude/settings.local.json": {
+    "mtime": 1784005806.9340053,
+    "ast_hash": "64720ddd164e76d6a8514cfa91eb57fe",
+    "semantic_hash": "64720ddd164e76d6a8514cfa91eb57fe"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/__init__.py": {
+    "mtime": 1784177561.726142,
+    "ast_hash": "59e01cb64fabb16b746e4708e2339e3f",
+    "semantic_hash": "59e01cb64fabb16b746e4708e2339e3f"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/__main__.py": {
+    "mtime": 1781420913.8161845,
+    "ast_hash": "e39ec67e51604d91a5735162540187a4",
+    "semantic_hash": "e39ec67e51604d91a5735162540187a4"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/adoptcmd.py": {
+    "mtime": 1784088785.0792828,
+    "ast_hash": "52837055c808f377c08b18cd6e1646e7",
+    "semantic_hash": "52837055c808f377c08b18cd6e1646e7"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/agents.py": {
+    "mtime": 1784176971.394394,
+    "ast_hash": "7b65035121f4d715245511ad3726f1f2",
+    "semantic_hash": "7b65035121f4d715245511ad3726f1f2"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/attention.py": {
+    "mtime": 1784088785.0801406,
+    "ast_hash": "17218b100f7548002fcdebcbb01987ac",
+    "semantic_hash": "17218b100f7548002fcdebcbb01987ac"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/attribution.py": {
+    "mtime": 1784059503.0502856,
+    "ast_hash": "727b5ca612382d4ef8eb5e7b66685a48",
+    "semantic_hash": "727b5ca612382d4ef8eb5e7b66685a48"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/budget.py": {
+    "mtime": 1784088785.0809991,
+    "ast_hash": "c6bf77877f5b0b09f4b1086ff2d13e01",
+    "semantic_hash": "c6bf77877f5b0b09f4b1086ff2d13e01"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/calibration.py": {
+    "mtime": 1784088785.081482,
+    "ast_hash": "ab2a4f7a4bce909eca8122182f4af02f",
+    "semantic_hash": "ab2a4f7a4bce909eca8122182f4af02f"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/cfgio.py": {
+    "mtime": 1781434148.4203186,
+    "ast_hash": "202529b735f0139cf1614690d81f22d6",
+    "semantic_hash": "202529b735f0139cf1614690d81f22d6"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/claudewire.py": {
+    "mtime": 1784088983.0919569,
+    "ast_hash": "b33635b32e1a0b7c474edbf4eab2a8d5",
+    "semantic_hash": "b33635b32e1a0b7c474edbf4eab2a8d5"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/cleanup.py": {
+    "mtime": 1784088785.0822964,
+    "ast_hash": "d0dd3c502fdeaa1064b889136467aac9",
+    "semantic_hash": "d0dd3c502fdeaa1064b889136467aac9"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/cli.py": {
+    "mtime": 1784088628.079879,
+    "ast_hash": "78c14fbcae8861e6e11b15766e0548dc",
+    "semantic_hash": "78c14fbcae8861e6e11b15766e0548dc"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/clicmds.py": {
+    "mtime": 1784177121.2102504,
+    "ast_hash": "2d69f8a9d47cab94b4dc88a62966fd8d",
+    "semantic_hash": "2d69f8a9d47cab94b4dc88a62966fd8d"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/cliutil.py": {
+    "mtime": 1783764876.2240884,
+    "ast_hash": "122ccd0222a2d7644b3c9254d987695d",
+    "semantic_hash": "122ccd0222a2d7644b3c9254d987695d"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/codexwire.py": {
+    "mtime": 1783772023.5739753,
+    "ast_hash": "128430cbaebb50f7712b5e29600ceead",
+    "semantic_hash": "128430cbaebb50f7712b5e29600ceead"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/compare.py": {
+    "mtime": 1784088785.083974,
+    "ast_hash": "3ea8705a1fa85f42508d6677c0579dc0",
+    "semantic_hash": "3ea8705a1fa85f42508d6677c0579dc0"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/compress.py": {
+    "mtime": 1784088785.084602,
+    "ast_hash": "c72f62768ca79feee0bd4c11d5370a96",
+    "semantic_hash": "c72f62768ca79feee0bd4c11d5370a96"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/constants.py": {
+    "mtime": 1784088785.0850348,
+    "ast_hash": "8c3b5e81b73bac8907475a9fe333fb3a",
+    "semantic_hash": "8c3b5e81b73bac8907475a9fe333fb3a"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/convert.py": {
+    "mtime": 1784006785.690076,
+    "ast_hash": "db4c1f9cd36df73dd83b5791083c95c9",
+    "semantic_hash": "db4c1f9cd36df73dd83b5791083c95c9"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/copilotwire.py": {
+    "mtime": 1783771990.7997847,
+    "ast_hash": "72bbf5d7432ac22e6a57769035bd2227",
+    "semantic_hash": "72bbf5d7432ac22e6a57769035bd2227"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/credits.py": {
+    "mtime": 1782798340.2971864,
+    "ast_hash": "aff019610d3a44394ad4e5b96bcdcdb3",
+    "semantic_hash": "aff019610d3a44394ad4e5b96bcdcdb3"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/csvout.py": {
+    "mtime": 1784088785.0862625,
+    "ast_hash": "ba9cc98a3132900c3e0a9f4f05bba402",
+    "semantic_hash": "ba9cc98a3132900c3e0a9f4f05bba402"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/data/shims/graphify": {
+    "mtime": 1784088971.3232355,
+    "ast_hash": "f8da659c97335dbd5755b195ac5e0201",
+    "semantic_hash": "f8da659c97335dbd5755b195ac5e0201"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/debuglog.py": {
+    "mtime": 1782533153.268749,
+    "ast_hash": "e2635807c042dec8ee547e9ff23fc142",
+    "semantic_hash": "e2635807c042dec8ee547e9ff23fc142"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/demo.py": {
+    "mtime": 1784088785.0871782,
+    "ast_hash": "93f1c3fc11f7fda8e2f7eb4bdde9f187",
+    "semantic_hash": "93f1c3fc11f7fda8e2f7eb4bdde9f187"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/display.py": {
+    "mtime": 1784059091.120708,
+    "ast_hash": "22cf57167cd5df57f0eb38aff7a96082",
+    "semantic_hash": "22cf57167cd5df57f0eb38aff7a96082"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/doctorbundle.py": {
+    "mtime": 1783771496.1132061,
+    "ast_hash": "ec4baf3d2cf89422c4410f9295d9d2ce",
+    "semantic_hash": "ec4baf3d2cf89422c4410f9295d9d2ce"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/doctorcmd.py": {
+    "mtime": 1784177142.0407298,
+    "ast_hash": "6b12a8d5053ce2abb37679229452e8a3",
+    "semantic_hash": "6b12a8d5053ce2abb37679229452e8a3"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/errors.py": {
+    "mtime": 1782793953.8031816,
+    "ast_hash": "5d68a5af4669783924e3d8c1beed6130",
+    "semantic_hash": "5d68a5af4669783924e3d8c1beed6130"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/estimate.py": {
+    "mtime": 1784088785.0893164,
+    "ast_hash": "42f5f34be7280d0b1852072be352ff78",
+    "semantic_hash": "42f5f34be7280d0b1852072be352ff78"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/explain.py": {
+    "mtime": 1784091336.5528753,
+    "ast_hash": "36c4bc303817f7b11134bb38103a646d",
+    "semantic_hash": "36c4bc303817f7b11134bb38103a646d"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/explain_data.py": {
+    "mtime": 1784177546.6677136,
+    "ast_hash": "cb99b99499efa6eb83da172b1b67723a",
+    "semantic_hash": "cb99b99499efa6eb83da172b1b67723a"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/explain_types.py": {
+    "mtime": 1782266463.7246017,
+    "ast_hash": "fd1d0a0801af01f61fbf956ecb3fa2ce",
+    "semantic_hash": "fd1d0a0801af01f61fbf956ecb3fa2ce"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/exportcmd.py": {
+    "mtime": 1784088785.0912726,
+    "ast_hash": "eebabf4fc7d6a4b2ac3409623b2c16f3",
+    "semantic_hash": "eebabf4fc7d6a4b2ac3409623b2c16f3"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/forecast.py": {
+    "mtime": 1784088785.0918872,
+    "ast_hash": "39f912c1d317d8414baebeaa8ca6555a",
+    "semantic_hash": "39f912c1d317d8414baebeaa8ca6555a"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/freshness.py": {
+    "mtime": 1784043398.2970872,
+    "ast_hash": "41dc2cb6ad27b7a8404c3cce3c17caea",
+    "semantic_hash": "41dc2cb6ad27b7a8404c3cce3c17caea"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/gitcommithook.py": {
+    "mtime": 1783772053.528031,
+    "ast_hash": "9122588103c275b6fe44ba20dcdf3c56",
+    "semantic_hash": "9122588103c275b6fe44ba20dcdf3c56"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/graphifymeter.py": {
+    "mtime": 1784088785.0929213,
+    "ast_hash": "0dfea956265f1401ab34fd9b21137f6f",
+    "semantic_hash": "0dfea956265f1401ab34fd9b21137f6f"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/hooks.py": {
+    "mtime": 1784043388.1281443,
+    "ast_hash": "486851dd4631995b7d5a9bee93637ae2",
+    "semantic_hash": "486851dd4631995b7d5a9bee93637ae2"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/human.py": {
+    "mtime": 1782227493.2603054,
+    "ast_hash": "5e5794627090dadd433ac01f12c0c179",
+    "semantic_hash": "5e5794627090dadd433ac01f12c0c179"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/humanview.py": {
+    "mtime": 1784089039.0684898,
+    "ast_hash": "32a50d6a7ff8e45155691947635ff75f",
+    "semantic_hash": "32a50d6a7ff8e45155691947635ff75f"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/ids.py": {
+    "mtime": 1781420796.5625336,
+    "ast_hash": "cd452e26cafe359da13aadf5b69249d6",
+    "semantic_hash": "cd452e26cafe359da13aadf5b69249d6"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/importcmd.py": {
+    "mtime": 1784177072.6647866,
+    "ast_hash": "a2feb67d7f0426cffb294ac4b84649b8",
+    "semantic_hash": "a2feb67d7f0426cffb294ac4b84649b8"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/initcmd.py": {
+    "mtime": 1784088785.0958998,
+    "ast_hash": "cc865855a93df8ce55bb0a2430874ac6",
+    "semantic_hash": "cc865855a93df8ce55bb0a2430874ac6"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/kirowire.py": {
+    "mtime": 1783772037.8260546,
+    "ast_hash": "0a7d51645362547f8ed3aedadc89137e",
+    "semantic_hash": "0a7d51645362547f8ed3aedadc89137e"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/ledger.py": {
+    "mtime": 1784088785.0966232,
+    "ast_hash": "e624fb24de1a07e3a653b31c57284157",
+    "semantic_hash": "e624fb24de1a07e3a653b31c57284157"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/ledgersync.py": {
+    "mtime": 1784088785.097346,
+    "ast_hash": "44ff3000a0088a1be1b029c8d526a1c1",
+    "semantic_hash": "44ff3000a0088a1be1b029c8d526a1c1"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/limits.py": {
+    "mtime": 1784088785.0979295,
+    "ast_hash": "51904d3299ae26a041cf675c19177505",
+    "semantic_hash": "51904d3299ae26a041cf675c19177505"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/lockutil.py": {
+    "mtime": 1783492394.3113158,
+    "ast_hash": "0fac86de284ad0f77591b43697d4fded",
+    "semantic_hash": "0fac86de284ad0f77591b43697d4fded"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/machine.py": {
+    "mtime": 1783352346.9744911,
+    "ast_hash": "1d0a4267ab3c90ffb7b931c28aabecd6",
+    "semantic_hash": "1d0a4267ab3c90ffb7b931c28aabecd6"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/matrix.py": {
+    "mtime": 1784059435.7585816,
+    "ast_hash": "0e3a9c8b37cee3c2bb3f9d9da9fe753c",
+    "semantic_hash": "0e3a9c8b37cee3c2bb3f9d9da9fe753c"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/mcpserver.py": {
+    "mtime": 1783765045.4403703,
+    "ast_hash": "fd3710a914e09313b074ec19ed0787d3",
+    "semantic_hash": "fd3710a914e09313b074ec19ed0787d3"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/mergeutil.py": {
+    "mtime": 1782369210.3759027,
+    "ast_hash": "b84c8a6e2410e14c57132a6b9053c983",
+    "semantic_hash": "b84c8a6e2410e14c57132a6b9053c983"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/metercmd.py": {
+    "mtime": 1784088785.099537,
+    "ast_hash": "6e240af6ec3bf4102afdaf6fcff1cf9d",
+    "semantic_hash": "6e240af6ec3bf4102afdaf6fcff1cf9d"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/metering.py": {
+    "mtime": 1783488085.8177507,
+    "ast_hash": "4194cd09afdfaa3a12aa2abb95ed9a6a",
+    "semantic_hash": "4194cd09afdfaa3a12aa2abb95ed9a6a"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/notessync.py": {
+    "mtime": 1782369226.0953023,
+    "ast_hash": "14cea62f5120d6350906b2cf3fb6cbe2",
+    "semantic_hash": "14cea62f5120d6350906b2cf3fb6cbe2"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/origin.py": {
+    "mtime": 1784088785.1007764,
+    "ast_hash": "fb3b978874f91be5a9c489b430b397e6",
+    "semantic_hash": "fb3b978874f91be5a9c489b430b397e6"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/originrecord.py": {
+    "mtime": 1783492457.8443832,
+    "ast_hash": "946fca1411409fddeb335eec297c296d",
+    "semantic_hash": "946fca1411409fddeb335eec297c296d"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/pathprobe.py": {
+    "mtime": 1784091249.6598072,
+    "ast_hash": "df9516ab8c15ce9aa410e0f22fba8b73",
+    "semantic_hash": "df9516ab8c15ce9aa410e0f22fba8b73"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/paths.py": {
+    "mtime": 1784176971.3959093,
+    "ast_hash": "99e596b333d6186553777c074f403e47",
+    "semantic_hash": "99e596b333d6186553777c074f403e47"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/pointers.py": {
+    "mtime": 1784088785.1027343,
+    "ast_hash": "585976334aa3060eaa580e1897ca8466",
+    "semantic_hash": "585976334aa3060eaa580e1897ca8466"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/policy.py": {
+    "mtime": 1784091055.066747,
+    "ast_hash": "8241a393f568670b155b2b1326d859bb",
+    "semantic_hash": "8241a393f568670b155b2b1326d859bb"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/policysync.py": {
+    "mtime": 1784091302.5231314,
+    "ast_hash": "021d2f4d6afb3e19b8935fde6e5e829a",
+    "semantic_hash": "021d2f4d6afb3e19b8935fde6e5e829a"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/prices.py": {
+    "mtime": 1783745648.9854777,
+    "ast_hash": "955c0182ef18ba25b8708eb850dbaf0a",
+    "semantic_hash": "955c0182ef18ba25b8708eb850dbaf0a"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/pricescmd.py": {
+    "mtime": 1784088785.1048195,
+    "ast_hash": "e168a42352560a842e71103b413ba109",
+    "semantic_hash": "e168a42352560a842e71103b413ba109"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/pricestoml.py": {
+    "mtime": 1784088785.10538,
+    "ast_hash": "d200735f77fed14a3d7aae12c87ed0fa",
+    "semantic_hash": "d200735f77fed14a3d7aae12c87ed0fa"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/provenance.py": {
+    "mtime": 1784088785.1060658,
+    "ast_hash": "e4fa50c70bbef0741a45021706c2692d",
+    "semantic_hash": "e4fa50c70bbef0741a45021706c2692d"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/proxy.py": {
+    "mtime": 1784088785.1067991,
+    "ast_hash": "e1b0811537723405d61e68b2ac8fb075",
+    "semantic_hash": "e1b0811537723405d61e68b2ac8fb075"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/quality.py": {
+    "mtime": 1784088785.1072037,
+    "ast_hash": "fd89d0da8aa707e2bef9c99bf7cb2717",
+    "semantic_hash": "fd89d0da8aa707e2bef9c99bf7cb2717"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/receiptprice.py": {
+    "mtime": 1784011064.2859697,
+    "ast_hash": "ab24c46e51e58c5747982c64fe30bd3c",
+    "semantic_hash": "ab24c46e51e58c5747982c64fe30bd3c"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/recommend.py": {
+    "mtime": 1784088785.107786,
+    "ast_hash": "7aa7fd67c988a1a572438aedbc1f9eba",
+    "semantic_hash": "7aa7fd67c988a1a572438aedbc1f9eba"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/regression.py": {
+    "mtime": 1784088785.1082377,
+    "ast_hash": "55f01d56243d4cc785481cc7966525a5",
+    "semantic_hash": "55f01d56243d4cc785481cc7966525a5"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/render.py": {
+    "mtime": 1784088785.1085367,
+    "ast_hash": "eeaaefdb8367a77b33c969c43b5aae8e",
+    "semantic_hash": "eeaaefdb8367a77b33c969c43b5aae8e"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/report.py": {
+    "mtime": 1784177115.632644,
+    "ast_hash": "07f050399eb0ad4f6fb5e46b34c0247d",
+    "semantic_hash": "07f050399eb0ad4f6fb5e46b34c0247d"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/responsecache.py": {
+    "mtime": 1781434280.1390884,
+    "ast_hash": "a142aa21089928c0e63d0a23113cc94b",
+    "semantic_hash": "a142aa21089928c0e63d0a23113cc94b"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/roi.py": {
+    "mtime": 1784088785.1098185,
+    "ast_hash": "4b4a7ba1d95dc6bc0e182ec89cf8e9e7",
+    "semantic_hash": "4b4a7ba1d95dc6bc0e182ec89cf8e9e7"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/runshim.py": {
+    "mtime": 1783782241.2088628,
+    "ast_hash": "888976b2a7be5e4ddd97d76ec5228c36",
+    "semantic_hash": "888976b2a7be5e4ddd97d76ec5228c36"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/schema.py": {
+    "mtime": 1783741731.57456,
+    "ast_hash": "b99deea0c0559a0811632aa5c3ab824a",
+    "semantic_hash": "b99deea0c0559a0811632aa5c3ab824a"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/serve.py": {
+    "mtime": 1784088785.1108806,
+    "ast_hash": "ba270ddd6b58f4d3ab09245e328aa175",
+    "semantic_hash": "ba270ddd6b58f4d3ab09245e328aa175"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/setupcmd.py": {
+    "mtime": 1783771481.5374322,
+    "ast_hash": "a20406b99f71d3171f4f1456fde5bf24",
+    "semantic_hash": "a20406b99f71d3171f4f1456fde5bf24"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/study.py": {
+    "mtime": 1784088785.1117427,
+    "ast_hash": "b9492527cfc5d7bef39fe16130991b79",
+    "semantic_hash": "b9492527cfc5d7bef39fe16130991b79"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/taskgroup.py": {
+    "mtime": 1784088785.112306,
+    "ast_hash": "77928ecae144b1ff0fd273e588369d8e",
+    "semantic_hash": "77928ecae144b1ff0fd273e588369d8e"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/tasks.py": {
+    "mtime": 1782368920.1734567,
+    "ast_hash": "ce0d1b861384323f27a5e0ce3ca0f475",
+    "semantic_hash": "ce0d1b861384323f27a5e0ce3ca0f475"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/transcript.py": {
+    "mtime": 1783741785.2275448,
+    "ast_hash": "6168a9d297be465d31107255478190a8",
+    "semantic_hash": "6168a9d297be465d31107255478190a8"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/trend.py": {
+    "mtime": 1784088833.6933897,
+    "ast_hash": "c379c3629361a6caccfddfc57739f013",
+    "semantic_hash": "c379c3629361a6caccfddfc57739f013"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/usageparse.py": {
+    "mtime": 1781433977.618078,
+    "ast_hash": "145440720f1d45f4fa35d3aaa48d787f",
+    "semantic_hash": "145440720f1d45f4fa35d3aaa48d787f"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/verbmap.py": {
+    "mtime": 1784088388.7730324,
+    "ast_hash": "663a23402cf5b789edad91f826decf35",
+    "semantic_hash": "663a23402cf5b789edad91f826decf35"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/verdict.py": {
+    "mtime": 1784088785.1141176,
+    "ast_hash": "ffa57364e3f69b918d83bae1d71b4fc6",
+    "semantic_hash": "ffa57364e3f69b918d83bae1d71b4fc6"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/verifycmd.py": {
+    "mtime": 1784088785.1146445,
+    "ast_hash": "258c34945609b16136e3a9e09a54ec21",
+    "semantic_hash": "258c34945609b16136e3a9e09a54ec21"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/watchcmd.py": {
+    "mtime": 1784088785.1152263,
+    "ast_hash": "3edaa3326c0c31e5c5acc106e982f792",
+    "semantic_hash": "3edaa3326c0c31e5c5acc106e982f792"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/wizard.py": {
+    "mtime": 1784088785.1155164,
+    "ast_hash": "6afc39b32e337f09357ab73d80a5fa35",
+    "semantic_hash": "6afc39b32e337f09357ab73d80a5fa35"
+  },
+  "/Users/arpitarya/my_programs/cage/install.sh": {
+    "mtime": 1781420776.974263,
+    "ast_hash": "bca4a4a6005f332bcae0173800fb46cd",
+    "semantic_hash": "bca4a4a6005f332bcae0173800fb46cd"
+  },
+  "/Users/arpitarya/my_programs/cage/pyproject.toml": {
+    "mtime": 1783577678.1723983,
+    "ast_hash": "fa3403ad05ed721a9a54e960f109a385",
+    "semantic_hash": "fa3403ad05ed721a9a54e960f109a385"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/conftest.py": {
+    "mtime": 1783488471.9460487,
+    "ast_hash": "41bea7c76a54685f58a3b0ec2803ba8a",
+    "semantic_hash": "41bea7c76a54685f58a3b0ec2803ba8a"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/fixtures/transcripts/claude/cli/expected.json": {
+    "mtime": 1783742456.724004,
+    "ast_hash": "15387ae087362d55ea3d8bb31bec96d9",
+    "semantic_hash": "15387ae087362d55ea3d8bb31bec96d9"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/fixtures/transcripts/claude/vscode/expected.json": {
+    "mtime": 1783346932.9943895,
+    "ast_hash": "a3620a7dfac0bedf7a4eabcbe7dc94c2",
+    "semantic_hash": "a3620a7dfac0bedf7a4eabcbe7dc94c2"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/fixtures/transcripts/codex/cli/expected.json": {
+    "mtime": 1783449241.0202742,
+    "ast_hash": "c4d3a775f8d0cc26f63b7105d49252a4",
+    "semantic_hash": "c4d3a775f8d0cc26f63b7105d49252a4"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/fixtures/transcripts/codex/vscode/expected.json": {
+    "mtime": 1783449285.0674314,
+    "ast_hash": "7341fc86b862d042f6f5cf1b97460d0a",
+    "semantic_hash": "7341fc86b862d042f6f5cf1b97460d0a"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/fixtures/transcripts/copilot/cli/expected.json": {
+    "mtime": 1783346932.994967,
+    "ast_hash": "2869375308f66d25aba29c39603f9e69",
+    "semantic_hash": "2869375308f66d25aba29c39603f9e69"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/fixtures/transcripts/copilot/vscode/expected.json": {
+    "mtime": 1783488516.3715975,
+    "ast_hash": "c4f5284e95f364702b0da0bcf1af61c1",
+    "semantic_hash": "c4f5284e95f364702b0da0bcf1af61c1"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/fixtures/transcripts/kiro/cli/expected.json": {
+    "mtime": 1783346932.9952075,
+    "ast_hash": "99704dafe6556bebdf9ff6dd6182ecc9",
+    "semantic_hash": "99704dafe6556bebdf9ff6dd6182ecc9"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/fixtures/transcripts/kiro/vscode/expected.json": {
+    "mtime": 1783449321.8166294,
+    "ast_hash": "1080d034cd2d37c42d07a8991a45b7a2",
+    "semantic_hash": "1080d034cd2d37c42d07a8991a45b7a2"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/goldenseed.py": {
+    "mtime": 1784177247.4661524,
+    "ast_hash": "53e5845bb7bef776fde6fa3b79511912",
+    "semantic_hash": "53e5845bb7bef776fde6fa3b79511912"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_agents.py": {
+    "mtime": 1784091239.8544269,
+    "ast_hash": "b120acd63e9b7ac1251f10807eafa208",
+    "semantic_hash": "b120acd63e9b7ac1251f10807eafa208"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_attention.py": {
+    "mtime": 1784091239.8547006,
+    "ast_hash": "a574fc3cace12b18c24e263cb26c7a51",
+    "semantic_hash": "a574fc3cace12b18c24e263cb26c7a51"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_attribution.py": {
+    "mtime": 1782364057.4698775,
+    "ast_hash": "2a3fba76aa90b4bcc3fcc0b52c0bf52e",
+    "semantic_hash": "2a3fba76aa90b4bcc3fcc0b52c0bf52e"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_bundled_data.py": {
+    "mtime": 1783784484.8052871,
+    "ast_hash": "afe8612b18bb8dc4ef48b64f9ab3454b",
+    "semantic_hash": "afe8612b18bb8dc4ef48b64f9ab3454b"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_capture_health.py": {
+    "mtime": 1784177471.3027594,
+    "ast_hash": "67f8aa8fbdcc3450d452f4efee6e864b",
+    "semantic_hash": "67f8aa8fbdcc3450d452f4efee6e864b"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_cleanup.py": {
+    "mtime": 1784091239.855125,
+    "ast_hash": "e1d780c6ec21d6d169e21730e4ce7207",
+    "semantic_hash": "e1d780c6ec21d6d169e21730e4ce7207"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_cli_tiering.py": {
+    "mtime": 1784091239.8553038,
+    "ast_hash": "25a1fee96873f9d9e14f1fc2d2fe521c",
+    "semantic_hash": "25a1fee96873f9d9e14f1fc2d2fe521c"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_compare.py": {
+    "mtime": 1784091239.855495,
+    "ast_hash": "08c60c82119bb018b1d0fc79f64d8a23",
+    "semantic_hash": "08c60c82119bb018b1d0fc79f64d8a23"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_constants.py": {
+    "mtime": 1782245116.3755,
+    "ast_hash": "7c8b1588cda0e9d48833c98c25cefe41",
+    "semantic_hash": "7c8b1588cda0e9d48833c98c25cefe41"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_convert.py": {
+    "mtime": 1782364045.8973606,
+    "ast_hash": "4831c0e893e53d51672d44ff79433fd6",
+    "semantic_hash": "4831c0e893e53d51672d44ff79433fd6"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_csv.py": {
+    "mtime": 1784091239.8557303,
+    "ast_hash": "356d35dd820fc50c6727cc60ed7d4aeb",
+    "semantic_hash": "356d35dd820fc50c6727cc60ed7d4aeb"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_debug_coverage.py": {
+    "mtime": 1783747037.1310587,
+    "ast_hash": "b7e0ad9726b803bbac40182daf731ef4",
+    "semantic_hash": "b7e0ad9726b803bbac40182daf731ef4"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_debuglog.py": {
+    "mtime": 1782544183.4748404,
+    "ast_hash": "bbff5c33753ed9435d0ca0b3d2a696b5",
+    "semantic_hash": "bbff5c33753ed9435d0ca0b3d2a696b5"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_docgen.py": {
+    "mtime": 1784091239.8559372,
+    "ast_hash": "56b52de09c737b67b15127a643dbaee7",
+    "semantic_hash": "56b52de09c737b67b15127a643dbaee7"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_docgen_sources.py": {
+    "mtime": 1784176971.3979838,
+    "ast_hash": "cd2da68bb4ddf53bffa77df9f5c02172",
+    "semantic_hash": "cd2da68bb4ddf53bffa77df9f5c02172"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_doctor.py": {
+    "mtime": 1784091239.8561516,
+    "ast_hash": "a56c16621e7ca6d7875e4f49a8716611",
+    "semantic_hash": "a56c16621e7ca6d7875e4f49a8716611"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_doctor_bundle.py": {
+    "mtime": 1783488681.5250907,
+    "ast_hash": "974708fde0916f7512bf3b8101413bcb",
+    "semantic_hash": "974708fde0916f7512bf3b8101413bcb"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_errors.py": {
+    "mtime": 1784091239.856333,
+    "ast_hash": "0ee7686d1a074a361c3e58498272c864",
+    "semantic_hash": "0ee7686d1a074a361c3e58498272c864"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_estimate.py": {
+    "mtime": 1784091239.857043,
+    "ast_hash": "153718631701b699ae7ccdf7b68a5848",
+    "semantic_hash": "153718631701b699ae7ccdf7b68a5848"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_explain.py": {
+    "mtime": 1784007369.4620702,
+    "ast_hash": "dbc32203797dbdbcf3f1a0b86badb03e",
+    "semantic_hash": "dbc32203797dbdbcf3f1a0b86badb03e"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_export_sweep.py": {
+    "mtime": 1784091239.8573003,
+    "ast_hash": "247525981e64231fdb882e902ec7ab9b",
+    "semantic_hash": "247525981e64231fdb882e902ec7ab9b"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_features.py": {
+    "mtime": 1783449929.9455938,
+    "ast_hash": "f0584dbdc5ab0e3ded280eea9ae7694d",
+    "semantic_hash": "f0584dbdc5ab0e3ded280eea9ae7694d"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_fixture_corpus.py": {
+    "mtime": 1783496804.5077982,
+    "ast_hash": "6d6cada98080bdf31fb7b5e0a17b69e6",
+    "semantic_hash": "6d6cada98080bdf31fb7b5e0a17b69e6"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_freshness.py": {
+    "mtime": 1784091239.8576608,
+    "ast_hash": "6e462caa9e6963efb24d6366f3c7f994",
+    "semantic_hash": "6e462caa9e6963efb24d6366f3c7f994"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_graphifymeter.py": {
+    "mtime": 1784091239.8578148,
+    "ast_hash": "85dbc775d39cccacc352d0a98e7861de",
+    "semantic_hash": "85dbc775d39cccacc352d0a98e7861de"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_human.py": {
+    "mtime": 1781820297.5485923,
+    "ast_hash": "c50397612673b90c67d84fc93a96af23",
+    "semantic_hash": "c50397612673b90c67d84fc93a96af23"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_human_cmd.py": {
+    "mtime": 1784091239.8582585,
+    "ast_hash": "f0fdc207db1502880e86489a309d8eaf",
+    "semantic_hash": "f0fdc207db1502880e86489a309d8eaf"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_human_law.py": {
+    "mtime": 1781820886.6258488,
+    "ast_hash": "e2c5460dde525bfae3f73fa4ff6938c4",
+    "semantic_hash": "e2c5460dde525bfae3f73fa4ff6938c4"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_import_claude.py": {
+    "mtime": 1784091239.858405,
+    "ast_hash": "3b3d7321cfc6da7b5c279228088b2150",
+    "semantic_hash": "3b3d7321cfc6da7b5c279228088b2150"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_import_unified.py": {
+    "mtime": 1782455333.2930555,
+    "ast_hash": "b68c5a32ef98076ae95ee0b3b8585247",
+    "semantic_hash": "b68c5a32ef98076ae95ee0b3b8585247"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_launcher_mode.py": {
+    "mtime": 1784043590.4214976,
+    "ast_hash": "a51babecb27e34e53304e3b44cd940d9",
+    "semantic_hash": "a51babecb27e34e53304e3b44cd940d9"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_ledger_scale.py": {
+    "mtime": 1782583376.0659769,
+    "ast_hash": "9e3aef5971be851256f87595123d9dcf",
+    "semantic_hash": "9e3aef5971be851256f87595123d9dcf"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_limits.py": {
+    "mtime": 1784091239.858543,
+    "ast_hash": "a6f724eebc5646c913ce0189e58ca59e",
+    "semantic_hash": "a6f724eebc5646c913ce0189e58ca59e"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_meter.py": {
+    "mtime": 1784091239.8586745,
+    "ast_hash": "fe6af16fc125417830ff5fde2bd8a400",
+    "semantic_hash": "fe6af16fc125417830ff5fde2bd8a400"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_origin.py": {
+    "mtime": 1783576244.105701,
+    "ast_hash": "b77b4c018955eefe21617b2271c6bd9a",
+    "semantic_hash": "b77b4c018955eefe21617b2271c6bd9a"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_output_spec.py": {
+    "mtime": 1784177270.2356954,
+    "ast_hash": "2b013a42c1f074849c6a269878ce7715",
+    "semantic_hash": "2b013a42c1f074849c6a269878ce7715"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_platform_paths.py": {
+    "mtime": 1783493211.8978496,
+    "ast_hash": "7bbaad4ed741adb23a808d0fb413aefe",
+    "semantic_hash": "7bbaad4ed741adb23a808d0fb413aefe"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_policysync.py": {
+    "mtime": 1784091239.8591375,
+    "ast_hash": "968c7dfc383db145164724b1a740fd2a",
+    "semantic_hash": "968c7dfc383db145164724b1a740fd2a"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_portable_wiring.py": {
+    "mtime": 1783762053.2460337,
+    "ast_hash": "aa41afa8d58519593c8b9e4394a03ba5",
+    "semantic_hash": "aa41afa8d58519593c8b9e4394a03ba5"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_prices_cli.py": {
+    "mtime": 1784091239.859396,
+    "ast_hash": "32c5bd252dfa669c6808786759cf92e9",
+    "semantic_hash": "32c5bd252dfa669c6808786759cf92e9"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_pricestoml.py": {
+    "mtime": 1784091239.8597007,
+    "ast_hash": "fcfc8b21bcf4481ad3d6ac70bec54ff8",
+    "semantic_hash": "fcfc8b21bcf4481ad3d6ac70bec54ff8"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_pricing.py": {
+    "mtime": 1784091239.859928,
+    "ast_hash": "2b39f3e508811cae6cd94104099149f8",
+    "semantic_hash": "2b39f3e508811cae6cd94104099149f8"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_proxy.py": {
+    "mtime": 1781434613.0731034,
+    "ast_hash": "fb72f038b5c1282fa150b0edc2a3caad",
+    "semantic_hash": "fb72f038b5c1282fa150b0edc2a3caad"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_receipt_pricing.py": {
+    "mtime": 1784091239.8601274,
+    "ast_hash": "1698bd5b8089e17ee0549c8f4771d8c8",
+    "semantic_hash": "1698bd5b8089e17ee0549c8f4771d8c8"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_report_savings.py": {
+    "mtime": 1784091239.8603556,
+    "ast_hash": "685c3bcf00f1006751c343e95f22b6cf",
+    "semantic_hash": "685c3bcf00f1006751c343e95f22b6cf"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_setup_modes.py": {
+    "mtime": 1782365845.0465345,
+    "ast_hash": "e5e6b8d893bf3b5fd1ccbd0ac8ca15ef",
+    "semantic_hash": "e5e6b8d893bf3b5fd1ccbd0ac8ca15ef"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_skillgen.py": {
+    "mtime": 1784091239.8605385,
+    "ast_hash": "7c9321105b5558b92c3d7a723f8218fe",
+    "semantic_hash": "7c9321105b5558b92c3d7a723f8218fe"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_sources.py": {
+    "mtime": 1784176971.3983014,
+    "ast_hash": "f0402cc37e95b2a5cc66663c513f1cc7",
+    "semantic_hash": "f0402cc37e95b2a5cc66663c513f1cc7"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_study.py": {
+    "mtime": 1783352673.829546,
+    "ast_hash": "cc5b8ff65d8df2e483bafb09a6539247",
+    "semantic_hash": "cc5b8ff65d8df2e483bafb09a6539247"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_substrate.py": {
+    "mtime": 1782418361.8643463,
+    "ast_hash": "3b1f5dd4022ff6c77b9e2c2d26504ac2",
+    "semantic_hash": "3b1f5dd4022ff6c77b9e2c2d26504ac2"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_tasks.py": {
+    "mtime": 1781820511.7748241,
+    "ast_hash": "e7a2cf4b223133df1dd8d9bcf0c5b8f3",
+    "semantic_hash": "e7a2cf4b223133df1dd8d9bcf0c5b8f3"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_transcript.py": {
+    "mtime": 1783838799.964612,
+    "ast_hash": "519eeb354ba975b65db37cee34bcf81e",
+    "semantic_hash": "519eeb354ba975b65db37cee34bcf81e"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_universal_capture.py": {
+    "mtime": 1784091239.8607755,
+    "ast_hash": "d6b3d4bca9ea36e7baf9b63c1f97bd63",
+    "semantic_hash": "d6b3d4bca9ea36e7baf9b63c1f97bd63"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_validation_fixes.py": {
+    "mtime": 1784091239.8609138,
+    "ast_hash": "103fae72675dfa23527baec0554da29a",
+    "semantic_hash": "103fae72675dfa23527baec0554da29a"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_verdict.py": {
+    "mtime": 1784091239.8610575,
+    "ast_hash": "c2b32c0bc67ee151bfb5eedd6695ff54",
+    "semantic_hash": "c2b32c0bc67ee151bfb5eedd6695ff54"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_views.py": {
+    "mtime": 1784091239.861256,
+    "ast_hash": "1246ac33c1e2926bc95fc228b3866b0a",
+    "semantic_hash": "1246ac33c1e2926bc95fc228b3866b0a"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/test_zipapp.py": {
+    "mtime": 1784091239.8614829,
+    "ast_hash": "920efbe4280cc17e68bdb1a7f14af5db",
+    "semantic_hash": "920efbe4280cc17e68bdb1a7f14af5db"
+  },
+  "/Users/arpitarya/my_programs/cage/tools/__init__.py": {
+    "mtime": 1782760217.5148065,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "/Users/arpitarya/my_programs/cage/tools/buildpyz.py": {
+    "mtime": 1783784484.8057413,
+    "ast_hash": "c55b2a95b222e2a55ffe753f4faf64bd",
+    "semantic_hash": "c55b2a95b222e2a55ffe753f4faf64bd"
+  },
+  "/Users/arpitarya/my_programs/cage/tools/docgen/__init__.py": {
+    "mtime": 1784176971.398591,
+    "ast_hash": "7d167cca6a625de345695810404ecee4",
+    "semantic_hash": "7d167cca6a625de345695810404ecee4"
+  },
+  "/Users/arpitarya/my_programs/cage/tools/docgen/__main__.py": {
+    "mtime": 1784060783.0627267,
+    "ast_hash": "767266ed80b07a406cfcec98d065153d",
+    "semantic_hash": "767266ed80b07a406cfcec98d065153d"
+  },
+  "/Users/arpitarya/my_programs/cage/tools/docgen/gen.py": {
+    "mtime": 1784176971.398854,
+    "ast_hash": "2a62c5407136d1cf13d1f5173c6dbf58",
+    "semantic_hash": "2a62c5407136d1cf13d1f5173c6dbf58"
+  },
+  "/Users/arpitarya/my_programs/cage/tools/dummyrepo/__init__.py": {
+    "mtime": 1783347095.0559409,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "/Users/arpitarya/my_programs/cage/tools/dummyrepo/__main__.py": {
+    "mtime": 1783347096.2994645,
+    "ast_hash": "897ac2b97543f36b864e0c05037afa16",
+    "semantic_hash": "897ac2b97543f36b864e0c05037afa16"
+  },
+  "/Users/arpitarya/my_programs/cage/tools/dummyrepo/run.py": {
+    "mtime": 1784093692.1431148,
+    "ast_hash": "41c8d04c91d309bd799e4928480b312f",
+    "semantic_hash": "41c8d04c91d309bd799e4928480b312f"
+  },
+  "/Users/arpitarya/my_programs/cage/tools/skillgen/__init__.py": {
+    "mtime": 1782760211.6429534,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "/Users/arpitarya/my_programs/cage/tools/skillgen/__main__.py": {
+    "mtime": 1782760212.6674902,
+    "ast_hash": "120be0bf3daa3e84d0365bf2a964c8dd",
+    "semantic_hash": "120be0bf3daa3e84d0365bf2a964c8dd"
+  },
+  "/Users/arpitarya/my_programs/cage/tools/skillgen/gen.py": {
+    "mtime": 1782760261.7549205,
+    "ast_hash": "daecfa65c30127569605793bd338d586",
+    "semantic_hash": "daecfa65c30127569605793bd338d586"
+  },
+  "/Users/arpitarya/my_programs/cage/.github/workflows/prices-freshness-nag.yml": {
+    "mtime": 1784024208.2539496,
+    "ast_hash": "218f4c0c0ce97fd2a0c4c812bd3bcdb2",
+    "semantic_hash": "218f4c0c0ce97fd2a0c4c812bd3bcdb2"
+  },
+  "/Users/arpitarya/my_programs/cage/.github/workflows/publish.yml": {
+    "mtime": 1783782558.6875372,
+    "ast_hash": "64dcacde0aab557d639cc798bbedf9dd",
+    "semantic_hash": "64dcacde0aab557d639cc798bbedf9dd"
+  },
+  "/Users/arpitarya/my_programs/cage/.github/workflows/python-package.yml": {
+    "mtime": 1784060891.182266,
+    "ast_hash": "0c23a9c7b961442c64e63086448c7989",
+    "semantic_hash": "0c23a9c7b961442c64e63086448c7989"
+  },
+  "/Users/arpitarya/my_programs/cage/.pre-commit-config.yaml": {
+    "mtime": 1782760670.2928228,
+    "ast_hash": "2c69198d2fb3175b1090f3a5b0e9f885",
+    "semantic_hash": "2c69198d2fb3175b1090f3a5b0e9f885"
+  },
+  "/Users/arpitarya/my_programs/cage/AGENTS.md": {
+    "mtime": 1782366355.3653286,
+    "ast_hash": "741b8cade978495ae6a0a17485e37def",
+    "semantic_hash": "741b8cade978495ae6a0a17485e37def"
+  },
+  "/Users/arpitarya/my_programs/cage/CHANGELOG.md": {
+    "mtime": 1784177581.2893014,
+    "ast_hash": "50ab81a23cf0471dea7e458d39d01076",
+    "semantic_hash": "50ab81a23cf0471dea7e458d39d01076"
+  },
+  "/Users/arpitarya/my_programs/cage/CLAUDE.md": {
+    "mtime": 1784181306.8489852,
+    "ast_hash": "2f212972cb8b8c63c9e05493a83272d4",
+    "semantic_hash": "2f212972cb8b8c63c9e05493a83272d4"
+  },
+  "/Users/arpitarya/my_programs/cage/README.md": {
+    "mtime": 1784177673.2126992,
+    "ast_hash": "cd98a94400d822229f30048add89c73f",
+    "semantic_hash": "cd98a94400d822229f30048add89c73f"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/data/prompts/cage-doctor.prompt.md": {
+    "mtime": 1784089137.6648114,
+    "ast_hash": "c63a2014deaaad0ff7868dd116f75773",
+    "semantic_hash": "c63a2014deaaad0ff7868dd116f75773"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/data/prompts/cage.prompt.md": {
+    "mtime": 1784089095.2486024,
+    "ast_hash": "810232e4a45b3fd18e0c2453209fd202",
+    "semantic_hash": "810232e4a45b3fd18e0c2453209fd202"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/data/skills/agents/cage/SKILL.md": {
+    "mtime": 1784089095.2480357,
+    "ast_hash": "3fbf5868527e1fdc18e3fd4db596818d",
+    "semantic_hash": "3fbf5868527e1fdc18e3fd4db596818d"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/data/skills/cage-doctor/SKILL.md": {
+    "mtime": 1784089137.6646163,
+    "ast_hash": "3b5cffe5c480b8c3353fe950ceea0fbc",
+    "semantic_hash": "3b5cffe5c480b8c3353fe950ceea0fbc"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/data/skills/cage/SKILL.md": {
+    "mtime": 1784089095.2484348,
+    "ast_hash": "c060b13db6947864ac62376af28c374e",
+    "semantic_hash": "c060b13db6947864ac62376af28c374e"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/data/steering/cage-doctor.md": {
+    "mtime": 1784089137.6650376,
+    "ast_hash": "11036e5a8a71646044925b79b6ad6bf3",
+    "semantic_hash": "11036e5a8a71646044925b79b6ad6bf3"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/data/steering/cage.md": {
+    "mtime": 1784089095.2486727,
+    "ast_hash": "90febc5f36d1d5d1c98b357a50f5806d",
+    "semantic_hash": "90febc5f36d1d5d1c98b357a50f5806d"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/README.md": {
+    "mtime": 1784177606.886444,
+    "ast_hash": "7abbc2bd16ca184076fd5cfe99901f90",
+    "semantic_hash": "7abbc2bd16ca184076fd5cfe99901f90"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/adr/0001-ledger-team-aggregation-notes-not-external-sink.md": {
+    "mtime": 1782369821.1419008,
+    "ast_hash": "f155e5d6d0519e901a979a6b5ce04b36",
+    "semantic_hash": "f155e5d6d0519e901a979a6b5ce04b36"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/adr/0002-universal-capture-global-ledger-explicit-import-export.md": {
+    "mtime": 1782545524.1929243,
+    "ast_hash": "978e70fe67d7479703cd9142a7102081",
+    "semantic_hash": "978e70fe67d7479703cd9142a7102081"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/agents.md": {
+    "mtime": 1784090358.315353,
+    "ast_hash": "8011222696ea5ca51de90cb63ede0ead",
+    "semantic_hash": "8011222696ea5ca51de90cb63ede0ead"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/README.md": {
+    "mtime": 1784177597.7163072,
+    "ast_hash": "d19d2d03822759256ef2360a5fd2b0e7",
+    "semantic_hash": "d19d2d03822759256ef2360a5fd2b0e7"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.11-capture-debug-observability.prompt.md": {
+    "mtime": 1783784033.7117977,
+    "ast_hash": "33dde762f41b854dbcf8125146ab6aab",
+    "semantic_hash": "33dde762f41b854dbcf8125146ab6aab"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.12-universal-capture-scheduler-draft.prompt.md": {
+    "mtime": 1783784033.712072,
+    "ast_hash": "9be2b56d2fd0057d5f2b1e18ca8c0137",
+    "semantic_hash": "9be2b56d2fd0057d5f2b1e18ca8c0137"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.12-universal-capture.handoff.md": {
+    "mtime": 1783784033.7121801,
+    "ast_hash": "8bf26df7c8db12dd777c3c256fa32af2",
+    "semantic_hash": "8bf26df7c8db12dd777c3c256fa32af2"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.12-universal-capture.prompt.md": {
+    "mtime": 1783784033.7123547,
+    "ast_hash": "365df73ed4ebd33e01ba027e49e0a2ee",
+    "semantic_hash": "365df73ed4ebd33e01ba027e49e0a2ee"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.14-error-handling.handoff.md": {
+    "mtime": 1783784033.7125854,
+    "ast_hash": "3615ab996aa6216370db4a0c40b6247e",
+    "semantic_hash": "3615ab996aa6216370db4a0c40b6247e"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.14-error-handling.prompt.md": {
+    "mtime": 1783784033.7127626,
+    "ast_hash": "4203ce84a90334c4ee8e858f12c03677",
+    "semantic_hash": "4203ce84a90334c4ee8e858f12c03677"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.15-meter-competitive-lessons.md": {
+    "mtime": 1783784033.7129123,
+    "ast_hash": "bb20912ee2749c28d81b9ffda31aa394",
+    "semantic_hash": "bb20912ee2749c28d81b9ffda31aa394"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.15-meter-modification-plan.md": {
+    "mtime": 1783784033.713171,
+    "ast_hash": "101e6f79e39841e635df2ae20293a073",
+    "semantic_hash": "101e6f79e39841e635df2ae20293a073"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.15-meter-quota-credits.handoff.md": {
+    "mtime": 1783784033.713258,
+    "ast_hash": "0fa61a2f43a1aa7f899c393df9f27640",
+    "semantic_hash": "0fa61a2f43a1aa7f899c393df9f27640"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.15-meter-quota-credits.prompt.md": {
+    "mtime": 1783784033.7134197,
+    "ast_hash": "20bf4ceac2af03df2f8286e4c24a17e7",
+    "semantic_hash": "20bf4ceac2af03df2f8286e4c24a17e7"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.16-cost-impact-roadmap.handoff.md": {
+    "mtime": 1783784033.7136362,
+    "ast_hash": "01a6a8cb320ead1ee27600ded3cc6483",
+    "semantic_hash": "01a6a8cb320ead1ee27600ded3cc6483"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.16-cost-impact-roadmap.prompt.md": {
+    "mtime": 1783784033.713784,
+    "ast_hash": "ba7f4b20c7180d2f641c725c5bf04a58",
+    "semantic_hash": "ba7f4b20c7180d2f641c725c5bf04a58"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.16-dummy-repo-test.handoff.md": {
+    "mtime": 1783784033.7139337,
+    "ast_hash": "ee16d851debbf333f286fe753b6bbea5",
+    "semantic_hash": "ee16d851debbf333f286fe753b6bbea5"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.16-dummy-repo-test.plan.md": {
+    "mtime": 1783784533.2817125,
+    "ast_hash": "8402a77574155c05af7e78b6234e5ca1",
+    "semantic_hash": "8402a77574155c05af7e78b6234e5ca1"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.16-dummy-repo-test.prompt.md": {
+    "mtime": 1783784033.714371,
+    "ast_hash": "c43acd46779a8b86b2ac28f75a4f0aa0",
+    "semantic_hash": "c43acd46779a8b86b2ac28f75a4f0aa0"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.16-full-test-run.md": {
+    "mtime": 1783784072.7189307,
+    "ast_hash": "d81a4450c525c605793edf0a4fcab5ca",
+    "semantic_hash": "d81a4450c525c605793edf0a4fcab5ca"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.16-manual-test-prep.prompt.md": {
+    "mtime": 1783784033.7145221,
+    "ast_hash": "9b27a8247170f43cc009a153fa42e2f5",
+    "semantic_hash": "9b27a8247170f43cc009a153fa42e2f5"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.16-manual-test-verify.prompt.md": {
+    "mtime": 1783784033.7147694,
+    "ast_hash": "a9efc52fe962098215c005880029f343",
+    "semantic_hash": "a9efc52fe962098215c005880029f343"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.17-windows-and-path-probe.prompt.md": {
+    "mtime": 1783784033.7148552,
+    "ast_hash": "152bcaa0de37a21a5d580ac2522941a0",
+    "semantic_hash": "152bcaa0de37a21a5d580ac2522941a0"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.18-human-attention.prompt.md": {
+    "mtime": 1783784033.71529,
+    "ast_hash": "943b363926d55afcb87431ac9fa5e851",
+    "semantic_hash": "943b363926d55afcb87431ac9fa5e851"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.19-pricing-management.prompt.md": {
+    "mtime": 1783784033.7153847,
+    "ast_hash": "3ba0cf5486cebb7f035e7bf1c5a986ce",
+    "semantic_hash": "3ba0cf5486cebb7f035e7bf1c5a986ce"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.20-portable-wiring.prompt.md": {
+    "mtime": 1783784033.7155323,
+    "ast_hash": "d40bf93df4b5a3da0143a869924b2901",
+    "semantic_hash": "d40bf93df4b5a3da0143a869924b2901"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.21-csv-and-report-skill.prompt.md": {
+    "mtime": 1783784033.715682,
+    "ast_hash": "0f792456bc2167c0767ead00368089ed",
+    "semantic_hash": "0f792456bc2167c0767ead00368089ed"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.22-restricted-env.handoff.md": {
+    "mtime": 1783784033.7157714,
+    "ast_hash": "aa697bbe1e5c8fa7616d92a88dce1c77",
+    "semantic_hash": "aa697bbe1e5c8fa7616d92a88dce1c77"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.22-restricted-env.prompt.md": {
+    "mtime": 1783784033.7158537,
+    "ast_hash": "3afc62563009e66581610dbdfc1880b0",
+    "semantic_hash": "3afc62563009e66581610dbdfc1880b0"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.22.1-docs-lifecycle.prompt.md": {
+    "mtime": 1783786455.0306995,
+    "ast_hash": "4309f800750ffd4855e47465d1c4ceb6",
+    "semantic_hash": "4309f800750ffd4855e47465d1c4ceb6"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.22.1-full-test-run.md": {
+    "mtime": 1783838449.2188497,
+    "ast_hash": "d4eb47d5636b19441b636f4b2410c233",
+    "semantic_hash": "d4eb47d5636b19441b636f4b2410c233"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.23-prices-route-tool.handoff.md": {
+    "mtime": 1784011382.8339815,
+    "ast_hash": "05d73eb24455604b98fcf98052afd19e",
+    "semantic_hash": "05d73eb24455604b98fcf98052afd19e"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.23-prices-route-tool.prompt.md": {
+    "mtime": 1784011382.8341374,
+    "ast_hash": "4fa1066140dd599859b98159532b79f1",
+    "semantic_hash": "4fa1066140dd599859b98159532b79f1"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.23-tool-receipt-pricing.handoff.md": {
+    "mtime": 1784007941.8860238,
+    "ast_hash": "429a480921163a29b2e172b0d29dbbd3",
+    "semantic_hash": "429a480921163a29b2e172b0d29dbbd3"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.23-tool-receipt-pricing.prompt.md": {
+    "mtime": 1784007941.8861504,
+    "ast_hash": "a11e06ad192db43dbabacd3215ceb629",
+    "semantic_hash": "a11e06ad192db43dbabacd3215ceb629"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.24-pricing-freshness.handoff.md": {
+    "mtime": 1784024900.4392095,
+    "ast_hash": "0d024fdad40d02a556b6e06641cbf2eb",
+    "semantic_hash": "0d024fdad40d02a556b6e06641cbf2eb"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.24-pricing-freshness.prompt.md": {
+    "mtime": 1784024900.4425125,
+    "ast_hash": "ce8fa5a0b935a813dd885ef96ce3aa19",
+    "semantic_hash": "ce8fa5a0b935a813dd885ef96ce3aa19"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.25-policy-sync.handoff.md": {
+    "mtime": 1784022791.633962,
+    "ast_hash": "441316e7d2b32ae27bac12bc101e8ba7",
+    "semantic_hash": "441316e7d2b32ae27bac12bc101e8ba7"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.25-policy-sync.prompt.md": {
+    "mtime": 1784022814.995349,
+    "ast_hash": "68f5e155c0fc57c6860bed6e763fa8f9",
+    "semantic_hash": "68f5e155c0fc57c6860bed6e763fa8f9"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.26-output-honesty.handoff.md": {
+    "mtime": 1784044950.9855335,
+    "ast_hash": "d1ad2fbec2caf0fcf148a30559291276",
+    "semantic_hash": "d1ad2fbec2caf0fcf148a30559291276"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.26-output-honesty.prompt.md": {
+    "mtime": 1784058087.229092,
+    "ast_hash": "c16e330e53cc792f5c9c47cfcf6d3cb7",
+    "semantic_hash": "c16e330e53cc792f5c9c47cfcf6d3cb7"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.27-cli-tiering.handoff.md": {
+    "mtime": 1784058131.681933,
+    "ast_hash": "24b4f432f00765a6c8d5d1c1d02a9e35",
+    "semantic_hash": "24b4f432f00765a6c8d5d1c1d02a9e35"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.27-cli-tiering.prompt.md": {
+    "mtime": 1784058157.1184509,
+    "ast_hash": "17cda0d7ad3a6bd44c12ac83865b2666",
+    "semantic_hash": "17cda0d7ad3a6bd44c12ac83865b2666"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.28-policy-sources.handoff.md": {
+    "mtime": 1784058203.7860885,
+    "ast_hash": "1d2635aa7972be74e3b5b2d926c73bb0",
+    "semantic_hash": "1d2635aa7972be74e3b5b2d926c73bb0"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.28-policy-sources.prompt.md": {
+    "mtime": 1784058227.7401955,
+    "ast_hash": "e29b9b2625fe786934208efa6b78d174",
+    "semantic_hash": "e29b9b2625fe786934208efa6b78d174"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.29-sources-defaults.handoff.md": {
+    "mtime": 1784176971.3971019,
+    "ast_hash": "a90463983dfb5ab810bdb371437fa59e",
+    "semantic_hash": "a90463983dfb5ab810bdb371437fa59e"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.29-sources-defaults.prompt.md": {
+    "mtime": 1784176971.3973887,
+    "ast_hash": "8db8a4768f594622a045f0691b374b1c",
+    "semantic_hash": "8db8a4768f594622a045f0691b374b1c"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.3-human-baseline.prompt.md": {
+    "mtime": 1783784033.7160378,
+    "ast_hash": "8dffccc2129575671529d76c004dd986",
+    "semantic_hash": "8dffccc2129575671529d76c004dd986"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.3-tool-receipts-graphify-fux.handoff.md": {
+    "mtime": 1783784033.716246,
+    "ast_hash": "9c2ed4a270958f713ea842dbf54c1587",
+    "semantic_hash": "9c2ed4a270958f713ea842dbf54c1587"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.3-tool-receipts-graphify-fux.prompt.md": {
+    "mtime": 1783784033.7164283,
+    "ast_hash": "36f81980032e9b1753cdd4f6159163bd",
+    "semantic_hash": "36f81980032e9b1753cdd4f6159163bd"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.30-capture-health.handoff.md": {
+    "mtime": 1784176971.410574,
+    "ast_hash": "a08f0995836de1c10ec5afbe04d27743",
+    "semantic_hash": "a08f0995836de1c10ec5afbe04d27743"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.30-capture-health.prompt.md": {
+    "mtime": 1784176971.4107924,
+    "ast_hash": "9a2159eaab9484a97941b76cb9f4545e",
+    "semantic_hash": "9a2159eaab9484a97941b76cb9f4545e"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.5-cage-query-concepts.handoff.md": {
+    "mtime": 1783784033.716599,
+    "ast_hash": "671fc047bb31013e5e3726f4986bf6ae",
+    "semantic_hash": "671fc047bb31013e5e3726f4986bf6ae"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.5-cage-query-concepts.prompt.md": {
+    "mtime": 1783784033.7167578,
+    "ast_hash": "386fd420084fa96f930f3369138389c4",
+    "semantic_hash": "386fd420084fa96f930f3369138389c4"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.5-dx-constants-query-help.handoff.md": {
+    "mtime": 1783784033.7169235,
+    "ast_hash": "db7614aad9bb9b3d5206dc1c57d14011",
+    "semantic_hash": "db7614aad9bb9b3d5206dc1c57d14011"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.5-dx-constants-query-help.prompt.md": {
+    "mtime": 1783784033.717113,
+    "ast_hash": "dfbca4be0e1f7df5d3cff29ea3554607",
+    "semantic_hash": "dfbca4be0e1f7df5d3cff29ea3554607"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.5-fix-cost-rendering.prompt.md": {
+    "mtime": 1783784033.717462,
+    "ast_hash": "a0ef9e313340a20d4c8b5699bc3dcde4",
+    "semantic_hash": "a0ef9e313340a20d4c8b5699bc3dcde4"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.7-cli-surface.handoff.md": {
+    "mtime": 1783784033.717608,
+    "ast_hash": "adaf4ed5277f0715568c0dac469063c3",
+    "semantic_hash": "adaf4ed5277f0715568c0dac469063c3"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.7-import-claude-hookless.prompt.md": {
+    "mtime": 1783784033.7178743,
+    "ast_hash": "9f525ff6daf3e7fb171eb153e825a430",
+    "semantic_hash": "9f525ff6daf3e7fb171eb153e825a430"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.7-model-pricing-fallback.prompt.md": {
+    "mtime": 1783784033.7180588,
+    "ast_hash": "208a58962916e3890f64799a9f19b0fc",
+    "semantic_hash": "208a58962916e3890f64799a9f19b0fc"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.7-org-gateway-zero-setup.prompt.md": {
+    "mtime": 1783784033.7181332,
+    "ast_hash": "a27b82ba57129726c1dcc4e87c9da431",
+    "semantic_hash": "a27b82ba57129726c1dcc4e87c9da431"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.7-report-spent-and-saved.handoff.md": {
+    "mtime": 1783784033.7191424,
+    "ast_hash": "d1c1707cc7b682c86feadeb0ac9a5056",
+    "semantic_hash": "d1c1707cc7b682c86feadeb0ac9a5056"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.8-eli5-help-and-query.handoff.md": {
+    "mtime": 1783784033.7194276,
+    "ast_hash": "841d681152d68295d28134ef03fecac8",
+    "semantic_hash": "841d681152d68295d28134ef03fecac8"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.8-eli5-help-and-query.prompt.md": {
+    "mtime": 1783784033.719662,
+    "ast_hash": "9f9d9d2555a82423187bd86afb60cdfe",
+    "semantic_hash": "9f9d9d2555a82423187bd86afb60cdfe"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.8-hookless-and-gateway.handoff.md": {
+    "mtime": 1783784033.7198734,
+    "ast_hash": "13579ab049f15776d3ec5baaf67ba227",
+    "semantic_hash": "13579ab049f15776d3ec5baaf67ba227"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.8-implement-hookless-metering.prompt.md": {
+    "mtime": 1783784033.7200544,
+    "ast_hash": "6a8783231d79f98ea13346fd5cc182e7",
+    "semantic_hash": "6a8783231d79f98ea13346fd5cc182e7"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.8-kickoff-hookless-and-gateway.prompt.md": {
+    "mtime": 1783784033.7202263,
+    "ast_hash": "48fee95296dc4ea40669e26b44159d48",
+    "semantic_hash": "48fee95296dc4ea40669e26b44159d48"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.8-unified-hookless-all-agents.prompt.md": {
+    "mtime": 1783784033.7202952,
+    "ast_hash": "a50c4eccec2627730e0f5f424817863e",
+    "semantic_hash": "a50c4eccec2627730e0f5f424817863e"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.9-hookless-backfill-default.prompt.md": {
+    "mtime": 1783784033.720467,
+    "ast_hash": "61ec75389533bbf27147008be016f69c",
+    "semantic_hash": "61ec75389533bbf27147008be016f69c"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.9-ledger-scale.handoff.md": {
+    "mtime": 1783784033.7206573,
+    "ast_hash": "06dc2177c540dda346d6582f989cb1c5",
+    "semantic_hash": "06dc2177c540dda346d6582f989cb1c5"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.9-ledger-scale.plan-draft.md": {
+    "mtime": 1783784033.7208278,
+    "ast_hash": "6b76894564c6aca986632d3a6c146f24",
+    "semantic_hash": "6b76894564c6aca986632d3a6c146f24"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/archive/v0.9-ledger-scale.prompt.md": {
+    "mtime": 1783784033.721105,
+    "ast_hash": "0f9cb7564f2fa5afc3bff6be31ef6144",
+    "semantic_hash": "0f9cb7564f2fa5afc3bff6be31ef6144"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/cage-claude-code-prompt-full-test-run.md": {
+    "mtime": 1783835791.985648,
+    "ast_hash": "1ca09e59750f7ad650ad286e4c6b27ef",
+    "semantic_hash": "1ca09e59750f7ad650ad286e4c6b27ef"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/cage-plan.md": {
+    "mtime": 1784090358.319848,
+    "ast_hash": "eafaca3fe430ae6cc5ae4bb24d2dcae0",
+    "semantic_hash": "eafaca3fe430ae6cc5ae4bb24d2dcae0"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/cli-output-spec.md": {
+    "mtime": 1784177311.237812,
+    "ast_hash": "b364b19636c62285b53cb5b1765d9df1",
+    "semantic_hash": "b364b19636c62285b53cb5b1765d9df1"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/csv-output.md": {
+    "mtime": 1784089863.8842595,
+    "ast_hash": "9fbfddba31700ad924d9dd89975c86ad",
+    "semantic_hash": "9fbfddba31700ad924d9dd89975c86ad"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/debugging-capture.md": {
+    "mtime": 1784177523.1541092,
+    "ast_hash": "b5ca3c6f88a36830d67cb4419adfd5ab",
+    "semantic_hash": "b5ca3c6f88a36830d67cb4419adfd5ab"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/formulas.md": {
+    "mtime": 1784089164.4512663,
+    "ast_hash": "ea24e65131bd32bd028981c741876dbd",
+    "semantic_hash": "ea24e65131bd32bd028981c741876dbd"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/full-test-plan-sibling-repo.md": {
+    "mtime": 1784090271.2637358,
+    "ast_hash": "26573f1b97df62a5b641360e7272eb4c",
+    "semantic_hash": "26573f1b97df62a5b641360e7272eb4c"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/human-baseline.design.md": {
+    "mtime": 1784090358.3176732,
+    "ast_hash": "e0585d291634619e763903f3a4480e28",
+    "semantic_hash": "e0585d291634619e763903f3a4480e28"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/maintainers-interview.md": {
+    "mtime": 1783877208.5389624,
+    "ast_hash": "e61e45de1a4b78204efb9f6a2a427555",
+    "semantic_hash": "e61e45de1a4b78204efb9f6a2a427555"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/output-and-simplification.plan.md": {
+    "mtime": 1784089826.1513286,
+    "ast_hash": "a6f0f0f8ce6625548479ddb4f600245d",
+    "semantic_hash": "a6f0f0f8ce6625548479ddb4f600245d"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/portable-wiring.md": {
+    "mtime": 1784089863.8829076,
+    "ast_hash": "7bdfaedf4a5d33f10febb524b4cd5de4",
+    "semantic_hash": "7bdfaedf4a5d33f10febb524b4cd5de4"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/pricing.md": {
+    "mtime": 1784089863.8823292,
+    "ast_hash": "930b97b27c98986248ff045fdc8914b4",
+    "semantic_hash": "930b97b27c98986248ff045fdc8914b4"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/restricted-environments.md": {
+    "mtime": 1783784500.3200524,
+    "ast_hash": "7f70eea04155c39a350722df7e85922b",
+    "semantic_hash": "7f70eea04155c39a350722df7e85922b"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/skillgen.md": {
+    "mtime": 1782760948.2089236,
+    "ast_hash": "d10f48975552ef633df8d84546ab1023",
+    "semantic_hash": "d10f48975552ef633df8d84546ab1023"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/sources.md": {
+    "mtime": 1784177530.4484916,
+    "ast_hash": "bc8eee0b8c79afea57cc01d868b32788",
+    "semantic_hash": "bc8eee0b8c79afea57cc01d868b32788"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/windows-manual-checklist.md": {
+    "mtime": 1784090358.316582,
+    "ast_hash": "809d0b7a93ae7f08e9f66655ed345f78",
+    "semantic_hash": "809d0b7a93ae7f08e9f66655ed345f78"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/fixtures/cli-help.txt": {
+    "mtime": 1784091239.8476737,
+    "ast_hash": "39bd491595638162ba90ed9a19a498b5",
+    "semantic_hash": "39bd491595638162ba90ed9a19a498b5"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/fixtures/goldens/I2.txt": {
+    "mtime": 1784091239.8478956,
+    "ast_hash": "e521be72d8af726daae7b89b53c89cfe",
+    "semantic_hash": "e521be72d8af726daae7b89b53c89cfe"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/fixtures/goldens/I3.txt": {
+    "mtime": 1784091239.8480675,
+    "ast_hash": "24b2321c351ac5db0d8bbf19f2c6edc0",
+    "semantic_hash": "24b2321c351ac5db0d8bbf19f2c6edc0"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/fixtures/goldens/I4.txt": {
+    "mtime": 1784091239.8488467,
+    "ast_hash": "95e42ebf135ca4c844195e9ae7251383",
+    "semantic_hash": "95e42ebf135ca4c844195e9ae7251383"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/fixtures/goldens/I5.txt": {
+    "mtime": 1784091239.8489847,
+    "ast_hash": "c8e2191724ff73a637246875000cbbdd",
+    "semantic_hash": "c8e2191724ff73a637246875000cbbdd"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/fixtures/goldens/I6a.txt": {
+    "mtime": 1784091239.8491015,
+    "ast_hash": "b732e68b920015e6353ad26d3eb17c98",
+    "semantic_hash": "b732e68b920015e6353ad26d3eb17c98"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/fixtures/goldens/I6b.txt": {
+    "mtime": 1784091239.8492243,
+    "ast_hash": "4ec7893b41a9f568ec18b7a5e7e4d86d",
+    "semantic_hash": "4ec7893b41a9f568ec18b7a5e7e4d86d"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/fixtures/goldens/I7.txt": {
+    "mtime": 1784091239.8493383,
+    "ast_hash": "52391f35615b534d8e8463cfd749a92f",
+    "semantic_hash": "52391f35615b534d8e8463cfd749a92f"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/fixtures/goldens/I8a.txt": {
+    "mtime": 1784091239.8494515,
+    "ast_hash": "a31541f1eb9d6dc52bc3f2fc53d47091",
+    "semantic_hash": "a31541f1eb9d6dc52bc3f2fc53d47091"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/fixtures/goldens/I8b.txt": {
+    "mtime": 1784091239.8495586,
+    "ast_hash": "e1ebb015d1187879074df3b449a0917d",
+    "semantic_hash": "e1ebb015d1187879074df3b449a0917d"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/fixtures/goldens/O1.txt": {
+    "mtime": 1784091239.8496802,
+    "ast_hash": "b7ede7b732854100d768e5d4ebfd8726",
+    "semantic_hash": "b7ede7b732854100d768e5d4ebfd8726"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/fixtures/goldens/O2.txt": {
+    "mtime": 1784091239.8497834,
+    "ast_hash": "e77afd983370496418ab5831fd3270bd",
+    "semantic_hash": "e77afd983370496418ab5831fd3270bd"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/fixtures/goldens/P1.txt": {
+    "mtime": 1784091239.8504786,
+    "ast_hash": "c0b959d561ec05357b5bde80d61dafd4",
+    "semantic_hash": "c0b959d561ec05357b5bde80d61dafd4"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/fixtures/goldens/P2a.txt": {
+    "mtime": 1784091239.850791,
+    "ast_hash": "ba28b5b0a0dbcc07539fc86633e6272c",
+    "semantic_hash": "ba28b5b0a0dbcc07539fc86633e6272c"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/fixtures/goldens/P2b.txt": {
+    "mtime": 1784091239.8509853,
+    "ast_hash": "f74c20f3419d720ef9ed50edbd12ca53",
+    "semantic_hash": "f74c20f3419d720ef9ed50edbd12ca53"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/fixtures/goldens/P3a.txt": {
+    "mtime": 1784091239.8511176,
+    "ast_hash": "062a967e282aaa096f24f7886d3bdaaf",
+    "semantic_hash": "062a967e282aaa096f24f7886d3bdaaf"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/fixtures/goldens/P3b.txt": {
+    "mtime": 1784091239.8513157,
+    "ast_hash": "759b2009e40f47ce5a566aba165c4ae2",
+    "semantic_hash": "759b2009e40f47ce5a566aba165c4ae2"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/fixtures/goldens/P4a.txt": {
+    "mtime": 1784091239.8515117,
+    "ast_hash": "9a71f2a48b140f92de0ddcb32cc9149d",
+    "semantic_hash": "9a71f2a48b140f92de0ddcb32cc9149d"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/fixtures/goldens/P4b.txt": {
+    "mtime": 1784091239.8517532,
+    "ast_hash": "5a4a7f53046f55423f094c0805d67ccd",
+    "semantic_hash": "5a4a7f53046f55423f094c0805d67ccd"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/fixtures/goldens/P4c.txt": {
+    "mtime": 1784091239.8528972,
+    "ast_hash": "b19cad0d9379befe315485c871712030",
+    "semantic_hash": "b19cad0d9379befe315485c871712030"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/fixtures/goldens/P5.txt": {
+    "mtime": 1784091239.8530033,
+    "ast_hash": "552b43f13cbf0e0e6100e240747d6fed",
+    "semantic_hash": "552b43f13cbf0e0e6100e240747d6fed"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/fixtures/goldens/P6a.txt": {
+    "mtime": 1784091239.8530998,
+    "ast_hash": "0629865f4c1ea32d14385b63e3f903b9",
+    "semantic_hash": "0629865f4c1ea32d14385b63e3f903b9"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/fixtures/goldens/P6b.txt": {
+    "mtime": 1784091239.8531983,
+    "ast_hash": "5d7a5286e810f741a183b94b9ba01138",
+    "semantic_hash": "5d7a5286e810f741a183b94b9ba01138"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/fixtures/goldens/R1.txt": {
+    "mtime": 1784091239.8532944,
+    "ast_hash": "40cae8123ec3e70f85296f83c331bae6",
+    "semantic_hash": "40cae8123ec3e70f85296f83c331bae6"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/fixtures/goldens/R2.txt": {
+    "mtime": 1784091239.8533862,
+    "ast_hash": "68685463c2e9077fb307fd42614dab67",
+    "semantic_hash": "68685463c2e9077fb307fd42614dab67"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/fixtures/goldens/R3.txt": {
+    "mtime": 1784091239.8534782,
+    "ast_hash": "39048c0a634682d274f05e19f4b8b3f6",
+    "semantic_hash": "39048c0a634682d274f05e19f4b8b3f6"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/fixtures/goldens/R4.txt": {
+    "mtime": 1784091239.8535757,
+    "ast_hash": "0563fcab157a7a09405846283effb20d",
+    "semantic_hash": "0563fcab157a7a09405846283effb20d"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/fixtures/goldens/R5.txt": {
+    "mtime": 1784091239.8536794,
+    "ast_hash": "a1581c952fea8a58c10ec2f87f795bbf",
+    "semantic_hash": "a1581c952fea8a58c10ec2f87f795bbf"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/fixtures/goldens/R6.txt": {
+    "mtime": 1784091239.8537817,
+    "ast_hash": "7b65bc3466a96165082d72bcbcb5239c",
+    "semantic_hash": "7b65bc3466a96165082d72bcbcb5239c"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/fixtures/goldens/R7.txt": {
+    "mtime": 1784177288.6691966,
+    "ast_hash": "ab55e0883e1f60e37008e1d0f13e52e4",
+    "semantic_hash": "ab55e0883e1f60e37008e1d0f13e52e4"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/fixtures/goldens/S3.txt": {
+    "mtime": 1784091239.8538797,
+    "ast_hash": "f16f02c4885186c06ec349bee745fe9d",
+    "semantic_hash": "f16f02c4885186c06ec349bee745fe9d"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/fixtures/goldens/S4.txt": {
+    "mtime": 1784091239.8539762,
+    "ast_hash": "9c5ec21b51b6e0ece586670a12c683f3",
+    "semantic_hash": "9c5ec21b51b6e0ece586670a12c683f3"
+  },
+  "/Users/arpitarya/my_programs/cage/tests/fixtures/transcripts/README.md": {
+    "mtime": 1783742479.9048963,
+    "ast_hash": "dc4a4318a033d3983dbdff92b6f49f55",
+    "semantic_hash": "dc4a4318a033d3983dbdff92b6f49f55"
+  },
+  "/Users/arpitarya/my_programs/cage/tools/skillgen/expected/cage__data__prompts__cage.prompt.md": {
+    "mtime": 1784089103.6010466,
+    "ast_hash": "810232e4a45b3fd18e0c2453209fd202",
+    "semantic_hash": "810232e4a45b3fd18e0c2453209fd202"
+  },
+  "/Users/arpitarya/my_programs/cage/tools/skillgen/expected/cage__data__skills__agents__cage__SKILL.md": {
+    "mtime": 1784089103.6007805,
+    "ast_hash": "3fbf5868527e1fdc18e3fd4db596818d",
+    "semantic_hash": "3fbf5868527e1fdc18e3fd4db596818d"
+  },
+  "/Users/arpitarya/my_programs/cage/tools/skillgen/expected/cage__data__skills__cage__SKILL.md": {
+    "mtime": 1784089103.6009455,
+    "ast_hash": "c060b13db6947864ac62376af28c374e",
+    "semantic_hash": "c060b13db6947864ac62376af28c374e"
+  },
+  "/Users/arpitarya/my_programs/cage/tools/skillgen/expected/cage__data__steering__cage.md": {
+    "mtime": 1784089103.6011372,
+    "ast_hash": "90febc5f36d1d5d1c98b357a50f5806d",
+    "semantic_hash": "90febc5f36d1d5d1c98b357a50f5806d"
+  },
+  "/Users/arpitarya/my_programs/cage/tools/skillgen/fragments/core/core.md": {
+    "mtime": 1784089081.521366,
+    "ast_hash": "afe3e132575d2ffa048d4b8e18e9a42a",
+    "semantic_hash": "afe3e132575d2ffa048d4b8e18e9a42a"
+  },
+  "/Users/arpitarya/my_programs/cage/tools/skillgen/fragments/intro/agents.md": {
+    "mtime": 1782760295.1385093,
+    "ast_hash": "db3a41c65c0e584178be368652e7f083",
+    "semantic_hash": "db3a41c65c0e584178be368652e7f083"
+  },
+  "/Users/arpitarya/my_programs/cage/tools/skillgen/fragments/intro/copilot.md": {
+    "mtime": 1782760292.3126056,
+    "ast_hash": "c35685ed651a6a575e8a63a0e9995c32",
+    "semantic_hash": "c35685ed651a6a575e8a63a0e9995c32"
+  },
+  "/Users/arpitarya/my_programs/cage/tools/skillgen/fragments/intro/kiro.md": {
+    "mtime": 1782760293.7262774,
+    "ast_hash": "f5d2c874390c4404aa85c167040dd34b",
+    "semantic_hash": "f5d2c874390c4404aa85c167040dd34b"
+  },
+  "/Users/arpitarya/my_programs/cage/tools/skillgen/fragments/intro/skill.md": {
+    "mtime": 1782760290.9002528,
+    "ast_hash": "209d6d9799c9e08bf9f59b8dec483aee",
+    "semantic_hash": "209d6d9799c9e08bf9f59b8dec483aee"
+  },
+  "/Users/arpitarya/my_programs/cage/tools/skillgen/fragments/meter/agents.md": {
+    "mtime": 1784089081.5221972,
+    "ast_hash": "3165b0e4ad3d3fa3ec68876ce27f7392",
+    "semantic_hash": "3165b0e4ad3d3fa3ec68876ce27f7392"
+  },
+  "/Users/arpitarya/my_programs/cage/tools/skillgen/fragments/meter/copilot.md": {
+    "mtime": 1784089081.5224373,
+    "ast_hash": "3165b0e4ad3d3fa3ec68876ce27f7392",
+    "semantic_hash": "3165b0e4ad3d3fa3ec68876ce27f7392"
+  },
+  "/Users/arpitarya/my_programs/cage/tools/skillgen/fragments/meter/kiro.md": {
+    "mtime": 1784089081.5227263,
+    "ast_hash": "fb0fdf090a3047e906efc869e4bd46ae",
+    "semantic_hash": "fb0fdf090a3047e906efc869e4bd46ae"
+  },
+  "/Users/arpitarya/my_programs/cage/tools/skillgen/fragments/meter/skill.md": {
+    "mtime": 1784089081.5229785,
+    "ast_hash": "8e609bde91427153915395be26a9419e",
+    "semantic_hash": "8e609bde91427153915395be26a9419e"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/data/assets/cage-app-tile.svg": {
+    "mtime": 1783577672.7134995,
+    "ast_hash": "bf45a06ce2dd03bab23534c8101da72e",
+    "semantic_hash": "bf45a06ce2dd03bab23534c8101da72e"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/data/assets/cage-lockup.png": {
+    "mtime": 1783577672.713929,
+    "ast_hash": "c47bcfd46707e8483a87c99bd47ba037",
+    "semantic_hash": "c47bcfd46707e8483a87c99bd47ba037"
+  },
+  "/Users/arpitarya/my_programs/cage/cage/data/assets/cage-symbol.svg": {
+    "mtime": 1783577672.7142463,
+    "ast_hash": "49a8033917567c400c0308f9d6d084b6",
+    "semantic_hash": "49a8033917567c400c0308f9d6d084b6"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/assets/architecture.svg": {
+    "mtime": 1783835791.985431,
+    "ast_hash": "eebf5c18ad6e384745a69d266d07a104",
+    "semantic_hash": "eebf5c18ad6e384745a69d266d07a104"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/assets/cage-app-tile.png": {
+    "mtime": 1782007811.8973267,
+    "ast_hash": "622d814f79ab434623d9261568e11f2b",
+    "semantic_hash": "622d814f79ab434623d9261568e11f2b"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/assets/cage-app-tile.svg": {
+    "mtime": 1782007811.8977015,
+    "ast_hash": "bf45a06ce2dd03bab23534c8101da72e",
+    "semantic_hash": "bf45a06ce2dd03bab23534c8101da72e"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/assets/cage-app-tile@512.png": {
+    "mtime": 1782007811.8980727,
+    "ast_hash": "3d14160723e08d6d1d8605d81c8fa8dc",
+    "semantic_hash": "3d14160723e08d6d1d8605d81c8fa8dc"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/assets/cage-lockup.png": {
+    "mtime": 1782007811.898538,
+    "ast_hash": "c47bcfd46707e8483a87c99bd47ba037",
+    "semantic_hash": "c47bcfd46707e8483a87c99bd47ba037"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/assets/cage-lockup.svg": {
+    "mtime": 1782007811.8987398,
+    "ast_hash": "e51a122c847e652aa10f5995a75f5556",
+    "semantic_hash": "e51a122c847e652aa10f5995a75f5556"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/assets/cage-symbol.png": {
+    "mtime": 1782007811.898956,
+    "ast_hash": "11e87a568dc336c0defb5a2204c171be",
+    "semantic_hash": "11e87a568dc336c0defb5a2204c171be"
+  },
+  "/Users/arpitarya/my_programs/cage/docs/assets/cage-symbol.svg": {
+    "mtime": 1782007811.8990672,
+    "ast_hash": "49a8033917567c400c0308f9d6d084b6",
+    "semantic_hash": "49a8033917567c400c0308f9d6d084b6"
+  }
+}

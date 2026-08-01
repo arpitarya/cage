@@ -7,11 +7,11 @@
 [![Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)](#the-0-guarantee)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-You're paying for an agent, a graph tool, a rules engine, maybe Copilot. At the end of the month someone asks *"is any of this worth it?"* — and the honest answer is a shrug and a Slack thread. Cage meters every LLM call, collects a **savings receipt** from each tool in the stack, and turns the raw stream into an **attribution ledger**: what you spent, what each tool saved you, what *every other combination* of tools would have cost, and **how much money *and time* the agent saved versus a person** doing the same task. **`$0`, deterministic, zero dependencies, no model in the maintenance path.**
+You're paying for an agent, a graph tool, a rules engine, maybe Copilot. At the end of the month someone asks *"is any of this worth it?"* — and the honest answer is a shrug and a Slack thread. Cage meters every LLM call, collects a **savings receipt** from each tool in the stack, and turns the raw stream into an **attribution ledger**: what you spent, what each tool saved you — **gross and net of what using it cost you** — what *every other combination* of tools would have cost, and which tools your agents actually *adopt* when offered. **`$0`, deterministic, zero dependencies, no model in the maintenance path.**
 
 **Named after *John Cage*.** · Python ≥ 3.11 · stdlib only · MIT · sits beside `fux`, `bach`, `wagner`, `orff`.
 
-**Platforms:** macOS is field-validated (real extension sessions, the full manual capture matrix); Linux and Windows are CI-tested across the whole suite + scenario runner. On Windows, run `cage doctor --paths` first — it shows every log location cage probes on your machine and why any missed. Locked-down endpoint (AppLocker/WDAC blocks the exe, or no pip)? `cage setup --python-launcher` wires everything through the interpreter instead, and every release ships a single-file `cage.pyz`.
+**Platforms:** macOS is field-validated (real extension sessions, the full manual capture matrix); Linux and Windows are CI-tested across the whole suite + scenario runner. **One honest gap:** the graphify PATH interceptor is a bash shim, so on Windows the shim route doesn't exist yet — graphify savings there arrive via the transcript route only (a Windows-native twin is planned). On Windows, run `cage doctor --paths` first — it shows every log location cage probes on your machine and why any missed. Locked-down endpoint (AppLocker/WDAC blocks the exe, or no pip)? `cage setup --python-launcher` wires everything through the interpreter instead, and every release ships a single-file `cage.pyz`.
 
 <p align="center"><em>▶ Demo GIF coming soon.</em></p>
 
@@ -25,7 +25,9 @@ Here's the con. Nobody — and I mean *nobody* — can show you the number. They
 
 And the kicker — you built half of it. So when finance points at you and says "is this worth it," you, the expert, the one who's supposed to *know* — you got a screenshot and a feeling. You're not in trouble for spending the money, folks. You're in trouble because you bought the same fog everybody else did.
 
-**Cage is the thing that ruins the fog.** It's the itemized receipt nobody asks for and everybody needs: the graph tool saved 27,000 tokens here, fux saved 6,400, the agent did in four minutes what a person does in two hours — plus every other combo you *could've* run, priced out, each number stamped so you know which ones are real and which ones are some computer's best guess. It doesn't do synergy. It does arithmetic.
+**Cage is the thing that ruins the fog.** It's the itemized receipt nobody asks for and everybody needs: the graph tool saved 27,000 tokens here, fux saved 6,400 there — **and what invoking them cost you, netted against it** — plus every other combo you *could've* run, priced out, each number stamped so you know which ones are real and which ones are some computer's best guess. It doesn't do synergy. It does arithmetic.
+
+And when cage's own numbers came back saying a session *with* the graph tool cost **more** than one without? It printed that too, labelled, instead of burying it. A savings tool you can't catch lying about savings is just the fog with a logo. ([The finding.](docs/regression/2026-08-01-finding-saved-is-gross.md))
 
 ## See it
 
@@ -47,6 +49,8 @@ graphify  fux  compressor   input tok    cost    source
 ```
 
 Per-tool savings any meter can attempt. The part no cost dashboard does is the rest of that table — **what each stack you *didn't* run would have cost** — and the `source` column, so you always know which row is an invoice and which is a reconstruction. Only the configuration you actually ran is `measured`; **no projection ever masquerades as an invoice.** That discipline is the whole product.
+
+*(The table above is the seeded `cage demo` example. Where does cage's own evidence stand? Lab-validated capture across Claude Code, Copilot and Kiro on macOS — and the measured verdict on whether a graph tool nets positive is honestly **still open**: the first paired A/B run found the ON arm costing more, gross savings notwithstanding, at n=1. `cage insights verdict` refuses to call that a saving. Most tools in this space would not show you that sentence.)*
 
 ## Quickstart
 
@@ -84,7 +88,7 @@ cage.record_receipt(tool="fux", raw_alternative=8000, actual=1600,
 
 You and a robot helper did the chores. At the end of the day someone wants to know: did the robot actually help, or did it just look busy?
 
-**Cage is the chart on the fridge.** It writes down how long each chore took with the robot, and how long it *would* have taken if you'd done it yourself — so you can see, in real minutes and real dollars, which helper earned its place and which one just made noise. And it's careful to mark which numbers it actually timed and which ones are its best guess, so nobody gets fooled by a confident-looking total. It does all of this for free, without ever phoning a friend for the answer.
+**Cage is the chart on the fridge.** It writes down what each robot chore cost, what the robot's little gadgets saved — *and what switching the gadgets on cost you, taken off the total* — so you can see, in real tokens and real dollars, which helper earned its place and which one just made noise. And it's careful to mark which numbers it actually counted and which ones are its best guess, so nobody gets fooled by a confident-looking total. It does all of this for free, without ever phoning a friend for the answer.
 
 ## Why it's different
 
@@ -224,7 +228,7 @@ Every derived view is parse / arithmetic over the log — **no LLM call, ever, o
 
 Latest release below — full history and detail in [CHANGELOG.md](CHANGELOG.md).
 
-- **v0.37.1 (2026-08-01) — Windows dev-CI green.** Two same-day follow-ups to v0.36.0: v0.37.0 fixed a release-critical crash (`cage setup` wrote an unparseable `cage.toml` on Windows); v0.37.1 fixes the broader dev-CI matrix, which stayed red on `windows-latest` — `cage data graphify` crashed on a non-`.exe` target (`subprocess`/`CreateProcess` never honors a `#!` shebang; now shebang-resolved), plus a few Windows-only test bugs (quote-stripped tokenization, tilde-relative path assertions, a raw backslash in a test's own TOML write). One deeper gap is filed, not fixed: cage's own graphify interceptor is a bash script with no extension, so it's unreachable via a bare `graphify` PATH lookup on Windows at all — tracked as **WIN-GF** in `docs/OPEN-WORK.md`. No substrate/schema/CLI change. See [CHANGELOG.md](CHANGELOG.md) for the full accounting.
+- **v0.37.2 (2026-08-01) — the README tells the truth.** Docs and repo hygiene only; `cage/` is unchanged from v0.37.1 apart from the version string. The pitch had been selling the Tier-1 human axis ("money *and time* versus a person", chores "in real minutes") — amputated wholesale back in v0.36.0 — so it now describes what cage actually does: per-tool savings gross **and net of what invoking the tool cost you**, counterfactual stacks, tool adoption, plus an honest note that cage's own net-positive verdict is still open at n=1 and the Windows graphify shim gap (**WIN-GF**). The graphify knowledge graph is also now committed (`graphify-out/`) so agents and CI can read it without regenerating. See [CHANGELOG.md](CHANGELOG.md) for the full accounting.
 
 ## The name
 

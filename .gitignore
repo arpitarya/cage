@@ -13,9 +13,14 @@ __pycache__/
 .cage/out/
 .cage/state/
 
-# graphify — regenerable knowledge-graph output (graphify update .); the whole tree
-# is ignored so a `git add` can't sweep in the multi-MB graph.json/graph.html blobs.
-graphify-out/
+# graphify — the knowledge-graph output (graphify update .) is COMMITTED as of
+# v0.37.2, so agents and CI can read the graph without regenerating it (CLAUDE.md
+# tells agents to read GRAPH_REPORT.md before answering architecture questions).
+# Only the regenerable cache and the local interpreter marker stay ignored.
+# Trade-off, accepted deliberately: graph.json is multi-MB, so `graphify update .`
+# produces large diffs and the blobs are permanent in history.
+**/graphify-out/cache/
+.graphify_python
 
 # Claude Code — personal/machine-local settings only. `.claude/settings.json` is the
 # committable, team-shared wiring file (deliberately NOT ignored) — it stays untracked
