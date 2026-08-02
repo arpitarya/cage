@@ -1088,6 +1088,36 @@ REGISTRY: tuple[Explanation, ...] = (
         "  claims are 'this many rows exist' and 'this many join to an agent'.",
         kind="concept", plan_ref="archive/v0.40-insights-adoption.proposal.md"),
     Explanation(
+        "chats-view", ("chats", "chat", "per-chat", "conversation", "conversations",
+                       "session-title", "titled", "titles", "detail-view",
+                       "insights-chats"),
+        "`cage insights chats`: one row per chat, titled where the store has a title",
+        "GROUPED off the ledger alone, by (agent, surface, session) — the same bucket\n"
+        "  key the import manifest uses. Sums tokens_in/cached_in/cache_write_in/\n"
+        "  tokens_out/premium per bucket; reprices per call (UNPRICED counted, never\n"
+        "  a silent $0). Top {chats_default_rows} rows by tokens_in desc, --all lifts it\n"
+        "  (the cut is footnoted — no silent caps).\n"
+        "  THE ONE CARVE-OUT: a title is joined from imports.jsonl for a DISPLAY LABEL\n"
+        "  ONLY — manifest.py's own contract stays 'never read by a money view' with\n"
+        "  this one scoped exception. No name in the manifest ⇒ the session id, never a\n"
+        "  fabricated title. Pinned: deleting imports.jsonl changes ZERO numeric cells.\n"
+        "  Two honesty limits, stated not fixed: a renamed chat keeps its stale title\n"
+        "  until it produces a new row (the manifest only appends on capture), and a\n"
+        "  pre-manifest (legacy) session has no name row at all.\n"
+        "  KIRO-IDE stamps a constant session id, so every run already collapses into\n"
+        "  ONE row by construction, labelled 'kiro (no session identity)' rather than\n"
+        "  the literal id; kiro-CLI conversations are recorded as CREDITS, a different\n"
+        "  row shape with no tokens_in/out, so they carry no calls and do not appear\n"
+        "  here at all (out of scope for v1).\n"
+        "  LOCAL-ONLY BY CONSTRUCTION: no --team, no manifest data ever leaves this\n"
+        "  machine.",
+        ("cage/chats.py", "cage/manifest.py", "cage/importcmd.py"),
+        "cost cells follow call_usd_match's tag exactly like `report` — measured when a\n"
+        "  real price row matched, self when a provider's own est_cost_usd stood in,\n"
+        "  none (UNPRICED) otherwise. No method tag on the grouping/ranking itself —\n"
+        "  those are counts and a sort, not a claim about how a number was priced.",
+        kind="concept", plan_ref="archive/v0.42-chats-view.proposal.md"),
+    Explanation(
         "agent-layers", ("layers", "ladder", "l0", "l1", "l2", "l3", "opt-in",
                          "hooks-optional", "attestation", "attest", "steering",
                          "hookless", "floor", "auto-close"),

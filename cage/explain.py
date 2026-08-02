@@ -35,6 +35,7 @@ def _live(pol: dict) -> dict:
         "chars_per_token": constants.CHARS_PER_TOKEN,
         "per_million": f"{constants.TOKENS_PER_MILLION:,}",
         "max_tools": constants.MAX_MATRIX_TOOLS,
+        "chats_default_rows": constants.CHATS_DEFAULT_ROWS,
         "min_compare_n": constants.MIN_COMPARE_N,
         "min_estimate_n": constants.MIN_ESTIMATE_N,
         "net_window_s": constants.NET_ATTRIB_WINDOW_S,

@@ -141,6 +141,21 @@ def cmd_adoption(args) -> int:
     return emit(args, data, adoption.render_adoption(data))
 
 
+def cmd_chats(args) -> int:
+    """`cage insights chats` — per-chat detail view; local-only by construction (no
+    `--team`, `chats.py`'s module docstring)."""
+    from cage import chats, display
+    r = captured_read_root(args)
+    pol = _policy(r)
+    data = chats.summarize(r, pol, since=args.since, agent=getattr(args, "agent", None))
+    if (dest := csv_dest(args)) is not None:
+        from cage import csvout
+        return csvout.write(chats.render_csv(data), dest)
+    return emit(args, data, chats.render_chats(
+        data, disp=display.resolve(args, pol), show_all=getattr(args, "all", False),
+        kiro_route=report.kiro_routed_line(r, pol)))
+
+
 def cmd_why(args) -> int:
     lr = captured_read_root(args)
     data = provenance.explain(lr, args.call_id, pol=_policy(lr))

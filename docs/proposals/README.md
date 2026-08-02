@@ -22,10 +22,6 @@ Naming: `<topic>.proposal.md`. Written in short points, not walls of prose.
 
 Active (awaiting Arpit's accept or a trigger):
 
-- [chats-view.proposal.md](chats-view.proposal.md) — `cage insights chats`: one row
-  per chat (title where the store has one, id otherwise) — tokens in/out, cached
-  in/write, cost; per-agent honesty matrix; evidence:
-  [research/copilot-vscode-token-sources.md](../research/copilot-vscode-token-sources.md).
 - [agent-vs-human-v2.md](agent-vs-human-v2.md) — per-commit rebuild: tokens/commit ·
   authorship (mostly built) · suggested-vs-accepted (counts) · time (attestation only).
 
@@ -43,6 +39,14 @@ Active (awaiting Arpit's accept or a trigger):
 
 ## Graduated (implemented → archived)
 
+- **chats-view** → **IMPLEMENTED** 2026-08-02, `cage insights chats` (1125/0 ⇒
+  1148/0). One naming detail corrected: the assumed `manifest.read_imports` helper
+  never existed — shipped as `manifest.read()` filtered to `kind=="import"`, same
+  rows. Living spec: [cage/chats.py](../../cage/chats.py) + [FORMULAS.md
+  §2.13](../FORMULAS.md) + `cage query chats-view`.
+  [archived proposal](../archive/v0.42-chats-view.proposal.md) ·
+  [handoff](../archive/v0.42-chats-view.handoff.md) ·
+  [prompt](../archive/v0.42-chats-view.prompt.md).
 - **agent-surface-layers** → **IMPLEMENTED** 2026-08-02, all four phases (1024/0 ⇒
   1125/0). L0 floor proof · L2 MCP · L1 hooks+steering · L3 skills, each opt-in and
   proven to move no number. Living spec: `CLAUDE.md`'s agent-surface bullets ·

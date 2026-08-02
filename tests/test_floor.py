@@ -64,6 +64,7 @@ _VIEWS = (
     ["insights", "attrib"],
     ["insights", "roi"],
     ["insights", "adoption"],
+    ["insights", "chats"],
     ["task", "quality"],
 )
 

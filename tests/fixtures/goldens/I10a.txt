@@ -1,0 +1,7 @@
+$ cage insights chats
+Chats
+
+chat                 agent    surface  calls  tokens_in  cached_in  cache_write  tokens_out  premium
+-------------------  -------  -------  -----  ---------  ---------  -----------  ----------  -------
+fix the flaky test   claude   —            1    900,000          0            0      60,000        0
+refactor the parser  copilot  —            1    196,801          0            0       9,621        0

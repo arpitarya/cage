@@ -211,3 +211,9 @@ NET_SAVED_CONFIDENCE = 0.4
 OTEL_SEMCONV_VERSION = "1.42.0"
 OTEL_SEMCONV_STATUS = "pre-stable"
 
+# `cage insights chats` default row cap (chats-view proposal, no-silent-caps rule). A
+# flag (`--all`), not a policy knob — unlike the DEFAULT_CONFIDENCE-style fallbacks
+# above, there is no per-project reason to want a different default page size, only a
+# per-invocation one already served by `--all`.
+CHATS_DEFAULT_ROWS = 20
+

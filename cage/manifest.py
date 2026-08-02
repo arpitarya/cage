@@ -22,6 +22,12 @@ row's `session` is the task (already a validated cwd basename), and its name = t
 Never read by any derived view — it is an audit trail, so it never changes a reported
 number. Fail-open on every write: a manifest error is traced under CAGE_DEBUG and
 swallowed, never raised into the capture path.
+
+**The one scoped carve-out (chats-view proposal):** `imports.jsonl` is never read by a
+derived **money** view; `cage insights chats` joins `session_name` for **display labels
+only** — every numeric cell derives from ledger + policy alone (pinned by
+`tests/test_chats.py`'s money-independence test: deleting this file changes zero
+numeric cells, only labels fall back to session ids).
 """
 from __future__ import annotations
 

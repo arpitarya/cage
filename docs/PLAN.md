@@ -1010,6 +1010,7 @@ cage insights matrix [--task ID] [--usd]  # counterfactual permutation table (§
 cage insights budget                   # current session/day spend vs. policy ceilings
 cage data limits [--json]          # provider quota windows (Codex) + estimated AI-credits (§3.8); --json = cage.v1
 cage insights roi [--since 30d]        # saved $ vs. each tool's own cost + latency (tool-only)
+cage insights chats [--since] [--agent] [--all] [--usd]  # per-chat detail: tokens/cost by (agent, surface, session), titled where the store has a title
 cage task outcome <task> [--redo] [--label W]  # close a task with its outcome (§4.7)
 cage task quality                  # cost per *successful* task (§8.2)
 cage data serve                    # dashboard (reuse fux's serve/assets pattern)

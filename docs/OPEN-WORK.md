@@ -24,7 +24,6 @@ skips are the Windows-only shim behaviour tier and run on CI).
 | **KIRO-MCP-FIELD** | the committed path-free `python3 -m cage mcp` has never started on a real Kiro | open Kiro on a wired repo; if it does not start, **report it** — do not fall back to a gitignored absolute path |
 | **HR1** | agent-vs-human v2 — **accepted-amended 2026-08-02, ready to build** (P1 capture re-wire → P4 time; no USD; guarded `~` hours) | [handoff](agent-vs-human-v2.handoff.md) · [prompt](agent-vs-human-v2.prompt.md) — after the track |
 | **COPILOT-CREDITS** | chatSessions persists `copilotCredits` per request — cage drops the actual billing unit (retires copilot/auto UNPRICED); + `elapsedMs`→gap_ms, sidecar `cacheReadTokens` | [research](research/copilot-vscode-token-sources.md) §4 — spec the capture change |
-| **CHATS-VIEW** | per-chat detail view — one row per chat, titled via manifest join (labels only, never money) | [handoff](chats-view.handoff.md) + [prompt](chats-view.prompt.md) (Sonnet) — ready to execute |
 
 **AGENT SURFACE re-designed from scratch 2026-08-02 (Arpit: clean slate).** The old
 `cage-skills` proposal is **superseded** — its premise (*"cage already ships one skill"*)

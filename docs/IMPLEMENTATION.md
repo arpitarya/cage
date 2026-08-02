@@ -16,6 +16,42 @@ Entry format:
 
 ---
 
+## 2026-08-02 — CHATS-VIEW: `cage insights chats` built, single phase (1125/0 ⇒ 1148/0)
+
+- **Milestone:** the per-chat detail view, per
+  [docs/archive/v0.42-chats-view.proposal.md](archive/v0.42-chats-view.proposal.md) —
+  a new derived view, no substrate change, single phase.
+- **Implemented:**
+  - **`cage/chats.py`** — `summarize()` groups `ledger.calls` by `(agent, surface,
+    session)` (the same bucket key `importcmd._write_manifest` uses), sums
+    tokens_in/cached_in/cache_write_in/tokens_out/premium, reprices per call via
+    `prices.call_usd_match` (UNPRICED counted). `render_chats`/`render_csv` share the
+    one un-truncated data structure; ranking (`tokens_in` desc, then session id) and the
+    top-`constants.CHATS_DEFAULT_ROWS` cut are render-time only, so `--all` can never
+    move a number. Kiro-IDE's constant session id already collapses to one bucket;
+    labelled `kiro (no session identity)`, never a fabricated per-run title.
+  - **The one law amendment** — `manifest.py`'s docstring now carries the scoped
+    carve-out sentence: `imports.jsonl` stays unread by every money view, and `chats.py`
+    joins `session_name` for a **display label only**. Pinned by
+    `test_deleting_manifest_changes_zero_numeric_cells`.
+  - **Wiring** — `cage insights chats` (`--since`/`--agent`/`--all`/`--usd`/`--csv`/
+    capture flags) in `cli.py` + `clicmds.cmd_chats`, following the `adoption` shape
+    exactly. Added to `tests/test_floor.py`'s `_VIEWS` (an 8th pinned view — the floor
+    guarantee now covers it too).
+  - **Docs** — `explain_data.py` `chats-view` concept entry (+ `chats_default_rows` in
+    `explain._live`); FORMULAS §2.13; PLAN §7; GLOSSARY `chat (view)`; CHANGELOG
+    `v0.42.0 (unreleased)`; README quickstart line + a read-surface sentence.
+- **Files:** `cage/chats.py` (new), `cage/clicmds.py`, `cage/cli.py`,
+  `cage/constants.py`, `cage/manifest.py`, `cage/explain.py`, `cage/explain_data.py`,
+  `tests/test_chats.py` (new, 19 tests), `tests/test_floor.py`, `tests/test_output_spec.py`
+  + `tests/goldenseed.py` (I10a–d) + 4 new golden fixtures, `tests/fixtures/cli-help.txt`,
+  docs listed above.
+- **Tests:** green — `just test` 1148/0 (1125 baseline + 19 `test_chats.py` + 4 golden
+  `I10*` tests).
+- **Next:** archive the handoff/prompt pair + graduate the proposal; propose the
+  CLAUDE.md architecture-bullet edit for Arpit's review (not applied silently, per the
+  prompt's instruction).
+
 ## 2026-08-02 — AGENT-L3 **P3**: seven skills, one source, three agents — **the program is complete** (1096/0 ⇒ 1125/0)
 
 - **Milestone:** phase P3, the last of the agent-surface program. All four gates met.

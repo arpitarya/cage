@@ -12,6 +12,29 @@ by milestone) — the worklog is what *happened this session*.
 
 ---
 
+## 2026-08-02 (Claude Code) — CHATS-VIEW: `cage insights chats` built end to end
+
+- **Asked:** execute the CHATS-VIEW prompt (`docs/chats-view.prompt.md`) — the per-chat
+  detail view, per the accepted handoff + proposal.
+- **Done:** `cage/chats.py` (group-by-(agent,surface,session), title join, ranking/
+  truncation, CSV twin); CLI wiring (`insights chats`); the one manifest.py carve-out
+  sentence; `tests/test_chats.py` (19 tests) + 4 golden fixtures (I10a–d); added
+  `insights chats` to `test_floor.py`'s pinned view list; docs sweep (explain_data,
+  FORMULAS §2.13, PLAN §7, GLOSSARY, DOC-REGISTRY, CHANGELOG `v0.42.0 (unreleased)`,
+  README). `just test` 1125/0 ⇒ 1148/0.
+- **Decided/open:** the handoff's assumed `manifest.read_imports` helper doesn't
+  exist — used the real `manifest.read()` filtered to `kind=="import"` (same rows,
+  naming correction, not a design change). Followed the CLAUDE.md proposal lifecycle
+  precedent (v0.40/v0.41's archived docs) rather than the handoff's literal "next
+  unreleased version" wording for README's What's-new/test-count, since CLAUDE.md
+  frames those as release-time actions — added the CHANGELOG entry now (explicit
+  handoff ask) but left What's-new/test-count for the actual v0.42.0 release cut.
+  CLAUDE.md's own architecture-flow bullet edit is proposed for Arpit's review, not
+  applied — per the prompt's explicit instruction.
+- **Next step:** Arpit reviews the proposed CLAUDE.md edit; archive the handoff/prompt
+  pair to `docs/archive/v0.42-chats-view.{handoff,prompt}.md` and graduate the proposal
+  (already done in this session, ahead of this entry) — nothing else pending.
+
 ## 2026-08-02 (Cowork) — PROMPT-PROGRESS: prompt docs must state how much is done
 
 - **Asked:** Arpit — "whenever a prompt is generated i want to see the percentage of

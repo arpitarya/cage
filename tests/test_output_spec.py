@@ -243,6 +243,33 @@ def test_I9_adoption_empty(run):
     assert "cage import" in out and "cage doctor" in out
 
 
+def test_I10_chats_titled(run):
+    go = run(seed.chats_titled)
+    out = go("I10a", ["insights", "chats"])
+    assert "fix the flaky test" in out and "refactor the parser" in out
+    assert "s_ct1" not in out                    # a real title replaces the id
+
+
+def test_I10_chats_untitled_and_kiro(run):
+    go = run(seed.chats_untitled)
+    out = go("I10b", ["insights", "chats"])
+    assert "kiro (no session identity)" in out
+    assert "collapse into this one row" in out
+    assert "s_cu2" in out                        # no title ⇒ the honest session id
+
+
+def test_I10_chats_empty(run):
+    go = run()
+    out = go("I10c", ["insights", "chats"])
+    assert "No chats recorded yet." in out
+
+
+def test_I10_chats_truncated(run):
+    go = run(seed.chats_truncated)
+    out = go("I10d", ["insights", "chats"])
+    assert "3 more chat(s) — --all to show" in out
+
+
 # ── §3 · cage prices ──────────────────────────────────────────────────────────
 
 def _prices_project(root: Path) -> None:

@@ -435,6 +435,37 @@ agent*. Two halves, never blended — they have different precision:
   plus a `usage,agent-unattested` row carrying its reason — CSV never gates a caveat
   away. Explained by `cage query tool-adoption` and `cage query agent-layers`.
 
+### 2.13 Chats view — no new math, one column per ledger field
+
+`cage insights chats` ([chats.py](../cage/chats.py)) is a pure group-by over `calls`,
+summed per `(agent, surface, session)` bucket — every column is a straight ledger field
+or the existing `prices.call_usd_match` (§1). No formula lives here that isn't already
+spec'd elsewhere.
+
+| column | source |
+|---|---|
+| `chat` | `imports.jsonl` `session_name` (last-write-wins per `(agent, session)`) → the session id → `(no session)` |
+| `agent` / `surface` | `calls.agent` (mapped via `agents.row_surface`) / `calls.surface` |
+| `calls` | count of call rows in the bucket |
+| `tokens_in` / `cached_in` / `cache_write_in` / `tokens_out` / `premium` | summed straight off the matching call field |
+| `cost` (`--usd` only) | `Σ prices.call_usd_match(pol, call)` per row (§1); UNPRICED counted, never a silent `$0` |
+
+- **The one carve-out:** `chat` is the only column that reads `imports.jsonl` — a
+  **label**, not a number. Every other column derives from `calls` + policy alone, and
+  deleting `imports.jsonl` moves zero numeric cell (`manifest.py`'s docstring; pinned by
+  `tests/test_chats.py`'s money-independence test).
+  Kiro-IDE stamps a constant session id, so its rows already collapse into one bucket by
+  construction — `chat` renders the honest `kiro (no session identity)`, never a
+  fabricated per-run label. Kiro-CLI conversations are `credits` rows (no `tokens_in`/
+  `tokens_out`), so they never enter this table at all.
+- **No method tag on the grouping itself** — the same reasoning as §2.12: a sum and a
+  sort are not a claim about how a number was priced. `cost` inherits `call_usd_match`'s
+  tag exactly like `report` (§1).
+- Ranking (`tokens_in` desc, then session id) and the top-20 cut (`--all` lifts it) are
+  render-time only — `chats.summarize()` returns every row un-truncated, so `--all` can
+  never move a number, only how many rows are shown. CSV is never truncated. Explained
+  by `cage query chats-view`.
+
 ## 3. The human axis — **removed in v0.36**
 
 Every formula that lived here (human cost `usd = minutes / 60 × rate`, derived

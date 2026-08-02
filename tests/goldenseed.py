@@ -293,6 +293,49 @@ def adoption_attributed(root: Path) -> None:
     _savings_row(root, "s_cd02", tool="graphify", ts=_ts(4, 10), session="s_cd1")
 
 
+def _chat_name(root: Path, *, agent: str, session: str, name: str, ts: str) -> None:
+    """One `imports.jsonl` title row — written pre-mapped to the SURFACES agent name,
+    the way a real import sweep writes it (`importcmd._write_manifest`)."""
+    from cage import manifest
+    manifest.record_import(
+        root, import_id=manifest.new_import_id(), agent=agent, surface="",
+        session=session, session_uid=manifest.new_session_uid(), source_path="",
+        files_scanned=1, rows_appended=1, tokens_in=0, tokens_out=0, cached_in=0,
+        est_cost_usd=0.0, unpriced_rows=0, ts=ts, session_name=name)
+
+
+def chats_titled(root: Path) -> None:
+    """Spec I10a: two titled chats (claude, copilot-vscode) — the full-support case."""
+    _call(root, "c_ct1", provider="anthropic", model="claude-sonnet-4-6",
+          agent="claude", tin=900_000, tout=60_000, ts=_ts(2), session="s_ct1")
+    _chat_name(root, agent="claude", session="s_ct1", name="fix the flaky test",
+              ts=_ts(2, 9, 30))
+    _call(root, "c_ct2", provider="anthropic", model="copilot/claude-sonnet-4.6",
+          agent="copilot", tin=196_801, tout=9_621, ts=_ts(3), session="s_ct2")
+    _chat_name(root, agent="copilot", session="s_ct2", name="refactor the parser",
+              ts=_ts(3, 9, 30))
+
+
+def chats_untitled(root: Path) -> None:
+    """Spec I10b: kiro-IDE (no session identity — collapses to one row) beside an
+    untitled copilot-CLI chat. Both fall back honestly to their session id, never a
+    fabricated name."""
+    row = schema.make_call(route="chat", provider="kiro", model="agent",
+                           tokens_in=12_000, tokens_out=0, agent="kiro",
+                           session="kiro", surface="ide", ts=_ts(2), call_id="c_cu1")
+    ledger.append(paths.Footprint(root).calls, row)
+    _call(root, "c_cu2", provider="anthropic", model="copilot/claude-sonnet-4.6",
+          agent="copilot", tin=50_000, tout=4_000, ts=_ts(3), session="s_cu2")
+
+
+def chats_truncated(root: Path) -> None:
+    """Spec I10d: 23 chats — exercises the top-20 default cut + `--all`."""
+    for i in range(23):
+        _call(root, f"c_tr{i:02d}", provider="anthropic", model="claude-sonnet-4-6",
+              agent="claude", tin=100_000 - i * 1_000, tout=5_000,
+              ts=_ts(2, 9 + (i % 10)), session=f"s_tr{i:02d}")
+
+
 def fleet(root: Path, complete: int = 5) -> None:
     """Spec S3/S4: `complete` machines with both phases (5 days each), one
     missing the plugin phase, one enrolled with no rows. Markers are written

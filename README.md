@@ -62,6 +62,7 @@ cage setup                      # guided wizard: defaults to all agents, wires M
 cage demo                       # seed the worked example
 cage insights matrix                     # the counterfactual permutation table
 cage insights adoption                   # do your agents actually invoke the tools?
+cage insights chats                      # per-chat detail: tokens/cost by agent, titled where the store has a title
 cage task quality                    # cost per *successful* task
 cage query "how is attribution calculated"  # explain any number — live formula, $0
 ```
@@ -181,7 +182,7 @@ A tool earns rows in `attrib`/`matrix`/`roi` by filing a **savings receipt**, an
 - **In-tool (you own it) — e.g. fux** carries a fail-open `cage_receipt.py` and emits its own `tool="fux"` receipt. Cage stays optional; fux runs unchanged with cage absent.
 - **External adapter (third-party) — e.g. graphify:** `cage data graphify -- graphify query "…"` runs graphify unmodified, passes its output through byte-for-byte, and files a `tool="graphify"` receipt by parsing the cited `source_file`s. graphify is never edited; a metering error never alters its result.
 
-The full command surface (30+ subcommands: ledger · attribution · task outcomes · fleet study · ops · agents) is grouped in `cage --help`, which points at `cage query` for any "how is this computed". Every read command takes `--json` for the agent-as-user. The doc map — design of record, subsystem docs, operations, archive — starts at [docs/README.md](docs/README.md).
+The full command surface (30+ subcommands: ledger · attribution · task outcomes · fleet study · ops · agents) is grouped in `cage --help`, which points at `cage query` for any "how is this computed". Every read command takes `--json` for the agent-as-user. Want a chat-by-chat breakdown instead of a rollup? `cage insights chats` groups the ledger by `(agent, surface, session)` and titles each row where the store carries one — labels only, never a number the manifest could move. The doc map — design of record, subsystem docs, operations, archive — starts at [docs/README.md](docs/README.md).
 
 ## Works with any agent — explicit capture over one global ledger
 
@@ -223,7 +224,7 @@ cage data export --csv calls --since 30d -o calls.csv   # raw ledger rows for a 
 
 ## The `$0` guarantee
 
-Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 1125 tests; `cage demo` reproduces the worked attribution example against a real ledger.
+Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 1148 tests; `cage demo` reproduces the worked attribution example against a real ledger.
 
 **Honest limits.** Marginal-by-fixed-order is defensible and `$0`, but it is an *ordering convention*, not a Shapley value (that's a deferred audit mode). And a counterfactual cell is an honest reconstruction, never an invoice — the `method` column says so on every row, on purpose.
 
@@ -231,7 +232,7 @@ Every derived view is parse / arithmetic over the log — **no LLM call, ever, o
 
 Latest release below — full history and detail in [CHANGELOG.md](CHANGELOG.md).
 
-- **v0.41.0 (2026-08-02) — the agent surface, all four layers.** Cage's agent integration is now a ladder, and every rung above the first is optional: **L0** hookless capture (unchanged, still the whole product), **L1** lifecycle hooks (`cage setup --hooks`) for the two things pull capture structurally cannot do — stamping *which agent* ran something, and closing tasks at a session boundary so `compare`/`estimate`/`calibration` have anything to work with — **L2** MCP, now including `cage_verdict`, `cage_compare` and the ladder's one write tool `cage_task_outcome`, and **L3** seven skills (`--skills`) delivered from one source text to all three agents. Every layer is committed, two-way, and **provably free**: a test installs all of them over a fixed ledger and asserts every number byte-identical, then strips them and asserts it again. Kiro's MCP config is committable at last — it carries no path at all. See [CHANGELOG.md](CHANGELOG.md) for the full accounting.
+- **v0.42.0 (2026-08-02) — `cage insights chats`: one row per chat, titled where the store has a title.** A new derived view groups the ledger by `(agent, surface, session)` and sums tokens/cached/cache-write/premium per chat, with a title joined from the import manifest for **display only** — the one scoped, tested carve-out to `imports.jsonl`'s "never read by a derived view" contract; deleting the manifest moves zero numeric cells. Kiro-IDE's constant session id collapses every run into one honest `kiro (no session identity)` row. Top-20 by `tokens_in`, `--all` lifts the (footnoted) cut. See [CHANGELOG.md](CHANGELOG.md) for the full accounting.
 
 ## The name
 

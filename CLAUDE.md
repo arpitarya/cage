@@ -29,7 +29,7 @@ record_call / record_receipt  →  .cage/ledger/{calls,receipts,tasks}-YYYY-MM.j
         (meter, plan §5)                      │           · provenance.jsonl (unpartitioned buffer)
                                               ▼  derive ($0, no model)
   cage.toml (order/budgets/routing)      → report · attrib · matrix · budget · roi
-  + prices.toml (model prices, [credits])   · compare · verdict · why · origin
+  + prices.toml (model prices, [credits])   · compare · verdict · why · origin · chats
                                              + --scope (monorepo slice) · --team · ledger-sync (§3.6)
 ```
 
@@ -291,6 +291,18 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   is the first reader of the `state/` usage log and the diagnostic-only invariant is
   re-asserted from it (`tests/test_adoption.py`). Surface is deliberately not a dimension
   (K4). CSV/MCP/`--since` like report/attrib/roi; `cage query tool-adoption` explains it.
+- **Chats view** ([chats.py](cage/chats.py), FORMULAS §2.13) — `cage insights
+  chats`: one row per chat, titled where the store has a title. Pure derive over
+  `calls`, grouped by `(agent, surface, session)` — the same bucket key the import
+  manifest uses. **The one law amendment**: `manifest.py`'s "never read by a derived
+  view" contract gains a single scoped carve-out — a title is joined from
+  `imports.jsonl` for a **display label only**; deleting the manifest moves **zero**
+  numeric cells (pinned by `tests/test_chats.py`). Kiro-IDE's constant session id
+  already collapses every run into one row (`kiro (no session identity)`, never a
+  fabricated per-chat identity); kiro-CLI conversations are `credits` rows and don't
+  appear here. Top-20 by `tokens_in`, `--all` lifts it (footnoted cut, no silent
+  caps); CSV never truncated. Local-only by construction — no `--team`, no MCP tool.
+  `cage query chats-view` explains it.
 - **Display honesty** ([display.py](cage/display.py)) — the ONE display-context
   home (plan Phases 1+2). `Display` carries the resolved presentation switches
   (`usd`: tokens are the default, dollars opt-in — flag > env `CAGE_USD` >
@@ -731,7 +743,7 @@ the worked examples to copy.
 ## Dev
 
 ```bash
-just test          # python -m pytest -q   (1125 tests; +10 Windows-only skips)
+just test          # python -m pytest -q   (1148 tests; +10 Windows-only skips)
 just demo          # seed §4.4 + print attrib/matrix
 cage --version
 ```

@@ -21,10 +21,6 @@ spec.
 
 ## Active work
 
-- [chats-view.handoff.md](chats-view.handoff.md) +
-  [chats-view.prompt.md](chats-view.prompt.md) — **CHATS-VIEW**, `cage insights chats`
-  (Sonnet): per-chat detail view, titled via the labels-only manifest carve-out.
-  Design of record: [chats-view.proposal.md](proposals/chats-view.proposal.md).
 - [agent-vs-human-v2.handoff.md](agent-vs-human-v2.handoff.md) +
   [agent-vs-human-v2.prompt.md](agent-vs-human-v2.prompt.md) — **HR1, per-commit
   agent-vs-human** (P1 capture re-wire → P2 commit join → P3 views → P4 time; no USD,

@@ -2,6 +2,32 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
+## v0.42.0 (2026-08-02) — `cage insights chats`: one row per chat, titled where the store has a title
+
+Built from: [proposal](docs/archive/v0.42-chats-view.proposal.md) ·
+[handoff](docs/archive/v0.42-chats-view.handoff.md) +
+[prompt](docs/archive/v0.42-chats-view.prompt.md).
+
+A new derived view, no substrate change: `cage insights chats` groups the ledger's
+`calls` by `(agent, surface, session)` — the same bucket key the import manifest
+uses — and sums tokens in/out, cached, cache-write and premium per chat, repricing
+each call via the existing `call_usd_match` (UNPRICED counted, never a silent `$0`).
+
+**The one law amendment: a scoped, tested carve-out.** `imports.jsonl`'s contract has
+always said "never read by a derived view" — this view reads it for exactly one thing,
+a **display label**, never a number. `manifest.py`'s docstring now states the carve-out
+in one sentence, and `tests/test_chats.py` pins it: deleting `imports.jsonl` moves
+**zero** numeric cells, only titles fall back to session ids.
+
+Kiro-IDE's constant session id already collapses every run into one bucket by
+construction, so it renders as the honest `kiro (no session identity)` rather than a
+fabricated per-chat identity; kiro-CLI conversations are recorded as `credits` (no
+`tokens_in`/`tokens_out`) and don't appear here at all — out of scope for v1, same as
+Copilot's uncaptured cached/credits columns (COPILOT-CREDITS owns those). Top 20 by
+`tokens_in`, `--all` lifts it (the cut is footnoted, no silent caps); `--csv` is never
+truncated. Local-only by construction — no `--team`, no MCP tool. `cage query
+chats-view` explains it.
+
 ## v0.41.0 (2026-08-02) — the agent surface: four layers, three agents, no number moved
 
 Cage's agent integration is now a **ladder**, built end to end in one program. **L0**

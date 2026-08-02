@@ -235,3 +235,10 @@ wording escalates. The hook is never modified.
 the boundary of what `cage setup` may rewrite. A dead shim inside one is healed; a
 dead shim outside one is **named with a runnable fix and never written** — cage does
 not silently edit another project's files.
+
+**chat (view)** — one row of `cage insights chats`: every call sharing an
+`(agent, surface, session)` bucket, titled where `imports.jsonl` carries a name
+(display label only — deleting the manifest moves zero numeric cell, `manifest.py`).
+No name ⇒ the session id, never a fabricated title. Kiro-IDE's constant session id
+already collapses every run into one chat; kiro-CLI conversations are `credits` rows
+(no `tokens_in`/`tokens_out`) and never appear here. [chats.py](../cage/chats.py).
