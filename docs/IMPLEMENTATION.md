@@ -16,6 +16,132 @@ Entry format:
 
 ---
 
+## 2026-08-02 — DOGFOOD: cage's own ledger, published so it cannot rot
+
+- **Implemented:** P0 (Arpit's hands, done in-session by running the allowlisted
+  commands directly against the real global `~/.cage` ledger) + P1–P3 (Claude Code).
+  `docs/dogfood/2026-08-02.md` carries the real, verbatim output of `cage report --usd`
+  (52,179 calls, $9,921.4588, 71% of cost from cache reads, 33 calls UNPRICED) and
+  `cage insights adoption` (100% of savings rows agent-attributable; claude the only
+  agent with attributed savings). `docs/dogfood/latest.md` mirrors it;
+  `docs/dogfood/README.md` states the append-only convention, copied from
+  `docs/regression/`. README line 16's `▶ Demo GIF coming soon.` placeholder is now a
+  version/date-free pointer to `latest.md`.
+  **`cage insights attrib` is deliberately absent from this and every near-future
+  snapshot until real data exists**: every task-tagged row in the *entire* global
+  ledger — checked before publishing, not asserted — turned out to be the `cage demo`
+  seed itself (`session: "demo"`, task `fix-handover-bug`, ts 2026-07-23, `cage/demo.py`'s
+  hardcoded slices matched exactly). No real task has ever been closed/tagged on this
+  machine. Publishing it would have been exactly the dummy data this feature exists to
+  never show; surfaced to Arpit mid-session (AskUserQuestion), who chose to omit it with
+  a note rather than seed one or fake a label. This is the non-negotiable's first real
+  test and it held.
+  `tests/test_dogfood_freshness.py` reads `latest.md`'s frontmatter only (no ledger, no
+  YAML dependency) — 10 new tests: the real guard against the actual snapshot, the
+  `CAGE_SKIP_DOGFOOD_FRESHNESS=1` escape hatch, and 8 tmp_path failure-mode cases (stale
+  >60d, exact-60d boundary, frontmatter/filename mismatch, missing directory, empty
+  directory, missing dated snapshot, missing `snapshot_date` field).
+  CLAUDE.md is **not** edited beyond the `just test` count (a mechanical number, per
+  the repo's own release rule) — a proposed "Dogfood snapshot" section mirroring
+  "Regression & capture reports" is held in `docs/claude-md-dogfood.proposed.md` for
+  Arpit's review, never applied silently.
+- **Files:** new `docs/dogfood/{2026-08-02,latest,README}.md` ·
+  new `docs/claude-md-dogfood.proposed.md` · new `tests/test_dogfood_freshness.py` ·
+  `README.md` (line 16 pointer; test count 1391 → 1401) · `CLAUDE.md` (`just test`
+  count only) · `docs/README.md` (docs index + Active work) · `docs/OPEN-WORK.md`
+  (DOGFOOD row removed; header suite count + Next line) · `docs/DOC-REGISTRY.md`
+  (new dogfood/ row; CLAUDE.md/README/IMPLEMENTATION/OPEN-WORK/WORKLOG/proposals/
+  docs-README rows bumped) · `docs/WORKLOG.md` · proposal archived to
+  `docs/archive/v0.44-dogfood-report.proposal.md`, moved to Graduated in
+  `docs/proposals/README.md` · pair archived to
+  `docs/archive/v0.44-dogfood-report.{handoff,prompt}.md`.
+- **Tests:** green — **1401 passed / 0 failed / 10 skipped** (1391 baseline + 10 new).
+- **Next:** Arpit reviews `docs/claude-md-dogfood.proposed.md` (apply/amend/decline);
+  a real `attrib` snapshot lands once any task on this machine is actually closed/
+  tagged — no OPEN-WORK item filed for it, since it isn't actionable work, just a
+  fact about when real usage produces one.
+
+## 2026-08-02 — DOC-CASE: `docs/formulas.md` → `docs/FORMULAS.md`, 120 citations repaired
+
+- **Implemented:** the tracked file was the only lowercase tracker doc while 120
+  citations across 49 files already spelled it `FORMULAS.md` — invisible on macOS
+  (`core.ignorecase = true`), a dangling link on GitHub and any case-sensitive
+  checkout. Two-step `git mv` (`docs/formulas.md` → `docs/_formulas.tmp` →
+  `docs/FORMULAS.md`, verified via `git ls-files`, not `ls`) plus the two live code
+  docstrings that still spelled it lowercase. History-class citations left untouched
+  by design: `CHANGELOG.md` (4×), `docs/archive/**` (4×), `docs/IMPLEMENTATION.md:1051`,
+  `docs/WORKLOG.md:39,213,235,1160`, `docs/INTERVIEW.md:311` — the `:39`/`:213`/`:235`/
+  `:311` set specifically *quote the wrong name as the bug*; rewriting them would erase
+  the finding. `docs/WORKLOG.md:235` is a third such citation the handoff's explicit
+  list didn't name (another past session noting the same bug and not filing it) —
+  extended the same treatment on the same reasoning.
+  CLAUDE.md's ALL-CAPS entry-point list is not edited here (steering-file edits are
+  proposed, never applied) — see `docs/claude-md-doc-case.proposed.md`, held for
+  review.
+- **Files:** `docs/formulas.md` → `docs/FORMULAS.md` (rename only, contents
+  untouched) · `cage/roi.py:85` · `cage/report.py:682` · `docs/OPEN-WORK.md` ·
+  `docs/DOC-REGISTRY.md` · `docs/README.md` · `docs/archive/README.md` ·
+  `docs/WORKLOG.md` · new `docs/claude-md-doc-case.proposed.md` · pair archived to
+  `docs/archive/v0.44-doc-case-rename.{handoff,prompt}.md`.
+- **Tests:** green — **1391 passed / 0 failed / 10 skipped**, unchanged count from
+  the pre-change baseline.
+- **Next:** Arpit reviews `docs/claude-md-doc-case.proposed.md` (apply/amend/decline);
+  the link-checker idea from the handoff's open question is filed as its own
+  OPEN-WORK item rather than left unfiled a second time.
+
+## 2026-08-02 — COPILOT-CREDITS: billed credits + the copilot pricing ladder (v0.44, unreleased)
+
+- **Implemented:** the whole handoff, in four steps, green at each.
+  - **Substrate** — `CALL_FIELDS` gains `credits` (appended); `make_call(credits=None)`
+    writes the key only when *not None*, so absence and a recorded `0.0` stay distinct
+    facts and a legacy row is byte-identical.
+  - **Capture** — vscode `copilotCredits` verbatim (float, malformed ⇒ absent); copilot
+    **CLI** stamps `credits` from the same cumulative `totalPremiumRequests` delta as a
+    float, `premium` untouched.
+  - **The ladder** — new `creditprice.py` (rung-1 resolution, rung labels, footnote /
+    advisory phrasings, the match-kind → `priced_via` mapping), reached from
+    `prices.call_usd_match` — the **one** choke point every USD consumer already used,
+    so nothing forked per view (pinned by a grep test).
+  - **Surfaces** — mixed-basis split footnote · rate-unset advisory · second runnable
+    fix in the ⚠ UNPRICED block · credits column + `priced_via` in chats (text + CSV) ·
+    advisory `credits` line in doctor · `cage query copilot-credits` · the inert
+    `[billing.copilot]` block in the bundled `cage.toml`.
+- **Three decisions the build had to make**, each recorded in the archived proposal's
+  header rather than left as silent drift:
+  1. **`[billing.copilot] usd_per_credit`, not `[credits.copilot]`** (the handoff §10
+     fallback, verified then taken). `[credits]` is in `policy._PRICE_SECTIONS`, read
+     from `prices.toml` alone — the rate belongs in `cage.toml` by the vendor-facts-move
+     rule, so filing it under `[credits]` would have merged it as absent in every
+     project with a prices file. New `[billing]` section, two-level merge, never a price
+     section.
+  2. **`credits` defaults to a `None` sentinel, not `0.0`** — the handoff's literal
+     signature collided with its own §8 requirement that a recorded zero be distinct
+     from absence.
+  3. **Copilot-CLI stamps `credits` directly** rather than the read side treating
+     `premium` as credits (handoff §5): `premium` is an int and every real
+     `totalPremiumRequests` is fractional, so it floors to 0 and the key is dropped.
+     Arpit chose this option when the finding was surfaced.
+- **Method law:** rung 1 is `modeled`; any aggregate containing a credits-priced row
+  degrades from `measured` to `modeled` (`creditprice.method_for`) — applied to the
+  chats CSV *and* the report CSV, both of which previously hardcoded `measured`.
+  A credits-priced row also contributes no `cache_usd` split.
+- **Files:** `cage/creditprice.py` (new) · `schema.py` · `transcript.py` · `policy.py` ·
+  `prices.py` · `report.py` · `chats.py` · `doctorcmd.py` · `explain_data.py` ·
+  `data/cage.toml` · `tests/test_copilot_credits.py` (new, 35) · `tests/test_doctor.py` ·
+  `tests/fixtures/transcripts/copilot/cli/expected.json` · goldens `I10a/I10b/I10d` ·
+  docs (PLAN §3.1 · FORMULAS §1.1a + §2.13 · GLOSSARY · CHANGELOG · README ·
+  OPEN-WORK · research doc · archives + indexes).
+- **Goldens:** exactly the three predicted moved (`I10a`/`I10b`/`I10d` — the added
+  `credits` column), diff-reviewed line by line; **no report golden moved**, which is
+  the legacy byte-identity claim holding.
+- **Finding published:** copilot-CLI `premium` has never captured a single real value
+  (13 rows, none carrying it) — `docs/research/2026-08-02-copilot-credit-fields-real-stores.md`.
+  Carried into OPEN-WORK as **COPILOT-PREMIUM-DEAD**.
+- **Tests:** green — **1391 pass / 0 fail / 10 skipped** (1354 baseline + 35 new).
+- **Next:** Arpit reviews `docs/claude-md-copilot-credits.proposed.md` (the CLAUDE.md
+  bullet, deliberately not applied), then decide **COPILOT-PREMIUM-DEAD** — widen
+  `premium` to float or remove it, now that nothing reads it.
+
 ## 2026-08-02 — HR1 P4 + docs: `cage task time`, and the program closes
 
 - **Implemented (P4):** `cage task time <duration> [--task ID]` writes `human_minutes`

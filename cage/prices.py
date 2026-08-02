@@ -25,11 +25,23 @@ def input_cost_usd(pol: dict, provider: str, model: str, tokens_in: int) -> floa
 
 
 def call_usd_match(pol: dict, call: dict) -> tuple[float, str, str | None]:
-    """Per-call cost plus *how* the model priced:
-    ``exact | alias | family | self | none``.
+    """Per-call cost plus *how* it priced:
+    ``credits | exact | alias | family | self | none``.
 
-    Recompute from tokens × policy when the model has an exact, alias-routed, or
-    family price row (transcript-sourced calls carry counts but no `est_cost_usd`);
+    **The ONE pricing choke point** — `call_usd` wraps it, and every USD consumer in
+    cage (report, budget, chats, compare, verdict, roi, netsaved, study, forecast,
+    quality, freshness, doctor) reaches a dollar through one of the two. A rung added
+    here is inherited everywhere, with no per-view fork; that is why the credit ladder
+    lands here rather than in any view.
+
+    Rung 1 (``credits``, `cage/creditprice.py`) wins when the row carries a **recorded
+    billed credit** and a `[billing.<agent>] usd_per_credit` rate is configured — the
+    provider's own computation beats cage's price table, and it prices `copilot/auto`,
+    which no table row matches. It is `modeled`, never `measured`: the count is fact,
+    the dollar is your configured rate.
+
+    Otherwise: recompute from tokens × policy when the model has an exact, alias-routed,
+    or family price row (transcript-sourced calls carry counts but no `est_cost_usd`);
     else fall back to the stored `est_cost_usd` for a provider cage can't tokenize
     (a search API that self-reports its cost) → ``self``. No price *and* no
     self-cost ⇒ a genuine $0 that must surface as ``none`` (UNPRICED), never hide
@@ -37,8 +49,13 @@ def call_usd_match(pol: dict, call: dict) -> tuple[float, str, str | None]:
 
     Returns ``(usd, match, matched_key)``; ``matched_key`` is the price row used
     for a ``family`` match (so the read surface can show "≈ priced by family") or
-    the ``prov/model`` target for an ``alias`` route, else None.
+    the ``prov/model`` target for an ``alias`` route, and ``None`` for ``credits``
+    (which resolves no model at all — that is the point of the rung).
     """
+    from cage import creditprice
+    credit_usd = creditprice.resolve(pol, call)
+    if credit_usd is not None:
+        return credit_usd, creditprice.MATCH, None
     provider, model = call.get("provider", ""), call.get("model", "")
     _, match, key = policy.price_match(pol, provider, model)
     if match != "none":

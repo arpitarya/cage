@@ -45,7 +45,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from cage import agents as _agents
-from cage import ledger, manifest, prices, report
+from cage import creditprice, ledger, manifest, prices, report
 from cage.constants import CHATS_DEFAULT_ROWS
 
 KIRO_IDE_LABEL = "kiro (no session identity)"
@@ -75,9 +75,14 @@ def _bucket_key(c: dict) -> tuple[str, str, str]:
 
 
 def _new_bucket() -> dict:
+    # `credits` starts at None, not 0.0 — the same absent-vs-recorded-zero distinction
+    # the call field carries (`schema.make_call`). A chat where no request recorded a
+    # credit renders `—`; a chat that recorded 0.0 renders `0.00`, and they are
+    # different facts. `basis` tallies which ladder rung actually paid, per rung label,
+    # so `priced_via` can name a mixed chat instead of picking a winner.
     return {"calls": 0, "tokens_in": 0, "cached_in": 0, "cache_write_in": 0,
             "tokens_out": 0, "premium": 0, "cost": 0.0, "unpriced_calls": 0,
-            "unpriced_tokens": 0}
+            "unpriced_tokens": 0, "credits": None, "credits_calls": 0, "basis": {}}
 
 
 def summarize(root: Path, pol: dict, since: str | None = None,
@@ -101,7 +106,13 @@ def summarize(root: Path, pol: dict, since: str | None = None,
         b["cache_write_in"] += c.get("cache_write_in", 0)
         b["tokens_out"] += c.get("tokens_out", 0)
         b["premium"] += c.get("premium", 0)
+        rec = creditprice.recorded(c)
+        if rec is not None:
+            b["credits"] = (b["credits"] or 0.0) + rec
+            b["credits_calls"] += 1
         usd, match, _ = prices.call_usd_match(pol, c)
+        if (basis := creditprice.via(match)):
+            b["basis"][basis] = b["basis"].get(basis, 0) + 1
         if match == "none":
             b["unpriced_calls"] += 1
             b["unpriced_tokens"] += c.get("tokens_in", 0) + c.get("tokens_out", 0)
@@ -159,6 +170,17 @@ def _label(r: dict) -> str:
     return _short(r["title"])  # an untitled fallback is the raw session id — shorten it
 
 
+def _credits_cell(b: dict) -> str:
+    """The billed-credits cell: `—` when this chat recorded none, else the 2dp sum.
+
+    `—` reads as *not recorded*, which is the honest statement for a store that only
+    persists credits on some requests (and for claude/kiro, which never do). It is
+    deliberately NOT `0.00` — a recorded zero is a real billing fact and gets that cell
+    to itself. The dash never reaches CSV (`render_csv` emits an empty cell)."""
+    from cage.display import DASH
+    return DASH if b.get("credits") is None else creditprice.fmt(b["credits"])
+
+
 def _cost_cell(b: dict) -> str:
     from cage import render
     from cage.display import DASH
@@ -186,7 +208,7 @@ def render_chats(data: dict, disp=None, show_all: bool = False,
     cut = 0 if limit is None else max(0, len(rows) - limit)
 
     head = ["chat", "agent", "surface", "calls", "tokens_in", "cached_in",
-            "cache_write", "tokens_out", "premium"]
+            "cache_write", "tokens_out", "premium", "credits"]
     if disp.usd:
         head.append("cost")
     rights = set(range(3, len(head)))
@@ -196,7 +218,7 @@ def render_chats(data: dict, disp=None, show_all: bool = False,
         cells = [_label(r), r["agent"], r["surface"] or "—", render.tok(r["calls"]),
                  render.tok(r["tokens_in"]), render.tok(r["cached_in"]),
                  render.tok(r["cache_write_in"]), render.tok(r["tokens_out"]),
-                 render.tok(r["premium"])]
+                 render.tok(r["premium"]), _credits_cell(r)]
         if disp.usd:
             cells.append(_cost_cell(r))
         table_rows.append(cells)
@@ -213,6 +235,9 @@ def render_chats(data: dict, disp=None, show_all: bool = False,
     foot = _d.Footer()
     if cut:
         foot.gap(f"· {cut} more chat(s) — --all to show")
+    if any(r["credits"] is not None for r in shown):
+        foot.footnote("· cost basis per row: credits×rate where recorded, else "
+                      "token×table (`—` = not recorded) — `cage query copilot-credits`")
     if data.get("legacy_human"):
         n = data["legacy_human"]
         foot.caveat(f"· {n} legacy human-axis row(s) excluded — the agent-vs-human "
@@ -241,11 +266,12 @@ def render_csv(data: dict) -> str:
     full, unshortened label. Column contract: docs/FORMULAS.md § chats-view."""
     from cage import csvout
     head = ["chat", "agent", "surface", "session", "calls", "tokens_in", "cached_in",
-            "cache_write_in", "tokens_out", "premium", "cost_usd", "unpriced_calls",
-            "unpriced_tokens", "method"]
+            "cache_write_in", "tokens_out", "premium", "credits", "cost_usd",
+            "priced_via", "unpriced_calls", "unpriced_tokens", "method"]
     rows = [[r["title"], r["agent"], r["surface"], r["session"], r["calls"],
              r["tokens_in"], r["cached_in"], r["cache_write_in"], r["tokens_out"],
-             r["premium"], round(r["cost"], 6), r["unpriced_calls"],
-             r["unpriced_tokens"], "measured"]
+             r["premium"], "" if r["credits"] is None else round(r["credits"], 6),
+             round(r["cost"], 6), creditprice.basis_of(r["basis"]), r["unpriced_calls"],
+             r["unpriced_tokens"], creditprice.method_for(r["basis"])]
             for r in data["rows"]]
     return csvout.table(head, rows)

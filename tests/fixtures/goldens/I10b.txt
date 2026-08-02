@@ -1,9 +1,9 @@
 $ cage insights chats
 Chats
 
-chat                        agent    surface  calls  tokens_in  cached_in  cache_write  tokens_out  premium
---------------------------  -------  -------  -----  ---------  ---------  -----------  ----------  -------
-s_cu2                       copilot  —            1     50,000          0            0       4,000        0
-kiro (no session identity)  kiro     ide          1     12,000          0            0           0        0
+chat                        agent    surface  calls  tokens_in  cached_in  cache_write  tokens_out  premium  credits
+--------------------------  -------  -------  -----  ---------  ---------  -----------  ----------  -------  -------
+s_cu2                       copilot  —            1     50,000          0            0       4,000        0        —
+kiro (no session identity)  kiro     ide          1     12,000          0            0           0        0        —
 
 · kiro (no session identity): its IDE log stamps every run under the same constant session, so all of kiro's chats collapse into this one row (`cage query kiro-routing`)

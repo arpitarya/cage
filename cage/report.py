@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from cage import convert, ledger, paths, policy, prices, render
+from cage import convert, creditprice, ledger, paths, policy, prices, render
 from cage.constants import TOKENS_PER_MILLION
 
 DIMENSIONS = ("route", "agent", "model", "provider", "day", "task")
@@ -148,6 +148,18 @@ def summarize(root: Path, pol: dict, dim: str = "route", since: str | None = Non
     family: dict[str, str] = {}      # model → matched key (approximate, no exact row)
     alias: dict[str, str] = {}       # model → routed prov/model (explicit [alias] row)
     kiro = {"calls": 0, "tokens_in": 0, "tokens_out": 0}  # input-only-log caveat (Phase 1.5)
+    # COPILOT-CREDITS: the two-basis split behind the totals. A total that sums a
+    # credits-priced and a token-priced cell must SAY so (verdict C rule 4 — the axes
+    # are never blended silently), and credits recorded with no rate to price them must
+    # surface as a count rather than vanish into the UNPRICED bucket unexplained.
+    # Tallied PER AGENT, then reduced. The split footnote is a claim about one agent's
+    # rows ("copilot priced on two bases"), so the token side must count only that
+    # agent's token-priced calls — a global tally would attribute claude's spend to
+    # copilot's basis split, which is how the first version of this read.
+    cred_by_agent: dict[str, dict] = {}
+    cred = {"unrated_calls": 0, "unrated_total": 0.0,    # recorded, but no rate
+            "unrated_agents": set(),
+            "unpriced_with_credits": 0}                  # rung-3 rows that DO carry credits
     for c in calls:
         g = groups.setdefault(_key(c, dim), _new_group())
         g["calls"] += 1
@@ -161,9 +173,29 @@ def summarize(root: Path, pol: dict, dim: str = "route", since: str | None = Non
             kiro["tokens_out"] += c.get("tokens_out", 0)
         usd, match, key = prices.call_usd_match(pol, c)
         g["usd"] += usd
-        if match not in ("none", "self"):  # only a real price row has a token-level split
+        # A credits-priced row has NO token-level cache split to report: its dollar did
+        # not come from the price table at all, so attributing a slice of it to
+        # `cache_read` would describe a total that was never token-derived.
+        if match not in ("none", "self", creditprice.MATCH):
             g["cache_usd"] += _cache_read_usd(pol, c.get("provider") or "",
                                               c.get("model") or "", c.get("cached_in", 0))
+        ca = cred_by_agent.setdefault(c.get("agent") or "—",
+                                      {"calls": 0, "total": 0.0, "usd": 0.0,
+                                       "token_calls": 0, "token_usd": 0.0})
+        if match == creditprice.MATCH:
+            ca["calls"] += 1
+            ca["total"] += creditprice.recorded(c) or 0.0
+            ca["usd"] += usd
+        else:
+            if match != "none":
+                ca["token_calls"] += 1
+                ca["token_usd"] += usd
+            if creditprice.unrated(pol, c):
+                cred["unrated_calls"] += 1
+                cred["unrated_total"] += creditprice.recorded(c) or 0.0
+                cred["unrated_agents"].add(c.get("agent") or "")
+                if match == "none":
+                    cred["unpriced_with_credits"] += 1
         if match == "none":
             u = unpriced.setdefault(f"{c.get('provider') or '—'}/{c.get('model') or '—'}",
                                     {"calls": 0, "tokens": 0,
@@ -223,8 +255,18 @@ def summarize(root: Path, pol: dict, dim: str = "route", since: str | None = Non
     # excluded here because render_report prints those exact lines natively.
     from cage import freshness
     fresh = freshness.freshness(root, pol, include_unpriced=False, rows=all_calls)
+    cred["unrated_agents"] = sorted(a for a in cred["unrated_agents"] if a)
+    # An agent earns the mixed-basis footnote only if ITS OWN rows split across both
+    # rungs; one agent priced by credits and a different one by tokens is not a mixed
+    # basis, it is two agents. `calls`/`usd` stay as the view-wide credits totals the
+    # CSV method tag and the doctor line read.
+    cred["by_agent"] = {a: v for a, v in sorted(cred_by_agent.items())
+                        if v["calls"] and v["token_calls"]}
+    cred["calls"] = sum(v["calls"] for v in cred_by_agent.values())
+    cred["usd"] = sum(v["usd"] for v in cred_by_agent.values())
+    cred["total"] = sum(v["total"] for v in cred_by_agent.values())
     return {"dim": dim, "since": since, "project": project, "scope": scope,
-            "groups": groups,
+            "groups": groups, "credits": cred,
             "total": total, "unpriced": sorted(unpriced), "family": family,
             "alias": alias, "unpriced_detail": dict(sorted(unpriced.items())),
             "unpriced_receipts": unpriced_receipts, "freshness": fresh,
@@ -401,12 +443,18 @@ def _render_empty(rep: dict) -> str:
     return _EMPTY
 
 
-def _unpriced_block(detail: dict) -> str:
+def _unpriced_block(detail: dict, credits: dict | None = None) -> str:
     """The `--usd` view's ⚠ UNPRICED block (spec R4): counts headline + one
     **runnable** fix line per unpriced provider/model (the one fix-line builder,
     `pricescmd.fix_line` — reused, never re-phrased). ``detail`` rows lacking the
     provider/model split (legacy payloads) fall back to the `cage prices
-    unpriced` pointer."""
+    unpriced` pointer.
+
+    ``credits`` adds the SECOND fix line when some of these unpriced rows carry a
+    recorded credit (COPILOT-CREDITS): those rows need no price-table row at all —
+    they need a rate — and offering only the alias fix would send a reader to solve
+    the harder problem. The line states how many of the unpriced rows it would fix,
+    so it never over-claims to cover the whole block."""
     from cage import pricescmd
     calls = sum(d["calls"] for d in detail.values())
     tokens = sum(d["tokens"] for d in detail.values())
@@ -417,7 +465,12 @@ def _unpriced_block(detail: dict) -> str:
             fixes.append(f"  fix: {pricescmd.fix_line(d.get('provider', ''), d.get('model', ''))}")
         else:
             fixes.append("  run: cage prices unpriced   # per-model fix lines")
-    return "\n".join([head, *dict.fromkeys(fixes)])
+    lines = [head, *dict.fromkeys(fixes)]
+    n = (credits or {}).get("unpriced_with_credits", 0)
+    if n:
+        lines.append(f"  or:  {creditprice.rate_hint((credits or {}).get('unrated_agents', []))}"
+                     f" — {n} of these rows carry recorded credits")
+    return "\n".join(lines)
 
 
 def overview(root: Path, pol: dict, since: str | None = None) -> dict:
@@ -547,6 +600,16 @@ def render_report(rep: dict, last_import: str | None = None, disp=None,
                                       for m, k in sorted(rep["alias"].items())))
         for rung, tool, key in rep.get("rung_models", []):
             foot.footnote(receiptprice.footnote(rung, tool, key))
+        # COPILOT-CREDITS: a total spanning both pricing bases names the split, and
+        # credits with no rate render as a COUNT — never silently as a dollar, never
+        # silently as nothing.
+        cr = rep.get("credits") or {}
+        for agent, v in (cr.get("by_agent") or {}).items():
+            foot.footnote(creditprice.split_footnote(
+                agent, v["calls"], v["total"], v["usd"], v["token_calls"], v["token_usd"]))
+        if cr.get("unrated_calls"):
+            foot.gap(creditprice.unrated_line(cr["unrated_calls"], cr["unrated_total"],
+                                              cr.get("unrated_agents", [])))
         t = rep["total"]
         # F5 (docs/regression/2026-07-22-capture-report.md): a headline like
         # "8.2B tokens, $7,046" reads as alarming when it's almost entirely
@@ -578,7 +641,7 @@ def render_report(rep: dict, last_import: str | None = None, disp=None,
     if disp.usd:
         from cage import receiptprice
         if rep.get("unpriced_detail"):
-            foot.warn(_unpriced_block(rep["unpriced_detail"]))
+            foot.warn(_unpriced_block(rep["unpriced_detail"], rep.get("credits")))
         if rep.get("unpriced_receipts", {}).get("receipts"):
             foot.warn(receiptprice.unpriced_receipts_line(rep["unpriced_receipts"]))
     if savings_cols:  # K: what the gross column excludes, in the ONE shared phrasing
@@ -616,17 +679,24 @@ def render_csv(rep: dict) -> str:
     `repricing` query entry); spend is never a projection. The savings columns are
     named for what they are — `gross_saved_usd` excludes the cost of *using* the tool,
     and `net_vs_spend_usd` nets it against this window's spend, not against that cost
-    (net-savings handoff, K). Column contract in docs/formulas.md §2."""
+    (net-savings handoff, K). Column contract in docs/FORMULAS.md §2."""
     from cage import csvout
     savings = "saved_usd" in rep["total"]
     head = [rep["dim"], "calls", "tokens_in", "tokens_out", "cached_in", "cost_usd",
             *(("gross_saved_usd", "net_vs_spend_usd") if savings else ()),
             "unpriced_calls", "unpriced_tokens", "method"]
+    # Method law: `measured` is only true while every priced cell came from tokens ×
+    # price table. A credits-priced row makes the view's dollars partly a function of a
+    # configured rate, so the whole view degrades to `modeled` (`creditprice.method_for`).
+    # This is view-level, not per-group: the CSV's `cost_usd` rows share one basis
+    # statement, and a per-group tag would let a reader sum `measured` rows into a total
+    # that isn't.
+    method = creditprice.method_for({creditprice.CREDITS: rep.get("credits", {}).get("calls", 0)})
     def cells(name, g):
         return [name, g["calls"], g["tokens_in"], g["tokens_out"], g["cached_in"],
                 round(g["usd"], 6),
                 *((round(g["saved_usd"], 6), round(g["net_usd"], 6)) if savings else ()),
-                g["unpriced_calls"], g["unpriced_tokens"], "measured"]
+                g["unpriced_calls"], g["unpriced_tokens"], method]
     rows = [cells(name, g)
             for name, g in sorted(rep["groups"].items(), key=lambda kv: -kv[1]["usd"])]
     rows.append(cells("TOTAL", rep["total"]))

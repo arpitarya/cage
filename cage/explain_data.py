@@ -711,12 +711,47 @@ REGISTRY: tuple[Explanation, ...] = (
         "  (github.blog, retrieved 2026-07-11). The [credits] layer is a separate\n"
         "  axis (plan-quota multipliers, estimated, off by default) — never blurred\n"
         "  into per-token prices, and Kiro/Copilot credits are never derived from\n"
-        "  tokens. The bare router id copilot/auto matches nothing by design: route\n"
-        "  it explicitly (`cage prices alias - copilot/auto --to …`) — a router\n"
-        "  priced silently would be a wrong number.",
-        ("cage/transcript.py", "cage/policy.py", "cage/data/cage.toml"),
+        "  tokens. The bare router id copilot/auto matches no price row by design —\n"
+        "  a router priced silently would be a wrong number — so it resolves one of\n"
+        "  two other ways: a recorded billed credit prices it exactly (rung 1, see\n"
+        "  `cage query copilot-credits`), or you route it explicitly\n"
+        "  (`cage prices alias - copilot/auto --to …`). Neither guesses.",
+        ("cage/transcript.py", "cage/policy.py", "cage/creditprice.py",
+         "cage/data/cage.toml"),
         "n/a — describes a billing approximation and its provenance.",
         kind="concept", plan_ref="§3.3, §3.8"),
+    Explanation(
+        "copilot-credits", ("copilot-credits", "credits", "billed", "usd-per-credit",
+                            "billing", "ladder", "rung", "copilot-auto", "priced-via",
+                            "credits-rate", "token-table", "mixed-basis"),
+        "how a copilot row picks its price: the credits → tokens → UNPRICED ladder",
+        "Copilot persists the credits GitHub itself billed — per request in VS\n"
+        "  Code's chatSessions store (copilotCredits), per shutdown in the CLI's\n"
+        "  totalPremiumRequests. Cage records that figure VERBATIM as the call\n"
+        "  field `credits` and resolves each copilot dollar by a 3-rung ladder,\n"
+        "  one rung per row, at the single pricing choke point:\n"
+        "    1. credits × [billing.<agent>] usd_per_credit  — when the row carries\n"
+        "       a recorded credit AND you configured a rate. Tag: modeled.\n"
+        "    2. tokens × price table  — the usual exact/alias/family matching.\n"
+        "    3. UNPRICED  — loud, counted, with runnable fix lines.\n"
+        "  Rung 1 goes first because since 2026-06-01 a credit IS GitHub's own\n"
+        "  tokens×rates computation, made with what cage cannot see: which model\n"
+        "  copilot/auto actually routed to, and GitHub's current rates. So it\n"
+        "  prices copilot/auto exactly, with no price-table row at all.\n"
+        "  Method law: rung 1 is modeled, never measured — the credit COUNT is a\n"
+        "  recorded fact, but the DOLLAR is that count times a rate you set, which\n"
+        "  cage cannot check against an invoice. No rate configured ⇒ rung 1 is\n"
+        "  skipped and credits render as a COUNT, never a dollar.\n"
+        "  Credits are never derived from tokens, in either direction: an absent\n"
+        "  credit stays absent (it falls through to rung 2), and a recorded 0.0 is\n"
+        "  a REAL zero that prices at $0.0000 — a different fact from absence.\n"
+        "  A total spanning both bases is footnoted with the split (never blended\n"
+        "  silently); CSV names the winning basis per row in `priced_via`\n"
+        "  (credits-rate | token-table | mixed).",
+        ("cage/creditprice.py", "cage/prices.py", "cage/schema.py",
+         "cage/transcript.py", "cage/policy.py"),
+        "rung 1: usd = credits × [billing.<agent>] usd_per_credit  (modeled)",
+        kind="concept", plan_ref="§3.1, §3.3"),
     Explanation(
         "cleanup", ("cleanup", "state-dir", "prune", "stale", "retention", "warn",
                     "debug-log-growth", "cursors", "pending-buffers"),

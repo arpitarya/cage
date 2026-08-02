@@ -7,8 +7,16 @@ through v0.43.0 is tagged and released; there is no unreleased work in tree.
 (Verified against `git tag` + `gh release list` on 2026-08-02 — an earlier revision of
 this header claimed v0.40–v0.42 were unreleased, which was false and had been carried
 forward unchecked. Its own markers are not ground truth.)
-Suite: **1354 pass / 0 fail / 10 skipped** (dev machine, macOS/posix path only; the 10
+Suite: **1401 pass / 0 fail / 10 skipped** (dev machine, macOS/posix path only; the 10
 skips are the Windows-only shim behaviour tier and run on CI).
+
+**In tree, unreleased: v0.44 (COPILOT-CREDITS + DOGFOOD)** — billed credits + the
+copilot pricing ladder, plus cage's own ledger published as a dated snapshot; both
+built and green 2026-08-02; CHANGELOG entry covers COPILOT-CREDITS only (DOGFOOD ships
+nothing user-facing, by design). `__version__` deliberately **not** bumped (bumping is
+a release action, and it would propagate an unreleased stamp into every scaffolded
+project's `[meta] cage_version`). The header sentence above — "there is no unreleased
+work in tree" — was true through v0.43.0 and is no longer.
 
 ## Pending
 
@@ -18,14 +26,18 @@ skips are the Windows-only shim behaviour tier and run on CI).
 | **ADOPT-COV** | is half B's per-agent coverage real, or too thin? | measure on a lab run first |
 | **NET-1** | ④ prove graphify pays — n=1, gate 5 | [proposal](proposals/net-positive-evidence-run.md) — **your hands** |
 | **TOOL-SDK** | the paved road: next tool ≠ 34 modules; fux is the proof | [proposal](proposals/tool-integration-contract.md) — builds on [shim-contract](shim-contract.md) |
-| **DOGFOOD** | README shows demo data, not cage's own ledger | [proposal](proposals/dogfood-report.md) — dev machine, ~1h |
+| **CC-CLAUDEMD-DOCCASE** | `docs/claude-md-doc-case.proposed.md` is written and **deliberately not applied** — CLAUDE.md's ALL-CAPS entry-point list omits `FORMULAS.md` now that DOC-CASE renamed it | review [claude-md-doc-case.proposed.md](claude-md-doc-case.proposed.md): apply, amend or decline, then delete it and bump the CLAUDE.md DOC-REGISTRY row |
+| **CLAUDE-DOGFOOD** | `docs/claude-md-dogfood.proposed.md` is written and **deliberately not applied** — a short "Dogfood snapshot" section mirroring "Regression & capture reports" | review [claude-md-dogfood.proposed.md](claude-md-dogfood.proposed.md): apply, amend or decline, then delete it and bump the CLAUDE.md DOC-REGISTRY row |
+| **DOC-LINK-CHECK** | DOC-CASE's dangling-link class (case-broken doc citations, invisible on a case-insensitive filesystem) would be caught by a link-checker test, same class as `test_cli_reference.py` catching a dead verb in prose — recommended in the DOC-CASE handoff but explicitly scoped out of that change | design a minimal test walking `docs/*.md` links against `git ls-files`, case-sensitive |
 | **L1-FIELD** | L1 hook shapes are unit/CI-tested but never run on a real Claude Code / Copilot / Kiro install | wire one machine per agent, confirm the hook fires and `cage setup --status` agrees |
 | **KIRO-MCP-FIELD** | the committed path-free `python3 -m cage mcp` has never started on a real Kiro | open Kiro on a wired repo; if it does not start, **report it** — do not fall back to a gitignored absolute path |
 | **ID-ENTROPY** | `ids.new_id` has **16 bits** of randomness per millisecond, and every merge path dedupes by id — so a collision **silently drops a row**. Measured: **874 dupes in 200,000** sequential ids (~1 in 229); it turned main red once already (`test_study`, 37 vs 38) | widen the random field 4→8 hex (32 bits, ~65,000× safer) and correct `transcript._composite_id`'s stale "same 15-char shape" comment. [finding](regression/2026-08-02-finding-call-id-collisions.md) |
 | **HR-CLAUDEMD** | the CLAUDE.md architecture bullet for HR1 is written but **deliberately not applied** — the prompt forbids silently rewriting steering files | review [claude-md-hr1.proposed.md](claude-md-hr1.proposed.md): apply, amend or decline, then delete it and correct the CLAUDE.md DOC-REGISTRY row |
 | **HR-FIELD** | the four-bucket split has only been read on **cage's own repo**, whose history is unusually doc- and artifact-heavy (80% `unattributed`) | run `cage insights commits` on a second, code-heavy repo; if `unattributed` still dominates, the per-file table is the surface that needs work, not the buckets |
 | **HR-COPILOT-JOIN** | copilot-vscode has per-request timestamps but stamps **no `project`**, so every one of its calls is excluded as *unconfirmable* — the join is built and cannot fire for it | stamp `project` on the vscode chat-store parse (the claude `cwd` precedent), then it window-joins for free |
-| **COPILOT-CREDITS** | chatSessions persists `copilotCredits` per request — cage drops the actual billing unit (retires copilot/auto UNPRICED); + `elapsedMs`→gap_ms, sidecar `cacheReadTokens` | [handoff](copilot-credits.handoff.md) + [prompt](copilot-credits.prompt.md) (**Opus**) — ready to execute; extends the shipped `cage insights chats` with the credits column |
+| **CC-CLAUDEMD** | the CLAUDE.md bullets for the copilot pricing ladder are written and **deliberately not applied** — the prompt forbids silently rewriting steering files | review [claude-md-copilot-credits.proposed.md](claude-md-copilot-credits.proposed.md): apply, amend or decline, then delete it and bump the CLAUDE.md DOC-REGISTRY row |
+| **COPILOT-PREMIUM-DEAD** | `premium` is an int, but `totalPremiumRequests` is fractional in every real sample (`0.33`) — so `int()` floors it and `make_call` drops the key. **Confirmed: 13 copilot-CLI rows in the real ledger, not one carrying it.** Pricing no longer depends on it (COPILOT-CREDITS stamps a float `credits` instead), but the field is still written and still exported, and it is structurally wrong for its own source | decide: widen it to float, or **remove it** — it now has no reader. Removal is the cleaner call and is a substrate change, so it needs the same care as any `CALL_FIELDS` edit. [finding](research/2026-08-02-copilot-credit-fields-real-stores.md) |
+| **COPILOT-SIDECAR** | the deferred half of COPILOT-CREDITS: `agentHostUsage/<session>.jsonl` carries per-call `cacheReadTokens` (the vscode `cached` column is honestly empty without it) + the **real routed model** behind `copilot/auto`. Debug-gated and deleted with its session | trigger R3 of the [compare](compare/copilot-pricing-basis.compare.md) — parked, not lost. **Note the old OPEN-WORK phrasing said `elapsedMs`→`gap_ms`: `gap_ms` was removed with the human axis in v0.36, so that half is void, not pending** |
 | **CLI-GAPS** | two front-door inconsistencies, found writing [CLI.md](CLI.md): (a) `cage --help` lists **seven of `data`'s eight** commands — `migrate-savings` runs but is unadvertised; (b) `prices`/`study`/`policy` take their action as a **positional choice, not a subparser**, so `cage prices set --help` renders the group's help and the group's flags are a flat union (`--input` shows on `list`) | (a) is a one-line front-door fix + a golden re-bless. (b) is a **front-door change**: converting the three to real subparsers re-blesses goldens and touches `test_cli_tiering`'s help fixture — decide whether the asymmetry is worth keeping |
 
 **AGENT SURFACE re-designed from scratch 2026-08-02 (Arpit: clean slate).** The old

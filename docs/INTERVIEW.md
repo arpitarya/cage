@@ -296,6 +296,32 @@ you touch any savings number.**
 - **A renamed/removed verb is a wiring migration**, not just a CLI change — sweep
   every wire file, `install.sh`, `justfile`, docs/skills, and add a `verbmap.REMOVED`
   entry. Dead installed verbs fail open to exit 0 and look like cage-not-installed.
+- **Derive or guard, never remind** (2026-08-02, DOGFOOD). Any number a doc publishes
+  needs a *mechanism*, not a release-checklist line: `[meta] cage_version` drifted
+  **eleven releases** on exactly that. Where CI can't recompute the number (a real-ledger
+  figure — no ledger in CI, ZERO dummy data), guard its **freshness metadata** instead —
+  a test over a frontmatter date reads no numbers and still can't rot. And **date, not
+  version, is the freshness axis**: a cumulative ledger belongs to no single version, and
+  version-distance is a broken clock here (v0.37→v0.43 in ~two days; `__version__` is
+  deliberately not bumped for in-tree work). Corollary for any published window: make it
+  **absolute, never relative** — a relative `--since` re-measures a different window each
+  refresh, so staleness can move a number *down*; absolute means staleness only ever
+  understates, which fails safe.
+- **A shared/global store's "most recent" can be a fixture, not real usage**
+  (2026-08-02, DOGFOOD execution). Publishing this repo's own numbers, the "real"
+  ledger's `cage insights attrib` output for its default (most recent) task turned out
+  to be `cage demo`'s seed — the *only* task-tagged row in the whole global `~/.cage`
+  ledger. A command returning cleanly is not proof its input is real; trace a
+  self-measurement number back to its source rows before publishing it, especially
+  from a global store other work (tests, demos, other projects) also writes to.
+- **macOS hides case-broken links; GitHub does not** (2026-08-02, DOC-CASE). The tracked
+  file is `docs/formulas.md`, and **120 citations across 49 files** — CLAUDE.md, four
+  `cage/*.py` modules, the maintained-doc list itself — spell it `FORMULAS.md`. Every one
+  resolves on this machine and dangles on the renderer and any case-sensitive checkout.
+  This is the dangling-pointer class CLAUDE.md's *deleting a doc is a citation migration*
+  rule exists to prevent, and it went unseen for months because the dev filesystem is
+  case-insensitive. When you add a doc citation, check the **tracked** name
+  (`git ls-files`), not the one that happens to open.
 - **Verify a log shape against real data before coding to a plan's claim.** The
   v0.36 plan asserted the Copilot VS Code title sits on the `kind:0` record; 143
   real sessions said otherwise (it's a `customTitle` patch record, with
@@ -326,6 +352,20 @@ you touch any savings number.**
 
 ## Maintainers
 
+- Claude (Sonnet 5) — 2026-08-02 — built DOGFOOD (cage's own ledger, published).
+  Lesson for the next model: **"most recent" is not the same claim as "real."**
+  `cage insights attrib` defaults to the most recent task, and on this machine's real
+  global ledger that task was the `cage demo` seed itself — the only task-tagged row
+  in the *entire* ledger, sitting there since whenever `just demo` was last run. It
+  would have published fabricated numbers under a "real, verbatim" banner if I hadn't
+  traced the task name back to its source rows before writing anything down. **Any
+  self-measurement feature that reads "the most recent X" from a shared/global store
+  must be checked for fixtures, seeds, and test data before the output is trusted as
+  real** — a command that works correctly is not evidence its *input* is real. Second,
+  smaller lesson: a non-negotiable written for one failure mode ("P0's output is
+  missing") doesn't automatically cover its sibling ("P0's output exists but is
+  contaminated") — when a real scenario doesn't match any case a rule enumerated, that
+  is itself the "ambiguous — stop and ask" case, not a gap to reason past alone.
 - Claude (Opus 5) — 2026-08-01 — built the Windows graphify twin (WIN-GF) and the CI
   graphify axis (CI-GF). Lesson for the next model: **when a handoff states a fact about
   a third-party tool, go look at the tool.** This one said graphify installs via npm and

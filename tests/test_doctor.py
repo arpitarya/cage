@@ -56,7 +56,11 @@ def test_doctor_records_nothing_in_the_project(proj):
 def test_every_check_has_a_known_level(proj):
     res = doctorcmd.run(proj)
     names = {c["name"] for c in res["checks"]}
-    assert names == {"tool", "footprint", "policy", "pricing", "prices-meta", "prices-age", "policy-version",
+    assert names == {"tool", "footprint", "policy", "pricing",
+                     # billed-credit coverage — advisory beside `pricing`, never a fault:
+                     # partial coverage is the vendor's logging, not the user's setup
+                     "credits",
+                     "prices-meta", "prices-age", "policy-version",
                      "state", "portability",
                      # the price of kiro's MCP going path-free/committable: *which*
                      # `python3` resolves, probed rather than assumed

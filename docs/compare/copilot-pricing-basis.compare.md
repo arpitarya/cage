@@ -1,6 +1,6 @@
 ---
 doc: compare — pricing basis for Copilot usage
-status: DECIDED — verdict C accepted by Arpit 2026-08-02; spec: ../proposals/copilot-credits.proposal.md
+status: DECIDED — verdict C accepted by Arpit 2026-08-02; IMPLEMENTED v0.44 (unreleased) — living spec: ../FORMULAS.md §1.1a · ../PLAN.md §3.1 · `cage query copilot-credits`; the proposal it graduated through is archived at ../archive/v0.44-copilot-credits.proposal.md
 raised: 2026-08-02 (fork surfaced by COPILOT-CREDITS — the store persists the billed credits cage drops)
 evidence: ../research/copilot-vscode-token-sources.md
 ---

@@ -53,6 +53,22 @@ import_before_export = true
 [display]
 usd = false
 
+# YOUR plan's credit rate — rung 1 of the copilot pricing ladder (`cage query
+# copilot-credits`). Copilot records the credits GitHub itself billed on each request;
+# cage stores that count verbatim but will not turn it into a dollar until you say what
+# a credit costs you. Ships UNSET on purpose: an assumed rate would be a guess wearing a
+# number, so with none set the credits render as a COUNT and those rows price by
+# token × price-table instead.
+#
+# This lives in cage.toml, NOT prices.toml, and the split is the point: prices.toml is a
+# vendor rate card that `cage prices sync` replaces wholesale, while your overage rate is
+# a decision about your own plan that must survive every sync. Vendor facts move,
+# routing decisions stay. (It is spelled [billing.<agent>] rather than [credits.<agent>]
+# because [credits] is that vendor card's per-model multiplier table — see policy.py.)
+#
+# [billing.copilot]
+# usd_per_credit = 0.04   # your plan's overage rate per AI credit
+
 # State-dir maintenance (.cage/state/ only — a CLOSED allowlist: aged debug.log and
 # hooks-seen.jsonl rows, stale pending-* provenance buffers, cursors whose source log
 # is gone, *.tmp). Never touches ledger/ (tool savings included — a per-tool cleanup

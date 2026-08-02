@@ -757,7 +757,7 @@ the worked examples to copy.
 ## Dev
 
 ```bash
-just test          # python -m pytest -q   (1354 tests; +10 Windows-only skips)
+just test          # python -m pytest -q   (1401 tests; +10 Windows-only skips)
 just demo          # seed §4.4 + print attrib/matrix
 cage --version
 ```

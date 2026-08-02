@@ -12,6 +12,165 @@ by milestone) — the worklog is what *happened this session*.
 
 ---
 
+## 2026-08-02 (Claude Code) — DOGFOOD executed: cage's own ledger, published (Sonnet)
+
+- **Asked:** run the DOGFOOD prompt. Its own stop condition fired correctly on first
+  read — `docs/dogfood/<date>.md` did not exist, so I stopped and said so rather than
+  seeding or approximating anything. Arpit then said to run the commands myself and get
+  the real numbers, which is P0 — normally his hands, done in-session here instead.
+- **Done:** ran the three allowlisted commands (`cage report --usd`,
+  `cage insights adoption`) against the real global `~/.cage` ledger over the full
+  all-time window (no `--since` on either — the ledger's first row is 2026-02-15).
+  Before trusting `cage insights attrib`'s default "most recent task" output, traced it
+  to its source rows in `~/.cage/ledger/{calls,receipts}-2026-07.jsonl` and found it was
+  the `cage demo` seed (`session: "demo"`, task `fix-handover-bug`, ts 2026-07-23,
+  matching `cage/demo.py`'s hardcoded slices exactly) — the *only* task-tagged row in
+  the entire global ledger. Surfaced this to Arpit via AskUserQuestion rather than
+  deciding alone; he chose to omit `attrib` with a note. Built `docs/dogfood/
+  {2026-08-02,latest,README}.md`, the README line-16 pointer, `tests/
+  test_dogfood_freshness.py` (10 tests: the real guard + 8 tmp_path failure modes +
+  the skip-env test), refreshed the test count everywhere (1391 → 1401), and wrote
+  `docs/claude-md-dogfood.proposed.md` (held, not applied). Doc sweep: IMPLEMENTATION
+  milestone entry written before the OPEN-WORK row was removed, proposal archived to
+  `docs/archive/v0.44-dogfood-report.proposal.md` and moved to Graduated, pair archived
+  to `docs/archive/v0.44-dogfood-report.{handoff,prompt}.md`, DOC-REGISTRY rows bumped.
+  `just test`: **1401 passed / 0 failed / 10 skipped** (1391 baseline + 10 new).
+- **Decided:** the non-negotiable ("ZERO dummy data — the executing agent never runs a
+  ledger command and never authors a number") was written against a scenario where P0's
+  *output* is missing or fabricated; it didn't anticipate the executing agent running
+  P0 itself at the user's direct instruction, nor a ledger whose only real signal for
+  one of the three allowlisted commands turned out to be a fixture. Both were treated
+  as "ambiguous — stop and ask" rather than guessed through.
+- **Open:** `docs/claude-md-dogfood.proposed.md` awaits Arpit's apply/amend/decline; a
+  real `attrib` snapshot lands whenever any task on this machine is actually closed —
+  not filed as OPEN-WORK since it isn't actionable work, just a fact about future usage.
+- **Next:** Arpit reviews the proposed CLAUDE.md line; not committed — left dirty per
+  the standing directive.
+
+## 2026-08-02 (Claude Code) — DOC-CASE executed: `docs/formulas.md` → `docs/FORMULAS.md` (Sonnet)
+
+- **Asked:** run the DOC-CASE prompt — rename the tracked lowercase `docs/formulas.md`
+  to `docs/FORMULAS.md` so it matches the 120 existing uppercase citations, fix the two
+  live code docstrings, and sweep the docs.
+- **Done:** verified nothing programmatic reads the filename (no `docs/` glob in
+  `tests/`/`tools/`, no MANIFEST/pyproject reference) before touching it. Two-step
+  `git mv` (`formulas.md` → `_formulas.tmp` → `FORMULAS.md`), verified via
+  `git ls-files`, not `ls` — registered as a clean `R` rename, no silent no-op. Fixed
+  `cage/roi.py:85` and `cage/report.py:682`. Left every history-class citation
+  untouched: `CHANGELOG.md` (4×), `docs/archive/**` (4×), `docs/IMPLEMENTATION.md:1051`,
+  `docs/INTERVIEW.md:311`, `docs/WORKLOG.md:39,213,235,1160`. Doc sweep: OPEN-WORK row
+  removed (residuals filed as CC-CLAUDEMD-DOCCASE + DOC-LINK-CHECK), IMPLEMENTATION
+  milestone entry, DOC-REGISTRY rows bumped, README Active-work swapped, pair archived
+  to `docs/archive/v0.44-doc-case-rename.{handoff,prompt}.md`,
+  `docs/claude-md-doc-case.proposed.md` written and held for review (steering files are
+  never edited silently). `just test`: **1391 passed / 0 failed / 10 skipped** — no
+  change in count.
+- **Decided:** `docs/WORKLOG.md:235` is a third history-class citation the handoff's
+  explicit list (`:39`/`:213`) didn't name — another past session spotting the same bug
+  and not filing it. Extended the same treatment on the same reasoning rather than
+  rewriting it.
+- **Worth naming:** this line at `:39` below is exactly the entry that *did* eventually
+  get filed and executed — but `:213` records an *earlier* session spotting the same
+  bug and explicitly leaving it alone unfiled, which is why it survived long enough to
+  be found twice. The discipline held on the second sighting, not the first.
+- **Open:** `docs/claude-md-doc-case.proposed.md` awaits Arpit's apply/amend/decline;
+  the DOC-LINK-CHECK idea (a link-checker test, same class as `test_cli_reference.py`
+  catching a dead verb) is filed but not built.
+- **Next:** review the proposed CLAUDE.md line; not committed — left dirty per the
+  standing directive.
+
+## 2026-08-02 (Cowork) — DOGFOOD proposal reviewed and rewritten; DOC-CASE found (Opus)
+
+- **Asked:** review `proposals/dogfood-report.md` — "how is it going to work, is it
+  going to be one version behind or the same version?"
+- **Answered:** neither, and the question exposed the flaw. `~/.cage` is cumulative
+  across v0.12→v0.43, so no single version owns the numbers; the stamp only records
+  which build took the snapshot. Refreshed inside the release cut it matches the
+  shipping version, refreshed after it ships one behind — but either way the reader is
+  **time-behind**, so **date is the real freshness axis and version is provenance**.
+- **Done:** rewrote the proposal. Three changes: (1) dated `docs/dogfood/<date>.md` +
+  `latest.md` snapshots (the `regression/latest-*` pattern) instead of a README-inline
+  block; (2) a **version-free, date-free** README pointer at `latest.md`, so the README
+  is written once and never edited again; (3) a **60-day freshness guard test** reading
+  `latest.md`'s frontmatter — no numbers, so it runs in CI with no ledger — replacing
+  the release-checklist line.
+- **Decided:** *derive or guard, never remind.* The checklist line was the same pattern
+  `[meta] cage_version` drifted eleven releases on. Version-distance was rejected as the
+  gate because the cadence here breaks it — v0.37→v0.43 inside ~two days, and
+  `__version__` is deliberately not bumped for in-tree work.
+- **Also decided:** the snapshot window must be **absolute, never relative**. A relative
+  `--since` measures a different window each refresh, breaking comparability and letting
+  a stale number move *down*; an absolute window makes staleness only ever understate.
+- **Deliberately not taken, recorded in the proposal:** the README-inline block, with a
+  reopen trigger (two snapshots agreeing in shape ⇒ inline the headline figure).
+- **Found, filed as DOC-CASE:** the tracked file is `docs/formulas.md` but 120 citations
+  across 49 files spell `FORMULAS.md` — invisible on macOS, dangling on GitHub and any
+  case-sensitive checkout.
+- **Accepted same session (Arpit):** the `docs/dogfood/` home and the **60-day** gate.
+  DOGFOOD is now **picked up** — pair written, proposal stays put as the rationale.
+- **Pairs created:** `dogfood-report.{handoff,prompt}.md` (Sonnet; four phases, **P0 is
+  Arpit's hands** and blocks the rest) and `doc-case-rename.{handoff,prompt}.md`
+  (Sonnet; single phase). Both listed under *Active work* in `docs/README.md`.
+- **Debate gate, DOGFOOD — three challenges held, one residual accepted.** *Held:* the
+  guard is fakeable by editing one frontmatter line ⇒ hardened with a second assertion,
+  `snapshot_date` must equal the newest snapshot **filename**'s date, so satisfying it
+  requires a new file; the agent could invent numbers ⇒ killed by sequencing (P0 is
+  human, the agent never runs a ledger command); publishing real output could leak
+  private project names ⇒ killed by a command allowlist (no `insights chats`, no
+  `--project`). *Residual, named not solved:* a date-based test is calendar-triggered,
+  so `git bisect` and old-tag CI can go red for a non-code reason — mitigated by a
+  self-explaining failure message + `CAGE_SKIP_DOGFOOD_FRESHNESS=1`, in the
+  GF-LAUNCHER "stated limit, never half-fixed" tradition.
+- **Debate gate, DOC-CASE — measured, not assumed.** The rename fixes 120 citations and
+  breaks exactly **2**, both docstrings (`roi.py:85`, `report.py:682`); nothing globs
+  `docs/` and neither MANIFEST nor pyproject names the file. `core.ignorecase = true`,
+  so the `git mv` must be two-step or it silently no-ops — the one real trap.
+  History-class citations (CHANGELOG, `archive/`, and the WORKLOG/INTERVIEW lines that
+  *quote the bug*) stay lowercase deliberately.
+- **Next:** DOGFOOD **P0** — Arpit runs `cage report` · `insights attrib` ·
+  `insights adoption` over an absolute window on the dev machine. DOC-CASE can run any
+  time. **NET-1** unchanged as the standing next action.
+- **No code touched. Nothing committed** (standing directive).
+
+## 2026-08-02 (Claude Code) — COPILOT-CREDITS built: billed credits + the pricing ladder (Opus)
+
+- **Asked:** execute the COPILOT-CREDITS prompt — capture the credits Copilot bills,
+  price copilot by ladder (credits×rate → token×table → UNPRICED).
+- **Verified before planning, as the prompt required:** the choke point **is** one place
+  (`prices.call_usd_match`; `call_usd` wraps it, every USD consumer goes through one of
+  the two — no caller prices independently), and `copilotCredits` in the **real** store
+  matches the research doc (11/348 requests, float, 0.100185–1.382565, all
+  `copilot/auto`).
+- **Done:** substrate field → capture on both surfaces → the ladder in a new
+  `creditprice.py` behind the one choke point → report/chats/CSV/doctor/explain →
+  docs + archives. 1354/0 ⇒ **1391/0**; goldens `I10a/b/d` re-blessed (the added
+  column, nothing else), no report golden moved.
+- **Decided (§10, the open question):** the key is **`[billing.copilot] usd_per_credit`
+  in cage.toml**, not `[credits.copilot]`. Verified the merge first: `[credits]` sits in
+  `policy._PRICE_SECTIONS`, so `policy.load` reads it from `prices.toml` **only** — and
+  the rate belongs in cage.toml by the vendor-facts-move rule, so the proposal's
+  spelling would have been read back as absent in every project with a prices file. The
+  handoff pre-authorized this fallback; proposal amended in the same change.
+- **Decided (asked Arpit, guardrail):** copilot-**CLI** stamps the new float `credits`
+  itself rather than the read side treating `premium` as credits, because
+  `totalPremiumRequests` is fractional (`0.33`) and the int `premium` field floors it to
+  0 and drops the key. Arpit chose "stamp `credits` on CLI rows too"; `premium` left
+  untouched.
+- **Decided (no question needed):** `credits` defaults to a `None` sentinel, not `0.0` —
+  the handoff's literal signature contradicted its own §8 rule that a recorded zero is
+  a real zero, and no other reading satisfies both.
+- **Finding filed:** copilot-CLI `premium` has captured **nothing, ever** — 13 real rows,
+  none carrying it ([research](research/2026-08-02-copilot-credit-fields-real-stores.md)).
+  Now unread by pricing but still written; carried into OPEN-WORK as
+  **COPILOT-PREMIUM-DEAD**. Also corrected the old OPEN-WORK row's `elapsedMs`→`gap_ms`
+  half: `gap_ms` died with the human axis in v0.36, so that is void, not pending.
+- **Also caught:** both the chats CSV and the report CSV hardcoded `method="measured"`,
+  which would have let a rate-derived dollar read as an invoice. Now degrades to
+  `modeled` whenever a credits-priced row is in the aggregate.
+- **Open / next:** `docs/claude-md-copilot-credits.proposed.md` — the CLAUDE.md bullet,
+  written and **held for Arpit's review** (steering files are never rewritten silently).
+  `__version__` deliberately not bumped; v0.44 sits unreleased in tree.
+
 ## 2026-08-02 (Claude Code) — HR1 P4 + the full doc sweep; program closed (Opus)
 
 - **Asked:** finish the phases.
@@ -85,8 +244,8 @@ by milestone) — the worklog is what *happened this session*.
 ## 2026-08-02 (Cowork) — COPILOT-CREDITS packaged: handoff + prompt (Opus)
 
 - **Asked:** create the handoff and prompt for COPILOT-CREDITS.
-- **Done:** [copilot-credits.handoff.md](copilot-credits.handoff.md) +
-  [copilot-credits.prompt.md](copilot-credits.prompt.md); Active-work indexed;
+- **Done:** [copilot-credits.handoff.md](archive/v0.44-copilot-credits.handoff.md) +
+  [copilot-credits.prompt.md](archive/v0.44-copilot-credits.prompt.md); Active-work indexed;
   OPEN-WORK row → ready to execute; proposal header carries the picked-up pointer.
 - **Tier call:** **Opus**, not Sonnet — `CALL_FIELDS` gains a field (substrate
   contract, plan §3 in the same change) and a new pricing rung carries method-tag
@@ -102,7 +261,7 @@ by milestone) — the worklog is what *happened this session*.
 
 - **Asked:** "we're going with both" — proposal with example CLI outputs.
 - **Done:** compare verdict C recorded as DECIDED;
-  [proposals/copilot-credits.proposal.md](proposals/copilot-credits.proposal.md) —
+  [proposals/copilot-credits.proposal.md](archive/v0.44-copilot-credits.proposal.md) —
   capture design (additive `credits` call field; CLI `premium` read as credits;
   sidecar deferred), `[credits.copilot] usd_per_credit` policy key (cage.toml —
   plan economics, not vendor rate card), the 3-rung ladder, worked outputs in house

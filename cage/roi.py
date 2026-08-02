@@ -82,7 +82,7 @@ def render_csv(data: dict) -> str:
     provenance); `priced_via` = every pricing path the row's token receipts took.
     `gross_saved_usd`/`net_of_own_cost_usd` are named for what they are — the cost of
     *using* the tool is in neither (net-savings handoff, K). Column contract in
-    docs/formulas.md §2.5."""
+    docs/FORMULAS.md §2.5."""
     from cage import csvout
     head = ["tool", "receipts", "gross_saved_usd", "own_cost_usd", "net_of_own_cost_usd",
             "added_latency_ms", "method", "priced_via"]

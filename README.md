@@ -13,7 +13,7 @@ You're paying for an agent, a graph tool, a rules engine, maybe Copilot. At the 
 
 **Platforms:** macOS is field-validated (real extension sessions, the full manual capture matrix); Linux and Windows are CI-tested across the whole suite + scenario runner, plus a graphify leg that installs the real binary and meters real queries. The graphify PATH interceptor now ships as a **twin pair** — the bash shim and a `graphify.cmd` — so a bare `graphify` reaches cage on Windows too (Windows PATH lookup goes through `PATHEXT`, which has no extensionless entry, so the bash shim alone could never be found there). Windows is CI-asserted, not yet field-validated. On Windows, run `cage doctor --paths` first — it shows every log location cage probes on your machine and why any missed. Locked-down endpoint (AppLocker/WDAC blocks the exe, or no pip)? `cage setup --python-launcher` wires everything through the interpreter instead, and every release ships a single-file `cage.pyz` — **note that this turns the graphify shim route off too** (there's no `cage` command left on PATH for it to probe), so a launcher-mode project relies on the transcript route for graphify savings; see [restricted-environments.md](docs/restricted-environments.md).
 
-<p align="center"><em>▶ Demo GIF coming soon.</em></p>
+<p align="center"><em>Measured on itself: <a href="docs/dogfood/latest.md">cage's own ledger, real numbers, refreshed periodically</a>.</em></p>
 
 ## The story
 
@@ -228,7 +228,7 @@ cage data export --csv calls --since 30d -o calls.csv   # raw ledger rows for a 
 
 ## The `$0` guarantee
 
-Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 1354 tests; `cage demo` reproduces the worked attribution example against a real ledger.
+Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 1401 tests; `cage demo` reproduces the worked attribution example against a real ledger.
 
 **Honest limits.** Marginal-by-fixed-order is defensible and `$0`, but it is an *ordering convention*, not a Shapley value (that's a deferred audit mode). And a counterfactual cell is an honest reconstruction, never an invoice — the `method` column says so on every row, on purpose.
 
@@ -236,7 +236,7 @@ Every derived view is parse / arithmetic over the log — **no LLM call, ever, o
 
 Latest release below — full history and detail in [CHANGELOG.md](CHANGELOG.md).
 
-- **v0.43.0 (2026-08-02) — agent-vs-human, rebuilt per commit.** `cage insights commits` / `commit <sha>` / `cage authorship summary` answer *who wrote this commit* from line-level evidence: the exact text an agent proposed, matched transiently against the commit's added lines, with **only counts persisted** — never a line body, never a line hash. The residual splits four ways (`agent` / `human~` / `unattributed` / `unknown`), so a committed build artifact is never reported as a person's work. Hours are attested (`cage task time 45m`) or a guarded `~` estimate that refuses rather than print fog. **No USD, rate or valuation appears anywhere on these surfaces** — the v0.36 veto, kept. See [CHANGELOG.md](CHANGELOG.md) and [ADR 0008](docs/adr/0008-line-match-authorship-counts-persisted-content-transient.md).
+- **v0.44.0 (2026-08-02) — Copilot's own billing number.** Cage now records the credits Copilot itself billed per request and resolves every copilot dollar by a three-rung ladder — `credits × your rate` → `tokens × price table` → loudly UNPRICED — so `copilot/auto`, the biggest UNPRICED hole in a real ledger, prices *exactly* with no price-table row. Rung 1 is `modeled`, never `measured`: the count is fact, the dollar is a rate you set in `[billing.copilot] usd_per_credit` (unset by default ⇒ credits show as a **count**, never a dollar). Mixed totals print the split; CSV names the basis in `priced_via`. See [CHANGELOG.md](CHANGELOG.md).
 
 ## The name
 

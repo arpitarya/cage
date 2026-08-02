@@ -330,6 +330,19 @@ _COPILOT_OUT_KEYS = ("outputTokens", "output_tokens", "completionTokens",
 _COPILOT_CACHE_KEYS = ("cacheReadTokens", "cache_read_tokens", "cacheReadInputTokens",
                        "cache_read_input_tokens", "cachedTokens", "cached_tokens")
 
+# The **billed** credit figure, per surface (COPILOT-CREDITS, rung 1 of the copilot
+# pricing ladder). Two different keys because the two stores are different products:
+#   · VS Code chatSessions — `copilotCredits`, per REQUEST, fractional
+#     (real store, 2026-08-02: 11/348 requests, 0.100185 … 1.382565, all copilot/auto).
+#   · Copilot CLI events   — `totalPremiumRequests`, CUMULATIVE per session, fractional
+#     (real samples: 0.33) — so it is delta'd exactly like the token counters.
+# Both are read as floats and recorded verbatim: cage never interprets the unit, so a
+# vendor-side change of what a credit means relabels, never renumbers. `sessionCopilotCredits`
+# is deliberately NOT read — it is a running session total, and summing it per request
+# would multi-count (it is also absent from the store version probed).
+_COPILOT_CREDIT_KEYS = ("copilotCredits", "copilot_credits")
+_COPILOT_CLI_CREDIT_KEYS = ("totalPremiumRequests", "total_premium_requests")
+
 
 def _first_int(d: dict, keys: tuple[str, ...]) -> int:
     for k in keys:
@@ -337,6 +350,22 @@ def _first_int(d: dict, keys: tuple[str, ...]) -> int:
         if isinstance(v, (int, float)):
             return int(v)
     return 0
+
+
+def _first_float(d: dict, keys: tuple[str, ...]) -> float | None:
+    """The float twin of :func:`_first_int`, for the **credit** fields — which are
+    genuinely fractional in both real stores (VS Code `copilotCredits: 0.100185`,
+    CLI `totalPremiumRequests: 0.33`) and which `int()` would floor to a silent 0.
+
+    Returns ``None`` when no key is present or the value is not a number, so the
+    caller can keep *absent* distinct from a recorded ``0.0`` (`schema.make_call`'s
+    `credits` sentinel). `bool` is excluded explicitly — it is an `int` subclass, and
+    a `True` credit is malformed data, not the number 1."""
+    for k in keys:
+        v = d.get(k)
+        if isinstance(v, (int, float)) and not isinstance(v, bool):
+            return float(v)
+    return None
 
 
 def _copilot_provider(model: str) -> str:
@@ -371,6 +400,9 @@ def parse_copilot_calls(events_path: Path, session: str = "") -> list[dict]:
     Append-only and idempotent: `ledger.append_new` dedupes on the deterministic id, so a
     re-import adds zero rows. `totalPremiumRequests` is likewise cumulative, so its
     per-shutdown delta is stamped on the shutdown's first model row — never multi-counted.
+    That counter is stamped **twice, deliberately**: as the legacy int `premium` (unchanged)
+    and as the float `credits` that rung 1 of the pricing ladder actually reads — the real
+    values are fractional, and int truncation had been silently discarding every one.
     Fail-open per line."""
     if not events_path.exists():
         return []
@@ -379,6 +411,7 @@ def parse_copilot_calls(events_path: Path, session: str = "") -> list[dict]:
     rows: list[dict] = []
     prev: dict[str, tuple[int, int, int]] = {}  # model -> (cum_in, cum_out, cum_cached)
     prev_prem = 0
+    prev_cred = 0.0   # the float track of the same counter — see the `credits` note below
     ordinal = 0  # index among shutdowns that carry a modelMetrics map
     for line in events_path.read_text(encoding="utf-8").splitlines():
         line = line.strip()
@@ -398,9 +431,20 @@ def parse_copilot_calls(events_path: Path, session: str = "") -> list[dict]:
         # `totalPremiumRequests` is a cumulative session-level billing signal
         # (import-ledger plan §2.1 — archived; PLAN.md has no §2.1);
         # stamp only its per-shutdown delta, on the first model row, so it never multi-counts.
-        cum_prem = _first_int(data, ("totalPremiumRequests", "total_premium_requests"))
+        cum_prem = _first_int(data, _COPILOT_CLI_CREDIT_KEYS)
         prem_delta = cum_prem - prev_prem
         prev_prem = cum_prem
+        # `credits` is the SAME counter read as a float, and it exists because `premium`
+        # structurally cannot carry it: `totalPremiumRequests` is fractional in every real
+        # sample (0.33), so `_first_int` floors it to 0 and `make_call`'s `if premium:`
+        # drops the key — 13 copilot-CLI rows in a real ledger, not one carrying a premium.
+        # `premium` is left exactly as it was (legacy int contract, its id scheme
+        # untouched); the pricing ladder reads `credits` on BOTH copilot surfaces and never
+        # falls back to `premium`. Absent counter ⇒ absent credits, never a fabricated 0.
+        cum_cred = _first_float(data, _COPILOT_CLI_CREDIT_KEYS)
+        cred_delta = None if cum_cred is None else cum_cred - prev_cred
+        if cum_cred is not None:
+            prev_cred = cum_cred
         suffix = "" if ordinal == 0 else f"s{ordinal:03d}"  # ord 0 → legacy id, byte-identical
         for i, (model, m) in enumerate(metrics.items()):
             if not isinstance(m, dict):
@@ -419,6 +463,7 @@ def parse_copilot_calls(events_path: Path, session: str = "") -> list[dict]:
                 tokens_in=din, tokens_out=dout, cached_in=dcached,
                 session=session, agent="copilot", ts=ts, surface="cli",
                 premium=prem_delta if i == 0 else 0,
+                credits=cred_delta if i == 0 else None,
                 call_id=f"c_cop{sid[:12]}{i:03d}{suffix}"))
         ordinal += 1
     return rows
@@ -454,8 +499,14 @@ def parse_copilot_vscode_calls(chat_session_path: Path, session: str = "") -> li
     last-write-wins by `requestId` — re-imports and rewrites never double-record
     (the call id is derived from the requestId). Counts-never-content: titles,
     prompts, and response bodies in the same file are never read into a row.
-    `modelId` is often the virtual `copilot/auto`, which no price row matches — such
-    rows cost $0 and `cage doctor` flags them UNPRICED (a wrong number is worse)."""
+    `modelId` is often the virtual `copilot/auto`, which no price row matches — so the
+    token rung cannot price such a row, and it would cost $0 with `cage doctor` flagging
+    it UNPRICED (a wrong number is worse). `copilotCredits`, recorded here verbatim as the
+    `credits` field, is what retires that hole: GitHub already resolved the auto-routing
+    and its own rates into that figure, so rung 1 of the ladder prices `copilot/auto`
+    *exactly* without a single price-table row. Coverage is partial by the store's own
+    doing (11/348 requests carried it in the real store probed 2026-08-02) — the ladder
+    falls through per row, and an absent credit stays absent, never derived from tokens."""
     if not chat_session_path.exists():
         return []
     session = session or chat_session_path.stem
@@ -490,6 +541,7 @@ def parse_copilot_vscode_calls(chat_session_path: Path, session: str = "") -> li
             route="chat", provider=_copilot_provider(model), model=model,
             tokens_in=inp, tokens_out=out, session=session, agent="copilot",
             ts=_epoch_ms_iso(req.get("timestamp")), surface="vscode",
+            credits=_first_float(req, _COPILOT_CREDIT_KEYS),
             call_id=f"c_cop{rid_hash}"))
     return rows
 

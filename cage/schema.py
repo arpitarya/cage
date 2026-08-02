@@ -25,7 +25,7 @@ ORIGINS = ("human", "agent", "agent-autonomous", "unknown")
 CALL_FIELDS = ("id", "ts", "session", "task", "agent", "route", "provider", "model",
                "tokens_in", "tokens_out", "cached_in", "est_cost_usd",
                "latency_ms", "ok", "retries", "scope", "project",
-               "surface", "cache_write_in", "premium", "import_id")
+               "surface", "cache_write_in", "premium", "import_id", "credits")
 RECEIPT_FIELDS = ("id", "ts", "call", "task", "tool", "unit", "raw_alternative",
                   "actual", "saved", "method", "confidence", "meta", "scope")
 SAVINGS_FIELDS = ("id", "ts", "import_id", "tool", "op", "session", "task", "unit",
@@ -60,8 +60,8 @@ def make_call(*, route: str, provider: str, model: str, tokens_in: int = 0,
               latency_ms: int = 0, ok: bool = True, retries: int = 0,
               scope: str = "", project: str = "",
               surface: str = "", cache_write_in: int = 0, premium: int = 0,
-              import_id: str = "", ts: str | None = None,
-              call_id: str | None = None) -> dict:
+              import_id: str = "", credits: float | None = None,
+              ts: str | None = None, call_id: str | None = None) -> dict:
     """One ground-truth call row. `cached_in` ⊆ `tokens_in` (billed at discount).
 
     `call_id` may be supplied for idempotent sources (a transcript turn's uuid) so
@@ -78,7 +78,7 @@ def make_call(*, route: str, provider: str, model: str, tokens_in: int = 0,
     guard as `scope`/tasks). Only logs that carry the cwd can set it (Claude transcripts
     do; Copilot/Kiro leave it empty), so an empty `project` is the legacy contract.
 
-    Four more additive-optional fields (import-ledger plan §2.1), each **omitted when
+    Five more additive-optional fields (import-ledger plan §2.1), each **omitted when
     at its default** so an unstamped row stays byte-identical to the legacy contract,
     and **never part of any id**:
 
@@ -91,6 +91,25 @@ def make_call(*, route: str, provider: str, model: str, tokens_in: int = 0,
       copilot exposes that was previously dropped.
     - `import_id` — a foreign key to the capture-manifest row that produced this row
       (plan §4, threaded in Phase 3). Empty until a manifest is written.
+    - `credits` — the **billed** AI-credit figure the provider itself computed for this
+      request (COPILOT-CREDITS, plan §3.1). Copilot persists it per request in VS Code's
+      chatSessions store (`copilotCredits`) and per shutdown in the CLI's
+      `totalPremiumRequests`; since 2026-06-01 it *is* GitHub's own tokens×rates
+      computation, done with information cage cannot see (what `copilot/auto` actually
+      routed to, GitHub's current rates). It is rung 1 of the copilot pricing ladder
+      (`cage/creditprice.py`) — recorded count × the configured `[billing.<agent>]
+      usd_per_credit`, always `modeled`, never `measured`.
+
+      **`None` and `0.0` are different facts, and the sentinel default exists to keep
+      them apart.** `None` (the default) means *not recorded* — the key is omitted and
+      the row is byte-identical to the pre-COPILOT-CREDITS contract. `0.0` means the
+      store recorded a real zero (an included or 0x-rate model), which rung 1 prices at
+      $0.0000 with the rung named. This is the one additive field that does NOT use the
+      `if value:` omit-at-default idiom (`surface`/`premium`/`cache_write_in` do): that
+      idiom would collapse a recorded zero into absence, and **credits are never derived
+      from tokens in either direction, so absence must stay absence**. Float, verbatim —
+      the unit is deliberately not interpreted, so a vendor-side unit shift changes
+      labels, never invents numbers. Never part of any id.
     """
     row = {"id": call_id or ids.new_id("c"), "ts": ts or _now(), "session": session, "task": task,
            "agent": agent, "route": route, "provider": provider, "model": model,
@@ -106,6 +125,8 @@ def make_call(*, route: str, provider: str, model: str, tokens_in: int = 0,
         row["premium"] = int(premium)
     if import_id:
         row["import_id"] = str(import_id)
+    if credits is not None:   # `is not None`, never truthiness — 0.0 is a recorded zero
+        row["credits"] = float(credits)
     return row
 
 

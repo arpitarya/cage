@@ -21,16 +21,25 @@ spec.
 
 ## Active work
 
+- [claude-md-doc-case.proposed.md](claude-md-doc-case.proposed.md) — **CC-CLAUDEMD-DOCCASE**:
+  the CLAUDE.md ALL-CAPS entry-point list omits `FORMULAS.md` now that DOC-CASE renamed
+  it, written and **held for Arpit's review**. Apply / amend / decline, then delete it.
+
 - [claude-md-hr1.proposed.md](claude-md-hr1.proposed.md) — **HR-CLAUDEMD**: the
   CLAUDE.md architecture bullet for agent-vs-human v2, written and **held for
   Arpit's review**. Everything else in HR1's doc checklist is applied; steering
   files are never rewritten silently. Apply / amend / decline, then delete it.
 
-- [copilot-credits.handoff.md](copilot-credits.handoff.md) +
-  [copilot-credits.prompt.md](copilot-credits.prompt.md) — **COPILOT-CREDITS**
-  (**Opus** — substrate contract touch): billed-credits capture + the copilot pricing
-  ladder. Design of record: [copilot-credits.proposal.md](proposals/copilot-credits.proposal.md);
-  decision: [compare/copilot-pricing-basis.compare.md](compare/copilot-pricing-basis.compare.md).
+- [claude-md-copilot-credits.proposed.md](claude-md-copilot-credits.proposed.md) —
+  **CC-CLAUDEMD**: the CLAUDE.md edits for the copilot pricing ladder (per-call cost,
+  unit→USD, config-file placement, the substrate field), written and **held for Arpit's
+  review** for the same reason. Everything else in the feature's doc checklist is applied.
+
+- [claude-md-dogfood.proposed.md](claude-md-dogfood.proposed.md) —
+  **CLAUDE-DOGFOOD**: a short "Dogfood snapshot" section mirroring "Regression &
+  capture reports", written and **held for Arpit's review**. Everything else in
+  DOGFOOD's doc checklist is applied (the `just test` count was refreshed directly —
+  a mechanical number, not new guidance).
 
 ## The lab manual
 
@@ -70,6 +79,9 @@ The maintained doc set, governed by the *Documentation discipline* section of
   a diagram (also linked from the README).
 - [example/](example/) — copy-from contracts: cli · debug · setup · toml-config.
 - [IMPLEMENTATION.md](IMPLEMENTATION.md) — the build log.
+- [dogfood/](dogfood/README.md) — cage's own ledger, published as dated snapshots
+  (append-only, mirrors [regression/](regression/README.md)); linked from the README,
+  version-free. Freshness guarded by `tests/test_dogfood_freshness.py` (60-day gate).
 
 ## Standing records
 

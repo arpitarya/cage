@@ -115,6 +115,7 @@ This is the invoice-grade truth; provider `usage` fields are authoritative.
   "latency_ms": 5120, "ok": true, "retries": 0,
   "scope": "",                  // optional monorepo top-level dir (§3.6.2)
   "project": "cage",            // optional working-dir basename — derived attribution axis (§3.7)
+  "credits": 1.382565,          // optional BILLED credits, verbatim — rung 1 of the pricing ladder
 }
 ```
 
@@ -124,6 +125,22 @@ monorepo top-level changed dir (§3.6.2); `project` is the working directory a c
 under (§3.7), a derived `cage report --project` view of the global ledger. Only logs that
 expose the cwd populate `project` (Claude transcripts do; Copilot/Kiro leave it
 empty).
+
+**`credits` — the billed figure, and the one field where absence ≠ zero.** Additive and
+optional: the credit amount the *provider itself* billed for this call, recorded
+verbatim (Copilot persists it per request in VS Code's chatSessions store, per shutdown
+in the CLI). It is rung 1 of the copilot pricing ladder (§3.3) — since 2026-06-01 a
+Copilot credit *is* GitHub's own tokens×rates computation, made with information cage
+cannot see (what `copilot/auto` routed to, GitHub's current rates), so it prices that
+router exactly with no price-table row.
+
+Unlike every other additive field, `credits` is **omitted only when genuinely absent,
+never when zero**: a recorded `0.0` is a real billing fact (an included or 0x-rate
+model) and prices at $0.0000 through rung 1, while absence falls through to the token
+rung. `schema.make_call` therefore defaults it to `None`, not `0.0` — the usual
+omit-at-default idiom would collapse the two into one. **Credits are never derived from
+tokens in either direction**, and the unit is deliberately uninterpreted, so a
+vendor-side change of what a credit means relabels rather than renumbers.
 
 ### 3.2 The savings receipt — what a tool claims it saved
 

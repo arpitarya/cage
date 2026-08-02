@@ -28,5 +28,7 @@ Naming: `<topic>.compare.md`. Written in short points, not walls of prose.
 - [copilot-pricing-basis.compare.md](copilot-pricing-basis.compare.md) — Copilot
   cost: credits vs tokens vs both. **Proposed verdict C — both, one job each**
   (credits = what was billed; tokens = the cross-agent denominator), joined by a
-  ladder, never blended. **DECIDED — C accepted 2026-08-02**; spec:
-  [proposals/copilot-credits.proposal.md](../proposals/copilot-credits.proposal.md).
+  ladder, never blended. **DECIDED — C accepted 2026-08-02 · IMPLEMENTED v0.44**
+  (unreleased). Living spec: [FORMULAS.md §1.1a](../FORMULAS.md) ·
+  [PLAN.md §3.1](../PLAN.md) · `cage query copilot-credits`; the proposal it graduated
+  through is [archived](../archive/v0.44-copilot-credits.proposal.md).

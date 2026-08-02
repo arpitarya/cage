@@ -64,10 +64,10 @@ def _bundled() -> dict:
 # behavior — a partial project table silently dropped every bundled row for that
 # provider. Nothing legitimate relied on it: removing a row only ever meant falling
 # back to family/none, and `cage setup` copies carry the full table anyway.)
-_TWO_LEVEL = ("prices", "credits", "alias")
+_TWO_LEVEL = ("prices", "credits", "alias", "billing")
 _SECTIONS = ("prices", "tools", "budgets", "quality", "ledger",
              "capture", "debug", "credits", "alias", "meta", "cleanup", "wiring",
-             "display", "sources", "authorship")
+             "display", "sources", "authorship", "billing")
 
 # The vendor-fact sections that live in `prices.toml` (prices-toml plan §2): the rate
 # rows and the credit table. Everything else in `_SECTIONS` (routing decisions +
@@ -77,6 +77,20 @@ _SECTIONS = ("prices", "tools", "budgets", "quality", "ledger",
 # plan §2.1 — archived; PLAN.md has no §2.1).
 _PRICE_SECTIONS = ("prices", "credits")
 _PRICE_META_KEYS = ("prices_version", "prices_date")
+
+# `[billing]` is deliberately NOT a price section, and the distinction is the whole
+# reason it is not spelled `[credits.<agent>]` (COPILOT-CREDITS §10):
+#
+#   · `[credits]` is a VENDOR rate card — per-provider/per-model `per_mtok` multipliers,
+#     replaced wholesale by `cage prices sync`, so it lives in `prices.toml`.
+#   · `[billing.<agent>] usd_per_credit` is YOUR plan's overage rate — a routing decision
+#     about your own economics, hand-set and hand-preserved, so it lives in `cage.toml`.
+#
+# Filing the rate under `[credits.copilot]` would have put it in a section this loader
+# reads from the *prices* file only, so a rate written into `cage.toml` (where the
+# proposal put it, and where it belongs by the vendor-facts-move rule) would have been
+# read back as absent in every project that has a prices.toml — a silent half-merge, and
+# a silently-unpriced ledger. Vendor facts move, routing decisions stay.
 
 
 def _merge_section(pol: dict, data: dict, section: str) -> None:
@@ -266,6 +280,28 @@ def python_launcher(pol: dict) -> bool:
     is the *shim-runtime* no-rewire escape hatch, never a write-time mode switch —
     `cage setup`'s output must not depend on the caller's environment."""
     return bool(pol.get("wiring", {}).get("python_launcher", False))
+
+
+def credit_rate(pol: dict, agent: str) -> float | None:
+    """The configured `[billing.<agent>] usd_per_credit` — rung 1 of the credit pricing
+    ladder (`cage/creditprice.py`), or ``None`` when unset.
+
+    ``None`` is the shipped default and is **not** a zero: unset means the rung is
+    skipped entirely and recorded credits render as a *count*, never as a dollar. A rate
+    of exactly ``0.0`` is a different, legitimate statement (a plan whose credits cost
+    nothing marginally) and does price, at $0.0000 — the same absent-vs-recorded-zero
+    discipline the `credits` field itself carries.
+
+    Never env-overridable: a billing rate is durable configuration, and a report whose
+    dollars depend on the caller's environment would break the determinism law's
+    `(ledger, policy) ⇒ tables` reading for the one number people quote."""
+    v = pol.get("billing", {}).get(agent, {})
+    if not isinstance(v, dict):
+        return None
+    rate = v.get("usd_per_credit")
+    if isinstance(rate, bool) or not isinstance(rate, (int, float)):
+        return None
+    return float(rate)
 
 
 def capture_enabled(pol: dict) -> bool:

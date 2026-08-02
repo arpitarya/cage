@@ -256,6 +256,39 @@ def _pricing(root: Path) -> tuple[str, str]:
     return _OK, "all recorded models have an exact price row"
 
 
+def _credits(root: Path) -> tuple[str, str]:
+    """Billed-credit coverage: how many recorded rows carry the provider's own credit
+    figure, and whether a rate exists to price them (COPILOT-CREDITS rung 1).
+
+    **Advisory only — this check never fails, and never warns.** Credit coverage is a
+    property of the *store*, not of the user's setup: VS Code persists `copilotCredits`
+    on some requests and not others, and no action on this machine changes that. Calling
+    partial coverage a fault would be blaming someone for a vendor's logging, and would
+    train readers to ignore a red line they cannot clear. What it does buy is the answer
+    to "why is some copilot spend priced differently from the rest", visible before
+    anyone asks — plus the one actionable case (credits recorded, rate unset), stated as
+    an `ok` with a runnable fix rather than an alarm."""
+    from cage import creditprice
+    try:
+        pol = policy.load(paths.Footprint(root).policy)
+        calls = ledger.calls(root)
+    except Exception:  # noqa: BLE001 — a broken policy/ledger is reported by other checks
+        return _OK, "no ledger to check yet"
+    withc = [c for c in calls if creditprice.recorded(c) is not None]
+    if not withc:
+        return _OK, "no billed credits recorded — every row prices by token × table"
+    agents_ = sorted({c.get("agent") or "?" for c in withc})
+    surfaces = sorted({c.get("surface") or "?" for c in withc})
+    where = f"{'/'.join(agents_)} credits on {len(withc)}/{len(calls)} rows ({', '.join(surfaces)})"
+    unrated = [c for c in withc if creditprice.unrated(pol, c)]
+    if unrated:
+        return _OK, (f"{where}; no rate set — shown as counts, priced by token × table. "
+                     + creditprice.rate_hint(creditprice.agents_needing_rate(unrated)))
+    rates = sorted({policy.credit_rate(pol, a) for a in agents_} - {None})
+    shown = ", ".join(f"${r:g}/cr" for r in rates)
+    return _OK, f"{where}; rate set ({shown}) — those rows price by credits × rate"
+
+
 def _bundled_prices(root: Path) -> tuple[str, str]:
     """Compare the project policy's [meta] against the installed bundle's — a newer
     bundle means researched price rows this project isn't using yet. Recommendation
@@ -904,6 +937,9 @@ def run(root: Path) -> dict:
         ("footprint", *_footprint(active, source)),
         ("policy", *_policy(active)),
         ("pricing", *_pricing(active)),
+        # Directly below `pricing`: a credits-priced row is exactly the row `pricing`
+        # would otherwise have called UNPRICED, so the two lines answer one question.
+        ("credits", *_credits(active)),
         ("prices-meta", *_bundled_prices(active)),
         ("prices-age", *_prices_age(active)),
         ("policy-version", *_policy_version(active)),

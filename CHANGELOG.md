@@ -2,6 +2,47 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
+## v0.44.0 (2026-08-02) — Copilot's own billing number, and the pricing ladder
+
+Built from: [proposal](docs/archive/v0.44-copilot-credits.proposal.md) ·
+[handoff](docs/archive/v0.44-copilot-credits.handoff.md) +
+[prompt](docs/archive/v0.44-copilot-credits.prompt.md) ·
+[compare verdict C](docs/compare/copilot-pricing-basis.compare.md) ·
+[store evidence](docs/research/2026-08-02-copilot-credit-fields-real-stores.md).
+
+**`copilot/auto` prices exactly now — with GitHub's own number, not a guess.** Copilot
+persists the credits it billed for each request; cage was dropping them, which is why
+the router id that no price row can match was the largest UNPRICED hole in a real
+ledger. Cage now records that figure verbatim and resolves every copilot dollar by a
+three-rung ladder at the single pricing choke point.
+
+- **New additive call field `credits`** — the billed figure, recorded verbatim from VS
+  Code's chatSessions store (`copilotCredits`) and the CLI's `totalPremiumRequests`.
+  Old ledgers parse and re-render byte-identically. Never derived from tokens in either
+  direction; **absence and a recorded `0.0` are different facts** and stay that way.
+- **The ladder** (`cage query copilot-credits`, FORMULAS §1.1a): `credits × rate` →
+  `tokens × price table` → loudly UNPRICED. It lives in **one** place
+  (`creditprice.resolve`, reached from `prices.call_usd_match`), so report · budget ·
+  chats · compare · verdict · roi · study · forecast all inherit it with no per-view
+  fork. Rung 1 is **`modeled`, never `measured`** — the count is fact, the dollar is a
+  rate you configured.
+- **`[billing.copilot] usd_per_credit` in `cage.toml`**, unset by default. No rate ⇒
+  credits render as a **count**, never a dollar, and those rows price by token × table.
+  It is *not* filed under `[credits]` (the vendor rate card in `prices.toml`) on
+  purpose: your overage rate must survive `cage prices sync` — vendor facts move,
+  routing decisions stay.
+- **Nothing is blended silently.** A total spanning both bases prints the split; the ⚠
+  UNPRICED block gains a second runnable fix when the unpriced rows carry credits; CSV
+  names the winning basis per row in `priced_via`, and any view containing a
+  credits-priced row reports `modeled` rather than `measured`.
+- **`cage insights chats`** gains a `credits` column (`—` = not recorded; never in CSV)
+  and `priced_via`. **`cage doctor`** gains an advisory `credits` coverage line —
+  never a warning, because coverage is the vendor's logging, not your setup.
+- **Fixed, by widening:** copilot-CLI `totalPremiumRequests` is fractional (`0.33`) and
+  the int `premium` field floored every real value to 0 and dropped the key — 13 CLI
+  rows in a real ledger, not one carrying it. `credits` carries it as a float;
+  `premium` is untouched. [Finding](docs/research/2026-08-02-copilot-credit-fields-real-stores.md).
+
 ## v0.43.0 (2026-08-02) — agent-vs-human, rebuilt per commit
 
 Built from: [proposal](docs/archive/v0.43-agent-vs-human-v2.proposal.md) ·

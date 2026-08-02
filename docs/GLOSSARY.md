@@ -243,6 +243,25 @@ No name ⇒ the session id, never a fabricated title. Kiro-IDE's constant sessio
 already collapses every run into one chat; kiro-CLI conversations are `credits` rows
 (no `tokens_in`/`tokens_out`) and never appear here. [chats.py](../cage/chats.py).
 
+**credit (billed)** — the `credits` call field: what the *provider itself* billed for
+one call, recorded verbatim. Copilot persists it per request in VS Code's chatSessions
+store (`copilotCredits`) and per shutdown in the CLI (`totalPremiumRequests`); since
+2026-06-01 it *is* GitHub's own tokens×rates computation, made with what cage cannot see
+(what `copilot/auto` routed to, GitHub's current rates). Rung 1 of the pricing ladder.
+**Absence and zero are different facts** — no recorded credit falls through to the token
+rung, a recorded `0.0` is a real zero priced at `$0.0000` — and credits are never derived
+from tokens in either direction. [creditprice.py](../cage/creditprice.py), FORMULAS §1.1a.
+Not to be confused with **`[credits]`** (the vendor rate card's per-model `per_mtok`
+multipliers, in `prices.toml`) or with Kiro-CLI **credit rows** (a whole different row
+kind, `schema.make_credit`).
+
+**`[billing.<agent>] usd_per_credit`** — *your* plan's rate for one billed credit, and
+the switch that turns rung 1 on. Lives in `cage.toml`, not `prices.toml`, because it is
+a decision about your own plan that must survive a `cage prices sync` — vendor facts
+move, routing decisions stay. **Unset by default:** with no rate, credits render as a
+*count* and those rows price by token × table. Unset ≠ `0.0`, which is a real rate that
+prices at zero. [policy.credit_rate](../cage/policy.py).
+
 **agent line** — an added line in a commit that exactly matches (after whitespace
 normalization, above `MIN_MATCH_CHARS`) a line the agent's transcript records it having
 *proposed*. Direct evidence. Read from the provenance row's `agent_lines`, never

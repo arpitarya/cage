@@ -22,17 +22,8 @@ Naming: `<topic>.proposal.md`. Written in short points, not walls of prose.
 
 Active (awaiting Arpit's accept or a trigger):
 
-- [copilot-credits.proposal.md](copilot-credits.proposal.md) — **COPILOT-CREDITS**
-  design spec (compare verdict C accepted 2026-08-02): capture recorded credits,
-  copilot USD by ladder (credits×rate → token×table → UNPRICED), worked CLI outputs
-  inside. **Picked up 2026-08-02** — [handoff](../copilot-credits.handoff.md) +
-  [prompt](../copilot-credits.prompt.md) (Opus).
-  authorship (mostly built) · suggested-vs-accepted (counts) · time (attestation only).
-
 - [net-positive-evidence-run.md](net-positive-evidence-run.md) — NET-1 protocol:
   5 closed tasks per arm, outcomes pre-committed. Arpit's hands, no code.
-- [dogfood-report.md](dogfood-report.md) — "Measured on itself" README section from the
-  real ledger; refreshed per release via checklist line.
 - [tool-integration-contract.md](tool-integration-contract.md) — the paved road:
   interceptor template · `cage data meter <tool>` · per-tool detection registry.
   **fux is the second tool**; ships only when two tools use it.
@@ -42,6 +33,35 @@ Active (awaiting Arpit's accept or a trigger):
   fake bundle; trigger: a **third** table removal (guard shipped 2026-08-01).
 
 ## Graduated (implemented → archived)
+
+- **dogfood-report** → **IMPLEMENTED** for v0.44 (unreleased) 2026-08-02 (1391/0 ⇒
+  1401/0). `docs/dogfood/` home (dated snapshots + `latest.md` + append-only
+  `README.md`, mirroring `regression/`), the version/date-free README pointer, and the
+  60-day freshness guard (`tests/test_dogfood_freshness.py`, frontmatter only, no
+  ledger). **One deviation from the proposal's own Steps §1:** `cage insights attrib`
+  is not published — every task-tagged row in the real global ledger turned out to be
+  the `cage demo` seed itself, so it was omitted with a note rather than shown as real
+  data (surfaced mid-session, decided by Arpit). Living spec:
+  `docs/dogfood/README.md` · `tests/test_dogfood_freshness.py`.
+  [archived proposal](../archive/v0.44-dogfood-report.proposal.md) ·
+  [handoff](../archive/v0.44-dogfood-report.handoff.md) ·
+  [prompt](../archive/v0.44-dogfood-report.prompt.md).
+
+- **copilot-credits** → **IMPLEMENTED** for v0.44 (unreleased) 2026-08-02 (1354/0 ⇒
+  1391/0). Billed `credits` captured verbatim on both copilot surfaces; every copilot
+  dollar resolves by ladder at the one pricing choke point, so `copilot/auto` prices
+  exactly with no price-table row. **Three corrections the build made:** the policy key
+  is `[billing.copilot]`, not `[credits.copilot]` (the latter is a *price* section, read
+  from `prices.toml` alone — a rate filed there would have merged as absent); `credits`
+  defaults to a `None` sentinel, not `0.0`, or a recorded zero would collapse into
+  absence; and copilot-CLI stamps `credits` directly rather than the read side reusing
+  `premium`, which is an int that floored every real fractional value to zero. Living
+  spec: [FORMULAS.md §1.1a](../FORMULAS.md) · [PLAN.md §3.1](../PLAN.md) ·
+  `cage query copilot-credits`. Evidence:
+  [real-store probe](../research/2026-08-02-copilot-credit-fields-real-stores.md).
+  [archived proposal](../archive/v0.44-copilot-credits.proposal.md) ·
+  [handoff](../archive/v0.44-copilot-credits.handoff.md) ·
+  [prompt](../archive/v0.44-copilot-credits.prompt.md).
 
 - **agent-vs-human-v2** → **IMPLEMENTED** 2026-08-02, all four phases (1148/0 ⇒
   1354/0). `cage insights commits` / `commit <sha>` / `authorship summary` /
