@@ -181,8 +181,8 @@ def capture(root: Path, files, *, repo: Path | None = None, pol: dict | None = N
         summary["sessions"] = len({s for _sha, s in buckets})
 
         for sha in sorted(by_sha):
-            added, binary = linematch.commit_added_lines(repo, sha)
-            numstat = linematch.commit_numstat(repo, sha)
+            diff = linematch.commit_diff(repo, sha)   # ONE git call per commit
+            added, binary, numstat = diff["added"], diff["binary"], diff["numstat"]
             for session in sorted(by_sha[sha]):
                 proposed = buckets[(sha, session)]
                 matches, totals = linematch.match_commit(proposed, added, binary)

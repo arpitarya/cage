@@ -239,6 +239,12 @@ MIN_MATCH_CHARS = 4
 AUTHORSHIP_ESTIMATE_HOURS = True
 AUTHORSHIP_MAX_EST_GAP = "4h"
 
+# `cage insights commits` default row cap — the `CHATS_DEFAULT_ROWS` precedent (a
+# flag, `--all`, not a policy knob; the cut is always footnoted, never silent). It
+# also bounds cost: each rendered commit costs one `git show`, so an unbounded
+# default on a large repo would be slow for a screen nobody reads past.
+COMMITS_DEFAULT_ROWS = 20
+
 # `cage insights chats` default row cap (chats-view proposal, no-silent-caps rule). A
 # flag (`--all`), not a policy knob — unlike the DEFAULT_CONFIDENCE-style fallbacks
 # above, there is no per-project reason to want a different default page size, only a

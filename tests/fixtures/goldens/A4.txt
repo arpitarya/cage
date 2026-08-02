@@ -1,0 +1,21 @@
+$ cage authorship summary
+Authorship · 3 commit(s)
+
+  UNKNOWN     2 of 3 commit(s) (67%) have no authorship row at all
+              — unknown by ABSENCE, never a stored row
+  recorded    1 commit(s) · 1 row(s)
+
+agent        rows
+-----------  ----
+claude-code     1
+
+method      rows
+----------  ----
+transcript     1
+
+  suggested 4 · kept 3 verbatim · 1 landed-modified · 0 dropped
+  counts, not a score — no acceptance percentage is derived from them
+
+· `unknown` is the honest headline: a commit cage never saw looks exactly like
+  one made before cage existed. Absence of evidence.
+· not line-matchable: copilot: its stores record usage and prompts, not the text of an edit · kiro: its usage log records token counts only, with no tool-input payload

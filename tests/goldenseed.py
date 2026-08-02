@@ -363,3 +363,87 @@ def fleet(root: Path, complete: int = 5) -> None:
                   model="claude-sonnet-4-6", agent="claude",
                   tin=120_000 + n * 6_000, tout=14_000, ts=_ts(6 + d, 12),
                   machine=mid)
+
+
+# ── agent-vs-human v2: the commit surfaces (HR1 P3) ──────────────────────────
+#
+# These seeds build a REAL git repo, because the views read one. Every input that
+# feeds a commit sha is pinned — content, author, committer, both timestamps, and
+# `core.autocrlf=false` (a Windows checkout would otherwise rewrite the blobs and
+# change the shas) — so the goldens stay byte-stable on every OS.
+
+_GIT_ENV = {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.invalid",
+            "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@example.invalid"}
+
+
+def _git(repo: Path, *args: str, when: str = "") -> str:
+    import os
+    import subprocess
+    env = {**os.environ, **_GIT_ENV}
+    if when:
+        env["GIT_AUTHOR_DATE"] = env["GIT_COMMITTER_DATE"] = when
+    return subprocess.run(("git", "-C", str(repo), *args), capture_output=True,
+                          text=True, check=True, env=env).stdout.strip()
+
+
+def git_repo(root: Path) -> None:
+    """An empty, deterministic repo at ``root`` (the golden runner's project dir)."""
+    _git(root, "init", "-q", "-b", "main")
+    _git(root, "config", "user.name", "t")
+    _git(root, "config", "user.email", "t@example.invalid")
+    _git(root, "config", "commit.gpgsign", "false")
+    _git(root, "config", "core.autocrlf", "false")
+
+
+def _commit(root: Path, files: dict, when: str) -> str:
+    for rel, body in files.items():
+        p = root / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(body, encoding="utf-8", newline="\n")
+    _git(root, "add", "-A")
+    _git(root, "commit", "-q", "-m", "c", when=when)
+    return _git(root, "rev-parse", "--short", "HEAD")
+
+
+_AGENT_SRC = ("def resolve(name):\n"
+              "    table = {'alpha': 1, 'beta': 2}\n"
+              "    return table.get(name)\n")
+_HUMAN_SRC = ("def tweaked_by_a_person(name):\n"
+              "    return resolve(name) or 0\n")
+_GENERATED = '{"nodes": ["a generated blob no agent proposed"], "edges": []}\n'
+
+
+def commits_mixed(root: Path) -> None:
+    """Three commits exercising every state the list view has to render:
+
+    c1  seed             — no calls, no authorship          → unattributed, `—` tokens
+    c2  agent + human + a generated file                    → all four buckets
+    c3  a later commit, no ledger signal                    → unattributed
+    """
+    git_repo(root)
+    _commit(root, {"seed.txt": "the very first line of this repo\n"},
+            "2026-07-01T09:00:00+00:00")
+    c2 = _commit(root, {"mod.py": _AGENT_SRC + _HUMAN_SRC, "generated.json": _GENERATED},
+                 "2026-07-01T10:00:00+00:00")
+    _commit(root, {"after.txt": "a later change nobody metered\n"},
+            "2026-07-01T11:30:00+00:00")
+    # `project` is what confirms a call belongs to THIS repo (an unstamped call is
+    # *unconfirmable*, not adopted — `commitjoin`), so these are written directly
+    # rather than through `_call`, which predates that axis.
+    for i, ts in enumerate(("2026-07-01T09:20:00Z", "2026-07-01T09:50:00Z")):
+        ledger.append(paths.Footprint(root).calls, schema.make_call(
+            route="chat", provider="anthropic", model="claude-sonnet-4-6",
+            tokens_in=12000, tokens_out=900, cached_in=4000, cache_write_in=500,
+            agent="claude-code", session="s_hr1", project=root.name, ts=ts,
+            call_id=f"c_hr{i}"))
+    from cage import originrecord
+    originrecord.record_transcript(root, sha=c2, files=["mod.py"], agent="claude-code",
+                                   lines_added=5, lines_removed=0, session_id="s_hr1",
+                                   suggested=4, kept=3, kept_modified=1, agent_lines=3)
+
+
+def commits_bare(root: Path) -> None:
+    """A repo with commits and an entirely empty ledger — every row refuses."""
+    git_repo(root)
+    _commit(root, {"only.txt": "one commit, nothing metered at all\n"},
+            "2026-07-01T09:00:00+00:00")

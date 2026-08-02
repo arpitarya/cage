@@ -435,3 +435,51 @@ def _now() -> str:
     import datetime as _dt
     return (_dt.datetime.now(_dt.timezone.utc)
             .isoformat(timespec="seconds").replace("+00:00", "Z"))
+
+
+# ── §HR1 · the commit surfaces (agent-vs-human v2) ───────────────────────────
+
+def test_A1_commits_mixed(run, monkeypatch):
+    """Every state the list view owes a reader, in one table: an attributed commit
+    with all four buckets, two unattributed ones refusing with `—`, and the Σ row."""
+    monkeypatch.setenv("CAGE_AUTHORSHIP", "1")
+    go = run(seed.commits_mixed)
+    out = go("A1", ["insights", "commits"])
+    assert "$" not in out                            # the standing v1 guard
+    assert out.count("—") >= 8                       # refusals render, never 0
+    assert "Never redistributed, never a score" in out
+    assert "50% /  33% /  17% /   0%" in out   # all four buckets exercised
+
+
+def test_A2_commits_all_refused(run, monkeypatch):
+    """An empty ledger: every cell refuses and the Σ row refuses with them."""
+    monkeypatch.setenv("CAGE_AUTHORSHIP", "1")
+    go = run(seed.commits_bare)
+    out = go("A2", ["insights", "commits"])
+    assert "no authorship rows recorded yet" in out
+    import re as _re
+    sigma = _re.split(r"\s{2,}", out.split("Σ")[1].split("\n")[0].strip())
+    assert sigma[1:6] == ["—"] * 5, sigma   # the total refuses with its rows
+
+
+def test_A3_commit_detail(run, monkeypatch):
+    """The detail view: tokens, origin+confidence, four buckets, suggested-vs-kept,
+    the per-file table, and the time line."""
+    monkeypatch.setenv("CAGE_AUTHORSHIP", "1")
+    go = run(seed.commits_mixed)
+    import subprocess
+    sha = subprocess.run(("git", "-C", str(go.root), "log", "--format=%h",
+                          "--skip=1", "-n", "1"), capture_output=True,
+                         text=True, check=True).stdout.strip()
+    out = go("A3", ["insights", "commit", sha])
+    assert "counts, not a score" in out and "$" not in out
+    assert "human only by attestation" in out
+
+
+def test_A4_authorship_summary(run, monkeypatch):
+    """Unknown-rate first — the coverage gap is the headline, not a footnote."""
+    monkeypatch.setenv("CAGE_AUTHORSHIP", "1")
+    go = run(seed.commits_mixed)
+    out = go("A4", ["authorship", "summary"])
+    assert out.index("UNKNOWN") < out.index("recorded")
+    assert "unknown by ABSENCE" in out

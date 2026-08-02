@@ -12,6 +12,25 @@ by milestone) — the worklog is what *happened this session*.
 
 ---
 
+## 2026-08-02 (Claude Code) — HR1 P2 + P3 built (Opus)
+
+- **Asked:** continue through the phases.
+- **Done (P2):** `commitjoin.join_calls` — task-id join (reusing `taskgroup.join_rows`)
+  then the commit window, with per-agent joinability as a **stated table** and every
+  exclusion counted by reason. **Done (P3):** the three views + goldens A1–A4.
+- **Decided:** `unattributed` becomes a first-class fourth bucket (from the P1 gate);
+  an **unstamped** `project` is *unconfirmable*, not adopted; `BEFORE_HISTORY` deleted
+  as unreachable rather than shipped as dead vocabulary.
+- **Caught while smoking the real repo:** the Σ row printed `0` where its rows printed
+  `—`, and the hours estimator printed the raw commit gap when no agent span existed.
+  Both now refuse. The second one was v1's exact failure mode reappearing.
+- **Open:** none blocking.
+- **Next step:** P4 — `cage task time <duration>`.
+
+---
+
+---
+
 ## 2026-08-02 (Claude Code) — HR1 P1 built + dogfood gate passed (Opus)
 
 - **Asked:** implement all four phases of agent-vs-human v2, one after the other.

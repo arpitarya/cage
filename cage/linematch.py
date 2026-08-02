@@ -224,8 +224,16 @@ def _git(root: Path, *args: str) -> str | None:
         return None
 
 
-def commit_added_lines(root: Path, sha: str) -> tuple[dict, set]:
-    """``({repo-relative path: [added lines]}, {binary paths})`` for one commit.
+def commit_diff(root: Path, sha: str) -> dict:
+    """Everything one commit's diff can tell cage, from **one** git invocation::
+
+        {"added":   {repo-relative path: [added lines]},   # transient, never persisted
+         "numstat": {path: (added, removed)},              # the measured line counts
+         "binary":  {path, …}}                             # numstat reported `-`
+
+    One call, because the views read a diff per commit and two subprocesses per commit
+    is twice the cost for the same bytes — `git show --numstat --unified=0` prints the
+    numstat block and then the patch.
 
     Read with ``--unified=0`` (context lines carry no authorship signal and would
     inflate every side) and ``--no-color``/``--no-ext-diff``/``--no-textconv`` so a
@@ -234,57 +242,52 @@ def commit_added_lines(root: Path, sha: str) -> tuple[dict, set]:
     ``--first-parent`` is deliberately absent: `git show` on a merge already prints no
     diff, which is the honest answer (a merge commit adds no lines of its own).
 
-    The returned strings are transient by contract — the caller matches on them and
-    drops them. Fail-open ⇒ ``({}, set())``."""
-    out = _git(root, "show", "--format=", "--unified=0", "--no-color", "--no-ext-diff",
-               "--no-textconv", sha)
+    The ``added`` strings are transient by contract — the caller matches on them and
+    drops them. Fail-open ⇒ empty everything."""
+    out = _git(root, "show", "--format=", "--numstat", "--unified=0", "--no-color",
+               "--no-ext-diff", "--no-textconv", sha)
     added: dict[str, list[str]] = {}
-    if out:
-        current = None
-        for line in out.splitlines():
-            if line.startswith("+++ "):
-                m = _DIFF_FILE.match(line)
-                current = m.group(1) if m else None
-                if current == "/dev/null":
-                    current = None
-                elif current is not None:
-                    added.setdefault(current, [])
-                continue
-            if line.startswith("--- ") or line.startswith("@@"):
-                continue
-            if current is not None and line.startswith("+"):
-                added[current].append(line[1:])
-    return added, commit_binary_files(root, sha)
-
-
-def commit_binary_files(root: Path, sha: str) -> set:
-    """Paths git's numstat reports as binary (``-`` for both counts) — no readable
-    lines, so their whole contribution is `unknown` rather than silently zero."""
-    out = _git(root, "show", "--numstat", "--format=", sha)
+    numstat: dict[str, tuple[int, int]] = {}
+    binary: set = set()
     if not out:
-        return set()
-    binary = set()
+        return {"added": added, "numstat": numstat, "binary": binary}
+    current = None
+    in_patch = False
     for line in out.splitlines():
-        m = _NUMSTAT.match(line)
-        if m and m.group(1) == "-" and m.group(2) == "-":
-            binary.add(m.group(3))
-    return binary
+        if not in_patch:
+            m = _NUMSTAT.match(line)
+            if m:
+                a, r, f = m.groups()
+                if a == "-" or r == "-":
+                    binary.add(f)
+                else:
+                    numstat[f] = (int(a), int(r))
+                continue
+            if line.startswith("diff --git"):
+                in_patch = True   # the numstat block is over; everything after is patch
+        if line.startswith("+++ "):
+            m = _DIFF_FILE.match(line)
+            current = m.group(1) if m else None
+            if current == "/dev/null":
+                current = None
+            elif current is not None:
+                added.setdefault(current, [])
+            continue
+        if line.startswith("--- ") or line.startswith("@@"):
+            continue
+        if current is not None and line.startswith("+"):
+            added[current].append(line[1:])
+    return {"added": added, "numstat": numstat, "binary": binary}
+
+
+def commit_added_lines(root: Path, sha: str) -> tuple[dict, set]:
+    """``({path: [added lines]}, {binary paths})`` — the matcher's view of `commit_diff`."""
+    d = commit_diff(root, sha)
+    return d["added"], d["binary"]
 
 
 def commit_numstat(root: Path, sha: str) -> dict:
-    """``{path: (added, removed)}`` for one commit, binary files excluded (numstat
-    reports ``-`` for them). The *measured* line counts the provenance row stores —
-    read from git, never inferred from the diff parse."""
-    out = _git(root, "show", "--numstat", "--format=", sha)
-    if not out:
-        return {}
-    rows: dict[str, tuple[int, int]] = {}
-    for line in out.splitlines():
-        m = _NUMSTAT.match(line)
-        if not m:
-            continue
-        a, r, f = m.groups()
-        if a == "-" or r == "-":
-            continue
-        rows[f] = (int(a), int(r))
-    return rows
+    """``{path: (added, removed)}``, binary files excluded (numstat reports ``-``).
+    The *measured* line counts a provenance row stores — read from git, never inferred
+    from the patch parse."""
+    return commit_diff(root, sha)["numstat"]

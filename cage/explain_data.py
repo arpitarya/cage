@@ -1118,6 +1118,54 @@ REGISTRY: tuple[Explanation, ...] = (
         "  those are counts and a sort, not a claim about how a number was priced.",
         kind="concept", plan_ref="archive/v0.42-chats-view.proposal.md"),
     Explanation(
+        "agent-authorship", ("authorship", "agent-vs-human", "human", "who wrote",
+                             "commits", "commit", "line-match", "suggested", "kept",
+                             "residual", "unattributed", "provenance", "hours",
+                             "attested", "split"),
+        "`cage insights commits` / `commit <sha>`: who wrote a commit, and how cage knows",
+        "NEVER OBSERVE THE HUMAN — observe the agent precisely; the human is what is\n"
+        "  left. A Claude transcript records the exact text an Edit/Write/MultiEdit/\n"
+        "  NotebookEdit block PROPOSED. At import that text is compared, TRANSIENTLY IN\n"
+        "  MEMORY, against the added lines of the commit whose window contains the edit.\n"
+        "  Only counts are written: no line body, and no line HASH (a hash is a\n"
+        "  membership oracle over your source).\n"
+        "  WINDOWS, NEVER HEAD: commit i owns (ts_{{i-1}}, ts_i], upper bound inclusive.\n"
+        "  Work after the newest commit is left UNRECORDED this sweep and picked up\n"
+        "  exactly once by the next import — guessing a commit that does not exist yet\n"
+        "  would be wrong forever.\n"
+        "  FOUR LINE BUCKETS, none of them redistributed:\n"
+        "    agent   matched an agent's recorded proposal            (direct evidence)\n"
+        "    human~  added in a file that session DID propose,\n"
+        "            matching nothing — a real human tweak            (ESTIMATED residual)\n"
+        "    unattr  added in a file NO session proposed: a person, a vendored tree, or\n"
+        "            generated output — cage has no evidence either way and says so\n"
+        "    unkn    below the {min_match_chars}-char content gate, or a binary file    (structural)\n"
+        "  The 4th bucket exists because a single `human` bucket printed 76.6% on cage's\n"
+        "  own repo, 89% of it ONE commit of generated JSON. A residual presented as a\n"
+        "  finding is the v1 mistake (docs/regression/2026-08-02-p1-authorship-dogfood.md).\n"
+        "  SUGGESTED vs KEPT: suggested = kept + kept_modified + dropped, exactly. Counts,\n"
+        "  never an acceptance percentage — the enum is the resolution the source supports.\n"
+        "  HOURS, three visibly distinct tiers: * attested (`cage task time`) ALWAYS wins ·\n"
+        "  ~ estimated = wall-clock − agent turn-span, floored at 0, refused past\n"
+        "  [authorship] max_est_gap ({max_est_gap}) and refused outright when no agent span\n"
+        "  joined (that would just be the commit gap) · — otherwise, reason named.\n"
+        "  NO USD, NO RATE, NO VALUATION anywhere on these surfaces — the v1 veto, kept.\n"
+        "  COVERAGE IS PER-AGENT AND STATED: claude only. Copilot's stores record usage\n"
+        "  and prompts but not the text of an edit; kiro's log records token counts with\n"
+        "  no tool-input payload. They render `—` with the reason, never 0%.\n"
+        "  CONSENT: [authorship] capture / CAGE_AUTHORSHIP is its own switch — this is the\n"
+        "  one path that reads your diffs, and that is a different permission from\n"
+        "  metering spend.",
+        ("cage/linematch.py", "cage/authorcapture.py", "cage/commitjoin.py",
+         "cage/commitview.py", "cage.toml [authorship]"),
+        "agent lines are read from the recorded provenance row (never re-matched at\n"
+        "  render time — a second matcher could disagree with the one that wrote it);\n"
+        "  human~ is ESTIMATED by construction — 'not the agent' is the observation, so\n"
+        "  the label says so, and an unmarked `human` is reachable ONLY by attestation.\n"
+        "  Tokens are measured; placing a call on a commit is modeled (task-id join\n"
+        "  first, commit-window fallback). unknown is shown, never redistributed.",
+        kind="concept", plan_ref="adr/0008-line-match-authorship-counts-persisted-content-transient.md"),
+    Explanation(
         "agent-layers", ("layers", "ladder", "l0", "l1", "l2", "l3", "opt-in",
                          "hooks-optional", "attestation", "attest", "steering",
                          "hookless", "floor", "auto-close"),

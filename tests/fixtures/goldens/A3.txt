@@ -1,0 +1,33 @@
+$ cage insights commit 9e41bcc
+commit 9e41bcc · 2026-07-01 10:00 · main · claude-code · 1 session(s) recorded · calls joined via window
+
+  tokens     in 24,000 · out 1,800 · cache read 8,000 · cache write 1,000   (2 call(s))
+  origin     agent · confidence 0.67 (transcript) — human only by attestation, unknown by absence
+  lines      +6 / −0 total
+             agent             3    line-match vs the session's recorded edit blocks
+             human~            2    residual in files the session proposed (estimated)
+             unattr            1    in files no session proposed — cage does not guess
+             unkn              0    below the content gate / binary
+  suggested  4 line(s) across 1 session(s)
+  kept       3 verbatim · 1 landed-modified · 0 dropped
+  time       wall 1h00m · agent 30m~ · human 0.5~
+
+file            +  −  agent  human~  unattr  unkn
+--------------  -  -  -----  ------  ------  ----
+mod.py          5  0      3       2       0     0
+generated.json  1  0      0       0       1     0
+  ───────────────────────────────────────────────────
+  Σ suggested 4 · kept 3 — counts, not a score
+
+· split = share of CLASSIFIED added lines. agent = matched an agent's recorded
+  proposal (direct); human~ = added in a file that session proposed but matching
+  nothing (ESTIMATED residual); unattr = added in a file no session proposed —
+  a person, a vendored tree or generated output, cage does not guess which;
+  unkn = below the content gate or binary. Never redistributed, never a score.
+· human hrs marked ~ are ESTIMATED: commit wall-clock minus the agent's turn-span,
+  floored at 0 and refused past [authorship] max_est_gap = 4h. An inference, not a
+  measurement. * = attested via `cage task time` — always wins over the estimate.
+· tokens are MEASURED; placing a call on a commit is MODELED (task-id join first,
+  commit-window fallback). No USD on this surface, by design.
+· not window-joinable: copilot/cli: one shutdown timestamp per session — every call in a session shares it, so a window join would dump the whole session on one commit · kiro: its rows carry the IMPORT time, not the call time — the log has no per-call timestamp to place
+· not line-matchable: copilot: its stores record usage and prompts, not the text of an edit · kiro: its usage log records token counts only, with no tool-input payload — their commits show as unattr, never 0%

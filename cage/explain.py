@@ -36,6 +36,12 @@ def _live(pol: dict) -> dict:
         "per_million": f"{constants.TOKENS_PER_MILLION:,}",
         "max_tools": constants.MAX_MATRIX_TOOLS,
         "chats_default_rows": constants.CHATS_DEFAULT_ROWS,
+        "commits_default_rows": constants.COMMITS_DEFAULT_ROWS,
+        "min_match_chars": constants.MIN_MATCH_CHARS,
+        # Live from the resolved policy, so a project that turned the estimator off or
+        # widened the cap sees ITS values in the explanation, not the shipped default.
+        "max_est_gap": policy.authorship_max_est_gap(pol),
+        "estimate_hours": str(policy.authorship_estimate_hours(pol)).lower(),
         "min_compare_n": constants.MIN_COMPARE_N,
         "min_estimate_n": constants.MIN_ESTIMATE_N,
         "net_window_s": constants.NET_ATTRIB_WINDOW_S,

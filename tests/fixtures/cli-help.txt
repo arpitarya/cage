@@ -8,11 +8,11 @@ daily:
   query       ask cage how any number or mechanism works
 
 groups (run any group name for its commands):
-  insights    attrib · matrix · roi · adoption · chats · verdict · budget ·
-              compare · estimate · calibration · why · forecast · regression ·
-              recommend
+  insights    attrib · matrix · roi · adoption · chats · commits · commit ·
+              verdict · budget · compare · estimate · calibration · why ·
+              forecast · regression · recommend
   task        outcome · quality
-  authorship  origin · verify · notes-sync · ledger-sync
+  authorship  origin · summary · verify · notes-sync · ledger-sync
   prices      list · unpriced · set · alias · route-tool · sync
   study       join · start · stop · report · id
   policy      diff · sync

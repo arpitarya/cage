@@ -31,11 +31,11 @@ daily:
   query       ask cage how any number or mechanism works
 
 groups (run any group name for its commands):
-  insights    attrib · matrix · roi · adoption · chats · verdict · budget ·
-              compare · estimate · calibration · why · forecast · regression ·
-              recommend
+  insights    attrib · matrix · roi · adoption · chats · commits · commit ·
+              verdict · budget · compare · estimate · calibration · why ·
+              forecast · regression · recommend
   task        outcome · quality
-  authorship  origin · verify · notes-sync · ledger-sync
+  authorship  origin · summary · verify · notes-sync · ledger-sync
   prices      list · unpriced · set · alias · route-tool · sync
   study       join · start · stop · report · id
   policy      diff · sync
@@ -235,8 +235,9 @@ def build_parser() -> argparse.ArgumentParser:
     # ── group: insights (attribution + money views, the differentiator) ────────
     insights = _group(sub, "insights",
                        "per-tool savings & money views: attrib · matrix · roi · "
-                       "adoption · chats · verdict · budget · compare · estimate · "
-                       "calibration · why · forecast · regression · recommend")
+                       "adoption · chats · commits · commit · verdict · budget · "
+                       "compare · estimate · calibration · why · forecast · "
+                       "regression · recommend")
 
     at = insights.add_parser("attrib", help="per-tool marginal savings for a task (§4.2)")
     at.add_argument("--task", help="task id (default: most recent)")
@@ -292,6 +293,29 @@ def build_parser() -> argparse.ArgumentParser:
     _csv_flag(ch)
     _capture_flags(ch)
     ch.set_defaults(fn=clicmds.cmd_chats)
+
+    cm = insights.add_parser("commits",
+                             help="one row per commit: tokens, human hours, and the "
+                                  "agent / human~ / unattr / unkn line split "
+                                  "(no USD on this surface, by design)")
+    cm.add_argument("--since", metavar="WINDOW", help="window like 7d / 24h / 2w")
+    cm.add_argument("--all", action="store_true",
+                    help="show every commit (default: the 20 newest)")
+    _json_flag(cm)
+    _csv_flag(cm)
+    _capture_flags(cm)
+    cm.set_defaults(fn=clicmds.cmd_commits)
+
+    cd = insights.add_parser("commit",
+                             help="one commit in detail: tokens · origin · line "
+                                  "buckets · suggested-vs-kept · per-file · time")
+    cd.add_argument("sha", help="commit sha (short or full)")
+    cd.add_argument("--files", action="store_true",
+                    help="show every file (default: the 8 largest)")
+    _json_flag(cd)
+    _csv_flag(cd)
+    _capture_flags(cd)
+    cd.set_defaults(fn=clicmds.cmd_commit)
 
     vd = insights.add_parser("verdict",
                              help="one-line answer: is this tool saving or costing? "
@@ -388,8 +412,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     # ── group: authorship (who wrote which files + its git-notes distribution) ──
     authorship = _group(sub, "authorship",
-                        "who wrote which files + its distribution: origin · verify · "
-                        "notes-sync · ledger-sync (§3.5, §3.6.3)")
+                        "who wrote which files + its distribution: origin · summary · "
+                        "verify · notes-sync · ledger-sync (§3.5, §3.6.3)")
 
     og = authorship.add_parser("origin", help="authorship attribution for a commit (§3.5)",
                                epilog="examples:\n"
@@ -402,6 +426,15 @@ def build_parser() -> argparse.ArgumentParser:
     og.add_argument("--agent", default="", help="agent name to attach to --attest")
     _json_flag(og)
     og.set_defaults(fn=clicmds.cmd_origin)
+
+    au = authorship.add_parser("summary",
+                               help="how much of this repo's history cage can speak "
+                                    "to at all — unknown-rate first, then the rows")
+    au.add_argument("--since", metavar="WINDOW", help="window like 7d / 24h / 2w")
+    _json_flag(au)
+    _csv_flag(au)
+    _capture_flags(au)
+    au.set_defaults(fn=clicmds.cmd_authorship_summary)
 
     authorship.add_parser("verify", help="report-only consistency check over the provenance ledger (never fails the build)").set_defaults(fn=clicmds.cmd_verify)
 

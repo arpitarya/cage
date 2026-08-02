@@ -466,6 +466,89 @@ spec'd elsewhere.
   never move a number, only how many rows are shown. CSV is never truncated. Explained
   by `cage query chats-view`.
 
+### 2.14 Per-commit authorship — the four buckets, and **no money at all**
+
+`cage insights commits` / `commit <sha>` / `cage authorship summary`
+([commitview.py](../cage/commitview.py), [linematch.py](../cage/linematch.py),
+[ADR 0008](adr/0008-line-match-authorship-counts-persisted-content-transient.md)).
+**No USD, no rate, no valuation appears on any of these surfaces** — the standing guard
+from the v0.36 removal, and it is structural: `commitview.py` imports no pricing module
+(asserted in `tests/test_commitview.py`).
+
+**Line matching (capture, P1).** For each edit an agent proposed, in the commit whose
+window contains that edit's own turn timestamp:
+
+```
+normalize(line)  = collapse internal whitespace runs, strip ends   (ONE function, BOTH sides)
+matchable(line)  = len(normalize(line)) >= MIN_MATCH_CHARS          (= 4)
+kept             = |proposed ∩ added|   as MULTISETS — a proposed line is spent once
+suggested        = kept + kept_modified + dropped                   (exactly; asserted)
+```
+
+| persisted count | definition |
+|---|---|
+| `suggested` | proposed lines clearing the gate |
+| `kept` | of those, landed **verbatim** in the commit's added lines |
+| `kept_modified` | proposed lines whose **file** landed but whose line did not match |
+| `dropped` | proposed lines whose file is absent from the commit |
+| `agent_lines` | the added-line side of the same match (= `kept`; separate name, §3.5) |
+
+Line **bodies** and line **hashes** are never persisted — a hash is a membership oracle
+over the source. Only these five integers, additive-optional, omitted at 0.
+
+**The four buckets (derive, P3).** Over one commit's added lines:
+
+```
+unknown       = lines failing matchable()                    (+ binary files, counted as FILES)
+agent         = Σ agent_lines from that commit's provenance rows, clamped to
+                (matchable − unattributed)                    ← READ, never re-matched
+unattributed  = matchable lines in files NO session proposed
+human~        = matchable − unattributed − agent
+```
+
+- **Nothing is redistributed.** `unknown` is shown, never folded into agent or human to
+  make a split reach 100.
+- **`unattributed` is not `human`.** A file nobody proposed may be human-written,
+  vendored, or generated — cage has no evidence which. Measured: a single `human`
+  bucket printed **76.6%** on cage's own repo, 89% of it one commit of generated JSON
+  ([dogfood](regression/2026-08-02-p1-authorship-dogfood.md) §4).
+- **`agent` is read from the row, never re-derived.** Re-matching at render time would
+  be a second matcher, free to disagree with the one that wrote the row.
+- The split renders as a share of *classified* added lines, so the four sum to 100%.
+
+**Call → commit join (P2, `modeled`).** Task-id first (`taskgroup.join_rows`, reused —
+never a second join), then the commit window. A task closed on a **dirty tree** is not
+trusted: its snapshot sha is the *prior* commit, so it falls back to the window. A call
+must be confirmable as this project — a **different** `project` stamp is excluded, and
+an **empty** one is excluded as *unconfirmable* (adopting it would pull other repos'
+spend onto these commits). Exclusions are counted by reason, never merged.
+
+**Hours — three visibly distinct tiers, and it refuses four ways.**
+
+```
+*  attested  = human_minutes / 60          (cage task time)  — ALWAYS wins
+~  estimated = max(0, wall − agent_span) / 3600
+—  refused   when: estimate_hours = false · no previous commit (no wall)
+                 · NO agent span joined (the value would be the raw commit gap)
+                 · wall > [authorship] max_est_gap (default 4h)
+wall       = commit_ts − previous commit_ts                      measured
+agent_span = Σ latency_ms where > 0                              measured (lib-metered only)
+             else last_turn_ts − first_turn_ts, rendered `~`     modeled (includes think-time)
+```
+
+| number | method |
+|---|---|
+| tokens per commit | **measured** counts, **modeled** join |
+| `agent` lines | **transcript** (the provenance row's own method), direct evidence |
+| `human~` lines | **estimated** — "not the agent" is the observation, so the label says so |
+| `unattributed` / `unknown` | not an estimate at all: counted refusals |
+| attested hours | the user's assertion — never inferred, never outranked |
+| estimated hours | **estimated**, method named in the view's own footnote |
+
+Knobs: `MIN_MATCH_CHARS` (constants — **not** policy: it changes what the buckets
+*mean*) · `[authorship] capture` / `estimate_hours` / `max_est_gap` (+ `CAGE_AUTHORSHIP`,
+`CAGE_AUTHORSHIP_ESTIMATE`). Explained by `cage query agent-authorship`.
+
 ## 3. The human axis — **removed in v0.36**
 
 Every formula that lived here (human cost `usd = minutes / 60 × rate`, derived
@@ -481,6 +564,14 @@ The one rule that outlives them, because pre-0.36 ledgers still hold the rows:
   at. The exclusion is **counted and footnoted** on `cage report`
   (`· N legacy human-axis receipt(s) excluded …`), never applied silently.
   Explained by `cage query savings-axis`; pinned by `tests/test_legacy_ledger.py`.
+
+**A v2 exists, and it is a different question.** §2.14 rebuilds agent-vs-human
+**per commit** — the unit v1 lacked. Nothing here came back: no rate, no USD, no
+`gap_ms`, no `minutes` unit, no derived attention. What v2 adds is line-level evidence
+(the agent's proposals matched against the commit's added lines) and a human that is an
+explicitly-labelled *residual*, split into `human~` and `unattributed` so a generated
+file is never reported as a person's work. Hours exist only as an attestation or a
+guarded, `~`-marked estimate whose method is printed beside it.
 
 ## 4. Prediction & calibration
 

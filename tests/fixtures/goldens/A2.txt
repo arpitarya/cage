@@ -1,0 +1,25 @@
+$ cage insights commits
+Commits · main · 1 commit
+
+commit   date · time    tok in  tok out  cache r  cache w  human hrs    agent / human~ / unattr / unkn
+-------  -------------  ------  -------  -------  -------  ---------  --------------------------------
+2c2f423  07-01 · 09:00       —        —        —        —          —           0% /   0% / 100% /   0%
+───────
+Σ 1      —                   —        —        —        —          —           0% /   0% / 100% /   0%
+
+· split = share of CLASSIFIED added lines. agent = matched an agent's recorded
+  proposal (direct); human~ = added in a file that session proposed but matching
+  nothing (ESTIMATED residual); unattr = added in a file no session proposed —
+  a person, a vendored tree or generated output, cage does not guess which;
+  unkn = below the content gate or binary. Never redistributed, never a score.
+· human hrs marked ~ are ESTIMATED: commit wall-clock minus the agent's turn-span,
+  floored at 0 and refused past [authorship] max_est_gap = 4h. An inference, not a
+  measurement. * = attested via `cage task time` — always wins over the estimate.
+· tokens are MEASURED; placing a call on a commit is MODELED (task-id join first,
+  commit-window fallback). No USD on this surface, by design.
+· not window-joinable: copilot/cli: one shutdown timestamp per session — every call in a session shares it, so a window join would dump the whole session on one commit · kiro: its rows carry the IMPORT time, not the call time — the log has no per-call timestamp to place
+· not line-matchable: copilot: its stores record usage and prompts, not the text of an edit · kiro: its usage log records token counts only, with no tool-input payload — their commits show as unattr, never 0%
+· 1 commit(s) unattributed — no joinable call. Tokens render '—', never 0:
+  cage has no evidence they cost nothing.
+· no authorship rows recorded yet — every added line is unattr/unkn. Run
+  `cage import` in this repo (or check [authorship] capture).

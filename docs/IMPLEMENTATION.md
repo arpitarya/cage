@@ -16,6 +16,47 @@ Entry format:
 
 ---
 
+## 2026-08-02 — HR1 P2+P3: the call→commit join and the three commit surfaces
+
+- **Implemented (P2, `commitjoin.join_calls`):** task-id join first — reusing
+  `taskgroup.join_rows`, never a second join — then the commit window. Guards that are
+  the point of it: a task closed on a **dirty tree** is not trusted (its snapshot sha is
+  the *prior* commit) and falls back to the window; a **dangling** task sha is excluded,
+  never chased. `_TS_FIDELITY`/`_TS_GAPS` make per-agent joinability a **stated table** —
+  copilot-CLI (one shutdown ts per session) and kiro (import-time ts) are excluded and
+  **counted**, and an *unrecognised* source is excluded rather than assumed per-call.
+  Project confirmation has **three** outcomes, not two: matching joins, a different stamp
+  is another project's, and an **empty** stamp is *unconfirmable* — adopting it would pull
+  every other repo's spend onto these commits. `BEFORE_HISTORY` was written and then
+  **removed as unreachable** (the oldest window is open below, correctly).
+- **Implemented (P3, `commitview.py`):** `cage insights commits` · `cage insights commit
+  <sha>` · `cage authorship summary`. All three: `--json` (`cage.v1`), `--csv`,
+  `--since`, deterministic bytes, refusals rendered.
+  - **Four buckets, not three** — the P1 dogfood defect, fixed: `agent` (read from the
+    row, never re-matched) · `human~` (residual in files the session proposed) ·
+    `unattributed` (files nobody proposed) · `unknown` (sub-gate/binary). Nothing
+    redistributed.
+  - **Two honesty defects caught while smoking the real repo:** the Σ row printed `0`
+    tokens under a column of `—` (now refuses with its rows), and the hours estimator
+    reported the raw commit gap as "human hours" when **no agent span** had joined (now
+    a named refusal, `NO_AGENT_SPAN` — that was the v1 mistake reappearing).
+  - `linematch.commit_diff` folds numstat + patch into **one** `git show` per commit.
+  - Structural no-money guard: the module imports no pricing path, asserted by AST in
+    `tests/test_commitview.py`.
+- **Files:** `cage/{commitjoin,commitview,linematch,constants,cli,clicmds,explain,explain_data}.py` ·
+  `tests/{test_commitjoin,test_commitview}.py` (new) · `tests/{goldenseed,test_output_spec}.py` ·
+  `tests/fixtures/goldens/A{1,2,3,4}.txt` (new) · `tests/fixtures/cli-help.txt` ·
+  `docs/{CLI,FORMULAS}.md`
+- **Tests:** green — **1322 pass / 0 fail / 10 skipped** (+44 over P1). The CLI-reference
+  and front-door-help gates both fired on the new verbs and were satisfied by updating
+  the doc, not the assertion.
+- **Next:** P4 — `cage task time <duration>`, writing `human_minutes` on the task row
+  (the view's attested tier already reads it).
+
+---
+
+---
+
 ## 2026-08-02 — HR1 P1: authorship capture re-wired + line matching (agent-vs-human v2)
 
 - **Implemented:** the capture half of the v2 axis. Provenance rows are written

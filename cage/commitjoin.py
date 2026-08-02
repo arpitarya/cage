@@ -125,3 +125,192 @@ def newest_ts(windows: list[Window]) -> str:
     *coverable*. The authorship cursor uses it to decide whether a transcript still
     has work waiting for a commit that has not been made yet."""
     return windows[-1].hi if windows else ""
+
+
+# ── P2: joining CALLS to commits ──────────────────────────────────────────────
+#
+# Two joins, tried in order and **named on every row** so neither is passed off as
+# the other — the same discipline `adoption.py` applies to its two attribution paths.
+
+VIA_TASK = "task"      # the call belongs to a closed task whose snapshot names a commit
+VIA_WINDOW = "window"  # the call's own timestamp falls inside the commit's window
+
+# Why a call could not be window-joined. Each is a *different fact* with a different
+# fix, so they are counted separately and never merged into one "other" bucket.
+NO_TS_FIDELITY = "no-ts-fidelity"    # the source's timestamps cannot place a call in time
+OTHER_PROJECT = "other-project"      # stamped with a different project — definitely not ours
+NO_PROJECT = "no-project"            # unstamped: cage cannot confirm it belongs to this repo
+AFTER_HEAD = "after-head"            # newer than the newest commit — work not yet committed
+DANGLING_TASK = "dangling-task"      # the task's snapshot sha is not in this history
+
+# **Per-agent joinability is a stated table, not an assumption.** A window join is only
+# as good as the timestamp it reads, and the four capture routes carry four different
+# grades of timestamp. Naming them here (rather than discovering it as a wrong number)
+# is the whole point: a source whose rows all share one timestamp would dump an entire
+# session's tokens onto whichever commit that instant happened to fall in.
+#
+# Keyed `(agent, surface)`; a `None` surface matches any. Anything NOT in this table is
+# excluded and counted with the reason named — cage never assumes a new source's
+# timestamps are per-call.
+_TS_FIDELITY = {
+    ("claude", None): "per-turn timestamp, recorded by the agent",
+    ("copilot", "vscode"): "per-request timestamp from the chat store",
+    ("lib", None): "recorded in-process at the call",
+}
+_TS_GAPS = {
+    ("copilot", "cli"): "one shutdown timestamp per session — every call in a session "
+                        "shares it, so a window join would dump the whole session on "
+                        "one commit",
+    ("kiro", None): "its rows carry the IMPORT time, not the call time — the log has "
+                    "no per-call timestamp to place",
+}
+
+
+def ts_fidelity(agent: str, surface: str) -> tuple[bool, str]:
+    """``(window-joinable?, the reason either way)`` for one call's source."""
+    for key in ((agent, surface), (agent, None)):
+        if key in _TS_GAPS:
+            return False, _TS_GAPS[key]
+        if key in _TS_FIDELITY:
+            return True, _TS_FIDELITY[key]
+    return False, (f"{agent or 'unknown'}: cage has not verified that this source's "
+                   f"timestamps are per-call, so it is not placed on a commit")
+
+
+def joinability_note() -> str:
+    """Every source cage declines to window-join, with its reason — rendered as a
+    footnote so an exclusion is never a silently missing row."""
+    return " · ".join(f"{a}{'/' + s if s else ''}: {why}"
+                      for (a, s), why in sorted(_TS_GAPS.items(),
+                                                key=lambda kv: (kv[0][0], kv[0][1] or "")))
+
+
+def _task_commits(tasks: dict) -> tuple[dict, int]:
+    """``({task id: sha}, dirty_count)`` for closed tasks whose snapshot names a commit
+    cage is willing to trust.
+
+    **A task closed on a dirty tree is not trusted.** `tasks.git_snapshot` records HEAD
+    *plus* `git diff --shortstat` of the working tree, so a non-zero `files_changed`
+    means the work had not been committed when the task closed — its `commit` is the
+    *prior* commit, and attributing the task's calls to it would put the spend on the
+    wrong sha. Those tasks fall through to the window join, which reads the call's own
+    timestamp and gets it right."""
+    out, dirty = {}, 0
+    for tid, row in tasks.items():
+        if not row.get("outcome") or not row.get("commit"):
+            continue
+        if int(row.get("files_changed", 0) or 0):
+            dirty += 1
+            continue
+        out[tid] = row["commit"]
+    return out, dirty
+
+
+def join_calls(calls: list[dict], windows: list[Window], tasks: dict | None = None,
+               *, project: str = "", receipts: list[dict] | None = None) -> dict:
+    """Place each call on the commit it belongs to. Pure derive — no clock, no I/O.
+
+    **Task-id join first**, because a task id is an *asserted* link and a window is an
+    inferred one. The task join is `taskgroup.join_rows` — the documented precedence
+    (task-id, then session-window), reused rather than re-implemented, so the two
+    surfaces can never drift apart.
+
+    **Window join as the fallback**, gated twice: the source's timestamps must be
+    per-call (`ts_fidelity`) and the call must be confirmable as *this* project.
+
+    ``project`` is the repo's basename. Three outcomes, deliberately not two:
+    a matching stamp joins; a **different** stamp is excluded as another project's
+    work; an **empty** stamp is excluded as *unconfirmable* — a distinct fact with a
+    distinct fix, and never quietly adopted. Adopting unstamped rows is exactly how a
+    global ledger (the default sink) would pull every other repo's spend onto these
+    commits. Two repos sharing a basename are indistinguishable here; that is a stated
+    caveat, not something this join pretends to solve.
+
+    Returns::
+
+        {"by_sha": {sha: {"calls": [...], "via": {"task": n, "window": n}}},
+         "attributed": n, "excluded": [{"reason", "calls", "tokens"}],
+         "unattributed": [sha, …], "dirty_tasks": n, "joined": n}
+
+    ``unattributed`` lists commits with **no** joinable call. They are excluded from
+    every total and **counted** — never rendered as a zero, which would claim the
+    commit cost nothing.
+
+    There is deliberately no "before history" exclusion: the oldest commit's window is
+    open below, so a call predating the first commit lands **on** it. That is right, not
+    a fallback — the work that produced a repo's first commit necessarily precedes it."""
+    from cage import agents as _agents
+    from cage import taskgroup
+
+    by_sha: dict[str, dict] = {}
+    excluded: dict[str, dict] = {}
+    shas = {w.sha for w in windows}
+
+    def _place(sha: str, call: dict, via: str) -> None:
+        g = by_sha.setdefault(sha, {"calls": [], "via": {VIA_TASK: 0, VIA_WINDOW: 0}})
+        g["calls"].append(call)
+        g["via"][via] += 1
+
+    def _drop(reason: str, call: dict) -> None:
+        e = excluded.setdefault(reason, {"reason": reason, "calls": 0, "tokens": 0})
+        e["calls"] += 1
+        e["tokens"] += int(call.get("tokens_in", 0)) + int(call.get("tokens_out", 0))
+
+    task_sha, dirty = _task_commits(tasks or {})
+    # Which task each call belongs to, via the ONE documented join.
+    call_task: dict[str, str] = {}
+    for tid, grp in taskgroup.join_rows(calls, receipts or []).items():
+        for c in grp["calls"]:
+            if c.get("id"):
+                call_task[c["id"]] = tid
+
+    lo = windows[0].lo if windows else ""
+    hi = newest_ts(windows)
+    for c in calls:
+        tid = call_task.get(c.get("id", ""))
+        if tid in task_sha:
+            sha = task_sha[tid]
+            if sha in shas:
+                _place(sha, c, VIA_TASK)
+                continue
+            _drop(DANGLING_TASK, c)   # squashed/rebased/other-branch — never chased
+            continue
+        agent = _agents.row_surface(c.get("agent")) or c.get("agent") or ""
+        ok, _why = ts_fidelity(agent, c.get("surface", ""))
+        if not ok:
+            _drop(NO_TS_FIDELITY, c)
+            continue
+        stamped = c.get("project", "")
+        if not stamped:
+            _drop(NO_PROJECT, c)
+            continue
+        if project and stamped != project:
+            _drop(OTHER_PROJECT, c)
+            continue
+        ts = c.get("ts", "")
+        w = window_for(windows, ts)
+        if w is None:
+            _drop(AFTER_HEAD, c)   # the only way out: newer than every window
+            continue
+        _place(w.sha, c, VIA_WINDOW)
+
+    joined = sum(len(g["calls"]) for g in by_sha.values())
+    return {"by_sha": by_sha,
+            "joined": joined,
+            "attributed": len(by_sha),
+            "excluded": sorted(excluded.values(), key=lambda e: (-e["calls"], e["reason"])),
+            "unattributed": [w.sha for w in windows if w.sha not in by_sha],
+            "dirty_tasks": dirty}
+
+
+# Why an exclusion happened, in one line each — rendered as footnotes, never dropped.
+EXCLUSION_TEXT = {
+    NO_TS_FIDELITY: "their source has no per-call timestamp to place on a commit",
+    OTHER_PROJECT: "they are stamped with a different project",
+    NO_PROJECT: "they carry no project stamp, so cage cannot confirm they are this "
+                "repo's work (adopting them would pull other repos' spend onto these "
+                "commits)",
+    AFTER_HEAD: "they are newer than the newest commit — not committed yet",
+    DANGLING_TASK: "their task's recorded commit is not in this history "
+                   "(squashed, rebased or another branch) — never chased",
+}

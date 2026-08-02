@@ -1,7 +1,7 @@
 # CLI
 
 **Every `cage` command in one place.** 16 top-level entries — 5 daily verbs, 7 groups,
-4 hidden plumbing commands — resolving to **50 addressable commands**. The front door
+4 hidden plumbing commands — resolving to **53 addressable commands**. The front door
 (`cage --help`) shows only the curated five plus the group names; this file is the
 whole surface.
 
@@ -161,7 +161,7 @@ rather than guessing.
 
 ---
 
-## `cage insights` — 14 derived views
+## `cage insights` — 16 derived views
 
 | Command | What it answers |
 |---|---|
@@ -170,6 +170,8 @@ rather than guessing.
 | `cage insights roi` | saved $ per tool vs its own cost + latency |
 | `cage insights adoption` | do your agents actually invoke the tools you wired? (counts only — nothing here is priced) |
 | `cage insights chats` | per-chat detail: tokens/cached/cost by `(agent, surface, session)`, titled where the store has a title (local-only — no `--team`) |
+| `cage insights commits` | one row per commit: tokens, human hours, and the `agent / human~ / unattr / unkn` line split. **No USD on this surface, by design** (the v1 veto, kept) |
+| `cage insights commit SHA` | one commit in detail: tokens · origin + confidence · the four line buckets · suggested-vs-kept counts · per-file table · wall/agent/human time |
 | `cage insights verdict` | one-line answer: is this tool saving or costing? A pure composer over attrib/roi/regression/quality — computes no new statistics and refuses (`INSUFFICIENT DATA`) over approximating |
 | `cage insights budget` | session/day spend vs policy ceilings (plan §8.1) |
 | `cage insights compare` | **measured** comparison of closed tasks grouped by stack (n · median · IQR; the delta is `estimated` + observational) |
@@ -189,6 +191,8 @@ Flags, beyond the [capture-on-read three](#capture-on-read-flags):
 | `cage insights roi` | `--since WINDOW` · `--json` · `--csv [PATH]` |
 | `cage insights adoption` | `--since WINDOW` · `--json` · `--csv [PATH]` |
 | `cage insights chats` | `--since WINDOW` · `--agent {claude,copilot,kiro,all}` · `--all` (every chat; default is top 20 by `tokens_in`) · `--usd` · `--json` · `--csv [PATH]` |
+| `cage insights commits` | `--since WINDOW` · `--all` (every commit; default is the 20 newest) · `--json` · `--csv [PATH]` |
+| `cage insights commit SHA` | positional `SHA` (short or full) · `--files` (every file; default is the 8 largest) · `--json` · `--csv [PATH]` |
 | `cage insights verdict TOOL` | positional `TOOL` (name as it appears on receipts, e.g. `graphify`) · `--since WINDOW` (default: all history) · `--json` |
 | `cage insights budget` | `--session ID` · `--scope DIR` · `--json` |
 | `cage insights compare` | `--scope DIR` · `--label WORD` · `--by KEYS` (comma-separated from `stack,scope,label`; `stack` always included) · `--json` · `--csv [PATH]` |
@@ -201,6 +205,12 @@ Flags, beyond the [capture-on-read three](#capture-on-read-flags):
 
 `compare`, `estimate` and `calibration` are gated by `MIN_COMPARE_N` /
 `MIN_ESTIMATE_N` in `constants.py` — below the gate they **explain, never number**.
+
+`commits` / `commit` carry **no dollar figure at all** — not gated, absent. They are
+the rebuilt agent-vs-human axis (v1 died pricing an inferred gap), so tokens and hours
+are the whole vocabulary; valuation stays in your spreadsheet. A commit with no
+joinable call renders `—`, never `0`: *nothing joined here* and *this cost nothing* are
+different claims. See `cage query agent-authorship`.
 
 ---
 
@@ -218,7 +228,7 @@ label guard cannot be laxer on the agent-facing side.
 
 ---
 
-## `cage authorship` — 4 commands
+## `cage authorship` — 5 commands
 
 Who wrote which files in which commit (plan §3.5). Its own closed enums, separate from
 the ledger's: `method ∈ {hooked, transcript, heuristic}`, `origin ∈ {human, agent,
@@ -227,13 +237,18 @@ agent-autonomous, unknown}`.
 | Command | What it does | Flags |
 |---|---|---|
 | `cage authorship origin SHA` | authorship attribution for a commit | `--attest {human,agent,agent-autonomous}` (record a human-triage attestation) · `--agent NAME` (attach to `--attest`) · `--json` |
+| `cage authorship summary` | how much of this repo's history cage can speak to at all — **unknown-rate first**, then the recorded rows by agent/method and the suggested-vs-kept counts | `--since WINDOW` · `--json` · `--csv [PATH]` |
 | `cage authorship verify` | report-only consistency check over the provenance ledger — **never fails the build, always exits 0** | — |
 | `cage authorship notes-sync` | merge the buffered provenance into `refs/notes/cage-provenance` | `--write` (push; default is dry-run unless `CAGE_NOTES_WRITE=1`) · `--json` |
 | `cage authorship ledger-sync` | merge local call/receipt rows into `refs/notes/cage-ledger` for the team view (plan §3.6.3) | `--write` · `--json` |
 
 `origin = "human"` is reachable **only** via explicit attestation, and is always paired
 with `method = "heuristic"` (enforced at construction). `unknown` is a read-time
-default, never a written row. Both sync commands are **CI-sole-writer**: a dev machine
+default, never a written row. Automated rows are written by the **import sweep**
+(`cage/authorcapture.py`, [ADR 0008](adr/0008-line-match-authorship-counts-persisted-content-transient.md)),
+gated by its own consent switch `[authorship] capture` / `CAGE_AUTHORSHIP` — this is
+the one path that reads your diffs, and that is a different permission from metering
+spend. Both sync commands are **CI-sole-writer**: a dev machine
 defaults to a dry-run print.
 
 ---

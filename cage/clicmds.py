@@ -156,6 +156,44 @@ def cmd_chats(args) -> int:
         kiro_route=report.kiro_routed_line(r, pol)))
 
 
+def cmd_commits(args) -> int:
+    """`cage insights commits` — per-commit tokens, hours and the line split.
+    **No USD**: nothing on this surface is priced, so no `display` context is
+    resolved and no dollar column can appear (`commitview.py`'s docstring)."""
+    from cage import commitview
+    r = captured_read_root(args)
+    data = commitview.summarize(r, _policy(r), since=args.since)
+    if (dest := csv_dest(args)) is not None:
+        from cage import csvout
+        return csvout.write(commitview.render_csv(data), dest)
+    return emit(args, render.envelope("commits", data) if args.json else data,
+                commitview.render_commits(data, show_all=getattr(args, "all", False)))
+
+
+def cmd_commit(args) -> int:
+    """`cage insights commit <sha>` — one commit in detail."""
+    from cage import commitview
+    r = captured_read_root(args)
+    data = commitview.summarize(r, _policy(r), sha=args.sha)
+    if (dest := csv_dest(args)) is not None:
+        from cage import csvout
+        return csvout.write(commitview.render_csv(data), dest)
+    return emit(args, render.envelope("commit", data) if args.json else data,
+                commitview.render_commit(data, show_files=getattr(args, "files", False)))
+
+
+def cmd_authorship_summary(args) -> int:
+    """`cage authorship summary` — unknown-rate first, then what was recorded."""
+    from cage import commitview
+    r = captured_read_root(args)
+    data = commitview.summarize_authorship(r, _policy(r), since=args.since)
+    if (dest := csv_dest(args)) is not None:
+        from cage import csvout
+        return csvout.write(commitview.render_authorship_csv(data), dest)
+    return emit(args, render.envelope("authorship-summary", data) if args.json else data,
+                commitview.render_authorship(data))
+
+
 def cmd_why(args) -> int:
     lr = captured_read_root(args)
     data = provenance.explain(lr, args.call_id, pol=_policy(lr))
