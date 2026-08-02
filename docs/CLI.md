@@ -1,7 +1,7 @@
 # CLI
 
 **Every `cage` command in one place.** 16 top-level entries — 5 daily verbs, 7 groups,
-4 hidden plumbing commands — resolving to **53 addressable commands**. The front door
+4 hidden plumbing commands — resolving to **54 addressable commands**. The front door
 (`cage --help`) shows only the curated five plus the group names; this file is the
 whole surface.
 
@@ -214,12 +214,20 @@ different claims. See `cage query agent-authorship`.
 
 ---
 
-## `cage task` — 2 commands
+## `cage task` — 3 commands
 
 | Command | What it does | Flags |
 |---|---|---|
 | `cage task outcome TASK` | close a task with its outcome (`ok` by default) | `--redo` (mark as needing a redo) · `--label WORD` (one short token: letters/digits/`._-`, ≤32 chars, for `cage insights compare` grouping — never a path or free text) |
+| `cage task time DURATION` | attest how long **you** spent on a task — `45m` · `2h` · `1h30m` · a bare number of minutes. Written as `human_minutes` + `human_minutes_method = "attested"` | `--task ID` (default: the most recent) |
 | `cage task quality` | quality-adjusted cost: cost per *successful* task (plan §8.2) | `--json` |
+
+`cage task time` is the **only** unmarked human number cage will ever print: it always
+outranks the wall-clock estimator in `cage insights commits` (rendered `*`, versus the
+estimator's `~`), and **no rate, hourly figure or dollar amount is derived from it,
+anywhere** — that pairing is what killed the v1 axis. Parsing is strict, not fail-open
+(a typo is refused, never silently a different number), and `0` is rejected because the
+absence of an attestation already means unknown.
 
 `cage task outcome` is the **task-close verb** the whole cost-impact surface
 (compare / estimate / calibration / net savings) depends on. It is also the single

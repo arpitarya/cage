@@ -34,7 +34,7 @@ groups (run any group name for its commands):
   insights    attrib · matrix · roi · adoption · chats · commits · commit ·
               verdict · budget · compare · estimate · calibration · why ·
               forecast · regression · recommend
-  task        outcome · quality
+  task        outcome · time · quality
   authorship  origin · summary · verify · notes-sync · ledger-sync
   prices      list · unpriced · set · alias · route-tool · sync
   study       join · start · stop · report · id
@@ -395,7 +395,7 @@ def build_parser() -> argparse.ArgumentParser:
     # neither is the removed Tier-1 human-cost axis. `outcome` is the task-CLOSE verb
     # every cost-impact view depends on (compare/estimate/calibration read only closed
     # tasks); `quality` is cost-per-successful-task (§8.2). They moved, they did not go.
-    task = _group(sub, "task", "task outcomes and quality-adjusted cost: outcome · quality")
+    task = _group(sub, "task", "task outcomes, attested time and quality-adjusted cost: outcome · time · quality")
 
     oc = task.add_parser("outcome", help="close a task with its outcome (ok / redo)")
     oc.add_argument("task")
@@ -404,6 +404,20 @@ def build_parser() -> argparse.ArgumentParser:
                     help="tag the task with one short token (letters/digits/._-, ≤32 chars) "
                          "for `cage insights compare --by label` grouping — never a path or free text")
     oc.set_defaults(fn=clicmds.cmd_outcome)
+
+    tt = task.add_parser("time",
+                         help="attest how long YOU spent on a task — minutes only, "
+                              "never a rate (`cage insights commits` shows it as *)",
+                         epilog="examples:\n"
+                                "  cage task time 45m                 # the most recent task\n"
+                                "  cage task time 1h30m --task t_9f31\n"
+                                "  cage task time 90                  # bare digits = minutes\n"
+                                "An attestation ALWAYS outranks the wall-clock estimator, and no\n"
+                                "hourly rate or dollar figure is derived from it — anywhere.",
+                         formatter_class=argparse.RawDescriptionHelpFormatter)
+    tt.add_argument("duration", help="45m · 2h · 1h30m · a bare number of minutes")
+    tt.add_argument("--task", help="task id (default: the most recent)")
+    tt.set_defaults(fn=clicmds.cmd_task_time)
 
     ql = task.add_parser("quality", help="quality-adjusted cost: cost per successful task (§8.2)")
     _json_flag(ql)

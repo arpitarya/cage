@@ -27,7 +27,6 @@ Active (awaiting Arpit's accept or a trigger):
   copilot USD by ladder (credits×rate → token×table → UNPRICED), worked CLI outputs
   inside. **Picked up 2026-08-02** — [handoff](../copilot-credits.handoff.md) +
   [prompt](../copilot-credits.prompt.md) (Opus).
-- [agent-vs-human-v2.md](agent-vs-human-v2.md) — per-commit rebuild: tokens/commit ·
   authorship (mostly built) · suggested-vs-accepted (counts) · time (attestation only).
 
 - [net-positive-evidence-run.md](net-positive-evidence-run.md) — NET-1 protocol:
@@ -44,6 +43,19 @@ Active (awaiting Arpit's accept or a trigger):
 
 ## Graduated (implemented → archived)
 
+- **agent-vs-human-v2** → **IMPLEMENTED** 2026-08-02, all four phases (1148/0 ⇒
+  1354/0). `cage insights commits` / `commit <sha>` / `authorship summary` /
+  `cage task time`. **One design correction the build made:** the proposal's three-way
+  `agent / human / unknown` split became **four** — `unattributed` had to be separated
+  from `human~`, because a single human bucket printed 76.6% on cage's own repo, 89% of
+  it one commit of generated JSON. Living spec:
+  [ADR 0008](../adr/0008-line-match-authorship-counts-persisted-content-transient.md) ·
+  [FORMULAS.md §2.14](../FORMULAS.md) · [PLAN.md §3.5](../PLAN.md) ·
+  `cage query agent-authorship`. Evidence:
+  [dogfood](../regression/2026-08-02-p1-authorship-dogfood.md).
+  [archived proposal](../archive/v0.43-agent-vs-human-v2.proposal.md) ·
+  [handoff](../archive/v0.43-agent-vs-human-v2.handoff.md) ·
+  [prompt](../archive/v0.43-agent-vs-human-v2.prompt.md).
 - **chats-view** → **IMPLEMENTED** 2026-08-02, `cage insights chats` (1125/0 ⇒
   1148/0). One naming detail corrected: the assumed `manifest.read_imports` helper
   never existed — shipped as `manifest.read()` filtered to `kind=="import"`, same

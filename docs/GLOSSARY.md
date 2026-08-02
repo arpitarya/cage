@@ -242,3 +242,32 @@ not silently edit another project's files.
 No name ⇒ the session id, never a fabricated title. Kiro-IDE's constant session id
 already collapses every run into one chat; kiro-CLI conversations are `credits` rows
 (no `tokens_in`/`tokens_out`) and never appear here. [chats.py](../cage/chats.py).
+
+**agent line** — an added line in a commit that exactly matches (after whitespace
+normalization, above `MIN_MATCH_CHARS`) a line the agent's transcript records it having
+*proposed*. Direct evidence. Read from the provenance row's `agent_lines`, never
+re-matched at render time. See [ADR 0008](adr/0008-line-match-authorship-counts-persisted-content-transient.md).
+
+**human~** — an added line in a file **that session did propose** which matched no
+proposal: a real human tweak of agent work. A *residual*, so it is always `estimated`
+and always carries the `~`. Distinct from `unattributed`, and never written as `human`
+(that requires an attestation).
+
+**unattributed (line)** — an added line in a file **no** session proposed. Could be
+human-written, vendored, or generated output; cage has no evidence which and says so.
+Introduced because a single `human` bucket printed 76.6% on cage's own repo, 89% of it
+one commit of generated JSON. Distinct from **unattributed (commit)** below.
+
+**unattributed (commit)** — a commit with no joinable call. Its token cells render `—`,
+never `0`: *nothing joined here* and *this cost nothing* are different claims.
+
+**commit window** — commit *i* owns `(ts_{i-1}, ts_i]`, upper bound inclusive. The rule
+that places an edit or a call on a commit without ever consulting `HEAD`-at-import.
+
+**attested time** — minutes a person asserted with `cage task time`, stored as
+`human_minutes` + `human_minutes_method="attested"`. Rendered `*`, always outranks the
+`~` estimator, and **no rate or currency is ever derived from it**.
+
+**unconfirmable (call)** — a call carrying no `project` stamp. Excluded from a commit
+join as a *distinct* fact from "another project's call": adopting unstamped rows would
+pull every other repo's spend onto this repo's commits.

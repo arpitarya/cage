@@ -282,6 +282,60 @@ def cmd_outcome(args) -> int:
     return 0
 
 
+def cmd_task_time(args) -> int:
+    """`cage task time <duration>` — attest how long *you* spent on a task (v2 P4).
+
+    The one number on the authorship surfaces a person asserts outright, so it is
+    written with `human_minutes_method="attested"` and **always outranks** the
+    estimator in `cage insights commits`. It is minutes only: **no rate, no USD**, here
+    or anywhere downstream — that pairing is what killed the v1 axis.
+
+    Task rows are append-only and last-write-wins by id, so re-attesting supersedes
+    rather than rewrites. `snapshot=False`: re-running git here would overwrite the
+    task's recorded `commit`/diff counts with *now*, and it is that recorded sha the
+    hours are attached to."""
+    r = ledger_root()
+    try:
+        minutes = tasks.parse_duration(args.duration)
+    except ValueError as e:
+        raise CageError(str(e)) from e
+    known = tasks.read(r)
+    task = args.task or _newest_task(known)
+    if not task:
+        raise CageError("no task to attest against — pass --task ID, or close one "
+                        "first with `cage task outcome <id>`")
+    if not tasks.record(r, task, human_minutes=minutes,
+                        human_minutes_method="attested", snapshot=False):
+        raise CageError("could not write the task row (ledger not writable?)")
+    h, m = divmod(minutes, 60)
+    pretty = f"{h}h{m:02d}m" if h else f"{m}m"
+    print(f"✔ attested {pretty} of human time on {task!r}.")
+    row = known.get(task, {})
+    if not row.get("outcome"):
+        # Recorded, but say where it will and will not show. The commit views read
+        # attested minutes only from CLOSED tasks (the same guard the call join uses),
+        # so silently accepting this would look exactly like the write not working.
+        print(f"  · {task!r} is still open — the hours appear on `cage insights "
+              f"commits` once you close it (`cage task outcome {task}`).")
+    elif int(row.get("files_changed", 0) or 0):
+        # Its snapshot sha is the PRIOR commit; donating hours to it would put them on
+        # the wrong commit, so the view declines. Say so rather than let it vanish.
+        print(f"  · {task!r} was closed with uncommitted work, so its recorded commit "
+              f"is the\n    one before that work landed — the hours stay on the task, "
+              f"not on a commit.")
+
+
+    return 0
+
+
+def _newest_task(known: dict) -> str:
+    """The most recently recorded task id — the one a person means by "this work".
+    Ties break on the id so the choice is stable, never dict order."""
+    if not known:
+        return ""
+    return max(known.items(), key=lambda kv: (kv[1].get("ts", ""), kv[0]))[0]
+
+
 def cmd_compare(args) -> int:
     r = captured_read_root(args)
     by = tuple(k.strip() for k in (args.by or "stack").split(",") if k.strip())

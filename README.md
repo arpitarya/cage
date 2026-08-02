@@ -236,7 +236,7 @@ Every derived view is parse / arithmetic over the log — **no LLM call, ever, o
 
 Latest release below — full history and detail in [CHANGELOG.md](CHANGELOG.md).
 
-- **v0.42.0 (2026-08-02) — `cage insights chats`: one row per chat, titled where the store has a title.** A new derived view groups the ledger by `(agent, surface, session)` and sums tokens/cached/cache-write/premium per chat, with a title joined from the import manifest for **display only** — the one scoped, tested carve-out to `imports.jsonl`'s "never read by a derived view" contract; deleting the manifest moves zero numeric cells. Kiro-IDE's constant session id collapses every run into one honest `kiro (no session identity)` row. Top-20 by `tokens_in`, `--all` lifts the (footnoted) cut. See [CHANGELOG.md](CHANGELOG.md) for the full accounting.
+- **v0.43.0 (unreleased) — agent-vs-human, rebuilt per commit.** `cage insights commits` / `commit <sha>` / `cage authorship summary` answer *who wrote this commit* from line-level evidence: the exact text an agent proposed, matched transiently against the commit's added lines, with **only counts persisted** — never a line body, never a line hash. The residual splits four ways (`agent` / `human~` / `unattributed` / `unknown`), so a committed build artifact is never reported as a person's work. Hours are attested (`cage task time 45m`) or a guarded `~` estimate that refuses rather than print fog. **No USD, rate or valuation appears anywhere on these surfaces** — the v0.36 veto, kept. See [CHANGELOG.md](CHANGELOG.md) and [ADR 0008](docs/adr/0008-line-match-authorship-counts-persisted-content-transient.md).
 
 ## The name
 

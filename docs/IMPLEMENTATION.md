@@ -16,6 +16,43 @@ Entry format:
 
 ---
 
+## 2026-08-02 — HR1 P4 + docs: `cage task time`, and the program closes
+
+- **Implemented (P4):** `cage task time <duration> [--task ID]` writes `human_minutes`
+  + `human_minutes_method="attested"` onto the task row (append-only, last-write-wins).
+  `tasks.parse_duration` accepts `45m` · `2h` · `1h30m` · bare minutes and is
+  **strict, not fail-open** — this is the one number on these surfaces a person asserts
+  outright, so a typo is refused rather than silently becoming a different figure. `0`
+  is rejected: an attestation of no time is the absence of one, which cage already
+  reads as unknown. Days are not a unit (a day-scale claim would sail past
+  `max_est_gap`; it earns its own decision, not a silent `d`).
+  - `snapshot=False` on the write — re-running git here would overwrite the task's
+    recorded `commit` with *now*, and it is that sha the hours attach to.
+  - It **says where the number will not show**: an open task, or one closed on a dirty
+    tree (its sha is the prior commit), each print a named note rather than letting the
+    attestation silently vanish from the view.
+  - The read side (`commitview._attested_minutes`) shipped in P3, so `*` lit up as soon
+    as the verb existed.
+- **Docs (the whole §9.5 checklist):** README *What's new* → v0.43.0 (replaced, not
+  appended) · CHANGELOG v0.43.0 · FORMULAS **§2.14** + the §3 *a v2 exists* pointer ·
+  PLAN **§3.5 Capture rewritten** (it still described the hook machinery deleted in
+  v0.36) · CLI.md 50 ⇒ **54** commands · GLOSSARY ×6 terms · ADR 0008 · DOC-REGISTRY ×8
+  rows · OPEN-WORK (**HR1 deleted**, residuals filed as HR-FIELD + HR-COPILOT-JOIN,
+  header de-staled) · the handoff/prompt/**proposal** trio archived as
+  `docs/archive/v0.43-*` with headers naming what the build corrected · every dangling
+  citation swept. **CLAUDE.md edit PROPOSED, not applied** (steering file).
+- **Files:** `cage/{tasks,clicmds,cli}.py` · `tests/test_task_time.py` (new) ·
+  `tests/fixtures/cli-help.txt` · 15 docs.
+- **Tests:** green — **1354 pass / 0 fail / 10 skipped** (+206 across the program).
+  Determinism sweep run on the live repo: all three views byte-identical over two
+  runs, text **and** CSV.
+- **Next:** HR-COPILOT-JOIN — stamp `project` on the copilot-vscode parse and its
+  window join fires for free (it is built and currently cannot).
+
+---
+
+---
+
 ## 2026-08-02 — HR1 P2+P3: the call→commit join and the three commit surfaces
 
 - **Implemented (P2, `commitjoin.join_calls`):** task-id join first — reusing

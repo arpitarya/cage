@@ -79,6 +79,39 @@ def record(root: Path, task: str, *, type: str = "", outcome: str = "",
     return ledger.append_row(root, "tasks", row)
 
 
+_DURATION = re.compile(r"^(?:(\d+)\s*h)?\s*(?:(\d+)\s*m(?:in)?)?$", re.IGNORECASE)
+
+
+def parse_duration(spec: str) -> int:
+    """A human duration → **whole minutes**. Raises ``ValueError`` on anything else.
+
+    Accepts ``45m`` · ``90`` (bare digits are minutes) · ``2h`` · ``1h30m`` ·
+    ``1h 30min``. Deliberately narrow, and deliberately **strict rather than
+    fail-open**: this is the one number on the authorship surfaces a human asserts
+    outright, so a typo must be rejected at the CLI boundary rather than silently
+    become a different figure. `0` is rejected too — "I spent no time on this" is not
+    an attestation, it is the absence of one, and absence is already how cage says
+    unknown.
+
+    Days are not a unit here. A commit-scale attestation measured in days is a
+    different claim (and would sail past `max_est_gap` on the estimator side); if that
+    turns out to be a real workflow it earns its own decision, not a silent `d`."""
+    s = (spec or "").strip()
+    if s.isdigit():
+        mins = int(s)
+    else:
+        m = _DURATION.match(s)
+        if not m or not (m.group(1) or m.group(2)):
+            raise ValueError(f"cannot read {spec!r} as a duration — use 45m, 2h, "
+                             f"1h30m, or a bare number of minutes")
+        mins = int(m.group(1) or 0) * 60 + int(m.group(2) or 0)
+    if mins <= 0:
+        raise ValueError("a duration must be greater than zero — an attestation of "
+                         "no time is the absence of one, which cage already reads "
+                         "as unknown")
+    return mins
+
+
 def read(root: Path) -> dict[str, dict]:
     """Latest row per task id (last-write-wins) keyed by id — pure derive."""
     latest: dict[str, dict] = {}

@@ -2,13 +2,13 @@
 
 **Next:** **NET-1** — does graphify actually pay? (your hands, n=5 per arm).
 Nothing is blocked; **v0.39.0 is released** (tagged + GitHub release fired publish.yml).
-ADOPT landed *after* that tag (**v0.40.0**, in tree), and the **whole agent-surface
-ladder** landed after that (**v0.41.0**, in tree) — both built, green and unreleased;
-`__version__` is still `0.39.0`, bumped by the release commit as always.
+Four versions have landed in tree since that tag and are all **built, green and
+unreleased**: **v0.40.0** (ADOPT), **v0.41.0** (the agent-surface ladder), **v0.42.0**
+(chats view + the CLI reference) and **v0.43.0** (agent-vs-human v2, HR1).
 **State:** v0.38.0 and v0.39.0 both tagged, released and on PyPI — PyPI upload, cross-OS
 `cage.pyz` smoke and release assets all green, including the Windows behaviour tier that
 had never executed before v0.38.
-Suite: **1125 pass / 0 fail / 10 skipped** (dev machine, macOS/posix path only; the 10
+Suite: **1354 pass / 0 fail / 10 skipped** (dev machine, macOS/posix path only; the 10
 skips are the Windows-only shim behaviour tier and run on CI).
 
 ## Pending
@@ -22,7 +22,9 @@ skips are the Windows-only shim behaviour tier and run on CI).
 | **DOGFOOD** | README shows demo data, not cage's own ledger | [proposal](proposals/dogfood-report.md) — dev machine, ~1h |
 | **L1-FIELD** | L1 hook shapes are unit/CI-tested but never run on a real Claude Code / Copilot / Kiro install | wire one machine per agent, confirm the hook fires and `cage setup --status` agrees |
 | **KIRO-MCP-FIELD** | the committed path-free `python3 -m cage mcp` has never started on a real Kiro | open Kiro on a wired repo; if it does not start, **report it** — do not fall back to a gitignored absolute path |
-| **HR1** | agent-vs-human v2 — **accepted-amended 2026-08-02, ready to build** (P1 capture re-wire → P4 time; no USD; guarded `~` hours) | [handoff](agent-vs-human-v2.handoff.md) · [prompt](agent-vs-human-v2.prompt.md) — after the track |
+| **HR-CLAUDEMD** | the CLAUDE.md architecture bullet for HR1 is written but **deliberately not applied** — the prompt forbids silently rewriting steering files | review [claude-md-hr1.proposed.md](claude-md-hr1.proposed.md): apply, amend or decline, then delete it and correct the CLAUDE.md DOC-REGISTRY row |
+| **HR-FIELD** | the four-bucket split has only been read on **cage's own repo**, whose history is unusually doc- and artifact-heavy (80% `unattributed`) | run `cage insights commits` on a second, code-heavy repo; if `unattributed` still dominates, the per-file table is the surface that needs work, not the buckets |
+| **HR-COPILOT-JOIN** | copilot-vscode has per-request timestamps but stamps **no `project`**, so every one of its calls is excluded as *unconfirmable* — the join is built and cannot fire for it | stamp `project` on the vscode chat-store parse (the claude `cwd` precedent), then it window-joins for free |
 | **COPILOT-CREDITS** | chatSessions persists `copilotCredits` per request — cage drops the actual billing unit (retires copilot/auto UNPRICED); + `elapsedMs`→gap_ms, sidecar `cacheReadTokens` | [handoff](copilot-credits.handoff.md) + [prompt](copilot-credits.prompt.md) (**Opus**) — ready to execute; extends the shipped `cage insights chats` with the credits column |
 | **CLI-GAPS** | two front-door inconsistencies, found writing [CLI.md](CLI.md): (a) `cage --help` lists **seven of `data`'s eight** commands — `migrate-savings` runs but is unadvertised; (b) `prices`/`study`/`policy` take their action as a **positional choice, not a subparser**, so `cage prices set --help` renders the group's help and the group's flags are a flat union (`--input` shows on `list`) | (a) is a one-line front-door fix + a golden re-bless. (b) is a **front-door change**: converting the three to real subparsers re-blesses goldens and touches `test_cli_tiering`'s help fixture — decide whether the asymmetry is worth keeping |
 
@@ -272,19 +274,7 @@ and **closed one version later** by WIN-GF, above. Full accounting: the v0.37.2 
 [CHANGELOG.md](../CHANGELOG.md). The mooted grep gate for removed-feature claims is
 deliberately **not** filed; raise it again if a second such claim ever ships.
 
-**HR1 — accepted-amended 2026-08-02, graduated to a live pair.** Per-commit rebuild:
-tokens · line-level authorship · suggested-vs-kept · time — **no USD on any of these
-surfaces**. Two audit findings re-graded the build: provenance transcript capture is
-**orphaned** (zero callers — P1 re-wires it into the import sweep, with a dogfood gate
-on cage's own repo), and `latency_ms` exists only on lib-metered calls (agent time is a
-`~` turn-span elsewhere). §4 amended, not repealed: human hours may be **estimated**
-(`~`, method named in output, `max_est_gap` guard ⇒ `—`, kill-switch) and attestation
-(`*`) always wins; the v1 rate×gap valuation stays dead. Line capture: agent edit-block
-lines matched transiently against commit diffs, counts-only persisted; **human =
-residual (`human~`)**; unknown never redistributed.
-[Proposal](proposals/agent-vs-human-v2.md) · [handoff](agent-vs-human-v2.handoff.md) ·
-[prompt](agent-vs-human-v2.prompt.md). What existed before removal:
-[archived handoff](archive/v0.36-human-removal.handoff.md).
+**HR1 closed 2026-08-02** — agent-vs-human v2 built end to end (P1–P4), 1148/0 ⇒ 1354/0. Capture was genuinely orphaned and now writes; the window join is **measured sound** (68.7% verbatim match inside proposed files, [dogfood](regression/2026-08-02-p1-authorship-dogfood.md)); `MIN_MATCH_CHARS` frozen at 4 with a sweep. **One design correction:** the three-bucket split became four — `unattributed` had to be separated from `human~`, because a single human bucket printed 76.6% here, 89% of it one commit of generated JSON. Living spec: [ADR 0008](adr/0008-line-match-authorship-counts-persisted-content-transient.md) · [FORMULAS §2.14](FORMULAS.md) · [CLI.md](CLI.md). Residuals carried forward above as **HR-FIELD** and **HR-COPILOT-JOIN**.
 
 **BUD-V closed 2026-08-01** — verified via `just test` on the dev machine (Python
 3.14): the bundle change needs no code fix; `cage policy sync` does not try to re-add

@@ -21,15 +21,16 @@ spec.
 
 ## Active work
 
+- [claude-md-hr1.proposed.md](claude-md-hr1.proposed.md) — **HR-CLAUDEMD**: the
+  CLAUDE.md architecture bullet for agent-vs-human v2, written and **held for
+  Arpit's review**. Everything else in HR1's doc checklist is applied; steering
+  files are never rewritten silently. Apply / amend / decline, then delete it.
+
 - [copilot-credits.handoff.md](copilot-credits.handoff.md) +
   [copilot-credits.prompt.md](copilot-credits.prompt.md) — **COPILOT-CREDITS**
   (**Opus** — substrate contract touch): billed-credits capture + the copilot pricing
   ladder. Design of record: [copilot-credits.proposal.md](proposals/copilot-credits.proposal.md);
   decision: [compare/copilot-pricing-basis.compare.md](compare/copilot-pricing-basis.compare.md).
-- [agent-vs-human-v2.handoff.md](agent-vs-human-v2.handoff.md) +
-  [agent-vs-human-v2.prompt.md](agent-vs-human-v2.prompt.md) — **HR1, per-commit
-  agent-vs-human** (P1 capture re-wire → P2 commit join → P3 views → P4 time; no USD,
-  guarded `~` hours). Design of record: [agent-vs-human-v2.md](proposals/agent-vs-human-v2.md).
 
 ## The lab manual
 

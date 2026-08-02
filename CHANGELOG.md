@@ -2,6 +2,73 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
+## v0.43.0 (unreleased) — agent-vs-human, rebuilt per commit
+
+Built from: [proposal](docs/archive/v0.43-agent-vs-human-v2.proposal.md) ·
+[handoff](docs/archive/v0.43-agent-vs-human-v2.handoff.md) +
+[prompt](docs/archive/v0.43-agent-vs-human-v2.prompt.md) ·
+[ADR 0008](docs/adr/0008-line-match-authorship-counts-persisted-content-transient.md) ·
+[dogfood evidence](docs/regression/2026-08-02-p1-authorship-dogfood.md).
+
+The Tier-1 human axis was removed in v0.36 for inventing precision — a turn-gap
+heuristic priced at an hourly rate, rendered so it read as measured. This is its
+replacement, and it answers a different question at a unit you can `git show`.
+
+**Capture was dead, and now it isn't.** `transcript.parse_provenance` and
+`originrecord.record_transcript` had **zero callers** since the hookless rebuild
+removed their SessionEnd trigger, so `cage authorship origin` answered `unknown` for
+every commit while working perfectly. The import sweep now writes provenance rows.
+
+**How the agent is measured, and why the human isn't.** A Claude transcript records the
+exact text an `Edit`/`Write`/`MultiEdit`/`NotebookEdit` block proposed. At import that
+text is compared — transiently, in process memory — against the added lines of the
+commit whose window contains the edit. **Only counts are persisted: no line body, and
+no line hash** (a hash is a membership oracle over your source). The human is never
+observed; it is what is left over, and the label says so.
+
+**Windows, never `HEAD`.** Commit *i* owns `(ts_{i-1}, ts_i]`. Work after the newest
+commit is left **unrecorded** and picked up exactly once by the next import — guessing
+a commit that does not exist yet would be wrong forever.
+
+**Four line buckets, not three.** Measured on cage's own repo, a single `human` bucket
+printed **76.6%** — 89% of it one commit of generated JSON. So the residual splits:
+`agent` (matched a proposal) · `human~` (in a file that session *did* propose — a real
+human tweak) · `unattributed` (in a file **no** session proposed: a person, a vendored
+tree, or generated output — cage does not guess) · `unknown` (below the content gate or
+binary). Nothing is redistributed.
+
+### Added
+
+- `cage insights commits` — one row per commit: tokens, human hours, the four-way split.
+- `cage insights commit <sha>` — tokens · origin + confidence · line buckets ·
+  suggested-vs-kept counts · per-file table · wall/agent/human time.
+- `cage authorship summary` — **unknown-rate first**: how much of this repo's history
+  cage can speak to at all.
+- `cage task time <duration>` — attest your own time (`45m` · `2h` · `1h30m`). Always
+  outranks the estimator; parsing is strict, not fail-open.
+- `[authorship]` policy table: `capture` (its **own** consent switch — reading your
+  diffs is a different permission from metering spend), `estimate_hours`, `max_est_gap`.
+  Env: `CAGE_AUTHORSHIP`, `CAGE_AUTHORSHIP_ESTIMATE`.
+- Five additive-optional provenance counts (`suggested`, `kept`, `kept_modified`,
+  `dropped`, `agent_lines`) — omitted at 0, `schema_ver` stays 1.
+- `cage query agent-authorship` explains the whole mechanism with live values.
+
+### Guarantees this release makes
+
+- **No USD, rate or valuation on any authorship surface** — structural, not a policy:
+  `commitview.py` imports no pricing module, asserted by AST in the suite.
+- **Refusals render.** A commit with no joinable call shows `—`, never `0`; so does the
+  Σ row. The hours estimator refuses four ways, each with the reason named — including
+  when no agent span joined, where `wall − nothing` would print the raw commit gap as
+  effort (v1's exact mistake).
+- **Exclusions are counted, never merged.** Per-agent joinability is a stated table:
+  copilot-CLI (one shutdown timestamp per session) and kiro (import-time timestamps)
+  cannot be window-joined; an unrecognised source is excluded rather than assumed.
+- **An unstamped `project` is *unconfirmable*, not adopted** — otherwise a global ledger
+  would pull every other repo's spend onto these commits.
+- A task closed on a **dirty tree** is not trusted for either calls or hours: its
+  snapshot sha is the *prior* commit.
+
 ## v0.42.0 (2026-08-02) — `cage insights chats`: one row per chat, titled where the store has a title
 
 Built from: [proposal](docs/archive/v0.42-chats-view.proposal.md) ·

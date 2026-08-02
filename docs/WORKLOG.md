@@ -12,6 +12,27 @@ by milestone) — the worklog is what *happened this session*.
 
 ---
 
+## 2026-08-02 (Claude Code) — HR1 P4 + the full doc sweep; program closed (Opus)
+
+- **Asked:** finish the phases.
+- **Done (P4):** `cage task time` — strict duration parsing, `human_minutes` +
+  `human_minutes_method="attested"`, and two named notes for the cases where the
+  attestation will not reach a commit (open task; dirty close). Then the §9.5 doc
+  checklist end to end, plus archiving the handoff/prompt/proposal trio.
+- **Decided:** parsing is **strict, not fail-open** (the write-path rule does not apply
+  to a figure a human types); `0` and `d` are both rejected, with reasons.
+- **Findings filed rather than fixed:** **HR-COPILOT-JOIN** — copilot-vscode has
+  per-request timestamps but stamps no `project`, so the join cage just built can never
+  fire for it; **HR-FIELD** — the four buckets have only been read on cage's own repo,
+  which is unusually artifact-heavy (80% `unattributed`).
+- **Not applied, deliberately:** the CLAUDE.md architecture bullet is **proposed for
+  Arpit's review**, per the prompt — steering files are never silently rewritten.
+- **Next step:** Arpit reviews the proposed CLAUDE.md edit; then HR-COPILOT-JOIN.
+
+---
+
+---
+
 ## 2026-08-02 (Claude Code) — HR1 P2 + P3 built (Opus)
 
 - **Asked:** continue through the phases.
@@ -161,7 +182,7 @@ by milestone) — the worklog is what *happened this session*.
   count, say it in words) · `0% — not started` → `100%` in the archiving change ·
   updated in the same change as the work. Doc-discipline pointer updated to name both
   prompt-doc rules. Applied on contact to the live pair
-  ([agent-vs-human-v2](agent-vs-human-v2.prompt.md) 0%,
+  ([agent-vs-human-v2](archive/v0.43-agent-vs-human-v2.prompt.md) 0%,
   [chats-view](chats-view.prompt.md) 0%) and to the just-archived
   [v0.41-agent-surface](archive/v0.41-agent-surface.prompt.md) (100%, P0–P3).
 - **Found:** `agent-vs-human-v2.prompt.md` had **no `**Model:**` line at all** — a
@@ -230,7 +251,7 @@ by milestone) — the worklog is what *happened this session*.
   diffs; **human = residual (`human~`)**; unknown is first-class, never redistributed.
   Views: `cage insights commits` (list) + `cage insights commit <sha>` (detail).
 - **Produced:** proposal rewritten in place (accepted-amended) ·
-  [handoff](agent-vs-human-v2.handoff.md) · [prompt](agent-vs-human-v2.prompt.md).
+  [handoff](archive/v0.43-agent-vs-human-v2.handoff.md) · [prompt](archive/v0.43-agent-vs-human-v2.prompt.md).
   Build order P1 capture re-wire → P2 `commitjoin.py` → P3 views → P4 time; P1 ends
   with a dogfood gate on cage's own repo (match/unknown rates) before P2.
 - **Next:** run the prompt (P1 first) — slotted after the current track per OPEN-WORK.
