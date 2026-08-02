@@ -414,7 +414,108 @@ def test_counts_are_omitted_at_zero_and_present_when_set():
                                  kept_modified=0, dropped=2, agent_lines=3)
     assert row["suggested"] == 5 and row["kept"] == 3 and row["dropped"] == 2
     assert "kept_modified" not in row       # omitted at its default
+    assert "residual_lines" not in row      # not supplied ⇒ absent (the version gate)
     assert row["schema_ver"] == 1
+
+
+def test_residual_lines_is_the_one_count_written_at_zero():
+    """Its default is the `None` *omit* sentinel, not 0 — so a caller that does not
+    line-match writes the pre-v2 row exactly, while a caller that does can record a
+    real zero. Absent and zero are different facts and must stay distinguishable."""
+    assert schema.PROVENANCE_ZERO_BEARING_COUNTS == ("residual_lines",)
+    assert "residual_lines" in schema.PROVENANCE_COUNT_FIELDS
+    omitted = schema.make_provenance(sha="abc1234", files=["a.py"])
+    assert tuple(omitted) == schema.PROVENANCE_FIELDS      # byte-identical to pre-v2
+    zero = schema.make_provenance(sha="abc1234", files=["a.py"], residual_lines=0)
+    assert zero["residual_lines"] == 0
+    assert schema.make_provenance(sha="abc1234", files=["a.py"],
+                                  residual_lines=7)["residual_lines"] == 7
+
+
+def test_the_write_boundary_passes_a_zero_through_and_drops_a_none():
+    """`originrecord.record`'s `**counts` filter must not pre-empt the factory's
+    omit-vs-write decision, and must not `int(None)` inside a never-raising path."""
+    from cage import originrecord
+    import tempfile
+    with tempfile.TemporaryDirectory() as d:
+        root = Path(d)
+        assert originrecord.record_transcript(root, sha="abc1234", files=["a.py"],
+                                              agent="claude-code", session_id="s1",
+                                              agent_lines=4, residual_lines=0)
+        assert originrecord.record_transcript(root, sha="def5678", files=["b.py"],
+                                              agent="claude-code", session_id="s2",
+                                              agent_lines=4, residual_lines=None)
+        rows = {r["sha"]: r for r in ledger.provenance(root)}
+        assert rows["abc1234"]["residual_lines"] == 0
+        assert "residual_lines" not in rows["def5678"]
+
+
+def test_residual_lines_is_the_not_the_agent_side_of_this_rows_own_files(repo, tmp_path):
+    """`_seed`'s commit adds 5 lines to mod.py: 4 clear the gate (`}` does not), and
+    2 of those matched the agent. So the row's residual is the other 2 — scoped to the
+    files THIS row landed, never the commit's `unattributed` bucket."""
+    tr, _sha = _seed(repo, tmp_path)
+    root = tmp_path / "ledger"
+    authorcapture.capture(root, [tr], repo=repo, cursor={})
+    row = ledger.provenance(root)[0]
+    assert row["agent_lines"] == 2
+    assert row["residual_lines"] == 2
+
+
+def test_a_zero_residual_is_written_and_survives_the_row_round_trip(repo, tmp_path):
+    """THE deviation from omitted-at-0, and it must be real rather than accidental.
+
+    Everything matchable in the commit matched the agent, so the residual is a genuine
+    0 — and `0` must reach disk, because absence of the key is what marks a row as
+    predating the count. If this ever regresses to an omitted key, every such chat
+    silently drops from `agent%` to `—` and reads as "no evidence"."""
+    body = "def only_the_agent():\n    return 'wrote every line here'\n"
+    tr = _transcript(tmp_path / "logs" / "sess-z.jsonl", "sess-z", [
+        {"ts": "2026-07-01T09:00:00.000Z", "tool": "Write",
+         "file": str(repo / "solo.py"), "content": body}])
+    _commit(repo, {"solo.py": body}, "2026-07-01T10:00:00+00:00")
+    root = tmp_path / "ledger"
+    assert authorcapture.capture(root, [tr], repo=repo, cursor={})["rows"] == 1
+    row = ledger.provenance(root)[0]
+    assert row["agent_lines"] == 2
+    assert "residual_lines" in row, "a zero residual was omitted — the version gate is broken"
+    assert row["residual_lines"] == 0
+    # And it survives the jsonl round-trip, not just the in-memory dict.
+    assert json.loads(json.dumps(row))["residual_lines"] == 0
+
+
+def test_the_residual_is_floored_at_zero_and_never_negative():
+    assert authorcapture._residual([], [], 0) == 0
+    m = linematch.FileMatch("a.py", linematch.KEPT, added_matchable=3, agent_lines=9)
+    assert authorcapture._residual([m], ["a.py"], 9) == 0       # floored, not -6
+    assert authorcapture._residual([m], ["a.py"], 1) == 2
+    # A file the row did not land contributes nothing — that is commit scope, not ours.
+    assert authorcapture._residual([m], [], 0) == 0
+
+
+def test_chat_sums_reconcile_with_the_per_commit_buckets(repo, tmp_path):
+    """The arbiter check (FORMULAS §2.14): a chat's `agent_lines`/`residual_lines` must
+    equal the `agent`/`human~` buckets `commitview` derives for that session's commits.
+    Two derivations of one fact that disagree would make the friendlier surface a lie —
+    so this asserts across the seam rather than re-implementing either side."""
+    from cage import chats, commitview
+    from cage.policy import load as load_policy
+    tr, sha = _seed(repo, tmp_path)
+    root = tmp_path / "ledger"
+    authorcapture.capture(root, [tr], repo=repo, cursor={})
+
+    prov = ledger.provenance(root)
+    buckets = commitview._buckets(linematch.commit_diff(repo, sha), prov)
+
+    (root / ".cage" / "ledger").mkdir(parents=True, exist_ok=True)
+    ledger.append(paths.Footprint(root).calls, schema.make_call(
+        route="chat", provider="anthropic", model="claude-sonnet-4-6", tokens_in=10,
+        agent="claude-code", session="sess-a", ts="2026-07-01T09:00:00Z", call_id="c1"))
+    row = chats.summarize(root, load_policy(paths.Footprint(root).policy))["rows"][0]
+
+    assert row["agent_lines"] == buckets["agent"] == 2
+    assert row["residual_lines"] == buckets["human"] == 2
+    assert row["agent_pct"] == 50.0
 
 
 def test_record_drops_unknown_count_keys():

@@ -21,13 +21,6 @@ spec.
 
 ## Active work
 
-- [chats-author.handoff.md](chats-author.handoff.md) +
-  [chats-author.prompt.md](chats-author.prompt.md) — **CHATS-AUTHOR**: the `agent%`
-  authorship column on `cage insights chats`
-  ([proposal](proposals/chats-agent-authorship-column.proposal.md)). **Unblocked 2026-08-02** —
-  its Phase-0 gate (REV-TS) failed once, then REV-TS landed
-  ([archived](archive/v0.45-rev-ts.handoff.md)); the gate now passes.
-
 - [steering-edits-pending.proposal.md](proposals/steering-edits-pending.proposal.md) —
   **STEERING-EDITS**: the four held CLAUDE.md edits (authorship bullet · copilot credit
   ladder · `FORMULAS.md` entry point · dogfood section), merged into one file 2026-08-03

@@ -16,7 +16,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from cage import ledger, paths, schema, tasks
+from cage import ledger, originrecord, paths, schema, tasks
 
 
 def _ts(day: int, hh: int = 9, month: int = 7) -> str:
@@ -305,11 +305,21 @@ def _chat_name(root: Path, *, agent: str, session: str, name: str, ts: str) -> N
 
 
 def chats_titled(root: Path) -> None:
-    """Spec I10a: two titled chats (claude, copilot-vscode) — the full-support case."""
+    """Spec I10a: two titled chats (claude, copilot-vscode) — the full-support case.
+
+    Also the `agent%` contract in ONE table: the claude chat has landed-code evidence
+    and renders a number; the copilot chat structurally cannot be line-matched and
+    renders `—` with its reason. A golden where every cell refuses would pin the
+    refusal and leave the number itself uncontracted."""
     _call(root, "c_ct1", provider="anthropic", model="claude-sonnet-4-6",
           agent="claude", tin=900_000, tout=60_000, ts=_ts(2), session="s_ct1")
     _chat_name(root, agent="claude", session="s_ct1", name="fix the flaky test",
               ts=_ts(2, 9, 30))
+    originrecord.record_transcript(root, sha="9f3c1ab", files=["cage/report.py"],
+                                   agent="claude-code", session_id="s_ct1",
+                                   lines_added=104, lines_removed=12, suggested=71,
+                                   kept=68, kept_modified=3, agent_lines=68,
+                                   residual_lines=42)
     _call(root, "c_ct2", provider="anthropic", model="copilot/claude-sonnet-4.6",
           agent="copilot", tin=196_801, tout=9_621, ts=_ts(3), session="s_ct2")
     _chat_name(root, agent="copilot", session="s_ct2", name="refactor the parser",

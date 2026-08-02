@@ -437,12 +437,20 @@ def test_chats_credits_column_sums_and_renders_2dp(root):
     assert "1.48275" in chats.render_csv(data)                 # data: full precision
 
 
+def _csv_rows(root):
+    """Read by HEADER, never by column index — the chats CSV gains columns (`agent%`
+    added three in CHATS-AUTHOR), and a positional read turns that into a false
+    failure about credits."""
+    import csv as _csv
+    import io
+    return list(_csv.DictReader(io.StringIO(chats.render_csv(_chats_data(root)))))
+
+
 def test_chats_priced_via_names_the_basis(root):
     _call(root, "c1", credits=2.0, session="s1")
     _call(root, "c2", agent="claude", session="s2", provider="anthropic",
           model="claude-sonnet-4-6")
-    rows = chats.render_csv(_chats_data(root)).splitlines()[1:]
-    vias = sorted(r.split(",")[12] for r in rows)
+    vias = sorted(r["priced_via"] for r in _csv_rows(root))
     assert vias == [creditprice.CREDITS, creditprice.TOKENS]
 
 
@@ -451,7 +459,7 @@ def test_chats_priced_via_mixed_when_a_chat_spans_both(root):
     says `mixed` rather than claiming one basis for all of it."""
     _call(root, "c1", credits=2.0, session="s1")
     _call(root, "c2", session="s1", provider="anthropic", model="claude-sonnet-4-6")
-    assert chats.render_csv(_chats_data(root)).splitlines()[1].split(",")[12] == creditprice.MIXED
+    assert _csv_rows(root)[0]["priced_via"] == creditprice.MIXED
 
 
 def _chats_data(root):

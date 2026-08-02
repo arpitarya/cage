@@ -365,10 +365,15 @@ callers**, so every commit answered `unknown` while the read surface worked perf
    normalizer is applied to both sides, a `MIN_MATCH_CHARS` gate excludes punctuation
    noise, and matching consumes 1:1.
 4. **Only counts persist** — `schema.PROVENANCE_COUNT_FIELDS` (`suggested`, `kept`,
-   `kept_modified`, `dropped`, `agent_lines`), additive-optional and omitted at 0, so
+   `kept_modified`, `dropped`, `agent_lines`, `residual_lines`), additive-optional, so
    `schema_ver` stays 1 and a row from any other path is byte-identical. **No line
    body and no line *hash* is ever written** (a hash is a membership oracle over the
    source — the reason it is named, not just implied).
+   **Five are omitted at 0; `residual_lines` is written at 0** — the one deviation
+   (`PROVENANCE_ZERO_BEARING_COUNTS`), because presence of the key is the version gate
+   for §7's `agent%` column: absent means the row predates the count (rows are frozen
+   by the idempotency key and are **never backfilled**), a recorded `0` means
+   everything matchable matched the agent. Absent-vs-recorded-zero, as with `credits`.
 5. **Human is a residual, and it splits in two.** `human~` = added lines in a file the
    session *did* propose that matched nothing (a real human tweak — high signal);
    `unattributed` = added lines in files **no** session proposed (human-written,
@@ -1059,7 +1064,7 @@ cage insights matrix [--task ID] [--usd]  # counterfactual permutation table (§
 cage insights budget                   # current session/day spend vs. policy ceilings
 cage data limits [--json]          # provider quota windows (Codex) + estimated AI-credits (§3.8); --json = cage.v1
 cage insights roi [--since 30d]        # saved $ vs. each tool's own cost + latency (tool-only)
-cage insights chats [--since] [--agent] [--all] [--usd]  # per-chat detail: tokens/cost by (agent, surface, session), titled where the store has a title
+cage insights chats [--since] [--agent] [--all] [--usd]  # per-chat detail: tokens/cost + agent% by (agent, surface, session), titled where the store has a title
 cage task outcome <task> [--redo] [--label W]  # close a task with its outcome (§4.7)
 cage task quality                  # cost per *successful* task (§8.2)
 cage data serve                    # dashboard (reuse fux's serve/assets pattern)

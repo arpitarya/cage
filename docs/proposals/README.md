@@ -43,15 +43,20 @@ Two more that bite in practice:
 Active (awaiting Arpit's accept or a trigger):
 
 - [steering-edits-pending.proposal.md](steering-edits-pending.proposal.md) — **the
-  four CLAUDE.md edits, in one sitting.** Raised by four programs, merged 2026-08-03
-  because they patch one file and need one decision. Head table carries a verdict box
-  per edit; an applied section is deleted from the file, and the file goes when the
-  table empties. Re-verified at HEAD: none applied.
+  four CLAUDE.md edits, in one sitting.** Raised by five programs (CHATS-AUTHOR added
+  **F** on 2026-08-03), merged because they patch one file and need one decision. Head
+  table carries a verdict box per edit; an applied section is deleted from the file, and
+  the file goes when the table empties. Re-verified at HEAD: none of the four applied.
 
-  Its item **E** is the lesson worth keeping — both source proposals hardcoded a
-  `just test` target (1354, 1391) and both fell *below* the file they patch (1401,
-  suite 1423), so applying either would have regressed it. **A held patch decays against
-  its target**; E is now a rule, not a number.
+  **Item E is gone — applied in the v0.46.0 release**, being the one row the Must-Know
+  release rule already mandates. Its lesson outlives it: both source proposals hardcoded
+  a `just test` target (1354, 1391) and both fell *below* the file they patch, so either
+  would have **regressed** it. **A held patch decays against its target** — the count has
+  now been 1401 → 1441 → 1462 while this file existed.
+
+  **F is the one with teeth**: CLAUDE.md's chats bullet states the money-independence law
+  as **one** scoped carve-out, and v0.46.0 made it **two**. Until F lands, that bullet
+  understates a law's cardinality.
 
 - [net-positive-evidence-run.proposal.md](net-positive-evidence-run.proposal.md) — NET-1 protocol:
   5 closed tasks per arm, outcomes pre-committed. Arpit's hands, no code.
@@ -69,17 +74,23 @@ Active (awaiting Arpit's accept or a trigger):
 - [review-hardening.proposal.md](review-hardening.proposal.md) — the rest of the review's
   confirmed findings, phased: dogfood **date bomb (~2026-10-02)** · `cage hook`
   exit-2 = BLOCK collision · honest-refusal fixes · wiring hygiene · durable joins.
-- [chats-agent-authorship-column.proposal.md](chats-agent-authorship-column.proposal.md) — `agent%`
-  per chat on `cage insights chats`: the v2 authorship counts joined by
-  `(agent, session)` — pure ledger join, one new always-written `residual_lines`
-  count, three standing guards answered. **Sequenced after
-  timestamp-utc-normal-form**, which **landed 2026-08-02**, so it is unblocked.
-  **Picked up 2026-08-02** — live pair
-  [chats-author.handoff.md](../chats-author.handoff.md) ·
-  [chats-author.prompt.md](../chats-author.prompt.md); entry stays put, per the
-  lifecycle rule.
 
 ## Graduated (implemented → archived)
+
+- **chats-agent-authorship-column (CHATS-AUTHOR)** → **IMPLEMENTED** and RELEASED in v0.46.0
+  2026-08-03 (1442/0 ⇒ 1462/0). `agent%` on `cage insights chats` — the v2
+  authorship counts joined by `(agent, session)`, one new `residual_lines` count written
+  even at 0 (presence of the key is the version gate), three refusal shapes that never
+  read as 0%. **The build corrected the proposal three ways:** its "demote behind
+  `--authorship` if the golden overflows 100 cols" fork was **moot** (the table was
+  already 113 cols before the column, so width could not decide it — default-on
+  confirmed); a **fourth** refusal shape exists in fact (a row that joins but carries no
+  matchable line) and is folded into *no landed evidence*; and CSV empties **all three**
+  authorship cells on a refusal, not just the percentage.
+  [proposal](../archive/v0.46-chats-author.proposal.md) ·
+  [handoff](../archive/v0.46-chats-author.handoff.md) ·
+  [prompt](../archive/v0.46-chats-author.prompt.md) · living spec: FORMULAS §2.13/§2.14,
+  PLAN §3.5, `cage query chats-view`.
 
 - **timestamp-utc-normal-form (REV-TS)** → **IMPLEMENTED** for v0.45.0 (unreleased)
   2026-08-02 (1401/0 ⇒ 1413/0). One UTC normal form (`YYYY-MM-DDTHH:MM:SSZ`,

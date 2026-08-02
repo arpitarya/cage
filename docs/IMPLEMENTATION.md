@@ -16,6 +16,53 @@ Entry format:
 
 ---
 
+## 2026-08-03 — CHATS-AUTHOR: the `agent%` column on `cage insights chats` (1442/0 ⇒ 1462/0)
+
+- **Phase 0 gate (REV-TS) verified before any work** — `commitjoin.norm_ts` normalizes,
+  `Window` normalizes at construction, `window_for` normalizes its probe; the five
+  non-UTC / mixed-offset / inclusive-bound fixtures in `tests/test_authorship_capture.py`
+  pass. Verified independently rather than trusting the prompt's status line.
+- **Implemented:** per chat, `agent% = agent_lines / (agent_lines + residual_lines)` over
+  the provenance rows sharing `(agents.row_surface(agent), session_id)` — a pure ledger
+  join, **no git at render**, counts **read** never re-matched.
+  - Substrate: `residual_lines` joins `PROVENANCE_COUNT_FIELDS`. **The one count written
+    at 0** (`PROVENANCE_ZERO_BEARING_COUNTS`); its default is a `None` *omit* sentinel, so
+    every non-matching caller writes the pre-v2 row byte-for-byte while presence of the
+    key is the version gate. `originrecord`'s `**counts` boundary passes a `0` through and
+    drops a `None` (never `int(None)` inside a never-raising path).
+  - Capture: `authorcapture._residual` sums `FileMatch.added_matchable` over the row's
+    **landed** files minus `agent_lines`, floored at 0 — off the match list already in
+    hand, **no extra git call**.
+  - Render: one `agent%` column after `credits`, **default on**. Three refusal shapes
+    render `—`, each footnoted: coverage (`coverage_note()` verbatim) · no landed evidence
+    (no row joined, *or* rows carrying no matchable line — the divide-by-zero case, folded
+    in because both reduce to the same statement) · pre-upgrade (excluded from both sums,
+    counted). A measured `0%` renders `0%`. Split-across-surfaces is footnoted.
+  - CSV: `agent_lines` · `residual_lines` · `agent_pct` (0–100, 1dp); **all three empty on
+    a refusal** — writing `0,0` would put the claim the dash refuses to make into data.
+- **Decisions:** (a) the handoff's "demote behind `--authorship` if the golden overflows
+  100 cols" trigger was **moot** — I10a was already 113 cols before this column, so it
+  could not be what decides it; Arpit confirmed default-on. (b) §10 open question resolved:
+  `agent_pct` is **0–100 with 1dp**, pinned in FORMULAS §2.13 and a golden.
+- **Files:** `cage/schema.py` · `cage/originrecord.py` · `cage/authorcapture.py` ·
+  `cage/chats.py` · `cage/explain_data.py` · `tests/test_chats.py` (+14) ·
+  `tests/test_authorship_capture.py` (+6) · `tests/goldenseed.py` ·
+  `tests/test_copilot_credits.py` (positional CSV reads → by header) ·
+  `tests/fixtures/goldens/I10{a,b,d}.txt` · FORMULAS §2.13/§2.14 · PLAN §3.5/§7 ·
+  GLOSSARY · README · CHANGELOG (v0.46.0 unreleased) · DOC-REGISTRY.
+- **Tests:** green — **1462 passed, 0 failed**, 11 Windows-only skips. Goldens re-blessed
+  (chats only; no other view moved a byte). The reconciliation assertion holds across the
+  seam: a chat's sums equal `commitview._buckets`' `agent`/`human` on the same session.
+  Money-independence extended: deleting `provenance.jsonl` moves zero pre-existing cell.
+  Plant-string test untouched and green.
+- **Released as v0.46.0** the same day: `__version__` bumped, README "What's new"
+  replaced, both test counts refreshed to 1462 (the steering proposal's item E — the one
+  row the release rule already mandates — applied and deleted from it). The **chats-bullet**
+  CLAUDE.md edit stays **proposed, not applied** (item F), because it changes a stated
+  law's cardinality.
+- **Next:** tier 2's three decisions (COPILOT-PREMIUM-DEAD · REV-CREDITS defect 2 ·
+  OTEL-SEMCONV-PIN), none of which is a build.
+
 ## 2026-08-03 — Tier 2: REV-CREDITS · REV-HARDEN P2 · CLI-GAPS(a) (1423/0 ⇒ 1441/0)
 
 - **REV-CREDITS defect 1 + the guard gaps.** The copilot CLI shutdown loop dropped a

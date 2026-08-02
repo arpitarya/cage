@@ -55,6 +55,17 @@ def _name(root: Path, *, agent: str, session: str, name: str,
         est_cost_usd=0.0, unpriced_rows=0, ts=ts, session_name=name)
 
 
+def _prov(root: Path, *, session: str, agent: str = "claude-code", sha: str = "abc1234",
+          files: tuple = ("a.py",), agent_lines: int = 0,
+          residual_lines: int | None = 0, **counts):
+    """One provenance row the way `authorcapture` writes it. ``residual_lines=None``
+    writes a **pre-upgrade** row (key absent), which is the version gate."""
+    from cage import originrecord
+    return originrecord.record_transcript(root, sha=sha, files=list(files), agent=agent,
+                                          session_id=session, agent_lines=agent_lines,
+                                          residual_lines=residual_lines, **counts)
+
+
 # ── grouping math ─────────────────────────────────────────────────────────────
 
 def test_grouping_sums_within_one_bucket(root, pol):
@@ -110,6 +121,160 @@ def test_untitled_fallback_is_shortened_for_display_not_csv(root, pol):
     assert long_session in csv_text  # CSV keeps the full, unshortened label
 
 
+# ── agent%: the authorship join ───────────────────────────────────────────────
+
+def test_agent_pct_is_read_from_the_recorded_counts(root, pol):
+    """READ, never re-derived — no matcher and no git run at render time."""
+    _call(root, "c_1", agent="claude-code", session="s1")
+    _prov(root, session="s1", agent_lines=62, residual_lines=38)
+    r = chats.summarize(root, pol)["rows"][0]
+    assert (r["agent_lines"], r["residual_lines"]) == (62, 38)
+    assert r["agent_pct"] == 62.0
+    assert r["auth_refusal"] == ""
+    assert "62%" in chats.render_chats(chats.summarize(root, pol))
+
+
+def test_the_join_normalizes_the_agent_name_on_both_sides(root, pol):
+    """Provenance stamps `claude-code`, the bucket keys on `claude` — one
+    normalization function (`agents.row_surface`), never a second mapping."""
+    _call(root, "c_1", agent="claude-code", session="s1")
+    _prov(root, session="s1", agent="claude-code", agent_lines=3, residual_lines=1)
+    r = chats.summarize(root, pol)["rows"][0]
+    assert r["agent"] == "claude" and r["agent_pct"] == 75.0
+
+
+def test_rows_from_many_commits_sum_into_one_chat(root, pol):
+    _call(root, "c_1", agent="claude-code", session="s1")
+    _prov(root, session="s1", sha="aaa1111", agent_lines=10, residual_lines=10)
+    _prov(root, session="s1", sha="bbb2222", agent_lines=30, residual_lines=10)
+    r = chats.summarize(root, pol)["rows"][0]
+    assert (r["agent_lines"], r["residual_lines"], r["auth_rows"]) == (40, 20, 2)
+    assert r["agent_pct"] == pytest.approx(66.667, abs=0.001)
+
+
+def test_another_sessions_rows_never_leak_into_this_chat(root, pol):
+    _call(root, "c_1", agent="claude-code", session="s1")
+    _call(root, "c_2", agent="claude-code", session="s2")
+    _prov(root, session="s1", agent_lines=9, residual_lines=1)
+    _prov(root, session="s2", sha="bbb2222", agent_lines=1, residual_lines=9)
+    by = {r["session"]: r for r in chats.summarize(root, pol)["rows"]}
+    assert by["s1"]["agent_pct"] == 90.0
+    assert by["s2"]["agent_pct"] == 10.0
+
+
+# ── the refusal triad: `—` is never 0% ────────────────────────────────────────
+
+def test_refusal_no_landed_evidence(root, pol):
+    """A chat with no provenance row: nothing landed, or it landed in another repo.
+    "Nothing landed" is not "the agent wrote nothing"."""
+    _call(root, "c_1", agent="claude-code", session="s1")
+    r = chats.summarize(root, pol)["rows"][0]
+    assert r["agent_pct"] is None and r["auth_refusal"] == chats.NO_EVIDENCE
+    out = chats.render_chats(chats.summarize(root, pol))
+    assert "no landed code evidence" in out
+    assert "`—` is never 0%" in out
+
+
+def test_refusal_coverage_names_the_reason_verbatim(root, pol):
+    """Copilot/kiro stores cannot be line-matched at all — the reason comes from
+    `authorcapture.coverage_note()`, never re-worded here."""
+    from cage import authorcapture
+    _call(root, "c_1", agent="copilot", session="s1", surface="vscode")
+    r = chats.summarize(root, pol)["rows"][0]
+    assert r["agent_pct"] is None and r["auth_refusal"] == chats.COVERAGE
+    assert authorcapture.coverage_note() in chats.render_chats(chats.summarize(root, pol))
+
+
+def test_refusal_pre_upgrade_rows_are_excluded_and_counted(root, pol):
+    """Frozen rows predating `residual_lines` contribute to NEITHER sum — folding
+    their `agent_lines` into the numerator with no denominator would inflate it."""
+    _call(root, "c_1", agent="claude-code", session="s1")
+    _prov(root, session="s1", agent_lines=50, residual_lines=None)
+    r = chats.summarize(root, pol)["rows"][0]
+    assert r["auth_refusal"] == chats.PRE_UPGRADE
+    assert r["agent_pct"] is None
+    assert (r["agent_lines"], r["residual_lines"]) == (0, 0)
+    assert r["auth_pre_upgrade"] == 1
+    out = chats.render_chats(chats.summarize(root, pol))
+    assert "1 provenance row(s) predate residual counts — excluded" in out
+
+
+def test_a_mixed_chat_computes_over_the_carrying_rows_only(root, pol):
+    _call(root, "c_1", agent="claude-code", session="s1")
+    _prov(root, session="s1", sha="aaa1111", agent_lines=8, residual_lines=2)
+    _prov(root, session="s1", sha="bbb2222", agent_lines=99, residual_lines=None)
+    r = chats.summarize(root, pol)["rows"][0]
+    assert r["agent_pct"] == 80.0          # the pre-upgrade row's 99 is not in it
+    assert r["auth_pre_upgrade"] == 1
+    assert "1 provenance row(s) predate residual counts" in chats.render_chats(
+        chats.summarize(root, pol))
+
+
+def test_a_real_zero_percent_renders_zero_not_a_dash(root, pol):
+    """THE distinction the column exists for. A dash spent on absence of evidence
+    would leave nothing to say "measured, and it was none of it"."""
+    _call(root, "c_1", agent="claude-code", session="s1")
+    _prov(root, session="s1", agent_lines=0, residual_lines=40)
+    r = chats.summarize(root, pol)["rows"][0]
+    assert r["agent_pct"] == 0.0 and r["auth_refusal"] == ""
+    out = chats.render_chats(chats.summarize(root, pol))
+    assert "0%" in out
+    assert "no landed code evidence" not in out
+
+
+def test_a_row_with_no_matchable_line_refuses_rather_than_dividing_by_zero(root, pol):
+    """A commit of only binary files lands a row carrying zeros on both sides. There
+    is no share to compute, so it refuses as `no evidence` — never 0%, never a crash."""
+    _call(root, "c_1", agent="claude-code", session="s1")
+    _prov(root, session="s1", agent_lines=0, residual_lines=0)
+    r = chats.summarize(root, pol)["rows"][0]
+    assert r["agent_pct"] is None and r["auth_refusal"] == chats.NO_EVIDENCE
+
+
+def test_a_session_split_across_surfaces_is_footnoted_not_silently_doubled(root, pol):
+    """Provenance carries no surface, so its counts attach to every bucket sharing
+    `(agent, session)` — the reader is told, rather than shown two rows that look
+    like independent evidence."""
+    _call(root, "c_1", agent="claude-code", session="s1", surface="cli")
+    _call(root, "c_2", agent="claude-code", session="s1", surface="vscode")
+    _prov(root, session="s1", agent_lines=3, residual_lines=1)
+    rows = chats.summarize(root, pol)["rows"]
+    assert len(rows) == 2 and all(r["auth_split"] for r in rows)
+    assert "not independent evidence" in chats.render_chats(chats.summarize(root, pol))
+
+
+# ── the v0.36 guard: no money ever touches an authorship number ────────────────
+
+def test_no_authorship_number_is_ever_combined_with_a_usd_value(root, pol):
+    """The standing guard from the human-axis removal. `chats.py` legitimately imports
+    `prices` for the `cost` column, so the guard is **per formula**, not per import:
+    no expression in this module may put an authorship count and a money value on the
+    same line, and `--usd` must move no authorship cell."""
+    import inspect
+    import re
+    from cage import display
+    src = inspect.getsource(chats)
+    money = ("cost", "usd", "credits", "price", "rate", "minutes")
+    author = ("agent_lines", "residual_lines", "agent_pct")
+    for i, line in enumerate(src.splitlines(), 1):
+        code = line.split("#", 1)[0]
+        if not any(a in code for a in author):
+            continue
+        # A dict/tuple that merely carries both names side by side is fine; an
+        # ARITHMETIC operator between them is not.
+        for m in money:
+            assert not re.search(rf"\b{m}\w*\b\s*[-+*/]|[-+*/]\s*\w*\b{m}\b", code), \
+                f"chats.py:{i} combines money with an authorship count: {line.strip()}"
+
+    _call(root, "c_1", agent="claude-code", session="s1")
+    _prov(root, session="s1", agent_lines=7, residual_lines=3)
+    plain = chats.summarize(root, pol)["rows"][0]
+    assert plain["agent_pct"] == 70.0
+    # And the presentation switch cannot move it either.
+    out = chats.render_chats(chats.summarize(root, pol), disp=display.Display(usd=True))
+    assert "70%" in out
+
+
 # ── money independence: the one law amendment, pinned ──────────────────────────
 
 def test_deleting_manifest_changes_zero_numeric_cells(root, pol):
@@ -134,13 +299,46 @@ def test_deleting_manifest_changes_zero_numeric_cells(root, pol):
     assert after_by_session["s1"]["named"] is False
 
 
+def test_deleting_provenance_changes_zero_pre_existing_cells(root, pol):
+    """The **second** scoped carve-out, on the first one's exact terms: `agent%` reads
+    `provenance.jsonl`, and deleting that file must move no pre-existing cell — only
+    the new authorship cells fall to their refusal. If a number here ever depended on
+    an authorship row, the money views would inherit a dependency on a diff-reading
+    capture path that is opt-in and can be switched off."""
+    _call(root, "c_1", agent="claude-code", session="s1", tin=100, tout=10, cached=5)
+    _call(root, "c_2", agent="copilot", session="s2", surface="cli", tin=200, tout=20)
+    _name(root, agent="claude-code", session="s1", name="my chat")
+    _prov(root, session="s1", agent_lines=40, residual_lines=10)
+    before = chats.summarize(root, pol)
+    assert {r["session"]: r["agent_pct"] for r in before["rows"]}["s1"] == 80.0
+
+    paths.Footprint(root).provenance.unlink()
+    after = chats.summarize(root, pol)
+
+    pre_existing = ("calls", "tokens_in", "cached_in", "cache_write_in", "tokens_out",
+                    "premium", "cost", "unpriced_calls", "unpriced_tokens", "credits",
+                    "title", "named", "agent", "surface")
+    b = {r["session"]: r for r in before["rows"]}
+    a = {r["session"]: r for r in after["rows"]}
+    assert set(a) == set(b)
+    for sess, row in b.items():
+        for f in pre_existing:
+            assert a[sess][f] == row[f], f"{f} moved for {sess}"
+    # Only the authorship cells changed — and they refuse rather than reading 0%.
+    assert a["s1"]["agent_pct"] is None
+    assert a["s1"]["auth_refusal"] == chats.NO_EVIDENCE
+    assert a["s1"]["agent_lines"] == 0
+
+
 def test_determinism(root, pol):
     _call(root, "c_1", agent="claude-code", session="s1")
     _call(root, "c_2", agent="copilot", session="s2", surface="vscode")
     _name(root, agent="claude-code", session="s1", name="chat one")
+    _prov(root, session="s1", agent_lines=5, residual_lines=3)
     first = chats.summarize(root, pol)
     assert first == chats.summarize(root, pol)
     assert chats.render_chats(first) == chats.render_chats(first)
+    assert chats.render_csv(first) == chats.render_csv(first)
 
 
 # ── ranking + truncation (no-silent-caps law) ───────────────────────────────────
@@ -194,6 +392,39 @@ def test_kiro_ide_collapses_to_one_row_with_the_honest_label(root, pol):
     out = chats.render_chats(data)
     assert chats.KIRO_IDE_LABEL in out
     assert "collapse into this one row" in out
+
+
+def test_csv_carries_the_authorship_counts_and_leaves_a_refusal_empty(root, pol):
+    """`—` never enters CSV, and neither does a fabricated 0: a refused chat's three
+    authorship cells are **empty**, because writing `0,0` would put the very claim the
+    text dash refuses to make (*this agent wrote none of it*) into machine-readable
+    data. The empty-not-dash rule `credits` already follows."""
+    import csv as _csv
+    import io
+    _call(root, "c_1", agent="claude-code", session="s1", tin=900)
+    _call(root, "c_2", agent="copilot", session="s2", surface="vscode", tin=800)
+    _call(root, "c_3", agent="claude-code", session="s3", tin=700)
+    _prov(root, session="s1", agent_lines=45, residual_lines=15)
+    rows = list(_csv.DictReader(io.StringIO(chats.render_csv(chats.summarize(root, pol)))))
+    by = {r["session"]: r for r in rows}
+
+    assert (by["s1"]["agent_lines"], by["s1"]["residual_lines"]) == ("45", "15")
+    assert by["s1"]["agent_pct"] == "75"            # 0–100, 1dp (trailing zero trimmed)
+    for sess in ("s2", "s3"):                       # coverage · no-evidence
+        assert by[sess]["agent_lines"] == ""
+        assert by[sess]["residual_lines"] == ""
+        assert by[sess]["agent_pct"] == ""
+    assert "—" not in chats.render_csv(chats.summarize(root, pol))
+
+
+def test_csv_agent_pct_keeps_one_decimal(root, pol):
+    import csv as _csv
+    import io
+    _call(root, "c_1", agent="claude-code", session="s1")
+    _prov(root, session="s1", agent_lines=1, residual_lines=2)   # 33.333…
+    row = next(iter(_csv.DictReader(io.StringIO(
+        chats.render_csv(chats.summarize(root, pol))))))
+    assert row["agent_pct"] == "33.3"
 
 
 # ── legacy-human exclusion (calls never really carry this, but the predicate is

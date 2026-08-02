@@ -40,15 +40,19 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
   never run on a real Claude Code / Copilot / Kiro) and **KIRO-MCP-FIELD** (the
   committed path-free `python3 -m cage mcp` never started on a real Kiro). Both need a
   machine, not code. Then **NET-1**, still the product's open question.
-- **CHATS-AUTHOR (2026-08-02, Cowork): accepted and packaged, gated on REV-TS.** A
-  human-vs-agent authorship column (`agent%`) on `cage insights chats`, joining the
-  v2 provenance counts by `(agent, session)`. Live pair:
-  [chats-author.handoff.md](chats-author.handoff.md) +
-  [chats-author.prompt.md](chats-author.prompt.md) (Opus). The prompt's **Phase-0
-  gate STOPs unless REV-TS has landed** — do not lift that gate to "make progress";
-  a new column must not publish the skewed window join with a friendlier face. Read
-  the handoff's Stress-tested line before touching `chats.py` — it carries a limit
-  (same-file double-count across sessions) that is stated, not fixable per chat.
+- **CHATS-AUTHOR: BUILT 2026-08-03** (v0.46.0, unreleased — see *In flight* below).
+  The `agent%` authorship column on `cage insights chats`, joining the v2 provenance
+  counts by `(agent, session)`. Pair + proposal archived:
+  [handoff](archive/v0.46-chats-author.handoff.md) ·
+  [prompt](archive/v0.46-chats-author.prompt.md) ·
+  [proposal](archive/v0.46-chats-author.proposal.md); living spec is FORMULAS
+  §2.13/§2.14. **Its Phase-0 REV-TS gate did its job** — it STOPped an earlier session
+  cold with no work done, REV-TS was then built and shipped, and the re-run verified the
+  gate independently rather than trusting the prompt's own status line. That sequencing
+  is the model to copy, not an obstacle that was overcome. The limit the handoff's
+  Stress-tested line named (same-file double-count across sessions) is **shipped as
+  stated, not fixed**: per chat there is no diff to clamp against, so the commit view
+  stays the arbiter for any single sha.
 - **Lessons from this session, in order of how much they would cost to relearn:**
   1. **A committed file can carry ONE spelling.** The handoff said write `python3` on
      POSIX and `py -3` on Windows for Kiro's MCP — both *committed*, which would churn
@@ -115,8 +119,41 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
 
 ## In flight + the single next step
 
-**Update 2026-08-02 (latest) — the queue has been re-prioritised and filed as a
-proposal; the single next step is REV-TS.**
+**Update 2026-08-03 (latest) — CHATS-AUTHOR is BUILT and green (1462/0). The single
+next step is the v0.46.0 release; the agent lane's next build is tier 2's decisions.**
+
+- **`cage insights chats` now carries `agent%`** — per chat, the share of evidenced
+  landed lines that matched the agent's own proposals. It closed the last item the
+  REV-TS/ID-ENTROPY cleanup had unblocked. Unreleased in tree as **v0.46.0**;
+  `__version__` deliberately still `0.45.0`.
+- **The one thing to internalise:** this column's whole value is that **`—` is never
+  0%**. Three refusal shapes each carry their reason, and a *measured* `0%` still
+  prints `0%` — which is exactly why the dash can never be spent on absence of
+  evidence. The same discipline governs its CSV: a refused chat's authorship cells are
+  **empty**, because `0,0` would put the claim the dash refuses to make into data.
+  If a future change makes a refusal render as a number, it has broken the feature,
+  not improved it.
+- **The substrate gained one deliberate irregularity — know why before you "fix" it.**
+  `residual_lines` is the only line-match count written at `0`
+  (`schema.PROVENANCE_ZERO_BEARING_COUNTS`); the other five are omitted at 0. Presence
+  of the key is the **version gate**, because provenance rows are frozen by the
+  idempotency key and can never be backfilled. Normalising it to the omit-at-0 loop
+  would silently turn *everything matched the agent* into *no data*.
+- **A held CLAUDE.md edit became FIVE, not four.** CHATS-AUTHOR's item F is the one
+  with teeth: the chats bullet currently states the money-independence law amendment as
+  **one** scoped carve-out, and there are now **two** (`imports.jsonl` for a label,
+  `provenance.jsonl` for counts). Until F lands, CLAUDE.md understates a law's
+  cardinality — an agent reading it would treat the second carve-out as a violation.
+- **What I'd warn the next model about, from this build:** two tests read the chats CSV
+  by **column index**, so adding columns broke them as a *false failure about credits*.
+  I re-pointed them to read by header. Assume more positional reads exist elsewhere;
+  a broken assertion that names the wrong subsystem costs more than one that fails
+  honestly.
+
+**Update 2026-08-02 — the queue has been re-prioritised and filed as a
+proposal; the single next step is REV-TS.** *(Superseded: REV-TS shipped in v0.45.0
+and CHATS-AUTHOR, its dependent, shipped 2026-08-03 — kept for the reasoning below,
+which still binds.)*
 
 - **OPEN-WORK was cut 469 → 243 lines on 2026-08-02** by removing fifteen blocks of
   *completed* work (they belong in IMPLEMENTATION.md, and every one was verified to be
@@ -397,6 +434,21 @@ you touch any savings number.**
 
 ## Maintainers
 
+- Claude (Opus 5) — 2026-08-03 — built CHATS-AUTHOR (`agent%` on `cage insights
+  chats`, 1442/0 ⇒ 1462/0). **The lesson I'd want inherited: a recorded fallback can be
+  moot, and noticing that is the work.** The handoff said "demote the column behind
+  `--authorship` if the golden overflows 100 cols" — but the chats table was already
+  **113 cols before the column existed**, so width could never have been what decided
+  it. Both readings were defensible and they lead to opposite products (a default
+  column vs. one nobody discovers), so I raised it instead of picking. **A trigger
+  written against a threshold that was already breached is not a trigger — it is a
+  stale assumption wearing one.** Check whether a spec's gate could ever have fired
+  before you let it decide anything. Second, smaller: the same instinct applies to a
+  *count* of things a spec enumerates. The proposal named three refusal shapes; a
+  fourth exists in fact (a provenance row that joins but carries no matchable line).
+  I folded it into an existing shape rather than inventing a new one, because both
+  reduce to the identical statement — but an executor who trusts "three" as a closed
+  set ships a `ZeroDivisionError` instead.
 - Claude (Opus 5) — 2026-08-02 — reviewed and prioritised the open queue
   (merged into [OPEN-WORK.md](OPEN-WORK.md)). Lesson for the next model:
   **when you are asked to prioritise, the ranking axis is the deliverable — not the

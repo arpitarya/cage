@@ -493,6 +493,9 @@ spec'd elsewhere.
 | `calls` | count of call rows in the bucket |
 | `tokens_in` / `cached_in` / `cache_write_in` / `tokens_out` / `premium` | summed straight off the matching call field |
 | `credits` | summed `calls.credits`, or `—` when **no** call in the bucket recorded one (absence, not zero — §1.1a). Text renders 2dp; CSV carries the full float and leaves the cell **empty** when absent, so `—` never enters data |
+| `agent%` | `agent_lines / (agent_lines + residual_lines)` over the provenance rows sharing this chat's `(agent, session)` — **read** from §2.14's recorded counts, never re-matched. Refuses (`—`, footnoted) three ways; see below |
+| `agent_lines` / `residual_lines` (CSV only) | the two sums the share is built from, raw counts. **Empty — not `0` — on a refusal**, like `credits` |
+| `agent_pct` (CSV only) | the same share as `0–100` with **1dp** (`csvout.cell` trims a cosmetic trailing zero); empty when refused |
 | `cost` (`--usd` only) | `Σ prices.call_usd_match(pol, call)` per row (§1); UNPRICED counted, never a silent `$0` |
 | `priced_via` (CSV only) | which rung paid for this bucket — `credits-rate` \| `token-table` \| `mixed` when its rows split, empty when nothing priced |
 
@@ -508,6 +511,28 @@ spec'd elsewhere.
   sort are not a claim about how a number was priced. `cost` inherits `call_usd_match`'s
   tag exactly like `report` (§1), which means a bucket with any credits-priced row
   carries `modeled` in the CSV `method` column, not `measured` (§1.1a).
+- **`agent%` scope, and the sentence the footnote must carry:** it is the share of
+  *evidenced lines in files this chat touched* — **never** a share of the chat's work.
+  Lines in files no session proposed are §2.14's `unattributed`: commit-scoped, so
+  structurally outside this denominator. That is scope, not redistribution.
+- **Three refusal shapes, each `—` and each footnoted — `—` is never 0%.**
+  **coverage** (copilot/kiro, `authorcapture.coverage_note()` verbatim — their stores
+  hold no edit text) · **no landed evidence** (no row joined, or rows carrying no
+  matchable line: not committed yet, or committed in another repo/ledger root —
+  "nothing landed" ≠ "the agent wrote nothing") · **pre-upgrade** (rows predating
+  `residual_lines`; excluded from **both** sums and counted in one footnote). A
+  *measured* `0%` renders `0%`, which is why the dash can never be spent on absence.
+- **The second money-independent carve-out.** `agent%` reads `provenance.jsonl` —
+  counts only, and deleting it moves **zero** pre-existing cell; only the authorship
+  cells fall to `—`. Same terms as the `chat`-label carve-out, pinned by the same test
+  file. **No USD, no rate, no minutes ever touches it** (the v0.36 law): `agent%` never
+  combines with `cost`, and `--usd` moves no authorship cell (asserted per-formula in
+  `tests/test_chats.py`, since this module legitimately imports `prices` for `cost`).
+- **Two stated limits.** A provenance row carries no `surface`, so a session split
+  across surfaces attaches its counts to **every** such bucket — footnoted, because
+  those rows are not independent evidence. And per chat there is no diff to clamp
+  against (§2.14 clamps per commit), so two chats that proposed the same landed file
+  each count its lines: **the commit view stays the arbiter for any single sha**.
 - Ranking (`tokens_in` desc, then session id) and the top-20 cut (`--all` lifts it) are
   render-time only — `chats.summarize()` returns every row un-truncated, so `--all` can
   never move a number, only how many rows are shown. CSV is never truncated. Explained
@@ -562,9 +587,19 @@ suggested        = kept + kept_modified + dropped                   (exactly; as
 | `kept_modified` | proposed lines whose **file** landed but whose line did not match |
 | `dropped` | proposed lines whose file is absent from the commit |
 | `agent_lines` | the added-line side of the same match (= `kept`; separate name, §3.5) |
+| `residual_lines` | matchable added lines in **this row's own landed files**, minus `agent_lines`, floored at 0 — the not-the-agent side of its own scope, and the denominator half of §2.13's `agent%`. Scoped to the row's landed files on purpose: `unattributed` is a commit fact, and folding it in would let every session on a commit claim the same lines |
 
 Line **bodies** and line **hashes** are never persisted — a hash is a membership oracle
-over the source. Only these five integers, additive-optional, omitted at 0.
+over the source. Only these six integers, and only counts.
+
+**Five are omitted at 0; `residual_lines` is written at 0** — the one deliberate
+deviation (`schema.PROVENANCE_ZERO_BEARING_COUNTS`). **Presence of the key is the
+version gate**: absent means *this row predates the count* (renders `—` forever — rows
+are frozen by `originrecord`'s idempotency key and are never backfilled), while a
+recorded `0` is the real finding *everything matchable matched the agent*. Omitting it
+would make the most flattering true result indistinguishable from no data. Same
+absent-vs-recorded-zero law as `credits`' `None` sentinel (§1.1a). A caller that does
+not line-match supplies nothing and writes the pre-v2 row byte-for-byte.
 
 **The four buckets (derive, P3).** Over one commit's added lines:
 

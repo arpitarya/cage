@@ -62,7 +62,7 @@ cage setup                      # guided wizard: defaults to all agents, wires M
 cage demo                       # seed the worked example
 cage insights matrix                     # the counterfactual permutation table
 cage insights adoption                   # do your agents actually invoke the tools?
-cage insights chats                      # per-chat detail: tokens/cost by agent, titled where the store has a title
+cage insights chats                      # per-chat detail: tokens/cost + agent%, titled where the store has a title
 cage task quality                    # cost per *successful* task
 cage query "how is attribution calculated"  # explain any number — live formula, $0
 ```
@@ -186,7 +186,7 @@ A tool earns rows in `attrib`/`matrix`/`roi` by filing a **savings receipt**, an
 - **In-tool (you own it) — e.g. fux** carries a fail-open `cage_receipt.py` and emits its own `tool="fux"` receipt. Cage stays optional; fux runs unchanged with cage absent.
 - **External adapter (third-party) — e.g. graphify:** `cage data graphify -- graphify query "…"` runs graphify unmodified, passes its output through byte-for-byte, and files a `tool="graphify"` receipt by parsing the cited `source_file`s. graphify is never edited; a metering error never alters its result.
 
-The full command surface (30+ subcommands: ledger · attribution · task outcomes · fleet study · ops · agents) is grouped in `cage --help`, which points at `cage query` for any "how is this computed". Every read command takes `--json` for the agent-as-user. Want a chat-by-chat breakdown instead of a rollup? `cage insights chats` groups the ledger by `(agent, surface, session)` and titles each row where the store carries one — labels only, never a number the manifest could move. The doc map — design of record, subsystem docs, operations, archive — starts at [docs/README.md](docs/README.md).
+The full command surface (30+ subcommands: ledger · attribution · task outcomes · fleet study · ops · agents) is grouped in `cage --help`, which points at `cage query` for any "how is this computed". Every read command takes `--json` for the agent-as-user. Want a chat-by-chat breakdown instead of a rollup? `cage insights chats` groups the ledger by `(agent, surface, session)` and titles each row where the store carries one — labels only, never a number the manifest could move. Its `agent%` column answers the question a spend rollup can't: *did this chat's tokens become code?* — per chat, the share of evidenced lines in files it touched that matched the agent's own proposals, read from the authorship rows rather than re-derived. Where cage has no evidence it prints `—` with the reason, never a `0%`. The doc map — design of record, subsystem docs, operations, archive — starts at [docs/README.md](docs/README.md).
 
 ## Works with any agent — explicit capture over one global ledger
 
@@ -228,7 +228,7 @@ cage data export --csv calls --since 30d -o calls.csv   # raw ledger rows for a 
 
 ## The `$0` guarantee
 
-Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 1441 tests; `cage demo` reproduces the worked attribution example against a real ledger.
+Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 1462 tests; `cage demo` reproduces the worked attribution example against a real ledger.
 
 **Honest limits.** Marginal-by-fixed-order is defensible and `$0`, but it is an *ordering convention*, not a Shapley value (that's a deferred audit mode). And a counterfactual cell is an honest reconstruction, never an invoice — the `method` column says so on every row, on purpose.
 
@@ -236,7 +236,7 @@ Every derived view is parse / arithmetic over the log — **no LLM call, ever, o
 
 Latest release below — full history and detail in [CHANGELOG.md](CHANGELOG.md).
 
-- **v0.45.0 (2026-08-03) — a correctness pass: nothing here was caught by a test.** Ten fixes from a v0.37.0→v0.44.0 review: dropped Copilot shutdown credits, a timezone bug misplacing authorship joins on non-UTC machines, 16-bit row-id collisions (measured 1-in-229, now 32-bit), a hook exit code that could block every Bash call in a session, and more. See [CHANGELOG.md](CHANGELOG.md).
+- **v0.46.0 (2026-08-03) — `agent%`: did this chat's tokens become code?** `cage insights chats` gains one column — per chat, the share of evidenced landed lines that matched the agent's own proposals, read from the authorship rows rather than re-derived. Where cage has no evidence it prints `—` with the reason, never a `0%`. See [CHANGELOG.md](CHANGELOG.md).
 
 ## The name
 

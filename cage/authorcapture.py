@@ -116,6 +116,29 @@ def _uncovered(edits, newest: str) -> bool:
     return any(commitjoin.norm_ts(e.get("ts") or "") > newest for e in edits)
 
 
+def _residual(matches, landed, agent_lines: int) -> int:
+    """The row's `residual_lines`: matchable added lines in the files this row LANDED,
+    minus what matched the agent — the not-the-agent side of its own scope.
+
+    Read off the `FileMatch` list the matcher already produced (`added_matchable` per
+    file), so there is no second matcher and no extra git call: `commit_diff` ran once
+    for the whole commit and `match_commit` has already gated every added line.
+
+    Scoped to `landed` on purpose. A file this session never proposed is
+    `commitview`'s `unattributed` bucket — a commit-level fact, and folding it in here
+    would let every session on the commit claim the same lines as its own residual.
+
+    **Floored at 0, and the floor is reachable**: binary files (`UNREADABLE`) land with
+    no readable lines at all, so a row whose only landed file is binary has `0`
+    matchable and a non-zero `agent_lines` cannot occur — but a future non-1:1 matcher
+    could exceed the denominator, and a negative count would render as a nonsense
+    percentage rather than an honest one. Returns an int, never None: this caller
+    always evidences the count, and that is what makes the key the version gate."""
+    scope = set(landed)
+    matchable = sum(int(m.added_matchable) for m in matches if m.path in scope)
+    return max(0, matchable - int(agent_lines))
+
+
 def _sig(f: Path):
     try:
         st = f.stat()
@@ -203,12 +226,13 @@ def capture(root: Path, files, *, repo: Path | None = None, pol: dict | None = N
                     continue  # proposed nothing that survived: no row, i.e. unknown
                 add = sum(numstat.get(p, (0, 0))[0] for p in landed)
                 rem = sum(numstat.get(p, (0, 0))[1] for p in landed)
+                residual = _residual(matches, landed, totals["agent_lines"])
                 ok = originrecord.record_transcript(
                     root, sha=sha, files=landed, agent=AGENT, lines_added=add,
                     lines_removed=rem, session_id=session,
                     suggested=totals["suggested"], kept=totals["kept"],
                     kept_modified=totals["kept_modified"], dropped=totals["dropped"],
-                    agent_lines=totals["agent_lines"])
+                    agent_lines=totals["agent_lines"], residual_lines=residual)
                 if ok:
                     summary["rows"] += 1
                     summary["suggested"] += totals["suggested"]

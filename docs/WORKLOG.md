@@ -12,6 +12,35 @@ by milestone) — the worklog is what *happened this session*.
 
 ---
 
+## 2026-08-03 — Claude Code — CHATS-AUTHOR: `agent%` on `cage insights chats` (1442/0 ⇒ 1462/0)
+
+- **Asked:** execute the CHATS-AUTHOR prompt — the `agent%` authorship column, behind a
+  hard Phase-0 REV-TS gate.
+- **Done:** gate verified **independently** (not trusted from the prompt's status line) —
+  `commitjoin` normalizes at construction and at probe; the five non-UTC fixtures pass.
+  Then the column, end to end: `residual_lines` in the provenance substrate, the capture
+  computation, the `(agent, session)` join, render + CSV, 20 new tests, all §9.5 docs,
+  pair + proposal archived, OPEN-WORK row deleted. 1462/0; only the three chats goldens
+  moved.
+- **Decided:** (a) the handoff's "demote behind `--authorship` if the golden overflows
+  100 cols" fallback was **moot** — I10a was already 113 cols *before* the column, so
+  width could never have been what decided it. Raised it rather than silently applying
+  either reading; Arpit confirmed **default-on**. (b) §10's open question: CSV
+  `agent_pct` is **0–100 with 1dp**. (c) A **fourth** refusal case exists in fact — a row
+  that joins but carries no matchable line (a commit of only binary files) — folded into
+  *no landed evidence* rather than invented as a new shape, since both reduce to the same
+  statement. (d) CSV empties **all three** authorship cells on a refusal, not just the
+  percentage: writing `0,0` would put the claim the text dash refuses to make into data.
+- **Found, not asked for:** two tests in `test_copilot_credits.py` read the chats CSV by
+  **column index**, so the three new columns broke them as a false failure about credits.
+  Re-pointed to read by header — the same class of latent breakage would hit the next
+  column too.
+- **Open:** the CLAUDE.md edit is **proposed, not applied** (below) — it needs Arpit's
+  read. The README "What's new" line and the `just test` count refresh are deliberately
+  left to the release, which is the next step.
+- **Next:** release v0.46.0 (bump `__version__`, "What's new", test count, tag, GitHub
+  release — the GitHub release *is* the publish trigger).
+
 ## 2026-08-03 — Claude Code — tier 2: REV-CREDITS · REV-HARDEN P2 · CLI-GAPS(a) (1423/0 ⇒ 1441/0)
 
 - **Asked:** "go" — continue to tier 2.
@@ -298,7 +327,7 @@ by milestone) — the worklog is what *happened this session*.
 
 ## 2026-08-02 — Claude Code — CHATS-AUTHOR Phase 0 gate: **FAILED, work not started**
 
-- **Asked:** execute [chats-author.prompt.md](chats-author.prompt.md) (the `agent%`
+- **Asked:** execute [chats-author.prompt.md](archive/v0.46-chats-author.prompt.md) (the `agent%`
   column on `cage insights chats`), whose Phase 0 gate requires REV-TS landed.
 - **Done:** gate verification only — read `cage/commitjoin.py` at HEAD and swept
   the tree for a normalizer and a non-UTC fixture. **REV-TS has not landed:**
@@ -350,8 +379,8 @@ by milestone) — the worklog is what *happened this session*.
 - **Asked:** create the handoff and prompt for CHATS-AUTHOR (the entry below) —
   i.e. accept the proposal and package it for execution.
 - **Done:** debate gate run before packaging (implementation-handoff discipline),
-  then wrote the live pair: [chats-author.handoff.md](chats-author.handoff.md) +
-  [chats-author.prompt.md](chats-author.prompt.md) (**Opus** — substrate deviation
+  then wrote the live pair: [chats-author.handoff.md](archive/v0.46-chats-author.handoff.md) +
+  [chats-author.prompt.md](archive/v0.46-chats-author.prompt.md) (**Opus** — substrate deviation
   + guard reconciliation). Proposal header, proposals/README entry, docs/README
   *Active work*, the OPEN-WORK **CHATS-AUTHOR** row and DOC-REGISTRY all updated
   to the picked-up state; entry stays in proposals/ per the lifecycle rule.
@@ -374,7 +403,7 @@ by milestone) — the worklog is what *happened this session*.
   authorship share** — the v2 line-match evidence re-keyed per chat — over
   conversation share or a tokens_in/out ratio (the latter would mislabel the whole
   context window as "human").
-- **Done:** filed [proposals/chats-agent-authorship-column.proposal.md](proposals/chats-agent-authorship-column.proposal.md)
+- **Done:** filed [chats-agent-authorship-column.proposal.md](archive/v0.46-chats-author.proposal.md)
   (status: proposed, owner unclaimed). Verified against HEAD before writing: the
   join key is real (`importcmd` and `authorcapture` both stamp `session=f.stem`;
   `agents.row_surface` normalizes `claude-code`→`claude`), so the column is a pure

@@ -46,8 +46,17 @@ PROVENANCE_FIELDS = ("schema_ver", "id", "ts", "sha", "agent", "files",
 # are the ONLY thing the matcher persists: the proposed line bodies it compares
 # exist in process memory for the length of one import and are never written, never
 # hashed, and never shipped (counts-never-content, plan §3.5).
+#
+# `residual_lines` is the ONE deliberate exception to omitted-at-zero: it is written
+# whenever the caller supplies it, **including 0**, because presence of the key is the
+# version gate for the per-chat `agent%` column (`chats.py`). See `make_provenance`.
 PROVENANCE_COUNT_FIELDS = ("suggested", "kept", "kept_modified", "dropped",
-                           "agent_lines")
+                           "agent_lines", "residual_lines")
+
+# Counts written whenever supplied, even at 0 — absence means *this row predates the
+# count*, which is a different fact from *this row recorded zero*. Everything else in
+# `PROVENANCE_COUNT_FIELDS` is omitted at 0.
+PROVENANCE_ZERO_BEARING_COUNTS = ("residual_lines",)
 
 
 def _now() -> str:
@@ -261,7 +270,7 @@ def make_provenance(*, sha: str, files: list[str], agent: str = "",
                     ts: str | None = None, schema_ver: int = 1,
                     row_id: str | None = None, suggested: int = 0, kept: int = 0,
                     kept_modified: int = 0, dropped: int = 0,
-                    agent_lines: int = 0) -> dict:
+                    agent_lines: int = 0, residual_lines: int | None = None) -> dict:
     """One authorship-attribution row — which agent touched which files in `sha`.
 
     `origin="human"` is reachable only by explicit attestation (plan §3.5), which is
@@ -270,7 +279,7 @@ def make_provenance(*, sha: str, files: list[str], agent: str = "",
     Counts-never-content: `files` are validated repo-relative, never absolute, and the
     row carries paths + line counts only — never diff bodies or commit messages.
 
-    The five line-match counts (`PROVENANCE_COUNT_FIELDS`, agent-vs-human v2 P1) are
+    The line-match counts (`PROVENANCE_COUNT_FIELDS`, agent-vs-human v2 P1) are
     **additive-optional** — each is omitted at 0, so a row from any other capture path
     is byte-identical to the pre-v2 contract and `schema_ver` stays 1. They partition
     what the agent PROPOSED in this session against what the commit actually contains:
@@ -285,6 +294,19 @@ def make_provenance(*, sha: str, files: list[str], agent: str = "",
       its own name because it answers the other question ("how much of this commit is
       the agent's", not "how much of the agent's suggestion survived") — the two
       diverge the moment matching stops being one-to-one.
+
+    **`residual_lines` is the one count written at 0** (`PROVENANCE_ZERO_BEARING_COUNTS`),
+    and the deviation is deliberate. It is the *other* side of `agent_lines` inside this
+    row's own landed files — matchable added lines there, minus `agent_lines`, floored at
+    0 (computed in `authorcapture.capture`) — and the per-chat `agent%` column reads the
+    two together. Omitting it at 0 would make *everything matchable matched the agent*
+    (a real, and the most flattering, finding) indistinguishable from *this row predates
+    the count*, whose honest render is `—`. So **presence of the key is the version
+    gate**: `None` (the default) omits it and keeps every legacy and non-matching caller
+    byte-identical; any supplied value, `0` included, is written. Same absent-vs-recorded-
+    zero law as `credits`' `None` sentinel on `make_call`. Rows are frozen by
+    `originrecord`'s idempotency key, so pre-upgrade rows can never be backfilled — they
+    must stay distinguishable forever, not be guessed at.
 
     Deliberately **not** persisted: `unknown` (sub-gate and binary-file lines) and
     `not-proposed` (files in the commit nobody proposed). Both are properties of the
@@ -310,4 +332,7 @@ def make_provenance(*, sha: str, files: list[str], agent: str = "",
                         ("agent_lines", agent_lines)):
         if value:
             row[name] = int(value)
+    # The zero-bearing count: supplied ⇒ written (0 included), None ⇒ absent.
+    if residual_lines is not None:
+        row["residual_lines"] = int(residual_lines)
     return row

@@ -5,8 +5,9 @@
 **Next (agent lane):** **tier 2** — four fabricated numbers, batchable in one green
 run (REV-CREDITS · REV-HARDEN P2 · COPILOT-PREMIUM-DEAD inside it · CLI-GAPS(a)).
 **Tiers 0 and 1 are both gone** — everything that accrued damage or was armed to fire
-later closed 2026-08-02/03 (REV-TS · ID-ENTROPY · REV-DOGFOOD-DATE · REV-HARDEN P1),
-which also unblocked CHATS-AUTHOR · HR-COPILOT-JOIN · HR-FIELD.
+later closed 2026-08-02/03 (REV-TS · ID-ENTROPY · REV-DOGFOOD-DATE · REV-HARDEN P1).
+**CHATS-AUTHOR, which they unblocked, is CLOSED and RELEASED 2026-08-03** (v0.46.0,
+1462/0); HR-COPILOT-JOIN and HR-FIELD remain open.
 **Nothing is blocked, and the two lanes run at the same time.**
 
 **How this queue is ordered (2026-08-02).** It has **two resources, not one** — *your
@@ -28,15 +29,12 @@ this file's own markers.
 deliberately unbumped — both false at HEAD, carried forward unchecked. That is the
 second time this header has gone stale in two days; its own markers are not ground
 truth.)*
-**In tree, unreleased: v0.45.0 (REV-TS · ID-ENTROPY · REV-DOGFOOD-DATE · REV-HARDEN
-P1)** — the UTC normal form for the authorship join, 32-bit row ids, the dogfood
-calendar bomb defused, and `cage hook` no longer able to block a session by failing;
-all built and green 2026-08-02/03, CHANGELOG entry written. `__version__` deliberately **not** bumped (bumping is a release action, and it
-would propagate an unreleased stamp into every scaffolded project's
-`[meta] cage_version`).
-Suite: **1423 pass / 0 fail / 11 skipped** — re-run and printed 2026-08-03 (the prior
-1401 figure was accurate; +22 are these four fixes' own tests, and the extra skip is
-the now-opt-in dogfood age check).
+**State: v0.46.0 is released** — `v0.46.0` tagged, `__version__ = "0.46.0"`
+(`cage/__init__.py:19`); CHATS-AUTHOR shipped in it, v0.45.0 before it. **Nothing is
+unreleased in tree.** *(This header has gone stale three times in three days; re-read
+`git tag --sort=-v:refname` and `cage/__init__.py` before trusting it again.)*
+Suite: **1462 pass / 0 fail / 11 skipped** — re-run and printed 2026-08-03 (+20 over the
+1442 baseline are CHATS-AUTHOR's own tests).
 
 ## Pending
 
@@ -56,14 +54,15 @@ plus REV-HARDEN's two later phases.
 
 ### Tier 3 — your lane · one sitting (~30 min)
 
-**One item now, not four** — the four held CLAUDE.md edits were merged into a single
-proposal on 2026-08-03, since they patch one file and need one decision sitting.
+**One item, four edits** — the four held CLAUDE.md edits were merged into a single
+proposal on 2026-08-03 (CHATS-AUTHOR added a fifth the same day), since they patch one
+file and need one decision sitting.
 
-Re-verified against CLAUDE.md at HEAD: **none of the four is applied**. Until they are,
+Re-verified against CLAUDE.md at HEAD: **none of the remaining four is applied** (E, the test count, shipped with v0.46.0). Until they are,
 every agent session reads a CLAUDE.md that is behind the code.
 
 **Both source proposals' test-count sections had gone stale** — they asked for 1354 and
-1391 against a file already at 1401 (suite now 1423), so either would have *regressed*
+1391 against a file already at 1401 (suite now 1462), so either would have *regressed*
 it. The merged proposal replaces the number with a rule.
 
 **DOC-LINK-CHECK rides this sitting** — it needs a policy call from you before it can be
@@ -71,7 +70,7 @@ written at all (see its row).
 
 | # | what | next action |
 |---|---|---|
-| **STEERING-EDITS** | **four** CLAUDE.md edits raised by four programs, all held because the prompts forbid rewriting a steering file without a human read. Re-verified at HEAD 2026-08-03 — **none applied**: no `Authorship, per commit` bullet · no `[billing.<agent>]` text · `:674–676` still omits `FORMULAS.md` · no Dogfood section. Merged into one file 2026-08-03 (they patch one file and need one sitting) | read [steering-edits-pending.proposal.md](proposals/steering-edits-pending.proposal.md) once, decide four times; its head table carries a verdict box each. **An applied section is deleted from it**, and the file goes when the table empties. Its item **E** — the `just test` count — is now a *rule* (set it to what `just test` prints that day), because both source proposals hardcoded targets and both went stale below the file they patch |
+| **STEERING-EDITS** | **four** CLAUDE.md edits raised by five programs (E applied in the v0.46.0 release and deleted), all held because the prompts forbid rewriting a steering file without a human read. Re-verified at HEAD 2026-08-03 — **none applied**: no `Authorship, per commit` bullet · no `[billing.<agent>]` text · `:674–676` still omits `FORMULAS.md` · no Dogfood section · the chats bullet still states the law amendment as **one** carve-out when there are now two. Merged into one file 2026-08-03 (they patch one file and need one sitting); **F added 2026-08-03 by CHATS-AUTHOR** | read [steering-edits-pending.proposal.md](proposals/steering-edits-pending.proposal.md) once, decide five times; its head table carries a verdict box each. **An applied section is deleted from it**, and the file goes when the table empties. Its item **E** — the `just test` count — is now a *rule* (set it to what `just test` prints that day), because both source proposals hardcoded targets and both went stale below the file they patch |
 | **DOC-LINK-CHECK** | DOC-CASE's dangling-link class (case-broken doc citations, invisible on a case-insensitive filesystem) would be caught by a link-checker test, same class as `test_cli_reference.py` catching a dead verb in prose — recommended in the DOC-CASE handoff but explicitly scoped out of that change | **scope measured 2026-08-02: 112 dangling `.md` links tree-wide**, nearly all history in WORKLOG/PLAN/INTERVIEW pointing at pairs that gained a `vX.Y-` prefix when archived. So the test cannot simply be added — it goes red on 112 links on day one. Decide the policy first (exempt `archive/`+history, or bulk-repair, or warn-not-fail), then write the case-sensitive walker over `git ls-files` |
 
 ### Tier 4 — evidence · runs CONCURRENTLY with the fix tiers, not after them
@@ -88,11 +87,8 @@ This is the whole point of the two-lane split, and as of 2026-08-02 **every item
 
 ### Tier 5 — blocked, gated or parked · do not pick up before the trigger fires
 
-**CHATS-AUTHOR is UNBLOCKED as of 2026-08-02** — its pair is written and its Phase-0 gate (REV-TS) now passes. It is here only because the tier's other rows are genuinely gated; it is ready to run and belongs to the agent lane.
-
 | # | what | next action |
 |---|---|---|
-| **CHATS-AUTHOR** | proposal filed 2026-08-02 (Arpit's ask): `agent%` per chat on `cage insights chats` — v2 authorship counts joined by `(agent, session)`, one new always-written `residual_lines` provenance count, refusals (`—`) for coverage / no-landed-evidence / pre-upgrade rows | **picked up 2026-08-02** — pair written: [handoff](chats-author.handoff.md) + [prompt](chats-author.prompt.md) (Opus); execute the pair. Its Phase-0 gate ran 2026-08-02 and **FAILED correctly** (no normalizer at HEAD, no `+05:30` fixture) — no work was started; **REV-TS then landed the same day, so the gate now passes.** Ready to run |
 | **HR-COPILOT-JOIN** | copilot-vscode has per-request timestamps but stamps **no `project`**, so every one of its calls is excluded as *unconfirmable* — the join is built and cannot fire for it | **unblocked 2026-08-02** (was sequenced after REV-TS): stamp `project` on the vscode chat-store parse (the claude `cwd` precedent), then it window-joins for free. Still a capture change |
 | **GF-LAUNCHER** | under `--python-launcher` neither twin meters (B5) | a decision — must move both twins |
 | **TOOL-SDK** | the paved road: next tool ≠ 34 modules; fux is the proof | [proposal](proposals/tool-integration-contract.proposal.md) — builds on [shim-contract](shim-contract.md) |

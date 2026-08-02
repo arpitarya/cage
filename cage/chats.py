@@ -30,6 +30,26 @@ fields (plan §3.1) — so this is pure derive, no substrate change.
 5. Render — text via `display.Display`/`Footer` (`--usd` adds the cost column; tokens
    are the default view); `--csv` from the same rows, untruncated (CSV never gates).
 
+**The `agent%` column (CHATS-AUTHOR)** joins one more append-only file: per chat, the
+share of *evidenced* landed lines — `agent_lines / (agent_lines + residual_lines)`
+summed over the provenance rows sharing this chat's `(agent, session)`. It is **read,
+never re-derived**: no matcher runs at render, no git call happens, and the counts are
+whatever `authorcapture` recorded (a second matcher would be free to disagree with the
+one that wrote the row — §2.14's stated mistake).
+
+That makes `provenance.jsonl` the **second** scoped carve-out to `manifest.py`'s
+"never read by a derived view" contract, and it holds on the same terms as the first:
+counts only, and deleting the file moves **zero** pre-existing cell — only the new
+authorship cells fall to `—`. Pinned by `tests/test_chats.py`.
+
+The scope is narrower than it looks and the footnote says so: the denominator is the
+matchable lines in files *this chat proposed*. Lines in files no session proposed are
+`commitview`'s `unattributed` — commit-scoped, structurally outside this denominator,
+never redistributed into it. Per-chat there is also no diff to clamp against, so two
+chats that proposed the same landed file each count its lines; **the commit view stays
+the arbiter for any single sha**. No USD, no rate, no minutes ever touches this number
+(the v0.36 law) — it never combines with `cost`.
+
 **Known honesty limits, stated not fixed** (proposal): a manifest row is written only
 when a sweep *appends* rows for that session, so a chat renamed after its last new
 call keeps its stale title. Legacy (pre-manifest) sessions have no name row at all —
@@ -45,11 +65,18 @@ from __future__ import annotations
 from pathlib import Path
 
 from cage import agents as _agents
-from cage import creditprice, ledger, manifest, prices, report
+from cage import authorcapture, creditprice, ledger, manifest, prices, report
 from cage.constants import CHATS_DEFAULT_ROWS
 
 KIRO_IDE_LABEL = "kiro (no session identity)"
 _NO_SESSION = "(no session)"
+
+# Why an `agent%` cell refuses. Each is a DIFFERENT fact with a different fix, so they
+# are never merged into one bucket and never rendered as 0% — the whole point of the
+# column is that "no evidence" and "the agent wrote none of it" are not the same claim.
+COVERAGE = "coverage"        # this agent's store cannot be line-matched at all
+NO_EVIDENCE = "no-evidence"  # nothing landed (or nothing matchable) to compute a share from
+PRE_UPGRADE = "pre-upgrade"  # rows exist but all predate `residual_lines`
 
 
 def _title_map(root: Path) -> dict[tuple[str, str], str]:
@@ -67,6 +94,72 @@ def _title_map(root: Path) -> dict[tuple[str, str], str]:
             continue
         names[(row.get("agent", ""), row.get("session", ""))] = name
     return names
+
+
+def _authorship_map(root: Path) -> dict[tuple[str, str], dict]:
+    """`(agent, session_id) -> {agent_lines, residual_lines, rows, pre_upgrade}` from
+    `provenance.jsonl` — the second money-independent carve-out (counts only, never a
+    numeric money cell; pinned by `tests/test_chats.py`).
+
+    **Both sides pass through `agents.row_surface`**, because they spell the same agent
+    differently: a provenance row stamps `claude-code` (the ledger's raw agent) and a
+    chat bucket keys on `claude` (the SURFACES name). One normalization function, used
+    on both sides — never a second mapping.
+
+    **The surface is deliberately not in the key.** Provenance rows carry none, so a
+    count attaches to every bucket sharing `(agent, session)`; a session split across
+    surfaces is footnoted at render rather than silently assigned to one of them.
+
+    **Rows lacking `residual_lines` contribute to NEITHER sum** and are counted as
+    `pre_upgrade` instead. They are frozen by `originrecord`'s idempotency key and can
+    never be backfilled, so folding their `agent_lines` into the numerator with no
+    denominator to match would inflate every mixed chat's percentage."""
+    out: dict[tuple[str, str], dict] = {}
+    for r in ledger.provenance(root):
+        session = r.get("session_id") or ""
+        if not session:
+            continue  # nothing to join on — a row cage cannot place in a chat
+        agent = _agents.row_surface(r.get("agent")) or r.get("agent") or "?"
+        a = out.setdefault((agent, session), {"agent_lines": 0, "residual_lines": 0,
+                                              "rows": 0, "pre_upgrade": 0})
+        a["rows"] += 1
+        if "residual_lines" not in r:
+            a["pre_upgrade"] += 1      # presence of the key IS the version gate
+            continue
+        a["agent_lines"] += int(r.get("agent_lines", 0) or 0)
+        a["residual_lines"] += int(r.get("residual_lines", 0) or 0)
+    return out
+
+
+def _authorship_cells(agent: str, auth: dict | None) -> dict:
+    """One chat's authorship cells: the two counts, the share, and the refusal reason.
+
+    Refusals are ordered by how *structural* they are — an agent whose store cannot be
+    line-matched refuses for that reason even if rows somehow exist, because coverage is
+    the fact the reader needs. `NO_EVIDENCE` deliberately covers two shapes that reduce
+    to the same statement: no provenance row joined at all, and rows that joined but
+    carry no matchable line (a commit of only binary files). Both mean *there is no
+    landed code evidence to compute a share from* — neither means 0%."""
+    cells = {"agent_lines": 0, "residual_lines": 0, "auth_rows": 0,
+             "auth_pre_upgrade": 0, "agent_pct": None, "auth_refusal": ""}
+    if agent in authorcapture.COVERAGE_GAPS:
+        cells["auth_refusal"] = COVERAGE
+        return cells
+    if not auth or not auth["rows"]:
+        cells["auth_refusal"] = NO_EVIDENCE
+        return cells
+    cells.update(agent_lines=auth["agent_lines"], residual_lines=auth["residual_lines"],
+                 auth_rows=auth["rows"], auth_pre_upgrade=auth["pre_upgrade"])
+    carrying = auth["rows"] - auth["pre_upgrade"]
+    if not carrying:
+        cells["auth_refusal"] = PRE_UPGRADE
+        return cells
+    total = auth["agent_lines"] + auth["residual_lines"]
+    if not total:
+        cells["auth_refusal"] = NO_EVIDENCE
+        return cells
+    cells["agent_pct"] = 100.0 * auth["agent_lines"] / total
+    return cells
 
 
 def _bucket_key(c: dict) -> tuple[str, str, str]:
@@ -119,6 +212,14 @@ def summarize(root: Path, pol: dict, since: str | None = None,
         else:
             b["cost"] += usd
 
+    authorship = _authorship_map(root)
+    # A session that appears under more than one surface: provenance carries no surface,
+    # so its counts attach to every one of those buckets. Detected here so render can
+    # footnote it rather than let a reader read two rows as independent evidence.
+    per_session: dict[tuple[str, str], int] = {}
+    for (a, _surf, session) in buckets:
+        per_session[(a, session)] = per_session.get((a, session), 0) + 1
+
     rows: list[dict] = []
     for (a, surf, session), b in buckets.items():
         if a == "kiro" and surf == "ide":
@@ -126,8 +227,10 @@ def summarize(root: Path, pol: dict, since: str | None = None,
         else:
             name = names.get((a, session))
             title, named = (name or session or _NO_SESSION), bool(name)
+        auth = _authorship_cells(a, authorship.get((a, session)))
+        auth["auth_split"] = bool(auth["auth_rows"]) and per_session[(a, session)] > 1
         rows.append({"agent": a, "surface": surf, "session": session,
-                     "title": title, "named": named, **b})
+                     "title": title, "named": named, **b, **auth})
     if agent and agent != "all":
         rows = [r for r in rows if r["agent"] == agent]
     rows.sort(key=lambda r: (-r["tokens_in"], r["session"]))
@@ -181,6 +284,18 @@ def _credits_cell(b: dict) -> str:
     return DASH if b.get("credits") is None else creditprice.fmt(b["credits"])
 
 
+def _agent_cell(b: dict) -> str:
+    """The `agent%` cell: `—` on any refusal, else the share as a whole percent.
+
+    **`—` never means 0%** — a refusal and a measured zero are different claims, and
+    every refusal shape carries its reason in the footer. A real `0%` (the chat's
+    proposals landed in files whose matchable lines all came from somewhere else) does
+    render as `0%`, which is why the dash must never be spent on absence of evidence."""
+    from cage.display import DASH
+    pct = b.get("agent_pct")
+    return DASH if pct is None else f"{round(pct)}%"
+
+
 def _cost_cell(b: dict) -> str:
     from cage import render
     from cage.display import DASH
@@ -190,6 +305,32 @@ def _cost_cell(b: dict) -> str:
     if b["unpriced_calls"]:
         cell += f" (+{b['unpriced_calls']} unpriced)"
     return cell
+
+
+def _authorship_footer(foot, shown: list[dict]) -> None:
+    """Every `agent%` line below the table: the scope sentence, then one line per
+    refusal shape actually present. A refusal that renders `—` and explains nothing is
+    the failure this whole column is trying to avoid, so each shape gets its reason,
+    counted — and the coverage reason is `authorcapture.coverage_note()` verbatim, never
+    re-worded here (one phrasing, one owner, like `netsaved.GROSS_NOTE`)."""
+    if any(r.get("agent_pct") is not None for r in shown):
+        foot.footnote("· agent% is the share of evidenced lines in files this chat "
+                      "touched — not a share of the chat's work; lines in files no "
+                      "chat proposed belong to no chat (`cage query agent-authorship`)")
+    if any(r.get("auth_refusal") == COVERAGE for r in shown):
+        foot.gap(f"· agent% `—` for {authorcapture.coverage_note()}")
+    if (n := sum(1 for r in shown if r.get("auth_refusal") == NO_EVIDENCE)):
+        foot.gap(f"· {n} chat(s) show agent% `—`: no landed code evidence — not "
+                 "committed yet, committed in another repo, or nothing matchable "
+                 "landed. `—` is never 0%")
+    pre = sum(r.get("auth_pre_upgrade", 0) for r in shown)
+    if pre:
+        foot.gap(f"· {pre} provenance row(s) predate residual counts — excluded "
+                 "(frozen rows are never backfilled)")
+    if any(r.get("auth_split") for r in shown):
+        foot.caveat("· a provenance row carries no surface, so a session split across "
+                    "surfaces attaches its authorship counts to every one of its rows "
+                    "— those rows are not independent evidence")
 
 
 def render_chats(data: dict, disp=None, show_all: bool = False,
@@ -208,7 +349,7 @@ def render_chats(data: dict, disp=None, show_all: bool = False,
     cut = 0 if limit is None else max(0, len(rows) - limit)
 
     head = ["chat", "agent", "surface", "calls", "tokens_in", "cached_in",
-            "cache_write", "tokens_out", "premium", "credits"]
+            "cache_write", "tokens_out", "premium", "credits", "agent%"]
     if disp.usd:
         head.append("cost")
     rights = set(range(3, len(head)))
@@ -218,7 +359,7 @@ def render_chats(data: dict, disp=None, show_all: bool = False,
         cells = [_label(r), r["agent"], r["surface"] or "—", render.tok(r["calls"]),
                  render.tok(r["tokens_in"]), render.tok(r["cached_in"]),
                  render.tok(r["cache_write_in"]), render.tok(r["tokens_out"]),
-                 render.tok(r["premium"]), _credits_cell(r)]
+                 render.tok(r["premium"]), _credits_cell(r), _agent_cell(r)]
         if disp.usd:
             cells.append(_cost_cell(r))
         table_rows.append(cells)
@@ -238,6 +379,7 @@ def render_chats(data: dict, disp=None, show_all: bool = False,
     if any(r["credits"] is not None for r in shown):
         foot.footnote("· cost basis per row: credits×rate where recorded, else "
                       "token×table (`—` = not recorded) — `cage query copilot-credits`")
+    _authorship_footer(foot, shown)
     if data.get("legacy_human"):
         n = data["legacy_human"]
         foot.caveat(f"· {n} legacy human-axis row(s) excluded — the agent-vs-human "
@@ -266,12 +408,31 @@ def render_csv(data: dict) -> str:
     full, unshortened label. Column contract: docs/FORMULAS.md § chats-view."""
     from cage import csvout
     head = ["chat", "agent", "surface", "session", "calls", "tokens_in", "cached_in",
-            "cache_write_in", "tokens_out", "premium", "credits", "cost_usd",
-            "priced_via", "unpriced_calls", "unpriced_tokens", "method"]
+            "cache_write_in", "tokens_out", "premium", "credits", "agent_lines",
+            "residual_lines", "agent_pct", "cost_usd", "priced_via", "unpriced_calls",
+            "unpriced_tokens", "method"]
     rows = [[r["title"], r["agent"], r["surface"], r["session"], r["calls"],
              r["tokens_in"], r["cached_in"], r["cache_write_in"], r["tokens_out"],
              r["premium"], "" if r["credits"] is None else round(r["credits"], 6),
+             *_authorship_csv(r),
              round(r["cost"], 6), creditprice.basis_of(r["basis"]), r["unpriced_calls"],
              r["unpriced_tokens"], creditprice.method_for(r["basis"])]
             for r in data["rows"]]
     return csvout.table(head, rows)
+
+
+def _authorship_csv(r: dict) -> tuple:
+    """`(agent_lines, residual_lines, agent_pct)` for one CSV row.
+
+    **All three go empty on a refusal**, not just the percentage — the same
+    empty-not-dash rule `credits` follows, applied to the counts as well because a
+    refused chat's counts are `0` only in the sense that no row exists to count. Writing
+    `0,0` for a copilot chat would put the very claim the text `—` refuses to make
+    (*this agent wrote none of it*) into a machine-readable cell.
+
+    `agent_pct` is 0–100 with 1dp — the text column's own scale, one decimal finer, the
+    same text-rounds/CSV-carries split `credits` uses. (`csvout.cell` then trims a
+    cosmetic trailing zero, as it does for every float cage emits.)"""
+    if r.get("auth_refusal"):
+        return "", "", ""
+    return r["agent_lines"], r["residual_lines"], round(r["agent_pct"], 1)

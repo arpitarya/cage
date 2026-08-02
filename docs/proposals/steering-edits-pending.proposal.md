@@ -1,20 +1,30 @@
 ---
 doc: proposal — the four CLAUDE.md edits held for Arpit, in one sitting
 status: proposed
-raised: 2026-08-02 (four separate programs; merged into one file 2026-08-03)
+raised: 2026-08-02 (four separate programs; merged into one file 2026-08-03; F added
+  2026-08-03 by CHATS-AUTHOR; E applied and removed in the v0.46.0 release)
 owner: Arpit — steering-file edits are never applied silently
 held: not applied — CLAUDE.md is the file every agent reads first
 ---
 
 # Proposal — the steering edits waiting on one decision
 
-Four CLAUDE.md edits, raised by four programs, all held for the same reason: **the
-prompts that produced them forbid rewriting a steering file without a human read.**
+**Four** CLAUDE.md edits (A · B · C · D · F — E is gone, see below), all held for the
+same reason: **the prompts that produced them forbid rewriting a steering file without a
+human read.**
 
 They were four separate proposals until 2026-08-03. They patch one file and need one
 sitting, so they are one document — read once, decide four times.
 
-**Re-verified against CLAUDE.md at HEAD 2026-08-03: none of the four is applied.**
+**Re-verified against CLAUDE.md at HEAD 2026-08-03: none of the remaining four is
+applied.**
+
+**E (the `just test` count) was APPLIED in the v0.46.0 release, 2026-08-03, and is
+deleted from this file per the rule below.** It was the one row that needed no judgment:
+the Must-Know release rule already mandates refreshing that count on every release, so
+shipping v0.46.0 without it would have been the release bug. It is now **1462**. Note
+that this is the third value that line has held while this proposal existed — the decay
+E documented is real, and the next release refreshes it again.
 
 | # | the edit | verified absent at HEAD | verdict |
 |---|---|---|---|
@@ -22,26 +32,11 @@ sitting, so they are one document — read once, decide four times.
 | **B** | the copilot credit ladder (4 bullets) | no `[billing.<agent>]` text anywhere | ☐ apply ☐ amend ☐ decline |
 | **C** | `FORMULAS.md` joins the ALL-CAPS entry-point list | `:674–676` still omits it | ☐ apply ☐ amend ☐ decline |
 | **D** | a "Dogfood snapshot" section | absent; its anchor `## Regression & capture reports` exists | ☐ apply ☐ amend ☐ decline |
-| **E** | refresh the `just test` count | `:760` reads 1401; suite is **1423** | ☐ apply ☐ decline |
+| **F** | the chats bullet gains `agent%` + the **second** carve-out | the chats bullet ends at "no MCP tool"; no `agent%`, no second carve-out named | ☐ apply ☐ amend ☐ decline |
 
 **On applying any row: delete that section from this file** — an applied edit is
 removed, never ticked, same law as OPEN-WORK. The file goes when the table is empty.
 Bump the CLAUDE.md row in [DOC-REGISTRY.md](../DOC-REGISTRY.md) in the same change.
-
----
-
-## E · The test count — the rule, not a number
-
-**Both source proposals hardcoded a target and both went stale.** HR1 asked for
-1148→1354; COPILOT-CREDITS asked for 1354→1391. CLAUDE.md is at **1401** and the suite
-now prints **1423**, so either would have *regressed* the file.
-
-That is the whole lesson: a held patch decays against the file it patches.
-
-**So the edit is a rule, not a value** — set `:760` to whatever `just test` prints on
-the day you apply it, and treat the same way the README `$0` section's count. This is
-mechanical, not new guidance; the Must-Know release rule already sanctions refreshing it
-on contact. **Apply it even if you decline A–D.**
 
 ---
 
@@ -270,6 +265,52 @@ shape, same reason for living in `docs/` rather than only in a chat transcript.
 - **No entry in the maintained-doc enumeration.** `docs/regression/` is not listed there
   either — it is covered by the `## Dev` section, and `docs/dogfood/` follows that
   precedent rather than growing the list.
+
+---
+
+## F · The chats bullet gains `agent%`, and names the second carve-out
+
+*Raised 2026-08-03 by CHATS-AUTHOR (`docs/archive/v0.46-chats-author.prompt.md` §9.5).*
+
+**Why it is held rather than applied:** the existing chats bullet states the law
+amendment as a **single** scoped carve-out ("gains a single scoped carve-out"). This
+feature adds a second one, so applying the edit *changes a stated law's cardinality* —
+exactly the kind of steering edit that should not land without a human read.
+
+### The edit
+
+In the **Chats view** bullet, replace the sentence beginning "**The one law
+amendment**" and append to the bullet's end:
+
+> **The law amendments are now TWO, and both are scoped**: `manifest.py`'s "never read
+> by a derived view" contract is read for a **title** (display label only), and
+> `provenance.jsonl` is read for **counts** by the `agent%` column. Both hold on the
+> same terms — deleting either file moves **zero** numeric/pre-existing cell (pinned by
+> `tests/test_chats.py`). · **`agent%`** is per chat the share of *evidenced lines in
+> files that chat touched* that matched the agent's own proposals —
+> `agent_lines / (agent_lines + residual_lines)` over the provenance rows sharing
+> `(agent, session)`; **read, never re-derived** (no matcher, no git at render), so it
+> can never disagree with the commit view. It **refuses three ways** and `—` is never
+> 0% (coverage · no landed evidence · pre-upgrade rows), while a *measured* `0%` renders
+> `0%`. Scope is not a share of the chat's work — `unattributed` is commit-scoped and
+> outside the denominator; per chat there is no diff to clamp against, so **the commit
+> view stays the arbiter for any single sha**. No USD/rate/minutes ever touches it.
+
+### The one substrate line worth adding
+
+In the **Provenance** bullet, after the closed-enums sentence:
+
+> The line-match counts are omitted at 0 with **one deliberate exception**:
+> `residual_lines` is written **including 0**
+> (`schema.PROVENANCE_ZERO_BEARING_COUNTS`) because **presence of the key is the version
+> gate** for `agent%` — absent means the row predates the count, a recorded `0` means
+> everything matchable matched the agent, and frozen rows are never backfilled.
+
+**Amend-or-decline is genuinely open here**: the bullet is already long, and the case
+for declining is that FORMULAS §2.13 + `cage query chats-view` carry all of it. The case
+for applying is that the *cardinality of a stated law* is wrong in CLAUDE.md until this
+lands — an agent reading "a single scoped carve-out" would treat a second one as a
+violation.
 
 ---
 

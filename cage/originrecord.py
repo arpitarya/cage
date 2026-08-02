@@ -136,8 +136,12 @@ def record(root: Path, *, sha: str, files: list[str], agent: str = "",
         if not sha or not files:
             return False
         files = list(dict.fromkeys(files))  # one edit signal per file, however many events
+        # A supplied 0 passes through unchanged — `make_provenance` decides which
+        # counts survive at zero, and this boundary must not pre-empt that decision.
+        # `None` is dropped rather than coerced: it is the factory's *omit* sentinel,
+        # and `int(None)` would raise inside a write path that must never raise.
         extra = {k: int(v) for k, v in counts.items()
-                 if k in schema.PROVENANCE_COUNT_FIELDS}
+                 if k in schema.PROVENANCE_COUNT_FIELDS and v is not None}
         with _record_lock(root):
             if _already_recorded(root, sha=sha, agent=agent, session_id=session_id, method=method):
                 return False

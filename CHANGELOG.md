@@ -2,6 +2,75 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
+## v0.46.0 (2026-08-03) — `agent%`: did this chat's tokens become code?
+
+Built from: [handoff](docs/archive/v0.46-chats-author.handoff.md) ·
+[prompt](docs/archive/v0.46-chats-author.prompt.md) ·
+[proposal](docs/archive/v0.46-chats-author.proposal.md).
+
+### `cage insights chats` gains an `agent%` column
+
+The chats view could say a conversation spent 2.1M tokens. It could not say whether any
+of it became code. The per-commit surfaces answered that per **sha**; nothing answered
+it per **conversation** — the unit the view exists for.
+
+- **Per chat: of the evidenced lines in files this chat touched, the share that matched
+  the agent's own proposals.** A pure ledger join — the v2 authorship rows already carry
+  `(sha, agent, session_id)`, and for claude-code both sides stamp the same session id
+  (the transcript stem), so **no git runs at render time** and the view stays a pure
+  derive.
+- **Read, never re-derived.** The counts are whatever capture recorded. Re-matching at
+  render would be a second matcher, free to disagree with the one that wrote the row —
+  a chat's sums are asserted equal to the per-commit buckets across that seam.
+- **The scope is narrower than the column head, and the footnote says so**: lines in
+  files no session proposed are commit-scoped (`unattributed`) and sit outside the
+  denominator. It is never "a share of this chat's work".
+- CSV gains `agent_lines` · `residual_lines` · `agent_pct` (0–100, 1dp).
+
+### It refuses three ways, and `—` never means 0%
+
+**coverage** (copilot/kiro persist no edit text — the reason is named verbatim from
+`authorcapture.coverage_note()`) · **no landed evidence** (nothing committed yet,
+committed in another repo/ledger root, or nothing matchable landed — "nothing landed"
+is not "the agent wrote nothing") · **pre-upgrade** (rows predating the new count are
+excluded from *both* sums and counted in a footnote). A **measured** `0%` still renders
+`0%` — which is precisely why the dash is never spent on absence of evidence. All three
+carry their reason below the table; none is ever a silent omission.
+
+### Substrate: one new count, and the one deliberate deviation
+
+`residual_lines` joins `schema.PROVENANCE_COUNT_FIELDS` — matchable added lines in a
+row's **own landed files** minus its `agent_lines`, floored at 0, computed in
+`authorcapture` step 4 from the diff already in hand (**no extra git call**).
+
+The other five counts are omitted at 0. This one is **written at 0**
+(`schema.PROVENANCE_ZERO_BEARING_COUNTS`), and **presence of the key is the version
+gate**: absent means the row predates the count and renders `—` forever — provenance
+rows are frozen by the idempotency key and are **never backfilled** — while a recorded
+`0` is the real finding that everything matchable matched the agent. Omitting it would
+make the most flattering true result indistinguishable from no data at all. Same
+absent-vs-recorded-zero law as `credits`' `None` sentinel. A caller that does not
+line-match supplies nothing and writes the pre-v2 row byte-for-byte.
+
+### The guards this had to answer
+
+- **The v0.36 human axis stays dead.** No rate, no minutes, no USD touches an authorship
+  number; `agent%` never combines with `cost`, and `--usd` moves no authorship cell. The
+  guard is asserted **per formula**, not per import (this module legitimately prices the
+  `cost` column).
+- **Counts, not a score** — no acceptance rate (`kept/suggested`) is derived anywhere.
+- **A second money-independent carve-out**, on the first one's exact terms: `agent%`
+  reads `provenance.jsonl` for counts only, and deleting that file moves **zero**
+  pre-existing cell — only the authorship cells fall to `—`. Pinned by a test.
+- **Counts-never-content is untouched** — `residual_lines` is an integer; no line body
+  and no line hash reaches disk, and the plant-string test stands unmodified.
+
+**Two stated limits, not fixed.** A provenance row carries no `surface`, so a session
+split across surfaces attaches its counts to every such row (footnoted — they are not
+independent evidence). And per chat there is no diff to clamp against the way the commit
+view clamps per sha, so two chats that proposed the same landed file each count its
+lines: **for any single sha, the commit view remains the arbiter.**
+
 ## v0.45.0 (2026-08-03) — a correctness pass: nothing here was caught by a test
 
 Ten fixes from the v0.37.0→v0.44.0 review, none of which the (green) suite detected.

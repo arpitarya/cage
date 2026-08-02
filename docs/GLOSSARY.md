@@ -272,6 +272,24 @@ proposal: a real human tweak of agent work. A *residual*, so it is always `estim
 and always carries the `~`. Distinct from `unattributed`, and never written as `human`
 (that requires an attestation).
 
+**`residual_lines`** — the per-row persisted form of the same residual: matchable added
+lines in **that provenance row's own landed files**, minus its `agent_lines`, floored at
+0. Scoped to the row's files on purpose — `unattributed` is a *commit* fact, and folding
+it in would let every session on a commit claim the same lines. **The one count written
+at zero** (`schema.PROVENANCE_ZERO_BEARING_COUNTS`); the other five are omitted at 0, so
+**presence of the key is the version gate** — absent means the row predates the count
+(renders `—` forever; frozen rows are never backfilled), a recorded `0` means everything
+matchable matched the agent. FORMULAS §2.14.
+
+**`agent%`** — the `cage insights chats` column: per chat,
+`agent_lines / (agent_lines + residual_lines)` summed over the provenance rows sharing
+that chat's `(agent, session)`. **Of evidenced lines in files the chat touched — never a
+share of the chat's work**: lines in files no session proposed are commit-scoped and sit
+outside the denominator (scope, not redistribution). Read from recorded counts, never
+re-matched. Refuses `—` three ways (coverage · no landed evidence · pre-upgrade rows),
+each footnoted — and **`—` never means 0%**, because a measured `0%` renders `0%`. No
+USD, rate or minutes ever touches it. FORMULAS §2.13, `cage query chats-view`.
+
 **unattributed (line)** — an added line in a file **no** session proposed. Could be
 human-written, vendored, or generated output; cage has no evidence which and says so.
 Introduced because a single `human` bucket printed 76.6% on cage's own repo, 89% of it
