@@ -236,7 +236,7 @@ Every derived view is parse / arithmetic over the log — **no LLM call, ever, o
 
 Latest release below — full history and detail in [CHANGELOG.md](CHANGELOG.md).
 
-- **v0.44.0 (2026-08-02) — Copilot's own billing number.** Cage now records the credits Copilot itself billed per request and resolves every copilot dollar by a three-rung ladder — `credits × your rate` → `tokens × price table` → loudly UNPRICED — so `copilot/auto`, the biggest UNPRICED hole in a real ledger, prices *exactly* with no price-table row. Rung 1 is `modeled`, never `measured`: the count is fact, the dollar is a rate you set in `[billing.copilot] usd_per_credit` (unset by default ⇒ credits show as a **count**, never a dollar). Mixed totals print the split; CSV names the basis in `priced_via`. See [CHANGELOG.md](CHANGELOG.md).
+- **v0.44.1 (2026-08-02) — golden fixture drift fix.** Re-blessed a stale golden fixture (`cage prices list` output had drifted to the new `[meta] cage_version`) that broke CI on `main` after v0.44.0. No behavior change. See [CHANGELOG.md](CHANGELOG.md).
 
 ## The name
 

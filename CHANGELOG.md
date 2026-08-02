@@ -2,6 +2,18 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
+## v0.44.1 (2026-08-02) — golden fixture drift fix
+
+CI on `main` failed after the v0.44.0 release: `[meta] cage_version` derives from
+`cage.__version__` (by design — see CLAUDE.md's `[meta] cage_version` rule), so
+`cage prices list`'s output changed to `0.44.0`, and the golden fixture
+`tests/fixtures/goldens/P1.txt` still asserted `0.43.0`. This is the drift-guard
+class the release checklist exists to catch.
+
+- Re-blessed `tests/fixtures/goldens/P1.txt` (`CAGE_BLESS_GOLDENS=1`). No
+  behavior change — output was already correct, only the fixture was stale.
+- No other code changes. 1401 tests passing, 10 skipped.
+
 ## v0.44.0 (2026-08-02) — Copilot's own billing number, and the pricing ladder
 
 Built from: [proposal](docs/archive/v0.44-copilot-credits.proposal.md) ·
