@@ -345,7 +345,10 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   (`justfile`/`install.sh`) for a stale `cage <old-verb>` spelling — treat a failure
   there as a wiring bug, not a lint nit. See the wiring-liveness paragraph above: a
   verb deleted outright (never added to `REMOVED`) is the harder case the live-parser
-  detector exists to catch.
+  detector exists to catch. **It is also a documentation migration:**
+  [docs/CLI.md](docs/CLI.md) is the complete command reference and
+  `tests/test_cli_reference.py` gates it against the live parser, so the rename lands
+  in the doc in the same change or the suite goes red.
 - **`paths.py` splits on contact, never wholesale.** The next change that touches one
   of its concerns moves that concern out *with* it. Named seams: `routing.py`
   (`kiro_routed` + `canonical_ledger` + `resolve_root` precedence) · `logsources.py`
@@ -642,6 +645,17 @@ fires a trigger updates the doc *and* bumps its row):
   behaviour contract: one spec, two twins. Update in the same change as **any** twin
   edit, marker-set change, or new tool interceptor (every future one implements this
   same shape). Two implementations of an unwritten contract drift.
+- **[docs/CLI.md](docs/CLI.md)** — **the complete CLI reference**: every command,
+  group, action, flag and choice list, the removed-verb migration table, and the
+  surface's known gaps. Update it in the *same change* as any CLI surface change — a
+  command added/renamed/removed, a flag added/dropped, a choice list changed. It is
+  **not** a promise: [tests/test_cli_reference.py](tests/test_cli_reference.py) gates it
+  bidirectionally against `cli.build_parser()` — every command and flag named there
+  must exist, and every leaf and flag the parser knows must appear there — so a rename
+  that misses the doc turns the suite red instead of leaving a dead verb in prose (the
+  F1 class, in documentation form; same detector, same reason as `wiringscan`). A
+  single-owner flag must additionally sit in its own command's section, so a shared
+  vocabulary can't paper over a misfiled one.
 - **[docs/GLOSSARY.md](docs/GLOSSARY.md)** — every recurring term, defined once
   against the code that owns it.
 - **[docs/DOC-REGISTRY.md](docs/DOC-REGISTRY.md)** — the freshness tracker itself; a

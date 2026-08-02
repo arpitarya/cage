@@ -22,6 +22,11 @@ Naming: `<topic>.proposal.md`. Written in short points, not walls of prose.
 
 Active (awaiting Arpit's accept or a trigger):
 
+- [copilot-credits.proposal.md](copilot-credits.proposal.md) — **COPILOT-CREDITS**
+  design spec (compare verdict C accepted 2026-08-02): capture recorded credits,
+  copilot USD by ladder (credits×rate → token×table → UNPRICED), worked CLI outputs
+  inside. **Picked up 2026-08-02** — [handoff](../copilot-credits.handoff.md) +
+  [prompt](../copilot-credits.prompt.md) (Opus).
 - [agent-vs-human-v2.md](agent-vs-human-v2.md) — per-commit rebuild: tokens/commit ·
   authorship (mostly built) · suggested-vs-accepted (counts) · time (attestation only).
 

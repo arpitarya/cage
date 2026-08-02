@@ -213,6 +213,24 @@ def capture_health(root: Path) -> dict:
     return h if isinstance(h, dict) else {}
 
 
+def glob_source(src: Path, pattern) -> list[Path]:
+    """The raw files a source's declared pattern(s) match — **before** any `--since`
+    or cursor filtering. Extracted from `_scan` because the authorship pass needs the
+    same file set under a *different* cursor (`authorcapture`'s docstring explains why
+    the call cursor is the wrong one for it), and two globs would be two answers.
+
+    An empty pattern sequence matches nothing, including for a file source — a
+    ``--path`` with nothing declared is a loud no-op, never a directory sweep."""
+    patterns = [pattern] if isinstance(pattern, str) else list(pattern)
+    if not patterns:
+        return []
+    if src.is_dir():
+        return sorted({f for p in patterns for f in src.glob(p)})
+    if src.is_file():
+        return [src]  # a file source (kiro's token log, an explicit --path file)
+    return []  # absent location — a normal miss, recorded by the probe event
+
+
 def _scan(root: Path, agent: str, src: Path, pattern, since,
           *, pol: dict | None = None, agent_cursor: dict | None = None,
           health: dict | None = None) -> list[Path]:
@@ -231,15 +249,8 @@ def _scan(root: Path, agent: str, src: Path, pattern, since,
     never hand the same file to `_ingest` twice. An **empty** sequence matches nothing,
     including for a file source — a ``--path`` with no declared patterns is a no-op the
     caller announces, never a quiet full-directory sweep."""
+    raw = glob_source(src, pattern)
     patterns = [pattern] if isinstance(pattern, str) else list(pattern)
-    if not patterns:
-        raw = []  # nothing declared ⇒ nothing scanned (the loud `--path` no-op)
-    elif src.is_dir():
-        raw = sorted({f for p in patterns for f in src.glob(p)})
-    elif src.is_file():
-        raw = [src]  # a file source (kiro's token log, an explicit --path file)
-    else:
-        raw = []  # absent location — a normal miss, recorded by the probe event
     shown = ", ".join(patterns)
     debuglog.event(root, pol=pol, event="probe", agent=agent, src=str(src),
                    pattern=shown, exists=src.exists(), files_matched=len(raw))
@@ -355,8 +366,16 @@ def missing_path_globs(args, targets, pol: dict | None) -> list[str]:
 def import_claude(root: Path, args, *, pol: dict | None = None, seen: set | None = None,
                   agent_cursor: dict | None = None, health: dict | None = None,
                   collect: list | None = None, import_id: str = "",
-                  names: dict | None = None) -> tuple[int, int]:
-    """Meter Claude Code from the transcripts it already writes to ~/.claude/projects."""
+                  names: dict | None = None,
+                  authorship_cursor: dict | None = None) -> tuple[int, int]:
+    """Meter Claude Code from the transcripts it already writes to ~/.claude/projects.
+
+    ``authorship_cursor`` opts this sweep into the **authorship pass** (agent-vs-human
+    v2 P1): the same transcripts are re-read for the text of each proposed edit, matched
+    against the commits whose windows contain those edits, and one provenance row per
+    (sha, agent, session) is appended. Passing ``None`` (the default, and what a
+    standalone `import_claude` call does) skips it entirely — capture of *calls* is
+    byte-identical either way."""
     if getattr(args, "path", None):
         sources = _override_sources("claude", Path(args.path), pol)
     elif getattr(args, "project", None):
@@ -383,6 +402,15 @@ def import_claude(root: Path, args, *, pol: dict | None = None, seen: set | None
                                   f, session=f.stem, root=root, pol=pol), surface),
                               pol=pol, seen=seen, agent_cursor=agent_cursor, collect=collect, import_id=import_id)
         _detect_graphify(root, files, gfx_ids, pol)
+        # The authorship pass reads the source's FULL match set, not `files`: the call
+        # cursor skips an unchanged transcript, and a session's last edits are almost
+        # always committed after its transcript stops growing — so gating authorship on
+        # the call cursor would mean those edits were never recorded at all
+        # (`authorcapture`'s own cursor closes that). Fail-open inside `capture`.
+        if authorship_cursor is not None:
+            from cage import authorcapture
+            authorcapture.capture(root, glob_source(src, pattern), pol=pol,
+                                  cursor=authorship_cursor)
         total_files += len(files)
     return total_rows, total_files
 
@@ -635,15 +663,22 @@ def run_agent(root: Path, agent: str, args, *, pol: dict | None = None,
               seen: set | None = None, agent_cursor: dict | None = None,
               health: dict | None = None, collect: list | None = None,
               import_id: str = "", names: dict | None = None,
-              sink_note: str = "") -> str:
+              sink_note: str = "", authorship_cursor: dict | None = None) -> str:
     """Import one agent into ``root``. ``sink_note`` replaces the summary line's trailing
     period when the rows landed in a ledger **other** than the sweep's own (the routed
     kiro leg, ADR 0006) — the summary must never read as "into this project" for rows
-    that went elsewhere. Empty (the default) keeps the line byte-identical."""
+    that went elsewhere. Empty (the default) keeps the line byte-identical.
+
+    ``authorship_cursor`` reaches **claude only**, and deliberately isn't accepted-and-
+    ignored by the other two the way ``names`` is: copilot and kiro persist no edit
+    payload at all (`authorcapture.COVERAGE_GAPS`), so a parameter they could never act
+    on would read as a capability gap rather than a structural one."""
     if agent in _ADAPTERS:
+        extra = ({"authorship_cursor": authorship_cursor}
+                 if agent == "claude" and authorship_cursor is not None else {})
         n, m = _ADAPTERS[agent](root, args, pol=pol, seen=seen, agent_cursor=agent_cursor,
                                 health=health, collect=collect, import_id=import_id,
-                                names=names)
+                                names=names, **extra)
         # Record rows appended *this run* so `_record_health` can mark an agent captured
         # on its FIRST-ever import: the run-shared `captured` set is snapshotted from the
         # ledger *before* these appends, so a brand-new surface isn't in it yet (the F2
@@ -949,9 +984,17 @@ def run(root: Path, agent: str, args) -> list[str]:
         # (the FK back to the manifest) and shared by the per-session manifest rows.
         from cage import manifest
         import_id = manifest.new_import_id()
+        # The authorship pass (agent-vs-human v2 P1) rides the same sweep and keeps its
+        # own bucket in the cursor map — the `_`-prefixed-metadata precedent beside
+        # `_last_import`/`_health`, and NOT the per-agent call cursor (see
+        # `authorcapture`). Nothing here can move a token or cost number: it writes
+        # only `provenance.jsonl`, which no money view reads.
+        from cage import authorcapture
+        authorship = cursors.setdefault(authorcapture.CURSOR_KEY, {})
         lines = [run_agent(root, a, args, pol=pol, seen=seen,
                            agent_cursor=cursors.setdefault(a, {}), health=health,
-                           collect=collected, import_id=import_id, names=names)
+                           collect=collected, import_id=import_id, names=names,
+                           authorship_cursor=authorship)
                  for a in targets]
         lines += routed  # kiro's line, in SURFACES order, naming the ledger it landed in
         # Custom tools ([sources.<name>], plan Phase 4) sweep on the umbrella `all`

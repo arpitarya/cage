@@ -12,6 +12,100 @@ by milestone) — the worklog is what *happened this session*.
 
 ---
 
+## 2026-08-02 (Claude Code) — HR1 P1 built + dogfood gate passed (Opus)
+
+- **Asked:** implement all four phases of agent-vs-human v2, one after the other.
+- **Decided up front (Arpit, this session):** the three OPEN QUESTIONS that change the
+  CLI contract — verb spelling **`cage insights commits` / `commit <sha>`** (not
+  `report --by commit`); the agent/human/unknown split **default-on** on the list view;
+  `[authorship] estimate_hours` default **true**. The fourth (`MIN_MATCH_CHARS`) was
+  deferred to the dogfood data, as the handoff requires.
+- **Done (P1):** both audit findings verified first-hand (`parse_provenance`/
+  `record_transcript` have no production callers; `latency_ms` is set only in
+  `metering.py`). Then the capture re-wire: `parse_edits`, `commitjoin` (windows),
+  `linematch` (normalize/gate/match), `authorcapture` (the pass), five additive-optional
+  provenance counts, the `[authorship]` policy table. 1270 pass / 0 fail.
+- **Gate:** PASSED on cage's own repo — 69 rows over 25 commits from 81 real
+  transcripts, **68.7% verbatim match inside proposed files**, re-run writes 0.
+  `MIN_MATCH_CHARS` frozen at **4** with a measured sweep.
+  [regression doc](regression/2026-08-02-p1-authorship-dogfood.md) · [ADR 0008](adr/0008-line-match-authorship-counts-persisted-content-transient.md).
+- **Amended the handoff's §5.4 mock (flagged, not silent):** a single `human` bucket
+  printed **76.6%** for this repo, 89% of it one commit of generated JSON. The residual
+  now splits `human~` (files the session proposed — a real human tweak) vs
+  `unattributed` (files nobody proposed — human, vendored or generated; cage does not
+  guess). Costs nothing: `NOT_PROPOSED` was already computed. A generated-file
+  classifier was considered and **declined** — a guess wearing a number.
+- **Open:** none blocking.
+- **Next step:** P2 — `commitjoin.join_calls`, reusing `taskgroup.join_rows`.
+
+---
+
+---
+
+## 2026-08-02 (Cowork) — COPILOT-CREDITS packaged: handoff + prompt (Opus)
+
+- **Asked:** create the handoff and prompt for COPILOT-CREDITS.
+- **Done:** [copilot-credits.handoff.md](copilot-credits.handoff.md) +
+  [copilot-credits.prompt.md](copilot-credits.prompt.md); Active-work indexed;
+  OPEN-WORK row → ready to execute; proposal header carries the picked-up pointer.
+- **Tier call:** **Opus**, not Sonnet — `CALL_FIELDS` gains a field (substrate
+  contract, plan §3 in the same change) and a new pricing rung carries method-tag
+  discipline; the rubric routes substrate/method changes to Opus even when additive.
+- **The one real risk, pre-decided:** `[credits.copilot] usd_per_credit` is a scalar
+  in a table shaped per-provider/per-model `per_mtok` — handoff §10 orders: verify
+  `policy.load` merge, fall back to `[billing.copilot]` + amend the proposal in the
+  same change if it collides. Guardrail: if the pricing choke point turns out not to
+  be one place, STOP and report — unifying is its own decision.
+- **Next step:** run the prompt in Claude Code (**Opus**).
+
+## 2026-08-02 (Cowork) — verdict C ACCEPTED; COPILOT-CREDITS spec written with worked CLI outputs
+
+- **Asked:** "we're going with both" — proposal with example CLI outputs.
+- **Done:** compare verdict C recorded as DECIDED;
+  [proposals/copilot-credits.proposal.md](proposals/copilot-credits.proposal.md) —
+  capture design (additive `credits` call field; CLI `premium` read as credits;
+  sidecar deferred), `[credits.copilot] usd_per_credit` policy key (cage.toml —
+  plan economics, not vendor rate card), the 3-rung ladder, worked outputs in house
+  style: report --usd before/after (⚠ both-fixes block), chats credits column, CSV
+  `priced_via`, doctor coverage line.
+- **Sequencing note:** CHATS-VIEW shipped mid-session (v0.42, parallel Claude Code
+  run) — so COPILOT-CREDITS now ADDS the credits column to the built view rather
+  than preceding it; proposal amended to match.
+- **Decided in-spec:** allowance modeling · nano-AIU→USD · sidecar capture all
+  *deliberately not taken*, each with a trigger.
+- **Next step:** handoff/prompt pair for COPILOT-CREDITS.
+
+## 2026-08-02 (Cowork) — CLI-REF: one document for every CLI command, test-gated
+
+- **Asked:** list all CLI commands → then "create one document with all cli commands
+  and link it to readme and always maintain it".
+- **Decided (Arpit, two choices put to him):** *hand-authored + test-gated*, over a
+  regenerated doc (which would re-add the `tools/docgen` machinery the hookless
+  rebuild deliberately deleted) and over hand-authored-with-a-rule (the class of doc
+  this repo has already watched go stale twice). And: document the gaps found **and**
+  file them in OPEN-WORK, rather than documenting only or fixing them in this change.
+- **Done:** `docs/CLI.md` (50 addressable commands, every flag, the removed-verb
+  table, Known gaps, a Maintaining section) + `tests/test_cli_reference.py`
+  (bidirectional against `cli.build_parser()`, with the detector self-tested);
+  linked from `README.md` and `docs/README.md`; registered in `CLAUDE.md`'s
+  maintained-doc set and `DOC-REGISTRY.md`; the removed-verb Must-Know rule now names
+  the doc as part of the migration.
+- **Found:** two front-door inconsistencies — `data migrate-savings` unadvertised in
+  `cage --help`, and `prices`/`study`/`policy` using a positional choice instead of a
+  subparser (no per-action `--help`, flags a flat union). Filed as **CLI-GAPS**;
+  deliberately not fixed here, since (b) is a front-door change that re-blesses
+  goldens. Also fixed on contact: four orphaned continuation lines in
+  `DOC-REGISTRY.md`'s docs-index row.
+- **Open / caveat:** the suite was **not** run — this Cowork sandbox has no pytest and
+  no network, so the new module was exercised through a pytest-free harness (93 green
+  against the live parser). Two pre-existing case bugs spotted but left alone:
+  `CLAUDE.md` and `docs/README.md` both cite `docs/FORMULAS.md` while the file on disk
+  is `docs/formulas.md` — harmless on macOS, a broken link on a case-sensitive checkout.
+- **Concurrency note:** a Claude Code session was editing `docs/` at the same time;
+  these edits were re-applied on top of its latest writes, not over them.
+- **Next step:** run `just test` on the dev machine (expect 1148 + 93), then decide
+  CLI-GAPS (a) — the one-line front-door fix plus a golden re-bless.
+
 ## 2026-08-02 (Claude Code) — CHATS-VIEW: `cage insights chats` built end to end
 
 - **Asked:** execute the CHATS-VIEW prompt (`docs/chats-view.prompt.md`) — the per-chat

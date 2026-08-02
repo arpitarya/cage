@@ -67,6 +67,10 @@ cage task quality                    # cost per *successful* task
 cage query "how is attribution calculated"  # explain any number — live formula, $0
 ```
 
+**Every command, in one page: [docs/CLI.md](docs/CLI.md)** — the 5 daily verbs, the 7
+groups, the hidden plumbing and every flag. It's checked against the live parser by
+`tests/test_cli_reference.py`, so it can't quietly drift out of date.
+
 > **Adopting into a project** — `cage setup` is the single front door: it offers Claude Code / Copilot / Kiro and **defaults to wiring all of them** (capture is pull-based and global, so any one of them meters the whole stack — there's no reason to pick just one). Drive it non-interactively with `cage setup --all` — or `cage setup --claude` for a single agent (`--no-project` / `--no-graphify` to skip parts). For finer control: `cage setup --project-only` scaffolds `.cage/` + the `bin/graphify` interceptor without wiring any agent (opt-in via `--<agent>`), `cage setup --wire-only --claude` wires just one agent's MCP, and `cage setup --status` reports what's already wired.
 >
 > **The agent surface is a ladder, and every rung above the first is optional.** **L0** is hookless capture plus every CLI view — that is cage, and it is what you get by default. **L1** (`cage setup --hooks`) adds lifecycle hooks for the two things pull capture structurally cannot do: stamping *which agent* ran something, and closing tasks at a session boundary so `compare`/`estimate`/`calibration` have anything to work with. **L2** is the MCP server (wired by default). **L3** (`cage setup --skills`) installs seven skills — one source text delivered as a Claude skill, a Copilot prompt and a Kiro steering doc. Every layer is committed, two-way (a plain `cage setup` removes what it didn't ask for), and **provably free**: a test installs all of them over a fixed ledger and asserts every number byte-identical, then strips them and asserts it again. If a layer moved a number, the layer would be wrong. Hooks are CLI-only — they don't fire under a VS Code extension, and every fact built on them says so.

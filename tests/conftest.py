@@ -27,6 +27,12 @@ def _bare_cage_in_hooks(monkeypatch, tmp_path):
     # tests opt back in with `monkeypatch.setenv("CAGE_CAPTURE_ON_READ", "1")` over
     # isolated empty homes.
     monkeypatch.setenv("CAGE_CAPTURE_ON_READ", "0")
+    # Same reasoning one step further: the authorship pass resolves its repo from the
+    # CWD, which under pytest is cage's own checkout — so an unrelated import test would
+    # shell `git log` at the developer's real repo and parse every transcript it swept
+    # against it. Pin it OFF for the suite; `tests/test_authorship_capture.py` opts back
+    # in with its own throwaway repo, exactly like the capture-on-read tests do.
+    monkeypatch.setenv("CAGE_AUTHORSHIP", "0")
     # The copilot import also scans VS Code's chat-session store — point it at a
     # throwaway dir so a pathless sweep never reads the developer's real sessions.
     monkeypatch.setenv("CAGE_VSCODE_USER", str(tmp_path / "vscode-user"))

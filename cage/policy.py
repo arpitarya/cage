@@ -67,7 +67,7 @@ def _bundled() -> dict:
 _TWO_LEVEL = ("prices", "credits", "alias")
 _SECTIONS = ("prices", "tools", "budgets", "quality", "ledger",
              "capture", "debug", "credits", "alias", "meta", "cleanup", "wiring",
-             "display", "sources")
+             "display", "sources", "authorship")
 
 # The vendor-fact sections that live in `prices.toml` (prices-toml plan §2): the rate
 # rows and the credit table. Everything else in `_SECTIONS` (routing decisions +
@@ -379,6 +379,53 @@ def import_stale_hours(pol: dict) -> int:
         return int(pol.get("capture", {}).get("import_stale_hours", IMPORT_STALE_HOURS))
     except (TypeError, ValueError):
         return IMPORT_STALE_HOURS
+
+
+def authorship_capture(pol: dict) -> bool:
+    """Whether the import sweep runs the **authorship pass** at all — reading each
+    Claude transcript for the text of its proposed edits and matching it, transiently,
+    against the added lines of the commits those edits fall inside (v2 P1).
+
+    This is the one capture path that reads a repository's *diffs*, which is the widest
+    PII surface cage has (plan §3.5 justifies repo-relative file paths; the line bodies
+    themselves never persist). So it gets its own switch, separate from
+    `capture_enabled`: someone can meter their spend and still decline to have cage
+    look at their code. Off ⇒ no provenance row is ever written, every commit reads
+    `unknown` by absence, and not one token or cost number moves.
+
+    Env `CAGE_AUTHORSHIP` overrides policy `[authorship] capture`; default on."""
+    return _flag("CAGE_AUTHORSHIP", pol, "authorship", "capture", True)
+
+
+def authorship_estimate_hours(pol: dict) -> bool:
+    """Whether the commit views may render an **estimated** human-hours figure
+    (agent-vs-human v2 §4). The estimator is `wall-clock − agent turn-span`, floored
+    at 0 — an inference, always shown with `~` and with its method named in the view's
+    own footnote, never a measurement and never multiplied by a rate.
+
+    This is the kill-switch the v1 removal bought: `false` and the column renders
+    `— not recorded` unless a human attested it with `cage task time`. Env
+    `CAGE_AUTHORSHIP_ESTIMATE` overrides policy `[authorship] estimate_hours`;
+    default on (`constants.AUTHORSHIP_ESTIMATE_HOURS`)."""
+    from cage.constants import AUTHORSHIP_ESTIMATE_HOURS
+    return _flag("CAGE_AUTHORSHIP_ESTIMATE", pol, "authorship", "estimate_hours",
+                 AUTHORSHIP_ESTIMATE_HOURS)
+
+
+def authorship_max_est_gap(pol: dict) -> str:
+    """The commit gap past which the hours estimate is **refused** rather than printed
+    (`—`, with the reason named). Beyond it the wall clock has stopped describing the
+    work — an overnight or weekend gap would read as hours at the keyboard — and fog is
+    not rendered. A `--since`-shaped window string (`4h` / `2d`); policy
+    `[authorship] max_est_gap` wins, `constants.AUTHORSHIP_MAX_EST_GAP` covers an
+    unset key (the DEFAULT_CONFIDENCE policy-preferred pattern). An unparseable value
+    falls back to the constant rather than disabling the guard — a malformed cap must
+    never widen it."""
+    from cage import ledger
+    from cage.constants import AUTHORSHIP_MAX_EST_GAP
+    v = pol.get("authorship", {}).get("max_est_gap", AUTHORSHIP_MAX_EST_GAP)
+    v = str(v).strip() if v is not None else ""
+    return v if ledger.valid_since(v) and v else AUTHORSHIP_MAX_EST_GAP
 
 
 def import_before_export(pol: dict) -> bool:

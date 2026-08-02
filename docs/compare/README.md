@@ -19,4 +19,14 @@ live options now); a proposal parks an **idea** (worth keeping, not being built)
 
 Naming: `<topic>.compare.md`. Written in short points, not walls of prose.
 
-_(No compare docs yet — the first real fork lands the first one.)_
+## Decided / awaiting verdict
+
+- [gf-launcher-metering.compare.md](gf-launcher-metering.compare.md) — **GF-LAUNCHER**:
+  how the graphify interceptor reaches cage when `--python-launcher` leaves no `cage` on
+  PATH. Three options (setup-time twin variants · a runtime interpreter arm · accept the
+  gap); **proposed verdict B**, awaiting Arpit's accept or override.
+- [copilot-pricing-basis.compare.md](copilot-pricing-basis.compare.md) — Copilot
+  cost: credits vs tokens vs both. **Proposed verdict C — both, one job each**
+  (credits = what was billed; tokens = the cross-agent denominator), joined by a
+  ladder, never blended. **DECIDED — C accepted 2026-08-02**; spec:
+  [proposals/copilot-credits.proposal.md](../proposals/copilot-credits.proposal.md).

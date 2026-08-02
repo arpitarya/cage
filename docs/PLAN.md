@@ -326,19 +326,51 @@ is a **report-only** consistency pass (shas exist in git, `origin=human` rows ar
 all attestations, methods are in the closed enum) that **always exits 0** — a
 hard constraint, never wired as a CI gate.
 
-**Capture.** A `PostToolUse` Claude Code hook (`hooks.post_tool_use`) buffers
-file-level diffs per session as edits happen; a local `post-commit` git hook
-(`gitcommithook.py`, installed alongside the Claude Code hooks by `cage adopt`)
-resolves that buffer against the just-made commit's sha and writes the `hooked`
-row. A `SessionEnd`-time transcript fallback (`transcript.parse_provenance`)
-covers agents/edits the live hook missed, tagged `transcript`. A
-`prepare-commit-msg` git hook stamps `Co-authored-by`/`Change-Origin`/
-`Agent-Session` commit trailers from the same buffer as a bypassable ergonomic
-convenience — never the ledger's source of truth.
+**Capture (v2 — the line-match pass).** Provenance is written by the **import
+sweep**, not by a hook ([ADR 0008](adr/0008-line-match-authorship-counts-persisted-content-transient.md)).
+The `hooked` method is legacy-only: the hookless rebuild removed the `PostToolUse` /
+`post-commit` / `prepare-commit-msg` machinery, and for a while nothing replaced it —
+`transcript.parse_provenance` and `originrecord.record_transcript` sat with **zero
+callers**, so every commit answered `unknown` while the read surface worked perfectly.
+`cage/authorcapture.py` is what writes rows now:
+
+1. **One repository per sweep**, resolved from the cwd (`commitjoin.toplevel`). A row
+   carries a short sha + repo-relative paths and *no repo identity*, so two repos in
+   one ledger would make those shas ambiguous. Edits outside the repo are ignored.
+2. **Commit windows, never `HEAD`-at-import.** Commit *i* owns `(ts_{i-1}, ts_i]`
+   (upper bound inclusive, committer date); an edit belongs to the window containing
+   its own turn timestamp. Work after the newest commit is left **unrecorded this
+   sweep** and picked up exactly once by the next import — guessing a commit that does
+   not exist yet is the one option that would be wrong forever.
+3. **Line matching** (`cage/linematch.py`): the exact text an `Edit`/`Write`/
+   `MultiEdit`/`NotebookEdit` block proposed (`transcript.parse_edits`) is compared —
+   **transiently, in process memory** — against the commit's added lines. ONE
+   normalizer is applied to both sides, a `MIN_MATCH_CHARS` gate excludes punctuation
+   noise, and matching consumes 1:1.
+4. **Only counts persist** — `schema.PROVENANCE_COUNT_FIELDS` (`suggested`, `kept`,
+   `kept_modified`, `dropped`, `agent_lines`), additive-optional and omitted at 0, so
+   `schema_ver` stays 1 and a row from any other path is byte-identical. **No line
+   body and no line *hash* is ever written** (a hash is a membership oracle over the
+   source — the reason it is named, not just implied).
+5. **Human is a residual, and it splits in two.** `human~` = added lines in a file the
+   session *did* propose that matched nothing (a real human tweak — high signal);
+   `unattributed` = added lines in files **no** session proposed (human-written,
+   vendored or generated — cage does not guess which). Measured: a single `human`
+   bucket printed **76.6%** on cage's own repo, 89% of it one commit of generated JSON
+   ([dogfood](regression/2026-08-02-p1-authorship-dogfood.md)). `unknown` (sub-gate,
+   binary) stays first-class and is **never redistributed**.
+
+Coverage is **per-agent and stated**: claude only. Copilot's stores record usage and
+prompts but not the text of an edit; Kiro's log records token counts with no tool-input
+payload (`authorcapture.COVERAGE_GAPS`) — both render `—` with the reason named, never
+`0%`. The pass has its **own consent switch**, `[authorship] capture` /
+`CAGE_AUTHORSHIP`, separate from `[capture] enabled`: this is the one path that reads a
+repo's diffs, and metering spend is a different permission from reading code.
 
 **Out of scope (v1).** Signed notes, hunk-range fingerprinting, build-blocking in
-`cage authorship verify`, and transcript archival are explicitly deferred — each has a
-one-line `# v2:` marker at its natural call site rather than being half-built.
+`cage authorship verify`, and transcript archival are explicitly deferred — hunk ranges
+and patch-id chasing each carry a numbered reopen threshold in ADR 0008's veto section
+rather than a `# v2:` half-build.
 
 ---
 

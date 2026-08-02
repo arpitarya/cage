@@ -110,6 +110,27 @@ order = ["graphify", "fux", "router", "compressor", "cache", "response-cache"]
 [quality]
 signal = "task_ok"
 
+# Authorship — the two switches behind `cage insights commits` / `commit <sha>`
+# (agent-vs-human v2). Shipped commented: the values below ARE the defaults
+# (constants.AUTHORSHIP_*), so uncommenting changes nothing until you edit one.
+#
+# estimate_hours — may the human-hours column show an ESTIMATE? The estimator is
+#   wall-clock minus the agent's turn-span, floored at 0. It is an inference, never a
+#   measurement: it always renders with `~` and names its own method in the view's
+#   footnote, and there is **no hourly rate and no USD anywhere on these surfaces** —
+#   valuation stays in your spreadsheet. Set false and the column reads
+#   `— not recorded` unless you attest it yourself with `cage task time 45m`.
+#   An attestation always wins over the estimate. Env: CAGE_AUTHORSHIP_ESTIMATE.
+# max_est_gap — the commit gap past which that estimate is REFUSED rather than
+#   printed. Past ~a working half-day the wall clock has stopped describing the work
+#   (an overnight gap would read as hours at the keyboard), so the view prints `—`
+#   with the reason named. A window string like `4h` / `2d`.
+# The line-match gate itself (constants.MIN_MATCH_CHARS) is deliberately NOT a knob
+# here: it changes what agent/human/unknown MEAN, which is not a per-project choice.
+# [authorship]
+# estimate_hours = true
+# max_est_gap = "4h"
+
 
 # cage:sources-start
 # [sources] — the ONLY place cage looks for each agent's session log (Directive A,

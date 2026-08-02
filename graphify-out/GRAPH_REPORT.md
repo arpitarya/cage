@@ -1,12 +1,12 @@
 # Graph Report - cage  (2026-08-02)
 
 ## Corpus Check
-- 185 files · ~624,635 words
+- 188 files · ~637,258 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 4748 nodes · 9713 edges · 355 communities detected
-- Extraction: 63% EXTRACTED · 37% INFERRED · 0% AMBIGUOUS · INFERRED: 3593 edges (avg confidence: 0.78)
+- 4877 nodes · 9929 edges · 384 communities detected
+- Extraction: 63% EXTRACTED · 37% INFERRED · 0% AMBIGUOUS · INFERRED: 3682 edges (avg confidence: 0.78)
 - Token cost: 0 input · 0 output
 
 ## Community Hubs (Navigation)
@@ -365,24 +365,53 @@
 - [[_COMMUNITY_Community 355|Community 355]]
 - [[_COMMUNITY_Community 356|Community 356]]
 - [[_COMMUNITY_Community 357|Community 357]]
+- [[_COMMUNITY_Community 358|Community 358]]
+- [[_COMMUNITY_Community 359|Community 359]]
+- [[_COMMUNITY_Community 360|Community 360]]
+- [[_COMMUNITY_Community 361|Community 361]]
+- [[_COMMUNITY_Community 362|Community 362]]
+- [[_COMMUNITY_Community 363|Community 363]]
+- [[_COMMUNITY_Community 364|Community 364]]
+- [[_COMMUNITY_Community 365|Community 365]]
+- [[_COMMUNITY_Community 366|Community 366]]
+- [[_COMMUNITY_Community 367|Community 367]]
+- [[_COMMUNITY_Community 368|Community 368]]
+- [[_COMMUNITY_Community 369|Community 369]]
+- [[_COMMUNITY_Community 370|Community 370]]
+- [[_COMMUNITY_Community 371|Community 371]]
+- [[_COMMUNITY_Community 372|Community 372]]
+- [[_COMMUNITY_Community 373|Community 373]]
+- [[_COMMUNITY_Community 374|Community 374]]
+- [[_COMMUNITY_Community 375|Community 375]]
+- [[_COMMUNITY_Community 376|Community 376]]
+- [[_COMMUNITY_Community 377|Community 377]]
+- [[_COMMUNITY_Community 378|Community 378]]
+- [[_COMMUNITY_Community 379|Community 379]]
+- [[_COMMUNITY_Community 380|Community 380]]
+- [[_COMMUNITY_Community 381|Community 381]]
+- [[_COMMUNITY_Community 382|Community 382]]
+- [[_COMMUNITY_Community 383|Community 383]]
+- [[_COMMUNITY_Community 384|Community 384]]
+- [[_COMMUNITY_Community 385|Community 385]]
+- [[_COMMUNITY_Community 386|Community 386]]
 
 ## God Nodes (most connected - your core abstractions)
-1. `Footprint` - 222 edges
+1. `Footprint` - 226 edges
 2. `run()` - 205 edges
-3. `CageError` - 178 edges
+3. `CageError` - 195 edges
 4. `run()` - 173 edges
 5. `load()` - 157 edges
-6. `append()` - 147 edges
-7. `summarize()` - 124 edges
-8. `main()` - 122 edges
-9. `calls()` - 100 edges
+6. `append()` - 154 edges
+7. `summarize()` - 143 edges
+8. `main()` - 123 edges
+9. `calls()` - 101 edges
 10. `append_row()` - 78 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `README: the $0 guarantee` --semantically_similar_to--> `CLAUDE.md: Must-Know Rules`  [INFERRED] [semantically similar]
   README.md → CLAUDE.md
-- `test_capture_switch_env_overrides_policy()` --calls--> `capture_enabled()`  [INFERRED]
-  tests/test_import_unified.py → cage/policy.py
+- `pol()` --calls--> `Footprint`  [INFERRED]
+  tests/test_chats.py → cage/paths.py
 - `Error-handling boundary tests (handoff: cage error-handling hardening).  Two thi` --uses--> `CageError`  [INFERRED]
   tests/test_errors.py → cage/errors.py
 - `A command/callable that raises ``exc`` regardless of how it's called.` --uses--> `CageError`  [INFERRED]
@@ -429,139 +458,139 @@
 
 ### Community 0 - "Community 0"
 Cohesion: 0.01
-Nodes (313): agents_seen(), _append(), _argv(), _now(), L1 agent attestations — `state/attest.jsonl`: the one thing a hook knows and no, The attestable tool this command invokes, or ``""``.      Matches the **executab, Every attestation row. Tolerates a truncated tail, like every other cage read., Every agent that has attested anything here — the set a view may honestly say (+305 more)
+Nodes (408): CSV over the same `summarize()` payload as the text view (one structure, two, render_csv(), Every attestation row. Tolerates a truncated tail, like every other cage read., read(), Marginal attribution by fixed pipeline order (plan §4.2) — the differentiator., CSV over the same `attribute()` payload as the text table (one structure,     tw, render_attrib(), render_csv() (+400 more)
 
 ### Community 1 - "Community 1"
-Cohesion: 0.01
-Nodes (289): _age_days(), _aged_rows(), _apply_item(), _cutoff_iso(), maybe_run(), _now(), prune(), State-dir maintenance — a CLOSED allowlist over `.cage/state/` (plan §3.6.4).  ` (+281 more)
+Cohesion: 0.02
+Nodes (284): Dispatch one hook event. Always 0 except a deliberate budget block., run(), Every savings receipt: an **id-deduped union** of the legacy `receipts.jsonl`, receipts(), _free_port(), `cage data meter -- <cmd>` — run a command with the metering proxy in front (pla, run(), path_globs_for() (+276 more)
 
 ### Community 2 - "Community 2"
 Cohesion: 0.01
-Nodes (226): D1-D6 Manual Cell Matrix (claude/copilot/kiro × OFF/ON), Cage-Lab 05 — Manual Cells, VS Code / IDE Pre-Flight Shim-Liveness Probe, PASS / HONEST-LIMIT / UNPROVEN / FAIL Verdict Set, Automatic verification: raw recount, cage surfaces, money, cage-lab sibling verification lab plan (v3), Correctness matrix (agent x surface, M1-M6, G1-G5), Eyeball surface (manual side-by-side verification) (+218 more)
+Nodes (295): ADR 0002 (no OS scheduler) referenced, ADR 0004: Append-only Delta Rows, ADR 0004 (separate by schema, not by source), ADR TEMPLATE.md (graduation target), [alias] table — routing decision, anton/.cage/ledger (project-local ledger example), anton/.cage/ledger/receipts.jsonl (5 real receipts found), docs/archive/v0.36-path-globs.handoff.md (+287 more)
 
 ### Community 3 - "Community 3"
-Cohesion: 0.02
-Nodes (188): check(), `cage insights budget` + the Cage guard — ceilings per session / day (plan §8.1), Would spending `add_usd` more breach a ceiling? Returns the verdict, never raise, spend(), _today_utc(), _dist(), `cage insights compare` — measured comparison of closed tasks grouped by stack (, CSV over the same `summarize()` payload as the text view (one structure,     two (+180 more)
+Cohesion: 0.01
+Nodes (243): check(), `cage insights budget` + the Cage guard — ceilings per session / day (plan §8.1), Would spending `add_usd` more breach a ceiling? Returns the verdict, never raise, spend(), _today_utc(), _dist(), `cage insights compare` — measured comparison of closed tasks grouped by stack (, The deterministic data payload behind the table (and ``--json``). (+235 more)
 
 ### Community 4 - "Community 4"
-Cohesion: 0.02
-Nodes (197): close_task(), cmd_adoption(), cmd_attrib(), cmd_budget(), cmd_calibration(), cmd_cleanup(), cmd_compare(), cmd_debug() (+189 more)
+Cohesion: 0.01
+Nodes (226): D1-D6 Manual Cell Matrix (claude/copilot/kiro × OFF/ON), Cage-Lab 05 — Manual Cells, VS Code / IDE Pre-Flight Shim-Liveness Probe, PASS / HONEST-LIMIT / UNPROVEN / FAIL Verdict Set, Automatic verification: raw recount, cage surfaces, money, cage-lab sibling verification lab plan (v3), Correctness matrix (agent x surface, M1-M6, G1-G5), Eyeball surface (manual side-by-side verification) (+218 more)
 
 ### Community 5 - "Community 5"
 Cohesion: 0.02
-Nodes (192): _copy_shim(), _install_shim(), Per-project setup engine — the project-scaffold half of `cage setup` (plan §6)., Set cage up in ``root``. Each key present only if that step ran.      Agent wiri, Copy bundled shim ``name`` onto ``dst`` if the bytes differ; True if written., Copy both bundled graphify interceptors into <root>/bin; return the path of the, Bring an **already-installed** interceptor up to the bundled template; return, Append `export PATH=<root>/bin:$PATH` to the shell rc once. Returns rc path. (+184 more)
+Nodes (201): main(), _bare_cage_in_hooks(), proj(), Shared fixtures — an isolated project root with the demo ledger seeded., Pin `paths.cage_bin` to bare ``cage`` for tests. Production resolves it to the, A clean project root (no .cage/ yet — the ledger auto-creates on append)., The §4.4 worked example seeded into ``proj``; yields (root, call_id)., seeded() (+193 more)
 
 ### Community 6 - "Community 6"
 Cohesion: 0.02
-Nodes (190): cmd_import(), cmd_import_claude(), Umbrella hookless import across all three agents (default ``--agent all``) — the, Meter Claude Code with no hooks/MCP — pull the transcripts it already writes, _copilot_name(), _parse_copilot_any(), Dispatch on the on-disk store: VS Code chat-session files (extension) parse via, A copilot file's session name: the VS Code chat title for a `chatSessions/` file (+182 more)
+Nodes (207): The two halves, visibly separate, with every unknown named. Counts only — this, render_adoption(), attribute(), The (provider, model) the task actually ran on — its last recorded call., Aggregate a task's receipts per tool, ordered by the canonical pipeline.      Mu, Per-tool marginal savings for one task, in tokens and USD (the §4.2 table)., receipts_by_tool(), task_model() (+199 more)
 
 ### Community 7 - "Community 7"
 Cohesion: 0.02
-Nodes (186): ADR 0004: Append-only Delta Rows, ADR 0004 (separate by schema, not by source), anton/.cage/ledger (project-local ledger example), anton/.cage/ledger/receipts.jsonl (5 real receipts found), docs/archive/v0.36-path-globs.handoff.md, Cache-Efficiency Footer Line (report --usd), CAGE_DEBUG Verbose Trail Gate, cage doctor --bundle (+178 more)
+Nodes (194): _now(), Always-on capture breadcrumb — `state/capture.log` (plan F6, docs/debugging-capt, Append one breadcrumb line for `agent`'s sweep this run. Always on — no     `CAG, The last `n` breadcrumb rows (oldest→newest) — the raw feed behind a future, record(), tail(), _age_days(), _aged_rows() (+186 more)
 
 ### Community 8 - "Community 8"
 Cohesion: 0.02
-Nodes (165): The SURFACES name for a ledger row's ``agent`` field (``claude-code`` → ``claude, row_surface(), _append(), enabled(), event(), exception(), _explicit_base(), _explicit_log() (+157 more)
+Nodes (198): The SURFACES name for a ledger row's ``agent`` field (``claude-code`` → ``claude, row_surface(), cmd_import(), cmd_import_claude(), Umbrella hookless import across all three agents (default ``--agent all``) — the, Meter Claude Code with no hooks/MCP — pull the transcripts it already writes, _append(), enabled() (+190 more)
 
 ### Community 9 - "Community 9"
-Cohesion: 0.03
-Nodes (158): The two halves, visibly separate, with every unknown named. Counts only — this, render_adoption(), render_compare(), ceiling_footer_line(), A compact one-line form of the day-one ceiling for the `report` footer (G4,, The text report (spec §1, R1–R6): tokens by default, dollars on ``disp.usd``, render_report(), _day() (+150 more)
+Cohesion: 0.02
+Nodes (183): Bring an **already-installed** interceptor up to the bundled template; return, refresh_shim(), install(), Wire the picked agents. ``hooks=False`` is the default and the floor: `cage setu, _out_of_root_fix(), _path_interceptor(), The graphify that **actually runs** — resolved the way the shell does, first, The fix line for a dead interceptor cage must **not** write to. Cage never edits (+175 more)
 
 ### Community 10 - "Community 10"
 Cohesion: 0.02
-Nodes (141): _agent_half(), _attested(), _is_legacy_human(), _outcome_table(), `cage insights adoption` — do the agents you wired actually **use** the tools yo, Half A's **agent** breakdown — the one thing the usage breadcrumb alone cannot, Half B — per-agent attribution, from savings rows that join to a call.      Two, The one data structure both renderers consume (the same-numbers-by-construction (+133 more)
+Nodes (156): _cage_entry(), _hook_command(), hook_status(), install(), _load(), Wire Cage into Claude Code: the MCP read server (`.mcp.json`).  Hook wiring was, How many cage L1 hook entries are wired here (0 = hookless, the default)., Remove every cage-owned hook entry from `.claude/settings.json` (previous     ve (+148 more)
 
 ### Community 11 - "Community 11"
 Cohesion: 0.02
-Nodes (122): _cage_toml_has_prices(), _claude_pointer(), _gitignore(), _migrate_config(), _migrate_prices(), `cage setup` — scaffold the `.cage/` footprint (policy + gitignored ledger)., Move legacy in-``cage.toml`` prices into ``prices.toml`` (prices-toml plan §3)., A freshly scaffolded ``cage.toml`` records which cage version created it — a (+114 more)
+Nodes (154): hook_gap_lines(), Multi-agent integration orchestrator (plan §5, §6, §9.5-6).  One ledger contract, One line per agent that cannot do everything L1 offers, plus the limit that, load_json(), Idempotent JSON + markered-text config writers shared by agent wiring (≤50 lines, Insert or replace a `start…end`-delimited block in a text file., save_json(), upsert_block() (+146 more)
 
 ### Community 12 - "Community 12"
 Cohesion: 0.03
-Nodes (115): hook_gap_lines(), Multi-agent integration orchestrator (plan §5, §6, §9.5-6).  One ledger contract, One line per agent that cannot do everything L1 offers, plus the limit that, load_json(), Idempotent JSON + markered-text config writers shared by agent wiring (≤50 lines, Insert or replace a `start…end`-delimited block in a text file., save_json(), upsert_block() (+107 more)
+Nodes (130): _copilot_name(), _parse_copilot_any(), Dispatch on the on-disk store: VS Code chat-session files (extension) parse via, A copilot file's session name: the VS Code chat title for a `chatSessions/` file, append_new(), credits(), Kiro-CLI **credits** usage rows (capture-precision §3.4), collapsed     **last-w, Append only call rows whose id isn't already in the ledger. Returns #added. (+122 more)
 
 ### Community 13 - "Community 13"
 Cohesion: 0.02
 Nodes (116): cage/debuglog.py structured debug logger, Capture Debug Observability Prompt (v0.11), cage doctor --trace surfacing, Per-agent hook heartbeat (hooks-seen.jsonl), cage.toml as ONLY source of log paths (#7), config-authority.plan.md Part 2 (referenced), Counts-never-content guard (#3), Capture Precision — Fix Cycle Plan (v0.36) (+108 more)
 
 ### Community 14 - "Community 14"
-Cohesion: 0.04
-Nodes (107): _now(), Always-on capture breadcrumb — `state/capture.log` (plan F6, docs/debugging-capt, Append one breadcrumb line for `agent`'s sweep this run. Always on — no     `CAG, The last `n` breadcrumb rows (oldest→newest) — the raw feed behind a future, record(), tail(), _capture_quality(), Distinguishes a log-bearing agent that IS capturing rows from one whose     capt (+99 more)
-
-### Community 15 - "Community 15"
 Cohesion: 0.02
 Nodes (112): ADR 0001 decision: team ledger aggregation via refs/notes, ADR 0001 veto condition: single-digit GB/yr fine, 100s GB not, ADR 0002 decision: universal pull-based capture, global ledger, no OS scheduler, ADR 0002 veto condition: project capture returns if client exposes cwd, ADR 0003 decision: hookless capture — pull-only, MCP the only wired surface, ADR 0003 veto condition: real-time capture returns only on a named latency figure, ADR 0004 decision: reconcile cumulative sources with append-only delta rows, ADR 0004 veto condition: measured non-monotonic cumulative case (+104 more)
 
-### Community 16 - "Community 16"
-Cohesion: 0.02
-Nodes (109): ADR 0002 (no OS scheduler) referenced, ADR TEMPLATE.md (graduation target), [alias] table — routing decision, [budgets] opt-in change (trigger instance), [budgets] table, cage data export, cage data export --study, cage data watch (+101 more)
-
-### Community 17 - "Community 17"
+### Community 15 - "Community 15"
 Cohesion: 0.02
 Nodes (108): CLAUDE.md (project instructions), docs/OPEN-WORK.md (pending work tracker), docs/PLAN.md (design of record), cage limits view (quota + estimated credits), Codex rate_limits snapshot (latest-only state file), Composite-key deterministic id dedup (no-uuid turns), Token-based AI-credit estimation (estimated, token-providers only), v0.15 Meter Dedup + Codex Quota + Credits Handoff (+100 more)
 
+### Community 16 - "Community 16"
+Cohesion: 0.04
+Nodes (92): adoption_attributed(), adoption_mixed(), adoption_shim_only(), _call(), _chat_name(), chats_titled(), chats_truncated(), chats_untitled() (+84 more)
+
+### Community 17 - "Community 17"
+Cohesion: 0.05
+Nodes (83): _cited_files(), _confirm(), content_signature(), _graphify_receipt_ids(), _meter(), _op_of(), _quiet(), `cage data graphify -- graphify <args>` — meter a third-party tool without touch (+75 more)
+
 ### Community 18 - "Community 18"
 Cohesion: 0.04
-Nodes (93): compress(), Tier-0 structural compression of tool output → a `compressor` receipt (plan §6)., Return (compressed_text, raw_tokens, actual_tokens)., ``root`` is optional and logging-only (best-effort, `CAGE_DEBUG`-gated) — the, receipt(), _shrink(), _toks(), _cited_files() (+85 more)
+Nodes (77): provenance_for_sha(), _acquire(), locked(), One fail-open cross-process file lock for the capture path ($0/stdlib).  Seriali, Hold an exclusive lock on ``lock_file`` for the with-block; fail-open.      ``on, _release(), _existing_note(), _git() (+69 more)
 
 ### Community 19 - "Community 19"
-Cohesion: 0.03
-Nodes (94): _ago(), _bundled_prices(), _capture_timeline(), _capture_trace(), _committed_commands(), _footprint(), _graphify_usage(), _hook_bypass() (+86 more)
+Cohesion: 0.07
+Nodes (71): build(), main(), Build ``cage.pyz`` — a single-file stdlib zipapp over the cage package.  The res, Stage the cage package and zipapp it.      The ``__main__.py`` is written by han, assert_exact_rows(), assert_pii_clean(), _assert_rows_at(), cage() (+63 more)
 
 ### Community 20 - "Community 20"
-Cohesion: 0.04
-Nodes (83): render_calibration(), _graph_staleness(), GC4 (graphify-capture): is `graphify-out/graph.json` older than HEAD? A stale gr, _dist(), history_band(), Modeling what graphify is *going to* save (graphify-capture plan GC5) — three cl, (a) The per-query expected-saving band over graphify's recorded receipts (token, (b) The deterministic day-one ceiling from `graphify-out/graph.json`, **bounded (+75 more)
+Cohesion: 0.06
+Nodes (61): dispatch(), _error(), handle_login(), handle_logout(), handle_refresh(), handle_whoami(), HTTP entry points — the only layer that knows about requests and status codes., Resolve a bearer token to a user, honouring the revocation list. (+53 more)
 
 ### Community 21 - "Community 21"
-Cohesion: 0.04
-Nodes (83): attribute(), Marginal attribution by fixed pipeline order (plan §4.2) — the differentiator., The (provider, model) the task actually ran on — its last recorded call., Aggregate a task's receipts per tool, ordered by the canonical pipeline.      Mu, Per-tool marginal savings for one task, in tokens and USD (the §4.2 table)., receipts_by_tool(), render_attrib(), task_model() (+75 more)
-
-### Community 22 - "Community 22"
-Cohesion: 0.04
-Nodes (81): provenance_for_sha(), _acquire(), locked(), One fail-open cross-process file lock for the capture path ($0/stdlib).  Seriali, Hold an exclusive lock on ``lock_file`` for the with-block; fail-open.      ``on, _release(), _existing_note(), _git() (+73 more)
-
-### Community 23 - "Community 23"
-Cohesion: 0.06
-Nodes (80): build(), main(), Build ``cage.pyz`` — a single-file stdlib zipapp over the cage package.  The res, Stage the cage package and zipapp it.      The ``__main__.py`` is written by han, _call_span(), _is_legacy_human(), `cage data export --otel` — the ledger as OpenTelemetry GenAI-conformant JSON (d, One deterministic JSON document: `cage.meta` (semconv pin) + `calls`     (`gen_a (+72 more)
-
-### Community 24 - "Community 24"
-Cohesion: 0.05
-Nodes (80): adoption_attributed(), adoption_mixed(), adoption_shim_only(), _call(), compare_estimate(), fleet(), matrix_task(), matrix_unpriceable() (+72 more)
-
-### Community 25 - "Community 25"
-Cohesion: 0.06
-Nodes (58): dispatch(), _error(), handle_login(), handle_logout(), handle_refresh(), handle_whoami(), HTTP entry points — the only layer that knows about requests and status codes., Resolve a bearer token to a user, honouring the revocation list. (+50 more)
-
-### Community 26 - "Community 26"
 Cohesion: 0.05
 Nodes (64): ADR 0002: universal pull-based capture, global ledger, no OS scheduler, ADR 0006: Kiro rows are machine facts, not project facts, Archive README — shipped handoffs, prompts, superseded drafts index, actor identity field reserved (empty in v1, PII-guarded), cage-lab standing laws (zero dummy data, isolated ledger, no hand-written steering), cage query concept layer (how cage works, kind=concept), cage query deterministic calculation explainer registry, policy.toml → cage.toml rename with fallback + migration (+56 more)
 
-### Community 27 - "Community 27"
-Cohesion: 0.06
-Nodes (53): _call(), _err(), _handle(), _latest_task(), _ok(), _pol(), `cage mcp` — expose the Cage ledger to any agent over MCP (stdlib-only, $0).  A, _root() (+45 more)
+### Community 22 - "Community 22"
+Cohesion: 0.04
+Nodes (54): build_parser(), _capture_flags(), _command_token(), _csv_flag(), _group(), _html_flag(), _json_flag(), `cage` CLI — argparse dispatch over the deterministic command surface (plan §7). (+46 more)
 
-### Community 28 - "Community 28"
+### Community 23 - "Community 23"
+Cohesion: 0.11
+Nodes (50): capture_health(), The per-agent capture-health record from the last import (``cursors["_health"]``, copilot_home(), Copilot CLI home (`$COPILOT_HOME` or ~/.copilot). Holds `session-state/<id>/, capture_warnings(), The triple-gated "installed but capturing nothing" warnings (docs/capture-health, _copilot_log(), _health() (+42 more)
+
+### Community 24 - "Community 24"
+Cohesion: 0.07
+Nodes (48): by_project(), by_task(), _month_entirely_below(), newest_ts(), provenance(), The append-only event log — read/write `calls.jsonl` + `receipts.jsonl` (plan §3, All rows; a truncated final line (crash mid-append) is silently dropped., True if every instant of a dated shard's month is strictly before ``cutoff`` — (+40 more)
+
+### Community 25 - "Community 25"
+Cohesion: 0.06
+Nodes (43): _copy_shim(), _install_shim(), Per-project setup engine — the project-scaffold half of `cage setup` (plan §6)., Set cage up in ``root``. Each key present only if that step ran.      Agent wiri, Copy bundled shim ``name`` onto ``dst`` if the bytes differ; True if written., Copy both bundled graphify interceptors into <root>/bin; return the path of the, Append `export PATH=<root>/bin:$PATH` to the shell rc once. Returns rc path., run() (+35 more)
+
+### Community 26 - "Community 26"
+Cohesion: 0.06
+Nodes (41): _agent_half(), _attested(), _is_legacy_human(), _outcome_table(), `cage insights adoption` — do the agents you wired actually **use** the tools yo, Half A's **agent** breakdown — the one thing the usage breadcrumb alone cannot, Half B — per-agent attribution, from savings rows that join to a call.      Two, The one data structure both renderers consume (the same-numbers-by-construction (+33 more)
+
+### Community 27 - "Community 27"
 Cohesion: 0.09
 Nodes (38): _cage(), check_a_killed_shim_reports_dead(), check_bare_graphify_is_intercepted(), check_derivation_is_deterministic(), check_doctor_reports_live(), check_graph_builds(), check_passthrough_is_transparent(), check_setup_installs_both_twins() (+30 more)
 
-### Community 29 - "Community 29"
-Cohesion: 0.09
-Nodes (36): _bare_cage_in_hooks(), proj(), Shared fixtures — an isolated project root with the demo ledger seeded., Pin `paths.cage_bin` to bare ``cage`` for tests. Production resolves it to the, A clean project root (no .cage/ yet — the ledger auto-creates on append)., The §4.4 worked example seeded into ``proj``; yields (root, call_id)., seeded(), `cage demo` — seed the plan's §4.4 worked example so the thesis is runnable.  On (+28 more)
-
-### Community 30 - "Community 30"
-Cohesion: 0.08
-Nodes (34): build_parser(), _capture_flags(), _command_token(), _csv_flag(), _group(), _html_flag(), _json_flag(), `cage` CLI — argparse dispatch over the deterministic command surface (plan §7). (+26 more)
-
-### Community 31 - "Community 31"
+### Community 28 - "Community 28"
 Cohesion: 0.06
 Nodes (35): Budget Opt-In Verify Prompt (v0.36), [budgets] shipped commented-out (opt-in), 8-point verification checklist, Cage-Lab Setup Handoff (v0.36), reference/<scenario>.json|md independent recount, Untouched-source sha256 proof requirement, Cage-Lab Setup Prompt (v0.36), Eyeball manual-verification surface (+27 more)
 
-### Community 32 - "Community 32"
+### Community 29 - "Community 29"
 Cohesion: 0.06
 Nodes (35): v0.16 dummy-repo-test handoff, CAGE-FINDINGS.md ranked P0/P1/P2 report, Disposable /tmp/cage-testbed CLI + invariant validation, Rationale: no agent can drive a VS Code extension, must not fake it, v0.22.1 full test run findings record, 58-row Parts A-G findings table, Bug: graphify double-metering (native shim + wrapper both filed receipts), Bug: live-capture duplicate rows (hook race, fixed via lockutil) (+27 more)
 
-### Community 33 - "Community 33"
+### Community 30 - "Community 30"
 Cohesion: 0.06
 Nodes (34): v0.33.0 — Codex removed: cage is Claude Code · Copilot · Kiro, v0.34.0 — cage doctor --wiring installed-artifact inventory, CLAUDE.md: Constants — third audit layer (constants.py), CLAUDE.md: Must-Know Rules, CLAUDE.md: Wiring liveness (wiringscan.py), Doc size discipline rule 3: evidence lives elsewhere, always, Glossary: cage-managed root, Glossary: fail-open (+26 more)
+
+### Community 31 - "Community 31"
+Cohesion: 0.12
+Nodes (32): _hook_bypass(), An agent hook invoking graphify by absolute path (`cage/hookbypass.py`, B-fix-3), _cage_interceptor(), _claude_hook(), _kiro_hook(), Agent hooks that reach graphify past cage's interceptor (B-fix-3).  graphify ≥0., graphify works as designed; only cage's visibility is missing. Never `fail`., With --strict the read hook DENIES the first raw read — the avoided read is a re (+24 more)
+
+### Community 32 - "Community 32"
+Cohesion: 0.11
+Nodes (25): _graph_staleness(), GC4 (graphify-capture): is `graphify-out/graph.json` older than HEAD? A stale gr, _dist(), history_band(), Modeling what graphify is *going to* save (graphify-capture plan GC5) — three cl, (a) The per-query expected-saving band over graphify's recorded receipts (token, (b) The deterministic day-one ceiling from `graphify-out/graph.json`, **bounded, render_repo_ceiling() (+17 more)
+
+### Community 33 - "Community 33"
+Cohesion: 0.12
+Nodes (16): _Handler, `cage data proxy` — a thin metering reverse-proxy (plan §5, §9.5).  The protocol, Proxy usage extraction: Anthropic + OpenAI, JSON + SSE streams + live metering., test_anthropic_json_usage(), test_anthropic_sse_stream(), test_garbage_body_is_zero(), test_openai_json_usage(), test_openai_sse_stream() (+8 more)
 
 ### Community 34 - "Community 34"
 Cohesion: 0.14
@@ -572,16 +601,16 @@ Cohesion: 0.15
 Nodes (22): _call(), Gross vs net savings (net-savings handoff — K / NET-2 / NET-3).  The finding thi, Receipts a cost-of-use figure can never be built for (no task) — the graphify, The bug, reproduced: graphify pushes call-less, task-less receipts and declares, The asymmetry that makes the refusal rule principled rather than blanket: the, The composer property: every number in the payload comes from a composed view., A call one second inside the window is cost-of-use; one second outside is the, Union per task: the subtrahend must not scale with receipt volume, or a chatty (+14 more)
 
 ### Community 36 - "Community 36"
-Cohesion: 0.18
-Nodes (16): Proxy usage extraction: Anthropic + OpenAI, JSON + SSE streams + live metering., _serve(), test_anthropic_json_usage(), test_anthropic_sse_stream(), test_garbage_body_is_zero(), test_openai_json_usage(), test_openai_sse_stream(), test_proxy_forwards_and_meters() (+8 more)
-
-### Community 37 - "Community 37"
 Cohesion: 0.15
 Nodes (15): Behavior-neutrality safety test (zero-customization apply), Idempotent apply safety test (byte-identical no-op), [meta] policy_version stamping, cage policy sync / policy diff prompt (v0.25), Decision: [alias] stays in cage.toml (not moved), Acceptance bar: report/attrib/roi byte-identical, UNPRICED count unchanged, Footprint.prices resolution (prices.toml -> legacy -> bundled), Open ADR-level question: is project .cage/ config-only, global the ledger? (+7 more)
 
-### Community 38 - "Community 38"
+### Community 37 - "Community 37"
 Cohesion: 0.22
 Nodes (11): cage import (universal pull, dedupe), Derive engine ($0, deterministic: Spend, Attribution, Cost impact, Human axis, Fleet, Authorship, Self-explain), Fleet bundles (export → analyst → import), Four agents (Claude Code, Codex, Copilot, Kiro IDE), git refs/notes (team ledger, CI sole writer), Hooks (real-time, CLI only, optional add-on), .cage/ledger (append-only, month shards), MCP server (every agent reads back + rendered skills) (+3 more)
+
+### Community 38 - "Community 38"
+Cohesion: 0.29
+Nodes (9): compress(), Tier-0 structural compression of tool output → a `compressor` receipt (plan §6)., Return (compressed_text, raw_tokens, actual_tokens)., ``root`` is optional and logging-only (best-effort, `CAGE_DEBUG`-gated) — the, receipt(), _shrink(), _toks(), test_compress_receipt_logs_skip_and_produce() (+1 more)
 
 ### Community 39 - "Community 39"
 Cohesion: 0.29
@@ -620,12 +649,12 @@ Cohesion: 0.4
 Nodes (5): Display-context object design, v0.26 output-honesty prompt, Build-time doc generators (spec/formulas/policy comments), Golden fixtures per spec mockup, Rationale: rendering only, CSV byte-identity proves no math change
 
 ### Community 48 - "Community 48"
-Cohesion: 0.67
-Nodes (4): CLAUDE.md: CSV output (csvout.py), CLAUDE.md: Display honesty (display.py), PLAN §3.9: CSV output — a one-way reporting surface, README: CSV output of every read view
-
-### Community 49 - "Community 49"
 Cohesion: 0.5
 Nodes (4): FORMULAS §1.1: per-call cost (measured), Glossary: method (measured/modeled/estimated), Glossary: UNPRICED, README: pricing is managed, $0 never silent
+
+### Community 49 - "Community 49"
+Cohesion: 0.67
+Nodes (4): CLAUDE.md: CSV output (csvout.py), CLAUDE.md: Display honesty (display.py), PLAN §3.9: CSV output — a one-way reporting surface, README: CSV output of every read view
 
 ### Community 50 - "Community 50"
 Cohesion: 0.5
@@ -669,11 +698,11 @@ Nodes (1): `cage query`'s registry — the `Explanation` entries themselves (han
 
 ### Community 60 - "Community 60"
 Cohesion: 1.0
-Nodes (2): CLAUDE.md: Explain engine (explain.py, explain_data.py), README: cage query — live formula explainer
+Nodes (2): v0.37.0 — Windows sources.toml crash + dummyrepo resync, IMPLEMENTATION: v0.37.0 Windows sources.toml crash entry
 
 ### Community 61 - "Community 61"
 Cohesion: 1.0
-Nodes (2): v0.37.0 — Windows sources.toml crash + dummyrepo resync, IMPLEMENTATION: v0.37.0 Windows sources.toml crash entry
+Nodes (2): CLAUDE.md: Explain engine (explain.py, explain_data.py), README: cage query — live formula explainer
 
 ### Community 62 - "Community 62"
 Cohesion: 1.0
@@ -845,1005 +874,1121 @@ Nodes (1): verdict.py — cost-impact composer
 
 ### Community 107 - "Community 107"
 Cohesion: 1.0
-Nodes (1): All four wiring shapes must resolve to the same verb — a shape we fail to parse
+Nodes (1): S1/S2 stay shape-asserted (join wires agents + runs doctor — output is     machi
 
 ### Community 108 - "Community 108"
 Cohesion: 1.0
-Nodes (1): PROPERTY: every `verbmap.REMOVED` remediation must be a command the CLI accepts.
+Nodes (1): A negative net backed by real receipts is NEVER suppressed, smoothed, or     gat
 
 ### Community 109 - "Community 109"
 Cohesion: 1.0
-Nodes (1): The converse: nothing in REMOVED may still be a live verb (a stale map entry
+Nodes (1): A scaffolded project with a ledger and **no wiring of any kind**, and every agen
 
 ### Community 110 - "Community 110"
 Cohesion: 1.0
-Nodes (1): Redirect every agent home off the real machine (mirrors test_portable_wiring).
+Nodes (1): Where this agent's rows land. Kiro's IDE log is a *machine* fact and routes to
 
 ### Community 111 - "Community 111"
 Cohesion: 1.0
-Nodes (1): Write a v0.27-era .claude/settings.json with the given raw commands.
+Nodes (1): Every pinned view's stdout, with the per-test tmp path folded to a placeholder
 
 ### Community 112 - "Community 112"
 Cohesion: 1.0
-Nodes (1): MUST-PRESERVE: a v0.27 Claude backfill/banner hook naming a dead verb must not
+Nodes (1): No hooks, no MCP, no steering — `cage import` still parses the agent's real
 
 ### Community 113 - "Community 113"
 Cohesion: 1.0
-Nodes (1): Codex was removed completely: `agents.install` no longer has a wire module for
+Nodes (1): Every derived view renders (exit 0, non-empty) over a ledger captured with no
 
 ### Community 114 - "Community 114"
 Cohesion: 1.0
-Nodes (1): A stale cage hook in any event slot (not just SessionStart) is stripped — the
+Nodes (1): Install every layer cage ships onto a project whose ledger is already captured,
 
 ### Community 115 - "Community 115"
 Cohesion: 1.0
-Nodes (1): The user-level `~/.copilot/hooks/cage.json` is wholly cage-owned, so the hookles
+Nodes (1): Two teammates running `cage setup` must not churn a committed diff — so the
 
 ### Community 116 - "Community 116"
 Cohesion: 1.0
-Nodes (1): A project wired the way v0.27 left it, plus two foreign hooks that must be     t
+Nodes (1): The hookless rebuild deleted the rendered assets and `tools/skillgen`. L3 will
 
 ### Community 117 - "Community 117"
 Cohesion: 1.0
-Nodes (1): The handoff's §10 open question: a clean `cage setup` must produce zero     find
+Nodes (1): `--no-skill` skipped an asset that no longer exists. argparse exits 2 on an
 
 ### Community 118 - "Community 118"
 Cohesion: 1.0
-Nodes (1): Every artifact `agents.install` still manages heals; `.codex/hooks.json` is the
+Nodes (1): The README promised a `cage` skill three times — once on *"all four agents"*,
 
 ### Community 119 - "Community 119"
 Cohesion: 1.0
-Nodes (1): Idempotence: healing a healed tree changes nothing (no mtime churn, no diff).
+Nodes (1): A fresh per-sweep import id (`i_…`) minted once per `importcmd.run` and threaded
 
 ### Community 120 - "Community 120"
 Cohesion: 1.0
-Nodes (1): Refresh-only: a project that never installed the interceptor must not get one.
+Nodes (1): A fresh per-manifest-row session id (`n_…`) — the "separate unique id" every nam
 
 ### Community 121 - "Community 121"
 Cohesion: 1.0
-Nodes (1): The exact false ✅ from F1: the shim exists and is on PATH, but is dead.
+Nodes (1): One manifest row per (agent, surface, session) an import sweep captured rows fro
 
 ### Community 122 - "Community 122"
 Cohesion: 1.0
-Nodes (1): Determinism: this change touches detection and wiring only. A derived view must
+Nodes (1): One manifest row per graphify run that filed a saving. `session` is the task
 
 ### Community 123 - "Community 123"
 Cohesion: 1.0
-Nodes (1): P0 fixture corpus — `cage import` parses every agent × surface log to exact rows
+Nodes (1): Every manifest row (import + graphify), oldest first. Tolerates a truncated tail
 
 ### Community 124 - "Community 124"
 Cohesion: 1.0
-Nodes (1): S1/S2 stay shape-asserted (join wires agents + runs doctor — output is     machi
+Nodes (1): Top parser only: `cage --help` renders the curated front door verbatim     (`_RO
 
 ### Community 125 - "Community 125"
 Cohesion: 1.0
-Nodes (1): A negative net backed by real receipts is NEVER suppressed, smoothed, or     gat
+Nodes (1): Capture-on-read controls shared by every read surface (capture-architecture
 
 ### Community 126 - "Community 126"
 Cohesion: 1.0
-Nodes (1): A cage command whose executable is a machine-absolute path — the sharing bug
+Nodes (1): A command group (insights/task/authorship/data) — a subparser holding nested
 
 ### Community 127 - "Community 127"
 Cohesion: 1.0
-Nodes (1): No committed wired file may carry a machine-absolute cage path — teammates'
+Nodes (1): The first positional token in ``argv`` — the command word — skipping global
 
 ### Community 128 - "Community 128"
 Cohesion: 1.0
-Nodes (1): Every installed artifact's cage verb, checked against the **live parser**     (`
+Nodes (1): The resolved import candidates, one indented line each with provenance — the
 
 ### Community 129 - "Community 129"
 Cohesion: 1.0
-Nodes (1): Existence + PATH + **liveness**. The first two alone reported ✅ for 9 days while
+Nodes (1): Every leaf view (an actual derived command), read live from the parser (no     l
 
 ### Community 130 - "Community 130"
 Cohesion: 1.0
-Nodes (1): The graphify that **actually runs** — resolved the way the shell does, first
+Nodes (1): Token-overlap score: a full keyword/id hit is 2; a stem hit is 1.      A stem hi
 
 ### Community 131 - "Community 131"
 Cohesion: 1.0
-Nodes (1): The fix line for a dead interceptor cage must **not** write to. Cage never edits
+Nodes (1): Best-matching entries for a query (exact id wins outright). Deterministic.
 
 ### Community 132 - "Community 132"
 Cohesion: 1.0
-Nodes (1): An agent hook invoking graphify by absolute path (`cage/hookbypass.py`, B-fix-3)
+Nodes (1): When nothing matches: the n best-overlap ids to suggest (never a guess).
 
 ### Community 133 - "Community 133"
 Cohesion: 1.0
-Nodes (1): GC4 (graphify-capture): is `graphify-out/graph.json` older than HEAD? A stale gr
+Nodes (1): The structured form (`--json`) — formula interpolated with live values.
 
 ### Community 134 - "Community 134"
 Cohesion: 1.0
-Nodes (1): The GC1 usage breadcrumb, read back as one sentence: *"graphify ran N×, R     re
+Nodes (1): The text render — same live numbers as `payload`. Concept entries skip the     `
 
 ### Community 135 - "Community 135"
 Cohesion: 1.0
-Nodes (1): Are there savings receipts to attribute? Zero receipts means `cage insights
+Nodes (1): `--list` — every topic grouped by kind (calculation block, then concept).
 
 ### Community 136 - "Community 136"
 Cohesion: 1.0
-Nodes (1): Human "(3m ago)" for an ISO timestamp; fail-open to ''. Health-check only —
+Nodes (1): All four wiring shapes must resolve to the same verb — a shape we fail to parse
 
 ### Community 137 - "Community 137"
 Cohesion: 1.0
-Nodes (1): The most recent exception/skip in the debug log, as a short one-liner.
+Nodes (1): PROPERTY: every `verbmap.REMOVED` remediation must be a command the CLI accepts.
 
 ### Community 138 - "Community 138"
 Cohesion: 1.0
-Nodes (1): Per-agent capture event + last error, from the metadata-only debug log.     Off
+Nodes (1): The converse: nothing in REMOVED may still be a live verb (a stale map entry
 
 ### Community 139 - "Community 139"
 Cohesion: 1.0
-Nodes (1): Write + read a receipt in a throwaway ledger — proves the write path works.
+Nodes (1): Redirect every agent home off the real machine (mirrors test_portable_wiring).
 
 ### Community 140 - "Community 140"
 Cohesion: 1.0
-Nodes (1): The honest "versions installed" answer (handoff §5): running cage (+ `zipapp`
+Nodes (1): Write a v0.27-era .claude/settings.json with the given raw commands.
 
 ### Community 141 - "Community 141"
 Cohesion: 1.0
-Nodes (1): `cage doctor --wiring` payload: the installed-artifact inventory     (`wiringsca
+Nodes (1): MUST-PRESERVE: a v0.27 Claude backfill/banner hook naming a dead verb must not
 
 ### Community 142 - "Community 142"
 Cohesion: 1.0
-Nodes (1): The text form of `wiring_report()` — one data structure, two renderers (the
+Nodes (1): Codex was removed completely: `agents.install` no longer has a wire module for
 
 ### Community 143 - "Community 143"
 Cohesion: 1.0
-Nodes (1): Four mutually-exclusive verdicts (wiringscan._agent_inventory): "needs healing"
+Nodes (1): A stale cage hook in any event slot (not just SessionStart) is stripped — the
 
 ### Community 144 - "Community 144"
 Cohesion: 1.0
-Nodes (1): Run every check; return {status, checks:[{name, level, detail}]}.      Ledger ch
+Nodes (1): The user-level `~/.copilot/hooks/cage.json` is wholly cage-owned, so the hookles
 
 ### Community 145 - "Community 145"
 Cohesion: 1.0
-Nodes (1): The counterfactual permutation table (plan §4.4) — what every stack would cost.
+Nodes (1): A project wired the way v0.27 left it, plus two foreign hooks that must be     t
 
 ### Community 146 - "Community 146"
 Cohesion: 1.0
-Nodes (1): A reconstructed cell is `modeled` at best — never `measured` (it wasn't run).
+Nodes (1): The handoff's §10 open question: a clean `cage setup` must produce zero     find
 
 ### Community 147 - "Community 147"
 Cohesion: 1.0
-Nodes (1): Whether ``provider/model`` resolves any price row — the cost column's     availa
+Nodes (1): Every artifact `agents.install` still manages heals; `.codex/hooks.json` is the
 
 ### Community 148 - "Community 148"
 Cohesion: 1.0
-Nodes (1): The permutation grid (spec I7–I8): the **token grid always renders** —     only
+Nodes (1): Idempotence: healing a healed tree changes nothing (no mtime churn, no diff).
 
 ### Community 149 - "Community 149"
 Cohesion: 1.0
-Nodes (1): Gross vs **net** savings — what a tool avoided, minus what it cost to *use* (net
+Nodes (1): Refresh-only: a project that never installed the interceptor must not get one.
 
 ### Community 150 - "Community 150"
 Cohesion: 1.0
-Nodes (1): A row timestamp as seconds, or ``None`` when unparseable. A naive stamp is read
+Nodes (1): The exact false ✅ from F1: the shim exists and is on PATH, but is dead.
 
 ### Community 151 - "Community 151"
 Cohesion: 1.0
-Nodes (1): The gross USD of a receipt set — the SAME two routes `roi`/`report` use (linked
+Nodes (1): Determinism: this change touches detection and wiring only. A derived view must
 
 ### Community 152 - "Community 152"
 Cohesion: 1.0
-Nodes (1): Task-level gross/net for ``tool`` over the window.      ``calls``/``receipts`` l
+Nodes (1): P0 fixture corpus — `cage import` parses every agent × surface log to exact rows
 
 ### Community 153 - "Community 153"
 Cohesion: 1.0
-Nodes (1): The one-line net-of-use body for a `verdict` input line. Never renders a bare
+Nodes (1): S1/S2 stay shape-asserted (join wires agents + runs doctor — output is     machi
 
 ### Community 154 - "Community 154"
 Cohesion: 1.0
-Nodes (1): `cage insights roi` — **gross** saved $ per tool vs the tool's own cost + added
+Nodes (1): A negative net backed by real receipts is NEVER suppressed, smoothed, or     gat
 
 ### Community 155 - "Community 155"
 Cohesion: 1.0
-Nodes (1): CSV over the same `by_tool()` payload as the text table (one structure, two
+Nodes (1): A cage command whose executable is a machine-absolute path — the sharing bug
 
 ### Community 156 - "Community 156"
 Cohesion: 1.0
-Nodes (1): `cage insights regression` — alert when cost-per-call drifts up (plan §8.3).  A
+Nodes (1): No committed wired file may carry a machine-absolute cage path — teammates'
 
 ### Community 157 - "Community 157"
 Cohesion: 1.0
-Nodes (1): `tasks.jsonl` — one append-only row per task (design §5b.2, decision E).  A task
+Nodes (1): Every installed artifact's cage verb, checked against the **live parser**     (`
 
 ### Community 158 - "Community 158"
 Cohesion: 1.0
-Nodes (1): Run a read-only git command; return stripped stdout, or None on any failure.
+Nodes (1): Existence + PATH + **liveness**. The first two alone reported ✅ for 9 days while
 
 ### Community 159 - "Community 159"
 Cohesion: 1.0
-Nodes (1): SHA / branch / diff counts / top-level dirs — fail-open, fields omitted if absen
+Nodes (1): The graphify that **actually runs** — resolved the way the shell does, first
 
 ### Community 160 - "Community 160"
 Cohesion: 1.0
-Nodes (1): The single top-level changed dir of the working tree, for `scope` (plan §3.6.2).
+Nodes (1): The fix line for a dead interceptor cage must **not** write to. Cage never edits
 
 ### Community 161 - "Community 161"
 Cohesion: 1.0
-Nodes (1): Append one task row (git snapshot folded in unless disabled). Fail-open.
+Nodes (1): An agent hook invoking graphify by absolute path (`cage/hookbypass.py`, B-fix-3)
 
 ### Community 162 - "Community 162"
 Cohesion: 1.0
-Nodes (1): Latest row per task id (last-write-wins) keyed by id — pure derive.
+Nodes (1): GC4 (graphify-capture): is `graphify-out/graph.json` older than HEAD? A stale gr
 
 ### Community 163 - "Community 163"
 Cohesion: 1.0
-Nodes (1): True when a chat-session request was answered by the Copilot Chat extension —
+Nodes (1): The GC1 usage breadcrumb, read back as one sentence: *"graphify ran N×, R     re
 
 ### Community 164 - "Community 164"
 Cohesion: 1.0
-Nodes (1): Meter the Copilot VS Code *extension* from VS Code's own chat-session store
+Nodes (1): Are there savings receipts to attribute? Zero receipts means `cage insights
 
 ### Community 165 - "Community 165"
 Cohesion: 1.0
-Nodes (1): Meter Kiro from its append-only usage log `dev_data/tokens_generated.jsonl` —
+Nodes (1): Human "(3m ago)" for an ISO timestamp; fail-open to ''. Health-check only —
 
 ### Community 166 - "Community 166"
 Cohesion: 1.0
-Nodes (1): Normalize a `conversations_v2.key` (or the workspace root it is matched against)
+Nodes (1): The most recent exception/skip in the debug log, as a short one-liner.
 
 ### Community 167 - "Community 167"
 Cohesion: 1.0
-Nodes (1): Is ``key`` the workspace ``root`` **or a directory beneath it**? The tree, not t
+Nodes (1): Per-agent capture event + last error, from the metadata-only debug log.     Off
 
 ### Community 168 - "Community 168"
 Cohesion: 1.0
-Nodes (1): Extract one credits row from a conversation JSON, reading only whitelisted     n
+Nodes (1): Write + read a receipt in a throwaway ledger — proves the write path works.
 
 ### Community 169 - "Community 169"
 Cohesion: 1.0
-Nodes (1): Meter Kiro CLI from its SQLite store, **read-only**, yielding *credits* usage ro
+Nodes (1): The honest "versions installed" answer (handoff §5): running cage (+ `zipapp`
 
 ### Community 170 - "Community 170"
 Cohesion: 1.0
-Nodes (1): Seed data shipped with the cage package (default policy + skill assets).      Re
+Nodes (1): `cage doctor --wiring` payload: the installed-artifact inventory     (`wiringsca
 
 ### Community 171 - "Community 171"
 Cohesion: 1.0
-Nodes (1): ``"zipapp"`` when cage runs from a ``.pyz`` (zipimport), else ``"wheel"``     (w
+Nodes (1): The text form of `wiring_report()` — one data structure, two renderers (the
 
 ### Community 172 - "Community 172"
 Cohesion: 1.0
-Nodes (1): The `~/.claude/projects/<slug>` dir name Claude Code derives from a repo path:
+Nodes (1): Four mutually-exclusive verdicts (wiringscan._agent_inventory): "needs healing"
 
 ### Community 173 - "Community 173"
 Cohesion: 1.0
-Nodes (1): Copilot CLI home (`$COPILOT_HOME` or ~/.copilot). Holds `session-state/<id>/
+Nodes (1): Run every check; return {status, checks:[{name, level, detail}]}.      Ledger ch
 
 ### Community 174 - "Community 174"
 Cohesion: 1.0
-Nodes (1): The first candidate that exists on disk, else the first candidate (the     platf
+Nodes (1): The counterfactual permutation table (plan §4.4) — what every stack would cost.
 
 ### Community 175 - "Community 175"
 Cohesion: 1.0
-Nodes (1): Every VS Code user-dir location cage will consider, in probe order:     ``CAGE_V
+Nodes (1): A reconstructed cell is `modeled` at best — never `measured` (it wasn't run).
 
 ### Community 176 - "Community 176"
 Cohesion: 1.0
-Nodes (1): VS Code user dir (Copilot chat-session store lives under it). Override     CAGE_
+Nodes (1): Whether ``provider/model`` resolves any price row — the cost column's     availa
 
 ### Community 177 - "Community 177"
 Cohesion: 1.0
-Nodes (1): Kiro **CLI** SQLite store (`kiro-cli/data.sqlite3`) candidates, in probe order:
+Nodes (1): The permutation grid (spec I7–I8): the **token grid always renders** —     only
 
 ### Community 178 - "Community 178"
 Cohesion: 1.0
-Nodes (1): The first existing Kiro CLI SQLite store, else the top candidate (so a doctor pr
+Nodes (1): Gross vs **net** savings — what a tool avoided, minus what it cost to *use* (net
 
 ### Community 179 - "Community 179"
 Cohesion: 1.0
-Nodes (1): Kiro's per-call usage log (`kiro.kiroagent/dev_data/tokens_generated.jsonl`):
+Nodes (1): A row timestamp as seconds, or ``None`` when unparseable. A naive stamp is read
 
 ### Community 180 - "Community 180"
 Cohesion: 1.0
-Nodes (1): The **seed** ``(source, glob, path_globs)`` log locations per agent     (capture
+Nodes (1): The gross USD of a receipt set — the SAME two routes `roi`/`report` use (linked
 
 ### Community 181 - "Community 181"
 Cohesion: 1.0
-Nodes (1): Render a path home-relative (``~/…``) when it sits under ``$HOME`` — so a     ma
+Nodes (1): Task-level gross/net for ``tool`` over the window.      ``calls``/``receipts`` l
 
 ### Community 182 - "Community 182"
 Cohesion: 1.0
-Nodes (1): The default sources cage materializes into an active ``[sources]`` table (Direct
+Nodes (1): The one-line net-of-use body for a `verdict` input line. Never renders a bare
 
 ### Community 183 - "Community 183"
 Cohesion: 1.0
-Nodes (1): Compare the project's declared ``[sources]`` against the built-in seed — the
+Nodes (1): `cage insights roi` — **gross** saved $ per tool vs the tool's own cost + added
 
 ### Community 184 - "Community 184"
 Cohesion: 1.0
-Nodes (1): Render the active ``[sources]`` table cage materializes into ``cage.toml`` — a
+Nodes (1): CSV over the same `by_tool()` payload as the text table (one structure, two
 
 ### Community 185 - "Community 185"
 Cohesion: 1.0
-Nodes (1): Return ``text`` with its cage-managed sources block replaced by (or, if absent,
+Nodes (1): `cage insights regression` — alert when cost-per-call drifts up (plan §8.3).  A
 
 ### Community 186 - "Community 186"
 Cohesion: 1.0
-Nodes (1): One candidate log location, tagged with where it came from. ``provenance`` is
+Nodes (1): `tasks.jsonl` — one append-only row per task (design §5b.2, decision E).  A task
 
 ### Community 187 - "Community 187"
 Cohesion: 1.0
-Nodes (1): ``~`` + ``$VAR`` expansion for a policy path (local filesystem only — no glob,
+Nodes (1): Run a read-only git command; return stripped stdout, or None on any failure.
 
 ### Community 188 - "Community 188"
 Cohesion: 1.0
-Nodes (1): THE resolution point for import locations (plan Phase 4). Returns the     proven
+Nodes (1): SHA / branch / diff counts / top-level dirs — fail-open, fields omitted if absen
 
 ### Community 189 - "Community 189"
 Cohesion: 1.0
-Nodes (1): The candidate log locations for one built-in agent — the built-in registry plus
+Nodes (1): The single top-level changed dir of the working tree, for `scope` (plan §3.6.2).
 
 ### Community 190 - "Community 190"
 Cohesion: 1.0
-Nodes (1): THE lookup `cage import --path`/`--project` scans with (path-globs handoff §5):
+Nodes (1): Append one task row (git snapshot folded in unless disabled). Fail-open.
 
 ### Community 191 - "Community 191"
 Cohesion: 1.0
-Nodes (1): Agents that declare ``[sources]`` entries but no ``path_globs`` on any of them —
+Nodes (1): Latest row per task id (last-write-wins) keyed by id — pure derive.
 
 ### Community 192 - "Community 192"
 Cohesion: 1.0
-Nodes (1): The `[sources.<name>]` custom-tool sources (name ∉ the three agents) — each
+Nodes (1): True when a chat-session request was answered by the Copilot Chat extension —
 
 ### Community 193 - "Community 193"
 Cohesion: 1.0
-Nodes (1): Env-independent, ~-relative description of the built-in log sources for the
+Nodes (1): Meter the Copilot VS Code *extension* from VS Code's own chat-session store
 
 ### Community 194 - "Community 194"
 Cohesion: 1.0
-Nodes (1): THE project price-overrides resolver (prices-toml plan §3) — the one place the
+Nodes (1): Meter Kiro from its append-only usage log `dev_data/tokens_generated.jsonl` —
 
 ### Community 195 - "Community 195"
 Cohesion: 1.0
-Nodes (1): True if ``path`` on disk actually declares a ``[prices…]``/``[credits…]`` table
+Nodes (1): Normalize a `conversations_v2.key` (or the workspace root it is matched against)
 
 ### Community 196 - "Community 196"
 Cohesion: 1.0
-Nodes (1): The per-project ``.cage/`` layout (plan §3).      The ledger carries token *coun
+Nodes (1): Is ``key`` the workspace ``root`` **or a directory beneath it**? The tree, not t
 
 ### Community 197 - "Community 197"
 Cohesion: 1.0
-Nodes (1): The capture manifest (import-ledger plan §4): one append-only row per import
+Nodes (1): Extract one credits row from a conversation JSON, reading only whitelisted     n
 
 ### Community 198 - "Community 198"
 Cohesion: 1.0
-Nodes (1): The dedicated per-source savings tree (import-ledger plan §3):         ``ledger/
+Nodes (1): Meter Kiro CLI from its SQLite store, **read-only**, yielding *credits* usage ro
 
 ### Community 199 - "Community 199"
 Cohesion: 1.0
-Nodes (1): Month-partition path for a savings row of ``tool``, from the row's own ``ts``
+Nodes (1): Seed data shipped with the cage package (default policy + skill assets).      Re
 
 ### Community 200 - "Community 200"
 Cohesion: 1.0
-Nodes (1): Every readable savings shard across the whole tree (`savings/*/savings-*.jsonl`
+Nodes (1): ``"zipapp"`` when cage runs from a ``.pyz`` (zipimport), else ``"wheel"``     (w
 
 ### Community 201 - "Community 201"
 Cohesion: 1.0
-Nodes (1): Month-partition path for ``kind`` (``calls``/``receipts``/``tasks``) derived
+Nodes (1): The `~/.claude/projects/<slug>` dir name Claude Code derives from a repo path:
 
 ### Community 202 - "Community 202"
 Cohesion: 1.0
-Nodes (1): Every readable shard for ``kind``: the legacy unpartitioned file first         (
+Nodes (1): Copilot CLI home (`$COPILOT_HOME` or ~/.copilot). Holds `session-state/<id>/
 
 ### Community 203 - "Community 203"
 Cohesion: 1.0
-Nodes (1): Fleet-study phase markers (`cage study start/stop`, plan §4.9) — a small
+Nodes (1): The first candidate that exists on disk, else the first candidate (the     platf
 
 ### Community 204 - "Community 204"
 Cohesion: 1.0
-Nodes (1): THE single project-config path resolver — never a second place that knows
+Nodes (1): Every VS Code user-dir location cage will consider, in probe order:     ``CAGE_V
 
 ### Community 205 - "Community 205"
 Cohesion: 1.0
-Nodes (1): The legacy ``policy.toml`` when it sits *beside* a ``cage.toml`` that wins —
+Nodes (1): VS Code user dir (Copilot chat-session store lives under it). Override     CAGE_
 
 ### Community 206 - "Community 206"
 Cohesion: 1.0
-Nodes (1): The legacy in-``cage.toml`` (or ``policy.toml``) price block that a present
+Nodes (1): Kiro **CLI** SQLite store (`kiro-cli/data.sqlite3`) candidates, in probe order:
 
 ### Community 207 - "Community 207"
 Cohesion: 1.0
-Nodes (1): Per-agent incremental-import high-water cursors (plan §3.7). Maps each         s
+Nodes (1): The first existing Kiro CLI SQLite store, else the top candidate (so a doctor pr
 
 ### Community 208 - "Community 208"
 Cohesion: 1.0
-Nodes (1): Capture-path debug log (`cage/debuglog.py`) — metadata-only, written only
+Nodes (1): Kiro's per-call usage log (`kiro.kiroagent/dev_data/tokens_generated.jsonl`):
 
 ### Community 209 - "Community 209"
 Cohesion: 1.0
-Nodes (1): Always-on capture breadcrumb (`cage/capturelog.py`) — one line per agent per
+Nodes (1): The **seed** ``(source, glob, path_globs)`` log locations per agent     (capture
 
 ### Community 210 - "Community 210"
 Cohesion: 1.0
-Nodes (1): Always-on graphify usage breadcrumb (`cage/usagelog.py`, graphify-capture
+Nodes (1): Render a path home-relative (``~/…``) when it sits under ``$HOME`` — so a     ma
 
 ### Community 211 - "Community 211"
 Cohesion: 1.0
-Nodes (1): Per-(agent,event) hook heartbeat — append-only, last-write-wins on read.
+Nodes (1): The default sources cage materializes into an active ``[sources]`` table (Direct
 
 ### Community 212 - "Community 212"
 Cohesion: 1.0
-Nodes (1): Per-session buffer of uncommitted `PostToolUse` edits (plan §3.5) — a         `p
+Nodes (1): Compare the project's declared ``[sources]`` against the built-in seed — the
 
 ### Community 213 - "Community 213"
 Cohesion: 1.0
-Nodes (1): `cage doctor --paths` — which log locations cage looked at, which missed, and wh
+Nodes (1): Render the active ``[sources]`` table cage materializes into ``cage.toml`` — a
 
 ### Community 214 - "Community 214"
 Cohesion: 1.0
-Nodes (1): Parseable row count for one file — read-only, fail-open to 0.
+Nodes (1): Return ``text`` with its cage-managed sources block replaced by (or, if absent,
 
 ### Community 215 - "Community 215"
 Cohesion: 1.0
-Nodes (1): One candidate's found/missing/parse/cursor facts. ``fmt`` selects the parser
+Nodes (1): One candidate log location, tagged with where it came from. ``provenance`` is
 
 ### Community 216 - "Community 216"
 Cohesion: 1.0
-Nodes (1): Fail-open: is ``path`` git-tracked under ``root``? (Shelled, never imported —
+Nodes (1): ``~`` + ``$VAR`` expansion for a policy path (local filesystem only — no glob,
 
 ### Community 217 - "Community 217"
 Cohesion: 1.0
-Nodes (1): A policy source path that a teammate's clone can't resolve — an absolute     fil
+Nodes (1): THE resolution point for import locations (plan Phase 4). Returns the     proven
 
 ### Community 218 - "Community 218"
 Cohesion: 1.0
-Nodes (1): The probe data — read-only over the single `paths.resolve_log_sources` (built-in
+Nodes (1): The candidate log locations for one built-in agent — the built-in registry plus
 
 ### Community 219 - "Community 219"
 Cohesion: 1.0
-Nodes (1): The CLI reorganization map — the single source of truth for the error-with-direc
+Nodes (1): THE lookup `cage import --path`/`--project` scans with (path-globs handoff §5):
 
 ### Community 220 - "Community 220"
 Cohesion: 1.0
-Nodes (1): The one-line error body for a removed verb (`cli.main` prefixes ``error: ``).
+Nodes (1): Agents that declare ``[sources]`` entries but no ``path_globs`` on any of them —
 
 ### Community 221 - "Community 221"
 Cohesion: 1.0
-Nodes (1): The `Explanation` shape shared by `explain.py` (engine) and `explain_data.py` (r
+Nodes (1): The `[sources.<name>]` custom-tool sources (name ∉ the three agents) — each
 
 ### Community 222 - "Community 222"
 Cohesion: 1.0
-Nodes (1): Merge one section of ``data`` onto ``pol`` in place — two-level deep for the
+Nodes (1): Env-independent, ~-relative description of the built-in log sources for the
 
 ### Community 223 - "Community 223"
 Cohesion: 1.0
-Nodes (1): Project policy merged over the bundled default, returned as ONE merged dict —
+Nodes (1): THE project price-overrides resolver (prices-toml plan §3) — the one place the
 
 ### Community 224 - "Community 224"
 Cohesion: 1.0
-Nodes (1): The bundled policy alone (no project merge) — origin attribution for     `cage p
+Nodes (1): True if ``path`` on disk actually declares a ``[prices…]``/``[credits…]`` table
 
 ### Community 225 - "Community 225"
 Cohesion: 1.0
-Nodes (1): The project policy.toml alone, un-merged; ``{}`` when absent. Parse errors     p
+Nodes (1): The per-project ``.cage/`` layout (plan §3).      The ledger carries token *coun
 
 ### Community 226 - "Community 226"
 Cohesion: 1.0
-Nodes (1): Count of equal leading hyphen-segments shared by two split model ids.
+Nodes (1): The capture manifest (import-ledger plan §4): one append-only row per import
 
 ### Community 227 - "Community 227"
 Cohesion: 1.0
-Nodes (1): Canonical form for family matching: strip a known router prefix     (`copilot/cl
+Nodes (1): The dedicated per-source savings tree (import-ledger plan §3):         ``ledger/
 
 ### Community 228 - "Community 228"
 Cohesion: 1.0
-Nodes (1): The `[alias.<provider>."<model>"] to = "prov/model"` route, if configured.
+Nodes (1): Month-partition path for a savings row of ``tool``, from the row's own ``ts``
 
 ### Community 229 - "Community 229"
 Cohesion: 1.0
-Nodes (1): Resolve a price row *and how it matched*:     ``("exact" | "alias" | "family" |
+Nodes (1): Every readable savings shard across the whole tree (`savings/*/savings-*.jsonl`
 
 ### Community 230 - "Community 230"
 Cohesion: 1.0
-Nodes (1): Per-million-token price row for a model, or zeros if unpriced.      Thin wrapper
+Nodes (1): Month-partition path for ``kind`` (``calls``/``receipts``/``tasks``) derived
 
 ### Community 231 - "Community 231"
 Cohesion: 1.0
-Nodes (1): A boolean switch: env override (`0/false/no/off` vs `1/true/yes/on`) beats the
+Nodes (1): Every readable shard for ``kind``: the legacy unpartitioned file first         (
 
 ### Community 232 - "Community 232"
 Cohesion: 1.0
-Nodes (1): Persisted wiring mode (docs/restricted-environments.md): shims + user-level
+Nodes (1): Fleet-study phase markers (`cage study start/stop`, plan §4.9) — a small
 
 ### Community 233 - "Community 233"
 Cohesion: 1.0
-Nodes (1): Whether hook-driven `cage import` actually runs — the consumer's on/off switch
+Nodes (1): THE single project-config path resolver — never a second place that knows
 
 ### Community 234 - "Community 234"
 Cohesion: 1.0
-Nodes (1): Whether a read (report / insights / MCP read tools) lazily sweeps the log regist
+Nodes (1): The legacy ``policy.toml`` when it sits *beside* a ``cage.toml`` that wins —
 
 ### Community 235 - "Community 235"
 Cohesion: 1.0
-Nodes (1): Seconds within which a second read won't re-sweep (capture-on-read throttle,
+Nodes (1): The legacy in-``cage.toml`` (or ``policy.toml``) price block that a present
 
 ### Community 236 - "Community 236"
 Cohesion: 1.0
-Nodes (1): Whether the capture path writes its metadata-only debug log + hook heartbeat
+Nodes (1): Per-agent incremental-import high-water cursors (plan §3.7). Maps each         s
 
 ### Community 237 - "Community 237"
 Cohesion: 1.0
-Nodes (1): Whether the best-effort `task` backfill (plan §4 / Phase 4) runs — correlating a
+Nodes (1): Capture-path debug log (`cage/debuglog.py`) — metadata-only, written only
 
 ### Community 238 - "Community 238"
 Cohesion: 1.0
-Nodes (1): Whether the **automatic** state-dir sweep (`cleanup.maybe_run`, piggybacked on
+Nodes (1): Always-on capture breadcrumb (`cage/capturelog.py`) — one line per agent per
 
 ### Community 239 - "Community 239"
 Cohesion: 1.0
-Nodes (1): Whether the auto sweep prints its stderr reminder when `cleanup_enabled` is
+Nodes (1): Always-on graphify usage breadcrumb (`cage/usagelog.py`, graphify-capture
 
 ### Community 240 - "Community 240"
 Cohesion: 1.0
-Nodes (1): Retention window for the cleanable state/ classes. Policy `[cleanup] days`     w
+Nodes (1): Per-(agent,event) hook heartbeat — append-only, last-write-wins on read.
 
 ### Community 241 - "Community 241"
 Cohesion: 1.0
-Nodes (1): Age threshold (days) past which the bundled prices count as stale     (`cage/fre
+Nodes (1): Per-session buffer of uncommitted `PostToolUse` edits (plan §3.5) — a         `p
 
 ### Community 242 - "Community 242"
 Cohesion: 1.0
-Nodes (1): Whether `report`/`matrix`/the bare overview render dollar columns by default
+Nodes (1): `cage doctor --paths` — which log locations cage looked at, which missed, and wh
 
 ### Community 243 - "Community 243"
 Cohesion: 1.0
-Nodes (1): Age threshold (hours) past which the report footer's `last import: N ago`     ad
+Nodes (1): Parseable row count for one file — read-only, fail-open to 0.
 
 ### Community 244 - "Community 244"
 Cohesion: 1.0
-Nodes (1): Whether `cage data export` runs the all-agent import sweep before bundling, so a
+Nodes (1): One candidate's found/missing/parse/cursor facts. ``fmt`` selects the parser
 
 ### Community 245 - "Community 245"
 Cohesion: 1.0
-Nodes (1): The `cage.toml` `cage setup` writes — a copy of the bundled default (policy only
+Nodes (1): Fail-open: is ``path`` git-tracked under ``root``? (Shelled, never imported —
 
 ### Community 246 - "Community 246"
 Cohesion: 1.0
-Nodes (1): The `prices.toml` `cage setup` writes — a copy of the bundled price table     (t
+Nodes (1): A policy source path that a teammate's clone can't resolve — an absolute     fil
 
 ### Community 247 - "Community 247"
 Cohesion: 1.0
-Nodes (1): Append one breadcrumb line for `agent`'s sweep this run. Always on — no     `CAG
+Nodes (1): The probe data — read-only over the single `paths.resolve_log_sources` (built-in
 
 ### Community 248 - "Community 248"
 Cohesion: 1.0
-Nodes (1): The last `n` breadcrumb rows (oldest→newest) — the raw feed behind a future
+Nodes (1): The CLI reorganization map — the single source of truth for the error-with-direc
 
 ### Community 249 - "Community 249"
 Cohesion: 1.0
-Nodes (1): ISO cutoff; write-path only (a clock never feeds a derived view).
+Nodes (1): The one-line error body for a removed verb (`cli.main` prefixes ``error: ``).
 
 ### Community 250 - "Community 250"
 Cohesion: 1.0
-Nodes (1): (stale, total, stale_bytes) JSON rows by their own ``ts`` field; unparseable
+Nodes (1): The `Explanation` shape shared by `explain.py` (engine) and `explain_data.py` (r
 
 ### Community 251 - "Community 251"
 Cohesion: 1.0
-Nodes (1): What cleanup would touch: ``[{path, cls, age_days, action, detail}]``,     sorte
+Nodes (1): Merge one section of ``data`` onto ``pol`` in place — two-level deep for the
 
 ### Community 252 - "Community 252"
 Cohesion: 1.0
-Nodes (1): Atomic line-filter rewrite: temp file (non-`.tmp` suffix) then os.replace.
+Nodes (1): Project policy merged over the bundled default, returned as ONE merged dict —
 
 ### Community 253 - "Community 253"
 Cohesion: 1.0
-Nodes (1): Apply `scan` under the cleanup lock; per-item fail-open (an error is     debug-l
+Nodes (1): The bundled policy alone (no project merge) — origin attribution for     `cage p
 
 ### Community 254 - "Community 254"
 Cohesion: 1.0
-Nodes (1): The auto path's one stderr line: count, window, reclaimable size, and the     ex
+Nodes (1): The project policy.toml alone, un-merged; ``{}`` when absent. Parse errors     p
 
 ### Community 255 - "Community 255"
 Cohesion: 1.0
-Nodes (1): The auto path, piggybacked on `cage import`/read sweeps (cage installs no     sc
+Nodes (1): Count of equal leading hyphen-segments shared by two split model ids.
 
 ### Community 256 - "Community 256"
 Cohesion: 1.0
-Nodes (1): `cage data cleanup` — dry-run table by default (house pattern), ``--apply``
+Nodes (1): Canonical form for family matching: strip a known router prefix     (`copilot/cl
 
 ### Community 257 - "Community 257"
 Cohesion: 1.0
-Nodes (1): The ONE display-context implementation (plan Phases 1+2 — output honesty).  Two
+Nodes (1): The `[alias.<provider>."<model>"] to = "prov/model"` route, if configured.
 
 ### Community 258 - "Community 258"
 Cohesion: 1.0
-Nodes (1): Resolved presentation switches, threaded through the render layer.
+Nodes (1): Resolve a price row *and how it matched*:     ``("exact" | "alias" | "family" |
 
 ### Community 259 - "Community 259"
 Cohesion: 1.0
-Nodes (1): Flag > env > policy, resolved once at the CLI boundary. ``args`` is the     argp
+Nodes (1): Per-million-token price row for a model, or zeros if unpriced.      Thin wrapper
 
 ### Community 260 - "Community 260"
 Cohesion: 1.0
-Nodes (1): Collects the below-the-table lines for one command invocation.
+Nodes (1): A boolean switch: env override (`0/false/no/off` vs `1/true/yes/on`) beats the
 
 ### Community 261 - "Community 261"
 Cohesion: 1.0
-Nodes (1): The footer block ("" when nothing to say): deduped lines in fixed         order,
+Nodes (1): Persisted wiring mode (docs/restricted-environments.md): shims + user-level
 
 ### Community 262 - "Community 262"
 Cohesion: 1.0
-Nodes (1): The SURFACES name for a ledger row's ``agent`` field (``claude-code`` → ``claude
+Nodes (1): Whether hook-driven `cage import` actually runs — the consumer's on/off switch
 
 ### Community 263 - "Community 263"
 Cohesion: 1.0
-Nodes (1): Task grouping — the shared key-matching core under `cage insights compare` (road
+Nodes (1): Whether a read (report / insights / MCP read tools) lazily sweeps the log regist
 
 ### Community 264 - "Community 264"
 Cohesion: 1.0
-Nodes (1): Latest row per task id, filtered to *closed* tasks (an ``outcome`` recorded
+Nodes (1): Seconds within which a second read won't re-sweep (capture-on-read throttle,
 
 ### Community 265 - "Community 265"
 Cohesion: 1.0
-Nodes (1): ``{task_id: {"calls": [...], "receipts": [...]}}`` per the join precedence.
+Nodes (1): Whether the capture path writes its metadata-only debug log + hook heartbeat
 
 ### Community 266 - "Community 266"
 Cohesion: 1.0
-Nodes (1): The join over already-read rows — same contract as :func:`join`, for callers
+Nodes (1): Whether the best-effort `task` backfill (plan §4 / Phase 4) runs — correlating a
 
 ### Community 267 - "Community 267"
 Cohesion: 1.0
-Nodes (1): The observed stack: sorted joined receipt tools, ``human`` excluded;     ``agent
+Nodes (1): Whether the **automatic** state-dir sweep (`cleanup.maybe_run`, piggybacked on
 
 ### Community 268 - "Community 268"
 Cohesion: 1.0
-Nodes (1): A task's scope: the single top-level changed dir of its git snapshot     (`tasks
+Nodes (1): Whether the auto sweep prints its stderr reminder when `cleanup_enabled` is
 
 ### Community 269 - "Community 269"
 Cohesion: 1.0
-Nodes (1): One measured stat row per closed task, in sorted task-id order:     ``{task, sta
+Nodes (1): Retention window for the cleanable state/ classes. Policy `[cleanup] days`     w
 
 ### Community 270 - "Community 270"
 Cohesion: 1.0
-Nodes (1): Group stat rows by ``by`` keys (⊆ {stack, scope, label}; stack always     includ
+Nodes (1): Age threshold (days) past which the bundled prices count as stale     (`cage/fre
 
 ### Community 271 - "Community 271"
 Cohesion: 1.0
-Nodes (1): Copy the bundled graphify interceptor into <root>/bin; return its path.
+Nodes (1): Whether `report`/`matrix`/the bare overview render dollar columns by default
 
 ### Community 272 - "Community 272"
 Cohesion: 1.0
-Nodes (1): Rewrite an **already-installed** `<root>/bin/graphify` when it differs from the
+Nodes (1): Age threshold (hours) past which the report footer's `last import: N ago`     ad
 
 ### Community 273 - "Community 273"
 Cohesion: 1.0
-Nodes (1): Append `export PATH=<root>/bin:$PATH` to the shell rc once. Returns rc path.
+Nodes (1): Whether `cage data export` runs the all-agent import sweep before bundling, so a
 
 ### Community 274 - "Community 274"
 Cohesion: 1.0
-Nodes (1): Set cage up in ``root``. Each key present only if that step ran.      Agent wiri
+Nodes (1): The `cage.toml` `cage setup` writes — a copy of the bundled default (policy only
 
 ### Community 275 - "Community 275"
 Cohesion: 1.0
-Nodes (1): Opaque machine id for the fleet study (roadmap P5, plan §4.9).  A **random** id
+Nodes (1): The `prices.toml` `cage setup` writes — a copy of the bundled price table     (t
 
 ### Community 276 - "Community 276"
 Cohesion: 1.0
-Nodes (1): This ledger's machine id, or "" when not enrolled (the legacy contract).
+Nodes (1): Append one breadcrumb line for `agent`'s sweep this run. Always on — no     `CAG
 
 ### Community 277 - "Community 277"
 Cohesion: 1.0
-Nodes (1): The machine id, generated on first call (enrollment). Fail-open: if the     stat
+Nodes (1): The last `n` breadcrumb rows (oldest→newest) — the raw feed behind a future
 
 ### Community 278 - "Community 278"
 Cohesion: 1.0
-Nodes (1): Add ``machine`` to a row about to be appended — only when enrolled and the     w
+Nodes (1): ISO cutoff; write-path only (a clock never feeds a derived view).
 
 ### Community 279 - "Community 279"
 Cohesion: 1.0
-Nodes (1): The pricing ladder for call-less token receipts (plan §4.5; shipped v0.23).  A t
+Nodes (1): (stale, total, stale_bytes) JSON rows by their own ``ts`` field; unparseable
 
 ### Community 280 - "Community 280"
 Cohesion: 1.0
-Nodes (1): Whether a receipt enters the ladder: token unit AND no *resolvable* call.      T
+Nodes (1): What cleanup would touch: ``[{path, cls, age_days, action, detail}]``,     sorte
 
 ### Community 281 - "Community 281"
 Cohesion: 1.0
-Nodes (1): The pre-built ``{task_id: [calls]}`` join, built ONCE per view — consumers     t
+Nodes (1): Atomic line-filter rewrite: temp file (non-`.tmp` suffix) then os.replace.
 
 ### Community 282 - "Community 282"
 Cohesion: 1.0
-Nodes (1): The configured `[tools.<tool>] price_at` routes: ``{tool: "prov/model"}``.     R
+Nodes (1): Apply `scan` under the cleanup lock; per-item fail-open (an error is     debug-l
 
 ### Community 283 - "Community 283"
 Cohesion: 1.0
-Nodes (1): The `price_at` routes whose target resolves no price row — each prices     nothi
+Nodes (1): The auto path's one stderr line: count, window, reclaimable size, and the     ex
 
 ### Community 284 - "Community 284"
 Cohesion: 1.0
-Nodes (1): The dominant `(provider, model)` of a call set — max summed `tokens_in`,     tie
+Nodes (1): The auto path, piggybacked on `cage import`/read sweeps (cage installs no     sc
 
 ### Community 285 - "Community 285"
 Cohesion: 1.0
-Nodes (1): Price a call-less token receipt: ``(usd, rung, "provider/model")`` or     ``None
+Nodes (1): `cage data cleanup` — dry-run table by default (house pattern), ``--apply``
 
 ### Community 286 - "Community 286"
 Cohesion: 1.0
-Nodes (1): The one footnote phrasing every text view prints for a ladder-priced row.
+Nodes (1): The ONE display-context implementation (plan Phases 1+2 — output honesty).  Two
 
 ### Community 287 - "Community 287"
 Cohesion: 1.0
-Nodes (1): The receipts twin of `report.unpriced_line` — printed by roi and report     when
+Nodes (1): Resolved presentation switches, threaded through the render layer.
 
 ### Community 288 - "Community 288"
 Cohesion: 1.0
-Nodes (1): Delete the cage-owned `.kiro/hooks/cage.kiro.hook` a previous version     wrote
+Nodes (1): Flag > env > policy, resolved once at the CLI boundary. ``args`` is the     argp
 
 ### Community 289 - "Community 289"
 Cohesion: 1.0
-Nodes (1): One artifact naming a verb the parser rejects.
+Nodes (1): Collects the below-the-table lines for one command invocation.
 
 ### Community 290 - "Community 290"
 Cohesion: 1.0
-Nodes (1): Every verb path the current CLI accepts, as 1- and 2-tuples.      `cli` is impor
+Nodes (1): The footer block ("" when nothing to say): deduped lines in fixed         order,
 
 ### Community 291 - "Community 291"
 Cohesion: 1.0
-Nodes (1): Top-level verbs that own subcommands (`insights`, `data`, `task`, …) — for     t
+Nodes (1): The SURFACES name for a ledger row's ``agent`` field (``claude-code`` → ``claude
 
 ### Community 292 - "Community 292"
 Cohesion: 1.0
-Nodes (1): Does the current CLI accept this verb path? Empty (a foreign command) is not
+Nodes (1): Task grouping — the shared key-matching core under `cage insights compare` (road
 
 ### Community 293 - "Community 293"
 Cohesion: 1.0
-Nodes (1): True if ``command`` invokes cage with a verb the parser rejects. False for a
+Nodes (1): Latest row per task id, filtered to *closed* tasks (an ``outcome`` recorded
 
 ### Community 294 - "Community 294"
 Cohesion: 1.0
-Nodes (1): The replacement tail for a dead verb path, from `verbmap.REMOVED`; "" when the
+Nodes (1): ``{task_id: {"calls": [...], "receipts": [...]}}`` per the join precedence.
 
 ### Community 295 - "Community 295"
 Cohesion: 1.0
-Nodes (1): A command tail with its dead head verb rewritten to the current form; unchanged
+Nodes (1): The join over already-read rows — same contract as :func:`join`, for callers
 
 ### Community 296 - "Community 296"
 Cohesion: 1.0
-Nodes (1): Render a path with the home prefix as `~` (PII: no user name in output).      Pu
+Nodes (1): The observed stack: sorted joined receipt tools, ``human`` excluded;     ``agent
 
 ### Community 297 - "Community 297"
 Cohesion: 1.0
-Nodes (1): Commands from a `{"hooks": {<event>: [{"hooks": [...]}]}}` config.      Public b
+Nodes (1): A task's scope: the single top-level changed dir of its git snapshot     (`tasks
 
 ### Community 298 - "Community 298"
 Cohesion: 1.0
-Nodes (1): (display-path, command) for every **project-committed** wired file. This is the
+Nodes (1): One measured stat row per closed task, in sorted task-id order:     ``{task, sta
 
 ### Community 299 - "Community 299"
 Cohesion: 1.0
-Nodes (1): (display-path, command) for every **user-level / per-machine** wired file —
+Nodes (1): Group stat rows by ``by`` keys (⊆ {stack, scope, label}; stack always     includ
 
 ### Community 300 - "Community 300"
 Cohesion: 1.0
-Nodes (1): The `cage <verb>` invocations in a shell script's **executable** lines.      Spl
+Nodes (1): Copy the bundled graphify interceptor into <root>/bin; return its path.
 
 ### Community 301 - "Community 301"
 Cohesion: 1.0
-Nodes (1): The `cage <verb>` invocations inside `<root>/bin/graphify`. The shim is a shell
+Nodes (1): Rewrite an **already-installed** `<root>/bin/graphify` when it differs from the
 
 ### Community 302 - "Community 302"
 Cohesion: 1.0
-Nodes (1): Scan every artifact for a dead verb. Read-only; never executes anything.      Fa
+Nodes (1): Append `export PATH=<root>/bin:$PATH` to the shell rc once. Returns rc path.
 
 ### Community 303 - "Community 303"
 Cohesion: 1.0
-Nodes (1): Per-agent verdict; `doctorcmd.render_wiring_text` formats it into the display
+Nodes (1): Set cage up in ``root``. Each key present only if that step ran.      Agent wiri
 
 ### Community 304 - "Community 304"
 Cohesion: 1.0
-Nodes (1): One artifact a full `cage setup --wire-only --<agent>` writes. `required=False`
+Nodes (1): Opaque machine id for the fleet study (roadmap P5, plan §4.9).  A **random** id
 
 ### Community 305 - "Community 305"
 Cohesion: 1.0
-Nodes (1): (status, detail) for a *present* artifact — dead beats current; an MCP command's
+Nodes (1): This ledger's machine id, or "" when not enrolled (the legacy contract).
 
 ### Community 306 - "Community 306"
 Cohesion: 1.0
-Nodes (1): Build this agent's rows + rollup. ``stale`` is retained (always 0 now that the
+Nodes (1): The machine id, generated on first call (enrollment). Fail-open: if the     stat
 
 ### Community 307 - "Community 307"
 Cohesion: 1.0
-Nodes (1): A `.git/hooks/{post-commit,prepare-commit-msg}` that exists but isn't cage's —
+Nodes (1): Add ``machine`` to a row about to be appended — only when enrolled and the     w
 
 ### Community 308 - "Community 308"
 Cohesion: 1.0
-Nodes (1): Anything the raw enumeration finds that isn't part of a known agent's expected
+Nodes (1): The pricing ladder for call-less token receipts (plan §4.5; shipped v0.23).  A t
 
 ### Community 309 - "Community 309"
 Cohesion: 1.0
-Nodes (1): A cosmetic label for a leftover row — e.g. a lingering global     `~/.claude/set
+Nodes (1): Whether a receipt enters the ladder: token unit AND no *resolvable* call.      T
 
 ### Community 310 - "Community 310"
 Cohesion: 1.0
-Nodes (1): The full per-artifact installed inventory (`cage doctor --wiring`), grouped by
+Nodes (1): The pre-built ``{task_id: [calls]}`` join, built ONCE per view — consumers     t
 
 ### Community 311 - "Community 311"
 Cohesion: 1.0
-Nodes (1): The graphify PATH resolves first, when it is **not** this root's own shim.
+Nodes (1): The configured `[tools.<tool>] price_at` routes: ``{tool: "prov/model"}``.     R
 
 ### Community 312 - "Community 312"
 Cohesion: 1.0
-Nodes (1): Does a wired command string already reference the shim (any host's form —     `$
+Nodes (1): The `price_at` routes whose target resolves no price row — each prices     nothi
 
 ### Community 313 - "Community 313"
 Cohesion: 1.0
-Nodes (1): Top parser only: `cage --help` renders the curated front door verbatim     (`_RO
+Nodes (1): The dominant `(provider, model)` of a call set — max summed `tokens_in`,     tie
 
 ### Community 314 - "Community 314"
 Cohesion: 1.0
-Nodes (1): Capture-on-read controls shared by every read surface (capture-architecture
+Nodes (1): Price a call-less token receipt: ``(usd, rung, "provider/model")`` or     ``None
 
 ### Community 315 - "Community 315"
 Cohesion: 1.0
-Nodes (1): A command group (insights/task/authorship/data) — a subparser holding nested
+Nodes (1): The one footnote phrasing every text view prints for a ladder-priced row.
 
 ### Community 316 - "Community 316"
 Cohesion: 1.0
-Nodes (1): The first positional token in ``argv`` — the command word — skipping global
+Nodes (1): The receipts twin of `report.unpriced_line` — printed by roi and report     when
 
 ### Community 317 - "Community 317"
 Cohesion: 1.0
-Nodes (1): `cage insights estimate` — a pre-task cost band from matching closed tasks (road
+Nodes (1): Delete the cage-owned `.kiro/hooks/cage.kiro.hook` a previous version     wrote
 
 ### Community 318 - "Community 318"
 Cohesion: 1.0
-Nodes (1): The estimate payload: matching closed tasks → token/USD band, or a refusal.
+Nodes (1): One artifact naming a verb the parser rejects.
 
 ### Community 319 - "Community 319"
 Cohesion: 1.0
-Nodes (1): Stamp an ``ok`` estimate onto the open task row (fail-open, last-write-wins).
+Nodes (1): Every verb path the current CLI accepts, as 1- and 2-tuples.      `cli` is impor
 
 ### Community 320 - "Community 320"
 Cohesion: 1.0
-Nodes (1): Run `graphify <argv>` transparently; meter on the side. Returns its exit code.
+Nodes (1): Top-level verbs that own subcommands (`insights`, `data`, `task`, …) — for     t
 
 ### Community 321 - "Community 321"
 Cohesion: 1.0
-Nodes (1): Remove hook wiring a previous version installed. The user-level     `~/.copilot/
+Nodes (1): Does the current CLI accept this verb path? Empty (a foreign command) is not
 
 ### Community 322 - "Community 322"
 Cohesion: 1.0
-Nodes (1): `cage task outcome` / `cage task quality` — quality-adjusted cost (plan §8.2).
+Nodes (1): True if ``command`` invokes cage with a verb the parser rejects. False for a
 
 ### Community 323 - "Community 323"
 Cohesion: 1.0
-Nodes (1): The resolved import candidates, one indented line each with provenance — the
+Nodes (1): The replacement tail for a dead verb path, from `verbmap.REMOVED`; "" when the
 
 ### Community 324 - "Community 324"
 Cohesion: 1.0
-Nodes (1): Every leaf view (an actual derived command), read live from the parser (no     l
+Nodes (1): A command tail with its dead head verb rewritten to the current form; unchanged
 
 ### Community 325 - "Community 325"
 Cohesion: 1.0
-Nodes (1): Token-overlap score: a full keyword/id hit is 2; a stem hit is 1.      A stem hi
+Nodes (1): Render a path with the home prefix as `~` (PII: no user name in output).      Pu
 
 ### Community 326 - "Community 326"
 Cohesion: 1.0
-Nodes (1): Best-matching entries for a query (exact id wins outright). Deterministic.
+Nodes (1): Commands from a `{"hooks": {<event>: [{"hooks": [...]}]}}` config.      Public b
 
 ### Community 327 - "Community 327"
 Cohesion: 1.0
-Nodes (1): When nothing matches: the n best-overlap ids to suggest (never a guess).
+Nodes (1): (display-path, command) for every **project-committed** wired file. This is the
 
 ### Community 328 - "Community 328"
 Cohesion: 1.0
-Nodes (1): The structured form (`--json`) — formula interpolated with live values.
+Nodes (1): (display-path, command) for every **user-level / per-machine** wired file —
 
 ### Community 329 - "Community 329"
 Cohesion: 1.0
-Nodes (1): The text render — same live numbers as `payload`. Concept entries skip the     `
+Nodes (1): The `cage <verb>` invocations in a shell script's **executable** lines.      Spl
 
 ### Community 330 - "Community 330"
 Cohesion: 1.0
-Nodes (1): `--list` — every topic grouped by kind (calculation block, then concept).
+Nodes (1): The `cage <verb>` invocations inside `<root>/bin/graphify`. The shim is a shell
 
 ### Community 331 - "Community 331"
 Cohesion: 1.0
-Nodes (1): Every `name` on PATH **in shell resolution order** — index 0 is the one that run
+Nodes (1): Scan every artifact for a dead verb. Read-only; never executes anything.      Fa
 
 ### Community 332 - "Community 332"
 Cohesion: 1.0
-Nodes (1): The first `_SNIFF_BYTES` of `path` as text; "" on any read error. Never executed
+Nodes (1): Per-agent verdict; `doctorcmd.render_wiring_text` formats it into the display
 
 ### Community 333 - "Community 333"
 Cohesion: 1.0
-Nodes (1): Is this file a cage-written graphify interceptor (current **or** adopt-era)?
+Nodes (1): One artifact a full `cage setup --wire-only --<agent>` writes. `required=False`
 
 ### Community 334 - "Community 334"
 Cohesion: 1.0
-Nodes (1): The cage-managed project root owning `path`, or "" if there isn't one.      Deli
+Nodes (1): (status, detail) for a *present* artifact — dead beats current; an MCP command's
 
 ### Community 335 - "Community 335"
 Cohesion: 1.0
-Nodes (1): Resolve `graphify` on PATH and say whether cage can meter what runs.      Preced
+Nodes (1): Build this agent's rows + rollup. ``stale`` is retained (always 0 now that the
 
 ### Community 336 - "Community 336"
 Cohesion: 1.0
-Nodes (1): `cage insights verdict <tool>` — the one-line answer, composed from views that a
+Nodes (1): A `.git/hooks/{post-commit,prepare-commit-msg}` that exists but isn't cage's —
 
 ### Community 337 - "Community 337"
 Cohesion: 1.0
-Nodes (1): The least-trusted method among the tool's receipts — the same honest     worst-c
+Nodes (1): Anything the raw enumeration finds that isn't part of a known agent's expected
 
 ### Community 338 - "Community 338"
 Cohesion: 1.0
-Nodes (1): Pull each existing view once; return the verdict + its tagged inputs.
+Nodes (1): A cosmetic label for a leftover row — e.g. a lingering global     `~/.claude/set
 
 ### Community 339 - "Community 339"
 Cohesion: 1.0
-Nodes (1): NET-2 — the exclusion, named at the headline where the claim is made. Says which
+Nodes (1): The full per-artifact installed inventory (`cage doctor --wiring`), grouped by
 
 ### Community 340 - "Community 340"
 Cohesion: 1.0
-Nodes (1): The GC5 forward-model block: the day-one ceiling always, the history band only w
+Nodes (1): The graphify PATH resolves first, when it is **not** this root's own shim.
 
 ### Community 341 - "Community 341"
 Cohesion: 1.0
-Nodes (1): Copilot delta-id fix (#1)
+Nodes (1): Does a wired command string already reference the shim (any host's form —     `$
 
 ### Community 342 - "Community 342"
 Cohesion: 1.0
-Nodes (1): Surface-restamp collision fix (#4)
+Nodes (1): Top parser only: `cage --help` renders the curated front door verbatim     (`_RO
 
 ### Community 343 - "Community 343"
 Cohesion: 1.0
-Nodes (1): Rationale: captured_this_run vs Lifetime Captured
+Nodes (1): Capture-on-read controls shared by every read surface (capture-architecture
 
 ### Community 344 - "Community 344"
 Cohesion: 1.0
-Nodes (1): Rationale: Per-shutdown Delta Rows for Self-healing
+Nodes (1): A command group (insights/task/authorship/data) — a subparser holding nested
 
 ### Community 345 - "Community 345"
 Cohesion: 1.0
-Nodes (1): Rationale: Union Lifetime Set with This-Run Appends Closes Snapshot Gap
+Nodes (1): The first positional token in ``argv`` — the command word — skipping global
 
 ### Community 346 - "Community 346"
 Cohesion: 1.0
-Nodes (1): cli-help.txt (cage --help golden fixture)
+Nodes (1): `cage insights estimate` — a pre-task cost band from matching closed tasks (road
 
 ### Community 347 - "Community 347"
 Cohesion: 1.0
-Nodes (1): I6a golden — cage insights estimate --label docfix
+Nodes (1): The estimate payload: matching closed tasks → token/USD band, or a refusal.
 
 ### Community 348 - "Community 348"
 Cohesion: 1.0
-Nodes (1): S4 golden — cage study report (fleet study)
+Nodes (1): Stamp an ``ok`` estimate onto the open task row (fail-open, last-write-wins).
 
 ### Community 349 - "Community 349"
 Cohesion: 1.0
-Nodes (1): cage insights estimate --label refactor (golden)
+Nodes (1): Run `graphify <argv>` transparently; meter on the side. Returns its exit code.
 
 ### Community 350 - "Community 350"
 Cohesion: 1.0
-Nodes (1): cage report — no calls recorded (golden)
+Nodes (1): Remove hook wiring a previous version installed. The user-level     `~/.copilot/
 
 ### Community 351 - "Community 351"
 Cohesion: 1.0
-Nodes (1): cage report --by agent — gross note + freshness (golden)
+Nodes (1): `cage task outcome` / `cage task quality` — quality-adjusted cost (plan §8.2).
 
 ### Community 352 - "Community 352"
 Cohesion: 1.0
-Nodes (1): cage report --by agent — kiro capture off (golden)
+Nodes (1): The resolved import candidates, one indented line each with provenance — the
 
 ### Community 353 - "Community 353"
 Cohesion: 1.0
-Nodes (1): cage study report — fleet study (golden)
+Nodes (1): Every leaf view (an actual derived command), read live from the parser (no     l
 
 ### Community 354 - "Community 354"
 Cohesion: 1.0
-Nodes (1): Cage Symbol Mark — brand/icon SVG: two vertical bars (one tall, one short) in a cyan-to-teal gradient (#9DECFF to #1186AE) representing a tall 'human cost' bar beside a short 'tool cost' bar, sitting on a dark baseline, with a white bracket-like stroke on the right marking the gap between them (the saved amount); used as the project's icon/favicon-style brand asset, titled 'Cage — value ledger'
+Nodes (1): Token-overlap score: a full keyword/id hit is 2; a stem hit is 1.      A stem hi
 
 ### Community 355 - "Community 355"
 Cohesion: 1.0
-Nodes (1): Cage App Tile Icon (SVG Logo)
+Nodes (1): Best-matching entries for a query (exact id wins outright). Deterministic.
 
 ### Community 356 - "Community 356"
 Cohesion: 1.0
-Nodes (1): Cage Lockup (Logo + Wordmark)
+Nodes (1): When nothing matches: the n best-overlap ids to suggest (never a guess).
 
 ### Community 357 - "Community 357"
+Cohesion: 1.0
+Nodes (1): The structured form (`--json`) — formula interpolated with live values.
+
+### Community 358 - "Community 358"
+Cohesion: 1.0
+Nodes (1): The text render — same live numbers as `payload`. Concept entries skip the     `
+
+### Community 359 - "Community 359"
+Cohesion: 1.0
+Nodes (1): `--list` — every topic grouped by kind (calculation block, then concept).
+
+### Community 360 - "Community 360"
+Cohesion: 1.0
+Nodes (1): Every `name` on PATH **in shell resolution order** — index 0 is the one that run
+
+### Community 361 - "Community 361"
+Cohesion: 1.0
+Nodes (1): The first `_SNIFF_BYTES` of `path` as text; "" on any read error. Never executed
+
+### Community 362 - "Community 362"
+Cohesion: 1.0
+Nodes (1): Is this file a cage-written graphify interceptor (current **or** adopt-era)?
+
+### Community 363 - "Community 363"
+Cohesion: 1.0
+Nodes (1): The cage-managed project root owning `path`, or "" if there isn't one.      Deli
+
+### Community 364 - "Community 364"
+Cohesion: 1.0
+Nodes (1): Resolve `graphify` on PATH and say whether cage can meter what runs.      Preced
+
+### Community 365 - "Community 365"
+Cohesion: 1.0
+Nodes (1): `cage insights verdict <tool>` — the one-line answer, composed from views that a
+
+### Community 366 - "Community 366"
+Cohesion: 1.0
+Nodes (1): The least-trusted method among the tool's receipts — the same honest     worst-c
+
+### Community 367 - "Community 367"
+Cohesion: 1.0
+Nodes (1): Pull each existing view once; return the verdict + its tagged inputs.
+
+### Community 368 - "Community 368"
+Cohesion: 1.0
+Nodes (1): NET-2 — the exclusion, named at the headline where the claim is made. Says which
+
+### Community 369 - "Community 369"
+Cohesion: 1.0
+Nodes (1): The GC5 forward-model block: the day-one ceiling always, the history band only w
+
+### Community 370 - "Community 370"
+Cohesion: 1.0
+Nodes (1): Copilot delta-id fix (#1)
+
+### Community 371 - "Community 371"
+Cohesion: 1.0
+Nodes (1): Surface-restamp collision fix (#4)
+
+### Community 372 - "Community 372"
+Cohesion: 1.0
+Nodes (1): Rationale: captured_this_run vs Lifetime Captured
+
+### Community 373 - "Community 373"
+Cohesion: 1.0
+Nodes (1): Rationale: Per-shutdown Delta Rows for Self-healing
+
+### Community 374 - "Community 374"
+Cohesion: 1.0
+Nodes (1): Rationale: Union Lifetime Set with This-Run Appends Closes Snapshot Gap
+
+### Community 375 - "Community 375"
+Cohesion: 1.0
+Nodes (1): cli-help.txt (cage --help golden fixture)
+
+### Community 376 - "Community 376"
+Cohesion: 1.0
+Nodes (1): I6a golden — cage insights estimate --label docfix
+
+### Community 377 - "Community 377"
+Cohesion: 1.0
+Nodes (1): S4 golden — cage study report (fleet study)
+
+### Community 378 - "Community 378"
+Cohesion: 1.0
+Nodes (1): cage insights estimate --label refactor (golden)
+
+### Community 379 - "Community 379"
+Cohesion: 1.0
+Nodes (1): cage report — no calls recorded (golden)
+
+### Community 380 - "Community 380"
+Cohesion: 1.0
+Nodes (1): cage report --by agent — gross note + freshness (golden)
+
+### Community 381 - "Community 381"
+Cohesion: 1.0
+Nodes (1): cage report --by agent — kiro capture off (golden)
+
+### Community 382 - "Community 382"
+Cohesion: 1.0
+Nodes (1): cage study report — fleet study (golden)
+
+### Community 383 - "Community 383"
+Cohesion: 1.0
+Nodes (1): Cage Symbol Mark — brand/icon SVG: two vertical bars (one tall, one short) in a cyan-to-teal gradient (#9DECFF to #1186AE) representing a tall 'human cost' bar beside a short 'tool cost' bar, sitting on a dark baseline, with a white bracket-like stroke on the right marking the gap between them (the saved amount); used as the project's icon/favicon-style brand asset, titled 'Cage — value ledger'
+
+### Community 384 - "Community 384"
+Cohesion: 1.0
+Nodes (1): Cage App Tile Icon (SVG Logo)
+
+### Community 385 - "Community 385"
+Cohesion: 1.0
+Nodes (1): Cage Lockup (Logo + Wordmark)
+
+### Community 386 - "Community 386"
 Cohesion: 1.0
 Nodes (1): Cage Architecture Diagram
 
@@ -1860,7 +2005,7 @@ Nodes (1): Cage Architecture Diagram
   docs/cage-lab/01-setup.md · relation: conceptually_related_to
 
 ## Knowledge Gaps
-- **1686 isolated node(s):** `Build ``cage.pyz`` — a single-file stdlib zipapp over the cage package.  The res`, `Stage the cage package and zipapp it.      The ``__main__.py`` is written by han`, ``python -m tools.cigraphify` — the `present` leg of the graphify CI axis (CI-GF)`, `A check failed — recorded and tabulated, never a traceback at the user.`, ``shutil.rmtree` that survives Windows read-only files (same helper shape as` (+1681 more)
+- **1751 isolated node(s):** `Build ``cage.pyz`` — a single-file stdlib zipapp over the cage package.  The res`, `Stage the cage package and zipapp it.      The ``__main__.py`` is written by han`, ``python -m tools.cigraphify` — the `present` leg of the graphify CI axis (CI-GF)`, `A check failed — recorded and tabulated, never a traceback at the user.`, ``shutil.rmtree` that survives Windows read-only files (same helper shape as` (+1746 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 - **Thin community `Community 57`** (2 nodes): ``python -m tools.dummyrepo` — the dummy sibling-repo scenario runner.`, `__main__.py`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
@@ -1868,9 +2013,9 @@ Nodes (1): Cage Architecture Diagram
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `Community 59`** (2 nodes): `explain_data.py`, ``cage query`'s registry — the `Explanation` entries themselves (handoff §1, §2).`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 60`** (2 nodes): `CLAUDE.md: Explain engine (explain.py, explain_data.py)`, `README: cage query — live formula explainer`
+- **Thin community `Community 60`** (2 nodes): `v0.37.0 — Windows sources.toml crash + dummyrepo resync`, `IMPLEMENTATION: v0.37.0 Windows sources.toml crash entry`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 61`** (2 nodes): `v0.37.0 — Windows sources.toml crash + dummyrepo resync`, `IMPLEMENTATION: v0.37.0 Windows sources.toml crash entry`
+- **Thin community `Community 61`** (2 nodes): `CLAUDE.md: Explain engine (explain.py, explain_data.py)`, `README: cage query — live formula explainer`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `Community 62`** (2 nodes): `Glossary: receipt`, `PLAN §3.2: the savings receipt`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
@@ -1956,507 +2101,565 @@ Nodes (1): Cage Architecture Diagram
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `Community 106`** (1 nodes): `verdict.py — cost-impact composer`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 107`** (1 nodes): `All four wiring shapes must resolve to the same verb — a shape we fail to parse`
+- **Thin community `Community 107`** (1 nodes): `S1/S2 stay shape-asserted (join wires agents + runs doctor — output is     machi`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 108`** (1 nodes): `PROPERTY: every `verbmap.REMOVED` remediation must be a command the CLI accepts.`
+- **Thin community `Community 108`** (1 nodes): `A negative net backed by real receipts is NEVER suppressed, smoothed, or     gat`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 109`** (1 nodes): `The converse: nothing in REMOVED may still be a live verb (a stale map entry`
+- **Thin community `Community 109`** (1 nodes): `A scaffolded project with a ledger and **no wiring of any kind**, and every agen`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 110`** (1 nodes): `Redirect every agent home off the real machine (mirrors test_portable_wiring).`
+- **Thin community `Community 110`** (1 nodes): `Where this agent's rows land. Kiro's IDE log is a *machine* fact and routes to`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 111`** (1 nodes): `Write a v0.27-era .claude/settings.json with the given raw commands.`
+- **Thin community `Community 111`** (1 nodes): `Every pinned view's stdout, with the per-test tmp path folded to a placeholder`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 112`** (1 nodes): `MUST-PRESERVE: a v0.27 Claude backfill/banner hook naming a dead verb must not`
+- **Thin community `Community 112`** (1 nodes): `No hooks, no MCP, no steering — `cage import` still parses the agent's real`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 113`** (1 nodes): `Codex was removed completely: `agents.install` no longer has a wire module for`
+- **Thin community `Community 113`** (1 nodes): `Every derived view renders (exit 0, non-empty) over a ledger captured with no`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 114`** (1 nodes): `A stale cage hook in any event slot (not just SessionStart) is stripped — the`
+- **Thin community `Community 114`** (1 nodes): `Install every layer cage ships onto a project whose ledger is already captured,`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 115`** (1 nodes): `The user-level `~/.copilot/hooks/cage.json` is wholly cage-owned, so the hookles`
+- **Thin community `Community 115`** (1 nodes): `Two teammates running `cage setup` must not churn a committed diff — so the`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 116`** (1 nodes): `A project wired the way v0.27 left it, plus two foreign hooks that must be     t`
+- **Thin community `Community 116`** (1 nodes): `The hookless rebuild deleted the rendered assets and `tools/skillgen`. L3 will`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 117`** (1 nodes): `The handoff's §10 open question: a clean `cage setup` must produce zero     find`
+- **Thin community `Community 117`** (1 nodes): ``--no-skill` skipped an asset that no longer exists. argparse exits 2 on an`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 118`** (1 nodes): `Every artifact `agents.install` still manages heals; `.codex/hooks.json` is the`
+- **Thin community `Community 118`** (1 nodes): `The README promised a `cage` skill three times — once on *"all four agents"*,`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 119`** (1 nodes): `Idempotence: healing a healed tree changes nothing (no mtime churn, no diff).`
+- **Thin community `Community 119`** (1 nodes): `A fresh per-sweep import id (`i_…`) minted once per `importcmd.run` and threaded`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 120`** (1 nodes): `Refresh-only: a project that never installed the interceptor must not get one.`
+- **Thin community `Community 120`** (1 nodes): `A fresh per-manifest-row session id (`n_…`) — the "separate unique id" every nam`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 121`** (1 nodes): `The exact false ✅ from F1: the shim exists and is on PATH, but is dead.`
+- **Thin community `Community 121`** (1 nodes): `One manifest row per (agent, surface, session) an import sweep captured rows fro`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 122`** (1 nodes): `Determinism: this change touches detection and wiring only. A derived view must`
+- **Thin community `Community 122`** (1 nodes): `One manifest row per graphify run that filed a saving. `session` is the task`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 123`** (1 nodes): `P0 fixture corpus — `cage import` parses every agent × surface log to exact rows`
+- **Thin community `Community 123`** (1 nodes): `Every manifest row (import + graphify), oldest first. Tolerates a truncated tail`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 124`** (1 nodes): `S1/S2 stay shape-asserted (join wires agents + runs doctor — output is     machi`
+- **Thin community `Community 124`** (1 nodes): `Top parser only: `cage --help` renders the curated front door verbatim     (`_RO`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 125`** (1 nodes): `A negative net backed by real receipts is NEVER suppressed, smoothed, or     gat`
+- **Thin community `Community 125`** (1 nodes): `Capture-on-read controls shared by every read surface (capture-architecture`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 126`** (1 nodes): `A cage command whose executable is a machine-absolute path — the sharing bug`
+- **Thin community `Community 126`** (1 nodes): `A command group (insights/task/authorship/data) — a subparser holding nested`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 127`** (1 nodes): `No committed wired file may carry a machine-absolute cage path — teammates'`
+- **Thin community `Community 127`** (1 nodes): `The first positional token in ``argv`` — the command word — skipping global`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 128`** (1 nodes): `Every installed artifact's cage verb, checked against the **live parser**     (``
+- **Thin community `Community 128`** (1 nodes): `The resolved import candidates, one indented line each with provenance — the`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 129`** (1 nodes): `Existence + PATH + **liveness**. The first two alone reported ✅ for 9 days while`
+- **Thin community `Community 129`** (1 nodes): `Every leaf view (an actual derived command), read live from the parser (no     l`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 130`** (1 nodes): `The graphify that **actually runs** — resolved the way the shell does, first`
+- **Thin community `Community 130`** (1 nodes): `Token-overlap score: a full keyword/id hit is 2; a stem hit is 1.      A stem hi`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 131`** (1 nodes): `The fix line for a dead interceptor cage must **not** write to. Cage never edits`
+- **Thin community `Community 131`** (1 nodes): `Best-matching entries for a query (exact id wins outright). Deterministic.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 132`** (1 nodes): `An agent hook invoking graphify by absolute path (`cage/hookbypass.py`, B-fix-3)`
+- **Thin community `Community 132`** (1 nodes): `When nothing matches: the n best-overlap ids to suggest (never a guess).`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 133`** (1 nodes): `GC4 (graphify-capture): is `graphify-out/graph.json` older than HEAD? A stale gr`
+- **Thin community `Community 133`** (1 nodes): `The structured form (`--json`) — formula interpolated with live values.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 134`** (1 nodes): `The GC1 usage breadcrumb, read back as one sentence: *"graphify ran N×, R     re`
+- **Thin community `Community 134`** (1 nodes): `The text render — same live numbers as `payload`. Concept entries skip the     ``
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 135`** (1 nodes): `Are there savings receipts to attribute? Zero receipts means `cage insights`
+- **Thin community `Community 135`** (1 nodes): ``--list` — every topic grouped by kind (calculation block, then concept).`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 136`** (1 nodes): `Human "(3m ago)" for an ISO timestamp; fail-open to ''. Health-check only —`
+- **Thin community `Community 136`** (1 nodes): `All four wiring shapes must resolve to the same verb — a shape we fail to parse`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 137`** (1 nodes): `The most recent exception/skip in the debug log, as a short one-liner.`
+- **Thin community `Community 137`** (1 nodes): `PROPERTY: every `verbmap.REMOVED` remediation must be a command the CLI accepts.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 138`** (1 nodes): `Per-agent capture event + last error, from the metadata-only debug log.     Off`
+- **Thin community `Community 138`** (1 nodes): `The converse: nothing in REMOVED may still be a live verb (a stale map entry`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 139`** (1 nodes): `Write + read a receipt in a throwaway ledger — proves the write path works.`
+- **Thin community `Community 139`** (1 nodes): `Redirect every agent home off the real machine (mirrors test_portable_wiring).`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 140`** (1 nodes): `The honest "versions installed" answer (handoff §5): running cage (+ `zipapp``
+- **Thin community `Community 140`** (1 nodes): `Write a v0.27-era .claude/settings.json with the given raw commands.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 141`** (1 nodes): ``cage doctor --wiring` payload: the installed-artifact inventory     (`wiringsca`
+- **Thin community `Community 141`** (1 nodes): `MUST-PRESERVE: a v0.27 Claude backfill/banner hook naming a dead verb must not`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 142`** (1 nodes): `The text form of `wiring_report()` — one data structure, two renderers (the`
+- **Thin community `Community 142`** (1 nodes): `Codex was removed completely: `agents.install` no longer has a wire module for`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 143`** (1 nodes): `Four mutually-exclusive verdicts (wiringscan._agent_inventory): "needs healing"`
+- **Thin community `Community 143`** (1 nodes): `A stale cage hook in any event slot (not just SessionStart) is stripped — the`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 144`** (1 nodes): `Run every check; return {status, checks:[{name, level, detail}]}.      Ledger ch`
+- **Thin community `Community 144`** (1 nodes): `The user-level `~/.copilot/hooks/cage.json` is wholly cage-owned, so the hookles`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 145`** (1 nodes): `The counterfactual permutation table (plan §4.4) — what every stack would cost.`
+- **Thin community `Community 145`** (1 nodes): `A project wired the way v0.27 left it, plus two foreign hooks that must be     t`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 146`** (1 nodes): `A reconstructed cell is `modeled` at best — never `measured` (it wasn't run).`
+- **Thin community `Community 146`** (1 nodes): `The handoff's §10 open question: a clean `cage setup` must produce zero     find`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 147`** (1 nodes): `Whether ``provider/model`` resolves any price row — the cost column's     availa`
+- **Thin community `Community 147`** (1 nodes): `Every artifact `agents.install` still manages heals; `.codex/hooks.json` is the`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 148`** (1 nodes): `The permutation grid (spec I7–I8): the **token grid always renders** —     only`
+- **Thin community `Community 148`** (1 nodes): `Idempotence: healing a healed tree changes nothing (no mtime churn, no diff).`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 149`** (1 nodes): `Gross vs **net** savings — what a tool avoided, minus what it cost to *use* (net`
+- **Thin community `Community 149`** (1 nodes): `Refresh-only: a project that never installed the interceptor must not get one.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 150`** (1 nodes): `A row timestamp as seconds, or ``None`` when unparseable. A naive stamp is read`
+- **Thin community `Community 150`** (1 nodes): `The exact false ✅ from F1: the shim exists and is on PATH, but is dead.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 151`** (1 nodes): `The gross USD of a receipt set — the SAME two routes `roi`/`report` use (linked`
+- **Thin community `Community 151`** (1 nodes): `Determinism: this change touches detection and wiring only. A derived view must`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 152`** (1 nodes): `Task-level gross/net for ``tool`` over the window.      ``calls``/``receipts`` l`
+- **Thin community `Community 152`** (1 nodes): `P0 fixture corpus — `cage import` parses every agent × surface log to exact rows`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 153`** (1 nodes): `The one-line net-of-use body for a `verdict` input line. Never renders a bare`
+- **Thin community `Community 153`** (1 nodes): `S1/S2 stay shape-asserted (join wires agents + runs doctor — output is     machi`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 154`** (1 nodes): ``cage insights roi` — **gross** saved $ per tool vs the tool's own cost + added`
+- **Thin community `Community 154`** (1 nodes): `A negative net backed by real receipts is NEVER suppressed, smoothed, or     gat`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 155`** (1 nodes): `CSV over the same `by_tool()` payload as the text table (one structure, two`
+- **Thin community `Community 155`** (1 nodes): `A cage command whose executable is a machine-absolute path — the sharing bug`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 156`** (1 nodes): ``cage insights regression` — alert when cost-per-call drifts up (plan §8.3).  A`
+- **Thin community `Community 156`** (1 nodes): `No committed wired file may carry a machine-absolute cage path — teammates'`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 157`** (1 nodes): ``tasks.jsonl` — one append-only row per task (design §5b.2, decision E).  A task`
+- **Thin community `Community 157`** (1 nodes): `Every installed artifact's cage verb, checked against the **live parser**     (``
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 158`** (1 nodes): `Run a read-only git command; return stripped stdout, or None on any failure.`
+- **Thin community `Community 158`** (1 nodes): `Existence + PATH + **liveness**. The first two alone reported ✅ for 9 days while`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 159`** (1 nodes): `SHA / branch / diff counts / top-level dirs — fail-open, fields omitted if absen`
+- **Thin community `Community 159`** (1 nodes): `The graphify that **actually runs** — resolved the way the shell does, first`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 160`** (1 nodes): `The single top-level changed dir of the working tree, for `scope` (plan §3.6.2).`
+- **Thin community `Community 160`** (1 nodes): `The fix line for a dead interceptor cage must **not** write to. Cage never edits`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 161`** (1 nodes): `Append one task row (git snapshot folded in unless disabled). Fail-open.`
+- **Thin community `Community 161`** (1 nodes): `An agent hook invoking graphify by absolute path (`cage/hookbypass.py`, B-fix-3)`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 162`** (1 nodes): `Latest row per task id (last-write-wins) keyed by id — pure derive.`
+- **Thin community `Community 162`** (1 nodes): `GC4 (graphify-capture): is `graphify-out/graph.json` older than HEAD? A stale gr`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 163`** (1 nodes): `True when a chat-session request was answered by the Copilot Chat extension —`
+- **Thin community `Community 163`** (1 nodes): `The GC1 usage breadcrumb, read back as one sentence: *"graphify ran N×, R     re`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 164`** (1 nodes): `Meter the Copilot VS Code *extension* from VS Code's own chat-session store`
+- **Thin community `Community 164`** (1 nodes): `Are there savings receipts to attribute? Zero receipts means `cage insights`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 165`** (1 nodes): `Meter Kiro from its append-only usage log `dev_data/tokens_generated.jsonl` —`
+- **Thin community `Community 165`** (1 nodes): `Human "(3m ago)" for an ISO timestamp; fail-open to ''. Health-check only —`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 166`** (1 nodes): `Normalize a `conversations_v2.key` (or the workspace root it is matched against)`
+- **Thin community `Community 166`** (1 nodes): `The most recent exception/skip in the debug log, as a short one-liner.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 167`** (1 nodes): `Is ``key`` the workspace ``root`` **or a directory beneath it**? The tree, not t`
+- **Thin community `Community 167`** (1 nodes): `Per-agent capture event + last error, from the metadata-only debug log.     Off`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 168`** (1 nodes): `Extract one credits row from a conversation JSON, reading only whitelisted     n`
+- **Thin community `Community 168`** (1 nodes): `Write + read a receipt in a throwaway ledger — proves the write path works.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 169`** (1 nodes): `Meter Kiro CLI from its SQLite store, **read-only**, yielding *credits* usage ro`
+- **Thin community `Community 169`** (1 nodes): `The honest "versions installed" answer (handoff §5): running cage (+ `zipapp``
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 170`** (1 nodes): `Seed data shipped with the cage package (default policy + skill assets).      Re`
+- **Thin community `Community 170`** (1 nodes): ``cage doctor --wiring` payload: the installed-artifact inventory     (`wiringsca`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 171`** (1 nodes): ```"zipapp"`` when cage runs from a ``.pyz`` (zipimport), else ``"wheel"``     (w`
+- **Thin community `Community 171`** (1 nodes): `The text form of `wiring_report()` — one data structure, two renderers (the`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 172`** (1 nodes): `The `~/.claude/projects/<slug>` dir name Claude Code derives from a repo path:`
+- **Thin community `Community 172`** (1 nodes): `Four mutually-exclusive verdicts (wiringscan._agent_inventory): "needs healing"`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 173`** (1 nodes): `Copilot CLI home (`$COPILOT_HOME` or ~/.copilot). Holds `session-state/<id>/`
+- **Thin community `Community 173`** (1 nodes): `Run every check; return {status, checks:[{name, level, detail}]}.      Ledger ch`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 174`** (1 nodes): `The first candidate that exists on disk, else the first candidate (the     platf`
+- **Thin community `Community 174`** (1 nodes): `The counterfactual permutation table (plan §4.4) — what every stack would cost.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 175`** (1 nodes): `Every VS Code user-dir location cage will consider, in probe order:     ``CAGE_V`
+- **Thin community `Community 175`** (1 nodes): `A reconstructed cell is `modeled` at best — never `measured` (it wasn't run).`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 176`** (1 nodes): `VS Code user dir (Copilot chat-session store lives under it). Override     CAGE_`
+- **Thin community `Community 176`** (1 nodes): `Whether ``provider/model`` resolves any price row — the cost column's     availa`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 177`** (1 nodes): `Kiro **CLI** SQLite store (`kiro-cli/data.sqlite3`) candidates, in probe order:`
+- **Thin community `Community 177`** (1 nodes): `The permutation grid (spec I7–I8): the **token grid always renders** —     only`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 178`** (1 nodes): `The first existing Kiro CLI SQLite store, else the top candidate (so a doctor pr`
+- **Thin community `Community 178`** (1 nodes): `Gross vs **net** savings — what a tool avoided, minus what it cost to *use* (net`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 179`** (1 nodes): `Kiro's per-call usage log (`kiro.kiroagent/dev_data/tokens_generated.jsonl`):`
+- **Thin community `Community 179`** (1 nodes): `A row timestamp as seconds, or ``None`` when unparseable. A naive stamp is read`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 180`** (1 nodes): `The **seed** ``(source, glob, path_globs)`` log locations per agent     (capture`
+- **Thin community `Community 180`** (1 nodes): `The gross USD of a receipt set — the SAME two routes `roi`/`report` use (linked`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 181`** (1 nodes): `Render a path home-relative (``~/…``) when it sits under ``$HOME`` — so a     ma`
+- **Thin community `Community 181`** (1 nodes): `Task-level gross/net for ``tool`` over the window.      ``calls``/``receipts`` l`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 182`** (1 nodes): `The default sources cage materializes into an active ``[sources]`` table (Direct`
+- **Thin community `Community 182`** (1 nodes): `The one-line net-of-use body for a `verdict` input line. Never renders a bare`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 183`** (1 nodes): `Compare the project's declared ``[sources]`` against the built-in seed — the`
+- **Thin community `Community 183`** (1 nodes): ``cage insights roi` — **gross** saved $ per tool vs the tool's own cost + added`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 184`** (1 nodes): `Render the active ``[sources]`` table cage materializes into ``cage.toml`` — a`
+- **Thin community `Community 184`** (1 nodes): `CSV over the same `by_tool()` payload as the text table (one structure, two`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 185`** (1 nodes): `Return ``text`` with its cage-managed sources block replaced by (or, if absent,`
+- **Thin community `Community 185`** (1 nodes): ``cage insights regression` — alert when cost-per-call drifts up (plan §8.3).  A`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 186`** (1 nodes): `One candidate log location, tagged with where it came from. ``provenance`` is`
+- **Thin community `Community 186`** (1 nodes): ``tasks.jsonl` — one append-only row per task (design §5b.2, decision E).  A task`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 187`** (1 nodes): ```~`` + ``$VAR`` expansion for a policy path (local filesystem only — no glob,`
+- **Thin community `Community 187`** (1 nodes): `Run a read-only git command; return stripped stdout, or None on any failure.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 188`** (1 nodes): `THE resolution point for import locations (plan Phase 4). Returns the     proven`
+- **Thin community `Community 188`** (1 nodes): `SHA / branch / diff counts / top-level dirs — fail-open, fields omitted if absen`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 189`** (1 nodes): `The candidate log locations for one built-in agent — the built-in registry plus`
+- **Thin community `Community 189`** (1 nodes): `The single top-level changed dir of the working tree, for `scope` (plan §3.6.2).`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 190`** (1 nodes): `THE lookup `cage import --path`/`--project` scans with (path-globs handoff §5):`
+- **Thin community `Community 190`** (1 nodes): `Append one task row (git snapshot folded in unless disabled). Fail-open.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 191`** (1 nodes): `Agents that declare ``[sources]`` entries but no ``path_globs`` on any of them —`
+- **Thin community `Community 191`** (1 nodes): `Latest row per task id (last-write-wins) keyed by id — pure derive.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 192`** (1 nodes): `The `[sources.<name>]` custom-tool sources (name ∉ the three agents) — each`
+- **Thin community `Community 192`** (1 nodes): `True when a chat-session request was answered by the Copilot Chat extension —`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 193`** (1 nodes): `Env-independent, ~-relative description of the built-in log sources for the`
+- **Thin community `Community 193`** (1 nodes): `Meter the Copilot VS Code *extension* from VS Code's own chat-session store`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 194`** (1 nodes): `THE project price-overrides resolver (prices-toml plan §3) — the one place the`
+- **Thin community `Community 194`** (1 nodes): `Meter Kiro from its append-only usage log `dev_data/tokens_generated.jsonl` —`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 195`** (1 nodes): `True if ``path`` on disk actually declares a ``[prices…]``/``[credits…]`` table`
+- **Thin community `Community 195`** (1 nodes): `Normalize a `conversations_v2.key` (or the workspace root it is matched against)`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 196`** (1 nodes): `The per-project ``.cage/`` layout (plan §3).      The ledger carries token *coun`
+- **Thin community `Community 196`** (1 nodes): `Is ``key`` the workspace ``root`` **or a directory beneath it**? The tree, not t`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 197`** (1 nodes): `The capture manifest (import-ledger plan §4): one append-only row per import`
+- **Thin community `Community 197`** (1 nodes): `Extract one credits row from a conversation JSON, reading only whitelisted     n`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 198`** (1 nodes): `The dedicated per-source savings tree (import-ledger plan §3):         ``ledger/`
+- **Thin community `Community 198`** (1 nodes): `Meter Kiro CLI from its SQLite store, **read-only**, yielding *credits* usage ro`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 199`** (1 nodes): `Month-partition path for a savings row of ``tool``, from the row's own ``ts```
+- **Thin community `Community 199`** (1 nodes): `Seed data shipped with the cage package (default policy + skill assets).      Re`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 200`** (1 nodes): `Every readable savings shard across the whole tree (`savings/*/savings-*.jsonl``
+- **Thin community `Community 200`** (1 nodes): ```"zipapp"`` when cage runs from a ``.pyz`` (zipimport), else ``"wheel"``     (w`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 201`** (1 nodes): `Month-partition path for ``kind`` (``calls``/``receipts``/``tasks``) derived`
+- **Thin community `Community 201`** (1 nodes): `The `~/.claude/projects/<slug>` dir name Claude Code derives from a repo path:`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 202`** (1 nodes): `Every readable shard for ``kind``: the legacy unpartitioned file first         (`
+- **Thin community `Community 202`** (1 nodes): `Copilot CLI home (`$COPILOT_HOME` or ~/.copilot). Holds `session-state/<id>/`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 203`** (1 nodes): `Fleet-study phase markers (`cage study start/stop`, plan §4.9) — a small`
+- **Thin community `Community 203`** (1 nodes): `The first candidate that exists on disk, else the first candidate (the     platf`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 204`** (1 nodes): `THE single project-config path resolver — never a second place that knows`
+- **Thin community `Community 204`** (1 nodes): `Every VS Code user-dir location cage will consider, in probe order:     ``CAGE_V`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 205`** (1 nodes): `The legacy ``policy.toml`` when it sits *beside* a ``cage.toml`` that wins —`
+- **Thin community `Community 205`** (1 nodes): `VS Code user dir (Copilot chat-session store lives under it). Override     CAGE_`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 206`** (1 nodes): `The legacy in-``cage.toml`` (or ``policy.toml``) price block that a present`
+- **Thin community `Community 206`** (1 nodes): `Kiro **CLI** SQLite store (`kiro-cli/data.sqlite3`) candidates, in probe order:`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 207`** (1 nodes): `Per-agent incremental-import high-water cursors (plan §3.7). Maps each         s`
+- **Thin community `Community 207`** (1 nodes): `The first existing Kiro CLI SQLite store, else the top candidate (so a doctor pr`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 208`** (1 nodes): `Capture-path debug log (`cage/debuglog.py`) — metadata-only, written only`
+- **Thin community `Community 208`** (1 nodes): `Kiro's per-call usage log (`kiro.kiroagent/dev_data/tokens_generated.jsonl`):`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 209`** (1 nodes): `Always-on capture breadcrumb (`cage/capturelog.py`) — one line per agent per`
+- **Thin community `Community 209`** (1 nodes): `The **seed** ``(source, glob, path_globs)`` log locations per agent     (capture`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 210`** (1 nodes): `Always-on graphify usage breadcrumb (`cage/usagelog.py`, graphify-capture`
+- **Thin community `Community 210`** (1 nodes): `Render a path home-relative (``~/…``) when it sits under ``$HOME`` — so a     ma`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 211`** (1 nodes): `Per-(agent,event) hook heartbeat — append-only, last-write-wins on read.`
+- **Thin community `Community 211`** (1 nodes): `The default sources cage materializes into an active ``[sources]`` table (Direct`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 212`** (1 nodes): `Per-session buffer of uncommitted `PostToolUse` edits (plan §3.5) — a         `p`
+- **Thin community `Community 212`** (1 nodes): `Compare the project's declared ``[sources]`` against the built-in seed — the`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 213`** (1 nodes): ``cage doctor --paths` — which log locations cage looked at, which missed, and wh`
+- **Thin community `Community 213`** (1 nodes): `Render the active ``[sources]`` table cage materializes into ``cage.toml`` — a`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 214`** (1 nodes): `Parseable row count for one file — read-only, fail-open to 0.`
+- **Thin community `Community 214`** (1 nodes): `Return ``text`` with its cage-managed sources block replaced by (or, if absent,`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 215`** (1 nodes): `One candidate's found/missing/parse/cursor facts. ``fmt`` selects the parser`
+- **Thin community `Community 215`** (1 nodes): `One candidate log location, tagged with where it came from. ``provenance`` is`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 216`** (1 nodes): `Fail-open: is ``path`` git-tracked under ``root``? (Shelled, never imported —`
+- **Thin community `Community 216`** (1 nodes): ```~`` + ``$VAR`` expansion for a policy path (local filesystem only — no glob,`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 217`** (1 nodes): `A policy source path that a teammate's clone can't resolve — an absolute     fil`
+- **Thin community `Community 217`** (1 nodes): `THE resolution point for import locations (plan Phase 4). Returns the     proven`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 218`** (1 nodes): `The probe data — read-only over the single `paths.resolve_log_sources` (built-in`
+- **Thin community `Community 218`** (1 nodes): `The candidate log locations for one built-in agent — the built-in registry plus`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 219`** (1 nodes): `The CLI reorganization map — the single source of truth for the error-with-direc`
+- **Thin community `Community 219`** (1 nodes): `THE lookup `cage import --path`/`--project` scans with (path-globs handoff §5):`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 220`** (1 nodes): `The one-line error body for a removed verb (`cli.main` prefixes ``error: ``).`
+- **Thin community `Community 220`** (1 nodes): `Agents that declare ``[sources]`` entries but no ``path_globs`` on any of them —`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 221`** (1 nodes): `The `Explanation` shape shared by `explain.py` (engine) and `explain_data.py` (r`
+- **Thin community `Community 221`** (1 nodes): `The `[sources.<name>]` custom-tool sources (name ∉ the three agents) — each`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 222`** (1 nodes): `Merge one section of ``data`` onto ``pol`` in place — two-level deep for the`
+- **Thin community `Community 222`** (1 nodes): `Env-independent, ~-relative description of the built-in log sources for the`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 223`** (1 nodes): `Project policy merged over the bundled default, returned as ONE merged dict —`
+- **Thin community `Community 223`** (1 nodes): `THE project price-overrides resolver (prices-toml plan §3) — the one place the`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 224`** (1 nodes): `The bundled policy alone (no project merge) — origin attribution for     `cage p`
+- **Thin community `Community 224`** (1 nodes): `True if ``path`` on disk actually declares a ``[prices…]``/``[credits…]`` table`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 225`** (1 nodes): `The project policy.toml alone, un-merged; ``{}`` when absent. Parse errors     p`
+- **Thin community `Community 225`** (1 nodes): `The per-project ``.cage/`` layout (plan §3).      The ledger carries token *coun`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 226`** (1 nodes): `Count of equal leading hyphen-segments shared by two split model ids.`
+- **Thin community `Community 226`** (1 nodes): `The capture manifest (import-ledger plan §4): one append-only row per import`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 227`** (1 nodes): `Canonical form for family matching: strip a known router prefix     (`copilot/cl`
+- **Thin community `Community 227`** (1 nodes): `The dedicated per-source savings tree (import-ledger plan §3):         ``ledger/`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 228`** (1 nodes): `The `[alias.<provider>."<model>"] to = "prov/model"` route, if configured.`
+- **Thin community `Community 228`** (1 nodes): `Month-partition path for a savings row of ``tool``, from the row's own ``ts```
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 229`** (1 nodes): `Resolve a price row *and how it matched*:     ``("exact" | "alias" | "family" |`
+- **Thin community `Community 229`** (1 nodes): `Every readable savings shard across the whole tree (`savings/*/savings-*.jsonl``
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 230`** (1 nodes): `Per-million-token price row for a model, or zeros if unpriced.      Thin wrapper`
+- **Thin community `Community 230`** (1 nodes): `Month-partition path for ``kind`` (``calls``/``receipts``/``tasks``) derived`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 231`** (1 nodes): `A boolean switch: env override (`0/false/no/off` vs `1/true/yes/on`) beats the`
+- **Thin community `Community 231`** (1 nodes): `Every readable shard for ``kind``: the legacy unpartitioned file first         (`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 232`** (1 nodes): `Persisted wiring mode (docs/restricted-environments.md): shims + user-level`
+- **Thin community `Community 232`** (1 nodes): `Fleet-study phase markers (`cage study start/stop`, plan §4.9) — a small`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 233`** (1 nodes): `Whether hook-driven `cage import` actually runs — the consumer's on/off switch`
+- **Thin community `Community 233`** (1 nodes): `THE single project-config path resolver — never a second place that knows`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 234`** (1 nodes): `Whether a read (report / insights / MCP read tools) lazily sweeps the log regist`
+- **Thin community `Community 234`** (1 nodes): `The legacy ``policy.toml`` when it sits *beside* a ``cage.toml`` that wins —`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 235`** (1 nodes): `Seconds within which a second read won't re-sweep (capture-on-read throttle,`
+- **Thin community `Community 235`** (1 nodes): `The legacy in-``cage.toml`` (or ``policy.toml``) price block that a present`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 236`** (1 nodes): `Whether the capture path writes its metadata-only debug log + hook heartbeat`
+- **Thin community `Community 236`** (1 nodes): `Per-agent incremental-import high-water cursors (plan §3.7). Maps each         s`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 237`** (1 nodes): `Whether the best-effort `task` backfill (plan §4 / Phase 4) runs — correlating a`
+- **Thin community `Community 237`** (1 nodes): `Capture-path debug log (`cage/debuglog.py`) — metadata-only, written only`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 238`** (1 nodes): `Whether the **automatic** state-dir sweep (`cleanup.maybe_run`, piggybacked on`
+- **Thin community `Community 238`** (1 nodes): `Always-on capture breadcrumb (`cage/capturelog.py`) — one line per agent per`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 239`** (1 nodes): `Whether the auto sweep prints its stderr reminder when `cleanup_enabled` is`
+- **Thin community `Community 239`** (1 nodes): `Always-on graphify usage breadcrumb (`cage/usagelog.py`, graphify-capture`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 240`** (1 nodes): `Retention window for the cleanable state/ classes. Policy `[cleanup] days`     w`
+- **Thin community `Community 240`** (1 nodes): `Per-(agent,event) hook heartbeat — append-only, last-write-wins on read.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 241`** (1 nodes): `Age threshold (days) past which the bundled prices count as stale     (`cage/fre`
+- **Thin community `Community 241`** (1 nodes): `Per-session buffer of uncommitted `PostToolUse` edits (plan §3.5) — a         `p`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 242`** (1 nodes): `Whether `report`/`matrix`/the bare overview render dollar columns by default`
+- **Thin community `Community 242`** (1 nodes): ``cage doctor --paths` — which log locations cage looked at, which missed, and wh`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 243`** (1 nodes): `Age threshold (hours) past which the report footer's `last import: N ago`     ad`
+- **Thin community `Community 243`** (1 nodes): `Parseable row count for one file — read-only, fail-open to 0.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 244`** (1 nodes): `Whether `cage data export` runs the all-agent import sweep before bundling, so a`
+- **Thin community `Community 244`** (1 nodes): `One candidate's found/missing/parse/cursor facts. ``fmt`` selects the parser`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 245`** (1 nodes): `The `cage.toml` `cage setup` writes — a copy of the bundled default (policy only`
+- **Thin community `Community 245`** (1 nodes): `Fail-open: is ``path`` git-tracked under ``root``? (Shelled, never imported —`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 246`** (1 nodes): `The `prices.toml` `cage setup` writes — a copy of the bundled price table     (t`
+- **Thin community `Community 246`** (1 nodes): `A policy source path that a teammate's clone can't resolve — an absolute     fil`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 247`** (1 nodes): `Append one breadcrumb line for `agent`'s sweep this run. Always on — no     `CAG`
+- **Thin community `Community 247`** (1 nodes): `The probe data — read-only over the single `paths.resolve_log_sources` (built-in`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 248`** (1 nodes): `The last `n` breadcrumb rows (oldest→newest) — the raw feed behind a future`
+- **Thin community `Community 248`** (1 nodes): `The CLI reorganization map — the single source of truth for the error-with-direc`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 249`** (1 nodes): `ISO cutoff; write-path only (a clock never feeds a derived view).`
+- **Thin community `Community 249`** (1 nodes): `The one-line error body for a removed verb (`cli.main` prefixes ``error: ``).`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 250`** (1 nodes): `(stale, total, stale_bytes) JSON rows by their own ``ts`` field; unparseable`
+- **Thin community `Community 250`** (1 nodes): `The `Explanation` shape shared by `explain.py` (engine) and `explain_data.py` (r`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 251`** (1 nodes): `What cleanup would touch: ``[{path, cls, age_days, action, detail}]``,     sorte`
+- **Thin community `Community 251`** (1 nodes): `Merge one section of ``data`` onto ``pol`` in place — two-level deep for the`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 252`** (1 nodes): `Atomic line-filter rewrite: temp file (non-`.tmp` suffix) then os.replace.`
+- **Thin community `Community 252`** (1 nodes): `Project policy merged over the bundled default, returned as ONE merged dict —`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 253`** (1 nodes): `Apply `scan` under the cleanup lock; per-item fail-open (an error is     debug-l`
+- **Thin community `Community 253`** (1 nodes): `The bundled policy alone (no project merge) — origin attribution for     `cage p`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 254`** (1 nodes): `The auto path's one stderr line: count, window, reclaimable size, and the     ex`
+- **Thin community `Community 254`** (1 nodes): `The project policy.toml alone, un-merged; ``{}`` when absent. Parse errors     p`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 255`** (1 nodes): `The auto path, piggybacked on `cage import`/read sweeps (cage installs no     sc`
+- **Thin community `Community 255`** (1 nodes): `Count of equal leading hyphen-segments shared by two split model ids.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 256`** (1 nodes): ``cage data cleanup` — dry-run table by default (house pattern), ``--apply```
+- **Thin community `Community 256`** (1 nodes): `Canonical form for family matching: strip a known router prefix     (`copilot/cl`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 257`** (1 nodes): `The ONE display-context implementation (plan Phases 1+2 — output honesty).  Two`
+- **Thin community `Community 257`** (1 nodes): `The `[alias.<provider>."<model>"] to = "prov/model"` route, if configured.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 258`** (1 nodes): `Resolved presentation switches, threaded through the render layer.`
+- **Thin community `Community 258`** (1 nodes): `Resolve a price row *and how it matched*:     ``("exact" | "alias" | "family" |`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 259`** (1 nodes): `Flag > env > policy, resolved once at the CLI boundary. ``args`` is the     argp`
+- **Thin community `Community 259`** (1 nodes): `Per-million-token price row for a model, or zeros if unpriced.      Thin wrapper`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 260`** (1 nodes): `Collects the below-the-table lines for one command invocation.`
+- **Thin community `Community 260`** (1 nodes): `A boolean switch: env override (`0/false/no/off` vs `1/true/yes/on`) beats the`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 261`** (1 nodes): `The footer block ("" when nothing to say): deduped lines in fixed         order,`
+- **Thin community `Community 261`** (1 nodes): `Persisted wiring mode (docs/restricted-environments.md): shims + user-level`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 262`** (1 nodes): `The SURFACES name for a ledger row's ``agent`` field (``claude-code`` → ``claude`
+- **Thin community `Community 262`** (1 nodes): `Whether hook-driven `cage import` actually runs — the consumer's on/off switch`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 263`** (1 nodes): `Task grouping — the shared key-matching core under `cage insights compare` (road`
+- **Thin community `Community 263`** (1 nodes): `Whether a read (report / insights / MCP read tools) lazily sweeps the log regist`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 264`** (1 nodes): `Latest row per task id, filtered to *closed* tasks (an ``outcome`` recorded`
+- **Thin community `Community 264`** (1 nodes): `Seconds within which a second read won't re-sweep (capture-on-read throttle,`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 265`** (1 nodes): ```{task_id: {"calls": [...], "receipts": [...]}}`` per the join precedence.`
+- **Thin community `Community 265`** (1 nodes): `Whether the capture path writes its metadata-only debug log + hook heartbeat`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 266`** (1 nodes): `The join over already-read rows — same contract as :func:`join`, for callers`
+- **Thin community `Community 266`** (1 nodes): `Whether the best-effort `task` backfill (plan §4 / Phase 4) runs — correlating a`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 267`** (1 nodes): `The observed stack: sorted joined receipt tools, ``human`` excluded;     ``agent`
+- **Thin community `Community 267`** (1 nodes): `Whether the **automatic** state-dir sweep (`cleanup.maybe_run`, piggybacked on`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 268`** (1 nodes): `A task's scope: the single top-level changed dir of its git snapshot     (`tasks`
+- **Thin community `Community 268`** (1 nodes): `Whether the auto sweep prints its stderr reminder when `cleanup_enabled` is`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 269`** (1 nodes): `One measured stat row per closed task, in sorted task-id order:     ``{task, sta`
+- **Thin community `Community 269`** (1 nodes): `Retention window for the cleanable state/ classes. Policy `[cleanup] days`     w`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 270`** (1 nodes): `Group stat rows by ``by`` keys (⊆ {stack, scope, label}; stack always     includ`
+- **Thin community `Community 270`** (1 nodes): `Age threshold (days) past which the bundled prices count as stale     (`cage/fre`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 271`** (1 nodes): `Copy the bundled graphify interceptor into <root>/bin; return its path.`
+- **Thin community `Community 271`** (1 nodes): `Whether `report`/`matrix`/the bare overview render dollar columns by default`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 272`** (1 nodes): `Rewrite an **already-installed** `<root>/bin/graphify` when it differs from the`
+- **Thin community `Community 272`** (1 nodes): `Age threshold (hours) past which the report footer's `last import: N ago`     ad`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 273`** (1 nodes): `Append `export PATH=<root>/bin:$PATH` to the shell rc once. Returns rc path.`
+- **Thin community `Community 273`** (1 nodes): `Whether `cage data export` runs the all-agent import sweep before bundling, so a`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 274`** (1 nodes): `Set cage up in ``root``. Each key present only if that step ran.      Agent wiri`
+- **Thin community `Community 274`** (1 nodes): `The `cage.toml` `cage setup` writes — a copy of the bundled default (policy only`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 275`** (1 nodes): `Opaque machine id for the fleet study (roadmap P5, plan §4.9).  A **random** id`
+- **Thin community `Community 275`** (1 nodes): `The `prices.toml` `cage setup` writes — a copy of the bundled price table     (t`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 276`** (1 nodes): `This ledger's machine id, or "" when not enrolled (the legacy contract).`
+- **Thin community `Community 276`** (1 nodes): `Append one breadcrumb line for `agent`'s sweep this run. Always on — no     `CAG`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 277`** (1 nodes): `The machine id, generated on first call (enrollment). Fail-open: if the     stat`
+- **Thin community `Community 277`** (1 nodes): `The last `n` breadcrumb rows (oldest→newest) — the raw feed behind a future`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 278`** (1 nodes): `Add ``machine`` to a row about to be appended — only when enrolled and the     w`
+- **Thin community `Community 278`** (1 nodes): `ISO cutoff; write-path only (a clock never feeds a derived view).`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 279`** (1 nodes): `The pricing ladder for call-less token receipts (plan §4.5; shipped v0.23).  A t`
+- **Thin community `Community 279`** (1 nodes): `(stale, total, stale_bytes) JSON rows by their own ``ts`` field; unparseable`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 280`** (1 nodes): `Whether a receipt enters the ladder: token unit AND no *resolvable* call.      T`
+- **Thin community `Community 280`** (1 nodes): `What cleanup would touch: ``[{path, cls, age_days, action, detail}]``,     sorte`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 281`** (1 nodes): `The pre-built ``{task_id: [calls]}`` join, built ONCE per view — consumers     t`
+- **Thin community `Community 281`** (1 nodes): `Atomic line-filter rewrite: temp file (non-`.tmp` suffix) then os.replace.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 282`** (1 nodes): `The configured `[tools.<tool>] price_at` routes: ``{tool: "prov/model"}``.     R`
+- **Thin community `Community 282`** (1 nodes): `Apply `scan` under the cleanup lock; per-item fail-open (an error is     debug-l`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 283`** (1 nodes): `The `price_at` routes whose target resolves no price row — each prices     nothi`
+- **Thin community `Community 283`** (1 nodes): `The auto path's one stderr line: count, window, reclaimable size, and the     ex`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 284`** (1 nodes): `The dominant `(provider, model)` of a call set — max summed `tokens_in`,     tie`
+- **Thin community `Community 284`** (1 nodes): `The auto path, piggybacked on `cage import`/read sweeps (cage installs no     sc`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 285`** (1 nodes): `Price a call-less token receipt: ``(usd, rung, "provider/model")`` or     ``None`
+- **Thin community `Community 285`** (1 nodes): ``cage data cleanup` — dry-run table by default (house pattern), ``--apply```
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 286`** (1 nodes): `The one footnote phrasing every text view prints for a ladder-priced row.`
+- **Thin community `Community 286`** (1 nodes): `The ONE display-context implementation (plan Phases 1+2 — output honesty).  Two`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 287`** (1 nodes): `The receipts twin of `report.unpriced_line` — printed by roi and report     when`
+- **Thin community `Community 287`** (1 nodes): `Resolved presentation switches, threaded through the render layer.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 288`** (1 nodes): `Delete the cage-owned `.kiro/hooks/cage.kiro.hook` a previous version     wrote`
+- **Thin community `Community 288`** (1 nodes): `Flag > env > policy, resolved once at the CLI boundary. ``args`` is the     argp`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 289`** (1 nodes): `One artifact naming a verb the parser rejects.`
+- **Thin community `Community 289`** (1 nodes): `Collects the below-the-table lines for one command invocation.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 290`** (1 nodes): `Every verb path the current CLI accepts, as 1- and 2-tuples.      `cli` is impor`
+- **Thin community `Community 290`** (1 nodes): `The footer block ("" when nothing to say): deduped lines in fixed         order,`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 291`** (1 nodes): `Top-level verbs that own subcommands (`insights`, `data`, `task`, …) — for     t`
+- **Thin community `Community 291`** (1 nodes): `The SURFACES name for a ledger row's ``agent`` field (``claude-code`` → ``claude`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 292`** (1 nodes): `Does the current CLI accept this verb path? Empty (a foreign command) is not`
+- **Thin community `Community 292`** (1 nodes): `Task grouping — the shared key-matching core under `cage insights compare` (road`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 293`** (1 nodes): `True if ``command`` invokes cage with a verb the parser rejects. False for a`
+- **Thin community `Community 293`** (1 nodes): `Latest row per task id, filtered to *closed* tasks (an ``outcome`` recorded`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 294`** (1 nodes): `The replacement tail for a dead verb path, from `verbmap.REMOVED`; "" when the`
+- **Thin community `Community 294`** (1 nodes): ```{task_id: {"calls": [...], "receipts": [...]}}`` per the join precedence.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 295`** (1 nodes): `A command tail with its dead head verb rewritten to the current form; unchanged`
+- **Thin community `Community 295`** (1 nodes): `The join over already-read rows — same contract as :func:`join`, for callers`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 296`** (1 nodes): `Render a path with the home prefix as `~` (PII: no user name in output).      Pu`
+- **Thin community `Community 296`** (1 nodes): `The observed stack: sorted joined receipt tools, ``human`` excluded;     ``agent`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 297`** (1 nodes): `Commands from a `{"hooks": {<event>: [{"hooks": [...]}]}}` config.      Public b`
+- **Thin community `Community 297`** (1 nodes): `A task's scope: the single top-level changed dir of its git snapshot     (`tasks`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 298`** (1 nodes): `(display-path, command) for every **project-committed** wired file. This is the`
+- **Thin community `Community 298`** (1 nodes): `One measured stat row per closed task, in sorted task-id order:     ``{task, sta`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 299`** (1 nodes): `(display-path, command) for every **user-level / per-machine** wired file —`
+- **Thin community `Community 299`** (1 nodes): `Group stat rows by ``by`` keys (⊆ {stack, scope, label}; stack always     includ`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 300`** (1 nodes): `The `cage <verb>` invocations in a shell script's **executable** lines.      Spl`
+- **Thin community `Community 300`** (1 nodes): `Copy the bundled graphify interceptor into <root>/bin; return its path.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 301`** (1 nodes): `The `cage <verb>` invocations inside `<root>/bin/graphify`. The shim is a shell`
+- **Thin community `Community 301`** (1 nodes): `Rewrite an **already-installed** `<root>/bin/graphify` when it differs from the`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 302`** (1 nodes): `Scan every artifact for a dead verb. Read-only; never executes anything.      Fa`
+- **Thin community `Community 302`** (1 nodes): `Append `export PATH=<root>/bin:$PATH` to the shell rc once. Returns rc path.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 303`** (1 nodes): `Per-agent verdict; `doctorcmd.render_wiring_text` formats it into the display`
+- **Thin community `Community 303`** (1 nodes): `Set cage up in ``root``. Each key present only if that step ran.      Agent wiri`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 304`** (1 nodes): `One artifact a full `cage setup --wire-only --<agent>` writes. `required=False``
+- **Thin community `Community 304`** (1 nodes): `Opaque machine id for the fleet study (roadmap P5, plan §4.9).  A **random** id`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 305`** (1 nodes): `(status, detail) for a *present* artifact — dead beats current; an MCP command's`
+- **Thin community `Community 305`** (1 nodes): `This ledger's machine id, or "" when not enrolled (the legacy contract).`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 306`** (1 nodes): `Build this agent's rows + rollup. ``stale`` is retained (always 0 now that the`
+- **Thin community `Community 306`** (1 nodes): `The machine id, generated on first call (enrollment). Fail-open: if the     stat`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 307`** (1 nodes): `A `.git/hooks/{post-commit,prepare-commit-msg}` that exists but isn't cage's —`
+- **Thin community `Community 307`** (1 nodes): `Add ``machine`` to a row about to be appended — only when enrolled and the     w`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 308`** (1 nodes): `Anything the raw enumeration finds that isn't part of a known agent's expected`
+- **Thin community `Community 308`** (1 nodes): `The pricing ladder for call-less token receipts (plan §4.5; shipped v0.23).  A t`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 309`** (1 nodes): `A cosmetic label for a leftover row — e.g. a lingering global     `~/.claude/set`
+- **Thin community `Community 309`** (1 nodes): `Whether a receipt enters the ladder: token unit AND no *resolvable* call.      T`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 310`** (1 nodes): `The full per-artifact installed inventory (`cage doctor --wiring`), grouped by`
+- **Thin community `Community 310`** (1 nodes): `The pre-built ``{task_id: [calls]}`` join, built ONCE per view — consumers     t`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 311`** (1 nodes): `The graphify PATH resolves first, when it is **not** this root's own shim.`
+- **Thin community `Community 311`** (1 nodes): `The configured `[tools.<tool>] price_at` routes: ``{tool: "prov/model"}``.     R`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 312`** (1 nodes): `Does a wired command string already reference the shim (any host's form —     `$`
+- **Thin community `Community 312`** (1 nodes): `The `price_at` routes whose target resolves no price row — each prices     nothi`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 313`** (1 nodes): `Top parser only: `cage --help` renders the curated front door verbatim     (`_RO`
+- **Thin community `Community 313`** (1 nodes): `The dominant `(provider, model)` of a call set — max summed `tokens_in`,     tie`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 314`** (1 nodes): `Capture-on-read controls shared by every read surface (capture-architecture`
+- **Thin community `Community 314`** (1 nodes): `Price a call-less token receipt: ``(usd, rung, "provider/model")`` or     ``None`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 315`** (1 nodes): `A command group (insights/task/authorship/data) — a subparser holding nested`
+- **Thin community `Community 315`** (1 nodes): `The one footnote phrasing every text view prints for a ladder-priced row.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 316`** (1 nodes): `The first positional token in ``argv`` — the command word — skipping global`
+- **Thin community `Community 316`** (1 nodes): `The receipts twin of `report.unpriced_line` — printed by roi and report     when`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 317`** (1 nodes): ``cage insights estimate` — a pre-task cost band from matching closed tasks (road`
+- **Thin community `Community 317`** (1 nodes): `Delete the cage-owned `.kiro/hooks/cage.kiro.hook` a previous version     wrote`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 318`** (1 nodes): `The estimate payload: matching closed tasks → token/USD band, or a refusal.`
+- **Thin community `Community 318`** (1 nodes): `One artifact naming a verb the parser rejects.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 319`** (1 nodes): `Stamp an ``ok`` estimate onto the open task row (fail-open, last-write-wins).`
+- **Thin community `Community 319`** (1 nodes): `Every verb path the current CLI accepts, as 1- and 2-tuples.      `cli` is impor`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 320`** (1 nodes): `Run `graphify <argv>` transparently; meter on the side. Returns its exit code.`
+- **Thin community `Community 320`** (1 nodes): `Top-level verbs that own subcommands (`insights`, `data`, `task`, …) — for     t`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 321`** (1 nodes): `Remove hook wiring a previous version installed. The user-level     `~/.copilot/`
+- **Thin community `Community 321`** (1 nodes): `Does the current CLI accept this verb path? Empty (a foreign command) is not`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 322`** (1 nodes): ``cage task outcome` / `cage task quality` — quality-adjusted cost (plan §8.2).`
+- **Thin community `Community 322`** (1 nodes): `True if ``command`` invokes cage with a verb the parser rejects. False for a`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 323`** (1 nodes): `The resolved import candidates, one indented line each with provenance — the`
+- **Thin community `Community 323`** (1 nodes): `The replacement tail for a dead verb path, from `verbmap.REMOVED`; "" when the`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 324`** (1 nodes): `Every leaf view (an actual derived command), read live from the parser (no     l`
+- **Thin community `Community 324`** (1 nodes): `A command tail with its dead head verb rewritten to the current form; unchanged`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 325`** (1 nodes): `Token-overlap score: a full keyword/id hit is 2; a stem hit is 1.      A stem hi`
+- **Thin community `Community 325`** (1 nodes): `Render a path with the home prefix as `~` (PII: no user name in output).      Pu`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 326`** (1 nodes): `Best-matching entries for a query (exact id wins outright). Deterministic.`
+- **Thin community `Community 326`** (1 nodes): `Commands from a `{"hooks": {<event>: [{"hooks": [...]}]}}` config.      Public b`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 327`** (1 nodes): `When nothing matches: the n best-overlap ids to suggest (never a guess).`
+- **Thin community `Community 327`** (1 nodes): `(display-path, command) for every **project-committed** wired file. This is the`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 328`** (1 nodes): `The structured form (`--json`) — formula interpolated with live values.`
+- **Thin community `Community 328`** (1 nodes): `(display-path, command) for every **user-level / per-machine** wired file —`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 329`** (1 nodes): `The text render — same live numbers as `payload`. Concept entries skip the     ``
+- **Thin community `Community 329`** (1 nodes): `The `cage <verb>` invocations in a shell script's **executable** lines.      Spl`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 330`** (1 nodes): ``--list` — every topic grouped by kind (calculation block, then concept).`
+- **Thin community `Community 330`** (1 nodes): `The `cage <verb>` invocations inside `<root>/bin/graphify`. The shim is a shell`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 331`** (1 nodes): `Every `name` on PATH **in shell resolution order** — index 0 is the one that run`
+- **Thin community `Community 331`** (1 nodes): `Scan every artifact for a dead verb. Read-only; never executes anything.      Fa`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 332`** (1 nodes): `The first `_SNIFF_BYTES` of `path` as text; "" on any read error. Never executed`
+- **Thin community `Community 332`** (1 nodes): `Per-agent verdict; `doctorcmd.render_wiring_text` formats it into the display`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 333`** (1 nodes): `Is this file a cage-written graphify interceptor (current **or** adopt-era)?`
+- **Thin community `Community 333`** (1 nodes): `One artifact a full `cage setup --wire-only --<agent>` writes. `required=False``
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 334`** (1 nodes): `The cage-managed project root owning `path`, or "" if there isn't one.      Deli`
+- **Thin community `Community 334`** (1 nodes): `(status, detail) for a *present* artifact — dead beats current; an MCP command's`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 335`** (1 nodes): `Resolve `graphify` on PATH and say whether cage can meter what runs.      Preced`
+- **Thin community `Community 335`** (1 nodes): `Build this agent's rows + rollup. ``stale`` is retained (always 0 now that the`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 336`** (1 nodes): ``cage insights verdict <tool>` — the one-line answer, composed from views that a`
+- **Thin community `Community 336`** (1 nodes): `A `.git/hooks/{post-commit,prepare-commit-msg}` that exists but isn't cage's —`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 337`** (1 nodes): `The least-trusted method among the tool's receipts — the same honest     worst-c`
+- **Thin community `Community 337`** (1 nodes): `Anything the raw enumeration finds that isn't part of a known agent's expected`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 338`** (1 nodes): `Pull each existing view once; return the verdict + its tagged inputs.`
+- **Thin community `Community 338`** (1 nodes): `A cosmetic label for a leftover row — e.g. a lingering global     `~/.claude/set`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 339`** (1 nodes): `NET-2 — the exclusion, named at the headline where the claim is made. Says which`
+- **Thin community `Community 339`** (1 nodes): `The full per-artifact installed inventory (`cage doctor --wiring`), grouped by`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 340`** (1 nodes): `The GC5 forward-model block: the day-one ceiling always, the history band only w`
+- **Thin community `Community 340`** (1 nodes): `The graphify PATH resolves first, when it is **not** this root's own shim.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 341`** (1 nodes): `Copilot delta-id fix (#1)`
+- **Thin community `Community 341`** (1 nodes): `Does a wired command string already reference the shim (any host's form —     `$`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 342`** (1 nodes): `Surface-restamp collision fix (#4)`
+- **Thin community `Community 342`** (1 nodes): `Top parser only: `cage --help` renders the curated front door verbatim     (`_RO`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 343`** (1 nodes): `Rationale: captured_this_run vs Lifetime Captured`
+- **Thin community `Community 343`** (1 nodes): `Capture-on-read controls shared by every read surface (capture-architecture`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 344`** (1 nodes): `Rationale: Per-shutdown Delta Rows for Self-healing`
+- **Thin community `Community 344`** (1 nodes): `A command group (insights/task/authorship/data) — a subparser holding nested`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 345`** (1 nodes): `Rationale: Union Lifetime Set with This-Run Appends Closes Snapshot Gap`
+- **Thin community `Community 345`** (1 nodes): `The first positional token in ``argv`` — the command word — skipping global`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 346`** (1 nodes): `cli-help.txt (cage --help golden fixture)`
+- **Thin community `Community 346`** (1 nodes): ``cage insights estimate` — a pre-task cost band from matching closed tasks (road`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 347`** (1 nodes): `I6a golden — cage insights estimate --label docfix`
+- **Thin community `Community 347`** (1 nodes): `The estimate payload: matching closed tasks → token/USD band, or a refusal.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 348`** (1 nodes): `S4 golden — cage study report (fleet study)`
+- **Thin community `Community 348`** (1 nodes): `Stamp an ``ok`` estimate onto the open task row (fail-open, last-write-wins).`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 349`** (1 nodes): `cage insights estimate --label refactor (golden)`
+- **Thin community `Community 349`** (1 nodes): `Run `graphify <argv>` transparently; meter on the side. Returns its exit code.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 350`** (1 nodes): `cage report — no calls recorded (golden)`
+- **Thin community `Community 350`** (1 nodes): `Remove hook wiring a previous version installed. The user-level     `~/.copilot/`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 351`** (1 nodes): `cage report --by agent — gross note + freshness (golden)`
+- **Thin community `Community 351`** (1 nodes): ``cage task outcome` / `cage task quality` — quality-adjusted cost (plan §8.2).`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 352`** (1 nodes): `cage report --by agent — kiro capture off (golden)`
+- **Thin community `Community 352`** (1 nodes): `The resolved import candidates, one indented line each with provenance — the`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 353`** (1 nodes): `cage study report — fleet study (golden)`
+- **Thin community `Community 353`** (1 nodes): `Every leaf view (an actual derived command), read live from the parser (no     l`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 354`** (1 nodes): `Cage Symbol Mark — brand/icon SVG: two vertical bars (one tall, one short) in a cyan-to-teal gradient (#9DECFF to #1186AE) representing a tall 'human cost' bar beside a short 'tool cost' bar, sitting on a dark baseline, with a white bracket-like stroke on the right marking the gap between them (the saved amount); used as the project's icon/favicon-style brand asset, titled 'Cage — value ledger'`
+- **Thin community `Community 354`** (1 nodes): `Token-overlap score: a full keyword/id hit is 2; a stem hit is 1.      A stem hi`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 355`** (1 nodes): `Cage App Tile Icon (SVG Logo)`
+- **Thin community `Community 355`** (1 nodes): `Best-matching entries for a query (exact id wins outright). Deterministic.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 356`** (1 nodes): `Cage Lockup (Logo + Wordmark)`
+- **Thin community `Community 356`** (1 nodes): `When nothing matches: the n best-overlap ids to suggest (never a guess).`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 357`** (1 nodes): `Cage Architecture Diagram`
+- **Thin community `Community 357`** (1 nodes): `The structured form (`--json`) — formula interpolated with live values.`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 358`** (1 nodes): `The text render — same live numbers as `payload`. Concept entries skip the     ``
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 359`** (1 nodes): ``--list` — every topic grouped by kind (calculation block, then concept).`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 360`** (1 nodes): `Every `name` on PATH **in shell resolution order** — index 0 is the one that run`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 361`** (1 nodes): `The first `_SNIFF_BYTES` of `path` as text; "" on any read error. Never executed`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 362`** (1 nodes): `Is this file a cage-written graphify interceptor (current **or** adopt-era)?`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 363`** (1 nodes): `The cage-managed project root owning `path`, or "" if there isn't one.      Deli`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 364`** (1 nodes): `Resolve `graphify` on PATH and say whether cage can meter what runs.      Preced`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 365`** (1 nodes): ``cage insights verdict <tool>` — the one-line answer, composed from views that a`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 366`** (1 nodes): `The least-trusted method among the tool's receipts — the same honest     worst-c`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 367`** (1 nodes): `Pull each existing view once; return the verdict + its tagged inputs.`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 368`** (1 nodes): `NET-2 — the exclusion, named at the headline where the claim is made. Says which`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 369`** (1 nodes): `The GC5 forward-model block: the day-one ceiling always, the history band only w`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 370`** (1 nodes): `Copilot delta-id fix (#1)`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 371`** (1 nodes): `Surface-restamp collision fix (#4)`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 372`** (1 nodes): `Rationale: captured_this_run vs Lifetime Captured`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 373`** (1 nodes): `Rationale: Per-shutdown Delta Rows for Self-healing`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 374`** (1 nodes): `Rationale: Union Lifetime Set with This-Run Appends Closes Snapshot Gap`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 375`** (1 nodes): `cli-help.txt (cage --help golden fixture)`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 376`** (1 nodes): `I6a golden — cage insights estimate --label docfix`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 377`** (1 nodes): `S4 golden — cage study report (fleet study)`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 378`** (1 nodes): `cage insights estimate --label refactor (golden)`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 379`** (1 nodes): `cage report — no calls recorded (golden)`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 380`** (1 nodes): `cage report --by agent — gross note + freshness (golden)`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 381`** (1 nodes): `cage report --by agent — kiro capture off (golden)`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 382`** (1 nodes): `cage study report — fleet study (golden)`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 383`** (1 nodes): `Cage Symbol Mark — brand/icon SVG: two vertical bars (one tall, one short) in a cyan-to-teal gradient (#9DECFF to #1186AE) representing a tall 'human cost' bar beside a short 'tool cost' bar, sitting on a dark baseline, with a white bracket-like stroke on the right marking the gap between them (the saved amount); used as the project's icon/favicon-style brand asset, titled 'Cage — value ledger'`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 384`** (1 nodes): `Cage App Tile Icon (SVG Logo)`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 385`** (1 nodes): `Cage Lockup (Logo + Wordmark)`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 386`** (1 nodes): `Cage Architecture Diagram`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 
 ## Suggested Questions
@@ -2472,7 +2675,7 @@ _Questions this graph is uniquely positioned to answer:_
   _Edge tagged AMBIGUOUS (relation: cites) - confidence is low._
 - **What is the exact relationship between `Cage-Lab 01 — Setup` and `Global Ledger (~/.cage) + Resolution Precedence`?**
   _Edge tagged AMBIGUOUS (relation: conceptually_related_to) - confidence is low._
-- **Why does `Footprint` connect `Community 1` to `Community 0`, `Community 3`, `Community 4`, `Community 5`, `Community 6`, `Community 8`, `Community 9`, `Community 10`, `Community 11`, `Community 12`, `Community 14`, `Community 18`, `Community 19`, `Community 20`, `Community 21`, `Community 22`, `Community 24`, `Community 27`, `Community 29`?**
-  _High betweenness centrality (0.107) - this node is a cross-community bridge._
-- **Why does `append()` connect `Community 14` to `Community 0`, `Community 1`, `Community 3`, `Community 4`, `Community 5`, `Community 6`, `Community 8`, `Community 9`, `Community 10`, `Community 11`, `Community 12`, `Community 18`, `Community 19`, `Community 20`, `Community 21`, `Community 22`, `Community 23`, `Community 24`, `Community 28`, `Community 30`?**
+- **Why does `append()` connect `Community 0` to `Community 1`, `Community 3`, `Community 5`, `Community 6`, `Community 7`, `Community 8`, `Community 9`, `Community 10`, `Community 11`, `Community 12`, `Community 16`, `Community 17`, `Community 18`, `Community 19`, `Community 22`, `Community 23`, `Community 24`, `Community 25`, `Community 27`, `Community 38`?**
+  _High betweenness centrality (0.114) - this node is a cross-community bridge._
+- **Why does `Footprint` connect `Community 7` to `Community 0`, `Community 32`, `Community 1`, `Community 3`, `Community 5`, `Community 6`, `Community 8`, `Community 9`, `Community 10`, `Community 11`, `Community 12`, `Community 16`, `Community 17`, `Community 18`, `Community 23`, `Community 24`, `Community 25`, `Community 26`?**
   _High betweenness centrality (0.096) - this node is a cross-community bridge._

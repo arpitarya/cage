@@ -40,6 +40,15 @@ PROVENANCE_FIELDS = ("schema_ver", "id", "ts", "sha", "agent", "files",
                      "lines_added", "lines_removed", "method", "origin",
                      "confidence", "session_id")
 
+# The line-match counts (agent-vs-human v2, P1) — additive and OPTIONAL: each is
+# omitted when zero, so a row from any pre-v2 capture path stays byte-identical to
+# `PROVENANCE_FIELDS` and `schema_ver` stays 1 (additive, not a new contract). They
+# are the ONLY thing the matcher persists: the proposed line bodies it compares
+# exist in process memory for the length of one import and are never written, never
+# hashed, and never shipped (counts-never-content, plan §3.5).
+PROVENANCE_COUNT_FIELDS = ("suggested", "kept", "kept_modified", "dropped",
+                           "agent_lines")
+
 
 def _now() -> str:
     return _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
@@ -229,7 +238,9 @@ def make_provenance(*, sha: str, files: list[str], agent: str = "",
                     method: str = "heuristic", origin: str = "unknown",
                     confidence: float = 0.0, session_id: str = "",
                     ts: str | None = None, schema_ver: int = 1,
-                    row_id: str | None = None) -> dict:
+                    row_id: str | None = None, suggested: int = 0, kept: int = 0,
+                    kept_modified: int = 0, dropped: int = 0,
+                    agent_lines: int = 0) -> dict:
     """One authorship-attribution row — which agent touched which files in `sha`.
 
     `origin="human"` is reachable only by explicit attestation (plan §3.5), which is
@@ -237,6 +248,28 @@ def make_provenance(*, sha: str, files: list[str], agent: str = "",
     this combination is the one case where the row's own fields enforce that rule.
     Counts-never-content: `files` are validated repo-relative, never absolute, and the
     row carries paths + line counts only — never diff bodies or commit messages.
+
+    The five line-match counts (`PROVENANCE_COUNT_FIELDS`, agent-vs-human v2 P1) are
+    **additive-optional** — each is omitted at 0, so a row from any other capture path
+    is byte-identical to the pre-v2 contract and `schema_ver` stays 1. They partition
+    what the agent PROPOSED in this session against what the commit actually contains:
+
+    - `suggested` — proposed lines that cleared the min-content gate (matchable).
+    - `kept` — of those, the ones that landed **verbatim** in the commit's added lines.
+    - `kept_modified` — proposed lines whose FILE landed but whose line did not match.
+    - `dropped` — proposed lines whose file is absent from the commit entirely.
+      (`suggested == kept + kept_modified + dropped`, by construction.)
+    - `agent_lines` — the added-line side of the same match: commit lines attributed
+      to this agent. Equal to `kept` today because matching consumes 1:1, and kept as
+      its own name because it answers the other question ("how much of this commit is
+      the agent's", not "how much of the agent's suggestion survived") — the two
+      diverge the moment matching stops being one-to-one.
+
+    Deliberately **not** persisted: `unknown` (sub-gate and binary-file lines) and
+    `not-proposed` (files in the commit nobody proposed). Both are properties of the
+    COMMIT, not of any one (agent, session) row, and both re-derive exactly from git
+    at read time — which the commit views must touch anyway. Persisting a commit-level
+    fact once per session row would let two rows disagree about one commit.
     """
     if method not in PROV_METHODS:
         raise ValueError(f"method {method!r} not in {PROV_METHODS}")
@@ -246,8 +279,14 @@ def make_provenance(*, sha: str, files: list[str], agent: str = "",
         raise ValueError("origin='human' is only reachable via attestation (method='heuristic')")
     for f in files:
         _repo_relative(f)
-    return {"schema_ver": schema_ver, "id": row_id or ids.new_id("p"), "ts": ts or _now(),
-            "sha": sha, "agent": agent, "files": list(files),
-            "lines_added": int(lines_added), "lines_removed": int(lines_removed),
-            "method": method, "origin": origin, "confidence": float(confidence),
-            "session_id": session_id}
+    row = {"schema_ver": schema_ver, "id": row_id or ids.new_id("p"), "ts": ts or _now(),
+           "sha": sha, "agent": agent, "files": list(files),
+           "lines_added": int(lines_added), "lines_removed": int(lines_removed),
+           "method": method, "origin": origin, "confidence": float(confidence),
+           "session_id": session_id}
+    for name, value in (("suggested", suggested), ("kept", kept),
+                        ("kept_modified", kept_modified), ("dropped", dropped),
+                        ("agent_lines", agent_lines)):
+        if value:
+            row[name] = int(value)
+    return row

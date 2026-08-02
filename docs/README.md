@@ -21,6 +21,11 @@ spec.
 
 ## Active work
 
+- [copilot-credits.handoff.md](copilot-credits.handoff.md) +
+  [copilot-credits.prompt.md](copilot-credits.prompt.md) — **COPILOT-CREDITS**
+  (**Opus** — substrate contract touch): billed-credits capture + the copilot pricing
+  ladder. Design of record: [copilot-credits.proposal.md](proposals/copilot-credits.proposal.md);
+  decision: [compare/copilot-pricing-basis.compare.md](compare/copilot-pricing-basis.compare.md).
 - [agent-vs-human-v2.handoff.md](agent-vs-human-v2.handoff.md) +
   [agent-vs-human-v2.prompt.md](agent-vs-human-v2.prompt.md) — **HR1, per-commit
   agent-vs-human** (P1 capture re-wire → P2 commit join → P3 views → P4 time; no USD,
@@ -43,6 +48,11 @@ The maintained doc set, governed by the *Documentation discipline* section of
 [`../CLAUDE.md`](../CLAUDE.md). Freshness is tracked in
 [DOC-REGISTRY.md](DOC-REGISTRY.md).
 
+- **[CLI.md](CLI.md) — every `cage` command in one place.** The 5 daily verbs, the 7
+  groups, the 4 hidden plumbing commands and every flag, plus the removed-verb
+  migration table and the surface's known gaps. **Test-gated**: `tests/test_cli_reference.py`
+  checks it bidirectionally against `cli.build_parser()`, so a rename that misses this
+  file turns the suite red rather than leaving a dead verb in prose.
 - [doc-size-discipline.md](doc-size-discipline.md) — ⏳ **TRIAL to 2026-09-01**: the
   four doc-size rules (lead with the answer · one audience · evidence elsewhere ·
   hard budget), the fix procedure, and the retain/remove criteria.

@@ -217,6 +217,103 @@ def parse_provenance(transcript_path: Path, session: str = "") -> list[dict]:
     return [{"session": session, "file": f} for f in dict.fromkeys(files)]  # de-dup, order kept
 
 
+def _proposed_lines(name: str, inp: dict) -> list[str]:
+    """The exact text an edit tool-use block proposed to write, split into lines.
+
+    One branch per tool because each carries the new text under its own key — and the
+    keys are read as a **closed set**, never `for v in inp.values()`: a future tool
+    input field holding a prompt or a shell command must never be swept in here as if
+    it were file content.
+
+    - ``Edit``          → ``new_string``
+    - ``MultiEdit``     → every ``edits[].new_string``, in order
+    - ``Write``         → ``content`` (the whole file body)
+    - ``NotebookEdit``  → ``new_source`` (one cell)
+
+    Returns [] for a malformed/absent payload — a block cage can't read proposes
+    nothing, which the matcher then scores as `unknown`, never as human."""
+    if name == "Edit":
+        s = inp.get("new_string")
+        return s.splitlines() if isinstance(s, str) else []
+    if name == "MultiEdit":
+        out: list[str] = []
+        for e in inp.get("edits") or []:
+            s = e.get("new_string") if isinstance(e, dict) else None
+            if isinstance(s, str):
+                out.extend(s.splitlines())
+        return out
+    if name == "Write":
+        s = inp.get("content")
+        return s.splitlines() if isinstance(s, str) else []
+    if name == "NotebookEdit":
+        s = inp.get("new_source")
+        return s.splitlines() if isinstance(s, str) else []
+    return []
+
+
+def parse_edits(transcript_path: Path, session: str = "") -> list[dict]:
+    """Every edit an assistant turn **proposed**, with the text it proposed and the
+    turn's timestamp — the direct evidence behind agent-vs-human authorship (v2 P1).
+
+    One record per `Edit`/`Write`/`MultiEdit`/`NotebookEdit` tool-use block::
+
+        {"session": …, "file": <absolute path as the agent wrote it>,
+         "ts": <ISO turn timestamp>, "cwd": <record cwd>, "lines": [<proposed lines>]}
+
+    **The `lines` never leave process memory.** They exist so the matcher can compare
+    them, transiently, against the added lines of a commit; only the resulting *counts*
+    are ever written (`schema.PROVENANCE_COUNT_FIELDS`). No line body and no line hash
+    is persisted, shipped, or logged — the plant-string test in
+    `tests/test_authorship_capture.py` greps every written shard to prove it.
+
+    `ts` is the turn's own timestamp, not an import-time clock: it is what places the
+    edit inside a commit's window (`commitjoin.commit_windows`), so a transcript
+    imported days later still resolves to the commit that actually contains the work.
+    Paths are returned exactly as the agent wrote them (absolute); making them
+    repo-relative is the caller's job, because only the caller knows the repo.
+
+    Parse-only and fail-open, like every other reader here: a bad line is skipped, an
+    unreadable transcript yields []. Order is transcript order (deterministic)."""
+    if not transcript_path.exists():
+        return []
+    session = session or transcript_path.stem
+    out: list[dict] = []
+    try:
+        text = transcript_path.read_text(encoding="utf-8")
+    except OSError:
+        return []
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            rec = json.loads(line)
+        except ValueError:
+            continue
+        if rec.get("type") != "assistant":
+            continue
+        ts = rec.get("timestamp")
+        cwd = rec.get("cwd") or ""
+        for block in (rec.get("message") or {}).get("content") or []:
+            if not isinstance(block, dict) or block.get("type") != "tool_use":
+                continue
+            name = block.get("name")
+            if name not in _EDIT_TOOLS:
+                continue
+            inp = block.get("input") or {}
+            if not isinstance(inp, dict):
+                continue
+            fp = inp.get("file_path") or inp.get("notebook_path")
+            if not fp or not isinstance(fp, str):
+                continue
+            lines = _proposed_lines(name, inp)
+            if not lines:
+                continue  # nothing proposed ⇒ nothing to match (never a human residual)
+            out.append({"session": session, "file": fp, "ts": ts, "cwd": cwd,
+                        "lines": lines})
+    return out
+
+
 # Copilot CLI persists a per-session usage log at
 # ~/.copilot/session-state/<id>/events.jsonl; the `session.shutdown` event carries a
 # `modelMetrics` map keyed by model. Each value nests tokens under a `usage` object —

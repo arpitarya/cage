@@ -16,6 +16,107 @@ Entry format:
 
 ---
 
+## 2026-08-02 — HR1 P1: authorship capture re-wired + line matching (agent-vs-human v2)
+
+- **Implemented:** the capture half of the v2 axis. Provenance rows are written
+  automatically for the first time — `transcript.parse_provenance` /
+  `originrecord.record_transcript` had **zero callers** since the hookless rebuild, so
+  every commit answered `unknown` by absence while the read surface worked fine.
+  - `transcript.parse_edits` — one record per `Edit`/`Write`/`MultiEdit`/`NotebookEdit`
+    block: file · turn ts · cwd · the exact proposed lines. Payload keys are a **closed
+    set** per tool, never `inp.values()`.
+  - `commitjoin.py` (new) — commit ownership windows `(ts_{i-1}, ts_i]`, upper bound
+    inclusive, oldest first, sorted by **committer** date. `toplevel`/`head`/`window_for`/
+    `newest_ts`. Never `HEAD`-at-import; work after the newest commit is left unrecorded
+    and picked up exactly once by the next import.
+  - `linematch.py` (new) — ONE normalizer applied to both sides, the
+    `MIN_MATCH_CHARS` content gate, 1:1 multiset consumption, the five file verdicts
+    (`kept`/`landed-modified`/`dropped`/`not-proposed`/`unreadable`), and transient
+    reads of a commit's added lines (`--unified=0 --no-textconv`, so a user's diff
+    config can't change what cage measures).
+  - `authorcapture.py` (new) — the pass: one repo per sweep (resolved from cwd), its
+    **own cursor** (`cursors["_authorship"]`, `[size, mtime, covered]`) because the call
+    cursor skips an unchanged transcript and a session's last edits are committed *after*
+    it stops growing. `COVERAGE_GAPS` names why copilot/kiro can't be line-matched.
+  - Substrate: `make_provenance` gains five **additive-optional** counts
+    (`PROVENANCE_COUNT_FIELDS`), omitted at 0 ⇒ pre-v2 rows byte-identical, `schema_ver`
+    stays 1. `originrecord.record` drops unknown count keys at the write boundary.
+  - Policy: `[authorship] capture` / `estimate_hours` / `max_est_gap`
+    (+ `CAGE_AUTHORSHIP`, `CAGE_AUTHORSHIP_ESTIMATE`); bundled `cage.toml` ships the
+    table commented. **`capture` is its own consent switch** — reading diffs is a
+    different permission from metering spend.
+  - `importcmd.glob_source` extracted so the pass and `_scan` share ONE glob.
+- **Phase gate — PASSED, with one design defect found and fixed:**
+  [regression/2026-08-02-p1-authorship-dogfood.md](regression/2026-08-02-p1-authorship-dogfood.md).
+  103 commits × 81 real transcripts (123 MB), 4.2 s → **69 rows / 25 commits**, re-run 0.
+  **The join is sound: 68.7% verbatim match inside files a session proposed.**
+  `MIN_MATCH_CHARS` **frozen at 4** with a 1→12 sweep (rate flat at 41.1–41.2%; 1→4
+  discards 331 punctuation-only "matches"). **Defect:** the handoff's three-bucket split
+  would have printed **human~ 76.6%**, 89% of it one commit of generated JSON — so the
+  residual splits into `human~` (files the session proposed) vs `unattributed` (files
+  nobody proposed). No new inference; `NOT_PROPOSED` was already computed.
+- **Files:** `cage/{commitjoin,linematch,authorcapture}.py` (new) ·
+  `cage/{transcript,schema,originrecord,policy,importcmd,constants}.py` ·
+  `cage/data/cage.toml` · `tests/{test_authorship_capture.py (new),conftest.py}` ·
+  `docs/adr/0008-line-match-authorship-counts-persisted-content-transient.md` (new) ·
+  `docs/regression/2026-08-02-p1-authorship-dogfood.md` (new)
+- **Tests:** green — **1270 pass / 0 fail / 10 skipped** (+25 new). Includes the
+  plant-string PII test: runs the pass under `CAGE_DEBUG=1` and greps every written
+  file for the sentinel line bodies **and** their sha1/sha256/md5 digests (full and
+  truncated). The suite pins `CAGE_AUTHORSHIP=0` (conftest) so no unrelated test shells
+  git at the developer's real repo; the authorship file opts back in.
+- **Next:** P2 — `commitjoin.join_calls` (task-id join first via `taskgroup.join_rows`,
+  window fallback on `project` + ts; copilot-CLI and kiro excluded **and counted**).
+
+---
+
+---
+
+## 2026-08-02 — CLI-REF: `docs/CLI.md`, the complete command reference, gated against the live parser
+
+- **Implemented:** the whole CLI surface as one maintained doc, plus the drift gate
+  that keeps it true.
+  - `docs/CLI.md` — **50 addressable commands** at v0.42.0: 5 daily verbs · the 7
+    groups (`insights` 14 · `task` 2 · `authorship` 4 · `prices` 6 · `study` 5 ·
+    `policy` 2 · `data` 8) · 4 hidden plumbing commands (`mcp`/`demo`/`debug`/`hook`) ·
+    every flag and choice list · the removed-verb migration table read off
+    `verbmap.REMOVED` · a **Known gaps** section · a *Maintaining this file* section
+    carrying the standing trigger.
+  - `tests/test_cli_reference.py` — **bidirectional** against `cli.build_parser()`,
+    never a fixture: (1) every leaf the parser knows appears in the doc; (2) every
+    command path named in a doc **code span** resolves — prose is deliberately not
+    checked, an English allowlist would rot faster than the doc; (3) the flag
+    vocabulary matches both ways, minus the three shared capture-on-read flags
+    declared once; (4) a flag with **exactly one owner** must sit in that command's
+    own `##` section, so a shared vocabulary can't hide a misfiled flag; (5) the
+    doc's own headline count must equal the parser's leaf count; (6) the detector is
+    self-tested — `insights attribute`, `prices delete`, `rep` and the pre-v0.32 bare
+    `attrib` must all fail to resolve.
+  - `_resolvable()` walks the parser the way argparse does: subparser → positional
+    choice list → free positional (trailing tokens are then *arguments*, so
+    `cage query gross-vs-net` is valid while `cage insights attribute` is not).
+    `prices`/`study`/`policy` expand to their actions (they are groups on the front
+    door); `cage hook` deliberately does **not** — it is one hidden verb taking an
+    event argument.
+- **Two defects found and filed, not silently worked around** (new OPEN-WORK
+  **CLI-GAPS**): `cage --help` advertises seven of `data`'s eight commands
+  (`migrate-savings` is unlisted); and `prices`/`study`/`policy` use a positional
+  choice rather than a subparser, so their per-action `--help` is the group's and
+  their flags are a flat union across all actions.
+- **One doc defect fixed on contact:** `DOC-REGISTRY.md`'s docs-index row had four
+  continuation lines sitting *outside* the table since 2026-08-01 — merged back into
+  the row.
+- **Files:** `docs/CLI.md` (new) · `tests/test_cli_reference.py` (new) ·
+  `README.md` (quickstart link) · `docs/README.md` (living-process-docs index) ·
+  `CLAUDE.md` (maintained-doc set + the removed-verb rule now names the doc) ·
+  `docs/DOC-REGISTRY.md` (new row + 3 bumps + the orphaned-row fix) ·
+  `docs/OPEN-WORK.md` (CLI-GAPS filed).
+- **Tests:** the new module's 93 cases run green against the live parser via a
+  pytest-free harness (the Cowork sandbox has no pytest and no network); **the full
+  `just test` suite has NOT been run from this session** — run it on the dev machine
+  before committing.
+- **Next:** `just test` to confirm 1148 + 93 green, then decide CLI-GAPS (a).
+
 ## 2026-08-02 — CHATS-VIEW: `cage insights chats` built, single phase (1125/0 ⇒ 1148/0)
 
 - **Milestone:** the per-chat detail view, per

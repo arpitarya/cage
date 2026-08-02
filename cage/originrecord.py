@@ -122,14 +122,22 @@ def _record_lock(root: Path):
 
 def record(root: Path, *, sha: str, files: list[str], agent: str = "",
           lines_added: int = 0, lines_removed: int = 0, method: str = "heuristic",
-          origin: str = "agent", session_id: str = "", confidence: float | None = None) -> bool:
+          origin: str = "agent", session_id: str = "", confidence: float | None = None,
+          **counts) -> bool:
     """Append one provenance row. Fail-open; idempotent on (sha, agent, session_id, method).
     Confidence is bumped when a *different* method already recorded an overlapping
-    file for the same (sha, session) — independent-path corroboration, plan §3.5."""
+    file for the same (sha, session) — independent-path corroboration, plan §3.5.
+
+    ``**counts`` carries the additive-optional line-match integers
+    (`schema.PROVENANCE_COUNT_FIELDS`, agent-vs-human v2 P1). Unknown keys are dropped
+    rather than passed through, so a typo can never smuggle a new field into the row —
+    the substrate contract stays closed at this boundary, not at the factory's."""
     try:
         if not sha or not files:
             return False
         files = list(dict.fromkeys(files))  # one edit signal per file, however many events
+        extra = {k: int(v) for k, v in counts.items()
+                 if k in schema.PROVENANCE_COUNT_FIELDS}
         with _record_lock(root):
             if _already_recorded(root, sha=sha, agent=agent, session_id=session_id, method=method):
                 return False
@@ -139,7 +147,7 @@ def record(root: Path, *, sha: str, files: list[str], agent: str = "",
             row = schema.make_provenance(sha=sha, files=files, agent=agent,
                                          lines_added=lines_added, lines_removed=lines_removed,
                                          method=method, origin=origin, confidence=conf,
-                                         session_id=session_id)
+                                         session_id=session_id, **extra)
             return ledger.append(paths.Footprint(root).provenance, row)
     except Exception:  # noqa: BLE001 — write-path discipline: never raise
         return False
@@ -157,8 +165,12 @@ def record_hooked(root: Path, *, sha: str, files: list[str], agent: str,
 
 def record_transcript(root: Path, *, sha: str, files: list[str], agent: str,
                       lines_added: int = 0, lines_removed: int = 0,
-                      session_id: str = "", origin: str = "agent") -> bool:
-    """Parsed after the fact from a session transcript — lower trust than a live hook."""
+                      session_id: str = "", origin: str = "agent", **counts) -> bool:
+    """Parsed after the fact from a session transcript — lower trust than a live hook.
+
+    The one automated writer since the hookless rebuild (`authorcapture.capture` calls
+    it; the `hooked` path is legacy-only). ``**counts`` are the line-match integers —
+    omitted at 0, so a caller that doesn't line-match writes the pre-v2 row exactly."""
     return record(root, sha=sha, files=files, agent=agent, lines_added=lines_added,
                  lines_removed=lines_removed, method="transcript", origin=origin,
-                 session_id=session_id)
+                 session_id=session_id, **counts)

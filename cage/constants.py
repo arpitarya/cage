@@ -211,6 +211,34 @@ NET_SAVED_CONFIDENCE = 0.4
 OTEL_SEMCONV_VERSION = "1.42.0"
 OTEL_SEMCONV_STATUS = "pre-stable"
 
+# ── authorship line-matching (agent-vs-human v2, P1) ─────────────────────────
+# The minimum-content gate. A proposed/added line whose NORMALIZED form is shorter
+# than this many characters is excluded from matching on both sides and counted
+# toward `unknown` — never toward agent and never toward human. `}`, `)`, blank
+# lines and one-character continuations occur in almost every diff, so matching on
+# them would manufacture agreement between an agent proposal and an unrelated human
+# edit. 4 is deliberately small: it excludes the punctuation noise and essentially
+# nothing else (`pass`, `else:` and `import x` all survive it).
+#
+# Tuned against the P1 dogfood on cage's own repo (docs/regression/) — raise it and
+# the unknown bucket grows without the agent share moving; lower it and matches start
+# coming from lines that carry no information. A heuristic that must stay reviewable
+# ⇒ constants, not policy: it changes what a number MEANS, so it is not a per-project
+# knob (`[authorship]` carries the two switches that are).
+MIN_MATCH_CHARS = 4
+
+# `[authorship]` policy defaults (the DEFAULT_CONFIDENCE policy-preferred pattern —
+# `cage.toml [authorship]` wins, `CAGE_AUTHORSHIP_ESTIMATE` overrides the switch).
+# The human-hours ESTIMATOR is `wall-clock − agent turn-span`, floored at 0: an
+# inference, never a measurement, always rendered with `~` and its method named in
+# the view's own footnote. `max_est_gap` is the point past which the inference is
+# fog and is REFUSED (`—`) rather than printed: across a 4h+ commit gap the wall
+# clock stopped describing the work, so the subtraction stops meaning anything.
+# 4h ≈ a working half-day — wide enough for one uninterrupted session, narrow
+# enough that an overnight or weekend gap can never be read as hours worked.
+AUTHORSHIP_ESTIMATE_HOURS = True
+AUTHORSHIP_MAX_EST_GAP = "4h"
+
 # `cage insights chats` default row cap (chats-view proposal, no-silent-caps rule). A
 # flag (`--all`), not a policy knob — unlike the DEFAULT_CONFIDENCE-style fallbacks
 # above, there is no per-project reason to want a different default page size, only a
