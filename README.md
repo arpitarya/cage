@@ -228,7 +228,7 @@ cage data export --csv calls --since 30d -o calls.csv   # raw ledger rows for a 
 
 ## The `$0` guarantee
 
-Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 1148 tests; `cage demo` reproduces the worked attribution example against a real ledger.
+Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 1354 tests; `cage demo` reproduces the worked attribution example against a real ledger.
 
 **Honest limits.** Marginal-by-fixed-order is defensible and `$0`, but it is an *ordering convention*, not a Shapley value (that's a deferred audit mode). And a counterfactual cell is an honest reconstruction, never an invoice — the `method` column says so on every row, on purpose.
 
@@ -236,7 +236,7 @@ Every derived view is parse / arithmetic over the log — **no LLM call, ever, o
 
 Latest release below — full history and detail in [CHANGELOG.md](CHANGELOG.md).
 
-- **v0.43.0 (unreleased) — agent-vs-human, rebuilt per commit.** `cage insights commits` / `commit <sha>` / `cage authorship summary` answer *who wrote this commit* from line-level evidence: the exact text an agent proposed, matched transiently against the commit's added lines, with **only counts persisted** — never a line body, never a line hash. The residual splits four ways (`agent` / `human~` / `unattributed` / `unknown`), so a committed build artifact is never reported as a person's work. Hours are attested (`cage task time 45m`) or a guarded `~` estimate that refuses rather than print fog. **No USD, rate or valuation appears anywhere on these surfaces** — the v0.36 veto, kept. See [CHANGELOG.md](CHANGELOG.md) and [ADR 0008](docs/adr/0008-line-match-authorship-counts-persisted-content-transient.md).
+- **v0.43.0 (2026-08-02) — agent-vs-human, rebuilt per commit.** `cage insights commits` / `commit <sha>` / `cage authorship summary` answer *who wrote this commit* from line-level evidence: the exact text an agent proposed, matched transiently against the commit's added lines, with **only counts persisted** — never a line body, never a line hash. The residual splits four ways (`agent` / `human~` / `unattributed` / `unknown`), so a committed build artifact is never reported as a person's work. Hours are attested (`cage task time 45m`) or a guarded `~` estimate that refuses rather than print fog. **No USD, rate or valuation appears anywhere on these surfaces** — the v0.36 veto, kept. See [CHANGELOG.md](CHANGELOG.md) and [ADR 0008](docs/adr/0008-line-match-authorship-counts-persisted-content-transient.md).
 
 ## The name
 

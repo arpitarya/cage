@@ -1,13 +1,12 @@
 # OPEN-WORK — the one plan of pending work
 
 **Next:** **NET-1** — does graphify actually pay? (your hands, n=5 per arm).
-Nothing is blocked; **v0.39.0 is released** (tagged + GitHub release fired publish.yml).
-Four versions have landed in tree since that tag and are all **built, green and
-unreleased**: **v0.40.0** (ADOPT), **v0.41.0** (the agent-surface ladder), **v0.42.0**
-(chats view + the CLI reference) and **v0.43.0** (agent-vs-human v2, HR1).
-**State:** v0.38.0 and v0.39.0 both tagged, released and on PyPI — PyPI upload, cross-OS
-`cage.pyz` smoke and release assets all green, including the Windows behaviour tier that
-had never executed before v0.38.
+Nothing is blocked. **State: v0.43.0 is released** — tagged, GitHub release created,
+publish.yml fired (PyPI via OIDC) alongside the cross-OS `cage.pyz` chain. Every version
+through v0.43.0 is tagged and released; there is no unreleased work in tree.
+(Verified against `git tag` + `gh release list` on 2026-08-02 — an earlier revision of
+this header claimed v0.40–v0.42 were unreleased, which was false and had been carried
+forward unchecked. Its own markers are not ground truth.)
 Suite: **1354 pass / 0 fail / 10 skipped** (dev machine, macOS/posix path only; the 10
 skips are the Windows-only shim behaviour tier and run on CI).
 

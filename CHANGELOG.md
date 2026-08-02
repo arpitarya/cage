@@ -2,7 +2,7 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
-## v0.43.0 (unreleased) — agent-vs-human, rebuilt per commit
+## v0.43.0 (2026-08-02) — agent-vs-human, rebuilt per commit
 
 Built from: [proposal](docs/archive/v0.43-agent-vs-human-v2.proposal.md) ·
 [handoff](docs/archive/v0.43-agent-vs-human-v2.handoff.md) +
