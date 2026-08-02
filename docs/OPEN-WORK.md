@@ -2,13 +2,13 @@
 
 **Next:** **NET-1** — does graphify actually pay? (your hands, n=5 per arm).
 Nothing is blocked; **v0.39.0 is released** (tagged + GitHub release fired publish.yml).
-ADOPT landed *after* that tag, so it rides **v0.40.0 — built, green, unreleased in tree**
-(changelog entry written; `__version__` still `0.39.0`, bumped by the release commit as
-always).
+ADOPT landed *after* that tag (**v0.40.0**, in tree), and the **whole agent-surface
+ladder** landed after that (**v0.41.0**, in tree) — both built, green and unreleased;
+`__version__` is still `0.39.0`, bumped by the release commit as always.
 **State:** v0.38.0 and v0.39.0 both tagged, released and on PyPI — PyPI upload, cross-OS
 `cage.pyz` smoke and release assets all green, including the Windows behaviour tier that
 had never executed before v0.38.
-Suite: **1024 pass / 0 fail / 10 skipped** (dev machine, macOS/posix path only; the 10
+Suite: **1125 pass / 0 fail / 10 skipped** (dev machine, macOS/posix path only; the 10
 skips are the Windows-only shim behaviour tier and run on CI).
 
 ## Pending
@@ -20,13 +20,16 @@ skips are the Windows-only shim behaviour tier and run on CI).
 | **NET-1** | ④ prove graphify pays — n=1, gate 5 | [proposal](proposals/net-positive-evidence-run.md) — **your hands** |
 | **TOOL-SDK** | the paved road: next tool ≠ 34 modules; fux is the proof | [proposal](proposals/tool-integration-contract.md) — builds on [shim-contract](shim-contract.md) |
 | **DOGFOOD** | README shows demo data, not cage's own ledger | [proposal](proposals/dogfood-report.md) — dev machine, ~1h |
-| **AGENT-SURFACE** | the 4-tier ladder — L0 floor → L2 MCP → L1 hooks → L3 skills | [prompt](agent-surface.prompt.md) — P2 is **Opus** |
-| **HR1** | agent-vs-human v2, four asks graded | [proposal](proposals/agent-vs-human-v2.md) — after the track |
+| **L1-FIELD** | L1 hook shapes are unit/CI-tested but never run on a real Claude Code / Copilot / Kiro install | wire one machine per agent, confirm the hook fires and `cage setup --status` agrees |
+| **KIRO-MCP-FIELD** | the committed path-free `python3 -m cage mcp` has never started on a real Kiro | open Kiro on a wired repo; if it does not start, **report it** — do not fall back to a gitignored absolute path |
+| **HR1** | agent-vs-human v2 — **accepted-amended 2026-08-02, ready to build** (P1 capture re-wire → P4 time; no USD; guarded `~` hours) | [handoff](agent-vs-human-v2.handoff.md) · [prompt](agent-vs-human-v2.prompt.md) — after the track |
+| **COPILOT-CREDITS** | chatSessions persists `copilotCredits` per request — cage drops the actual billing unit (retires copilot/auto UNPRICED); + `elapsedMs`→gap_ms, sidecar `cacheReadTokens` | [research](research/copilot-vscode-token-sources.md) §4 — spec the capture change |
+| **CHATS-VIEW** | per-chat detail view — one row per chat, titled via manifest join (labels only, never money) | [handoff](chats-view.handoff.md) + [prompt](chats-view.prompt.md) (Sonnet) — ready to execute |
 
 **AGENT SURFACE re-designed from scratch 2026-08-02 (Arpit: clean slate).** The old
 `cage-skills` proposal is **superseded** — its premise (*"cage already ships one skill"*)
 was pre-hookless and false; no code writes a skill file anywhere. New design of record:
-[agent-surface-layers.md](proposals/agent-surface-layers.md) — a **four-layer ladder**,
+[agent-surface-layers.md](archive/v0.41-agent-surface-layers.proposal.md) — a **four-layer ladder**,
 each optional and strictly additive: **L0 hookless** (the floor, must work perfectly
 alone, forever) → **L1 hooks+steering** → **L2 MCP** → **L3 skills**.
 Three findings drove it: **L1 mostly fixes problems that already exist** (auto task-close
@@ -35,12 +38,77 @@ unblocks compare/estimate/calibration/NET-1, all starved because nobody runs
 cannot get from a shim subprocess); **L2 ships six read tools but not `verdict`/`compare`,
 the two that answer the product question**; and **only L3 can carry the honesty
 discipline** (MCP hands over a JSON number, nothing makes an agent say *"that's modeled,
-not measured"*). Order: **L0 → L2 → L1 → L3**, and **all four phases are now specced in one program**
-with a gate between each — P0 floor proof · P1 MCP (incl. **the ladder's only write
-tool**, `cage_task_outcome`) · **P2 hooks, Opus** · P3 skills.
-**The gate that matters: removing a layer must change no number** — proven by a floor
-test built in P0, *before* the layers that must not break it.
-[handoff](agent-surface.handoff.md) · [prompt](agent-surface.prompt.md).
+not measured"*). Order: **L0 → L2 → L1 → L3**, and **all four phases are specced in one program**
+with a gate between each. **ALL FOUR BUILT 2026-08-02 — the program is complete
+(1024/0 ⇒ 1125/0), and the proposal + pair are archived.** Nothing remains but the two
+field-verification residuals below.
+**Everything committed, multi-user (Arpit, 2026-08-02)** — every layer's wiring is
+committed and must work for a teammate on another machine. **Every piece of wiring is committed;
+only the *records* are not** (`ledger/`/`out/`/`state/` gitignored; team numbers come
+from `refs/notes/cage-ledger`, ADR 0001 — never committed records).
+✅ **The Kiro MCP blocker is resolved and BUILT in P1** — `kirowire.PATH_FREE`
+(`python3 -m cage mcp`) is the committed default, the gitignore exception is gone, and
+doctor's new `kiro-mcp` check asks the resolved interpreter to import cage. **One
+residual, carried forward: [KIRO-MCP-FIELD]** — the path-free form is CI- and
+unit-tested but **not yet verified on a real Kiro install**; that can only close on a
+machine with Kiro (the prompt's stop-condition). **Windows is a stated limit, not a
+bug:** `python3` is often absent there and a *committed* file can carry one spelling, so
+the default is `python3` and doctor points a Windows machine at `cage setup
+--python-launcher` for the `py -3` form.
+**Three agents at every tier is a gate, not an aspiration** — claude · copilot · kiro,
+or the gap is *named in output*. Shapes differ and matter: **copilot hooks CAN be
+committed** — `.github/hooks/*.json` is repo-level and portable (a 2026-08-02 correction:
+an earlier draft called them user-level-only; cage's own `_strip_legacy_hooks` cleans
+`.github/hooks/cage.json`). Both sources **combine**, so wiring both double-fires ·
+kiro's hook file is
+**one hook per file with no session-start**. ⚠️ **Hooks are CLI-only — they don't fire under a VS Code extension**, so
+L1's agent identity and auto task-close are CLI-session only and must never be presented
+as "cage knows which agent ran".
+✅ **P0 landed 2026-08-02 (1024/0 ⇒ 1039/0).** The gate that matters — **adding or removing
+a layer must change no number** — is now a *test*, not an intention:
+[tests/test_floor.py](../tests/test_floor.py) installs every layer cage ships onto an
+already-captured project and asserts the ledger shards **and** seven derived views'
+stdout byte-identical, then strips the wiring and asserts it again, per agent. **P1–P3
+are judged against it.** A new layer is wired in by adding its artifacts to
+`_WIRING_ARTIFACTS` — never by relaxing an assertion. Residue cleared with it: the
+README's three skill claims (one *"all four agents"*, live on PyPI), PLAN §5.1's dead
+`tools/skillgen` section, CLAUDE.md's `hooks+MCP` wiring bullet, `docs/example/setup.md`.
+✅ **P1 landed 2026-08-02 (1039/0 ⇒ 1059/0).** `cage_verdict` + `cage_compare` +
+`cage_task_outcome` ([mcpserver.py](../cage/mcpserver.py)); kiro's MCP committed
+path-free; new `kiro-mcp` doctor check. **The refusals are asserted as *equality with
+the CLI's stdout*, not substring presence** — a wrapper that printed `INSUFFICIENT DATA`
+and dropped the note beneath it would pass a substring test, so it must fail this one.
+`cage_task_outcome` is the ladder's only write tool (`mcpserver.WRITE_TOOLS`), sharing
+`clicmds.close_task` with the CLI verb so the label guard cannot be laxer on the
+agent-facing side. **Correction to the spec:** `tests/test_portable_wiring.py`, cited by
+CLAUDE.md and the prompt, **has never existed** — the greps live in `test_agents.py` and
+`test_mcp_layer.py`.
+✅ **P2 landed 2026-08-02 (1059/0 ⇒ 1096/0).** `cage hook <event>`
+([hookcmd.py](../cage/hookcmd.py)) + attestation ([attest.py](../cage/attest.py)) + auto
+task-close + budget blocking + steering ([steering.py](../cage/steering.py)), **opt-in**
+via `cage setup --hooks` and two-way (plain `cage setup` removes it). **Gate met the hard
+way:** the floor test was *extended* to install hooks too and still asserts ledger bytes
+and seven views byte-identical in both directions. Two calls worth keeping: **auto-close
+writes `outcome="auto"`, never `ok`** (closed for cost comparison, invisible to `cage
+task quality` — a session ending is not a job well done), and **no unverified host event
+name was invented** (copilot gets identity + auto-close but no pre-tool hook, named in
+`agents.HOOK_GAPS`). **ADOPT-COV is NOT closed by this** — attestation fixes adoption's
+half A only; half B's `NO_LINK` is still structurally true.
+**Residual carried forward: [L1-FIELD]** — the hook file shapes come from cage's own
+prior implementations, not fresh vendor verification; field-verify on a real Claude
+Code / Copilot / Kiro install.
+✅ **P3 landed 2026-08-02 (1096/0 ⇒ 1125/0) — the program is COMPLETE.** Seven skills
+through `steering.py`'s one-source renderer (task-closer · analyst · doctor-triage ·
+honesty-reviewer · release · lab-runner · windows-shim), `cage setup --skills`, opt-in
+and two-way. *No skill computes a number* is enforced **mechanically** (`steering.lint`)
+and every `cage …` a document names is checked against the **live parser** — a skill
+teaching a dead verb is the F1 class in prose. **The single best fact from the whole
+program: the floor test passes with every layer installed.** Three layers added, no
+derived number moved, either direction, all three agents.
+**Archived:** [proposal](archive/v0.41-agent-surface-layers.proposal.md) ·
+[handoff](archive/v0.41-agent-surface.handoff.md) ·
+[prompt](archive/v0.41-agent-surface.prompt.md). Living spec: `CLAUDE.md`'s
+agent-surface bullets · `cage query agent-layers` · [FORMULAS.md §2.12](FORMULAS.md).
 
 **ADOPT closed 2026-08-02 — `cage insights adoption` shipped, 995/0 ⇒ 1024/0.** Two
 halves, never blended: **A** invocations + outcomes (exact, **agent-blind** — a usage row
@@ -204,11 +272,18 @@ and **closed one version later** by WIN-GF, above. Full accounting: the v0.37.2 
 [CHANGELOG.md](../CHANGELOG.md). The mooted grep gate for removed-feature claims is
 deliberately **not** filed; raise it again if a second such claim ever ships.
 
-**HR1** — v1 removed completely in v0.36 (substrate included); v2 proposed per-commit:
-tokens/commit (join reuse) · authorship/commit (provenance aggregation, mostly built) ·
-suggested-vs-accepted (new capture, counts-only, `estimated`) · time (agent measured,
-wall-clock measured, **human only by attestation — never gap-derived**, the v1 killer).
-[Proposal](proposals/agent-vs-human-v2.md). What existed:
+**HR1 — accepted-amended 2026-08-02, graduated to a live pair.** Per-commit rebuild:
+tokens · line-level authorship · suggested-vs-kept · time — **no USD on any of these
+surfaces**. Two audit findings re-graded the build: provenance transcript capture is
+**orphaned** (zero callers — P1 re-wires it into the import sweep, with a dogfood gate
+on cage's own repo), and `latency_ms` exists only on lib-metered calls (agent time is a
+`~` turn-span elsewhere). §4 amended, not repealed: human hours may be **estimated**
+(`~`, method named in output, `max_est_gap` guard ⇒ `—`, kill-switch) and attestation
+(`*`) always wins; the v1 rate×gap valuation stays dead. Line capture: agent edit-block
+lines matched transiently against commit diffs, counts-only persisted; **human =
+residual (`human~`)**; unknown never redistributed.
+[Proposal](proposals/agent-vs-human-v2.md) · [handoff](agent-vs-human-v2.handoff.md) ·
+[prompt](agent-vs-human-v2.prompt.md). What existed before removal:
 [archived handoff](archive/v0.36-human-removal.handoff.md).
 
 **BUD-V closed 2026-08-01** — verified via `just test` on the dev machine (Python

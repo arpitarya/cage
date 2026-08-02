@@ -22,9 +22,10 @@ Naming: `<topic>.proposal.md`. Written in short points, not walls of prose.
 
 Active (awaiting Arpit's accept or a trigger):
 
-- [agent-surface-layers.md](agent-surface-layers.md) — **the agent-surface ladder**:
-  L0 hookless (the floor, never optional) → L1 hooks+steering → L2 MCP → L3 skills, each
-  optional and strictly additive. Supersedes `cage-skills.md`.
+- [chats-view.proposal.md](chats-view.proposal.md) — `cage insights chats`: one row
+  per chat (title where the store has one, id otherwise) — tokens in/out, cached
+  in/write, cost; per-agent honesty matrix; evidence:
+  [research/copilot-vscode-token-sources.md](../research/copilot-vscode-token-sources.md).
 - [agent-vs-human-v2.md](agent-vs-human-v2.md) — per-commit rebuild: tokens/commit ·
   authorship (mostly built) · suggested-vs-accepted (counts) · time (attestation only).
 
@@ -42,6 +43,15 @@ Active (awaiting Arpit's accept or a trigger):
 
 ## Graduated (implemented → archived)
 
+- **agent-surface-layers** → **IMPLEMENTED** 2026-08-02, all four phases (1024/0 ⇒
+  1125/0). L0 floor proof · L2 MCP · L1 hooks+steering · L3 skills, each opt-in and
+  proven to move no number. Living spec: `CLAUDE.md`'s agent-surface bullets ·
+  `cage query agent-layers` · [FORMULAS.md §2.12](../FORMULAS.md).
+  [archived proposal](../archive/v0.41-agent-surface-layers.proposal.md) ·
+  [handoff](../archive/v0.41-agent-surface.handoff.md) ·
+  [prompt](../archive/v0.41-agent-surface.prompt.md).
+  Carried forward: **[L1-FIELD]**, **[KIRO-MCP-FIELD]** in
+  [OPEN-WORK](../OPEN-WORK.md).
 - **cage-skills** → **superseded** 2026-08-02 by `agent-surface-layers` (its premise,
   "cage already ships a skill", was pre-hookless and false).
   [archived](../archive/v0.40-cage-skills.proposal.md)

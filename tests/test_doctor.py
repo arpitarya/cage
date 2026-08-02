@@ -57,7 +57,11 @@ def test_every_check_has_a_known_level(proj):
     res = doctorcmd.run(proj)
     names = {c["name"] for c in res["checks"]}
     assert names == {"tool", "footprint", "policy", "pricing", "prices-meta", "prices-age", "policy-version",
-                     "state", "portability", "wiring", "metering", "timeline",
+                     "state", "portability",
+                     # the price of kiro's MCP going path-free/committable: *which*
+                     # `python3` resolves, probed rather than assumed
+                     "kiro-mcp",
+                     "wiring", "metering", "timeline",
                      "capture-quality", "trace", "interceptor",
                      # the PATH-scoped pair: what actually RUNS, and what reaches
                      # graphify without passing the interceptor at all (B-fix-1/3)

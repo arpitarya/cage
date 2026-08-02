@@ -298,7 +298,8 @@ def parse_copilot_calls(events_path: Path, session: str = "") -> list[dict]:
         ts = rec.get("timestamp")
         if not isinstance(metrics, dict):
             continue
-        # `totalPremiumRequests` is a cumulative session-level billing signal (plan §2.1);
+        # `totalPremiumRequests` is a cumulative session-level billing signal
+        # (import-ledger plan §2.1 — archived; PLAN.md has no §2.1);
         # stamp only its per-shutdown delta, on the first model row, so it never multi-counts.
         cum_prem = _first_int(data, ("totalPremiumRequests", "total_premium_requests"))
         prem_delta = cum_prem - prev_prem

@@ -353,9 +353,11 @@ class Inventory(NamedTuple):
 
 class _Spec(NamedTuple):
     """One artifact a full `cage setup --wire-only --<agent>` writes. `required=False`
-    marks a piece that's normal to be missing — Kiro's project `.kiro/settings/mcp.json`
-    is gitignore-advised (kirowire.py) — so its absence must never read as a partial
-    install (handoff §8)."""
+    marks a piece that is normal to be missing, so its absence never reads as a partial
+    install (handoff §8). **Nothing is optional today** — Kiro's project
+    `.kiro/settings/mcp.json` was the only holder of that flag, and it lost it when the
+    entry went path-free and therefore committable (kirowire.py). The flag stays because
+    the next optional layer (L1 hooks are opt-in) will need it."""
     kind: str
     scope: str
     display: str
@@ -381,35 +383,64 @@ def _spec_status(display: str, commands: tuple[str, ...], committed: bool) -> tu
 # AGENT LIST itself always comes from `agents.SURFACES`, never from this table's keys
 # (see `inventory()`).
 
-# Capture is pull-based and MCP is the only wired surface (hooks/steering/instructions
-# were removed with the hook machinery), so each agent's expected set is a single MCP
-# entry. Pre-removal hook artifacts still on a real machine are never in the expected
-# set — they surface via `_leftover`/`user_artifacts` as leftover/dead rows instead.
+# Capture is pull-based, so MCP is the only **required** wired surface. The opt-in L1
+# hooks are `required=False` — absent is the default and must never read as a partial
+# install — but when present they are scanned exactly like any other artifact.
+#
+# **That scan is the point, not a bonus.** A hook whose command names a renamed verb
+# exits 1 with its output going nowhere, which is indistinguishable from cage not being
+# installed; that is the F1 failure, and it cost nine silent days. Every hook command
+# cage writes therefore goes into a spec's `commands` tuple and is checked against the
+# **live parser** — so `cage hook <event>` cannot be renamed without this turning red.
+
+def _hook_spec(display: str, n: int, commands: tuple[str, ...]) -> _Spec:
+    return _Spec("hooks", "project", display, False, bool(n), commands)
+
 
 def _claude_specs(root: Path) -> list[_Spec]:
+    from cage import claudewire
     mcp = root / ".mcp.json"
     mcp_cmd = cfgio.load_json(mcp).get("mcpServers", {}).get("cage", {}).get("command", "")
+    settings = cfgio.load_json(root / ".claude" / "settings.json").get("hooks") or {}
+    hook_cmds = tuple(h.get("command", "") for entries in settings.values()
+                      if isinstance(entries, list) for e in entries
+                      for h in e.get("hooks", [])
+                      if paths.cage_command_tail(h.get("command", "")) is not None)
     return [_Spec("mcp", "project", ".mcp.json", True, bool(mcp_cmd),
-                  (mcp_cmd,) if mcp_cmd else ())]
+                  (mcp_cmd,) if mcp_cmd else ()),
+            _hook_spec(".claude/settings.json (L1 hooks)",
+                       claudewire.hook_status(root), hook_cmds)]
 
 
 def _copilot_specs(root: Path) -> list[_Spec]:
+    from cage import copilotwire
     mcp = root / ".vscode" / "mcp.json"
     mcp_cmd = cfgio.load_json(mcp).get("servers", {}).get("cage", {}).get("command", "")
+    hooks = cfgio.load_json(root / ".github" / "hooks" / "cage.json").get("hooks") or {}
+    hook_cmds = tuple(h.get("bash", "") for entries in hooks.values() for h in entries
+                      if paths.cage_tail_any(h.get("bash", "")) is not None)
     return [_Spec("mcp", "project", ".vscode/mcp.json", True, bool(mcp_cmd),
-                  (mcp_cmd,) if mcp_cmd else ())]
+                  (mcp_cmd,) if mcp_cmd else ()),
+            _hook_spec(".github/hooks/cage.json (L1 hooks)",
+                       copilotwire.hook_status(root), hook_cmds)]
 
 
 def _kiro_specs(root: Path) -> list[_Spec]:
-    # `required=False` — Kiro's `.kiro/settings/mcp.json` keeps a per-machine absolute
-    # path (kirowire.py) and is gitignore-advised, so its absence is normal, never a
-    # partial install (handoff §8).
+    # `required=True` since the entry went **path-free** (`python3 -m cage mcp`,
+    # kirowire.py): it is committed and byte-identical like the other two, so a missing
+    # one is a genuinely partial install again. It was `required=False` only while the
+    # file had to carry a machine-absolute path and was gitignore-advised.
     mcp = root / ".kiro" / "settings" / "mcp.json"
     srv = cfgio.load_json(mcp).get("mcpServers", {}).get("cage", {})
     mcp_cmd = " ".join([srv.get("command", ""), *srv.get("args", [])]).strip()
     from cage import kirowire
-    return [_Spec("mcp", "project", ".kiro/settings/mcp.json", False,
-                  kirowire.status(root), (mcp_cmd,) if mcp_cmd else ())]
+    hook = cfgio.load_json(root / ".kiro" / "hooks" / "cage.kiro.hook")
+    hook_cmd = hook.get("then", {}).get("command", "")
+    return [_Spec("mcp", "project", ".kiro/settings/mcp.json", True,
+                  kirowire.status(root), (mcp_cmd,) if mcp_cmd else ()),
+            _hook_spec(".kiro/hooks/cage.kiro.hook (L1 hook)",
+                       kirowire.hook_status(root),
+                       (hook_cmd,) if hook_cmd else ())]
 
 
 _SPECS = {"claude": _claude_specs, "copilot": _copilot_specs, "kiro": _kiro_specs}

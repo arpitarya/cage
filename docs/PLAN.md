@@ -8,8 +8,27 @@
 > any *other* combination of tools would have cost. `$0`, stdlib-only,
 > deterministic, and independent of any single AI tool.
 
-Status: **design of record (v0.1)**. Nothing built yet. This document defines
-the category, the substrate, the attribution engine, and the build order.
+Status: **the design of record — and substantially BUILT.** This document defines the
+category, the substrate, the attribution engine, and the build order. It was written at
+v0.1 when nothing existed; cage is now shipped and on PyPI, so **read it as the contract,
+not as a plan of unbuilt work.** [IMPLEMENTATION.md](IMPLEMENTATION.md) is what is
+actually built; [OPEN-WORK.md](OPEN-WORK.md) is what is left.
+
+> **How to read this file (2026-08-02).** Its **section numbers are a live addressing
+> scheme** — ~65 source files cite `plan §X` in comments — so a superseded section is
+> **marked, never deleted or renumbered**. A section headed **REMOVED in vX.Y** is
+> correct history: the feature is gone, the anchor stays so every other citation keeps
+> resolving. Where this file and `CLAUDE.md` disagree, **CLAUDE.md wins**.
+
+> **v0.36 note — the hookless rebuild.** Cage's capture is now **pull-based**
+> (`cage import` / capture-on-read) and needs no hooks. This plan predates that and still
+> describes hook-driven capture in several places — read those as history. The
+> skill/steering machinery of §5.1 was deleted outright (that section is marked). If an
+> agent-side surface is being rebuilt, the design of record is
+> [archive/v0.41-agent-surface-layers.proposal.md](archive/v0.41-agent-surface-layers.proposal.md), not this file.
+
+> **Agent count.** `agents.SURFACES` has been **three** — claude · copilot · kiro — since
+> v0.33.0. Any "four agents" phrasing below is pre-v0.33 history.
 
 > **v0.33.0 note:** Codex was removed from cage completely (a product/scope
 > decision — see `docs/archive/*-codex-removal.handoff.md`). This plan predates
@@ -103,7 +122,7 @@ This is the invoice-grade truth; provider `usage` fields are authoritative.
 guard); empty is the legacy contract. They are **different axes**: `scope` is the
 monorepo top-level changed dir (§3.6.2); `project` is the working directory a call ran
 under (§3.7), a derived `cage report --project` view of the global ledger. Only logs that
-expose the cwd populate `project` (Claude transcripts do; Copilot/Kiro/Codex leave it
+expose the cwd populate `project` (Claude transcripts do; Copilot/Kiro leave it
 empty).
 
 ### 3.2 The savings receipt — what a tool claims it saved
@@ -417,15 +436,16 @@ views, so cleanup cannot change a reported number.
 
 `$0`/stdlib-only (glob, datetime, git shell-out — never `import git`); determinism
 (shard names from `ts`, no clock/random on read); ledger never rewritten (new write
-targets only); four agents always (`scope` + `ledger-sync` fan out to all four); method
+targets only); **three** agents always (`scope` + `ledger-sync` fan out to all three — "four" here is
+pre-v0.33 history); method
 is sacred (aggregation is a row union, not a re-derivation); no-flag byte-identity
 (`--scope`/`--team`/partitioning all default off ⇒ output identical to pre-amendment).
 
 ## 3.7 Universal capture — global ledger + explicit import/export
 
-cage is a package any user installs, often using **only** Copilot, only Codex, only Kiro,
+cage is a package any user installs, often using **only** Copilot, only Kiro,
 or any mix, in a CLI **or a VS Code extension**. Field-proven: hooks are client-specific
-and mostly don't fire (a VS Code extension never runs `.codex/hooks.json` /
+and mostly don't fire (a VS Code extension never runs a CLI agent's hook file /
 `.kiro/hooks/*.hook` / `~/.copilot/hooks`; only Claude Code's extension honors its hooks),
 yet the on-disk import works for all four, always. So capture **leads with explicit
 `cage import` / `cage data export`** over a global ledger, and cage installs **nothing in the
@@ -450,7 +470,7 @@ lands in the **global** ledger rather than scattering a stray local `.cage/` (th
 prevents scatter structurally), so a Copilot-only user is captured even via the hook.
 
 **Project as a derived view (the `project` field, §3.1).** Per-project *capture* is
-impossible for Copilot/Kiro/Codex (their logs carry no cwd), so project is only ever a
+impossible for Copilot/Kiro (their logs carry no cwd), so project is only ever a
 derived *attribution view*, exact where the log supports it. `cage report --project <name>`
 (or `--project .`/bare = cwd basename) filters the global ledger by the `project` field;
 the view is exact for Claude and silently excludes the projectless rows of the other
@@ -486,11 +506,24 @@ capture/read path); counts-never-content (no prompt bodies in any export; `proje
 basename-only); deterministic byte-identical export for the same `--since` window;
 fail-open + idempotent (a malformed `policy.toml` degrades to the bundled default, never a
 traceback); additive (the one new optional `project` field; hooks, MCP, and the
-project-local `.cage/` ledger all unchanged); four agents always.
+project-local `.cage/` ledger all unchanged); **three** agents always (pre-v0.33 text
+said four).
 
 ---
 
-## 3.8 Provider quota + estimated credits — `cage data limits` (a state snapshot, NOT a ledger)
+## 3.8 Provider quota + estimated credits — `cage data limits` · **REMOVED with Codex (v0.33.0)**
+
+**The feature described below does not exist.** There is no `cage/limits.py` and no
+`cage data limits` verb. It was removed with the Codex agent because **Codex's rollout
+JSONL `rate_limits` block was the only quota signal any supported agent ever provided** —
+with Codex gone there is no source, and cage does not invent one.
+
+`cleanup.NEVER` still protects a `limits.json` by name: that is deliberate, so a
+pre-v0.33 machine's snapshot is never deleted by a later cage. Protection of a legacy
+file, not evidence the feature lives.
+
+**Section number kept for citation stability** (see *How to read this file*). Everything
+below is history.
 
 cage meters tokens; it has no view of provider **quota/credits**. Two things are
 recoverable from data cage already touches: Codex's rollout JSONL carries a `rate_limits`
@@ -821,7 +854,7 @@ with a plugin — did the plugin pay off?* One analyst, one number, no backend.
   **`estimated`** with the different-work-mix caveat. Below `MIN_COMPARE_N`
   machines with both phases the delta refuses (coverage still prints).
 - **One-command enrollment** — `cage study join <phase>` = scaffold → wire all
-  four agents → start the phase → `cage doctor` + the cron hint for
+  all three agents → start the phase → `cage doctor` + the cron hint for
   `cage import` (cage installs no scheduler).
 
 ### 4.10 Derived human attention — **REMOVED in v0.36**
@@ -889,27 +922,21 @@ scanning files). Five landed phases (GC0–GC5), one follow-up (GC6/G1):
   (Claude Code). Targets the *protocol*, so it is not "wrap claude" — any
   OpenAI/Anthropic-compatible client is metered, none is named.
 
-### 5.1 Build-time assets — `tools/skillgen` (renders the per-host skill, $0)
+### 5.1 Build-time assets — `tools/skillgen` · **REMOVED in v0.36**
 
-The flagship `cage` skill ships four ways for the four agents — a Claude/Codex
-slash-command `SKILL.md`, a Copilot `.prompt.md`, and a Kiro steering doc (plus a
-generic `agents` Agent-Skills target). The *content* is the same pitch; only the
-host wrapper (frontmatter shape, header, trigger framing, metering note) differs.
-Hand-maintaining four files lets the wording drift. `tools/skillgen/` single-
-sources them: one shared `fragments/core/core.md` body with a few `@@SLOT@@`s
-filled per host from `platforms.toml`, rendered to the existing
-`cage/data/skills|prompts|steering/` paths (so `cage setup` / `<agent>wire.py` are
-unchanged). `python -m tools.skillgen --check` byte-diffs the render against the
-committed files **and** a tracked `expected/` snapshot and is wired into CI +
-pre-commit; `--bless` refreshes the snapshot.
+The skill/steering machinery this section described was **deleted in the hookless
+rebuild**: there is no `tools/skillgen/`, no `cage/data/skills|prompts|steering/`, and
+**no code writes a skill file anywhere**. `cage setup` wires MCP and the graphify
+interceptor; it does not install a skill.
 
-This is **build-time only** and holds the same constitution as the engine:
-stdlib-only (`tomllib`/`re`/`pathlib`/`argparse`), no runtime dependency, no
-LLM/network, deterministic (same fragments ⇒ byte-identical render, LF-normalized).
-Nothing under `tools/skillgen/` is imported by the `cage` package at runtime or
-shipped in the wheel (the `include=["cage*"]` packaging filter excludes it). The
-four-agents invariant is preserved and test-asserted — every host renders, none is
-dropped.
+Two of the section's premises are also historically wrong now: it says the skill ships
+**four ways for the four agents** — Codex was removed in v0.33.0 and
+`agents.SURFACES` has been **three** (claude · copilot · kiro) since.
+
+**The section number is kept, not deleted**, so the ~65 source files that cite `plan §`
+anchors keep a stable numbering. **Where an agent surface is being *rebuilt*, the design
+of record is [archive/v0.41-agent-surface-layers.proposal.md](archive/v0.41-agent-surface-layers.proposal.md)** —
+the L0/L1/L2/L3 ladder — not this section.
 
 ### 5.2 Error surfacing — typed CLI error + exit-code contract (fail-open preserved)
 
@@ -1029,28 +1056,31 @@ carry the Claude rows.
 
 ## 8. What else Cage should do
 
-Beyond track-and-attribute, the substrate unlocks:
+Beyond track-and-attribute, the substrate unlocks the following. **The numbered items
+below ARE §8.1 … §8.8** — five shipped modules cite those anchors
+(`budget.py` §8.1 · `quality.py` §8.2 · `regression.py` §8.3 · `recommend.py` §8.4 ·
+`forecast.py` §8.5), so the numbering is load-bearing: **never renumber this list.**
 
-1. **Cage guard (the namesake).** Budget ceilings per session/day/route from
+1. **§8.1 — Cage guard (the namesake).** Budget ceilings per session/day/route from
    `policy.toml`; `warn` or `block` on exceed. Orff already has a `CostGuard` —
    Cage subsumes it behind one ledger so dev and app share one budget brain.
-2. **Quality-adjusted cost.** Cost is dishonest alone — you can "save" by
+2. **§8.2 — Quality-adjusted cost.** Cost is dishonest alone — you can "save" by
    degrading answers. Pair every call with the `quality.signal` (task succeeded
    without human redo) and report **cost per *successful* task**, not per call.
    This is the metric that stops false economies.
-3. **Regression detection.** Alert when cost-per-task drifts up — e.g. a prompt
+3. **§8.3 — Regression detection.** Alert when cost-per-task drifts up — e.g. a prompt
    edit broke prefix-cache hits, or a route silently fell back to a pricier
    model. Deterministic threshold on the ledger.
-4. **Cheapest-path recommender.** Given a route, recommend the tool combination
+4. **§8.4 — Cheapest-path recommender.** Given a route, recommend the tool combination
    that historically minimized quality-adjusted cost — turn the matrix from a
    report into a policy suggestion.
-5. **Forecast.** Project monthly spend from the current trajectory; flag when a
+5. **§8.5 — Forecast.** Project monthly spend from the current trajectory; flag when a
    budget will blow before month-end.
-6. **Secondary ledgers, same substrate.** `unit` already generalizes — swap
+6. **§8.6 — Secondary ledgers, same substrate.** `unit` already generalizes — swap
    USD for `ms` (latency) or `gco2` (carbon) and every view works unchanged.
-7. **Per-feature cost (Orff).** Roll up by `route`/`query_type` to see which
+7. **§8.7 — Per-feature cost (Orff).** Roll up by `route`/`query_type` to see which
    Orff intents cost the most — the input to where compression/caching pays off.
-8. **Verdict (shipped, roadmap P4).** `cage insights verdict <tool>` — the one-line
+8. **§8.8 — Verdict (shipped, roadmap P4).** `cage insights verdict <tool>` — the one-line
    answer (*SAVING / COSTING / INSUFFICIENT DATA*) as a **pure composer** over
    items 2–3 plus attribution/roi/trend: it computes no new statistics, prints
    every input with its own method tag, adds a break-even line derived from roi,

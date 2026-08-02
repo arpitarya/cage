@@ -2,11 +2,27 @@
 
 A minimal Model Context Protocol server on stdio: newline-delimited JSON-RPC 2.0,
 hand-rolled so it adds no dependency. Publishes Cage's read paths — report /
-attrib / matrix / budget / roi / adoption / why — as MCP *tools*, so an agent (Claude Code,
-Kiro, Copilot) can ask "what did this cost, and what saved me money?" and
-answer from its own ledger. Every tool is deterministic and never calls an LLM.
+attrib / matrix / budget / roi / adoption / why / **verdict / compare** — as MCP
+*tools*, so an agent (Claude Code, Kiro, Copilot) can ask "what did this cost, and
+what saved me money?" and answer from its own ledger. Every read tool is
+deterministic and never calls an LLM.
 
     claude mcp add cage -- cage mcp        # or the equivalent for copilot / kiro
+
+**The refusals are the point (L2 of the agent-surface ladder).** `verdict` and
+`compare` are the two views that answer *"is this tool worth keeping"*, and both
+routinely decline to answer: `INSUFFICIENT DATA` when a tool has no receipts,
+`SAVING (GROSS)` when no cost-of-use figure exists, the `MIN_COMPARE_N` block when a
+group is too thin. Those texts cross this boundary **verbatim**, because a tool that
+returns silence where the CLI would have explained itself is worse than no tool — an
+agent reads an empty result as *zero*, which is the one thing it never means. Nothing
+here summarizes, thresholds, or re-derives; each tool renders the same string the CLI
+prints, from the same composer.
+
+**`cage_task_outcome` is the ONLY write tool in the entire ladder** — L0…L3 included.
+It exists because every starved surface (`compare`, `estimate`, `calibration`, the net
+saving) is starved for one reason: nobody closes tasks. Do **not** add a second write
+tool by analogy with it; the read/write asymmetry here is the design, not an oversight.
 """
 from __future__ import annotations
 
@@ -56,7 +72,49 @@ TOOLS = [
      "description": "Full provenance for one call id: the call + every receipt against it.",
      "inputSchema": {"type": "object", "required": ["call_id"],
                      "properties": {"call_id": {"type": "string"}}}},
+    {"name": "cage_verdict",
+     "description": "Is one tool worth keeping? The one-line answer, composed from "
+                    "attrib/roi/regression/quality — it computes no new statistic. "
+                    "READ THE VERDICT WORD LITERALLY: 'SAVING (GROSS)' means the cost "
+                    "of USING the tool is excluded and unknown, so it is NOT a proven "
+                    "saving; 'INSUFFICIENT DATA' means cage declines to answer and must "
+                    "be relayed as a refusal, never as zero or as 'no savings'.",
+     "inputSchema": {"type": "object", "required": ["tool"],
+                     "properties": {"tool": {"type": "string",
+                                             "description": "the tool name as it appears "
+                                                            "in its savings receipts"},
+                                    "since": {"type": "string"}}}},
+    {"name": "cage_compare",
+     "description": "Observational cost comparison between tool stacks over closed "
+                    "tasks — the measured counterpart to verdict's modeled answer. "
+                    "Group totals are measured; the delta is always 'estimated' and "
+                    "carries an observational caveat (the groups were not randomized). "
+                    "A group with too few tasks is BLOCKED with its own n — relay that "
+                    "refusal verbatim rather than comparing the numbers anyway.",
+     "inputSchema": {"type": "object", "properties": {
+         "by": {"type": "string", "default": "stack",
+                "description": "comma-separated: stack, scope, label"},
+         "scope": {"type": "string"}, "label": {"type": "string"}, "format": _FORMAT}}},
+    # ── the one write tool in the whole ladder — see the module docstring ──────
+    {"name": "cage_task_outcome",
+     "description": "Close a task as ok or redo (optionally with a one-token label). "
+                    "THE ONLY WRITE TOOL CAGE EXPOSES. Append-only: it never rewrites "
+                    "history, and re-closing a task supersedes rather than edits. Call "
+                    "it when a unit of work finishes — compare/estimate/calibration can "
+                    "say nothing at all about tasks nobody closed.",
+     "inputSchema": {"type": "object", "required": ["task"], "properties": {
+         "task": {"type": "string", "description": "the task id used when metering"},
+         "redo": {"type": "boolean", "default": False,
+                  "description": "true = the work had to be redone (not a success)"},
+         "label": {"type": "string",
+                   "description": "optional grouping key — ONE short token "
+                                  "(letters/digits/._-, <=32 chars). Never a path, a "
+                                  "sentence, or a commit message."}}}},
 ]
+
+# Tool names that mutate. Everything not listed is a pure read — the split is explicit
+# so "is this server safe to auto-approve" is answerable by reading one line.
+WRITE_TOOLS = frozenset({"cage_task_outcome"})
 
 
 def _root() -> Path:
@@ -108,6 +166,38 @@ def _call(name: str, args: dict) -> tuple[str, dict | None]:
     elif name == "cage_why":
         cid = args["call_id"]
         text = provenance.render_why(provenance.explain(root, cid), cid)
+    elif name == "cage_verdict":
+        from cage import verdict
+        if not args.get("tool"):
+            raise ValueError("cage_verdict needs a 'tool' name (as it appears in its "
+                             "savings receipts) — try cage_roi to list the tools on file")
+        # `verdict.compose` is a pure composer and `render_verdict` is the CLI's own
+        # renderer — so INSUFFICIENT DATA / SAVING (GROSS) / the ⚠ gross note reach the
+        # agent as the exact text a human would read. No summarizing layer here, ever.
+        text = verdict.render_verdict(
+            verdict.compose(root, _pol(root), args["tool"], since=args.get("since")))
+    elif name == "cage_compare":
+        from cage import compare
+        by = tuple(k.strip() for k in (args.get("by") or "stack").split(",") if k.strip())
+        bad = [k for k in by if k not in ("stack", "scope", "label")]
+        if bad:
+            raise ValueError(f"unknown by key(s) {bad}; choose from stack, scope, label")
+        data = compare.summarize(root, _pol(root), by=by, scope=args.get("scope"),
+                                 label=args.get("label"))
+        # The MIN_COMPARE_N block is *inside* this structure (per-group `reason`), so it
+        # survives into both renderings — CSV included, where a blocked group keeps its
+        # row rather than vanishing into an apparently-complete table.
+        text = compare.render_csv(data) if as_csv else compare.render_compare(data)
+    elif name == "cage_task_outcome":
+        # The ONLY write tool cage exposes (module docstring). It goes through the same
+        # `clicmds.close_task` the CLI verb uses — same label guard, same append-only
+        # write, same confirmation wording — so the two surfaces cannot diverge.
+        from cage import clicmds
+        if not args.get("task"):
+            raise ValueError("cage_task_outcome needs the 'task' id the work was "
+                             "metered under — closing an unnamed task is not possible")
+        text = clicmds.close_task(root, args["task"], redo=bool(args.get("redo")),
+                                  label=args.get("label") or "")
     else:
         raise ValueError(f"unknown tool '{name}'")
     return text, summary

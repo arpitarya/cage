@@ -388,10 +388,14 @@ def _is_machine_absolute_cage(command: str) -> bool:
 def _portability(root: Path) -> tuple[str, str]:
     """No committed wired file may carry a machine-absolute cage path — teammates'
     clones get broken wiring. Also verifies the committed shim exists, kept its
-    execute bit, and actually resolves cage on THIS machine. The single documented
-    exception (`kirowire.py`): .kiro/settings/mcp.json is absolute by necessity —
-    Kiro spawns MCP servers from its install dir with no workspace variable — so it
-    is reported as gitignore advice, never rewritten to a broken relative path."""
+    execute bit, and actually resolves cage on THIS machine.
+
+    **There is no exception left.** `.kiro/settings/mcp.json` was one — Kiro spawns MCP
+    servers from its install dir with no workspace variable, so neither the shim nor a
+    variable works there — until it went **path-free** (`python3 -m cage mcp`,
+    `kirowire.py`), which carries no path at all. A kiro entry still holding an absolute
+    path is now a *finding with a fix*, not standing advice. What that form costs is
+    checked separately, by `_kiro_mcp`."""
     from cage import cfgio, runshim
     cmds = _committed_commands(root)
     shim = runshim.shim_path(root)
@@ -430,11 +434,12 @@ def _portability(root: Path) -> tuple[str, str]:
                 problems.append(f"shim failed to run (exit {r.returncode})")
         except Exception as exc:  # noqa: BLE001 — diagnosis must not crash doctor
             problems.append(f"shim run check skipped: {exc}")
-    kiro_mcp = root / ".kiro" / "settings" / "mcp.json"
-    if "cage" in cfgio.load_json(kiro_mcp).get("mcpServers", {}):
-        notes.append("kiro MCP stays machine-absolute by necessity (Kiro spawns MCP "
-                     "servers from its install dir) — add .kiro/settings/mcp.json "
-                     "to .gitignore")
+    kiro = cfgio.load_json(root / ".kiro" / "settings" / "mcp.json") \
+        .get("mcpServers", {}).get("cage") or {}
+    if kiro and _is_machine_absolute_cage(kiro.get("command", "")):
+        problems.append("kiro MCP still carries a machine-absolute cage path — it is "
+                        "committable now via the path-free form; re-run "
+                        "`cage setup --wire-only --kiro`")
     # Wiring mode (docs/restricted-environments.md): the mode lives in project policy;
     # the on-disk shim carries a marker in its launcher variant. Report which is
     # active, and warn on drift (policy flipped but `cage setup` not re-run).
@@ -450,6 +455,53 @@ def _portability(root: Path) -> tuple[str, str]:
         return _WARN, "; ".join(problems + notes)
     detail = f"mode: {mode} · committed wiring is portable (no absolute cage paths)"
     return _OK, "; ".join([detail] + notes) if notes else detail
+
+
+def _kiro_mcp(root: Path) -> tuple[str, str]:
+    """Can the interpreter Kiro will resolve actually import cage?
+
+    Going path-free (`python3 -m cage mcp`) is what made `.kiro/settings/mcp.json`
+    committable — but it buys portability with a dependency on *which* `python3` wins
+    on PATH. If cage lives in a virtualenv that interpreter is not in, the MCP server
+    fails to start **and says nothing**: Kiro shows no cage tools and no error. That is
+    the same silent-capture class as F1, one layer up, so it is checked rather than
+    assumed.
+
+    The probe is the honest one — resolve the command, then ask *it* to import cage.
+    Nothing else can answer the question (a same-name interpreter is not the same
+    environment). Fail-open: a probe that cannot run reports itself, never crashes
+    doctor and never claims a pass."""
+    import os as _os
+    import subprocess
+    from cage import cfgio, kirowire
+    server = cfgio.load_json(root / ".kiro" / "settings" / "mcp.json") \
+        .get("mcpServers", {}).get("cage") or {}
+    if not server:
+        return _OK, "kiro MCP not wired here — nothing to check"
+    cmd = server.get("command", "")
+    if cmd not in (kirowire.PATH_FREE["command"], kirowire.PATH_FREE_WIN["command"]):
+        return _OK, f"kiro MCP uses {cmd!r} (not the path-free form) — interpreter probe skipped"
+    resolved = shutil.which(cmd)
+    if not resolved:
+        fix = ("run `cage setup --python-launcher` to write the `py -3` form for this "
+               "machine (machine-specific — gitignore .kiro/settings/mcp.json on a "
+               "mixed-OS team)" if _os.name == "nt" else
+               f"put a {cmd!r} on PATH, or re-run `cage setup --wire-only --kiro`")
+        return _FAIL, f"kiro MCP names {cmd!r} but nothing by that name is on PATH — " \
+                      f"Kiro will start no cage server, silently; {fix}"
+    try:
+        r = subprocess.run([resolved, "-c", "import cage"],
+                           capture_output=True, text=True, timeout=15)
+    except Exception as exc:  # noqa: BLE001 — a diagnostic never takes doctor down
+        return _WARN, f"kiro MCP interpreter probe skipped ({exc}) — could not confirm " \
+                      f"{resolved} imports cage"
+    if r.returncode != 0:
+        return _FAIL, (f"kiro MCP resolves {cmd!r} → {resolved}, which CANNOT import "
+                       f"cage — the server will fail to start and Kiro will show no "
+                       f"error. Install cage for that interpreter "
+                       f"(`{resolved} -m pip install cage-flux`) or re-run `cage setup "
+                       f"--python-launcher` from the environment cage lives in")
+    return _OK, f"kiro MCP is path-free and committable; {cmd!r} → {resolved} imports cage"
 
 
 def _wiring(scan) -> tuple[str, str]:
@@ -857,6 +909,9 @@ def run(root: Path) -> dict:
         ("policy-version", *_policy_version(active)),
         ("state", *_state_dir(active)),
         ("portability", *_portability(root)),
+        # Directly below `portability`: going path-free is what made kiro's MCP config
+        # committable, and this is the condition that buys — read them together.
+        ("kiro-mcp", *_kiro_mcp(root)),
         # `wiring` must render ABOVE `receipts`: a dead verb is the *reason* receipts
         # can be empty, and the receipts line points back up at it.
         ("wiring", *_wiring(scan)),

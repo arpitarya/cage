@@ -1,103 +1,133 @@
 ---
 doc: proposal — agent-vs-human measurement, v2 (per-commit)
-status: proposed
+status: accepted 2026-08-02 (amended in session; graduated to handoff)
 raised: 2026-08-01 (Arpit)
+amended: 2026-08-02 (Arpit — commit views, line-match capture, §4 estimator lifted with guards)
 supersedes-context: the Tier-1 human axis, removed v0.36 (archive/v0.36-human-removal.handoff.md)
+handoff: ../agent-vs-human-v2.handoff.md · prompt: ../agent-vs-human-v2.prompt.md
 ---
 
 # Proposal — agent-vs-human, rebuilt per-commit
 
 **The v1 axis died because it invented precision** (a turn-gap heuristic priced at an
 hourly rate, read as measured). **v2 anchors every number to a commit** — a real,
-inspectable unit of work — and grades each of the four asks by what its source can
-actually carry. Two are buildable on existing substrate; one is genuinely new capture;
-one is the trap that killed v1 and gets the strictest treatment.
+inspectable unit of work — and grades each ask by what its source can actually carry.
+**No USD appears anywhere on these surfaces** (Arpit, 2026-08-02): tokens and hours
+only; valuation stays in the reader's spreadsheet.
 
-## The four asks, graded
+## Two findings that re-graded the build (2026-08-02 code audit)
+
+1. **Provenance capture is orphaned.** `transcript.parse_provenance` and
+   `originrecord.record_transcript` have **zero callers** — the hookless rebuild
+   removed the SessionEnd trigger and nothing re-wired it. `provenance.jsonl` gains
+   rows only via `--attest` today. So ask #2 is *read-surface built, capture dead*:
+   on a real repo the unknown-rate is ~100% until the import sweep learns to write
+   provenance. The sha-resolution question (which commit does a late-imported edit
+   belong to?) is the real design decision — answered below by the same
+   commit-window join #1 uses.
+2. **`latency_ms` is set only by the library meter** (`metering.py`). Transcript-
+   imported calls — the dominant real source — carry `latency_ms=0`. "Agent time:
+   measured, already captured" holds only for lib-metered traffic; everywhere else
+   agent time is a **turn-span** (first→last turn ts in the joined window), which
+   includes human think-time between turns and is therefore `modeled`, labeled.
+
+## The four asks, re-graded
 
 | # | ask | source exists? | honest method | verdict |
 |---|---|---|---|---|
-| 1 | tokens per commit | mostly | `measured` calls, `modeled` join | **build** |
-| 2 | human vs agent authorship per commit | **yes — provenance** | `transcript`/`heuristic` | **mostly built** |
-| 3 | suggested vs accepted | partially | `estimated`, counts only | **build, coarse** |
-| 4 | time: human vs agent vs combined | **no** | see below | **strict limits** |
+| 1 | tokens per commit | mostly | `measured` counts, `modeled` join | **build** (task-join reuse + new commit-window fallback) |
+| 2 | human vs agent authorship per commit | read side yes, **capture orphaned** | `transcript` + line-match, `estimated` residual | **build: re-wire capture, then aggregate** |
+| 3 | suggested vs kept | partially | `estimated`, counts + line-match | **build — line-grain now honest via exact-match** |
+| 4 | time: human vs agent vs wall | agent: partial · human: no | see §4 (amended) | **build with guards** |
 
-### 1. Tokens per commit
+## The line-match capture design (the mechanism behind #2 and #3)
 
-Cage already has both ends: calls carry `ts`/`session`, and the task record
-git-snapshots a SHA at task close (`tasks.py`). What's missing is the join.
+Never observe the human — observe the agent precisely; the human emerges as the
+residual.
 
-- **Design:** a commit's tokens = calls in the window between the previous task-close
-  SHA and this one, joined task-id-first, session-window fallback — the *same* join
-  `taskgroup.py` already implements for the cost-impact surface. Reuse it; do not
-  build a second join.
-- **Method:** token counts `measured`; the commit attribution `modeled` (the window is
-  an inference). A commit with no joinable calls reads **unattributed**, never zero.
-- **Surface:** `cage report --by commit` (or `insights commits`), CSV column parity.
+- **Agent lines (direct evidence).** Claude transcript `Edit`/`Write`/`MultiEdit`/
+  `NotebookEdit` tool-use blocks carry the exact proposed text. At import: normalize
+  each proposed line (strip whitespace), compare **transiently, in memory** against
+  the added lines of `git show <sha>` for commits in the session's window. A match =
+  agent-kept line. **Only counts are persisted — never line bodies, never hashes.**
+- **Suggested vs kept falls out free.** `suggested` = proposed-line count; `kept` =
+  exact-match count; `landed-modified` = file landed, lines diverged; `dropped` =
+  proposed file absent from the diff; `not-proposed` = in the commit, never proposed
+  (the human-contribution shadow, for free from the same set-difference).
+- **Human lines = residual, always `~`.** An added line matching no joined agent
+  proposal is human-or-unknown. "Not the agent" is the actual observation, so the
+  label is `human~` (`estimated`), never `human`.
+- **Unknown is a first-class bucket.** Lines below the minimum-content gate (`}`,
+  blanks, bare imports), formatter-reflowed lines, binary files, and rebased/squashed
+  commits whose recorded shas dangle. Unknown is shown, **never redistributed**.
+- **Corroboration & override.** Where CLI hooks fire, `hooked` rows corroborate and
+  bump confidence (machinery already in `originrecord`). `--attest` stays the only
+  path to an unmarked `human`.
+- **Out:** keystroke/editor telemetry (no source cage is allowed to want); git author
+  identity (agents commit as you — proves nothing).
+- **Coverage is per-agent and stated:** Claude transcripts are edit-parseable today;
+  Copilot/Kiro are not — their rows read `—` with the reason named, never 0.
 
-### 2. Human vs agent authorship per commit
+## §4 amended — time (Arpit, 2026-08-02: estimator lifted, with guards)
 
-**Provenance already answers this** (plan §3.5): `origin ∈ {human, agent,
-agent-autonomous}` per file per commit, `origin="human"` only by attestation, unknown
-derived from absence. What v2 adds is only an *aggregation*: per-commit file/line
-counts by origin, and a repo-level trend.
+- **wall-clock**: commit-to-commit timestamps — `measured`, elapsed-not-effort caveat.
+- **agent**: `latency_ms` sum where present (`measured`, lib-metered only); else
+  turn-span, rendered with `~` and named as a span.
+- **human**: two tiers, visibly distinct —
+  `*` **attested** (`cage task time 45m`) — user-asserted, always wins;
+  `~` **estimated** = wall-clock − agent span, floored at 0, and **refused (`—`)
+  when the commit gap exceeds `[authorship] max_est_gap`** (default 4h) — beyond
+  that the estimate is fog, and fog is not rendered.
+- **Standing guards (the v1 lesson, kept):** no hourly rate, no USD, no valuation —
+  ever, on any of these surfaces. The estimator's method is named in the view's own
+  footnote, not a doc. Config kill-switch (`[authorship] estimate_hours = false`).
+  The v1 mistake — a rate × an inferred gap read as measured — stays dead.
 
-- **Design:** a derived view over `provenance.jsonl` — zero new capture, zero schema
-  change. `cage authorship summary [--since]`: N commits, files by origin, the
-  unknown-rate stated first (it is the honesty headline, not a footnote).
-- **Trap to preserve:** `unknown` is a read-time default, never a written row. The
-  summary must show unknown as unknown — an "agent wrote 80%" claim with a 40%
-  unknown-rate is fog.
+## The two surfaces (spec'd 2026-08-02; mocks in the handoff)
 
-### 3. Suggested vs accepted
+1. **List — `cage insights commits`**: one row per commit: sha · date·time ·
+   tok in / tok out / cache read / cache write · human hrs (`*`/`~`/`—`) ·
+   agent/human/unknown % split (share of classified kept added-lines; unknown shown,
+   never folded). Σ totals row; unattributed commits excluded-and-counted, never
+   zeroed. Footnotes carry: estimator method, join method (task-id vs window vs
+   unattributed), per-agent exclusions (copilot-CLI shutdown ts, kiro import-time ts).
+2. **Detail — `cage insights commit <sha>`**: tokens block (in/out/cache r/w) ·
+   origin line (confidence + method; human only by attestation, unknown by absence) ·
+   lines block (total +/−, agent / human~ / unknown) · suggested vs kept
+   (verbatim / landed-modified / dropped / not-proposed **counts** — never an
+   accept-%) · per-file table · time line (wall / agent span~ / human `*`|`~`|`—`) ·
+   Σ suggested/kept totals.
 
-New capture, and only coarsely knowable. The transcript contains what the agent
-*proposed* (tool-use edit blocks); the commit contains what *landed*. Neither contains
-what happened in between (manual tweaks, partial staging, rebases).
+Both: `--json` in the `cage.v1` envelope, CSV column parity, deterministic output.
 
-- **Design:** at task close, per file: agent-proposed edit count (from the transcript
-  cage already parses) vs whether the file appears in the commit diff — yielding
-  **proposed · landed · landed-modified · dropped** *counts* (PII guard: counts and
-  paths only, never bodies — same widening provenance already justified).
-- **Method: `estimated`, always.** Line-level accept-rates are NOT claimable — a
-  landed-but-modified file is not "accepted 80%", it is `landed-modified`. The enum is
-  the honest resolution; percentages of it are not.
-- **This is the genuinely novel metric** — nothing on the market reports it — and the
-  most likely to be over-read. The view ships with the caveat in the output, K3-style.
+## Scenario honesty matrix (what each ask renders, per situation)
 
-### 4. Time — human vs agent vs combined
+| scenario | tokens | authorship / lines | suggested-kept | time |
+|---|---|---|---|---|
+| clean loop (task closed, 1 commit) | full join | agent lines matched | full | wall · span~ · human `*`/`~` |
+| multi-commit task | per-commit via ts sub-windows, `modeled` | per-commit via edit-ts | per-commit | span unsplittable → task grain |
+| pure human commit | **unattributed** | 100% human~/unknown | "no proposals recorded" | wall only |
+| no task discipline | commit-window join carries all | same | same | wall + span~ |
+| copilot CLI / kiro | excluded + counted (unjoinable ts) | `—`, reason named | `—` | wall only |
+| copilot VS Code | window-joinable (per-request ts) | `—` (no edit parsing) | `—` | wall |
+| two agents interleaved | split by session | residual after **all** agents | per-agent; both-proposed = contested | spans never summed |
+| squash/rebase/amend | anchors gone → unattributed | **unmatched** bucket (own honesty line) | unreliable, flagged | skipped |
+| human tweaks agent files | normal | agent stands at file grain; line grain catches the tweak | landed-modified | normal |
 
-**The v1 killer. The source for "human time" still does not exist** — a turn gap is
-not attention (lunch, meetings, another repo). What each column can honestly be:
+## Shape of the build (graduated — see handoff)
 
-- **agent time:** `measured` — transcript turn durations / `latency_ms` already
-  captured. Buildable today.
-- **combined wall-clock per commit:** `measured` — commit-to-commit timestamps, with
-  the multi-tasking caveat stated (wall-clock ≠ effort).
-- **human time:** **not derivable passively. Refuse it.** Two honest options only:
-  (a) explicit attestation, `cage task time 45m` (the `--attest` pattern provenance
-  already uses — user-asserted, labelled as such); (b) absent attestation, the column
-  prints `—` with "not recorded", never a gap-derived guess.
-- **The v1 mistake — a rate × an inferred idle-capped gap — is explicitly out.**
-  Reopening it requires new *evidence* the gap signal can be validated (e.g. a user
-  study correlating gaps with attested time), not a new heuristic.
-
-## Shape of the build (if accepted)
-
-Order: **#2 (aggregation only) → #1 (join reuse) → #4 agent+wall columns → #3 (new
-capture) → #4 human-attestation**. Each stage ships alone; none blocks the next.
-Substrate impact: #1/#2/#4 none; #3 adds one additive optional task-record field
-(proposed/landed counts) — plan §3 change, additive like `scope`/`project`.
+**P1** capture re-wire + line-match into the import sweep (substrate; ends with a
+dogfood run on cage's own repo reporting match/unknown rates) → **P2** commit-window
+join (`commitjoin.py`) → **P3** the two views + `authorship summary` → **P4** time:
+attestation verb + guarded estimator. Each phase ships alone, suite green.
+Substrate impact: additive-optional fields only (provenance counts; task
+`human_minutes`); no new row kinds; `CALL_FIELDS` untouched.
 
 ## Deliberately not proposed
 
-- Any hourly-rate valuation of human time (v1's `[human.rate]`) — valuation belongs to
-  the reader's spreadsheet, not cage's ledger.
-- Gap-derived attention in any form, per the veto above.
-- Line-level accept percentages (#3's enum is the resolution the source supports).
-
-## Trigger / next step
-
-Arpit accepts (possibly amending grades) → #2 graduates to a handoff first — it is
-aggregation over existing rows, provable in an afternoon, and its unknown-rate line
-will immediately show how good the provenance capture actually is on a real repo.
+- Any USD/valuation on these surfaces (list, detail, summary) — reader's spreadsheet.
+- Line-level accept **percentages** — the counts enum is the resolution the source
+  supports; 84% renders as "verbatim share of suggested", never a score.
+- Rewritten-history reconciliation (patch-id chasing) — dangling shas are counted
+  as `unmatched`, never chased.
+- Keystroke, editor, or attention telemetry of any kind.

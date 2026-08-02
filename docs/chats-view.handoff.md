@@ -1,0 +1,140 @@
+# Handoff: CHATS-VIEW — `cage insights chats` (per-chat detail view)
+
+**One-liner:** one row per chat across claude/copilot/kiro — titled where the store
+has a title — calls · tokens in/out · cached read/write · premium · cost, derive-time
+only.
+**Owner / executor:** Claude Code.
+**Status:** Ready to build.
+**Stress-tested (2026-08-02):** challenged: (a) *new verb vs `report` flag* — survives:
+manifest rows are per-sweep increments, not totals, so the ledger group-by is required
+and `insights` is the precedent home (adoption); (b) *the manifest title join* — the
+debate surfaced two real gaps now IN the spec: stale titles (a manifest row appears
+only when rows append) and legacy sessions with no name row → id display, both stated
+honestly, never patched over; (c) *unbounded table* → top-20 default with a **counted**
+footer cut + `--all` (no-silent-caps law); (d) *PII drift into team surfaces* →
+local-only by construction, no `--team`, and a money-independence test pins the
+carve-out. Residual risk: manifest name quality varies by agent — that is the design
+(honest `""` → id), not a defect.
+
+## 1. Context & background
+
+Design of record: [docs/proposals/chats-view.proposal.md](proposals/chats-view.proposal.md)
+(the *How it works* five steps + the per-agent honesty matrix are binding spec).
+Evidence: [docs/research/copilot-vscode-token-sources.md](research/copilot-vscode-token-sources.md).
+The substrate already carries every numeric column (`cached_in`, `cache_write_in`,
+`premium` are on call rows); titles are already lifted into `imports.jsonl` at import.
+This view is pure derive + one scoped law amendment (labels-only manifest read).
+
+## 2. Definition of done
+
+- [ ] `cage insights chats [--since] [--agent] [--all] [--csv [dest]] [--usd] [--no-import]`
+      works on a real ledger and an empty one (empty ⇒ a friendly empty-state, exit 0).
+- [ ] One row per `(agent, surface, session)`; columns:
+      `chat · agent · surface · calls · tokens_in · cached_in · cache_write · tokens_out · premium · cost`.
+- [ ] Title from `imports.jsonl` last-write-wins per `(agent, session)`; no name ⇒
+      short session id; kiro-IDE ⇒ single `kiro (no session identity)` row + footnote;
+      kiro absent under routing ⇒ `report.kiro_routed_line` reused.
+- [ ] Top-20 default, `tokens_in` desc then session id; cut count footnoted
+      (`… N more chats — --all to show`); `--all` lifts it.
+- [ ] Money-independence test green: deleting `imports.jsonl` changes **zero** numeric
+      cells (labels only). Determinism test: same inputs ⇒ byte-identical output.
+- [ ] UNPRICED counted per row (never silent $0); legacy-human rows excluded, counted,
+      footnoted; `—` in text where an agent can't say; those cells absent in CSV.
+- [ ] CSV twin (`render_csv` beside `render_chats`, one shared data structure, LF,
+      RFC-4180); golden fixture(s) added and blessed; full suite green.
+- [ ] `cage query chats-view` concept entry (explain_data) with `code_refs`+`plan_ref`;
+      capture-on-read honored (`importcmd.ensure_captured`, `--no-import` suppresses;
+      determinism/golden suites pin it OFF).
+- [ ] Documentation updated per §9.5.
+
+## 3. Scope
+
+**In:** new `cage/chats.py` (summarize/render/render_csv) · `clicmds.cmd_chats` ·
+`cli.py` insights subparser + help-group line · manifest label join + the one-sentence
+contract amendment in `manifest.py`'s docstring · tests · docs.
+**Out (explicit):** "lines suggested" in any form · MCP `cage_chats` tool · `--team` /
+any name leaving the machine · copilot credits/cached capture (COPILOT-CREDITS owns
+it) · any substrate/schema change · any manifest write-side change · backfilling
+names for legacy sessions.
+
+## 4. Current state
+
+- Repo: `~/my_programs/cage`. Read first: `cage/adoption.py` (the structural template:
+  summarize → render → render_csv, refusal discipline), `cage/importcmd.py`
+  `_write_manifest`/`_lift_names` (the bucket key + name semantics), `cage/manifest.py`
+  (read side + the never-read contract being amended), `cage/report.py`
+  (`_is_legacy_human`, `kiro_routed_line`, since-handling), `cage/display.py`,
+  `cage/csvout.py`, `cage/prices.py` (`call_usd_match`).
+- Wiring pattern: `cli.py` insights group (`adoption` block ~L269) → `clicmds.cmd_adoption`
+  (~L132) → module. Copy that shape exactly.
+- Tests to mirror: `tests/test_adoption.py`, `tests/test_output_spec.py` (goldens —
+  bless with `CAGE_BLESS_GOLDENS=1`).
+
+## 5. Technical approach (decided — do not re-litigate)
+
+- **Key = `(agent, surface, session)`; title = label only.** Titles are mutable/
+  non-unique/late (research §3) — never a group key.
+- **Option A carve-out**: chats reads `manifest.read_imports` for `session_name` only;
+  amendment sentence in the proposal is the wording to add to `manifest.py`'s
+  docstring ("never read by a derived **money** view; …labels only").
+- **Ranking/truncation**: top-20 via a new `constants.CHATS_DEFAULT_ROWS = 20`
+  (policy-preferred fallback NOT needed — a flag, not policy).
+- **Pricing**: per-call `prices.call_usd_match` at derive time, same as the manifest
+  bucketing does; `--usd` through `display.Display` (tokens default).
+- **Stale/legacy titles are accepted behavior**, stated in the explain entry.
+
+## 6. Non-negotiables / constraints
+
+- **$0 / stdlib only**; derive-time only — the ledger is never rewritten.
+- **Determinism law**: no clocks/random; same ledger+policy+manifest ⇒ same bytes.
+- **Method law**: nothing here invents a `measured` anything; cost cells follow
+  `call_usd_match` tags (footnote match classes like report does).
+- **Honesty rules**: `—` never means 0; refusals render, never vanish; no fabricated
+  names; cut rows counted.
+- **Do not touch:** schema.py enums/fields · ledger write path · `_write_manifest` ·
+  hooks/wiring modules · `verbmap` (new verb, nothing removed).
+- **State files stay unread** except the ONE carve-out; `usage rows`/`state/` never
+  price anything.
+
+## 7. Dependencies & prerequisites
+
+None external. Builds on the existing manifest (v0.40+ ledgers have names; older ones
+degrade to ids by design). No new config keys.
+
+## 8. Edge cases & risks
+
+- Empty ledger → empty-state text, exit 0. · Manifest missing/corrupt line → skip
+  line, labels degrade, numbers unaffected (fail-open read). · Duplicate titles → two
+  rows (key is id). · Session spanning months → `--since` may split totals; footnote
+  the window like report. · kiro routed → absent locally + `kiro_routed_line`. ·
+  Truncated ledger tail → `ledger.read` already tolerates. · A name containing
+  control chars → sanitize for terminal width only, never rewrite the manifest.
+
+## 9. Testing & validation
+
+- `tests/test_chats.py`: grouping math · title join last-write-wins · money
+  independence (delete manifest, numbers byte-identical) · determinism · truncation
+  footer · kiro single-row + routed-line · legacy-human exclusion footnote · CSV twin
+  parity · UNPRICED counting.
+- Goldens: text output fixture(s) per state (empty · titled · untitled · truncated).
+- Run: `just test` (expect current count + new tests, 0 fail).
+
+## 9.5 Documentation impact
+
+- [ ] **CLAUDE.md** — new view in the Architecture flow line + a short bullet
+      (derived views list); ⚠️ propose the edit, surface for Arpit's review.
+- [ ] **README** — command list + a line in the read-surface section (user-facing).
+- [ ] **CHANGELOG** — entry under the next unreleased version.
+- [ ] **FORMULAS.md** — §: chats-view columns (source field per column, no new math).
+- [ ] **docs/PLAN.md** — plan entry (graduation per the proposal lifecycle).
+- [ ] **explain_data.py** — `chats-view` concept entry (ships in the binary).
+- [ ] **DOC-REGISTRY** — bump touched rows. **GLOSSARY** — "chat (view)" term.
+- [ ] **OPEN-WORK** — delete CHATS-VIEW row after IMPLEMENTATION.md records the build.
+- [ ] **manifest.py docstring** — the carve-out sentence (this IS the contract text).
+- N/A: ADR (the carve-out is recorded in the proposal + module contract; promote to an
+  ADR only if a second consumer ever appears — the proposal's reopen trigger).
+
+## 10. Open questions
+
+- OPEN QUESTION (naming only, non-blocking): column header `cache_write` vs
+  `cache_w` for narrow terminals — executor picks what fits 100 cols, golden pins it.

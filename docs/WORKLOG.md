@@ -12,6 +12,390 @@ by milestone) — the worklog is what *happened this session*.
 
 ---
 
+## 2026-08-02 (Cowork) — PROMPT-PROGRESS: prompt docs must state how much is done
+
+- **Asked:** Arpit — "whenever a prompt is generated i want to see the percentage of
+  work done; always add it in the CLAUDE.md."
+- **Decided (his two calls, asked before writing):** it binds **`docs/*.prompt.md`
+  only** (not every agent reply), and the denominator is **that feature/program's own
+  phases** — not the OPEN-WORK queue (no fixed total) and not an effort guess.
+- **Done:** new Must-Know bullet in CLAUDE.md beside the model-tier rule — a
+  `**Progress:**` line under `**Model:**`, three constraints (countable denominator ·
+  count against evidence not ticks, the OPEN-WORK ✅ trap · a partial phase doesn't
+  count, say it in words) · `0% — not started` → `100%` in the archiving change ·
+  updated in the same change as the work. Doc-discipline pointer updated to name both
+  prompt-doc rules. Applied on contact to the live pair
+  ([agent-vs-human-v2](agent-vs-human-v2.prompt.md) 0%,
+  [chats-view](chats-view.prompt.md) 0%) and to the just-archived
+  [v0.41-agent-surface](archive/v0.41-agent-surface.prompt.md) (100%, P0–P3).
+- **Found:** `agent-vs-human-v2.prompt.md` had **no `**Model:**` line at all** — a
+  standing violation of the older prompt-doc rule. Added **Opus** with the reason
+  (P1 is a substrate re-wire behind a STOP-capable gate; the commit-window join is
+  diagnosis), flagged in-file for Arpit to confirm.
+- **Open:** confirm that Opus tier. Nothing else; no code moved, suite untouched.
+- **Next:** none from this exchange — the queue is unchanged (NET-1 still next).
+
+## 2026-08-02 (Cowork) — CHATS-VIEW picked up: detailed design + handoff/prompt pair
+
+- **Asked:** detailed proposal on how the chats view works, then the handoff and
+  Claude Code prompt.
+- **Done:** [proposals/chats-view.proposal.md](proposals/chats-view.proposal.md)
+  rewritten as the design of record (the five-step mechanism, the carve-out wording,
+  known honesty limits) + the pair: [chats-view.handoff.md](chats-view.handoff.md) ·
+  [chats-view.prompt.md](chats-view.prompt.md) (**Sonnet** — additive, fully specced).
+  Indexed in docs/README Active work; OPEN-WORK row → ready to execute.
+- **Debate gate (blocked-capable, run before packaging):** survived with amendments
+  now in spec — stale-title honesty (manifest rows only on appended rows), legacy
+  sessions display ids (never backfilled), top-20 counted truncation + `--all`
+  (no-silent-caps), local-only/no `--team` with a money-independence test pinning
+  the labels-only manifest read.
+- **Open:** one non-blocking naming question (cache_write column header width) —
+  executor picks, golden pins.
+- **Next step:** run the prompt in Claude Code (Sonnet) — build after COPILOT-CREDITS
+  if the copilot columns should fill on arrival, or before it (columns land empty-honest).
+
+## 2026-08-02 (Cowork) — CHATS-VIEW proposed: per-chat detail view, titled where the store has a title
+
+- **Asked:** can cage show a detailed per-chat view (kiro/claude/copilot) by chat
+  title — tokens in/out, cached in/out, lines suggested? Proposal if yes.
+- **Done:** [proposals/chats-view.proposal.md](proposals/chats-view.proposal.md) —
+  verdict YES, derive-time only; the substrate already carries every numeric column
+  (`cached_in` = cache reads, `cache_write_in` = the honest "cached out"). Per-agent
+  honesty matrix: claude full · copilot-vscode titled but uncached (store limit, see
+  research doc) · copilot-cli cached but untitled · kiro-ide ONE unsplittable row ·
+  kiro-cli credits-only per cwd.
+- **The crux decided in the proposal:** titles live only in `imports.jsonl`, which is
+  "never read by any derived view" — proposed option A: a scoped carve-out (chats
+  joins `session_name` for **labels only**; money cells stay ledger+policy-pure;
+  deleting the manifest must change zero money cells, tested).
+- **Deliberately not taken:** "lines suggested" — no agent store persists it;
+  revisit via agent-vs-human-v2's git-side counts at task level, never per-chat-exact.
+- **Next step:** Arpit accepts/overrides option A; then CHATS-VIEW graduates to a
+  plan entry (build after COPILOT-CREDITS so the copilot columns fill).
+
+## 2026-08-02 (Cowork) — HR1 graduates: v2 accepted-amended (commit views, line-match, guarded hours) → handoff + prompt
+
+- **Asked:** audit leftover human-axis logic; research v2 implementation; design commit
+  list/detail views (tokens + hours, **no USD**); spec human-vs-agent line capture;
+  produce the handoff + prompt pair.
+- **Found (re-grades the proposal):** (1) provenance capture is **ORPHANED** —
+  `transcript.parse_provenance` / `originrecord.record_transcript` have zero callers
+  since the hookless rebuild; only `--attest` writes rows, so the real unknown-rate is
+  ~100% until the import sweep is re-wired. (2) `latency_ms` is set only by the library
+  meter — transcript-imported calls carry 0, so "agent time measured" holds only there;
+  elsewhere it is a turn-span, `~`-marked. The v0.36 removal itself is clean — remaining
+  "human" mentions are legacy read-guards, verbmap tombstones, and the provenance enum,
+  all deliberate; do not clean them up.
+- **Decided (Arpit):** no USD anywhere on these surfaces. Human hours ESTIMATED is
+  allowed — §4 **amended, not repealed**: `~` marker with the method named in the
+  output, gap guard (`[authorship] max_est_gap`, default 4h ⇒ `—` beyond it),
+  attestation `*` always wins, config kill-switch. Line capture: match agent edit-block
+  lines (transient, counts-only persisted — never bodies or hashes) against commit
+  diffs; **human = residual (`human~`)**; unknown is first-class, never redistributed.
+  Views: `cage insights commits` (list) + `cage insights commit <sha>` (detail).
+- **Produced:** proposal rewritten in place (accepted-amended) ·
+  [handoff](agent-vs-human-v2.handoff.md) · [prompt](agent-vs-human-v2.prompt.md).
+  Build order P1 capture re-wire → P2 `commitjoin.py` → P3 views → P4 time; P1 ends
+  with a dogfood gate on cage's own repo (match/unknown rates) before P2.
+- **Next:** run the prompt (P1 first) — slotted after the current track per OPEN-WORK.
+
+## 2026-08-02 (Cowork) — Copilot/VS Code token research: credits are persisted per request; title is a label, not a key
+
+- **Asked:** research how VS Code Copilot displays token in/out/cached per chat, and
+  whether title-based lookup could beat id-based capture.
+- **Done:** read VS Code `main` + `vscode-copilot-chat` sources, real-store samples, and
+  public docs. Written up: [research/copilot-vscode-token-sources.md](research/copilot-vscode-token-sources.md).
+- **The finding that matters:** the chatSessions store persists **`copilotCredits` /
+  `sessionCopilotCredits` per request** — the actual billing unit — and cage drops them.
+  Capturing credits retires copilot/auto UNPRICED (24/60 real calls, 975k tok at $0)
+  with real billing, not a price alias. Also unread: `elapsedMs`/`timeSpentWaiting`
+  (a free `gap_ms` feed).
+- **Cached tokens are NOT in chatSessions.** They persist only in the new debug-gated
+  `<vscode-user>/agentHostUsage/<sessionId>.jsonl` sidecar (per-call `cacheReadTokens`,
+  real routed model, `totalNanoAiu`) — deleted with the session; candidate third source.
+- **Decided (research verdict):** title stays a display label (already lifted via
+  `session_name_copilot_vscode`); keying capture by title would break idempotent
+  re-import (mutable, non-unique, late). The id that hurts is `modelId: copilot/auto` —
+  fixable via credits (#1) and `kind:0` `selectedModel.metadata.family/version`.
+- **Next step:** decide whether COPILOT-CREDITS enters the queue ahead of P2, then spec
+  the importcmd/transcript change (ranked plan in the proposal, §4).
+
+## 2026-08-02 (Claude Code) — AGENT-L3 P3: seven skills, and the program is done
+
+- **Asked:** finish the program — this entry covers **P3**.
+- **Done:** seven skills through P2's `steering.py` renderer, `cage setup --skills`,
+  status reporting all three layers. 1096/0 ⇒ **1125/0**.
+- **The lint caught a real weakness, and I fixed the document rather than the rule.**
+  `steering.lint` failed the honesty-reviewer skill for naming no cage command. That
+  was correct: a review skill that never tells you how to *check* is weaker than one
+  that does. It gained a `cage query <topic>` / `just test` verification section. Same
+  for lab-runner. Neither got an exemption.
+- **The strongest single fact from the whole program:** the floor test passes with
+  **every** layer installed — three layers added across P1–P3, and not one derived
+  number moved, in either direction, on any of the three agents.
+- **Open (both field-verification, not code):** the hook file shapes and the path-free
+  Kiro MCP entry are unit- and CI-tested but have not run on a real Claude Code /
+  Copilot / Kiro install. Filed as **[L1-FIELD]** and **[KIRO-MCP-FIELD]**.
+- **Next step:** archive the agent-surface handoff/prompt pair and graduate the
+  proposal; then the field verification above.
+
+## 2026-08-02 (Claude Code) — AGENT-L1 P2: hooks that change no number, and every gap named
+
+- **Asked:** continue the program — this entry covers **P2**, the Opus phase.
+- **Done:** `cage hook <event>`, agent attestation, auto task-close, budget blocking,
+  steering; opt-in on all three agents. 1059/0 ⇒ **1096/0**.
+- **The strongest evidence is the floor test, extended rather than exempted.** It now
+  installs **hooks as well as MCP** onto an already-captured project and still asserts
+  the ledger bytes and seven views byte-identical, in both directions. That is the
+  phase's real acceptance criterion and it passed without any number being touched.
+- **Two design calls I'd want inherited:**
+  1. **Auto-close writes `outcome="auto"`, not `"ok"`.** A session ending is not a job
+     well done. `tasks.jsonl`'s outcome (which gates compare/estimate/calibration) and
+     `.cage/outcomes.json` (ok|redo, which gates `cage task quality`) turn out to be
+     **different stores on different axes** — so a task can be closed for cost purposes
+     while staying invisible to the success rate. Stamping `ok` would have silently
+     inflated quality for every session that merely finished.
+  2. **I did not invent a Copilot pre-tool event name.** The only Copilot hook shape
+     cage has evidence for is the `sessionStart` form its own v0.10 wrote and the tests
+     still pin. So Copilot gets identity + auto-close and **no** per-tool attestation or
+     budget block, named in `agents.HOOK_GAPS` and printed by `cage setup --status`.
+     Two-of-three *named* beats three-of-three *guessed* — an invented event name fails
+     **silently**, which is the exact class this repo has paid for twice.
+- **Scoped down honestly:** attestation resolves adoption's **half A** only. Half B's
+  `NO_LINK` is still structurally true — a graphify savings id folds in an answer hash
+  no attestation can reconstruct — so **ADOPT-COV is not closed by P2**, and the docs
+  say so rather than implying the hook layer solved it.
+- **Open:** the hook file *shapes* come from cage's own prior implementations and the
+  repo's recorded facts, not from fresh vendor verification. Field-verifying them on a
+  real Claude Code / Copilot / Kiro install is carried forward.
+- **Next step:** **P3 — L3 · skills**, through `steering.py`'s existing renderer.
+
+## 2026-08-02 (Claude Code) — AGENT-L2 P1: the refusals cross the boundary; kiro's MCP is committable
+
+- **Asked:** continue the agent-surface program — this entry covers **P1**.
+- **Done:** `cage_verdict` + `cage_compare` + `cage_task_outcome` on MCP; kiro's MCP
+  config moved to the committed path-free form; new `kiro-mcp` doctor check. 1039/0 ⇒
+  **1059/0**.
+- **The decision that mattered — how to test a refusal.** Asserting *"INSUFFICIENT DATA
+  is in the output"* would pass for a wrapper that printed the phrase and dropped the
+  ⚠ note beneath it. So the tests assert **equality with the CLI's own stdout**. That
+  makes any future summarizing layer a test failure rather than a judgement call.
+- **Found and stopped: the Windows fork in kiro's committed file.** The handoff says
+  write `python3` on POSIX and `py -3` on Windows. Both **committed** — which means two
+  teammates on different OSes churn the diff on every `cage setup`, breaking the
+  byte-identical rule the same phase requires. A committed file can carry one spelling.
+  **Resolved by naming the limit rather than forking:** default `python3` everywhere,
+  and `cage doctor` tells a Windows machine to run `cage setup --python-launcher` for
+  the `py -3` form (machine-specific — gitignore that one file on a mixed-OS team).
+  Pinned by `test_kiro_mcp_is_byte_identical_across_machines`.
+- **Found: `tests/test_portable_wiring.py` does not exist** and never has, though
+  CLAUDE.md and the prompt both cite it as the grep gate. The assertions live in
+  `tests/test_agents.py`; CLAUDE.md now says so rather than pointing at a ghost.
+- **Open:** nothing blocking. The path-free form is **not yet verified on a real Kiro
+  install** — the prompt's stop-condition is about that, and it can only be closed on a
+  machine with Kiro. Doctor's check is the substitute until then.
+- **Next step:** **P2 — L1 · hooks + steering (Opus)**.
+
+## 2026-08-02 (Claude Code) — AGENT-L0 P0: residue cleared, the floor is a test
+
+- **Asked:** execute [agent-surface.prompt.md](archive/v0.41-agent-surface.prompt.md) — phases in
+  order, stop at each gate. This entry covers **P0** only.
+- **Done:**
+  - **The floor is now a test, not an intention** — `tests/test_floor.py`, 15 tests,
+    parametrized over all three agents. It proves both directions of the binding rule:
+    installing every layer cage ships onto an already-captured project changes **no**
+    ledger byte and **no** view's stdout, and stripping it again changes neither.
+  - **Built before P1 on purpose** — P1/P2/P3 are judged against it, so it could not be
+    written after the thing it judges.
+  - Skill residue removed from the README (×3, one saying *"all four agents"*), and the
+    same lie found and fixed in two places the prompt didn't list: **CLAUDE.md's wiring
+    bullet** and **`docs/example/setup.md`**, both describing hooks/skills/steering/git
+    hooks that `cage setup` has not written since v0.36.
+  - `--no-skill` was **already** gone from the parser; the test now pins that it stays
+    gone (a removed flag must *fail*, never be silently accepted).
+- **Decided:** the floor test's `_WIRING_ARTIFACTS` list is the extension point —
+  **a new layer is added to the floor by listing its artifacts, never by relaxing an
+  assertion.** That is what stops P1–P3 quietly weakening the gate they must pass.
+- **Found (worth knowing for P1):** `agents.install` today writes exactly four files —
+  `.cage/bin/cage-run`, `.mcp.json`, `.vscode/mcp.json`, `.kiro/settings/mcp.json`. The
+  last is the absolute-path exception P1 replaces with the path-free form.
+- **Open:** nothing blocking. `just test` green at **1039/0** (was 1024/0).
+- **Next step:** **P1 — L2 · MCP** (Sonnet): `cage_verdict` + `cage_compare` with
+  refusals verbatim, `cage_task_outcome` as the ladder's only write tool, Kiro's MCP
+  committed path-free, and the doctor check on the resolved `python3`.
+
+## 2026-08-02 (Cowork) — PLAN.md de-staled: marked, never renumbered
+
+- **Asked:** is PLAN.md still needed? Then: fix it.
+- **Answer: yes, and it is the most load-bearing doc in the repo** — **~65 source files
+  cite `plan §X`**, so its section numbers are a live addressing scheme. Deleting it would
+  be a 65-file citation migration. But it was badly stale, and CLAUDE.md tells every agent
+  to read it before touching the substrate.
+- **The worst line was the first one:** *"Status: design of record (v0.1). **Nothing built
+  yet.**"* — in a project at v0.40 with 1024 tests, shipped on PyPI. Replaced with an
+  honest status plus three reader's notes: how to read the file (marked-never-renumbered),
+  the v0.36 hookless rebuild, and the three-agent count.
+- **Technique, applied consistently: mark, never delete or renumber.** A superseded
+  section keeps its number and gains a **REMOVED in vX.Y** heading — so every other
+  citation keeps resolving and the section becomes correct history instead of a lie.
+  §4.6/§4.10 already had this; added it to **§5.1** (`tools/skillgen` — the whole
+  skill/steering machinery, deleted in the hookless rebuild; the directory does not exist)
+  and **§3.8** (`cage data limits` — removed with Codex, since Codex's `rate_limits` block
+  was the *only* quota signal any supported agent ever provided; no `limits.py` exists).
+- **Fixed inline:** three prose enumerations naming Codex as a supported agent · two
+  "four agents always" claims · a moot `.codex/hooks.json` example. Left as history:
+  the mentions *inside* REMOVED sections, which are now correct past tense.
+- **Found and fixed a dangling-citation cluster nobody had noticed.** Five shipped
+  modules cite `plan §8.1`–`§8.5` as their design anchor (`budget` · `quality` ·
+  `regression` · `recommend` · `forecast`) — but **§8 had no subsections at all.** The
+  content was there as an unnumbered list; added the `§8.N` anchors and a note that the
+  numbering is load-bearing and must never be renumbered.
+- **Corrected my own earlier claim mid-task.** I had reported "`plan §2.1` is cited 8×
+  and dangles". Wrong twice: six are qualified *"prices-toml plan §2.1"* and one
+  *"import-ledger plan §2.1"* — archived plans that genuinely have a §2.1. Only **two**
+  were bare; I traced both (policy.py → the prices split; transcript.py →
+  import-ledger §2.1, which names `totalPremiumRequests` explicitly) and qualified them
+  with a note that PLAN.md has no §2.1.
+- **Verified, not assumed:** an anchor sweep over every `plan §X` cited in `cage/*.py`
+  now shows **zero dangling references** into PLAN.md; only §2.1 remains, correctly
+  pointing at archived plans. Both edited modules parse.
+- **Not run:** `just test` — the sandbox is Python 3.10. Changes are docs plus two code
+  *comments*; still worth a local run before commit.
+- **Next step:** unchanged — the agent-surface program from P0.
+
+---
+
+## 2026-08-02 (Cowork) — Kiro MCP blocker RESOLVED; "records, not wiring" clarified
+
+- **Asked:** (1) "nothing to commit" means the *records*, not hooks/MCP. (2) Can Kiro's
+  MCP path be relative to the repo root instead of `~`?
+- **(1) Clarified everywhere:** *every piece of wiring is committed; only the **records**
+  are not.* Reworded in the proposal, handoff, prompt and OPEN-WORK — the earlier phrasing
+  ("data is per-user") was loose enough to read as excluding config.
+- **(2) The answer is better than my proposal, and Arpit's instinct pointed at it.**
+  **Repo-relative genuinely fails** — Kiro resolves a relative `command` against its
+  *install directory*, not the workspace (kirodotdev/Kiro #6525), and there is no
+  variable substitution (#5659). **But path-free works, and cage already ships it:**
+  `kirowire.install` writes `{"command":"python3","args":["-m","cage","mcp"]}` under
+  `--python-launcher`. No absolute path, no relative path, no substitution — `python3`
+  resolves through PATH like any interpreter.
+- **So the blocker dissolves without new machinery.** Make the path-free form the
+  **committed default for Kiro**; the absolute-path + gitignore exception disappears, and
+  the parity table now reads ✅ committed for all three agents. **My seed/materialize
+  proposal from the previous turn is withdrawn** — it would have invented a mechanism to
+  solve a problem an existing code path already solves.
+- **The trade it introduces, written into all four docs rather than buried:** the
+  path-free form depends on *which* `python3` resolves. If cage lives in a venv that
+  interpreter isn't in, MCP silently won't start. **So `cage doctor` must check whether
+  the resolved `python3` can import cage** and name it with the fix — converting a silent
+  no-MCP into a named, fixable condition. Silent capture failure is the exact class this
+  project has paid for twice.
+- **Pattern worth noting:** the answer was in `kirowire.install`'s *other* branch — the
+  same shape as the Copilot correction two turns ago, where the answer was in
+  `_strip_legacy_hooks`'s other branch. Both times I read one branch and generalised;
+  both times the question caught it.
+- **Next step:** unchanged — run the program from P0.
+
+---
+
+## 2026-08-02 (Cowork) — "all layers committed, multi-user" turns a concession into a blocker
+
+- **Asked:** L0–L3 all get committed to git and must work with multiple users.
+- **Made it the acceptance test for every phase**, not a preference — in the proposal,
+  the handoff, every phase gate in the prompt, and OPEN-WORK.
+- **Drew a distinction the design had left implicit: wiring is shared, data is
+  per-user.** Committed — hook files, MCP config, steering, skills, `.cage/bin/cage-run`,
+  `cage.toml`, `prices.toml`. Gitignored and machine-local — `ledger/`, `out/`, `state/`.
+  **Nothing in this program may commit a ledger**; team numbers come from
+  `refs/notes/cage-ledger` (ADR 0001), a separate mechanism. Without stating this,
+  "multi-user" reads as "share the ledger", which would be a privacy and correctness
+  disaster.
+- **⚠️ The requirement converts a documented concession into a BLOCKER.**
+  `.kiro/settings/mcp.json` keeps a **resolved absolute path** because Kiro spawns MCP
+  servers from its *install directory* (kirodotdev/Kiro #6525) and supports **no variable
+  substitution in `command`** (#5659) — so relative or `${workspaceFolder}` provably
+  breaks. Cage's current answer is "keep the absolute path, gitignore the file".
+  **Under this requirement that fails both ways:** gitignored ⇒ a teammate gets no Kiro
+  MCP; committed ⇒ a path wrong on every other machine.
+- **Proposed resolution, due in P1 and not deferrable: commit the *intent*, materialize
+  the machine-local file** — a template or `cage.toml` declaration in git, with
+  `cage setup` writing the resolved `mcp.json` locally (still gitignored). Clone →
+  `cage setup` → correct path for *that* machine. This is **cage's own `[sources]`
+  seed→materialize pattern**, so it needs no new concept. If it proves impossible, the
+  prompt says **stop and report** rather than ship a gitignored two-of-three surface.
+- **Three hygiene rules the requirement implies, now written down:** writes must be
+  **idempotent and byte-identical** (two teammates running `cage setup` must not churn a
+  diff — cage already byte-compares, but that stops being an optimisation and becomes a
+  rule) · **foreign entries are never touched** in shared files · **a teammate without
+  cage installed gets silence, not breakage** (the shim already exits 0; every layer
+  must preserve it).
+- **New acceptance criteria:** a fresh clone + `cage setup` on a *different* machine
+  yields working wiring; **no absolute path in any committed file**; `cage setup` twice
+  produces no diff.
+- **Next step:** unchanged — run the program from P0; the Kiro MCP resolution lands in P1.
+
+---
+
+## 2026-08-02 (Cowork) — corrected: Copilot hooks CAN be committed
+
+- **Asked:** why are Copilot's hooks user-level — can't they be committed?
+- **They can. I was wrong, and cage's own code disproves my claim.**
+  `copilotwire._strip_legacy_hooks` cleans **two** locations, one of which is repo-level
+  `.github/hooks/cage.json` — which cage itself wrote in v0.10.0, *with foreign-hook
+  preservation*, the signature of a shared committed file rather than a cage-owned one.
+  I had read only the user-level line and generalised.
+- **Confirmed against GitHub's docs:** repo-level `.github/hooks/*.json` applies whenever
+  Copilot agents run in that repository; user-level `~/.copilot/hooks/*.json` applies to
+  the CLI everywhere; and hooks are **loaded from multiple sources and combined**
+  (policy · user · project · plugins), with *all* matching entries running.
+- **This inverts the parity table's conclusion.** Copilot is the **best**-placed of the
+  three for L1, not the worst: repo-level hooks are committed and portable, so they can
+  reference `.cage/bin/cage-run` and give a teammate working capture on clone — the same
+  property Claude's `.claude/settings.json` has. My table had it backwards.
+- **Two consequences the build now owes:** (1) **combining is a double-capture risk** —
+  wire both locations and both fire on the same event, which is exactly the proof P2
+  already owes; pick one location and justify it. (2) **repo hooks apply to the coding
+  agent only from the default branch**, so feature-branch wiring silently doesn't fire
+  until merged — stated so nobody debugs a phantom gap.
+- **Corrected in all four docs** (proposal, handoff, prompt, OPEN-WORK), each carrying
+  the correction visibly rather than a silent rewrite — the prompt's version explicitly
+  tells the executor an earlier draft was wrong, so they don't half-trust it.
+- **Lesson, again:** I asserted a platform constraint from one line of a docstring
+  without checking the other branch of the same function. Arpit's question was the check.
+- **Next step:** unchanged — run the program from P0.
+
+---
+
+## 2026-08-02 (Cowork) — three-agent parity made a gate; found the limit that shrinks L1
+
+- **Asked:** this must work with Claude, Copilot and Kiro — make sure of it, add it to
+  the table.
+- **Done:** a per-agent parity table added to the proposal, the handoff **and** every
+  phase gate in the prompt. `agents.SURFACES` is restated as a product invariant: **a
+  phase is not done until all three have the layer, or the gap is named in output.**
+  Handback now requires per-agent status per phase, not just at the end.
+- **⚠️ The finding that materially shrinks L1's promise: hooks are CLI-only — they do not
+  fire under a VS Code extension.** So L1's two headline wins (agent identity at capture,
+  auto task-close) apply to **CLI sessions only**; a VS Code session falls back to L0
+  silently. Written into all three docs as a build-to constraint: **L1 may never be
+  described as "cage knows which agent ran"** — it is *"for CLI sessions"*, and every view
+  built on it inherits the caveat. A hook-derived agent field silently absent for every
+  VS Code user is **the ADOPT half-B problem again, one layer up** — which is exactly the
+  kind of repeat this project keeps paying for.
+- **Three per-agent shapes recorded because they are load-bearing, not trivia:**
+  copilot's hooks are **user-level** (`~/.copilot/hooks`) so they cannot ride the portable
+  `.cage/bin/cage-run` shim the committed files use · kiro's hook file is **one hook per
+  file**, not a `hooks[]` container, and **kiro has no session-start trigger** (so
+  `agentStop` self-backfills, and auto task-close must close what it can infer *or
+  decline and say so*) · kiro's MCP config keeps the **absolute-path exception**, the one
+  documented deviation from portable wiring.
+- **P3 gained a parity clause too:** *a skill on one agent and not the others is not
+  done* — one source text, three deliveries, never three hand-written copies. That is the
+  shim-contract drift lesson applied to prose.
+- **Next step:** run the program from P0.
+
+---
+
 ## 2026-08-02 (Cowork) — all four agent-surface phases specced as one gated program
 
 - **Asked (mid-turn):** spec *all* the phases/tiers, not just phase 1.

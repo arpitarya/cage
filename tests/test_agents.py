@@ -83,10 +83,11 @@ def test_copilot_migration_preserves_foreign_repo_hooks(homes):
 
 
 def test_committed_wiring_never_carries_resolved_path(homes, monkeypatch):
-    # Even when cage resolves to an absolute path on THIS machine, committed files must
-    # reference the shim (portable). The Kiro MCP config is the ONE documented exception
-    # (Kiro spawns MCP servers from its install dir; no workspace variable exists).
-    from cage import runshim
+    # Even when cage resolves to an absolute path on THIS machine, EVERY committed file
+    # must be machine-independent. Claude/Copilot reach that through the shim; Kiro,
+    # which resolves neither a relative path nor a variable, reaches it by carrying no
+    # path at all (`python3 -m cage mcp`) — the last exception, closed.
+    from cage import kirowire, runshim
     monkeypatch.setattr("cage.paths.cage_bin", lambda: "/opt/cage/bin/cage")
     proj = homes / "proj"
     proj.mkdir()
@@ -95,9 +96,11 @@ def test_committed_wiring_never_carries_resolved_path(homes, monkeypatch):
             == f"${{CLAUDE_PROJECT_DIR:-.}}/{runshim.SHIM_REL}")
     vs = cfgio.load_json(proj / ".vscode" / "mcp.json")["servers"]
     assert vs["cage"]["command"] == f"${{workspaceFolder}}/{runshim.SHIM_REL}"
-    # the ONE exception: Kiro's MCP config stays absolute by necessity
-    kiro_mcp = cfgio.load_json(proj / ".kiro" / "settings" / "mcp.json")
-    assert kiro_mcp["mcpServers"]["cage"]["command"] == "/opt/cage/bin/cage"
+    kiro = cfgio.load_json(proj / ".kiro" / "settings" / "mcp.json")["mcpServers"]["cage"]
+    assert kiro == kirowire.PATH_FREE
+    # No committed file names this machine's cage, in any of the three.
+    for rel in (".mcp.json", ".vscode/mcp.json", ".kiro/settings/mcp.json"):
+        assert "/opt/cage/bin/cage" not in (proj / rel).read_text(encoding="utf-8")
 
 
 def test_reinstall_migrates_legacy_absolute_mcp_and_strips_hooks(homes):

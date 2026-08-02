@@ -393,8 +393,22 @@ agent*. Two halves, never blended — they have different precision:
 
 | half | source | precision | agent? |
 |---|---|---|---|
-| **A · invocations** | usage rows (§2.11) | exact, no join | **no** — a usage row has no `agent` field |
+| **A · invocations** | usage rows (§2.11) | exact, no join | only with an **L1 attestation** (below) — otherwise none |
 | **B · per-agent** | savings rows → `calls.agent` | exact where a link resolves | only where it resolves |
+
+- **Half A's agent split needs the opt-in L1 hooks, and says nothing without them.**
+  A usage row has no `agent` field, so half A was agent-blind by construction. A hook
+  runs *inside* the agent, so `cage hook tool --agent X` records an attestation
+  ([attest.py](../cage/attest.py), `state/attest.jsonl`) keyed by the **same
+  `args_hash`** the usage row already carries — an exact join, never proximity. With no
+  attestations the block is **absent entirely**, not empty: `by_agent.present = False`
+  and the renderer emits nothing, so a hookless project's output is byte-identical to
+  before L1 existed. An `args_hash` **two agents attested resolves to unknown**, never a
+  pick. Every attested number carries `attest.LIMIT` — hooks are CLI-only, so a VS Code
+  run is a real invocation that leaves no attestation and must never read as *no agent*.
+- **Attestation does NOT fix half B.** A graphify savings row's id folds in an *answer*
+  hash no attestation can reconstruct, so `no-link` stays structurally true. The two
+  halves are still never blended.
 
 - **Outcomes are read, never re-derived.** The per-outcome tally reads each row's
   recorded `outcome` (`usagelog.OUTCOMES`); re-deriving "did a receipt land?" from the
@@ -417,7 +431,9 @@ agent*. Two halves, never blended — they have different precision:
   `tests/test_adoption.py`.
 - CSV column contract: `section` · `dimension` · `key` · `agent` · `tool` · `rows` ·
   `joined_via` · `reason` · one column per outcome. An inapplicable cell is **empty**,
-  never `0`. Explained by `cage query tool-adoption`.
+  never `0`. The attested split adds `usage,agent,<name>` rows with `joined_via=attest`
+  plus a `usage,agent-unattested` row carrying its reason — CSV never gates a caveat
+  away. Explained by `cage query tool-adoption` and `cage query agent-layers`.
 
 ## 3. The human axis — **removed in v0.36**
 

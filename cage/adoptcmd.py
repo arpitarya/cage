@@ -103,19 +103,21 @@ def _wire_path(root: Path) -> str | None:
     return str(rc)
 
 
-def run(root: Path, *, graphify: bool = True,
-        surfaces: tuple[str, ...] | None = None) -> dict:
+def run(root: Path, *, graphify: bool = True, surfaces: tuple[str, ...] | None = None,
+        hooks: bool = False, skills: bool = False) -> dict:
     """Set cage up in ``root``. Each key present only if that step ran.
 
     Agent wiring is opt-in: ``out["hooks"]`` appears only when ``surfaces`` names
     at least one agent. With no surface flag this scaffolds + (optionally) the
-    graphify shim, but touches no agent config."""
+    graphify shim, but touches no agent config. ``hooks`` (`cage setup --hooks`) and
+    ``skills`` (`--skills`) additionally wire the **L1** and **L3** layers — both off by
+    default, because the floor must stay reachable by doing nothing."""
     info = initcmd.run(root)
     out: dict[str, object] = {"init": info["footprint"],
                               "migrated_config": info.get("migrated_config"),
                               "migrated_prices": info.get("migrated_prices")}
     if surfaces:
-        out["hooks"] = agents.install(root, surfaces)
+        out["hooks"] = agents.install(root, surfaces, hooks=hooks, skills=skills)
     if graphify:
         if shim := _install_shim(root):
             out["shim"] = shim

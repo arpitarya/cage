@@ -39,8 +39,59 @@ def row_surface(row_agent: str | None) -> str | None:
 # The wire module for each surface — add a row here when integrating a new agent.
 _WIRE = {"claude": claudewire, "copilot": copilotwire, "kiro": kirowire}
 
+# ── L1 hook capability, per agent — ONE table, read by the wiring AND by output ──────
+#
+# The three hosts are NOT equivalent here, and the differences are load-bearing rather
+# than incidental. This table is the single place they live, so `cage setup --status`,
+# `cage doctor` and the wire modules can never describe a different set of capabilities
+# from the one actually installed.
+#
+# Two rules govern what may appear here:
+#   1. **Only a host event cage has itself written and tested is listed.** Where an
+#      event's name or payload is unverified, the capability is ABSENT and appears in
+#      `HOOK_GAPS` — an invented event name fails silently, which is the one outcome
+#      this project has already paid for twice.
+#   2. **Every absence is named**, never left for a user to discover as "nothing
+#      happened". `hook_gap_lines()` renders them and is called by every surface that
+#      reports L1 status.
+HOOK_EVENTS: dict[str, tuple[str, ...]] = {
+    "claude": ("session-start", "session-end", "tool", "budget"),
+    "copilot": ("session-start", "session-end"),
+    "kiro": ("session-end",),
+}
 
-def install(root: Path, surfaces: tuple[str, ...] | None = None) -> dict:
+# Why each agent is missing what it is missing. Keyed by agent; a missing key means the
+# agent has the full set. These are *platform* facts, not cage defects.
+HOOK_GAPS: dict[str, str] = {
+    "copilot": ("no per-tool attestation and no budget block — cage has never written "
+                "or tested a Copilot pre-tool hook, and an unverified event name fails "
+                "silently; session identity and auto task-close are wired"),
+    "kiro": ("no session-start trigger exists, so the single `agentStop` hook carries "
+             "no session id — cage attests the agent but DECLINES to auto-close a task "
+             "rather than closing the most recent one by proximity"),
+}
+
+# The limit that applies to all three, always — see `attest.LIMIT`.
+HOOK_SURFACE_LIMIT = ("hooks are CLI-only: they do not fire under a VS Code extension, "
+                      "so every L1 fact is a CLI-session fact")
+
+
+def hook_gap_lines() -> list[str]:
+    """One line per agent that cannot do everything L1 offers, plus the limit that
+    binds all three. Rendered wherever L1 status is shown — a capability silently
+    absent for one agent is exactly the failure the three-agent invariant exists to
+    prevent."""
+    lines = [f"{a}: {HOOK_GAPS[a]}" for a in SURFACES if a in HOOK_GAPS]
+    return lines + [f"all agents: {HOOK_SURFACE_LIMIT}"]
+
+
+def install(root: Path, surfaces: tuple[str, ...] | None = None,
+            *, hooks: bool = False, skills: bool = False) -> dict:
+    """Wire the picked agents. ``hooks=False`` is the default and the floor: `cage setup`
+    stays hookless unless asked (`--hooks`), because L1 must remain opt-in — a layer that
+    installed itself would stop being removable, and removability is what the floor test
+    proves. ``hooks=False`` also *removes* any cage hook file a previous `--hooks` run
+    wrote, so the flag is a two-way switch rather than a one-way door."""
     from cage import paths, policy
     picked = surfaces or SURFACES
     # The wiring mode is project policy (`[wiring] python_launcher`, restricted
@@ -52,7 +103,23 @@ def install(root: Path, surfaces: tuple[str, ...] | None = None) -> dict:
     runshim.write(root, python_launcher=launcher)
     out: dict[str, dict] = {}
     for name in (s for s in SURFACES if s in picked):
-        out[name] = _WIRE[name].install(root, python_launcher=launcher)
+        out[name] = _WIRE[name].install(root, python_launcher=launcher, hooks=hooks)
+    # L1's other half: the steering document. One source, three deliveries
+    # ([steering.py](steering.py)) — and, like the hooks, a two-way switch: `hooks=False`
+    # removes it, so plain `cage setup` returns the project to the hookless floor.
+    # Each layer's documents ride that layer's flag, and each flag is a two-way switch —
+    # `hooks=False` / `skills=False` REMOVE what a previous run wrote, so a plain
+    # `cage setup` always returns the project to the hookless, skill-less floor.
+    from cage import steering
+    picked_t = tuple(s for s in SURFACES if s in picked)
+    for layer, on, label in (("L1", hooks, "steering doc"), ("L3", skills, "skill")):
+        docs = steering.by_layer(layer)
+        if on:
+            for name, n in steering.install(root, docs, picked_t).items():
+                if n:
+                    out.setdefault(name, {})[label] = f"{n} {label}(s)"
+        else:
+            steering.uninstall(root, docs, picked_t)
     # Heal an already-installed graphify interceptor whose capability probe names a
     # verb removed in v0.28.0 (it would exec the real binary unmetered, silently —
     # the F1 root cause). Refresh-only: never scaffolds a shim into a project that

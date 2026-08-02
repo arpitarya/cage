@@ -119,7 +119,45 @@ def _usage_half(root: Path, since: str | None) -> dict:
                 for k, v in sorted(bucket.items(), key=lambda kv: (-kv[1]["runs"], kv[0]))]
     return {"tool": USAGE_TOOL, "present": present, "runs": len(rows),
             "outcomes": outcomes, "by_op": _flat(by_op, "op"),
-            "by_route": _flat(by_route, "route")}
+            "by_route": _flat(by_route, "route"),
+            "by_agent": _attested(root, rows)}
+
+
+def _attested(root: Path, rows: list[dict]) -> dict:
+    """Half A's **agent** breakdown — the one thing the usage breadcrumb alone cannot
+    give, supplied by the opt-in L1 hooks ([attest.py](attest.py)).
+
+    A usage row is `ts · op · args_hash · exit · ms · outcome · route` and carries no
+    agent field, which is why half A has always been *exact but agent-blind*. A hook
+    runs **inside** the agent, so an attestation states the agent as a fact; the join is
+    on `args_hash`, an exact key both sides already record. **Not proximity, not the
+    most recent agent, not a guess.**
+
+    Three honesty rules, none of them optional:
+
+    · **Absent ⇒ absent.** No attestations (the hookless default) returns
+      ``{"present": False}`` and the renderer emits nothing at all — so L1 being off
+      leaves this view byte-identical, which is the floor's whole promise.
+    · **A hash two agents attested is `unattested`, never a pick** — identical queries
+      from two agents are indistinguishable (`attest.tool_agents` enforces it).
+    · **`unattested` is never read as "no agent"**: hooks are CLI-only, so a VS Code
+      run leaves no attestation while being a perfectly real invocation.
+    """
+    from cage import attest
+    claims = attest.tool_agents(root, USAGE_TOOL)
+    if not claims:
+        return {"present": False, "agents": [], "unattested": len(rows)}
+    tally: dict[str, int] = {}
+    unattested = 0
+    for r in rows:
+        agent = claims.get(r.get("args_hash") or "", attest.UNKNOWN)
+        if agent:
+            tally[agent] = tally.get(agent, 0) + 1
+        else:
+            unattested += 1
+    agents = [{"agent": a, "runs": n} for a, n in
+              sorted(tally.items(), key=lambda kv: (-kv[1], kv[0]))]
+    return {"present": True, "agents": agents, "unattested": unattested}
 
 
 def _agent_half(root: Path, since: str | None) -> dict:
@@ -259,6 +297,17 @@ def render_adoption(data: dict) -> str:
         out.append(_outcome_table("op", "op", u["by_op"]))
         out.append("")
         out.append(_outcome_table("route", "route", u["by_route"]))
+        # The agent breakdown exists ONLY when the opt-in L1 hooks attested it. With no
+        # attestations the block is absent entirely rather than empty — half A is
+        # honestly agent-blind without them, and an empty table would suggest otherwise.
+        if u["by_agent"]["present"]:
+            from cage import render
+            out.append("")
+            out.append("  by agent — attested by an L1 hook (stamped, not inferred)")
+            out.append(render.table(
+                ["agent", "runs"],
+                [[g["agent"], f"{g['runs']:,}"] for g in u["by_agent"]["agents"]],
+                rights={1}))
     out.append("")
 
     # ── B · per-agent attribution ─────────────────────────────────────────────
@@ -279,6 +328,16 @@ def render_adoption(data: dict) -> str:
                                 rights={2}))
 
     foot = Footer()
+    if u["by_agent"]["present"]:
+        # Every attested number carries its limit. Hooks are CLI-only, so a run made
+        # from a VS Code session is real, invisible here, and must not be read as an
+        # agent that did nothing — the ADOPT half-B problem, one layer up.
+        from cage import attest
+        foot.caveat(f"· agent breakdown: {attest.LIMIT}")
+        if (n := u["by_agent"]["unattested"]):
+            foot.gap(f"· {n:,} run(s) have no attestation — either made before hooks "
+                     f"were wired, from a VS Code session, or attested by more than "
+                     f"one agent.\n    Not evidence that no agent ran them.")
     if a["rows"]:
         pct = round(100.0 * a["attributed"] / a["rows"])
         foot.caveat(f"· coverage: {a['attributed']:,} of {a['rows']:,} savings rows "
@@ -320,6 +379,17 @@ def render_csv(data: dict) -> str:
     rows += [_usage_row("route", g["route"], g["runs"], g["outcomes"])
              for g in u["by_route"]]
     blanks = [None] * len(OUTCOMES)
+    # Half A's attested agent split. Present only when L1 hooks attested something, so a
+    # hookless project's CSV is byte-identical to before. `unattested` keeps its own row
+    # with the reason spelled out — CSV never gates, and a dropped caveat here would let
+    # a spreadsheet read "the rest belong to nobody".
+    if u["by_agent"]["present"]:
+        rows += [["usage", "agent", g["agent"], g["agent"], u["tool"], g["runs"],
+                  "attest", None, *blanks] for g in u["by_agent"]["agents"]]
+        rows.append(["usage", "agent-unattested", "", None, u["tool"],
+                     u["by_agent"]["unattested"], None,
+                     "no attestation (pre-hooks, VS Code session, or claimed by >1 agent)",
+                     *blanks])
     rows += [["attribution", "agent", g["agent"], g["agent"], g["tool"], g["rows"],
               "+".join(g["via"]), None, *blanks] for g in a["agents"]]
     rows += [["attribution", "agent-unknown", "", None, g["tool"], g["rows"], None,

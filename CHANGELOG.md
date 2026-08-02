@@ -2,6 +2,126 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
+## v0.41.0 (2026-08-02) — the agent surface: four layers, three agents, no number moved
+
+Cage's agent integration is now a **ladder**, built end to end in one program. **L0**
+hookless capture is unchanged and is still the whole product; **L1** hooks, **L2** MCP
+and **L3** skills each sit on top of it, each opt-in, each two-way, and **none of them
+able to move a number**.
+
+Built from: [proposal](docs/archive/v0.41-agent-surface-layers.proposal.md) ·
+[handoff](docs/archive/v0.41-agent-surface.handoff.md) +
+[prompt](docs/archive/v0.41-agent-surface.prompt.md).
+
+### The gate, which is the actual story
+
+**Adding or removing any layer changes no derived number.**
+[`tests/test_floor.py`](tests/test_floor.py) installs *every* layer cage ships onto an
+already-captured project, asserts the ledger shards **and seven views' stdout
+byte-identical**, then strips it all and asserts again — per agent. Three layers landed
+across this release and not one figure moved, in either direction. A future layer is
+added to `_WIRING_ARTIFACTS`; **an assertion there is never relaxed.** `cage query
+agent-layers` explains the contract.
+
+### L2 · MCP — the refusals are the point
+
+- **`cage_verdict` and `cage_compare`** join the read tools. They were the two views
+  that answer *"is this tool worth keeping"*, and they were the two an agent could not
+  see.
+- Both render through the **CLI's own renderer over the CLI's own composer**, so
+  `INSUFFICIENT DATA`, `SAVING (GROSS)` and the `MIN_COMPARE_N` block cross the boundary
+  **byte-identically** — asserted as *equality with the CLI's stdout*, never as
+  substring presence, because a wrapper that printed the phrase and dropped the note
+  beneath it would pass a substring test. An agent reads an empty result as **zero**,
+  the one thing a refusal never means.
+- **`cage_task_outcome` is the only write tool in the entire ladder**
+  (`mcpserver.WRITE_TOOLS`, and the module docstring says so where the next reader will
+  look). It exists because every starved surface — `compare`, `estimate`, `calibration`,
+  the net saving — is starved for one reason: nobody closes tasks. It goes through the
+  new `clicmds.close_task`, the **one** task-close path the CLI verb also uses, so the
+  single-token label guard cannot be laxer on the agent-facing side.
+
+### Kiro's MCP config is committable at last — the last portability exception, closed
+
+Kiro spawns MCP servers from its *install directory* and substitutes no variables, so
+`.kiro/settings/mcp.json` had to carry the wiring machine's absolute cage path and be
+gitignored. It now carries **no path at all** — `python3 -m cage mcp` — so the file is
+byte-identical on every machine and committed like the other two agents'.
+
+**The price is named, not buried:** that depends on *which* `python3` resolves, so a new
+**`kiro-mcp` doctor check** asks that interpreter to import cage and fails with the fix
+when it cannot. A venv miss would otherwise be a *silent* no-MCP — the failure class
+this project has already paid for twice. **Windows is a stated limit:** `python3` is
+often absent there and a committed file can carry one spelling, so the default is
+`python3` and doctor points a Windows machine at `cage setup --python-launcher`.
+
+### L1 · hooks + steering (`cage setup --hooks`) — not for capture
+
+Capture already works with no hooks, and a second write path would be a double-capture
+risk for no gain. L1 buys exactly three things pull capture structurally cannot:
+
+- **Agent identity, stamped rather than inferred.** A hook runs *inside* the agent, so
+  `cage hook <event> --agent X` states it as a fact. Attestations land in
+  `state/attest.jsonl` and join the usage breadcrumb on `args_hash` — an **exact** key —
+  turning `cage insights adoption`'s half A from agent-blind into per-agent. **A hash
+  two agents both claim resolves to unknown, never to a pick.** Commands are **hashed,
+  never stored**.
+- **Auto task-close** at the session boundary, on the **exact session id** — never the
+  most recent task, never by proximity. It writes **`outcome="auto"`, never `ok`**:
+  `tasks.jsonl`'s outcome and the quality store (`.cage/outcomes.json`, ok|redo) are
+  different axes, so the task is closed for `compare`/`estimate`/`calibration` and stays
+  **invisible to `cage task quality`**. Stamping `ok` would silently inflate the success
+  rate of every session that merely ended.
+- **`budget.check`'s first real caller.** `cage hook budget` exits 2 under `[budgets]
+  on_exceed = "block"` — the only place in cage that can stop a paid call *before* it
+  happens.
+
+**Fail-open is absolute** (every event exits 0 on any internal failure; the sole
+non-zero is the deliberate budget block), and **hooks are CLI-only** — they do not fire
+under a VS Code extension, so every L1 fact carries that limit wherever it is shown.
+
+**Every gap is named in output, never left to be discovered.** Per-agent capability is
+one table (`agents.HOOK_EVENTS`), and `cage setup --status` prints the shortfalls:
+Kiro has no session-start trigger, so its single `agentStop` hook attests the agent but
+**declines** to auto-close a task; Copilot has no *verified* pre-tool event, so it gets
+no per-tool attestation and no budget block. **No unverified host event name was
+invented** — an invented one fails silently. Two-of-three named beats three-of-three
+guessed.
+
+### L3 · skills (`cage setup --skills`) — one source, three deliveries
+
+Seven skills — **task-closer · analyst · doctor-triage · honesty-reviewer · release ·
+lab-runner · windows-shim** — authored once and rendered into `.claude/skills/<id>/
+SKILL.md`, `.github/prompts/<id>.prompt.md` and `.kiro/steering/<id>.md`. Only the
+~10-line host wrapper differs; the bodies are byte-identical, asserted rather than
+eyeballed.
+
+**Rendered from a Python literal at `cage setup` time, never as a bundled asset** — that
+removes the drift-check, `--bless` gate and committed second copy the deleted
+`tools/skillgen` needed. **The governing rule: a skill never computes a number — it runs
+cage and quotes it.** Method tags verbatim, refusals relayed unsmoothed, no arithmetic.
+`steering.lint` enforces it mechanically, and every `cage …` a document names is checked
+against the **live parser** — a skill teaching a dead verb is the F1 class in prose.
+
+### Also
+
+- **Residue cleared:** the README claimed a `cage` skill three times, once on *"all four
+  agents"* — wrong twice over, and live on PyPI since v0.36. `CLAUDE.md`'s wiring bullet
+  and `docs/example/setup.md` described hooks, skills and git hooks that `cage setup`
+  has not written since the hookless rebuild.
+- New `attest-log` cleanup class; `wiringscan` now scans hook artifacts too, so a
+  renamed verb cannot silently kill L1; `cage query agent-layers`.
+- **1024 → 1125 tests.**
+
+### Known limits, stated
+
+- **ADOPT-COV is not closed by this.** Attestation resolves adoption's half **A** only —
+  a graphify savings row's id folds in an *answer* hash no attestation can reconstruct,
+  so half B's `no-link` remains structurally true.
+- The L1 hook shapes and the path-free Kiro MCP entry are unit- and CI-tested but have
+  **not** been run on a real Claude Code / Copilot / Kiro install. Tracked as
+  **L1-FIELD** and **KIRO-MCP-FIELD** in [OPEN-WORK.md](docs/OPEN-WORK.md).
+
 ## v0.40.0 (2026-08-02) — tool-adoption view
 
 Does the tool you installed actually get *used*? One new derived view answers it. No

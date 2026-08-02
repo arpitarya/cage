@@ -340,7 +340,10 @@ def graphify_shims(root: Path) -> list[Path]:
 
 
 def bundled_data():
-    """Seed data shipped with the cage package (default policy + skill assets).
+    """Seed data shipped with the cage package (default cage.toml/prices.toml,
+    the graphify shim twin pair, assets). No skill/prompt/steering asset ships —
+    that machinery went with the hook machinery in v0.36 (`tests/test_floor.py`
+    pins its absence).
 
     Returns an ``importlib.resources`` Traversable: a real directory ``Path`` under
     a wheel/editable install (identical behavior to the old ``__file__`` form), a
@@ -606,7 +609,7 @@ def materialize_sources(text: str, seed: list[dict] | None = None) -> str:
 # `[sources]` ⇒ the built-in registry byte-for-byte, so capture is unchanged for
 # everyone who doesn't use it. Explained live by `cage query sources`.
 # NB: this 'byte-for-byte fallback' wording predates Directive A — reconcile when
-# CMD-SYNC lands (docs/proposals/claude-md-sources-authority.md).
+# CMD-SYNC lands (docs/archive/v0.39-claude-md-sources-authority.proposal.md).
 
 class LogSource(NamedTuple):
     """One candidate log location, tagged with where it came from. ``provenance`` is
@@ -1214,6 +1217,17 @@ class Footprint:
         reported number — the same invariant the `state/` home guarantees by
         construction). Size-managed by the `usage-log` cleanup class."""
         return Path(os.environ.get("CAGE_USAGE_LOG", self.state / "graphify-usage.jsonl"))
+
+    @property
+    def attest_log(self) -> Path:
+        """L1 agent attestations (`cage/attest.py`) — `{kind, agent, session|tool+
+        args_hash, ts}`, one row per hook firing. **Stamped, never inferred**: a hook
+        runs *inside* an agent, so it is the only place cage learns which agent did
+        something without guessing. Counts-never-content (a command is hashed, never
+        stored) and, like every `state/` file, **never read by a derived money view** —
+        only `cage insights adoption`, which prints no currency at all. Absent unless
+        the opt-in L1 hooks are wired; size-managed by the `attest-log` cleanup class."""
+        return Path(os.environ.get("CAGE_ATTEST_LOG", self.state / "attest.jsonl"))
 
     @property
     def hooks_seen(self) -> Path:

@@ -441,6 +441,17 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   parked, not lost; it graduates to a compare doc or plan entry when picked up
   (and keeps a `# v2:` idea out of the code). A settled fork graduates to a plan
   entry and, on ship, an ADR; the compare doc stays as the evidence behind it.
+- **Research gets its own doc, always — in [docs/research/](docs/research/).**
+  Whenever a session does research — an external-source investigation, a store/format
+  probe, a competitive or ecosystem survey, anything whose output is *findings rather
+  than a decision* — the findings are written up as a separate dated research doc in
+  `docs/research/` in that same session, never left as chat-only knowledge or inlined
+  into a proposal. Research docs are **evidence, not spec**: proposals, compare docs,
+  plan entries, and IMPLEMENTATION.md entries *link* to them as their grounding
+  (the same role `regression/` plays for measured evidence — research/ is the
+  sourced-findings twin). Cite sources (URLs, code paths, versions probed) so a
+  future agent can re-verify. First occupant:
+  [research/copilot-vscode-token-sources.md](docs/research/copilot-vscode-token-sources.md).
 - **Deleting a doc is a citation migration, not just a file removal** — the prose
   twin of the removed-verb rule. Source comments cite docs by path (`docs/x.md`), and
   a deleted doc leaves those pointers dangling **silently**: nothing fails, and a
@@ -514,6 +525,29 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   When in doubt on a *destructive or diagnostic* task, choose Opus; on an
   *additive, fully-specced* one, choose Sonnet. State the tier when handing a
   prompt to a human, too — not just in the file.
+- **Every prompt doc also declares how much of the work is already done.**
+  Directly under the `**Model:**` line, a `docs/*.prompt.md` carries a
+  `**Progress:**` line — the phases of that feature or program already built, over
+  its total, as a percentage, with the phases named:
+  `**Progress:** 75% — P0·P1·P2 built (2026-08-02), P3 remaining.`
+  A reader (or an executing agent) then knows *where in the program it is standing*
+  before it reads a line of spec — the same reason every plan doc opens with a phase
+  index. Three constraints make the number worth printing:
+  - **The denominator is that program's own phases** — never the OPEN-WORK queue
+    (which has no fixed total, so the ratio drifts every time work is discovered)
+    and never an effort guess. It must be *countable*, so a reader can check it.
+  - **Count against evidence, not against ticks** — the phase index,
+    [IMPLEMENTATION.md](docs/IMPLEMENTATION.md), `docs/archive/` and the code decide
+    what is built. A ✅ in the prompt itself is an assertion, not proof; this is the
+    same trap the OPEN-WORK rule names, and it bites hardest here because a prompt
+    is read by an agent that will act on the number.
+  - **A partial phase does not count** — built-and-green or not built. Round to
+    whole phases; if a phase is half-done, say so in words after the percentage
+    rather than inventing a fraction (`50% — P0·P1 built, P2 in flight`).
+  A single-phase prompt says `**Progress:** 0% — not started` and reaches `100%`
+  in the change that archives it. Update the line in the same change as the work,
+  like every other doc here — a stale Progress line is a lying doc, not a rounding
+  error. State the percentage when handing a prompt to a human, too.
 - Keep modules small and single-purpose (fux spirit). Tests live in `tests/`.
 
 ## Documentation discipline (required)
@@ -607,6 +641,9 @@ fires a trigger updates the doc *and* bumps its row):
   *Decision records* below.
 - **[docs/example/](docs/example/)** — copy-from contracts (cli · debug · setup ·
   toml-config), one per file; update the matching one when that surface changes.
+- **[docs/research/](docs/research/)** — dated research docs, one per investigation
+  (see the *Research gets its own doc* rule in Must-Know Rules): sourced findings
+  that proposals/plan/IMPLEMENTATION link to as evidence, never spec.
 
 Note: ALL-CAPS entry-point/tracker files (CLAUDE.md, CHANGELOG.md, README.md and
 AGENTS.md at root; IMPLEMENTATION.md, PLAN.md, INTERVIEW.md, GLOSSARY.md, WORKLOG.md,
@@ -640,9 +677,10 @@ lapses if unreviewed**, so it cannot become permanent by neglect. Review criteri
 the retain/remove call live in the spec doc. Tracked in
 [docs/DOC-REGISTRY.md](docs/DOC-REGISTRY.md).
 
-**Every prompt/handoff also names the model tier** that should execute it — see the
-prompt-doc rule and the Haiku/Sonnet/Opus rubric in *Must-Know Rules* above; don't
-restate it, apply it.
+**Every prompt/handoff also names the model tier** that should execute it, and
+**every prompt doc carries a `Progress:` percentage** of that program's phases — see
+the two prompt-doc rules and the Haiku/Sonnet/Opus rubric in *Must-Know Rules* above;
+don't restate them, apply them.
 
 ## Decision records (ADRs)
 
@@ -693,7 +731,7 @@ the worked examples to copy.
 ## Dev
 
 ```bash
-just test          # python -m pytest -q   (1024 tests; +10 Windows-only skips)
+just test          # python -m pytest -q   (1125 tests; +10 Windows-only skips)
 just demo          # seed §4.4 + print attrib/matrix
 cage --version
 ```
@@ -813,32 +851,121 @@ each agent only needs thin idiomatic wiring (`agents.py` orchestrates):
   (`origin`/`notes-sync`/`verify`, plan §3.5), and the ledger-scale surface
   (`--scope` / `--team` filters, `ledger-sync` into refs/notes/cage-ledger via the
   shared `mergeutil.union_by_id` core, plan §3.6).
+- **The agent surface is a four-layer ladder, and L0 is the floor**
+  ([archive/v0.41-agent-surface-layers.proposal.md](docs/archive/v0.41-agent-surface-layers.proposal.md);
+  `cage query agent-layers`). **L0 hookless** (pull capture + interceptor + every CLI
+  view — *this is cage*, never optional) → **L1 hooks+steering** (`cage setup --hooks`) →
+  **L2 MCP** → **L3 skills** (`--skills`). Everything above L0 is **opt-in and two-way**:
+  a plain `cage setup` both declines to wire a layer and *removes* one already wired.
+  **The binding rule, and it is a test:** adding or removing any layer changes **no
+  number** — [tests/test_floor.py](tests/test_floor.py) installs every layer cage ships
+  onto an already-captured project, asserts the ledger shards *and* seven views' stdout
+  byte-identical, strips it all, and asserts again, per agent. **A new layer is wired
+  into that test by adding its artifacts to `_WIRING_ARTIFACTS` — never by relaxing an
+  assertion.** If a phase cannot meet the gate, the phase is wrong; the number is never
+  what gets adjusted.
+- **L1 is NOT for capture** ([hookcmd.py](cage/hookcmd.py), [attest.py](cage/attest.py))
+  — capture already works with no hooks, and a second write path would be a
+  double-capture risk for no gain. L1 buys exactly three things: (a) **agent identity,
+  stamped not inferred** — a hook runs *inside* the agent, so `cage hook <event> --agent
+  X` states it as a fact; attestations land in `state/attest.jsonl` and join the usage
+  breadcrumb on `args_hash` (an **exact** key), turning `cage insights adoption`'s half A
+  from agent-blind into per-agent. It does **not** fix half B — a graphify savings row's
+  id folds in an *answer* hash no attestation can reconstruct, so `NO_LINK` stays
+  structurally true and is not quietly narrowed. (b) **auto task-close** at the session
+  boundary, on the **exact session id** — never the most recent task, never by proximity.
+  (c) `budget.check`'s **first real caller**: `cage hook budget` exits `BLOCK` (2) when
+  `[budgets] on_exceed = "block"`. **Auto-close never claims success:** `tasks.jsonl`'s
+  `outcome` and the quality store (`.cage/outcomes.json`, ok|redo) are *different axes*,
+  so the hook writes `outcome="auto"` — closed for compare/estimate/calibration,
+  **invisible to `cage task quality`**. Stamping `ok` would inflate the success rate of
+  every session that merely ended. **Fail-open is absolute** (every event exits 0 on any
+  internal failure; the sole non-zero is the deliberate budget block), and **hooks are
+  CLI-only** — they do not fire under a VS Code extension, so every L1 fact carries that
+  limit (`attest.LIMIT`). Per-agent capability is **ONE table**, `agents.HOOK_EVENTS`,
+  and **every gap is named in output** via `agents.HOOK_GAPS` (kiro has no session-start
+  ⇒ its `agentStop` hook attests but **declines** to auto-close; copilot has no verified
+  pre-tool event ⇒ no attestation, no budget block). **No unverified host event name is
+  ever invented** — an invented one fails silently, the class this project has already
+  paid for twice. Every wired hook command is checked against the **live parser** by
+  `wiringscan` (F1, applied before the fact).
+- **Steering/skills are one source, three deliveries** ([steering.py](cage/steering.py))
+  — a `Doc` is authored once and rendered into `.claude/skills/<id>/SKILL.md` ·
+  `.github/prompts/<id>.prompt.md` · `.kiro/steering/<id>.md`; only the ~10-line host
+  wrapper differs. **Rendered from a Python literal at `cage setup` time, never as a
+  bundled asset** — that removes the drift-check/`--bless`/committed-copy machinery
+  `tools/skillgen` needed, and is why `cage/data/{skills,prompts,steering}/` must stay
+  absent. **The governing content rule: a cage document never computes a number — it
+  runs cage and quotes it.** Method tags verbatim, refusals relayed unsmoothed, no
+  arithmetic. `steering.lint` enforces it mechanically, and `tests/test_skills_layer.py`
+  additionally checks every `cage …` a document names against the **live parser** — a
+  skill teaching a dead verb is the F1 class in prose. L1 ships one steering doc
+  (`cage-context`); **L3 ships seven skills**: task-closer · analyst · doctor-triage ·
+  honesty-reviewer · release · lab-runner · windows-shim. Adding a document = adding one
+  `Doc` to `steering.DOCS`; there is no second copy to keep in step, nothing to re-bless,
+  and **a document on one agent and not the others is not done**.
+- **MCP surface = 9 read tools + exactly ONE write tool** ([mcpserver.py](cage/mcpserver.py),
+  L2 of the agent-surface ladder). Reads: `report`/`attrib`/`matrix`/`budget`/`roi`/
+  `adoption`/`why`/**`verdict`**/**`compare`**. **The refusals are the point** — the two
+  product-question tools routinely decline (`INSUFFICIENT DATA` · `SAVING (GROSS)` · the
+  `MIN_COMPARE_N` block), and each renders through the CLI's *own* renderer so the text
+  crosses **byte-identically** (`tests/test_mcp_layer.py` asserts equality with the CLI,
+  not substring presence): an agent reads an empty result as **zero**, the one thing a
+  refusal never means. **Never add a summarizing layer between a composer and a tool.**
+  The write tool is **`cage_task_outcome`** and it is the *only* mutation in the whole
+  ladder (`mcpserver.WRITE_TOOLS`) — it exists because every starved surface
+  (`compare`/`estimate`/`calibration`/net) is starved for one reason, nobody closes
+  tasks. It goes through `clicmds.close_task`, the **one** task-close path the CLI verb
+  also uses, so the single-token label guard cannot be laxer on the agent-facing side.
+  **Do not add a second write tool by analogy** — the asymmetry is the design.
 - **Wiring — one `<agent>wire.py` per agent (a standing convention):** `claudewire.py`
-  (hooks+MCP), `copilotwire.py` (user-level `~/.copilot/hooks`+MCP+pointer),
-  `kirowire.py` (one `agentStop` Agent Hook+MCP+steering — Kiro's hook file is
-  *one hook per file*: `{name,version,description,when:{type},then:{type,command}}`,
-  not a `hooks[]` container, and Kiro has no session-start trigger so the single
-  `agentStop` hook self-backfills by re-importing the whole log each turn). Each exposes `install`/`status`/
-  `backfill_status`/`realtime_status`; `agents.py` dispatches via the `_WIRE` map (add a
-  row + a `SURFACES` entry for a new agent).
+  (`.mcp.json`), `copilotwire.py` (`.vscode/mcp.json`), `kirowire.py`
+  (`.kiro/settings/mcp.json`). **MCP is the only *required* surface** — capture is
+  pull-based, so `install(root, hooks=False)` is the default and it *strips* every cage
+  hook entry it finds, whichever version wrote it. That single path is both the
+  pre-v0.36 heal and the `--hooks` **off-switch**: foreign entries are never touched, an
+  emptied `hooks` table is dropped rather than left as `{}`, and a file cage reduced to
+  `{}` is removed. `install(root, hooks=True)` wires the opt-in L1 layer. Each module
+  exposes `install`/`status`/`hook_status`; `agents.py` dispatches via the `_WIRE` map
+  (add a row + a `SURFACES` entry for a new agent). **Per-agent hook shapes are
+  load-bearing, not incidental:** Claude uses a `hooks[]` container in
+  `.claude/settings.json` with a `matcher` per event; Copilot uses **repo-level**
+  `.github/hooks/cage.json` (`{"hooks": {"<event>": [{"bash": …}]}}`) — repo-level so a
+  teammate gets it on clone, and the **user-level** `~/.copilot/hooks/cage.json` is
+  always deleted because both sources *combine* and would double-fire; Kiro's file is
+  **one hook per file** (`{name,version,description,when:{type},then:{type,command}}`)
+  and Kiro has **no session-start trigger**. Copilot and Kiro get the
+  `runshim.selflocating_command` git-root one-liner (neither documents a repo variable
+  or a guaranteed hook cwd); Claude gets `${CLAUDE_PROJECT_DIR:-.}`.
   **Committed wiring is portable (plan §5.3):** every project-committed wired
-  file (`.claude/settings.json`, `.mcp.json`, `.vscode/mcp.json`,
-  `.kiro/hooks/*.kiro.hook`) references the committed
+  file (`.mcp.json`, `.vscode/mcp.json`) references the committed
   runtime-resolving shim `.cage/bin/cage-run` ([runshim.py](cage/runshim.py) —
   written by `agents.install`, identical bytes on every machine, resolution:
   PATH → ~/.local/bin/pipx/$VIRTUAL_ENV → `python3 -m cage` → exit 0 silently,
   fail-open) — **never** `paths.cage_bin()`'s absolute path. Per-host reference
   mechanism is documented in each wire module's docstring (Claude:
   `$CLAUDE_PROJECT_DIR` / `${CLAUDE_PROJECT_DIR:-.}`; VS Code:
-  `${workspaceFolder}`; kiro hooks: the `runshim.selflocating_command`
-  git-root one-liner). User-level configs (~/.copilot/hooks,
-  .git/hooks) stay absolute — per-machine by nature. The ONE
-  exception: `.kiro/settings/mcp.json` stays absolute (Kiro spawns MCP servers
-  from its install dir, no workspace variable) — gitignore-advised via doctor.
+  `${workspaceFolder}`). User-level configs, when a future layer writes any
+  (`~/.copilot/hooks`, `.git/hooks`), stay absolute — per-machine by nature.
+  **`.kiro/settings/mcp.json` was the ONE exception and no longer is (v0.41):** Kiro
+  resolves neither the shim nor a variable (it spawns MCP servers from its install dir,
+  #6525/#5659), so the entry is **path-free** — `python3 -m cage mcp`, `kirowire.PATH_FREE`,
+  the one enumeration the writer/migration/doctor all read. Committed, byte-identical,
+  no gitignore exception; `wiringscan`'s kiro spec is `required=True` again. **The trade
+  is named, not buried:** it depends on *which* `python3` resolves, so doctor's
+  **`kiro-mcp`** check asks that interpreter to `import cage` and fails with the fix when
+  it can't (a venv miss is otherwise a *silent* no-MCP — the F1 class one layer up).
+  Windows is a **stated limit**: `python3` is often absent there and a committed file can
+  carry one spelling, so the default is `python3` and doctor points at `cage setup
+  --python-launcher` (which writes `py -3` — machine-specific, gitignore that one file on
+  a mixed-OS team).
   Re-running setup migrates legacy absolute entries (idempotent, printed).
   `cage doctor` has a `portability` check; `cage query portable-wiring`
   explains the design. A new committed file must never embed a machine path —
-  `tests/test_portable_wiring.py` greps for this and must stay green.
+  `tests/test_agents.py::test_committed_wiring_never_carries_resolved_path` and
+  `tests/test_mcp_layer.py` grep for this and must stay green. (CLAUDE.md and the
+  agent-surface prompt both cited a `tests/test_portable_wiring.py`; **no such file has
+  ever existed** — the assertions live in the two files named above.)
   **Restricted endpoints (docs/restricted-environments.md):** opt-in
   python-launcher mode — `cage setup --python-launcher` persists `[wiring]
   python_launcher = true` (project policy, `policy.python_launcher`, written via
@@ -855,10 +982,12 @@ each agent only needs thin idiomatic wiring (`agents.py` orchestrates):
   `python3 -m cage …` / `py -3 -m cage …` so mode switches collapse stale
   entries. Doctor's `portability` check names the mode + warns on policy↔shim
   drift; `cage query restricted-env` explains the tiers.
-  `pointers.py` is now just the shared steering
-  *pointer text* both copilot/kiro embed. Plus `setupcmd.py` (`/cage` skill). All
-  idempotent. Every agent's hook runs
-  the same all-agent sweep (`paths.cage_import_all`) so any agent captures the whole stack.
+  All writes are idempotent and byte-identical (two teammates running `cage setup`
+  must not churn a committed diff). **No skill/steering/pointer asset ships** — the
+  rendered assets and `tools/skillgen` went with the hook machinery; `pointers.py` and
+  `setupcmd.py` no longer exist. Capture is the all-agent sweep
+  (`paths.cage_import_all`), reached by `cage import` / capture-on-read, so any one
+  wired agent meters the whole stack with no hook.
 - **Wiring liveness** ([wiringscan.py](cage/wiringscan.py), v0.32.0) — is an installed
   artifact's cage command still a command? A wiring artifact written before a verb was
   renamed still names the OLD verb, so it exits 1 — and because hook/shim output goes

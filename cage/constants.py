@@ -201,7 +201,7 @@ NET_ATTRIB_WINDOW_S = 120
 NET_SAVED_CONFIDENCE = 0.4
 
 # OTel GenAI semantic-convention version cage's `--otel` export targets
-# (`cage/otelout.py`, docs/otel-export.handoff.md). **The convention is pre-stable**:
+# (`cage/otelout.py`, docs/archive/v0.39-otel-export.handoff.md). **The convention is pre-stable**:
 # as of this version the `gen_ai.*` attributes live in a dedicated repo, carry no 1.0,
 # and names can still change between releases. Cage's determinism law — same ledger +
 # policy ⇒ same output — means cage never silently follows upstream: this is the ONE

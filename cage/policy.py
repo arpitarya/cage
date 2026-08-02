@@ -73,7 +73,8 @@ _SECTIONS = ("prices", "tools", "budgets", "quality", "ledger",
 # rows and the credit table. Everything else in `_SECTIONS` (routing decisions +
 # tunables, incl. `[alias]`) stays in `cage.toml`. `[meta]` is neither — it splits
 # per key: `prices_version`/`prices_date` follow the price file, the rest the policy
-# file, so a mis-split can't silently stop the staleness nag firing (plan §2.1).
+# file, so a mis-split can't silently stop the staleness nag firing (prices-toml
+# plan §2.1 — archived; PLAN.md has no §2.1).
 _PRICE_SECTIONS = ("prices", "credits")
 _PRICE_META_KEYS = ("prices_version", "prices_date")
 

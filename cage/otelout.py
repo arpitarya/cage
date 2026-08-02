@@ -1,5 +1,5 @@
 """`cage data export --otel` — the ledger as OpenTelemetry GenAI-conformant JSON
-(docs/otel-export.handoff.md). One-way REPORTING, exactly like `--csv`: never an
+(docs/archive/v0.39-otel-export.handoff.md). One-way REPORTING, exactly like `--csv`: never an
 import source, never combined with `--study` (the fleet bundle stays jsonl).
 
 **The GenAI semantic conventions are pre-stable.** As of the targeted version

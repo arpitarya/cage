@@ -21,11 +21,14 @@ spec.
 
 ## Active work
 
-- [agent-surface.handoff.md](agent-surface.handoff.md) +
-  [agent-surface.prompt.md](agent-surface.prompt.md) — **all four phases of the agent
-  surface**, gated: P0 residue + floor proof (Sonnet) · P1 MCP incl. the ladder's only
-  write tool (Sonnet) · **P2 hooks + steering (Opus)** · P3 skills (Sonnet). Design of
-  record: [agent-surface-layers.md](proposals/agent-surface-layers.md).
+- [chats-view.handoff.md](chats-view.handoff.md) +
+  [chats-view.prompt.md](chats-view.prompt.md) — **CHATS-VIEW**, `cage insights chats`
+  (Sonnet): per-chat detail view, titled via the labels-only manifest carve-out.
+  Design of record: [chats-view.proposal.md](proposals/chats-view.proposal.md).
+- [agent-vs-human-v2.handoff.md](agent-vs-human-v2.handoff.md) +
+  [agent-vs-human-v2.prompt.md](agent-vs-human-v2.prompt.md) — **HR1, per-commit
+  agent-vs-human** (P1 capture re-wire → P2 commit join → P3 views → P4 time; no USD,
+  guarded `~` hours). Design of record: [agent-vs-human-v2.md](proposals/agent-vs-human-v2.md).
 
 ## The lab manual
 

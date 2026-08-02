@@ -23,7 +23,50 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
 
 ---
 
-## State of play (2026-07-25, updated same day — pick up here on a model switch)
+## State of play (2026-08-02 — pick up here on a model switch)
+
+- **The agent-surface ladder is BUILT, all four phases, in one session.** L0 floor
+  proof · L2 MCP · L1 hooks+steering · L3 skills. **1024/0 ⇒ 1125/0**, uncommitted in
+  tree as **v0.41.0** (v0.40's ADOPT is also unreleased in tree; `__version__` is still
+  `0.39.0`). The proposal and the handoff/prompt pair are archived; `docs/` root carries
+  no agent-surface pair. Read `CLAUDE.md`'s three new architecture bullets (the ladder ·
+  L1-is-not-for-capture · steering/skills) before touching any of it.
+- **The one thing to internalise about this work:** *every layer above L0 is opt-in,
+  two-way, and provably free.* `tests/test_floor.py` installs **all** of them over a
+  fixed ledger and asserts every derived number byte-identical, then strips them and
+  asserts again, per agent. **If a future layer needs a number to move, the layer is
+  wrong.** Add it to `_WIRING_ARTIFACTS`; never relax an assertion there.
+- **In flight / next:** two field-verification items only — **L1-FIELD** (hook shapes
+  never run on a real Claude Code / Copilot / Kiro) and **KIRO-MCP-FIELD** (the
+  committed path-free `python3 -m cage mcp` never started on a real Kiro). Both need a
+  machine, not code. Then **NET-1**, still the product's open question.
+- **Lessons from this session, in order of how much they would cost to relearn:**
+  1. **A committed file can carry ONE spelling.** The handoff said write `python3` on
+     POSIX and `py -3` on Windows for Kiro's MCP — both *committed*, which would churn
+     the diff on every `cage setup` in a mixed-OS team. Named the Windows gap instead of
+     forking the file. When "portable" and "correct on every OS" conflict in a committed
+     artifact, **name the limit**; do not fork.
+  2. **Closing a task is not claiming it succeeded.** `tasks.jsonl`'s `outcome` and
+     `.cage/outcomes.json` (ok|redo) are different stores on different axes — which is
+     what let auto-close write `outcome="auto"` and stay invisible to `cage task
+     quality`. Had they been one field, the hook would have had to lie.
+  3. **Do not invent a host's event name.** Copilot has no pre-tool hook here because
+     cage has no verified event name for one. An invented name fails *silently* — the
+     exact class that cost nine days. Two-of-three **named** beats three-of-three
+     guessed, and `agents.HOOK_GAPS` is where the naming lives.
+  4. **Test a refusal by equality with the CLI's own output, not by substring.** A
+     wrapper that printed `INSUFFICIENT DATA` and dropped the note beneath it passes a
+     substring test. That is the whole failure mode L2 exists to prevent.
+  5. **A mechanical rule will find a real weakness if you let it.** `steering.lint`
+     failed the honesty-reviewer skill for naming no cage command. That was correct — a
+     review skill that never says how to *check* is weaker. Fix the document, not the
+     rule.
+- **Stale-doc warning inherited, not created:** `docs/WORKLOG.md`, `docs/PLAN.md` and
+  `docs/INTERVIEW.md` still link several pre-archive paths (`graphify-capture.plan.md`,
+  `cage-lab-plan.md`, …) that earlier archive sweeps did not re-point. Harmless to read
+  around, but it is the doc-deletion rule unpaid; sweep it on contact.
+
+## State of play (2026-07-25, updated same day — historical)
 
 - **cage is v0.36.0, entirely UNCOMMITTED by Arpit's explicit directive** ("do not
   commit anything yet, we will build few more things"). The working tree carries:
@@ -62,6 +105,15 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
   known debt, not breakage.
 
 ## In flight + the single next step
+
+- **2026-08-02 (Cowork): HR1 is build-ready.** The agent-vs-human v2 proposal was
+  accepted-amended (no USD; guarded `~` human-hours, attestation wins; line-match
+  authorship where **human = residual**); live pair: `agent-vs-human-v2.handoff.md` +
+  `.prompt.md`, slotted after the agent-surface track. Two facts a successor must
+  carry: provenance transcript capture is currently **orphaned** (zero callers — P1
+  re-wires it), and `latency_ms` exists only on lib-metered calls. The v0.36 legacy
+  guards, verbmap tombstones, and provenance `origin="human"` enum are deliberate —
+  do not "clean them up".
 
 **Update 2026-08-01 (latest) — WIN-GF + CI-GF are BUILT (v0.38.0, uncommitted). The
 single next step: push and read the Windows `graphify` CI job.**
@@ -220,6 +272,11 @@ you touch any savings number.**
   (cage-lab L5 is the gate).
 - **Every session updates WORKLOG + IMPLEMENTATION, and this file when direction
   moves** — including Cowork/chat sessions where no code moved.
+- **Every prompt doc states its `**Progress:**` percentage** (2026-08-02, Arpit) —
+  phases of *that* program built over its total, directly under `**Model:**`, counted
+  against evidence rather than the doc's own ticks. He wants to see how far along a
+  piece of work is at the moment the prompt is handed over. Keep it current in the
+  same change as the work; `0%` at hand-off, `100%` in the change that archives.
 
 ## How to work here (the scar tissue)
 

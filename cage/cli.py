@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import argparse
 
-from cage import __version__, clicmds, errors, verbmap
+from cage import __version__, clicmds, errors, hookcmd, verbmap
 from cage.agents import SURFACES
 from cage.report import DIMENSIONS
 
@@ -179,6 +179,21 @@ def build_parser() -> argparse.ArgumentParser:
                     help="persist [wiring] python_launcher=true and wire everything "
                          "via `python3 -m cage` / `py -3 -m cage` — no exe probed or "
                          "executed (restricted endpoints; `cage query restricted-env`)")
+    st.add_argument("--hooks", action="store_true",
+                    help="also wire the opt-in L1 lifecycle hooks (agent identity at "
+                         "capture, auto task-close, budget blocking). OFF by default — "
+                         "capture needs no hooks, and re-running `cage setup` without "
+                         "this flag removes them again. CLI sessions only: hooks do not "
+                         "fire under a VS Code extension")
+    st.add_argument("--skills", action="store_true",
+                    help="also install the opt-in L3 skills — one source text delivered "
+                         "as a Claude skill, a Copilot prompt and a Kiro steering doc. "
+                         "OFF by default; re-running `cage setup` without this flag "
+                         "removes them. A skill never computes a number: it runs cage "
+                         "and quotes it")
+    st.add_argument("--no-hooks", action="store_true",
+                    help="explicitly assert the hookless floor (the default) — a script "
+                         "uses this to state the intent rather than rely on it")
     st.add_argument("--sync-sources", dest="sync_sources", action="store_true",
                     help="refresh the cage-managed [sources] block in cage.toml from the "
                          "built-in defaults (Directive A) — preserves user-added entries; "
@@ -596,10 +611,21 @@ def build_parser() -> argparse.ArgumentParser:
     dbg.add_argument("--json", action="store_true", help="one JSON event per line")
     dbg.set_defaults(fn=clicmds.cmd_debug)
 
-    # Hook entrypoints were removed with the hook machinery (capture is pull-based
-    # now — `cage import` / capture-on-read). The old `hook-*` verbs live in
-    # `verbmap.REMOVED` so stale wiring prints a direction instead of exiting 1
-    # silently.
+    # `cage hook <event>` — the ONE entrypoint the opt-in L1 hooks call
+    # ([hookcmd.py](hookcmd.py)). Hidden from `cage --help` like `mcp`/`debug`: it is
+    # wiring plumbing, not a verb a human types. It must stay a LIVE parser verb
+    # regardless, because `wiringscan` checks every installed hook command against this
+    # parser — a hook naming a dead verb exits 1 into a void, which is the F1 class.
+    # The old pre-rebuild `hook-*` spellings stay in `verbmap.REMOVED` so stale wiring
+    # from before v0.36 still prints a direction instead of failing silently.
+    hk = sub.add_parser("hook", help=argparse.SUPPRESS)
+    hk.add_argument("event", choices=hookcmd.EVENTS)
+    hk.add_argument("--agent", required=True,
+                    help="which agent fired this hook — stamped, never inferred")
+    hk.add_argument("--session", default="", help="the host's session id, if it has one")
+    hk.add_argument("--command", default="",
+                    help="the command an agent ran (hashed for attestation, never stored)")
+    hk.set_defaults(fn=lambda args: hookcmd.run(args))
     return p
 
 

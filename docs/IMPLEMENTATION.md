@@ -16,6 +16,182 @@ Entry format:
 
 ---
 
+## 2026-08-02 — AGENT-L3 **P3**: seven skills, one source, three agents — **the program is complete** (1096/0 ⇒ 1125/0)
+
+- **Milestone:** phase P3, the last of the agent-surface program. All four gates met.
+- **Implemented:**
+  - **Seven skills** in [steering.py](../cage/steering.py), in the design's build order:
+    **task-closer** (needs P1's write tool; every starved surface is starved for want of
+    closed tasks) → **analyst** → **doctor-triage** → **honesty-reviewer** → **release**
+    → **lab-runner** → **windows-shim**.
+  - **`cage setup --skills`** — opt-in, two-way, and *separate from `--hooks`*: they are
+    different layers and a team may want either without the other.
+  - `cage setup --status` now reports all three layers per agent, plus the L1 gaps.
+- **The gate:** `tests/test_skills_layer.py` (29 tests). *No skill computes a number* is
+  enforced two ways — `steering.lint` on banned arithmetic language, and a check that
+  every `cage …` a document names **resolves in the live parser** (a skill teaching a
+  dead verb is the F1 class in prose). *One source, three deliveries* is asserted as
+  **body-byte equality** across claude/copilot/kiro, not by inspection.
+- **The lint earned its keep during the build**: it failed the honesty-reviewer skill
+  for naming no cage command. That was a real weakness — a review skill that never says
+  how to *check* — and it gained a `cage query` / `just test` verification section
+  rather than an exemption. Same for lab-runner, which now writes `cage --version` and
+  `cage doctor --paths` into the run manifest.
+- **Files:** `cage/steering.py` · `cage/{agents,adoptcmd,clicmds,cli}.py` ·
+  `tests/test_skills_layer.py` (new) · `CLAUDE.md` · `README.md` · `docs/FORMULAS.md` ·
+  `docs/example/setup.md`.
+- **Tests:** green — `1125 passed, 10 skipped` (+29). The floor test still passes with
+  **every** layer installed: the program added three layers and moved no number.
+- **Next:** archive the handoff/prompt pair and the proposal (all four phases landed);
+  field-verify the hook shapes and the path-free Kiro MCP on real installs
+  ([L1-FIELD], [KIRO-MCP-FIELD] in OPEN-WORK).
+
+## 2026-08-02 — AGENT-L1 **P2**: hooks + steering, opt-in on three agents, no number moved (1059/0 ⇒ 1096/0)
+
+- **Milestone:** phase P2 of the agent-surface program (the Opus phase) — gate met.
+- **Implemented:**
+  - **`cage hook <event>`** ([hookcmd.py](../cage/hookcmd.py)) — the one entrypoint
+    every agent's hook calls: `session-start` · `session-end` · `tool` · `budget`.
+    Hidden from `--help` but a **live parser verb**, so `wiringscan` checks every wired
+    command against it (F1's lesson, applied before the fact rather than after).
+  - **Agent identity, stamped** ([attest.py](../cage/attest.py)) — `state/attest.jsonl`.
+    Joins the usage breadcrumb on `args_hash`, so `cage insights adoption`'s half A
+    stops being agent-blind. **A hash two agents claim resolves to unknown**, never a
+    pick. Commands are **hashed, never stored**.
+  - **Auto task-close** on the exact session id, with `outcome="auto"` — closed for
+    compare/estimate/calibration, **invisible to `cage task quality`**. Kiro carries no
+    session id and therefore **declines** rather than closing by proximity.
+  - **`budget.check` finally has a caller** — `cage hook budget` exits 2 under
+    `on_exceed = "block"`, 0 (with a warning) under `warn`.
+  - **Steering** ([steering.py](../cage/steering.py)) — one `Doc`, three deliveries,
+    rendered from a Python literal at setup time (no bundled asset, no drift check, no
+    `--bless`). `steering.lint` enforces *a document never computes a number*
+    mechanically.
+  - **Wiring**: `cage setup --hooks` (opt-in; plain `cage setup` is the off-switch),
+    all three `<agent>wire.py` modules, `wiringscan` hook specs, an `attest-log`
+    cleanup class, `cage setup --status` showing the layer **and its gaps**, and a new
+    `cage query agent-layers`.
+- **The gate, and the evidence:** `tests/test_floor.py` now installs **hooks too** —
+  the full layer set — and still asserts ledger bytes and seven views byte-identical in
+  both directions. `tests/test_hooks_layer.py` (37 tests) adds: opt-in, two-way switch,
+  byte-identical re-install, no machine path in any committed hook file, every wired
+  verb live in the parser, **no double capture** (asserted on the shard bytes), every
+  event exits 0 with every dependency raising, and every gap named.
+- **Decisions worth keeping:**
+  - **No unverified host event name was invented.** Copilot gets session identity and
+    auto task-close but no per-tool attestation and no budget block, because cage has
+    never itself written or tested a Copilot pre-tool hook. That gap is in
+    `agents.HOOK_GAPS` and printed by `cage setup --status` — two-of-three *named* beats
+    three-of-three *guessed*.
+  - **Attestation fixes adoption's half A only.** Half B's `NO_LINK` is still
+    structurally true (a graphify savings id folds in an answer hash no attestation can
+    reconstruct), so ADOPT-COV is **not** closed by this phase.
+- **Files:** `cage/hookcmd.py` · `cage/attest.py` · `cage/steering.py` (all new) ·
+  `cage/{agents,claudewire,copilotwire,kirowire,adoption,cleanup,wiringscan,clicmds,cli,adoptcmd,paths,explain_data}.py` ·
+  `tests/test_hooks_layer.py` (new) · `tests/test_floor.py` · `CLAUDE.md` · `README.md`.
+- **Tests:** green — `1096 passed, 10 skipped` (+37).
+- **Next:** **P3 (L3 · skills, Sonnet)** — seven skills through `steering.py`'s existing
+  one-source-three-deliveries renderer; no skill computes a number.
+
+## 2026-08-02 — AGENT-L2 **P1**: MCP verdict/compare + the one write tool; kiro MCP goes path-free (1039/0 ⇒ 1059/0)
+
+- **Milestone:** phase P1 of the agent-surface program — gate met, P2 unblocked.
+- **Implemented:**
+  - **`cage_verdict` + `cage_compare`** ([mcpserver.py](../cage/mcpserver.py)) — the two
+    views that answer *"is this tool worth keeping"* and were the only ones missing.
+    Both render through the **CLI's own renderer over the CLI's own composer**, so
+    `INSUFFICIENT DATA`, `SAVING (GROSS)` and the `MIN_COMPARE_N` block cross the
+    boundary **byte-identically** — asserted as *equality with the CLI's stdout*, not as
+    substring presence, because substring tests permit exactly the summarizing layer
+    this rule forbids. `verdict` stays a pure composer; no new statistic was needed.
+  - **`cage_task_outcome`** — the ladder's **only** write tool, pinned as such
+    (`mcpserver.WRITE_TOOLS`, a test, and the module docstring where the next reader
+    will look). It goes through the new **`clicmds.close_task`**, extracted so the CLI
+    verb and the tool share one label guard, one append, one wording.
+  - **Kiro's MCP config is committed** — the last portability exception, closed.
+    `kirowire.PATH_FREE` (`python3 -m cage mcp`) carries no path at all, so the file is
+    byte-identical across machines; `install` migrates a legacy absolute entry **and
+    says it did**; `wiringscan`'s kiro spec is `required=True` again.
+  - **New doctor check `kiro-mcp`** — path-free buys portability with a dependency on
+    *which* `python3` resolves, so doctor resolves it and asks **that interpreter** to
+    import cage. A venv miss is otherwise a silent no-MCP (the F1 class, one layer up).
+    Windows is a **stated limit**, not a silent one: `python3` is often absent there,
+    and the check names `cage setup --python-launcher` as the per-machine fix.
+- **Files:** `cage/mcpserver.py` · `cage/clicmds.py` · `cage/kirowire.py` ·
+  `cage/doctorcmd.py` · `cage/wiringscan.py` · `cage/explain_data.py` ·
+  `tests/test_mcp_layer.py` (new, 20) · `tests/test_agents.py` · `tests/test_doctor.py` ·
+  `README.md` · `CLAUDE.md` · `docs/example/setup.md`.
+- **Tests:** green — `1059 passed, 10 skipped` (+20). Floor test still green: the new
+  layer moved no number.
+- **Correction to the spec:** CLAUDE.md and the prompt both cite
+  `tests/test_portable_wiring.py` as the grep gate. **No such file has ever existed** —
+  the assertions live in `tests/test_agents.py` and now `tests/test_mcp_layer.py`.
+  CLAUDE.md now says so.
+- **Next:** **P2 (L1 · hooks + steering, Opus)** — agent identity at capture and auto
+  task-close, opt-in, on all three agents, proving hooks change no number.
+
+## 2026-08-02 — AGENT-L0 **P0**: skill residue cleared, the floor proven (1024/0 ⇒ 1039/0)
+
+- **Milestone:** phase P0 of the agent-surface program
+  ([handoff](archive/v0.41-agent-surface.handoff.md) · [prompt](archive/v0.41-agent-surface.prompt.md)) — gate met,
+  P1 unblocked.
+- **Implemented:**
+  - **`tests/test_floor.py` (new, 15 tests) — the floor proof, built *before* the layers
+    it judges.** Per agent (`agents.SURFACES`, parametrized — a missing agent is a
+    failure, never a narrower run): a project with **zero** wiring artifacts imports that
+    agent's real CLI session log to the corpus's exact expected rows, and every derived
+    view renders. Then the acceptance criterion for P1–P3: `agents.install` on the
+    *same* already-captured project must leave the ledger shards **and seven views'
+    stdout byte-identical**, and stripping the wiring again must too. Plus:
+    `agents.install` is byte-identical on a second run (multi-user hygiene), no
+    skill/prompt/steering asset ships, `setup --no-skill` exits 2, and no live doc
+    claims a skill.
+  - `_WIRING_ARTIFACTS` enumerates every project path any layer writes (L1 hook files,
+    L2 MCP configs, L3 skill/prompt/steering, the shim). **A new layer is wired into the
+    floor by adding a row — never by relaxing an assertion.**
+  - **Residue removed.** README ×3 (the wizard line, `--no-skill` in the adopting note,
+    *"the `cage` skill on **all four agents**"* — wrong twice: no skill ships, and there
+    have been **three** agents since v0.33; all three were live on PyPI). `--no-skill`
+    itself was already gone from the parser — verified, now regression-pinned.
+  - **Stale live spec corrected on contact:** CLAUDE.md's wiring bullet claimed
+    `claudewire` wires `hooks+MCP`, a kiro `agentStop` hook, `backfill_status`/
+    `realtime_status`, `pointers.py` and `setupcmd.py` — **all five are gone**; it now
+    describes MCP-only wiring plus the heal path, and records Kiro's hook shape as a
+    forward note for L1. `docs/example/setup.md` (a copy-from contract) said setup writes
+    "hooks + MCP config + skill/steering pointers, plus the local git commit hooks" —
+    it writes **none** of those. `paths.bundled_data` docstring.
+  - `claudewire._strip_stale_hooks` **kept** (migration, not residue — per the handoff).
+- **Files:** `tests/test_floor.py` (new) · `README.md` · `CLAUDE.md` ·
+  `docs/example/setup.md` · `cage/paths.py` (docstring) · `docs/OPEN-WORK.md` ·
+  `docs/WORKLOG.md`. **No behaviour change** — no cage module's logic was touched.
+- **Tests:** green — `1039 passed, 10 skipped` (was 1024/10; +15).
+- **Next:** **P1 (L2 · MCP, Sonnet)** — `cage_verdict` + `cage_compare` with the
+  refusals crossing verbatim, and `cage_task_outcome`, the ladder's only write tool;
+  plus Kiro's MCP moving to the committed path-free `python3 -m cage mcp` form and the
+  doctor check that the resolved interpreter can import cage.
+
+## 2026-08-02 — PLAN.md de-staled; §8 anchors created (docs + 2 comments)
+
+- **Milestone:** the design of record no longer describes removed features as current,
+  and every `plan §X` cited from code resolves.
+- **Implemented:**
+  - `docs/PLAN.md` header — "Nothing built yet" replaced with an honest status; added
+    reader's notes for the marked-never-renumbered rule, the v0.36 hookless rebuild, and
+    the three-agent count.
+  - **§5.1** (`tools/skillgen`) and **§3.8** (`cage data limits`) marked **REMOVED**,
+    numbers retained for citation stability.
+  - **§8.1–§8.8 anchors added** — five shipped modules cited them; the section had no
+    subsections. Numbering flagged load-bearing.
+  - Inline: 3 Codex enumerations, 2 "four agents" claims, 1 moot hook example.
+  - `cage/policy.py` + `cage/transcript.py` — two bare `plan §2.1` comments qualified to
+    the archived plans they actually mean.
+- **Verified:** anchor sweep over every `plan §X` in `cage/*.py` ⇒ **no dangling
+  references into PLAN.md**; both edited modules parse.
+- **Files:** `docs/PLAN.md` · `cage/policy.py` · `cage/transcript.py` · `docs/WORKLOG.md`
+- **Tests: NOT RUN** — sandbox is Python 3.10. Docs + comments only; run `just test`
+  before commit.
+- **Next step:** the agent-surface program from P0.
+
 ## 2026-08-02 — `cage insights adoption` (ADOPT) built and green
 
 - **Milestone:** the README's third capability claim ("which tools your agents actually

@@ -819,9 +819,16 @@ REGISTRY: tuple[Explanation, ...] = (
         "  python3 -m cage → exit 0 silently. cage absent ⇒ a working (unmetered)\n"
         "  editor, no noise (fail-open extended to wiring; `cage doctor` diagnoses).\n"
         "  Per host: .mcp.json uses the documented ${{CLAUDE_PROJECT_DIR:-.}}\n"
-        "  expansion; .vscode/mcp.json uses ${{workspaceFolder}}. The ONE\n"
-        "  exception: .kiro/settings/mcp.json must stay absolute (Kiro spawns MCP\n"
-        "  servers from its install dir, no workspace variable) — gitignore it.\n"
+        "  expansion; .vscode/mcp.json uses ${{workspaceFolder}}. Kiro resolves\n"
+        "  NEITHER (it spawns MCP servers from its install dir and substitutes no\n"
+        "  variables), so .kiro/settings/mcp.json used to be the ONE exception and\n"
+        "  had to be gitignored. It no longer is: it carries no path AT ALL —\n"
+        "  `python3 -m cage mcp`, resolved through PATH like any interpreter — so it\n"
+        "  is byte-identical everywhere and COMMITTED like the other two. The price,\n"
+        "  named not buried: it depends on WHICH python3 resolves, so `cage doctor`'s\n"
+        "  kiro-mcp check asks that interpreter to import cage and says so if it\n"
+        "  can't. On Windows `python3` is often absent — doctor names that too, and\n"
+        "  `cage setup --python-launcher` writes the `py -3` form for that machine.\n"
         "  Re-running `cage setup` migrates legacy absolute entries and prints what\n"
         "  moved; `cage doctor` has a portability check and names the wiring mode.\n"
         "  Opt-in python-launcher mode (`cage setup --python-launcher`, persisted as\n"
@@ -951,9 +958,9 @@ REGISTRY: tuple[Explanation, ...] = (
         "  priority) > not wired (nothing present — purely informational, never a\n"
         "  warning) > partially wired (some but not all of the agent's REQUIRED\n"
         "  pieces present — names what's missing) > fully wired. Each agent's only\n"
-        "  wired surface now is its MCP entry; 'Required' excludes the known gitignore\n"
-        "  exception (Kiro's project .kiro/settings/mcp.json must stay absolute, see\n"
-        "  `portable-wiring`), whose absence is normal, never a partial install.\n"
+        "  wired surface now is its MCP entry — all three committed and machine-\n"
+        "  independent since kiro's went path-free (`portable-wiring`), so there is no\n"
+        "  longer a gitignore exception to exclude from 'Required'.\n"
         "  Pre-removal hook/skill leftovers surface as separate leftover/dead rows,\n"
         "  never as part of an agent's expected set.\n"
         "  No per-artifact VERSION is shown — artifacts are stampless, so a\n"
@@ -1046,7 +1053,7 @@ REGISTRY: tuple[Explanation, ...] = (
         "cage.method survives on every savings row — a modeled/estimated figure can\n"
         "  never arrive at a vendor looking measured; calls are the ledger's own\n"
         "  ground truth.",
-        kind="concept", plan_ref="otel-export.handoff.md"),
+        kind="concept", plan_ref="archive/v0.39-otel-export.handoff.md"),
     Explanation(
         "tool-adoption", ("adoption", "adopt", "invoked", "invocation", "usage",
                           "breadcrumb", "never-invoked", "agent-unknown", "uptake",
@@ -1080,4 +1087,41 @@ REGISTRY: tuple[Explanation, ...] = (
         "no method tag: these are COUNTS of recorded rows, not an estimate — the only\n"
         "  claims are 'this many rows exist' and 'this many join to an agent'.",
         kind="concept", plan_ref="archive/v0.40-insights-adoption.proposal.md"),
+    Explanation(
+        "agent-layers", ("layers", "ladder", "l0", "l1", "l2", "l3", "opt-in",
+                         "hooks-optional", "attestation", "attest", "steering",
+                         "hookless", "floor", "auto-close"),
+        "the four-layer agent surface: what each layer adds, and what happens without it",
+        "FOUR LAYERS, each optional above the first, each strictly additive:\n"
+        "  L0 HOOKLESS — the floor, and NOT optional: pull capture (`cage import`,\n"
+        "    capture-on-read), the PATH interceptor, every CLI view. This is cage.\n"
+        "  L1 HOOKS + STEERING (`cage setup --hooks`) — NOT for capture, which already\n"
+        "    works without it. It exists for the two things pull capture structurally\n"
+        "    cannot do: (a) AGENT IDENTITY, because a hook runs inside the agent and\n"
+        "    can state which one fired it as a fact instead of inferring it, and\n"
+        "    (b) AUTO TASK-CLOSE on the session boundary, which unblocks compare /\n"
+        "    estimate / calibration — all starved because nobody closes tasks. It also\n"
+        "    gives `budget.check` its first real caller: with [budgets] on_exceed =\n"
+        "    'block', a hook can stop a paid call BEFORE it happens.\n"
+        "  L2 MCP — the agent pulls cage's views mid-session, refusals included.\n"
+        "  L3 SKILLS — procedural knowledge: when to ask, and how to relay an answer\n"
+        "    without smoothing it.\n"
+        "  THE BINDING RULE: L0 must work perfectly, alone, forever. Adding or removing\n"
+        "  any layer above it changes NO number — asserted in tests/test_floor.py, in\n"
+        "  both directions, per agent. If a layer needed a number to move, the layer\n"
+        "  would be wrong, not the number.\n"
+        "  AUTO-CLOSE NEVER CLAIMS SUCCESS: a session ending is not a job well done, so\n"
+        "  the hook writes outcome='auto' — closed for cost comparison, INVISIBLE to\n"
+        "  `cage task quality`, which counts only ok/redo. Stamping 'ok' would inflate\n"
+        "  the success rate of every session that merely finished.\n"
+        "  HOOKS ARE CLI-ONLY — they do not fire under a VS Code extension, so every\n"
+        "  L1-derived fact is a CLI-session fact and says so wherever it is shown.\n"
+        "  Per-agent capability is one table (`agents.HOOK_EVENTS`) and every gap is\n"
+        "  NAMED in output (`agents.HOOK_GAPS`): kiro has no session-start trigger, so\n"
+        "  its single agentStop hook attests the agent but DECLINES to auto-close a\n"
+        "  task — closing the most recent one would be attribution by proximity.",
+        ("cage/hookcmd.py", "cage/attest.py", "cage/steering.py", "cage/agents.py"),
+        "n/a — describes the layer contract, not a number. That is the point: no layer\n"
+        "  above L0 may move one.",
+        kind="concept", plan_ref="archive/v0.41-agent-surface-layers.proposal.md"),
 )

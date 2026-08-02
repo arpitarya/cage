@@ -202,18 +202,30 @@ def cmd_quality(args) -> int:
 _LABEL = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,31}\Z")
 
 
-def cmd_outcome(args) -> int:
-    r = ledger_root()
-    label = getattr(args, "label", None) or ""
+def close_task(root, task: str, *, redo: bool = False, label: str = "") -> str:
+    """Record a task's outcome and return the confirmation line.
+
+    **The one task-close path**, shared by `cage task outcome` and the MCP
+    `cage_task_outcome` tool (the ladder's only write tool) — so the label guard,
+    the append-only semantics and the wording cannot diverge between the two
+    surfaces. Both writes are appends: `tasks.jsonl` is last-write-wins by id, so
+    re-closing a task supersedes the earlier row and never rewrites it.
+    """
+    label = label or ""
     if label and not _LABEL.match(label):
         # Single-token PII guard (roadmap P2): a label is a grouping key for
         # `cage insights compare --by label`, never free text, a path, or a message.
         raise CageError("label must be one short token (letters/digits/._-, ≤32 chars) "
                         "— no spaces, slashes, or paths")
-    quality.record_outcome(r, args.task, ok=not args.redo)
-    tasks.record(r, args.task, outcome="ok" if not args.redo else "redo", label=label)
+    quality.record_outcome(root, task, ok=not redo)
+    tasks.record(root, task, outcome="redo" if redo else "ok", label=label)
     tag = f" (label: {label})" if label else ""
-    print(f"✔ recorded {args.task!r} as {'redo' if args.redo else 'ok'}{tag}.")
+    return f"✔ recorded {task!r} as {'redo' if redo else 'ok'}{tag}."
+
+
+def cmd_outcome(args) -> int:
+    print(close_task(ledger_root(), args.task, redo=args.redo,
+                     label=getattr(args, "label", None) or ""))
     return 0
 
 
@@ -406,6 +418,27 @@ def _note_prices_migration(migrated) -> None:
         print(f"  ✔ moved model prices → {migrated} (routing decisions stay in cage.toml)")
 
 
+def _hooks(args) -> bool:
+    """The `cage setup --hooks` switch (L1, opt-in).
+
+    Default **False** and deliberately so: the hookless floor must be what you get by
+    doing nothing, and `agents.install(hooks=False)` also *removes* cage's hook entries,
+    so re-running plain `cage setup` is the documented off-switch. `--no-hooks` is
+    accepted for symmetry and is what a script uses to assert hooklessness explicitly."""
+    if getattr(args, "no_hooks", False):
+        return False
+    return bool(getattr(args, "hooks", False))
+
+
+def _skills(args) -> bool:
+    """The `cage setup --skills` switch (L3, opt-in).
+
+    Separate from `--hooks` because they are separate layers: a team can want the
+    procedural documents without the lifecycle hooks, or the reverse. Both default off
+    and both are two-way — a plain `cage setup` removes whichever is present."""
+    return bool(getattr(args, "skills", False))
+
+
 def cmd_setup(args) -> int:
     import sys
 
@@ -443,8 +476,29 @@ def cmd_setup(args) -> int:
 
     # Handle --status: report current wiring and exit
     if getattr(args, "status", False):
+        from cage import steering
+        l1, l3 = steering.by_layer("L1"), steering.by_layer("L3")
         for surface, on in agents.status(here).items():
-            print(f"  {'✔' if on else '·'} {surface:<8} {'wired' if on else 'not wired'}")
+            wire = agents._WIRE[surface]
+            n = wire.hook_status(here)
+            doc = sum(1 for d in l1 if steering.paths_for(here, d)[surface].exists())
+            skill = sum(1 for d in l3 if steering.paths_for(here, d)[surface].exists())
+            extra = []
+            if n:
+                extra.append(f"L1 hooks ×{n}")
+            if doc:
+                extra.append(f"steering ×{doc}")
+            if skill:
+                extra.append(f"L3 skills ×{skill}")
+            tail = f"  [{' · '.join(extra)}]" if extra else ""
+            print(f"  {'✔' if on else '·'} {surface:<8} "
+                  f"{'MCP wired' if on else 'not wired'}{tail}")
+        if any(agents._WIRE[s].hook_status(here) for s in agents.SURFACES):
+            # A capability one agent lacks is printed, never left to be discovered as
+            # "nothing happened" — the three-agent invariant applies to the LIMITS too.
+            print("\n  L1 limits:")
+            for line in agents.hook_gap_lines():
+                print(f"    · {line}")
         return 0
 
     # Persist the wiring mode FIRST (docs/restricted-environments.md): the flag is a
@@ -470,7 +524,7 @@ def cmd_setup(args) -> int:
             print("e.g. `cage setup --wire-only --claude`")
             return 2
         print("✔ Cage wired into:")
-        for surface, where in agents.install(here, flagged).items():
+        for surface, where in agents.install(here, flagged, hooks=_hooks(args), skills=_skills(args)).items():
             print(f"  {surface:<8} → {', '.join(where.values())}")
         print("Metering: pull-based — `cage import` (or `cage data meter -- <cmd>` / `cage data proxy`).")
         return 0
@@ -521,7 +575,7 @@ def cmd_setup(args) -> int:
         print(f"\n▸ cage setup — {agent}")
         if getattr(args, "project", True):
             res = adoptcmd.run(here, graphify=getattr(args, "graphify", True),
-                               surfaces=(agent,))
+                               surfaces=(agent,), hooks=_hooks(args), skills=_skills(args))
             print(f"  ✔ .cage/ ready → {res['init']}")
             if "shim" in res:
                 print(f"  ✔ graphify interceptor → {res['shim']}")
@@ -530,7 +584,7 @@ def cmd_setup(args) -> int:
             for surface, where in res.get("hooks", {}).items():
                 print(f"  ✔ {surface:<8} → {', '.join(where.values())}")
         else:
-            for surface, where in agents.install(here, (agent,)).items():
+            for surface, where in agents.install(here, (agent,), hooks=_hooks(args), skills=_skills(args)).items():
                 print(f"  ✔ {surface:<8} → {', '.join(where.values())}")
     print("\nDone. Verify with `cage doctor`; capture with `cage import`; then `cage report`.")
     return 0
