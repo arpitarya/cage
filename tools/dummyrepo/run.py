@@ -1203,11 +1203,23 @@ def s18_stale_wiring(base: Path) -> str:
         raise Fail("doctor did not report the dead graphify interceptor")
 
     expect_ok(repo, env, "setup", "--wire-only", "--all")
-    body = settings.read_text(encoding="utf-8")
     # Hookless heal: a stale cage hook entry is STRIPPED, not rewritten to the current
     # verb (cage no longer wires hooks) — so the dead verb must be gone entirely.
-    if "import-claude" in body:
-        raise Fail("re-running setup did not strip the dead cage hook")
+    #
+    # **And here it goes with the whole file.** Cage planted nothing else in this
+    # settings file, so stripping its entry empties the object, and `claudewire` then
+    # drops the emptied `hooks` table and *unlinks* a file it alone reduced to `{}` —
+    # otherwise every off-switch would leave a permanent committed diff. An ABSENT file
+    # is therefore the strongest possible form of "the dead verb is gone", not a
+    # failure: this scenario used to `read_text()` it unconditionally and die with
+    # FileNotFoundError on the correct outcome. Assert the removal rather than tolerate
+    # it — it is documented behaviour with no other scenario covering it.
+    if settings.exists():
+        body = settings.read_text(encoding="utf-8")
+        if "import-claude" in body:
+            raise Fail("re-running setup did not strip the dead cage hook")
+        raise Fail("cage reduced settings.json to nothing of anyone's but left the "
+                   f"file behind — an empty settings file is a diff with no meaning:\n{body}")
     shim = (bin_dir / "graphify").read_text(encoding="utf-8")
     if "cage data graphify" not in shim:
         raise Fail("re-running setup did not refresh the stale graphify interceptor")
@@ -1215,11 +1227,18 @@ def s18_stale_wiring(base: Path) -> str:
     doc2 = cage(repo, env, "doctor").stdout
     if "is not a command" in doc2 or "UNMETERED" in doc2:
         raise Fail(f"doctor still reports dead wiring after the heal:\n{doc2}")
-    before = settings.read_bytes() + (bin_dir / "graphify").read_bytes()
+    # Absent reads as b"" on both sides — the file stays removed across a re-heal, which
+    # is itself part of "byte-identical" (a re-setup must not resurrect an empty file).
+    def wiring_bytes() -> bytes:
+        s = settings.read_bytes() if settings.exists() else b""
+        return s + (bin_dir / "graphify").read_bytes()
+
+    before = wiring_bytes()
     expect_ok(repo, env, "setup", "--wire-only", "--all")
-    if settings.read_bytes() + (bin_dir / "graphify").read_bytes() != before:
+    if wiring_bytes() != before:
         raise Fail("healing an already-healed tree was not byte-identical")
-    return "dead verb + dead interceptor detected · healed by re-setup · idempotent"
+    return ("dead verb + dead interceptor detected · healed by re-setup "
+            "(emptied settings file removed) · idempotent")
 
 
 # id → (phase that ships it, callable or None-if-pending)

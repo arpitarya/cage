@@ -16,6 +16,43 @@ Entry format:
 
 ---
 
+## 2026-08-03 — CI-S18: the `build` gate goes green again (v0.46.1)
+
+- **Found while verifying the v0.46.0 release**, not reported by anyone: the `build` job
+  had been failing on **all nine** platform legs since v0.45.0, and two releases shipped
+  straight through it. `publish-pypi` fires on `release: published` with **no `needs`
+  link to `build`** (deliberate — CLAUDE.md), so neither publish was compromised; the
+  cost was a gate everyone had learned to ignore.
+- **Diagnosis: the harness asserted the pre-hookless heal.** `tools/dummyrepo` S18 plants
+  a stale pre-v0.36 cage hook in `.claude/settings.json`, heals it with `cage setup`, and
+  then re-read that file to assert the dead verb was gone. Cage plants nothing else
+  there, so the strip empties the object and `claudewire._wire_hooks` **unlinks a file it
+  alone reduced to `{}`** (so an off-switch leaves no permanent diff). The scenario died
+  with `FileNotFoundError` **on the correct outcome** — a test encoding an expectation
+  the product had deliberately moved past.
+- **Implemented:** S18 now *asserts* the removal rather than tolerating it (absence is
+  the strongest form of "the dead verb is gone", and it is documented behaviour no other
+  scenario covered); a file left behind is a named failure that prints its contents; the
+  byte-identical idempotency check reads absent as `b""` on both sides, so a re-heal
+  cannot resurrect an empty file either.
+- **No product code changed** — nothing under `cage/` is touched by this release.
+- **Files:** `tools/dummyrepo/run.py` · `cage/__init__.py` (0.46.1) · CHANGELOG · README ·
+  OPEN-WORK (new **CIGF-HERMETIC** row) · DOC-REGISTRY.
+- **Tests:** `just test` 1462/0 · `python -m tools.dummyrepo` **17/17 PASS** (was 16/17
+  with S18 erroring) · `python -m tools.cigraphify` green in CI on all three OSes.
+- **Also found, filed not fixed (CIGF-HERMETIC):** `tools/cigraphify` is **not runnable
+  on a developer machine**. It builds its sandbox as a sibling of the repo, so on a dev
+  box that path sits under `$HOME` — and `paths.resolve_root` walks up and adopts the
+  real `~/.cage`, making `cage setup --project-only` scaffold into the *home* root
+  instead of the sandbox (3 of 7 checks fail). CI has no ancestor `.cage`, so it passes
+  there and the gap is invisible. Same family as the cage-lab PATH rule in CLAUDE.md: a
+  lab that is not hermetic against the developer's machine cannot be verified before
+  pushing. **Caution for whoever picks it up:** running that leg from under `$HOME`
+  writes to the real `~/.cage` (it rewrote `cage.toml`/`prices.toml` here — idempotent
+  and non-destructive, ledger untouched, `cage doctor` green after).
+- **Next:** tier 2's three decisions; CIGF-HERMETIC when someone needs to verify the
+  graphify leg locally.
+
 ## 2026-08-03 — CHATS-AUTHOR: the `agent%` column on `cage insights chats` (1442/0 ⇒ 1462/0)
 
 - **Phase 0 gate (REV-TS) verified before any work** — `commitjoin.norm_ts` normalizes,

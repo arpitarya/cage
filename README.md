@@ -236,7 +236,7 @@ Every derived view is parse / arithmetic over the log — **no LLM call, ever, o
 
 Latest release below — full history and detail in [CHANGELOG.md](CHANGELOG.md).
 
-- **v0.46.0 (2026-08-03) — `agent%`: did this chat's tokens become code?** `cage insights chats` gains one column — per chat, the share of evidenced landed lines that matched the agent's own proposals, read from the authorship rows rather than re-derived. Where cage has no evidence it prints `—` with the reason, never a `0%`. See [CHANGELOG.md](CHANGELOG.md).
+- **v0.46.1 (2026-08-03) — CI green again.** The `build` job had been red on all nine legs since v0.45.0: scenario S18 asserted the *pre-hookless* heal, re-reading a settings file that cage correctly **removes** once its own entry is stripped. The harness now asserts that removal; no product code changed. (v0.46.0 shipped `agent%` on `cage insights chats` — see [CHANGELOG.md](CHANGELOG.md).)
 
 ## The name
 

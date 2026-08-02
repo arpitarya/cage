@@ -2,6 +2,27 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
+## v0.46.1 (2026-08-03) — CI green again: S18 asserted the pre-hookless heal
+
+**The `build` job had been red on all nine platform legs since v0.45.0**, and both
+releases shipped through it — `publish-pypi` fires on `release: published` and has no
+`needs` link to `build` (deliberate, CLAUDE.md), so the published artifacts were never
+in question. But a red gate that stays red teaches everyone to ignore it.
+
+**It was the scenario harness, not the product.** S18 plants a stale pre-v0.36 cage hook
+in `.claude/settings.json`, heals it with `cage setup`, then re-read the file to assert
+the dead verb was gone. Cage plants nothing else there, so stripping its entry empties
+the object — and `claudewire` then drops the emptied `hooks` table and **unlinks a file
+it alone reduced to `{}`**, because otherwise every off-switch leaves a permanent
+committed diff. The scenario died with `FileNotFoundError` **on the correct outcome**.
+
+- S18 now **asserts the removal** instead of tolerating it — an absent file is the
+  strongest form of "the dead verb is gone", and this is documented behaviour that no
+  other scenario covered. A file left behind is now a named failure with its contents.
+- The idempotency check reads absent as `b""` on both sides, so a re-heal must not
+  resurrect an empty file either.
+- Product code is **untouched**: no `cage/` module changed in this release.
+
 ## v0.46.0 (2026-08-03) — `agent%`: did this chat's tokens become code?
 
 Built from: [handoff](docs/archive/v0.46-chats-author.handoff.md) ·

@@ -12,6 +12,32 @@ by milestone) — the worklog is what *happened this session*.
 
 ---
 
+## 2026-08-03 — Claude Code — CI-S18: the build gate goes green again (v0.46.1)
+
+- **Asked:** "fix cicd and publish a new version" — after the v0.46.0 release surfaced a
+  red `build` job.
+- **Done:** root-caused and fixed S18, released v0.46.1. **The failure was pre-existing**
+  (v0.45.0 failed identically on all nine legs) and **not a product bug**: the scenario
+  re-read a `.claude/settings.json` that `claudewire` correctly *unlinks* once cage's own
+  entry is stripped and nothing of anyone else's remains. It died with FileNotFoundError
+  on the right answer. S18 now **asserts** the removal — documented behaviour that had no
+  scenario covering it. No `cage/` module changed.
+- **Decided:** assert the removal rather than guard it with `if exists()`. A tolerated
+  outcome is untested; the crash was pointing at a real coverage hole.
+- **Found, filed not fixed (CIGF-HERMETIC):** `tools/cigraphify` cannot run on a dev
+  machine at all — its sandbox is a sibling of the repo, so under `$HOME` the root
+  resolver walks up and adopts the real `~/.cage`. CI has no ancestor `.cage`, so it is
+  green there and nobody sees it.
+- **My error, reported:** diagnosing that, I ran `cage setup` from a probe dir under
+  `$HOME` and it rewrote the real `~/.cage/{cage.toml,prices.toml}`. Verified
+  non-destructive (setup is idempotent, ledger mtime predates it, `cage doctor` green,
+  52,576 rows intact) and cleaned up every sandbox I created — but the lesson is the
+  filed item's own: **never run a capture-path probe from inside `$HOME`.**
+- **Open:** the two releases that shipped through a red gate are worth a glance —
+  `publish-pypi` has no `needs` link to `build` by design, so nothing published was
+  affected, but a gate that stays red trains people to ignore it.
+- **Next:** tier 2's three decisions.
+
 ## 2026-08-03 — Claude Code — CHATS-AUTHOR: `agent%` on `cage insights chats` (1442/0 ⇒ 1462/0)
 
 - **Asked:** execute the CHATS-AUTHOR prompt — the `agent%` authorship column, behind a
