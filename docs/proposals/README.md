@@ -14,7 +14,27 @@ comment in the code — write the proposal, keep the code clean.
 Distinct from [compare/](../compare/): a proposal is an idea with no live
 competitor yet; a compare doc weighs two+ options that are both on the table now.
 
-Naming: `<topic>.proposal.md`. Written in short points, not walls of prose.
+## The format (audited 2026-08-03 — all 11 conform)
+
+Every file in this directory must satisfy all four. They are checkable, so check them
+rather than eyeballing:
+
+| rule | what it means |
+|---|---|
+| **Name** | `<topic>.proposal.md` — never a bare `<topic>.md`, and the topic is **the idea, not the file it patches or the release that raised it**. `claude-md-hr1` and `v044-review-hardening` were both wrong this way (fixed 2026-08-03); version prefixes belong to `archive/` alone |
+| **Frontmatter** | `doc:` (one line, takeaway first) · `status: proposed` · `raised:` · `owner:` or `trigger:` |
+| **`status:`** | the literal word `proposed` — not "held for review", not "AWAITING REVIEW". A held steering edit says so in a `held:` key, so the status vocabulary stays sortable |
+| **Paragraphs** | ≤4 lines (CLAUDE.md *Documentation style*). Short points, one idea each, takeaway first; tables for comparisons |
+
+Two more that bite in practice:
+
+- **Evidence must be reachable.** Link `docs/regression/` or `docs/research/`, never a
+  gitignored scratch path — a proof a teammate cannot open is not a proof.
+- **Implemented phases are REMOVED, not struck through.** Same law as OPEN-WORK: this
+  folder must read as *ideas not yet built*. The record goes to `IMPLEMENTATION.md`,
+  and any divergence the build chose is stated there — the code wins over the proposal.
+
+
 
 ## Parked
 
@@ -22,17 +42,60 @@ Naming: `<topic>.proposal.md`. Written in short points, not walls of prose.
 
 Active (awaiting Arpit's accept or a trigger):
 
-- [net-positive-evidence-run.md](net-positive-evidence-run.md) — NET-1 protocol:
+- [steering-edits-pending.proposal.md](steering-edits-pending.proposal.md) — **the
+  four CLAUDE.md edits, in one sitting.** Raised by four programs, merged 2026-08-03
+  because they patch one file and need one decision. Head table carries a verdict box
+  per edit; an applied section is deleted from the file, and the file goes when the
+  table empties. Re-verified at HEAD: none applied.
+
+  Its item **E** is the lesson worth keeping — both source proposals hardcoded a
+  `just test` target (1354, 1391) and both fell *below* the file they patch (1401,
+  suite 1423), so applying either would have regressed it. **A held patch decays against
+  its target**; E is now a rule, not a number.
+
+- [net-positive-evidence-run.proposal.md](net-positive-evidence-run.proposal.md) — NET-1 protocol:
   5 closed tasks per arm, outcomes pre-committed. Arpit's hands, no code.
-- [tool-integration-contract.md](tool-integration-contract.md) — the paved road:
+- [tool-integration-contract.proposal.md](tool-integration-contract.proposal.md) — the paved road:
   interceptor template · `cage data meter <tool>` · per-tool detection registry.
   **fux is the second tool**; ships only when two tools use it.
-- [larger-lab-corpus.md](larger-lab-corpus.md) — tinyshop (~43 KB) may understate
+- [larger-lab-corpus.proposal.md](larger-lab-corpus.proposal.md) — tinyshop (~43 KB) may understate
   graphify; trigger: NET-1 still net-negative at n=5.
-- [policysync-synthetic-bundle.md](policysync-synthetic-bundle.md) — sync tests own a
+- [policysync-synthetic-bundle.proposal.md](policysync-synthetic-bundle.proposal.md) — sync tests own a
   fake bundle; trigger: a **third** table removal (guard shipped 2026-08-01).
+- [copilot-credits-integrity.proposal.md](copilot-credits-integrity.proposal.md) — **defect, not
+  parked**: credit delta lost when the first-listed model idles; multi-model
+  shutdowns double-count (credits + tokens); negative-delta clamp; compare's
+  `measured` label. Same review.
+- [review-hardening.proposal.md](review-hardening.proposal.md) — the rest of the review's
+  confirmed findings, phased: dogfood **date bomb (~2026-10-02)** · `cage hook`
+  exit-2 = BLOCK collision · honest-refusal fixes · wiring hygiene · durable joins.
+- [chats-agent-authorship-column.proposal.md](chats-agent-authorship-column.proposal.md) — `agent%`
+  per chat on `cage insights chats`: the v2 authorship counts joined by
+  `(agent, session)` — pure ledger join, one new always-written `residual_lines`
+  count, three standing guards answered. **Sequenced after
+  timestamp-utc-normal-form**, which **landed 2026-08-02**, so it is unblocked.
+  **Picked up 2026-08-02** — live pair
+  [chats-author.handoff.md](../chats-author.handoff.md) ·
+  [chats-author.prompt.md](../chats-author.prompt.md); entry stays put, per the
+  lifecycle rule.
 
 ## Graduated (implemented → archived)
+
+- **timestamp-utc-normal-form (REV-TS)** → **IMPLEMENTED** for v0.45.0 (unreleased)
+  2026-08-02 (1401/0 ⇒ 1413/0). One UTC normal form (`YYYY-MM-DDTHH:MM:SSZ`,
+  sub-seconds truncated) for every timestamp the authorship join compares; bounds
+  normalize at `Window` construction, so a raw-bound window cannot be built.
+  **The build falsified one of the proposal's three failure shapes** — git renders
+  `%cI` as `…Z` at zero offset, never `+00:00`, so pure-UTC repos were correct all
+  along, and that is exactly why the normal form is **seconds** rather than the
+  milliseconds the sketch implied (milliseconds would have broken the working case).
+  Frozen provenance rows are not repaired and the `_authorship` cursor is deliberately
+  not invalidated. Living spec: [FORMULAS §2.14](../FORMULAS.md) ·
+  [GLOSSARY](../GLOSSARY.md) *UTC normal form* · `cage query agent-authorship`.
+  Evidence: [finding](../regression/2026-08-02-finding-commit-window-timestamp-skew.md).
+  [archived proposal](../archive/v0.45-rev-ts.proposal.md) ·
+  [handoff](../archive/v0.45-rev-ts.handoff.md) ·
+  [prompt](../archive/v0.45-rev-ts.prompt.md).
 
 - **dogfood-report** → **IMPLEMENTED** for v0.44 (unreleased) 2026-08-02 (1391/0 ⇒
   1401/0). `docs/dogfood/` home (dated snapshots + `latest.md` + append-only

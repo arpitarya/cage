@@ -1,0 +1,408 @@
+# Cage model prices — vendor rate cards (prices-toml plan §3). Split out of cage.toml
+# because prices and policy have opposite lifecycles: a vendor rate card is researched
+# at build time, shipped in the bundle, and REPLACED WHOLESALE on a change; your policy
+# (budgets, pipeline order, human rate, routing decisions, aliases) is hand-edited and
+# PRESERVED. Keeping them apart means `cage prices sync` can replace this file without
+# ever touching cage.toml. Vendor facts move here; routing decisions ([alias],
+# [tools.<tool>] price_at) stay in cage.toml.
+#
+# `cage setup` copies this file verbatim into a project's .cage/, so a project carries
+# the [meta] provenance it derived from; `cage doctor` / `cage prices list` compare the
+# two and recommend `cage prices sync` when the bundle is newer (never auto-applied).
+# prices_version is the date the rows were researched; prices_date its companion.
+[meta]
+prices_version = "2026-07-14"
+prices_date = "2026-07-14"
+
+# Prices in USD per million tokens. `cache_read` is the discounted rate the
+# provider bills for prefix-cache *reads* (makes cache-alignment measurable).
+# Keys are short aliases; Claude Code stamps full dated ids
+# (`claude-sonnet-4-5-20250929`) which resolve to the matching family row by
+# longest shared prefix over normalized ids (policy.price_match: known router
+# prefixes strip, `.` folds to `-`, trailing effort tiers low/medium/high/max
+# drop — both vendors bill every effort tier at the same per-token rate, verified
+# 2026-07-11) — opus never borrows a sonnet price, and a normalized match always
+# renders `family`, never `exact`. Update workflow: `cage prices unpriced` lists
+# what's billing $0 with a ready-to-run fix line; cage itself never fetches a
+# price (no network on any cage code path) — check the vendor's pricing page.
+
+# Anthropic — Claude Code / Kiro (both run Claude models), and Copilot-served
+# Claude (see the GitHub Copilot note below). Per-MTok list rates.
+# source: https://platform.claude.com/docs/en/about-claude/pricing (retrieved 2026-07-14)
+# Cache reads bill at 0.1× input across the current lineup.
+# Fable 5 / Mythos 5 are the most-capable tier — priced above Opus. `claude-fable-5`
+# shares only `claude` with the opus/sonnet/haiku rows (< 2 segments), so it needs its
+# own exact row or it prices at $0; Mythos 5 has identical pricing.
+[prices.anthropic."claude-fable-5"]
+input = 10.00
+output = 50.00
+cache_read = 1.00
+
+[prices.anthropic."claude-mythos-5"]
+input = 10.00
+output = 50.00
+cache_read = 1.00
+
+# Opus 4.5–4.8 all bill 5/25/0.50. The explicit `claude-opus-4-5` row is
+# load-bearing, not redundant: without it a `claude-opus-4-5` id ties at three
+# shared segments across every opus row and the deterministic tie-break lands on
+# `claude-opus-4` — the retired 15/75 rate. Same source/date as above.
+[prices.anthropic."claude-opus-4-8"]
+input = 5.00
+output = 25.00
+cache_read = 0.50
+
+[prices.anthropic."claude-opus-4-7"]
+input = 5.00
+output = 25.00
+cache_read = 0.50
+
+[prices.anthropic."claude-opus-4-6"]
+input = 5.00
+output = 25.00
+cache_read = 0.50
+
+[prices.anthropic."claude-opus-4-5"]
+input = 5.00
+output = 25.00
+cache_read = 0.50
+
+# Deprecated/retired Opus rows — kept so *historical* ledger rows keep repricing
+# at what they actually billed (the ledger stores counts, never conclusions).
+[prices.anthropic."claude-opus-4-1"]
+input = 15.00
+output = 75.00
+cache_read = 1.50
+
+[prices.anthropic."claude-opus-4"]
+input = 15.00
+output = 75.00
+cache_read = 1.50
+
+# Sonnet 5 ships at the standard rate (3/15/0.30, effective 2026-09-01). Through
+# 2026-08-31 Anthropic bills an introductory 2/10/0.20 — cage has no clocks in
+# derived views, so the bundle ships ONE honest static number (the standard rate,
+# a conservative over-estimate during the intro window). If you want intro-window
+# accuracy: cage prices set anthropic claude-sonnet-5 --input 2 --output 10 --cache-read 0.20
+[prices.anthropic."claude-sonnet-5"]
+input = 3.00
+output = 15.00
+cache_read = 0.30
+
+[prices.anthropic."claude-sonnet-4-6"]
+input = 3.00
+output = 15.00
+cache_read = 0.30
+
+[prices.anthropic."claude-sonnet-4-5"]
+input = 3.00
+output = 15.00
+cache_read = 0.30
+
+[prices.anthropic."claude-haiku-4-5"]
+input = 1.00
+output = 5.00
+cache_read = 0.10
+
+# Retired; the legacy-order id (`claude-3-5-haiku-*`) shares only one leading
+# segment with this key — its own `claude-3-5-haiku` row lives in the
+# recent-history block below so both namings price.
+[prices.anthropic."claude-haiku-3-5"]
+input = 0.80
+output = 4.00
+cache_read = 0.08
+
+# ── Anthropic recent-history rows (retired, but billable in 2025–26 ledgers) ──
+# Pricing is derive-time, so a June-2025 ledger row must still price at what it
+# actually billed — every missing row here is a silent $0 in someone's history.
+# The retired 4.x names still appear on the live pricing page; the Claude 3.x
+# rates come from Anthropic's own announcement posts (the pricing page no longer
+# lists them). cache_read is derived from the pricing page's published 0.1×
+# cache-hit multiplier — for 3.x-era rows where Anthropic once published a
+# rounded figure instead (claude-3-haiku read was listed $0.03), the multiplier
+# value is kept for consistency; the delta is $0.005/MTok.
+
+# Retired June 15, 2026 (except Bedrock/Google Cloud). The explicit row is
+# load-bearing: a dated `claude-sonnet-4-20250514` id would otherwise tie at
+# three segments across every sonnet-4-x row (the opus-4-5 tie-break story).
+# source: https://platform.claude.com/docs/en/about-claude/pricing (retrieved 2026-07-14)
+[prices.anthropic."claude-sonnet-4"]
+input = 3.00
+output = 15.00
+cache_read = 0.30
+
+# Retired February 19, 2026.
+# source: https://www.anthropic.com/news/claude-3-7-sonnet (retrieved 2026-07-14)
+[prices.anthropic."claude-3-7-sonnet"]
+input = 3.00
+output = 15.00
+cache_read = 0.30
+
+# Retired October 28, 2025 (both 20240620 and 20241022 snapshots).
+# source: https://www.anthropic.com/news/claude-3-5-sonnet (retrieved 2026-07-14)
+[prices.anthropic."claude-3-5-sonnet"]
+input = 3.00
+output = 15.00
+cache_read = 0.30
+
+# Retired February 19, 2026 — the legacy-order twin of `claude-haiku-3-5` above.
+# source: https://platform.claude.com/docs/en/about-claude/pricing (retrieved 2026-07-14)
+[prices.anthropic."claude-3-5-haiku"]
+input = 0.80
+output = 4.00
+cache_read = 0.08
+
+# Retired January 5, 2026.
+# source: https://www.anthropic.com/news/claude-3-family (retrieved 2026-07-14)
+[prices.anthropic."claude-3-opus"]
+input = 15.00
+output = 75.00
+cache_read = 1.50
+
+# Retired July 21, 2025.
+# source: https://www.anthropic.com/news/claude-3-family (retrieved 2026-07-14)
+[prices.anthropic."claude-3-sonnet"]
+input = 3.00
+output = 15.00
+cache_read = 0.30
+
+# Retired April 20, 2026.
+# source: https://www.anthropic.com/news/claude-3-family (retrieved 2026-07-14)
+[prices.anthropic."claude-3-haiku"]
+input = 0.25
+output = 1.25
+cache_read = 0.025
+
+# OpenAI — Codex CLI + Copilot (both emit gpt-family ids).
+# source: https://developers.openai.com/api/docs/pricing (retrieved 2026-07-14)
+# With `.`→`-` normalization a dotted minor (`gpt-5.5`) family-matches `gpt-5`
+# when its own row is missing — so current minors each get an exact row here.
+# Long-context tiers (~2× above ~270k input) are not modeled — cage prices the
+# short-context list rate. A bare `gpt-5.6` id would family-price at the
+# lexicographically smallest variant row — add an exact row if your logs stamp it.
+[prices.openai."gpt-5.6-sol"]
+input = 5.00
+output = 30.00
+cache_read = 0.50
+
+[prices.openai."gpt-5.6-terra"]
+input = 2.50
+output = 15.00
+cache_read = 0.25
+
+[prices.openai."gpt-5.6-luna"]
+input = 1.00
+output = 6.00
+cache_read = 0.10
+
+[prices.openai."gpt-5.5"]
+input = 5.00
+output = 30.00
+cache_read = 0.50
+
+# No cached-input discount published for the pro tiers — cache_read = input
+# (no discount, deliberately conservative rather than invented).
+[prices.openai."gpt-5.5-pro"]
+input = 30.00
+output = 180.00
+cache_read = 30.00
+
+[prices.openai."gpt-5.4"]
+input = 2.50
+output = 15.00
+cache_read = 0.25
+
+[prices.openai."gpt-5.4-mini"]
+input = 0.75
+output = 4.50
+cache_read = 0.075
+
+[prices.openai."gpt-5.4-nano"]
+input = 0.20
+output = 1.25
+cache_read = 0.02
+
+[prices.openai."gpt-5.4-pro"]
+input = 30.00
+output = 180.00
+cache_read = 30.00
+
+[prices.openai."gpt-5.3-codex"]
+input = 1.75
+output = 14.00
+cache_read = 0.175
+
+# ── OpenAI recent-history rows (deprecated/superseded, billable in 2025–26
+# ledgers). The live per-model docs pages still publish each rate — one source
+# per row below (all retrieved 2026-07-14). Codex CLI ledgers from late 2025 /
+# early 2026 stamp the 5.0–5.2 codex ids, so these rows are load-bearing.
+
+# source: https://developers.openai.com/api/docs/models/gpt-5.2 (retrieved 2026-07-14)
+[prices.openai."gpt-5.2"]
+input = 1.75
+output = 14.00
+cache_read = 0.175
+
+# source: https://developers.openai.com/api/docs/models/gpt-5.2-codex (retrieved 2026-07-14)
+[prices.openai."gpt-5.2-codex"]
+input = 1.75
+output = 14.00
+cache_read = 0.175
+
+# source: https://developers.openai.com/api/docs/models/gpt-5.1 (retrieved 2026-07-14)
+[prices.openai."gpt-5.1"]
+input = 1.25
+output = 10.00
+cache_read = 0.125
+
+# source: https://developers.openai.com/api/docs/models/gpt-5.1-codex (retrieved 2026-07-14)
+[prices.openai."gpt-5.1-codex"]
+input = 1.25
+output = 10.00
+cache_read = 0.125
+
+# The trailing `max` here is a *product* name, not a reasoning-effort tier — but
+# normalization can't tell the difference (it drops trailing low/medium/high/max),
+# so the exact row is load-bearing for byte-exact ids; a normalized match would
+# land on `gpt-5.1-codex` at the same rate, harmlessly.
+# source: https://developers.openai.com/api/docs/models/gpt-5.1-codex-max (retrieved 2026-07-14)
+[prices.openai."gpt-5.1-codex-max"]
+input = 1.25
+output = 10.00
+cache_read = 0.125
+
+# source: https://developers.openai.com/api/docs/models/gpt-5.1-codex-mini (retrieved 2026-07-14)
+[prices.openai."gpt-5.1-codex-mini"]
+input = 0.25
+output = 2.00
+cache_read = 0.025
+
+# source: https://developers.openai.com/api/docs/models/gpt-5 (retrieved 2026-07-14)
+[prices.openai."gpt-5"]
+input = 1.25
+output = 10.00
+cache_read = 0.125
+
+# source: https://developers.openai.com/api/docs/models/gpt-5-codex (retrieved 2026-07-14)
+[prices.openai."gpt-5-codex"]
+input = 1.25
+output = 10.00
+cache_read = 0.125
+
+# source: https://developers.openai.com/api/docs/models/gpt-5-mini (retrieved 2026-07-14)
+[prices.openai."gpt-5-mini"]
+input = 0.25
+output = 2.00
+cache_read = 0.025
+
+# source: https://developers.openai.com/api/docs/models/gpt-5-nano (retrieved 2026-07-14)
+[prices.openai."gpt-5-nano"]
+input = 0.05
+output = 0.40
+cache_read = 0.005
+
+# No cached-input discount published for the pro tier — cache_read = input
+# (no discount, deliberately conservative rather than invented).
+# source: https://developers.openai.com/api/docs/models/gpt-5-pro (retrieved 2026-07-14)
+[prices.openai."gpt-5-pro"]
+input = 15.00
+output = 120.00
+cache_read = 15.00
+
+# source: https://developers.openai.com/api/docs/models/gpt-4.1 (retrieved 2026-07-14)
+[prices.openai."gpt-4.1"]
+input = 2.00
+output = 8.00
+cache_read = 0.50
+
+# source: https://developers.openai.com/api/docs/models/gpt-4.1-mini (retrieved 2026-07-14)
+[prices.openai."gpt-4.1-mini"]
+input = 0.40
+output = 1.60
+cache_read = 0.10
+
+# source: https://developers.openai.com/api/docs/models/gpt-4.1-nano (retrieved 2026-07-14)
+[prices.openai."gpt-4.1-nano"]
+input = 0.10
+output = 0.40
+cache_read = 0.025
+
+# source: https://developers.openai.com/api/docs/models/gpt-4o (retrieved 2026-07-14)
+[prices.openai."gpt-4o"]
+input = 2.50
+output = 10.00
+cache_read = 1.25
+
+# source: https://developers.openai.com/api/docs/models/gpt-4o-mini (retrieved 2026-07-14)
+[prices.openai."gpt-4o-mini"]
+input = 0.15
+output = 0.60
+cache_read = 0.075
+
+# o-series: a bare `o3` normalizes to one segment, below the two-segment family
+# floor — so only a byte-exact `o3` id prices here; dated snapshots (`o3-2025-…`)
+# would need their own row. Codex-era logs stamp the bare ids.
+# source: https://developers.openai.com/api/docs/models/o3 (retrieved 2026-07-14)
+[prices.openai."o3"]
+input = 2.00
+output = 8.00
+cache_read = 0.50
+
+# source: https://developers.openai.com/api/docs/models/o3-mini (retrieved 2026-07-14)
+[prices.openai."o3-mini"]
+input = 1.10
+output = 4.40
+cache_read = 0.55
+
+# source: https://developers.openai.com/api/docs/models/o4-mini (retrieved 2026-07-14)
+[prices.openai."o4-mini"]
+input = 1.10
+output = 4.40
+cache_read = 0.275
+
+# The Codex CLI's original fine-tuned o4-mini.
+# source: https://developers.openai.com/api/docs/models/codex-mini-latest (retrieved 2026-07-14)
+[prices.openai."codex-mini-latest"]
+input = 1.50
+output = 6.00
+cache_read = 0.375
+
+# GitHub Copilot — no [prices.copilot] rows, by design. Copilot's VS Code store
+# stamps modelIds like `copilot/claude-opus-4.6` with provider inferred from the
+# name (→ anthropic), so Copilot-served Claude family-prices at the Anthropic rows
+# above after route-prefix normalization. That is an approximation of seat/
+# subscription billing — but it is also GitHub's own metering basis: since
+# 2026-06-01 Copilot bills usage-based AI Credits "calculated based on token
+# consumption, including input, output, and cached tokens, using the listed API
+# rates for each model".
+# source: https://github.blog/news-insights/company-news/github-copilot-is-moving-to-usage-based-billing/ (retrieved 2026-07-11)
+# The [credits] layer below is a SEPARATE axis (plan-quota multipliers, off by
+# default) — never blur a credit multiplier into a per-token price, and never
+# derive Kiro/Copilot credits from tokens.
+#
+# The bare router id `copilot/auto` strips to `auto` and matches nothing — it
+# stays loudly UNPRICED until you route it explicitly (a router priced silently
+# is a wrong number). Routing is a decision about YOUR setup, so an alias lives in
+# cage.toml, not here — add one with (writes cage.toml):
+#   cage prices alias - copilot/auto --to anthropic/claude-sonnet-4-6
+
+# Kiro — its usage log stamps a generic provider/model (`kiro`/`agent`), not the real
+# Claude model it runs underneath, so this is a blended *estimate* (Sonnet-tier rates).
+# Override if you know Kiro's configured model; output tokens are often under-reported.
+[prices.kiro."agent"]
+input = 3.00
+output = 15.00
+cache_read = 0.30
+
+# Estimated AI-credit multipliers (`cage data limits`). Post-2026 GitHub/Codex plans consume
+# credits as a function of tokens, so credits = tokens × per_mtok (per MILLION tokens).
+# These are OFF by default — cage ships no active rows because a wrong credit number is
+# worse than none, and the precise per-token rates aren't published. Uncomment + set
+# per_mtok from your provider's usage dashboard to turn on the estimate; it is always
+# labelled `estimated` and matched on the EXACT model id (no family fallback — an estimate
+# borrowed across models would be a different wrong number). Token-based providers only:
+# never add a [credits.kiro] row — Kiro spends units-of-work, not token multiples.
+# [credits.anthropic."claude-opus-4-8"]
+# per_mtok = 30   # illustrative — replace with your dashboard's figure
+# [credits.openai."gpt-5"]
+# per_mtok = 12   # illustrative

@@ -16,7 +16,8 @@ groups (run any group name for its commands):
   prices      list · unpriced · set · alias · route-tool · sync
   study       join · start · stop · report · id
   policy      diff · sync
-  data        export · cleanup · watch · serve · proxy · meter
+  data        export · cleanup · migrate-savings · watch · serve ·
+              proxy · meter · graphify
 
 $ cage report --since 7d          # the daily number
 $ cage insights verdict graphify  # is this tool paying for itself?

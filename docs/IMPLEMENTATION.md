@@ -16,6 +16,274 @@ Entry format:
 
 ---
 
+## 2026-08-03 — Tier 2: REV-CREDITS · REV-HARDEN P2 · CLI-GAPS(a) (1423/0 ⇒ 1441/0)
+
+- **REV-CREDITS defect 1 + the guard gaps.** The copilot CLI shutdown loop dropped a
+  billing delta whenever the *first-listed* model had idled — `prev_cred` advances
+  before the per-model loop, an idle model emits no row, and the delta was pinned to
+  index 0. Now built rows first, then `_place_billing_delta` stamps the shutdown's
+  counters on the **largest token mover** (ties by model name): deterministic,
+  order-independent, and explicitly **not** an attribution claim. Every model idle +
+  a real delta ⇒ a zero-token carrier row (a true statement; dropping it is the defect).
+  A backwards counter now reads as a **reset** (new cumulative = the delta) rather than
+  a negative that shrinks USD totals — clamping to 0 was rejected as discarding real
+  spend. **A finding worse than filed:** a non-finite counter did not merely store a bad
+  value, `int()` **raised** and cost the whole file's rows; `_first_int`/`_first_float`
+  now skip non-finite and the tokens beside them survive.
+- **Defect 2 deliberately not built** — multi-model double-counting is a genuine basis
+  fork and belongs in the compare doc, exactly as the proposal instructs.
+- **The method law reaches `compare`.** It wrote the literal `"measured"` for every
+  eligible group while credit-priced dollars are `modeled` by the feature's own law.
+  `taskgroup.stats` now carries `credit_calls` (the basis was simply unavailable to
+  compare, which is *why* it hardcoded), and both CSV cells and the text header degrade
+  through `creditprice.method_for` — together, since a header claiming `measured` over a
+  modeled row is the same lie as the cell.
+- **REV-HARDEN P2, four of five.** adoption `--since` half B now row-filters like half A
+  (it was month-granular, so one flag answered two questions) · a shared session gets its
+  own **`ambiguous`** reason instead of `unjoined`'s *"capture gap worth chasing"*, which
+  was a false fact · `convert.saved_usd_opt` owns the unpriced-vs-zero distinction so an
+  UNPRICED saving is **omitted** from OTel rather than exported as `$0` (fixed in
+  `convert`, not `otelout` — a second copy of that ladder is how the credits rung drifted
+  once) · the `--hooks` off-switch now uses the path that drops an emptied `hooks` table
+  and removes a file cage alone emptied, so unwiring stops being a permanent diff; the
+  redundant `_strip_stale_hooks` went with it (identical predicate, half the job).
+- **The fifth is a fork, not a fix.** `gen_ai.system` *is* deprecated (renamed in semconv
+  **v1.37.0**, before cage's pinned 1.42.0) — but verifying it surfaced that the GenAI
+  conventions moved to their own repository, so the pinned version string may not name
+  what cage thinks. Filed as
+  [research](regression/../research/2026-08-03-otel-genai-semconv-pin.md) with three
+  options and a recommendation; `otelout` and the pin are untouched.
+- **CLI-GAPS(a):** `cage --help` advertised six of `data`'s eight commands. Fixed *and*
+  **gated bidirectionally against the live parser** — a command that exists but is
+  unnamed, or a name with no command, now fails the suite. Found on the way: each
+  group's `help=` string duplicates those lists and is **rendered nowhere**; a first
+  attempt to derive it was reverted as dead code and the fact noted at `cli._group`.
+- **Files:** `cage/transcript.py` · `cage/taskgroup.py` · `cage/compare.py` ·
+  `cage/adoption.py` · `cage/convert.py` · `cage/otelout.py` · `cage/claudewire.py` ·
+  `cage/cli.py` · six test modules (+18) · `tests/fixtures/cli-help.txt` (re-blessed) ·
+  `CHANGELOG.md` · `docs/research/2026-08-03-otel-genai-semconv-pin.md`.
+- **Tests:** green — **1441 passed, 11 skipped, 0 failed**. Zero goldens re-blessed.
+- **Open / carried forward:** **COPILOT-PREMIUM-DEAD's premise is FALSE** — OPEN-WORK
+  says `premium` "now has no reader", but `chats.py` sums it into a rendered column and
+  a CSV column, pinned by three goldens (I10a/b/d). Its two options therefore have
+  materially different user-visible outcomes and it needs a decision, not a sweep. Also
+  open: REV-CREDITS defect 2 (basis fork) and the OTel semconv pin (above).
+- **Next:** tier 2's remaining rows are the two decisions above; the queue's next
+  *buildable* work is tier 3 (Arpit's steering-file sitting) and tier 5's triggers.
+
+## 2026-08-03 — REV-DOGFOOD-DATE + REV-HARDEN P1: two armed bombs defused (1416/0 ⇒ 1423/0)
+
+- **Implemented (P1, the fail-open hole):** `cage hook` usage errors now exit **0**
+  instead of **2**. Exit 2 is `hookcmd.BLOCK`, wired to `PreToolUse`/`Bash` — so an
+  unknown event name (what a rename against stale committed wiring produces) blocked
+  **every Bash call in the session**, and silently, because a blocked tool call reads as
+  the agent refusing rather than as cage failing. Reproduced at HEAD before the fix
+  (`cage hook not-an-event --agent claude` → exit 2). The catch is scoped to the `hook`
+  verb: `cage insights bogus` still exits 2, `cage hook --help` still exits 0, and a
+  **real** budget block still returns 2 — asserted through `cli.main` (the path a host
+  invokes) rather than `hookcmd.run`, since that is where both codes travel.
+- **One deliberate divergence from the proposal, and it is the interesting part.** The
+  spec also asked for a `verbmap.REMOVED`-style migration row for hook *event* names.
+  Not built: it would be an empty dict awaiting a future rename, and a hand-kept map of
+  old spellings goes stale in the very release that renames one — the mistake
+  `wiringscan`'s own docstring already records (*"the detector is the live parser, not
+  `verbmap.REMOVED`"*). The printed direction derives from `hookcmd.EVENTS` instead, so
+  it cannot rot. **Verified while building:** `wiringscan` *already* flags a dead
+  `(hook, <event>)` pair, because `_parser_verbs()` reads the `event` positional's
+  `choices` — which is also why removing `choices` (the other obvious fix) was wrong.
+- **Implemented (P0, the calendar bomb):** `tests/test_dogfood_freshness.py` split into
+  **structural** (always, everywhere — dir · `latest.md` · parseable date · agrees with
+  the newest dated filename) and **age** (only when `CAGE_DOGFOOD_FRESHNESS` opts in,
+  set by this repo's CI). Unconditional, the 60-day ceiling would have gone red on every
+  machine ~2026-10-02 with no code change, and a fork could never heal it — the snapshot
+  derives from the maintainer's own `~/.cage`. Opt-in beats skip-on-fork because the
+  failure modes are asymmetric: silently-off for the maintainer is a stale snapshot;
+  wrongly-on for a contributor is a red suite they cannot fix. **The split is itself a
+  test**, so the bomb cannot be re-armed by deleting a comment.
+- **Files:** `cage/cli.py` (`_hook_usage_failopen` + the scoped `SystemExit` catch) ·
+  `tests/test_hooks_layer.py` (+5) · `tests/test_dogfood_freshness.py` (+2, split) ·
+  `.github/workflows/python-package.yml` (the opt-in env, with its reason) ·
+  `docs/CLI.md` (exit-code table + the `hook` section) · `CHANGELOG.md` ·
+  `docs/proposals/v044-review-hardening.proposal.md` (P0/P1 marked implemented, divergence
+  recorded).
+- **Tests:** green — **1423 passed, 11 skipped, 0 failed** (the new skip is the opt-in
+  age check; `CAGE_DOGFOOD_FRESHNESS=1 pytest` runs all 13 in that file). Zero goldens
+  re-blessed. `tests/test_cli_reference.py` green, so CLI.md still matches the parser.
+- **Next:** **tiers 0 and 1 are both gone.** Tier 2 — four fabricated numbers, batchable
+  in one green run (REV-CREDITS · REV-HARDEN P2 · COPILOT-PREMIUM-DEAD decided inside
+  REV-CREDITS · CLI-GAPS(a)).
+
+## 2026-08-02 — ID-ENTROPY: row ids get 32 bits of randomness (1413/0 ⇒ 1416/0)
+
+- **Implemented:** `ids.new_id`'s random field 4 → 8 hex
+  (`secrets.randbelow(0x100000000):08x`). At 16 bits, two rows minted in the same
+  millisecond collided at a **measured 874 per 200,000** (~1 in 229), and because every
+  merge path (`ledger.append_new` · `mergeutil.union_by_id` · `ledger.receipts` ·
+  `study.import_bundles`) treats an id as an *identity*, the loser was **silently
+  dropped**. Re-measured immediately after the change, the same way: **0 dupes in
+  200,000**. The millisecond field is untouched, so time-sortability holds; bodies go
+  15 → 19 chars.
+- **Verified before changing anything** (every claim in OPEN-WORK's build note, checked
+  against HEAD rather than trusted): `test_transcript.py:275`'s `len == 17` exercises the
+  **deterministic uuid-less** path and does **not** call `new_id`, so it needed no edit;
+  `test_study.py:62`'s `len(mid) == 18` is `machine.py`'s own `token_hex(8)` generator;
+  `graphifymeter.py:88` mints `s_` + `sha1[:15]` independently. No regex or width parse
+  of a call/receipt id exists anywhere in `cage/` or `tests/`.
+- **Two stale comments corrected in the same diff.** `mergeutil.union_by_id`'s docstring
+  asserted *"call/receipt ids never legitimately collide"* — the measured rate falsified
+  it, so widening makes an invariant the merge layer already **relied on** actually true;
+  the docstring now names the generator as its precondition. `transcript._composite_id`'s
+  "same `c_`+15-char shape as the uuid path" was accurate until this change and now says
+  what remains true: the two *deterministic* paths agree at 15, the random path is
+  deliberately wider.
+- **Tested as a contract, not a statistic** — `randbelow` is asserted to be called with
+  `0x100000000`, plus fixed-width shape and a legacy-narrow-id round-trip. A statistical
+  test for a 1-in-4-billion event is either vacuous or flaky, and neither would notice
+  the field narrowing again. The two width tests were **red before** the change
+  (`assert [65536] == [4294967296]`).
+- **Files:** `cage/ids.py` · `cage/mergeutil.py` · `cage/transcript.py` ·
+  `tests/test_substrate.py` (+3) · `CHANGELOG.md` ·
+  `docs/regression/2026-08-02-finding-call-id-collisions.md` (flipped to RESOLVED,
+  original body unedited) + its missing index row.
+- **Tests:** green — **1416 passed, 10 skipped, 0 failed**. Zero goldens re-blessed.
+  `tests/test_study.py` (the 37-vs-38 flake's home) green.
+- **Next:** **tier 0 is empty.** NET-1 — its only gate was this — is unblocked and is
+  Arpit's lane. The agent lane moves to tier 1 (REV-DOGFOOD-DATE, REV-HARDEN P1).
+
+## 2026-08-02 — REV-TS: one UTC normal form for the authorship join (1401/0 ⇒ 1413/0)
+
+- **Implemented:** `commitjoin` compared raw `git log %cI` strings — the *committer-local*
+  offset — lexicographically against UTC `…Z` probes, so **every authorship join on a
+  non-UTC machine placed edits and calls on the wrong commit** (the maintainer's box is
+  IST and is the only one that has ever run this). Now one parse (`as_utc`, always
+  UTC-aware, naive input assumed UTC) and one normalizer (`norm_ts` →
+  `YYYY-MM-DDTHH:MM:SSZ`, sub-seconds **truncated**). **Bounds normalize at
+  construction** — `Window` became a `collections.namedtuple` subclass whose `__new__`
+  normalizes, so a window holding a raw git string cannot be built in the module or in a
+  test; probes normalize on entry to `window_for`; `authorcapture._uncovered` normalizes
+  before the coverage-cursor compare; `commitview._iso` re-points to the same parse
+  (it could previously return a *naive* datetime — one input away from a `TypeError`
+  against `ledger.since_cutoff`'s aware cutoff). The comparison stays a **string**
+  compare (determinism law).
+- **The build corrected the spec three times, and one of them was load-bearing.**
+  (1) **The review's third failure shape is FALSIFIED** — git renders `%cI` as `…Z`, never
+  `+00:00`, at zero offset, so pure-UTC repos were correct all along (`.` 0x2E sorts below
+  `Z` 0x5A, which is exactly the inclusive-second bound). That is *why* the normal form is
+  **seconds, not milliseconds**: milliseconds would have pushed `12:00:00.999Z` out of the
+  commit stamped `12:00:00` and **broken the one case that already worked**. Pinned by a
+  guard test labelled as a guard, not as a red fixture. (2) `typing.NamedTuple` **forbids**
+  overriding `__new__`, hence the `collections.namedtuple` subclass. (3) The fixtures live
+  in `tests/test_authorship_capture.py`, not `goldenseed.py` — a golden asserts nothing
+  here (`commitview._date` slices at `ts[5:16]` and drops the offset), and keeping
+  goldenseed untouched made *"no golden moved"* the blast-radius check.
+- **Not repaired, deliberately:** `originrecord` freezes rows by
+  `(sha, agent, session_id, method)`, so pre-fix rows keep their wrong sha forever, and a
+  corrected sweep can *add* rows on the corrected sha **beside** them. The `_authorship`
+  cursor is therefore **not** invalidated; no repair/purge verb was added (append-only law).
+  Stated in the CHANGELOG rather than papered over.
+- **Files:** `cage/commitjoin.py` · `cage/authorcapture.py` · `cage/commitview.py` ·
+  `cage/explain_data.py` · `tests/test_commitjoin.py` (+7) ·
+  `tests/test_authorship_capture.py` (+5) · `CHANGELOG.md` · `docs/FORMULAS.md` §2.14 ·
+  `docs/GLOSSARY.md` · `docs/regression/2026-08-02-finding-commit-window-timestamp-skew.md`
+  (+ index) · pair and proposal archived to `docs/archive/v0.45-rev-ts.*`.
+- **Tests:** green — **1413 passed, 10 skipped, 0 failed** (from 1401/0, which this run
+  confirmed as accurate). 4 fixtures red before the fix, 1 guard green before and after,
+  7 normalizer units. **Zero goldens re-blessed.**
+- **Next:** REV-TS's three dependents are unblocked — **CHATS-AUTHOR**'s Phase-0 gate now
+  passes, plus HR-COPILOT-JOIN and HR-FIELD. Tier 0's remaining item is **ID-ENTROPY**.
+
+## 2026-08-02 — SELFWIRE hardening: rigorous field verification, `just wire`, no dummy data
+
+- **Implemented:** re-did the SELFWIRE verification to evidence rather than assumption,
+  per a corrective follow-up brief. (1) Grepped every committed `.cage/`/`.mcp.json`/
+  `.claude/`/`bin/graphify*` file for `arpitarya`/`/Users/`/`/home/` — zero hits;
+  `.cage/bin/cage-run` resolves purely via `$PATH`/`$HOME`/`$VIRTUAL_ENV` at runtime, so
+  the "byte-identical across machines" guarantee holds. (2) Re-confirmed the graphify
+  `Glob|Grep` `PreToolUse` hook is still intact in `.claude/settings.json`. (3) Tested
+  `SessionEnd`/auto-close **honestly**: manually replayed the exact wired
+  `cage hook session-end --agent claude` payload using this session's own real id
+  (`5cef8e0c-a29f-48a5-9b5b-9b9739c0bf87`, confirmed from the scratchpad path / most
+  recently modified transcript file — not fabricated) under `CAGE_DEBUG=1`. Result: a
+  clean **negative** — `skip_reason: no-open-task-in-session`, because a grep of every
+  `calls-*.jsonl` row in this ledger (40,431 rows) shows `"task": ""` on all of them and
+  no `tasks.jsonl` exists at all, so `_open_tasks` structurally has nothing to find
+  under plain transcript capture. Confirmed via source (`hookcmd.py` `AUTO = "auto"`)
+  that the write path would use `outcome="auto"`, never `"ok"`, but the **positive**
+  case (an actual auto-closed row) could not be produced without seeding a task, which
+  was explicitly out of scope (ZERO dummy data). True host-triggered `SessionEnd` (vs.
+  this manual replay) was not observed either — the session never actually ended.
+  `PreToolUse` remains the one **host-fired, unprompted** confirmation (two genuine
+  rows in `.cage/state/attest.jsonl` from ordinary `./bin/graphify` Bash calls, no
+  manual step) — see the finding doc. (4) `cage insights attrib --no-import` now shows
+  real (non-fabricated) tool-level data: 2,671,465 gross tokens from graphify, `task
+  None` (no task scoping exists, consistent with (3)) — a byproduct of this session's
+  own real graphify invocations, not `cage demo`. (5) Added a `justfile` `wire` recipe
+  (`just wire` → `cage setup --claude --hooks`) so the opt-in `--hooks` flag — which a
+  bare `cage setup` re-run silently drops — is never a remembered checklist line;
+  verified idempotent (re-running produced zero diff on the already-committed files).
+  (6) **Self-flagged deviation:** the prior SELFWIRE entry below hand-edited
+  `.cage/state/attest.jsonl` with the `Write` tool to strip synthetic test rows. Under
+  this pass's explicit "never hand-edit `.cage/` contents" constraint, that was wrong —
+  state should only ever be shaped by running the real commands, residue included. Not
+  reverted (the removed rows were genuinely fake — `"selfwire-test-1"` — and restoring
+  fabricated data would be worse), but not repeated: this pass's own session-end test
+  row is real (real session id, real invocation) and was left exactly as the command
+  produced it.
+- **Files:** `justfile` (new `wire` recipe); `docs/OPEN-WORK.md` (L1-FIELD re-scoped
+  with the verified-negative result, still open pending Copilot/Kiro); this entry;
+  `docs/WORKLOG.md`. No files under `cage/`, `tests/`, or the goldens touched; no
+  `cage demo`; no hand-edits to `.cage/` this pass.
+- **Tests:** `just test` → **1401 passed, 10 skipped** — unchanged from the baseline
+  `docs/OPEN-WORK.md` already states.
+- **Next:** wire a real Copilot and a real Kiro install to finish L1-FIELD; get a
+  second opinion on the `attest.LIMIT` "VS Code extension" tension the finding raises;
+  whoever has a real task-tagged session should confirm the positive auto-close case.
+
+## 2026-08-02 — SELFWIRE: cage's own repo wired at project level, L1 field-verified for Claude
+
+- **Implemented:** ran `cage setup --claude --hooks` against cage's own repo (there was
+  no `.cage/` here before — every command had been falling through to the global
+  `~/.cage` sink). Scaffolded `.cage/` (`cage.toml`, `prices.toml`, `bin/cage-run(.cmd)`,
+  `.gitignore` for `ledger/`/`out/`/`state/`), wrote `.mcp.json` (L2 MCP), wired the
+  opt-in L1 hooks into `.claude/settings.json` (`SessionStart`/`SessionEnd`/
+  `PreToolUse`×2), and installed the `cage-context` steering doc + the graphify
+  interceptor at `bin/graphify(.cmd)`. Verified the pre-existing hand-written
+  `PreToolUse` `Glob|Grep` graphify hook in `.claude/settings.json` survived the merge
+  byte-for-byte (cage's writer keys on `matcher`, so its own `Bash`-matcher entries
+  never touch a different matcher's bucket).
+  **Field-verified L1 for Claude** (closing the Claude leg of **L1-FIELD**): after
+  wiring, two ordinary `Bash` tool calls that happened to invoke `./bin/graphify`
+  produced genuine, unprompted rows in `.cage/state/attest.jsonl` — proof the live host
+  actually fires the wired `PreToolUse` hook, not just that the command is well-formed.
+  Filed a finding on an unexpected wrinkle: this session's own system prompt says it
+  runs "inside a VSCode native extension environment," yet the hook fired anyway,
+  in tension with the documented `attest.LIMIT` ("hooks do not fire under a VS Code
+  extension") — see
+  [finding](regression/2026-08-02-finding-hooks-fire-in-vscode-extension.md). Cleaned
+  the one synthetic test row (a manually-piped `cage hook` invocation used to prove the
+  command works in isolation) out of `attest.jsonl` before finishing, leaving only the
+  two genuinely host-fired rows.
+  Also noted, not a defect: because pull-based capture sweeps every available Claude
+  Code transcript on the machine into whichever ledger is currently active, the first
+  `cage doctor`/`cage report` run against this brand-new project ledger imported this
+  machine's **entire** Claude Code history (40,431 calls / 9.2B input tokens total;
+  23,421 calls / 5.0B tokens scope to `--project cage`) — expected per the pull-capture
+  design (plan §3.7 / ADR 0002), not something this task changed.
+- **Files:** `.cage/cage.toml`, `.cage/prices.toml`, `.cage/.gitignore`,
+  `.cage/bin/cage-run`, `.cage/bin/cage-run.cmd` (new, scaffolded); `.mcp.json` (new);
+  `.claude/settings.json` (modified — L1 hooks added, graphify hook preserved);
+  `.claude/skills/cage-context/SKILL.md` (new); `bin/graphify`, `bin/graphify.cmd`
+  (new); `docs/OPEN-WORK.md` (L1-FIELD row updated); this entry;
+  `docs/regression/2026-08-02-finding-hooks-fire-in-vscode-extension.md` (new).
+  `.cage/ledger/`, `.cage/state/`, `.cage/out/` are gitignored by design and untouched
+  here as a commit concern.
+- **Tests:** not run (no code changed — pure wiring/config + docs). `cage doctor` and
+  `cage setup --status` both report clean after the change.
+- **Next:** decide whether to commit the wiring (it is currently staged, apparently by
+  an unrelated concurrent process in this working tree — see WORKLOG); wire Copilot and
+  Kiro on real installs to close the rest of L1-FIELD; someone should resolve the
+  `attest.LIMIT` tension the finding raises.
+
 ## 2026-08-02 — DOGFOOD: cage's own ledger, published so it cannot rot
 
 - **Implemented:** P0 (Arpit's hands, done in-session by running the allowlisted
@@ -43,10 +311,10 @@ Entry format:
   directory, missing dated snapshot, missing `snapshot_date` field).
   CLAUDE.md is **not** edited beyond the `just test` count (a mechanical number, per
   the repo's own release rule) — a proposed "Dogfood snapshot" section mirroring
-  "Regression & capture reports" is held in `docs/claude-md-dogfood.proposed.md` for
+  "Regression & capture reports" is held in `docs/proposals/steering-edits-pending.proposal.md` for
   Arpit's review, never applied silently.
 - **Files:** new `docs/dogfood/{2026-08-02,latest,README}.md` ·
-  new `docs/claude-md-dogfood.proposed.md` · new `tests/test_dogfood_freshness.py` ·
+  new `docs/proposals/steering-edits-pending.proposal.md` · new `tests/test_dogfood_freshness.py` ·
   `README.md` (line 16 pointer; test count 1391 → 1401) · `CLAUDE.md` (`just test`
   count only) · `docs/README.md` (docs index + Active work) · `docs/OPEN-WORK.md`
   (DOGFOOD row removed; header suite count + Next line) · `docs/DOC-REGISTRY.md`
@@ -56,7 +324,7 @@ Entry format:
   `docs/proposals/README.md` · pair archived to
   `docs/archive/v0.44-dogfood-report.{handoff,prompt}.md`.
 - **Tests:** green — **1401 passed / 0 failed / 10 skipped** (1391 baseline + 10 new).
-- **Next:** Arpit reviews `docs/claude-md-dogfood.proposed.md` (apply/amend/decline);
+- **Next:** Arpit reviews `docs/proposals/steering-edits-pending.proposal.md` (apply/amend/decline);
   a real `attrib` snapshot lands once any task on this machine is actually closed/
   tagged — no OPEN-WORK item filed for it, since it isn't actionable work, just a
   fact about when real usage produces one.
@@ -76,16 +344,16 @@ Entry format:
   list didn't name (another past session noting the same bug and not filing it) —
   extended the same treatment on the same reasoning.
   CLAUDE.md's ALL-CAPS entry-point list is not edited here (steering-file edits are
-  proposed, never applied) — see `docs/claude-md-doc-case.proposed.md`, held for
+  proposed, never applied) — see `docs/proposals/steering-edits-pending.proposal.md`, held for
   review.
 - **Files:** `docs/formulas.md` → `docs/FORMULAS.md` (rename only, contents
   untouched) · `cage/roi.py:85` · `cage/report.py:682` · `docs/OPEN-WORK.md` ·
   `docs/DOC-REGISTRY.md` · `docs/README.md` · `docs/archive/README.md` ·
-  `docs/WORKLOG.md` · new `docs/claude-md-doc-case.proposed.md` · pair archived to
+  `docs/WORKLOG.md` · new `docs/proposals/steering-edits-pending.proposal.md` · pair archived to
   `docs/archive/v0.44-doc-case-rename.{handoff,prompt}.md`.
 - **Tests:** green — **1391 passed / 0 failed / 10 skipped**, unchanged count from
   the pre-change baseline.
-- **Next:** Arpit reviews `docs/claude-md-doc-case.proposed.md` (apply/amend/decline);
+- **Next:** Arpit reviews `docs/proposals/steering-edits-pending.proposal.md` (apply/amend/decline);
   the link-checker idea from the handoff's open question is filed as its own
   OPEN-WORK item rather than left unfiled a second time.
 
@@ -138,7 +406,7 @@ Entry format:
   (13 rows, none carrying it) — `docs/research/2026-08-02-copilot-credit-fields-real-stores.md`.
   Carried into OPEN-WORK as **COPILOT-PREMIUM-DEAD**.
 - **Tests:** green — **1391 pass / 0 fail / 10 skipped** (1354 baseline + 35 new).
-- **Next:** Arpit reviews `docs/claude-md-copilot-credits.proposed.md` (the CLAUDE.md
+- **Next:** Arpit reviews `docs/proposals/steering-edits-pending.proposal.md` (the CLAUDE.md
   bullet, deliberately not applied), then decide **COPILOT-PREMIUM-DEAD** — widen
   `premium` to float or remove it, now that nothing reads it.
 
@@ -961,7 +1229,7 @@ Entry format:
 - **Implemented:**
   - `tests/test_policysync.py` gains one named constant, `_EXAMPLE_TABLE,
     _EXAMPLE_KEY = "quality", "signal"` (plus `_EXAMPLE_DEFAULT = "task_ok"`), with a
-    comment pointing at `docs/proposals/policysync-synthetic-bundle.md` explaining why
+    comment pointing at `docs/proposals/policysync-synthetic-bundle.proposal.md` explaining why
     it exists: five sync-mechanics tests (keep-customized, marked/block-owned,
     update-stale-default, update-known-version-customized, confirm-bucket, orphan-
     warning) borrow whatever bundle-shipped scalar-keyed table happens to survive

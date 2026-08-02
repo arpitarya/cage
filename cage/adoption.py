@@ -73,6 +73,7 @@ VIA_SESSION = "session"  # the row carries a session id some call also carries
 # fixes — one is structural and permanent, the other is a capture gap worth chasing.
 NO_LINK = "no-link"      # neither call nor session: the shim cannot know its caller
 UNJOINED = "unjoined"    # a link is present but nothing in `calls` carries it
+AMBIGUOUS = "ambiguous"  # the session resolves, but to MORE THAN ONE agent
 
 # What an agent's absence from half B is allowed to mean. The strong claim requires that
 # EVERY savings row found an agent — otherwise an unattributed row could be theirs.
@@ -185,7 +186,12 @@ def _agent_half(root: Path, since: str | None) -> dict:
         if surface and surface != LIB_AGENT:
             seen.add(surface)
 
-    rows = [r for r in ledger.receipts(root, since=since) if not _is_legacy_human(r)]
+    # `read_kind`'s `since` skips whole MONTH shards before loading; it is a read
+    # optimisation, not a row filter. Half A row-filters with `ledger.since(...)`,
+    # so without this one `--since` answered two different questions in one table.
+    # Same double-filter roi/report/chats already do.
+    rows = [r for r in ledger.since(ledger.receipts(root, since=since), since)
+            if not _is_legacy_human(r)]
     attributed: dict[tuple[str, str], dict] = {}
     unknown: dict[tuple[str, str], int] = {}
     for r in rows:
@@ -203,7 +209,16 @@ def _agent_half(root: Path, since: str | None) -> dict:
             grp["rows"] += 1
             grp["via"].add(via)
         else:
-            reason = NO_LINK if not (r.get("call") or r.get("session")) else UNJOINED
+            # Three distinct facts, never merged: nothing to join on · a link that
+            # matches nothing · a link that matches too much. Calling the third a
+            # "capture gap worth chasing" was a FALSE FACT — nothing was missed, the
+            # session genuinely belongs to more than one agent and cage refuses to pick.
+            if not (r.get("call") or r.get("session")):
+                reason = NO_LINK
+            elif len(by_session.get(r.get("session", ""), ())) > 1:
+                reason = AMBIGUOUS
+            else:
+                reason = UNJOINED
             unknown[(tool, reason)] = unknown.get((tool, reason), 0) + 1
 
     seen_agents = sorted(seen)
@@ -250,6 +265,9 @@ _UNKNOWN_TEXT = {
     UNJOINED: ("carry a link no call in the ledger matches\n"
                "    — the tool's run was captured but the agent turn behind it was not\n"
                "    (a capture gap worth chasing)"),
+    AMBIGUOUS: ("carry a session more than one agent's calls share\n"
+                "    — nothing is missing; cage will not resolve it to an arbitrary "
+                "name\n    (not a capture gap — there is no single right answer)"),
 }
 
 # The two phrasings for "this agent has no attributable savings row". They are NOT

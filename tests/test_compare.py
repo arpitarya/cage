@@ -185,3 +185,65 @@ def test_outcome_label_guard(proj, monkeypatch, capsys):
     for bad in ("two words", "a/b/path", "-leading", "x" * 33):
         with pytest.raises(CageError, match="label must be one short token"):
             clicmds.cmd_outcome(SimpleNamespace(task="t1", redo=False, label=bad))
+
+
+# ── the method law reaches compare too (REV-CREDITS) ──────────────────────────
+#
+# `compare` wrote the literal "measured" for every eligible group. But a copilot task
+# priced through the credits rung is `modeled` by the feature's own law — the credit
+# count is recorded fact, the dollar is that count × a rate *you* configured, which
+# cage cannot check against an invoice. `report` and `chats` already degrade via
+# `creditprice.method_for`; compare claimed an invoice for a configured rate.
+
+def _credit_call(root, tid, tin, ts):
+    ledger.append_row(root, "calls", schema.make_call(
+        route="chat", provider="copilot", model="copilot/auto", agent="copilot",
+        tokens_in=tin, tokens_out=100, task=tid, session=f"s-{tid}", ts=ts,
+        credits=0.5))
+
+
+@pytest.fixture
+def credit_seeded(proj):
+    """One eligible group of `MIN_COMPARE_N` copilot tasks, all credit-priced."""
+    from cage import paths
+    fp = paths.Footprint(proj)
+    fp.base.mkdir(parents=True, exist_ok=True)
+    fp.policy.write_text('[billing.copilot]\nusd_per_credit = 0.04\n', encoding="utf-8")
+    for i in range(MIN_COMPARE_N):
+        tid = f"cop-{i}"
+        _credit_call(proj, tid, 1_000 + i * 100, f"2026-06-1{i}T10:00:00Z")
+        _close(proj, tid, f"2026-06-1{i}T18:00:00Z")
+    return proj, policy.load(fp.policy)
+
+
+def test_a_credit_priced_group_is_modeled_never_measured(credit_seeded):
+    root, pol = credit_seeded
+    d = compare.summarize(root, pol)
+    eligible = [g for g in d["groups"] if g["ok"]]
+    assert eligible, "the fixture must produce an eligible group or this asserts nothing"
+    csv = compare.render_csv(d)
+    method_col = [m for line in csv.strip().splitlines()[1:]
+                  if line.startswith("group") and (m := line.split(",")[-2])]
+    assert method_col and set(method_col) == {"modeled"}
+
+
+def test_a_token_priced_group_stays_measured(seeded):
+    """The degrade is conditional, not a blanket downgrade — repriced tokens are still
+    an invoice, and calling them `modeled` would be its own dishonesty."""
+    root, pol = seeded
+    csv = compare.render_csv(compare.summarize(root, pol))
+    method_col = [m for line in csv.strip().splitlines()[1:]
+                  if line.startswith("group") and (m := line.split(",")[-2])]
+    assert method_col and set(method_col) == {"measured"}
+
+
+def test_the_text_header_carries_the_same_basis_as_the_cells(credit_seeded):
+    """A header saying `measured` above a modeled row is the same lie as a mislabelled
+    cell — the two must move together."""
+    root, pol = credit_seeded
+    assert "modeled group totals" in compare.render_compare(compare.summarize(root, pol))
+
+
+def test_the_text_header_still_says_measured_for_token_priced_groups(seeded):
+    root, pol = seeded
+    assert "measured group totals" in compare.render_compare(compare.summarize(root, pol))

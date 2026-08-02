@@ -9,6 +9,22 @@ the numbers). A missing/empty `docs/dogfood/` FAILS — a green check that asser
 nothing is worse than a red one. `CAGE_SKIP_DOGFOOD_FRESHNESS=1` is the bisect/old-tag
 escape hatch (handoff §8 R1): a date-based assertion can go red on a boundary with no
 code change, so the failure message says so in plain words.
+
+**The two halves are gated differently, and that split is the point.**
+
+- **Structural** (dir exists · `latest.md` exists · parseable `snapshot_date` · it
+  agrees with the newest dated filename) runs **always, everywhere**. It is not
+  date-dependent, anyone can fix it from the repo alone, and it is the half with teeth.
+- **Age** (<= 60 days) runs **only when `CAGE_DOGFOOD_FRESHNESS` opts in** — which the
+  canonical repo's CI sets and nobody else does. Left unconditional it was a **calendar
+  bomb**: on ~2026-10-02 the suite went red on *every machine with no code change*, and
+  a fork could not heal it at all, because the snapshot derives from the maintainer's
+  own `~/.cage`. Under "green, or no release" that would have blocked every release on
+  a docs refresh only one person on earth could perform.
+
+Opt-in rather than skip-on-fork because the failure mode of guessing wrong is
+asymmetric: a guard that is silently off for the maintainer is a stale snapshot, while
+a guard that is wrongly on for a contributor is a red suite they cannot fix.
 """
 from __future__ import annotations
 
@@ -23,6 +39,9 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 DOGFOOD_DIR = REPO_ROOT / "docs" / "dogfood"
 MAX_AGE_DAYS = 60
 _SKIP_ENV = "CAGE_SKIP_DOGFOOD_FRESHNESS"
+# Set by the canonical repo's CI only. Absent ⇒ the *age* assertion does not run;
+# the structural ones still do. See the module docstring for why this is opt-in.
+_AGE_ENV = "CAGE_DOGFOOD_FRESHNESS"
 _DATE_FILENAME_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})\.md$")
 
 
@@ -51,8 +70,12 @@ def _newest_snapshot_date(dogfood_dir: Path) -> str | None:
     return max(dates) if dates else None
 
 
-def _freshness_problem(dogfood_dir: Path, today: dt.date) -> str | None:
-    """None when fresh; else a message naming exactly what's wrong."""
+def _structure_problem(dogfood_dir: Path) -> str | None:
+    """None when the published snapshot is structurally intact; else what's wrong.
+
+    **Date-independent by construction** — every check here is answerable from the repo
+    alone, which is why this half runs on every machine while the age check does not.
+    """
     skip_hint = f"Set {_SKIP_ENV}=1 if you are bisecting or building an old tag."
 
     if not dogfood_dir.is_dir():
@@ -70,7 +93,7 @@ def _freshness_problem(dogfood_dir: Path, today: dt.date) -> str | None:
                 f"{skip_hint}")
 
     try:
-        parsed_date = dt.date.fromisoformat(snapshot_date)
+        dt.date.fromisoformat(snapshot_date)
     except ValueError:
         return (f"docs/dogfood/latest.md's snapshot_date {snapshot_date!r} is not a "
                 f"YYYY-MM-DD date. {skip_hint}")
@@ -87,14 +110,30 @@ def _freshness_problem(dogfood_dir: Path, today: dt.date) -> str | None:
                 f"re-running the snapshot, not by editing one frontmatter line. "
                 f"{skip_hint}")
 
+    return None
+
+
+def _age_problem(dogfood_dir: Path, today: dt.date) -> str | None:
+    """None when the snapshot is within `MAX_AGE_DAYS`; else the reminder.
+
+    Assumes the structure is already intact (`_structure_problem` ran first); an
+    unparseable or absent date is that function's fault to report, not this one's."""
+    fm = _parse_frontmatter((dogfood_dir / "latest.md").read_text(encoding="utf-8"))
+    parsed_date = dt.date.fromisoformat(fm["snapshot_date"])
     age_days = (today - parsed_date).days
     if age_days > MAX_AGE_DAYS:
         return (f"docs/dogfood/latest.md's snapshot is {age_days} days old "
                 f"(> {MAX_AGE_DAYS}). This is a calendar-triggered freshness "
                 f"reminder, not a code regression — refresh the snapshot per "
-                f"docs/dogfood-report.handoff.md. {skip_hint}")
-
+                f"docs/dogfood-report.handoff.md. "
+                f"Set {_SKIP_ENV}=1 if you are bisecting or building an old tag.")
     return None
+
+
+def _freshness_problem(dogfood_dir: Path, today: dt.date) -> str | None:
+    """Both halves, structure first. Kept as one entry point so the failure-mode
+    tests below exercise the same ordering the real guard does."""
+    return _structure_problem(dogfood_dir) or _age_problem(dogfood_dir, today)
 
 
 def _maybe_skip() -> None:
@@ -105,9 +144,26 @@ def _maybe_skip() -> None:
 
 # ── the guard itself, against the real repo ──────────────────────────────────
 
-def test_dogfood_snapshot_is_fresh():
+def test_dogfood_structure_is_intact():
+    """Unconditional, everywhere. Not date-dependent, and fixable from the repo alone."""
     _maybe_skip()
-    problem = _freshness_problem(DOGFOOD_DIR, dt.date.today())
+    problem = _structure_problem(DOGFOOD_DIR)
+    assert problem is None, problem
+
+
+def test_dogfood_snapshot_is_fresh():
+    """Opt-in: the canonical repo's CI sets `CAGE_DOGFOOD_FRESHNESS`, nobody else does.
+
+    Unconditional, this was a calendar bomb — red on every machine on ~2026-10-02 with
+    no code change, and unfixable by a fork (the snapshot derives from the maintainer's
+    own `~/.cage`). See the module docstring."""
+    _maybe_skip()
+    if not os.environ.get(_AGE_ENV):
+        pytest.skip(f"{_AGE_ENV} is not set — the age check is opt-in and belongs to "
+                    "the canonical repo's CI (a fork cannot refresh this snapshot). "
+                    "The structural assertions ran regardless.")
+    assert _structure_problem(DOGFOOD_DIR) is None      # age is meaningless without it
+    problem = _age_problem(DOGFOOD_DIR, dt.date.today())
     assert problem is None, problem
 
 
@@ -115,6 +171,25 @@ def test_skip_env_var_skips(monkeypatch):
     monkeypatch.setenv(_SKIP_ENV, "1")
     with pytest.raises(pytest.skip.Exception):
         _maybe_skip()
+
+
+def test_the_age_check_is_opt_in_but_the_structural_one_is_not(monkeypatch):
+    """The calendar bomb, asserted as a property rather than trusted to a comment: an
+    over-age snapshot must NOT fail a machine that did not opt in, and a structurally
+    broken one must fail every machine either way."""
+    monkeypatch.delenv(_AGE_ENV, raising=False)
+    monkeypatch.delenv(_SKIP_ENV, raising=False)
+    with pytest.raises(pytest.skip.Exception):
+        test_dogfood_snapshot_is_fresh()
+    # ...and the half that still has teeth is not gated on anything.
+    assert _structure_problem(DOGFOOD_DIR) is None
+
+
+def test_an_over_age_snapshot_is_only_a_problem_for_the_age_half(tmp_path):
+    _write_snapshot(tmp_path, "2026-01-01")
+    stale = dt.date(2027, 1, 1)
+    assert _structure_problem(tmp_path) is None          # structure is fine forever
+    assert _age_problem(tmp_path, stale) is not None     # only the calendar objects
 
 
 # ── failure-mode coverage, all on tmp_path — never mutate the real

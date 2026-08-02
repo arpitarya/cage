@@ -2,6 +2,213 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
+## v0.45.0 (2026-08-03) — a correctness pass: nothing here was caught by a test
+
+Ten fixes from the v0.37.0→v0.44.0 review, none of which the (green) suite detected.
+Two wrote **append-only rows a later fix is forbidden to rewrite**, so every day they
+stayed open cost real data; two were armed to fire later — one on a calendar date, one
+on the next hook-event rename; the rest were numbers that were simply wrong, or honest
+in a total and fabricated as a field. Two items were routed to decisions rather than
+patched: the copilot multi-model billing **basis**, and the OTel GenAI **semconv pin**.
+
+### Copilot billing integrity (REV-CREDITS defect 1 + the guard gaps)
+
+Evidence: [proposal](docs/proposals/copilot-credits-integrity.proposal.md).
+
+**A shutdown's credit delta was dropped whenever the first-listed model had idled.**
+`prev_cred` advances once per shutdown, before the per-model loop; a model whose token
+counters did not move emits no row; and the delta was pinned to index 0. So a resumed
+session that used only its *second* model lost the billing figure entirely — no row
+carried it, the cursor had already moved, nothing was logged. Billed spend, permanently
+undercounted, with `modelMetrics`' dict order deciding whether it happened.
+
+- **The delta now lands on a row the loop actually emits** — the largest token mover,
+  ties broken by model name. Deterministic (a re-parse is byte-identical) and
+  independent of dict order. It is *not* an attribution claim: GitHub computes the
+  counter over the whole shutdown, so **no** single row truly owns it. Splitting it
+  across rows is a genuine basis fork and stays filed for
+  [the compare doc](docs/compare/copilot-pricing-basis.compare.md) — defect 2 was
+  deliberately **not** decided inside a fix commit.
+- **When every model idled and credits still arrived**, a zero-token carrier row keeps
+  the figure. That row is a true statement — this shutdown billed N credits and moved
+  no tokens — and dropping it is the defect being fixed.
+- **A counter that goes backwards is a reset, not a refund.** Stored verbatim it was a
+  negative delta quietly shrinking every USD total; the new cumulative value is now
+  read as the delta. Clamping to 0 was the other option and is worse — it discards real
+  spend.
+- **Non-finite counters no longer cost the whole file.** `json` accepts bare
+  `NaN`/`Infinity` and `int()` **raises** on both, so one bad field threw out of the
+  parser and lost every row in it — worse than the review recorded. They now read as
+  *absent* (never a fabricated `0.0`), and the tokens beside them still land.
+- **`cage insights compare` stops calling credit-priced dollars `measured`.** A credit
+  dollar is a recorded count times a rate *you* configured, which is `modeled` by the
+  feature's own law; `report`/`chats` already degraded, compare printed an invoice.
+  `taskgroup.stats` now carries `credit_calls`, and both the CSV cells and the text
+  header degrade together — a header saying `measured` above a modeled row is the same
+  lie as a mislabelled cell.
+
+### Honest refusals (REV-HARDEN P2)
+
+- **`cage insights adoption --since` answered two different questions in one table.**
+  Half A row-filters; half B used `read_kind`'s `since`, which skips whole **month
+  shards** and applies no row filter. Half B now double-filters like roi/report/chats.
+- **A shared session is no longer described as a capture gap.** A savings row whose
+  session belongs to more than one agent was filed as `unjoined`, whose sentence reads
+  *"the agent turn behind it was not captured — a capture gap worth chasing"*. That is
+  a **false fact**: nothing was missed and there is nothing to chase. New `ambiguous`
+  reason with its own sentence. A view whose whole value is a boundary between three
+  unknowns cannot describe one of them as another.
+- **An unpriced saving is omitted, never exported as `$0`.** `policy.price` returns a
+  zero row for a model it cannot price, so `prices.input_cost_usd` produced a hard
+  `0.0` indistinguishable from a real zero — fine in a sum, a fabricated figure when
+  emitted as an OTel field. New `convert.saved_usd_opt` owns the unpriced-vs-zero
+  distinction **in `convert`**, where unit dispatch already lives; the review pointed at
+  `otelout`, but fixing it there would have put a second copy of the pricing ladder in
+  it, and the credits rung already drifted between two copies once.
+- **Unwiring hooks leaves nothing behind.** The `--hooks` off-switch routed through a
+  stripper that left `"hooks": {}` and the file itself on disk, so turning the layer off
+  showed up as a permanent committed diff. It now uses the path that already dropped an
+  emptied table and removed a file cage alone reduced to nothing — same predicate for
+  "is this cage's entry", so *which* entries get removed is unchanged.
+- **Not fixed, deliberately:** `gen_ai.system` is deprecated (renamed to
+  `gen_ai.provider.name` in semconv **v1.37.0**, before cage's pinned 1.42.0). Verifying
+  it surfaced a second problem that makes this a fork rather than a fix — the GenAI
+  conventions moved to their own repository, so the pinned version string may not name
+  what cage thinks it names. Findings and the three options:
+  [research](docs/research/2026-08-03-otel-genai-semconv-pin.md).
+
+### `cage --help` advertised six of `data`'s eight commands (CLI-GAPS a)
+
+`migrate-savings` and `graphify` ran while being invisible to anyone reading the help —
+the same failure class as a dead verb in prose, so it gets the same treatment: the front
+door is now **gated bidirectionally against the live parser**
+(`tests/test_cli_tiering.py`), so a command that exists but is unnamed, or a name with no
+command behind it, fails the suite. Also found while fixing it: each group's `help=`
+string duplicated those lists and is **rendered nowhere at all** — noted at
+`cli._group` rather than left to rot as a second source of the same drift.
+
+### `cage hook` can no longer block your session by failing (REV-HARDEN P1)
+
+**Exit `2` is the block verdict** (`hookcmd.BLOCK`, wired to `PreToolUse`/`Bash`) —
+and it is also what argparse exits on any usage error. So an unknown event name, which
+is exactly what renaming an event against stale committed wiring produces, would have
+blocked **every Bash call in the session**. Silently: a blocked tool call reads as the
+agent refusing, not as cage failing. Fail-open was absolute *inside* `hookcmd.run` and
+absent at the boundary standing in front of it.
+
+- `cage hook <anything argparse rejects>` now exits **0**, prints the accepted events
+  and `cage setup --hooks` on stderr, and traces under `CAGE_DEBUG`. The deliberate
+  budget block still returns `2` — asserted through `cli.main`, the path a host
+  actually invokes, since that is where both codes travel.
+- **Scoped to `hook` alone.** Every other verb keeps argparse's exit `2`, and
+  `cage hook --help` still exits `0`.
+- **The fix-hint is derived from the live `EVENTS`, not a hand-maintained map of old
+  spellings** — a map like that goes stale in the very release that renames an event,
+  which is the same reason `wiringscan` detects against the live parser rather than
+  `verbmap.REMOVED`.
+
+### The dogfood freshness guard stops being a calendar bomb (REV-HARDEN P0)
+
+`tests/test_dogfood_freshness.py` compared the committed snapshot date to the wall
+clock with a 60-day ceiling, unconditionally. On ~2026-10-02 the suite would have gone
+red **on every machine with no code change** — and a fork could not have healed it at
+all, because the snapshot derives from the maintainer's own `~/.cage`. Under "green, or
+no release", every release would have blocked on a docs refresh one person could
+perform.
+
+- The guard is now **two halves, gated differently**. *Structural* (directory exists ·
+  `latest.md` exists · parseable `snapshot_date` · it agrees with the newest dated
+  filename) runs **always, everywhere** — it is date-independent, fixable from the repo
+  alone, and it is the half with teeth. *Age* runs only when `CAGE_DOGFOOD_FRESHNESS`
+  opts in, which this repo's CI sets and nobody else does.
+- Opt-in rather than skip-on-fork because the failure modes are asymmetric: a guard
+  silently off for the maintainer is a stale snapshot; a guard wrongly on for a
+  contributor is a red suite they cannot fix.
+- `CAGE_SKIP_DOGFOOD_FRESHNESS=1` remains the local bisect/old-tag escape. The split
+  itself is now a test, so the bomb cannot be re-armed by removing a comment.
+
+### Row ids get 32 bits of randomness (ID-ENTROPY)
+
+Evidence: [finding](docs/regression/2026-08-02-finding-call-id-collisions.md).
+
+**`ids.new_id` had 16 bits of randomness per millisecond, and every merge path dedupes
+by id — so a collision was a silently dropped row, not a retry.** Measured on a real
+machine: **874 duplicates in 200,000** sequential ids (~1 in 229). It turned `main` red
+once (`test_study`, 37 calls where 38 were seeded) and the test was right; the generator
+was wrong.
+
+- **`secrets.randbelow(0x100000000):08x`** — 32 bits, ~65,000× safer. Re-measured the
+  same way immediately after: **0 duplicates in 200,000**. The millisecond field is
+  untouched, so ids stay lexicographically time-sortable; bodies go 15 → 19 chars.
+- **Entropy width is now a contract test, not a statistic** — `tests/test_substrate.py`
+  asserts `randbelow` is called with `0x100000000`, because a statistical test for a
+  1-in-4-billion event is either vacuous or flaky and neither would notice the field
+  getting narrower again.
+- **Ids already written are never rewritten** and keep their old 16-bit risk — which is
+  the argument for doing this now rather than later, not for backfilling. Old and new
+  shapes coexist because **nothing parses an id**.
+- `mergeutil.union_by_id`'s docstring asserted *"call/receipt ids never legitimately
+  collide"*; the measured rate falsified it. Widening makes an invariant the merge layer
+  already relied on actually true, and the docstring now names the generator as its
+  precondition. `transcript._composite_id`'s "same 15-char shape" parity note corrected
+  in the same change — the two *deterministic* paths still agree at 15; the random path
+  is deliberately wider.
+
+### One UTC normal form for the authorship join (REV-TS)
+
+Built from: [proposal](docs/archive/v0.45-rev-ts.proposal.md) ·
+[handoff](docs/archive/v0.45-rev-ts.handoff.md) +
+[prompt](docs/archive/v0.45-rev-ts.prompt.md) ·
+[finding](docs/regression/2026-08-02-finding-commit-window-timestamp-skew.md).
+
+**Every authorship join on a non-UTC machine was placing edits and calls on the wrong
+commit.** `commitjoin` built commit windows from raw `git log --format=%cI` strings —
+the *committer-local* offset — and compared them **lexicographically** against UTC
+`…Z` transcript and call timestamps. Ordering strings across different offset
+representations is meaningless.
+
+- **One normal form, `YYYY-MM-DDTHH:MM:SSZ`**, sub-seconds **truncated, never
+  rounded** (`commitjoin.norm_ts`). One parse (`as_utc`, always UTC-aware, naive input
+  assumed UTC); `commitview._iso` is now that function rather than a second copy of it
+  — it could previously return a *naive* datetime, one input away from a `TypeError`
+  against `ledger.since_cutoff`'s aware cutoff.
+- **Bounds normalize at construction.** `Window` is a `collections.namedtuple`
+  subclass whose `__new__` normalizes, so a window holding a raw git string cannot be
+  built — in the module or in a test. The skew was invisible for exactly as long as it
+  depended on every caller remembering. Probes normalize on entry to `window_for`, and
+  `authorcapture._uncovered` normalizes before the coverage-cursor compare. **The
+  comparison itself is still a string compare** — the determinism law keeps datetime
+  objects out of stored rows.
+- **Seconds, not milliseconds, is deliberate.** `%cI` carries no sub-second, so a
+  commit stamped `10:00:00` happened somewhere in `[10:00:00, 10:00:01)`. Millisecond
+  precision would push an edit at `10:00:00.500` — plausibly *before* the commit —
+  into the next window on precision cage does not have, breaking the documented
+  inclusive bound.
+- **Pure-UTC repos were never affected.** Git renders `%cI` as `Z` when the offset is
+  zero, so their bounds already shared the probes' shape. The review's third claimed
+  failure shape (a same-second bug in pure-UTC repos) assumed a `+00:00` bound git
+  never emits, and was **falsified** during the build — it is the reason the normal
+  form is seconds rather than milliseconds. Details in the finding.
+- **Pre-fix provenance rows are suspect and are NOT rewritten.** `originrecord` freezes
+  a row by `(sha, agent, session_id, method)`, so rows written on a non-UTC machine
+  keep their wrong sha forever; the log is append-only. Worse and stated plainly: a
+  corrected sweep can *add* rows on the corrected sha **beside** the wrong ones, so
+  those lines count on two commits. The `_authorship` cursor is therefore deliberately
+  **not** invalidated (an unchanged, already-covered transcript stays unread); files
+  still marked uncovered will be re-read and can produce the double-presence anyway.
+  No repair or purge verb was added — that would violate the append-only law.
+- **`cage insights commits --csv` `ts` is now UTC.** It emitted the raw window bound,
+  which on a non-UTC machine was *local* time. Text output is unchanged (it slices the
+  offset away), and **no golden fixture moved** — which is what verified the blast
+  radius.
+- The suite was green over this bug for its whole life because every fixture commit was
+  pinned `+00:00` and the one boundary test probed with byte-identical strings: it never
+  left UTC and never sat on a boundary.
+
+**Together: 1401 → 1441 tests**, 0 fail, 11 skipped (the new skip is the opt-in dogfood
+age check), and **no golden fixture moved** — which is what verified the blast radius.
+The one re-blessed fixture is `tests/fixtures/cli-help.txt`, the front door itself.
+
 ## v0.44.1 (2026-08-02) — golden fixture drift fix
 
 CI on `main` failed after the v0.44.0 release: `[meta] cage_version` derives from

@@ -22,21 +22,81 @@ is the one option that would be wrong forever.
 Git access is the `tasks._git` idiom throughout: shell out, read-only, 5s timeout,
 **fail-open** — no repo / no git / a detached or empty HEAD yields an empty window
 list and the caller records nothing, never an exception into the capture path.
+
+**Timestamps have ONE normal form here, and it is the module's whole safety story**
+(REV-TS). Three shapes arrive at the same ``<``: git's ``%cI`` carries the
+*committer-local* offset (``…+05:30``, and ``…Z`` only when that offset is zero), a
+call stamps ``…SSZ``, and a transcript turn stamps ``…SS.mmmZ``. Ordering strings
+across different offset representations is meaningless, so every bound and every
+probe is passed through `norm_ts` before it is ever compared — bounds at
+construction (`Window` normalizes, so a non-normalized window cannot be built), and
+probes on entry to `window_for`. The comparison itself stays a **string** compare:
+the determinism law keeps datetime objects out of stored rows.
 """
 from __future__ import annotations
 
+import collections
+import datetime as _dt
 import subprocess
 from pathlib import Path
-from typing import NamedTuple
+
+_UTC = _dt.timezone.utc
+
+# The one normal form. Seconds, not milliseconds, and deliberately so: `%cI` has no
+# sub-second component, so a commit stamped `10:00:00` happened *somewhere* in
+# [10:00:00, 10:00:01). Millisecond precision would push an edit at `10:00:00.500` —
+# plausibly before the commit — into the next window on precision cage does not have,
+# and would break the inclusive upper bound documented above in the one case
+# (a pure-UTC repo) that already gets it right.
+_NORM = "%Y-%m-%dT%H:%M:%SZ"
 
 
-class Window(NamedTuple):
+def as_utc(ts: str) -> _dt.datetime | None:
+    """``ts`` as a UTC-**aware** datetime, or None when it cannot be parsed.
+
+    The ONE timestamp parse for the authorship surfaces — `commitview._iso` is this
+    function, not a second copy. A naive input is *assumed* UTC rather than left
+    naive: returning naive is how a comparison against an aware cutoff raises
+    `TypeError` at some caller that has no idea it is holding two kinds of datetime.
+    """
+    try:
+        d = _dt.datetime.fromisoformat((ts or "").replace("Z", "+00:00"))
+    except (AttributeError, TypeError, ValueError):
+        return None
+    return (d if d.tzinfo is not None else d.replace(tzinfo=_UTC)).astimezone(_UTC)
+
+
+def norm_ts(ts: str) -> str:
+    """``ts`` in the one normal form (``YYYY-MM-DDTHH:MM:SSZ``), or ``""``.
+
+    Sub-seconds are **truncated, never rounded** — rounding is non-monotone at a
+    boundary and could carry an edit across the very window it belongs in. Empty and
+    unparseable both yield ``""``, which every comparison site already reads as
+    *no usable timestamp* (`window_for` returns None for it, and it sorts below every
+    real timestamp, which is what keeps the oldest window open below)."""
+    d = as_utc(ts)
+    return d.strftime(_NORM) if d is not None else ""
+
+
+_WindowFields = collections.namedtuple("Window", "sha lo hi")
+
+
+class Window(_WindowFields):
     """One commit's ownership window, ``(lo, hi]``. ``lo`` is ``""`` for the oldest
     commit — the empty string sorts below every ISO timestamp, so the open lower bound
-    needs no special case at the comparison site."""
-    sha: str
-    lo: str
-    hi: str
+    needs no special case at the comparison site.
+
+    **The bounds normalize at construction**, which is why no comparison site converts
+    one: a `Window` holding a raw ``%cI`` string cannot be built, in this module or in
+    a test. That is deliberately structural rather than a convention — the skew this
+    fixes was invisible for exactly as long as it depended on every caller remembering.
+    (`_make`/`_replace` bypass `__new__`, as they do for every namedtuple; nothing here
+    uses them. It is a `collections.namedtuple` subclass and not a `typing.NamedTuple`
+    because the latter forbids overriding `__new__`.)"""
+    __slots__ = ()
+
+    def __new__(cls, sha: str, lo: str, hi: str):
+        return super().__new__(cls, sha, norm_ts(lo), norm_ts(hi))
 
 
 def _git(root: Path, *args: str) -> str | None:
@@ -84,16 +144,24 @@ def commit_windows(root: Path) -> list[Window]:
     out-of-order committer date (an amended or grafted commit) still yields
     non-overlapping windows instead of a silently negative one.
 
+    **The sort happens on normalized timestamps**, which is the whole point: ``%cI``
+    renders each commit in its own committer's offset, so a history mixing local
+    commits with ``+00:00`` merges from CI or the GitHub web UI sorts *backwards* on
+    the raw strings and builds windows whose bounds run the wrong way.
+
     Fail-open ⇒ ``[]`` (no repo, no git, no commits): the caller then records nothing,
-    which is the honest answer when there is no history to attribute against."""
+    which is the honest answer when there is no history to attribute against. A commit
+    whose ``%cI`` will not parse is dropped from the list, matching the malformed-line
+    filter beside it — a bound cage cannot place in time is worse than one less window.
+    """
     out = _git(root, "log", "--format=%h|%cI")
     if not out:
         return []
     pairs: list[tuple[str, str]] = []
     for line in out.splitlines():
         sha, sep, ts = line.strip().partition("|")
-        if sep and sha and ts:
-            pairs.append((sha, ts))
+        if sep and sha and (norm := norm_ts(ts)):
+            pairs.append((sha, norm))
     if not pairs:
         return []
     pairs.sort(key=lambda p: (p[1], p[0]))  # oldest first; sha breaks a same-second tie
@@ -109,13 +177,18 @@ def window_for(windows: list[Window], ts: str) -> Window | None:
     """The window containing ``ts`` (``lo < ts <= hi``), or None when ``ts`` is after
     the newest commit — the deliberately-unrecorded case (module docstring).
 
+    The probe is normalized on entry (the bounds already are, by construction), so
+    ``lo < probe <= hi`` compares one shape against itself. An unparseable or empty
+    ``ts`` yields None: a thing cage cannot place in time is never placed at all.
+
     Linear rather than bisecting on purpose: the caller resolves a handful of distinct
     timestamps per sweep against a few hundred windows, and a plain scan has no
     boundary-condition surface to get wrong."""
-    if not ts:
+    probe = norm_ts(ts)
+    if not probe:
         return None
     for w in windows:
-        if w.lo < ts <= w.hi:
+        if w.lo < probe <= w.hi:
             return w
     return None
 

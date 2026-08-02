@@ -78,7 +78,7 @@ obvious from the code:
 
 [docs/shim-contract.md](../shim-contract.md) is the worked artifact — B1–B8 binding
 behaviours, D1–D7 documented divergences, the four-mechanism anti-recursion proof.
-`docs/proposals/tool-integration-contract.md` is why this matters beyond graphify: the
+`docs/proposals/tool-integration-contract.proposal.md` is why this matters beyond graphify: the
 contract is designed to be the template the *next* tool interceptor copies, with only
 the tool name, the cage verb, and the marker strings changing.
 

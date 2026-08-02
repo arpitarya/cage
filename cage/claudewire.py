@@ -35,37 +35,6 @@ def _save(path: Path, data: dict) -> None:
     path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
 
 
-def _strip_stale_hooks(root: Path) -> int:
-    """Remove every cage-owned hook entry from `.claude/settings.json` (previous
-    versions wired Stop/SessionStart/SessionEnd/PostToolUse there). Foreign hooks
-    are never touched; an empty `hooks` table is left as `{}` (harmless).
-    Returns how many entries were removed. Fail-open: an unreadable file is
-    left alone."""
-    settings = root / ".claude" / "settings.json"
-    if not settings.exists():
-        return 0
-    data = _load(settings)
-    hooks = data.get("hooks")
-    if not isinstance(hooks, dict):
-        return 0
-    removed = 0
-    for event, entries in list(hooks.items()):
-        kept = []
-        for e in entries:
-            cmds = [h for h in e.get("hooks", [])
-                    if paths.cage_command_tail(h.get("command", "")) is None]
-            removed += len(e.get("hooks", [])) - len(cmds)
-            if cmds:
-                e["hooks"] = cmds
-                kept.append(e)
-        hooks[event] = kept
-        if not kept:
-            del hooks[event]
-    if removed:
-        _save(settings, data)
-    return removed
-
-
 # ── L1 hooks (opt-in, `cage setup --hooks`) ──────────────────────────────────────────
 # Claude Code is the only host of the three where cage has itself written and tested
 # every event L1 needs, so it is the only one with the full capability set
@@ -172,9 +141,16 @@ def install(root: Path, *, python_launcher: bool = False, hooks: bool = False) -
         # report it as removed.
         n = _wire_hooks(root, True)
         out["hooks"] = f"wired {n} L1 hook entr{'y' if n == 1 else 'ies'}"
-    elif (stripped := _strip_stale_hooks(root)):
+    elif (stripped := hook_status(root)):
         # Hookless is the default, so this is BOTH the pre-v0.36 migration and the
-        # `--hooks` off-switch: whichever wrote them, cage's entries go.
+        # `--hooks` off-switch: whichever wrote them, cage's entries go. Routed through
+        # `_wire_hooks(root, False)` rather than a separate stripper because only this
+        # path finishes the job — it drops an emptied `hooks` table instead of leaving
+        # `"hooks": {}`, and removes a file cage alone reduced to nothing. Otherwise
+        # every off-switch showed up as a permanent committed diff. The two used the
+        # *same* predicate for "is this cage's entry" (`paths.cage_command_tail`), so
+        # nothing about which entries are removed changed.
+        _wire_hooks(root, False)
         out["hooks-removed"] = f"removed {stripped} cage hook entr{'y' if stripped == 1 else 'ies'}"
     return out
 

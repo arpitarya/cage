@@ -522,6 +522,29 @@ spec'd elsewhere.
 from the v0.36 removal, and it is structural: `commitview.py` imports no pricing module
 (asserted in `tests/test_commitview.py`).
 
+**Commit windows, and the one UTC normal form** ([commitjoin.py](../cage/commitjoin.py)).
+Commit `i` owns `(ts_{i-1}, ts_i]` — upper bound **inclusive**, oldest commit open below.
+
+```
+norm_ts(ts)   = parse (naive ⇒ assume UTC) → astimezone(UTC) → "%Y-%m-%dT%H:%M:%SZ"
+                sub-seconds TRUNCATED, never rounded; unparseable/empty ⇒ ""
+Window(lo,hi) = bounds normalized AT CONSTRUCTION — a raw-bound window cannot be built
+window_for    = normalize the probe, then  lo < probe <= hi        (a STRING compare)
+```
+
+Three shapes reach that one `<`: git's `%cI` renders each commit in its **committer's own
+offset** (`…+05:30`; `…Z` only when that offset is zero), a call stamps `…SSZ`, a
+transcript turn stamps `…SS.mmmZ`. Ordering strings across offset representations is
+meaningless, so normalization happens **at the boundary** — bounds on construction, probes
+on entry — and the comparison itself stays a string compare (determinism law: no datetime
+objects in stored rows).
+
+**Seconds, not milliseconds, is load-bearing.** `%cI` carries no sub-second, so a commit
+stamped `10:00:00` happened somewhere in `[10:00:00, 10:00:01)`. Finer precision would push
+an edit at `10:00:00.500` — plausibly *before* the commit — into the next window, breaking
+the inclusive bound. Evidence and the two claims this corrected:
+[finding](regression/2026-08-02-finding-commit-window-timestamp-skew.md).
+
 **Line matching (capture, P1).** For each edit an agent proposed, in the commit whose
 window contains that edit's own turn timestamp:
 

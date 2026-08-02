@@ -161,3 +161,59 @@ def test_committed_wiring_names_only_non_moving_verbs(tmp_path):
     for display, command in committed:
         assert not wiringscan.is_dead_cage_command(command), \
             f"committed wiring {display} names a dead verb: {command!r}"
+
+
+# ── the front door must advertise everything it can run ──────────────────────
+#
+# `cage --help` is a hand-authored one-screen literal (`cli._ROOT_HELP`), not
+# argparse's generated dump — that is deliberate, it is the curated front door. The
+# cost is drift: `data` advertised six of its eight commands, so `migrate-savings` and
+# `graphify` ran while being invisible to anyone reading the help. Same failure class
+# as a dead verb in prose, so it gets the same treatment: gated against the live
+# parser instead of trusted.
+
+def _group_commands():
+    from cage import cli
+    top = next(a for a in cli.build_parser()._actions
+               if a.choices and a.dest == "cmd")
+    import argparse
+    out = {}
+    for verb, parser in top.choices.items():
+        # Subparsers only — `report --by {model,provider,day}` is a flag's choice list,
+        # not a command, and counting it would make this assert nonsense.
+        nested = next((a for a in parser._actions
+                       if isinstance(a, argparse._SubParsersAction)), None)
+        if nested:
+            out[verb] = list(nested.choices)
+    return out
+
+
+def test_the_front_door_lists_every_subcommand_of_every_group():
+    from cage import cli
+    missing = []
+    for verb, commands in _group_commands().items():
+        if f"\n  {verb}" not in cli._ROOT_HELP:
+            continue                       # hidden group (never advertised on purpose)
+        for c in commands:
+            if c not in cli._ROOT_HELP:
+                missing.append(f"{verb} {c}")
+    assert not missing, (
+        f"`cage --help` can run these but never names them: {missing}. "
+        "Add them to cli._ROOT_HELP and re-bless the golden.")
+
+
+def test_the_front_door_never_advertises_a_command_that_does_not_exist():
+    """The other direction — a removed subcommand left in the literal sends a reader
+    at a verb that exits 2."""
+    from cage import cli
+    top = next(a for a in cli.build_parser()._actions
+               if a.choices and a.dest == "cmd")
+    known = set(top.choices)                              # every top-level verb
+    for parser in top.choices.values():
+        for a in parser._actions:                         # subparsers AND the positional
+            known |= set(a.choices or ())                 # -choice groups (prices/study/policy)
+    body = cli._ROOT_HELP.split("groups (run any group name for its commands):")[1]
+    body = body.split("\n$ ")[0]
+    for token in body.replace("·", " ").split():
+        if token.isalpha() or "-" in token:
+            assert token in known, f"`cage --help` advertises {token!r}, which no group registers"

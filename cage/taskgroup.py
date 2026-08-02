@@ -103,14 +103,23 @@ def _task_scope(row: dict) -> str:
 
 
 def stats(root: Path, pol: dict) -> list[dict]:
-    """One measured stat row per closed task, in sorted task-id order:
-    ``{task, stack, scope, label, calls, tokens, usd}``. Tasks whose joined call
-    set is empty still appear (tokens/usd 0, calls 0) — consumers decide whether
-    to exclude them, visibly."""
+    """One stat row per closed task, in sorted task-id order:
+    ``{task, stack, scope, label, calls, tokens, usd, credit_calls}``. Tasks whose
+    joined call set is empty still appear (tokens/usd 0, calls 0) — consumers decide
+    whether to exclude them, visibly.
+
+    ``credit_calls`` counts the calls priced through the **credits** rung, so a
+    consumer can apply the method law without re-pricing: a credit-priced dollar is
+    `modeled` (a recorded count times a rate *you* configured), a token-priced one is
+    `measured`. Carried here rather than recomputed downstream because this is where
+    the pricing decision is already being made — `compare` claimed `measured` for
+    every group precisely because the basis was not available to it."""
+    from cage import creditprice
     joined = join(root)
     rows = []
     for tid, trow in sorted(closed_tasks(root).items()):
         j = joined.get(tid, {"calls": [], "receipts": []})
+        priced = [prices.call_usd_match(pol, c) for c in j["calls"]]
         rows.append({
             "task": tid,
             "stack": signature(j["receipts"]),
@@ -119,7 +128,8 @@ def stats(root: Path, pol: dict) -> list[dict]:
             "agents": sorted(trow.get("agents") or []),
             "calls": len(j["calls"]),
             "tokens": sum(c.get("tokens_in", 0) + c.get("tokens_out", 0) for c in j["calls"]),
-            "usd": round(sum(prices.call_usd(pol, c) for c in j["calls"]), 6),
+            "usd": round(sum(p[0] for p in priced), 6),
+            "credit_calls": sum(1 for p in priced if p[1] == creditprice.MATCH),
         })
     return rows
 

@@ -103,8 +103,17 @@ def _bucket_edits(edits, windows, repo: Path) -> dict:
 
 
 def _uncovered(edits, newest: str) -> bool:
-    """Whether any edit is still waiting for a commit that has not been made yet."""
-    return any((e.get("ts") or "") > newest for e in edits) if newest else bool(edits)
+    """Whether any edit is still waiting for a commit that has not been made yet.
+
+    ``newest`` is already in the one normal form (it is a `Window` bound), so the edit
+    side is normalized to match — this compare decides whether a transcript is re-read
+    next sweep, and on a non-UTC repo the raw form gets it wrong by the offset. An edit
+    whose timestamp will not parse normalizes to ``""`` and counts as covered: it can
+    never be placed in a window either, so calling it uncovered would re-read the file
+    forever waiting for a commit that could not help it."""
+    if not newest:
+        return bool(edits)
+    return any(commitjoin.norm_ts(e.get("ts") or "") > newest for e in edits)
 
 
 def _sig(f: Path):

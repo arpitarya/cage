@@ -29,7 +29,9 @@ here. A rename that misses this file turns the suite red. See
 - **Exit codes:** `0` ok · `1` error (`error: <msg>`; full traceback only under
   `CAGE_DEBUG=1`) · `2` argparse usage · `130` interrupt. `cage authorship verify` is
   report-only and **always exits 0**; `cage hook budget` exits `2` on a deliberate
-  budget block.
+  budget block. **`cage hook` is the one verb that does NOT exit `2` on a usage
+  error** — for it, `2` already means *block the tool call*, so an argparse failure
+  exits `0` with the fix on stderr (see the `hook` section).
 - **Two error regimes, never mixed.** Write paths are fail-open (return `False`,
   swallow, never raise into a request). Only the read/CLI boundary raises.
 
@@ -390,6 +392,15 @@ Callable but deliberately absent from `cage --help`.
 `cage hook` is **fail-open absolute**: every event exits `0` on any internal failure.
 The sole non-zero is `cage hook budget` returning `2` when
 `[budgets] on_exceed = "block"`.
+
+**That absoluteness extends to the argparse boundary, and it is the reason `hook` is
+exempt from the usual exit `2`.** Exit `2` is the block verdict, wired to
+`PreToolUse`/`Bash` — so an unknown event name (what a rename against stale committed
+wiring produces) would otherwise block **every** Bash call in the session, silently: a
+blocked tool call reads as the agent refusing, not as cage failing. Instead cage exits
+`0` and prints the live event list plus `cage setup --hooks` on stderr. The direction
+is derived from the accepted events, never a hand-kept map of old spellings — the same
+reason `wiringscan` detects against the live parser.
 
 ---
 

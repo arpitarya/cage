@@ -32,9 +32,11 @@ the `receiptprice` ladder (`[tools.<tool>] price_at` → task-model → UNPRICED
 
 `fux/cage_receipt.py` already pushes receipts (zero-dep shim, deliberate `len/4` copy).
 Migrating fux onto the contract — registry entry, rendered interceptor, detection
-patterns — is the acceptance test. **The contract ships when two tools use it**, not
-before (a one-consumer abstraction is speculation; the rule of three, minus one, with
-the third named: any MCP-serving tool).
+patterns — is the acceptance test.
+
+**The contract ships when two tools use it**, not before: a one-consumer abstraction is
+speculation. (The rule of three, minus one, with the third named — any MCP-serving
+tool.)
 
 ## Sequencing (serves the "graphify works" goal directly)
 

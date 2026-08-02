@@ -28,7 +28,7 @@ the missing 8 closed tasks. **No code changes.**
 | result | meaning | follow-up |
 |---|---|---|
 | ON arm cheaper | first measured net-positive evidence | README evidence line updates |
-| ON arm still dearer | corroborates leg D at n=5 | [larger-lab-corpus](larger-lab-corpus.md) becomes the live question |
+| ON arm still dearer | corroborates leg D at n=5 | [larger-lab-corpus](larger-lab-corpus.proposal.md) becomes the live question |
 | gate unmet (task-join failures) | a capture bug worth more than the answer | file the finding |
 
 **Pre-committing the interpretation is the point** — no post-hoc reading. Cost:

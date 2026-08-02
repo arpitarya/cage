@@ -1,0 +1,184 @@
+# Cage policy — the only place your project numbers live. Versioned, deterministic
+# (plan §3.3). This file holds your DECISIONS — budgets, pipeline order,
+# capture switches, import sources, and routing (aliases, tool routes). Model PRICES
+# (vendor rate cards) live in a separate file, prices.toml, because they have the
+# opposite lifecycle: yours are preserved on upgrade, prices are replaced wholesale
+# by `cage prices sync` (prices-toml plan §3). Vendor facts there; your decisions here.
+
+# policy_version tracks the *non-pricing* defaults: it bumps only when a release
+# adds/changes/removes a bundled tunable, and `cage policy sync` compares it.
+# (The price-research provenance — prices_version/prices_date — lives in prices.toml,
+# next to the rows it dates.) `cage setup` copies this file verbatim.
+# cage_version is deliberately NOT declared here — it is derived live from
+# cage.__version__ (`policy._bundled`), never a hand-maintained literal (a stale
+# copy drifted for eleven releases). A scaffolded project's cage.toml still gets
+# a cage_version stamp (initcmd.run) — that one IS historical and is never rewritten.
+[meta]
+policy_version = "0.27.0"
+cage_version = "0.44.1"
+
+# Routing decisions (aliases + tool routes) live here — they describe YOUR setup,
+# not a vendor's rate card, so a wholesale `cage prices sync` never touches them.
+#
+# An alias routes a router pseudo-model (or a bare id) to a real price row. The bare
+# Copilot router id `copilot/auto` stays UNPRICED until you route it (a router priced
+# silently is a wrong number). Add one with (this writes cage.toml, not prices.toml):
+#   cage prices alias - copilot/auto --to anthropic/claude-sonnet-4-6
+# or uncomment (the empty-string table is the empty provider Copilot stamps):
+# [alias.""."copilot/auto"]
+# to = "anthropic/claude-sonnet-4-6"
+
+# Auto-capture switch. Each agent's hook runs `cage import --agent <itself>` to meter
+# its own on-disk usage log; set enabled=false to pause that without unwiring any hooks
+# (the hooks still fire, the import is a no-op). Env CAGE_CAPTURE (0/1) overrides.
+# import_before_export: `cage data export` (plain and --study) runs the all-agent import
+# sweep first, so a capture-only machine (hooks don't fire under a VS Code extension)
+# still ships a complete bundle. Set false for as-is snapshots; the `--no-import`
+# flag wins per invocation (precedence: flag > env CAGE_CAPTURE > policy).
+[capture]
+enabled = true
+import_before_export = true
+# Staleness gate (hours) for the report footer's "last import: N ago" advice line —
+# it renders only when the last import is older than this (it's advice, not a
+# banner). Uncomment to override the constants.IMPORT_STALE_HOURS fallback (24);
+# 0 restores the always-on line.
+# import_stale_hours = 24
+
+# Display defaults (plan Phase 2.5). Tokens are the measurement and the default;
+# dollars are an interpretation you ask for. usd = true makes `cage report`,
+# `cage insights matrix`, and the bare `cage` headline render their dollar columns without
+# the --usd flag (per-invocation flag > env CAGE_USD > this). Display-only:
+# pricing always computes underneath (budget guards, UNPRICED detection), the
+# money-native views (budget/roi/verdict/compare/estimate) always show dollars,
+# and CSV always carries the full column set.
+[display]
+usd = false
+
+# YOUR plan's credit rate — rung 1 of the copilot pricing ladder (`cage query
+# copilot-credits`). Copilot records the credits GitHub itself billed on each request;
+# cage stores that count verbatim but will not turn it into a dollar until you say what
+# a credit costs you. Ships UNSET on purpose: an assumed rate would be a guess wearing a
+# number, so with none set the credits render as a COUNT and those rows price by
+# token × price-table instead.
+#
+# This lives in cage.toml, NOT prices.toml, and the split is the point: prices.toml is a
+# vendor rate card that `cage prices sync` replaces wholesale, while your overage rate is
+# a decision about your own plan that must survive every sync. Vendor facts move,
+# routing decisions stay. (It is spelled [billing.<agent>] rather than [credits.<agent>]
+# because [credits] is that vendor card's per-model multiplier table — see policy.py.)
+#
+# [billing.copilot]
+# usd_per_credit = 0.04   # your plan's overage rate per AI credit
+
+# State-dir maintenance (.cage/state/ only — a CLOSED allowlist: aged debug.log and
+# hooks-seen.jsonl rows, stale pending-* provenance buffers, cursors whose source log
+# is gone, *.tmp). Never touches ledger/ (tool savings included — a per-tool cleanup
+# class must never be added), cage.toml, prices.toml, machine.json, study.jsonl, or
+# limits.json — fleet pairing and the audit trail are not cleanup's to lose.
+# Deletion only ever happens via an explicit `cage data cleanup --apply`: the auto
+# path (piggybacked on `cage import`, throttled, fail-open; cage installs no
+# scheduler) only ever WARNS on stderr, silent when nothing is eligible — never
+# deletes. `enabled` gates that automatic reminder only (env CAGE_CLEANUP overrides);
+# `warn` (env CAGE_CLEANUP_WARN) turns the reminder itself off without disabling the
+# gate. An explicitly-typed `cage data cleanup` / `--apply` always runs regardless of
+# either switch. State files are never read by derived views, so cleanup can't change
+# a single reported number.
+[cleanup]
+enabled = true
+warn = true
+days = 90
+
+# Capture-path observability (off by default, $0, metadata-only — never prompt bodies).
+# When on, hooks/imports write a structured debug log + per-hook heartbeat to
+# .cage/state/ so you can tell whether a hook fired, was guard-skipped, or raised. It is
+# strictly observational: the ledger is byte-identical with it on or off. Env CAGE_DEBUG
+# (0/1) overrides; CAGE_DEBUG_LOG sets the log path. Read it with `cage debug`.
+[debug]
+enabled = false
+
+# Canonical pipeline order. Marginal attribution walks this once; each tool's
+# receipt is the delta it produced *given the tools upstream of it* (plan §4.2).
+[tools]
+order = ["graphify", "fux", "router", "compressor", "cache", "response-cache"]
+
+# Budget ceilings (plan §8.1) — **opt-in, and shipped OFF**. No key ⇒ no ceiling:
+# `cage insights budget` renders `—` for the cap, `budget.check` never reports `over`
+# and always returns proceed=True. A cap that nobody asked for is a false alarm, and
+# there is no defensible default spend for someone else's project — so unlike
+# `[ledger] warn_mb` there is deliberately **no constant fallback**.
+# Uncomment and set your own to turn enforcement on. on_exceed: warn | block.
+# formula: Σ call_usd over the window vs [budgets] session_usd / daily_usd.
+# [budgets]
+# session_usd = 2.00
+# daily_usd = 25.00
+# on_exceed = "warn"
+
+# Ledger-size warning (plan §3.6.4). When the partitioned shards together exceed
+# warn_mb (in MB), `cage` prints ONE hint to stderr (never stdout — stdout is the
+# deterministic table surface) pointing at the remedy (archive old *-YYYY-MM.jsonl
+# shards / `cage authorship ledger-sync` then prune). Warn-only, never blocks a read or write.
+# Uncomment to override the derived default (constants.LEDGER_WARN_BYTES, ≈418 MB ≈
+# 2 heavy solo-years); the constant is the fallback when this key is absent.
+# [ledger]
+# warn_mb = 418
+
+# Cost is only honest paired with outcome (plan §8.2). `task_ok` = task succeeded
+# without a redo; cost-per-*successful*-task is the metric that matters.
+[quality]
+signal = "task_ok"
+
+# Authorship — the two switches behind `cage insights commits` / `commit <sha>`
+# (agent-vs-human v2). Shipped commented: the values below ARE the defaults
+# (constants.AUTHORSHIP_*), so uncommenting changes nothing until you edit one.
+#
+# estimate_hours — may the human-hours column show an ESTIMATE? The estimator is
+#   wall-clock minus the agent's turn-span, floored at 0. It is an inference, never a
+#   measurement: it always renders with `~` and names its own method in the view's
+#   footnote, and there is **no hourly rate and no USD anywhere on these surfaces** —
+#   valuation stays in your spreadsheet. Set false and the column reads
+#   `— not recorded` unless you attest it yourself with `cage task time 45m`.
+#   An attestation always wins over the estimate. Env: CAGE_AUTHORSHIP_ESTIMATE.
+# max_est_gap — the commit gap past which that estimate is REFUSED rather than
+#   printed. Past ~a working half-day the wall clock has stopped describing the work
+#   (an overnight gap would read as hours at the keyboard), so the view prints `—`
+#   with the reason named. A window string like `4h` / `2d`.
+# The line-match gate itself (constants.MIN_MATCH_CHARS) is deliberately NOT a knob
+# here: it changes what agent/human/unknown MEAN, which is not a per-project choice.
+# [authorship]
+# estimate_hours = true
+# max_est_gap = "4h"
+
+
+# cage:sources-start
+# [sources] — the ONLY place cage looks for agent logs (Directive A, §3.6).
+# Materialized by `cage setup`; refresh with `cage setup --sync-sources`.
+# An empty/absent [sources] table captures NOTHING — by design; `cage doctor`
+# reports it (a silent 'no sources' would look exactly like broken capture).
+# `glob` is anchored to `path` (normal imports); `path_globs` is root-agnostic
+# and is used ONLY by `cage import --path`/`--project` (path-globs handoff §5).
+
+[[sources.claude]]
+path = "~/.claude/projects"
+glob = "**/*.jsonl"
+path_globs = ["**/*.jsonl"]
+
+[[sources.copilot]]
+path = "~/.copilot/session-state"
+glob = "*/events.jsonl"
+path_globs = ["**/events.jsonl"]
+
+[[sources.copilot]]
+path = "~/Library/Application Support/Code/User/workspaceStorage"
+glob = "*/chatSessions/*.jsonl"
+path_globs = ["**/chatSessions/*.jsonl"]
+
+[[sources.kiro]]
+path = "~/Library/Application Support/Kiro/User/globalStorage/kiro.kiroagent/dev_data/tokens_generated.jsonl"
+glob = "*"
+path_globs = ["*"]
+
+[[sources.kirocli]]
+path = "~/Library/Application Support/kiro-cli/data.sqlite3"
+glob = "*"
+format = "kiro-cli"
+# cage:sources-end

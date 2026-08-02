@@ -69,6 +69,44 @@ def test_setup_is_hookless_by_default(proj_at):
                 __import__("cage.kirowire", fromlist=["x"])))
 
 
+def test_unwiring_leaves_no_residue_behind(proj_at):
+    """`hook_status == 0` is necessary and not sufficient: the off-switch used to route
+    through a stripper that left `"hooks": {}` and the file itself behind, so unwiring
+    showed up as a committed diff forever. Assert **absence**, not just a zero count."""
+    import json
+    from cage import claudewire
+    settings = proj_at / ".claude" / "settings.json"
+    agents.install(proj_at, hooks=True)
+    assert claudewire.hook_status(proj_at) > 0 and settings.exists()
+
+    agents.install(proj_at)                       # plain setup = the off-switch
+    assert claudewire.hook_status(proj_at) == 0
+    assert not settings.exists(), (
+        "cage reduced this file to nothing but left it on disk: "
+        + settings.read_text(encoding="utf-8"))
+
+
+def test_unwiring_never_touches_someone_elses_hook(proj_at):
+    """The other half: the file is only removed when *nothing of anyone's* is left."""
+    import json
+    from cage import claudewire
+    settings = proj_at / ".claude" / "settings.json"
+    settings.parent.mkdir(parents=True, exist_ok=True)
+    foreign = {"hooks": {"PreToolUse": [{"matcher": "Bash",
+                                         "hooks": [{"type": "command",
+                                                    "command": "echo not-cage"}]}]}}
+    settings.write_text(json.dumps(foreign, indent=2), encoding="utf-8")
+
+    agents.install(proj_at, hooks=True)
+    agents.install(proj_at)
+    assert claudewire.hook_status(proj_at) == 0
+    data = json.loads(settings.read_text(encoding="utf-8"))
+    cmds = [h["command"] for entries in data["hooks"].values()
+            for e in entries for h in e["hooks"]]
+    assert cmds == ["echo not-cage"]
+    assert data["hooks"] != {}, "an emptied table must be dropped, not left as {}"
+
+
 def test_hooks_wire_on_all_three_agents(proj_at):
     from cage import claudewire, copilotwire, kirowire
     agents.install(proj_at, hooks=True)
@@ -214,6 +252,55 @@ def test_missing_agent_never_guesses_and_never_fails(proj_at, capsys):
 
 def test_unknown_event_is_swallowed(proj_at):
     assert hookcmd.run(_args("not-an-event")) == 0
+
+
+# ── fail-open at the BOUNDARY, not just inside `hookcmd.run` ──────────────────
+#
+# `hookcmd.run` never returns non-zero by accident — but argparse stands in front of
+# it and exits **2** on any usage error, and 2 IS the block verdict (`hookcmd.BLOCK`,
+# wired to PreToolUse/Bash). So a stale wired event name — exactly what a rename
+# produces — used to block EVERY Bash call in the session, silently: a blocked tool
+# call reads to the user as the agent refusing, not as cage failing.
+
+def test_a_stale_hook_event_exits_zero_instead_of_blocking_every_tool_call(capsys):
+    assert hookcmd.BLOCK == 2                      # the collision this guards
+    assert cli.main(["hook", "not-an-event", "--agent", "claude"]) == 0
+
+
+def test_an_incomplete_hook_invocation_also_fails_open(capsys):
+    assert cli.main(["hook"]) == 0                 # missing event AND --agent
+    assert cli.main(["hook", "session-start"]) == 0            # missing --agent
+
+
+def test_the_stale_event_direction_is_derived_from_the_live_events(capsys):
+    """A hand-maintained map of renamed events would go stale in the very release that
+    renames one — `wiringscan`'s own lesson, applied to the fix-hint."""
+    cli.main(["hook", "not-an-event", "--agent", "claude"])
+    err = capsys.readouterr().err
+    assert "not-an-event" in err and "cage setup --hooks" in err
+    for event in hookcmd.EVENTS:
+        assert event in err
+
+
+def test_the_interception_is_scoped_to_hook_and_nothing_else():
+    """Every other verb keeps argparse's exit 2 — this fix buys fail-open for the one
+    verb where 2 has a second meaning, not a CLI that stops reporting usage errors."""
+    with pytest.raises(SystemExit) as e:
+        cli.main(["insights", "not-a-subcommand"])
+    assert e.value.code == 2
+    with pytest.raises(SystemExit) as e:
+        cli.main(["hook", "--help"])               # --help is exit 0, never swallowed
+    assert e.value.code == 0
+
+
+def test_a_real_block_still_reaches_the_host_through_the_same_boundary(proj_at, capsys):
+    """The fix must swallow the *accidental* 2 without swallowing the deliberate one.
+    Asserted through `cli.main` — the path the host actually invokes — because that is
+    where both codes travel; `hookcmd.run` alone could not tell them apart."""
+    _call(proj_at, "t1", "s1")
+    _budgets(proj_at, 0.0001, "block")
+    assert cli.main(["hook", "budget", "--agent", "claude",
+                     "--session", "s1"]) == hookcmd.BLOCK
 
 
 # ── agent identity: stamped, never inferred ───────────────────────────────────

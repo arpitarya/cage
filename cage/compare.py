@@ -21,7 +21,7 @@ from __future__ import annotations
 import statistics
 from pathlib import Path
 
-from cage import ledger, prices, render, taskgroup
+from cage import creditprice, ledger, prices, render, taskgroup
 from cage.constants import MIN_COMPARE_N
 from cage.report import unpriced_line
 
@@ -57,6 +57,11 @@ def summarize(root: Path, pol: dict, *, by: tuple[str, ...] = ("stack",),
             g["ok"] = True
             g["tokens"] = _dist([float(r["tokens"]) for r in rows])
             g["usd"] = _dist([r["usd"] for r in rows])
+            # Method law: one credit-priced call anywhere in the group degrades the
+            # whole group to `modeled` — the weaker tag always wins, or a configured
+            # rate reads as an invoice. Same rule and same helper as report/chats.
+            g["method"] = creditprice.method_for(
+                {creditprice.CREDITS: sum(r.get("credit_calls", 0) for r in rows)})
         groups.append(g)
 
     # deltas: each eligible stack vs the eligible agent-only group sharing every
@@ -126,7 +131,7 @@ def render_csv(d: dict) -> str:
             rows.append(["group", *key_cells, None, g["n"],
                          g["tokens"]["median"], g["tokens"]["q1"], g["tokens"]["q3"],
                          round(g["usd"]["median"], 6), round(g["usd"]["q1"], 6),
-                         round(g["usd"]["q3"], 6), None, None, "measured", ""])
+                         round(g["usd"]["q3"], 6), None, None, g["method"], ""])
         else:
             rows.append(["group", *key_cells, None, g["n"], *blank, None, None,
                          "", g["reason"]])
@@ -157,7 +162,11 @@ def render_compare(d: dict) -> str:
                          f"{render.usd(g['usd']['q1'])}–{render.usd(g['usd']['q3'])}"])
         else:
             rows.append([*head, str(g["n"]), g["reason"], "", "", ""])
-    out = ["Stack comparison · closed tasks · measured group totals "
+    # The headline carries the weakest method any eligible group earned — a header
+    # that says `measured` over a modeled row is the same lie as a mislabelled cell.
+    _methods = {g.get("method", "measured") for g in d["groups"] if g["ok"]}
+    _basis = "modeled" if "modeled" in _methods else "measured"
+    out = [f"Stack comparison · closed tasks · {_basis} group totals "
            "(tokens = in+out per task)", "",
            render.table(headers, rows, rights={len(keys), len(keys) + 1,
                                                len(keys) + 2, len(keys) + 3, len(keys) + 4})]

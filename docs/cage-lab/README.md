@@ -47,7 +47,7 @@ If `../cage-lab` does not exist, start at [01-setup.md](01-setup.md).
    **new named corpus alongside** it, and every result is labelled by which corpus
    produced it — so published evidence stays valid permanently instead of being
    invalidated by an edit. Whether tinyshop is too *small* to show graphify's value
-   is a separate open question: [proposal](../proposals/larger-lab-corpus.md).
+   is a separate open question: [proposal](../proposals/larger-lab-corpus.proposal.md).
 
 ## What is safe to delete
 

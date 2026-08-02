@@ -23,6 +23,68 @@ def _reason(res, reason):
     return next((e for e in res["excluded"] if e["reason"] == reason), None)
 
 
+# ── the one normal form (REV-TS) ──────────────────────────────────────────────
+
+def test_the_normal_form_is_one_fixed_shape():
+    assert cj.norm_ts("2026-07-01T10:00:00+00:00") == "2026-07-01T10:00:00Z"
+    assert cj.norm_ts("2026-07-01T10:00:00Z") == "2026-07-01T10:00:00Z"
+    # The offset is applied, not dropped: 09:00 IST is 03:30Z.
+    assert cj.norm_ts("2026-07-01T09:00:00+05:30") == "2026-07-01T03:30:00Z"
+    assert cj.norm_ts("2026-07-01T11:00:00-08:00") == "2026-07-01T19:00:00Z"
+
+
+def test_sub_seconds_are_truncated_never_rounded():
+    """Rounding is non-monotone at a boundary — `…59.999` would round *up* into the
+    next second and out of the window it belongs in."""
+    assert cj.norm_ts("2026-07-01T10:00:00.999Z") == "2026-07-01T10:00:00Z"
+    assert cj.norm_ts("2026-07-01T10:00:59.999999Z") == "2026-07-01T10:00:59Z"
+
+
+def test_a_naive_timestamp_is_assumed_utc_never_left_naive():
+    """Returning naive is how a comparison against an aware cutoff raises at a caller
+    holding two kinds of datetime without knowing it."""
+    assert cj.norm_ts("2026-07-01T10:00:00") == "2026-07-01T10:00:00Z"
+    assert cj.as_utc("2026-07-01T10:00:00").tzinfo is not None
+    assert cj.as_utc("2026-07-01T09:00:00+05:30").utcoffset().total_seconds() == 0
+
+
+def test_normalization_is_idempotent():
+    for raw in ("2026-07-01T09:00:00+05:30", "2026-07-01T10:00:00.500Z",
+                "2026-07-01T10:00:00", ""):
+        once = cj.norm_ts(raw)
+        assert cj.norm_ts(once) == once
+
+
+def test_unusable_input_yields_the_empty_string_not_a_guess():
+    for bad in ("", None, "not a timestamp", "2026-13-45T99:99:99Z"):
+        assert cj.norm_ts(bad) == ""
+        assert cj.as_utc(bad) is None
+    # "" sorts below every real timestamp — that is what keeps the oldest window
+    # open below, so it must never become a real value.
+    assert "" < cj.norm_ts("1970-01-01T00:00:00Z")
+
+
+def test_the_normal_form_totally_orders_a_mixed_corpus():
+    """The property the raw strings lack. Every shape cage actually meets — git's
+    local offset, a call's `…SSZ`, a transcript's `…SS.mmmZ` — in one sort."""
+    ist, utc, ms, pst = ("2026-07-01T12:00:00+05:30",     # 06:30Z
+                         "2026-07-01T09:00:00+00:00",     # 09:00Z
+                         "2026-07-01T05:00:00.250Z",      # 05:00Z
+                         "2026-07-01T23:00:00-08:00")     # 2026-07-02T07:00Z
+    raw = [ist, utc, ms, pst]
+    assert sorted(raw, key=cj.norm_ts) == [ms, ist, utc, pst]   # chronological
+    assert sorted(raw) != sorted(raw, key=cj.norm_ts)           # raw order is not
+
+
+def test_a_window_cannot_be_built_holding_a_raw_bound():
+    """Structural, not conventional: the skew was invisible for exactly as long as it
+    depended on every caller remembering to normalize."""
+    w = cj.Window("aaa1111", "2026-07-01T09:00:00+05:30", "2026-07-01T14:00:00+05:30")
+    assert (w.lo, w.hi) == ("2026-07-01T03:30:00Z", "2026-07-01T08:30:00Z")
+    assert cj.Window("bbb2222", "", "2026-07-01T10:00:00Z").lo == ""   # open below
+    assert w.sha == "aaa1111" and tuple(w) == (w.sha, w.lo, w.hi)
+
+
 # ── the window join ───────────────────────────────────────────────────────────
 
 def test_a_call_lands_on_the_commit_whose_window_holds_it():

@@ -40,6 +40,15 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
   never run on a real Claude Code / Copilot / Kiro) and **KIRO-MCP-FIELD** (the
   committed path-free `python3 -m cage mcp` never started on a real Kiro). Both need a
   machine, not code. Then **NET-1**, still the product's open question.
+- **CHATS-AUTHOR (2026-08-02, Cowork): accepted and packaged, gated on REV-TS.** A
+  human-vs-agent authorship column (`agent%`) on `cage insights chats`, joining the
+  v2 provenance counts by `(agent, session)`. Live pair:
+  [chats-author.handoff.md](chats-author.handoff.md) +
+  [chats-author.prompt.md](chats-author.prompt.md) (Opus). The prompt's **Phase-0
+  gate STOPs unless REV-TS has landed** — do not lift that gate to "make progress";
+  a new column must not publish the skewed window join with a friendlier face. Read
+  the handoff's Stress-tested line before touching `chats.py` — it carries a limit
+  (same-file double-count across sessions) that is stated, not fixable per chat.
 - **Lessons from this session, in order of how much they would cost to relearn:**
   1. **A committed file can carry ONE spelling.** The handoff said write `python3` on
      POSIX and `py -3` on Windows for Kiro's MCP — both *committed*, which would churn
@@ -105,6 +114,42 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
   known debt, not breakage.
 
 ## In flight + the single next step
+
+**Update 2026-08-02 (latest) — the queue has been re-prioritised and filed as a
+proposal; the single next step is REV-TS.**
+
+- **OPEN-WORK was cut 469 → 243 lines on 2026-08-02** by removing fifteen blocks of
+  *completed* work (they belong in IMPLEMENTATION.md, and every one was verified to be
+  there first — README-FIX's record is CHANGELOG v0.37.2, and it had zero IMPLEMENTATION
+  hits, so a blind delete would have lost it). **The lesson for whoever does this next:
+  the risk is not the deletion, it is what is buried in the prose.** Two live things were
+  only in those paragraphs — KIRO-CLI-SCOPE (a carried-forward item that was never a row)
+  and ADOPT-COV's trigger + guard rail — and both would have died silently. Read every
+  block for constraints before cutting it; what still binds now lives in **Standing
+  constraints**.
+- **The four held CLAUDE.md edits live in `proposals/` now, and two are traps.** hr1 §3
+  and copilot-credits §5 carry test counts (1354, 1391) that are *behind* the file they
+  patch (1401, suite 1416) — applying either verbatim regresses CLAUDE.md. Warnings are
+  on the rows and in both READMEs. General form: **a held steering-file patch decays
+  against the file it targets**; re-verify before applying, never trust its own age.
+- **[OPEN-WORK.md](OPEN-WORK.md) itself now carries the order** — a tiered Pending table
+  plus a §Implementation section. It was first written as a separate proposal and Arpit
+  rejected the extra document: *the plan of record is the one file*. Do not re-file a
+  sequencing doc alongside it.
+- **The argument a successor should carry even if the order is re-cut:** the queue has
+  **two resources**, not one. NET-1 and the three field-verifications cost *Arpit's
+  hands*; every fix costs *an agent session*. Sequencing them against each other is a
+  category error — they run concurrently. Inside the agent lane, rank by **accruing**
+  damage: REV-TS and ID-ENTROPY get permanently worse with elapsed time (`originrecord`
+  freezes rows by idempotency key; an id collision silently drops a row and widening
+  later never heals ids already written). Every other wrong number in the queue is
+  static and costs nothing to have waited on.
+- **REV-TS is the next step and this is observed, not argued.** The packaged
+  CHATS-AUTHOR pair was executed and **STOPPED at its Phase-0 gate with no work done**
+  — it is already burning sessions. Package REV-TS as its own handoff/prompt pair, land
+  the `+05:30` + same-second goldenseed fixtures, then re-run the CHATS-AUTHOR prompt.
+- **ID-ENTROPY is one line and is NET-1's only gate** — if Arpit wants the evidence run
+  moving this week, land it first and let REV-TS follow.
 
 - **2026-08-02 (Cowork): HR1 is build-ready.** The agent-vs-human v2 proposal was
   accepted-amended (no USD; guarded `~` human-hours, attestation wins; line-match
@@ -352,6 +397,22 @@ you touch any savings number.**
 
 ## Maintainers
 
+- Claude (Opus 5) — 2026-08-02 — reviewed and prioritised the open queue
+  (merged into [OPEN-WORK.md](OPEN-WORK.md)). Lesson for the next model:
+  **when you are asked to prioritise, the ranking axis is the deliverable — not the
+  list.** The queue read as a flat backlog with one "Next"; it was actually two lanes
+  (the human's hands vs. agent sessions) that had been serialised against each other for
+  no reason, and the items inside the agent lane split cleanly into *damage that accrues
+  while you wait* (REV-TS, ID-ENTROPY — both write append-only rows a later fix cannot
+  rewrite) and *damage that is merely present*. Finding that axis reordered more than
+  arguing about any individual item's severity would have. Second lesson, and it paid
+  three times in one session: **rule 3 applies to every doc, not just OPEN-WORK's ✅s.**
+  Reading the repo instead of the queue file caught that CHATS-AUTHOR was already
+  packaged *and already stalled* (which became the strongest evidence in the whole
+  proposal), that OPEN-WORK's header still called a released v0.44 unreleased, and that
+  the review's own "fix `otelout`" framing pointed at the wrong module — `otelout`
+  omits correctly; the fabricated `$0` is `convert.py:35-36`. A review inherited
+  second-hand is a hypothesis, including one I wrote.
 - Claude (Sonnet 5) — 2026-08-02 — built DOGFOOD (cage's own ledger, published).
   Lesson for the next model: **"most recent" is not the same claim as "real."**
   `cage insights attrib` defaults to the most recent task, and on this machine's real

@@ -60,11 +60,12 @@ NO_AGENT_SPAN = "no agent span joined — the estimate would just be the commit 
 
 
 def _iso(ts: str):
-    import datetime as _dt
-    try:
-        return _dt.datetime.fromisoformat((ts or "").replace("Z", "+00:00"))
-    except (ValueError, AttributeError):
-        return None
+    """The ONE timestamp parse (`commitjoin.as_utc`), never a second copy of it.
+
+    Always UTC-**aware**, which this module needs and its own former version did not
+    guarantee: an offset-free input used to return naive, and comparing that against
+    `ledger.since_cutoff`'s aware cutoff below raises `TypeError`."""
+    return commitjoin.as_utc(ts)
 
 
 def _seconds(lo: str, hi: str):

@@ -165,6 +165,98 @@ def test_windows_are_half_open_with_an_inclusive_upper_bound(repo):
     assert commitjoin.window_for(w, "2026-07-01T12:00:01+00:00") is None
 
 
+# ── REV-TS: one UTC normal form ───────────────────────────────────────────────
+#
+# Three timestamp shapes meet in one string compare here — git's `%cI` (committer
+# **local** offset), a call's `…SSZ`, and a transcript turn's `…SS.mmmZ`. The tests
+# above are green only because they never leave UTC and never sit on a boundary,
+# which is exactly the pair of blind spots that let the skew ship. These fixtures
+# are that pair, and they must fail before the fix.
+
+def test_a_non_utc_repo_buckets_an_edit_on_the_commit_it_actually_follows(repo):
+    """Offset skew. Committer dates in `+05:30`, probe in UTC. 05:00Z is 10:30 IST —
+    *after* the 09:00 IST commit (03:30Z) and before the 14:00 one (08:30Z) — so the
+    edit belongs to the second commit. A raw string compare reads `05` < `09` and
+    hands it to the first."""
+    c1 = _commit(repo, {"a.txt": "1\n"}, "2026-07-01T09:00:00+05:30")   # 03:30Z
+    c2 = _commit(repo, {"b.txt": "2\n"}, "2026-07-01T14:00:00+05:30")   # 08:30Z
+    w = commitjoin.commit_windows(repo)
+    assert [x.sha for x in w] == [c1, c2]
+    assert commitjoin.window_for(w, "2026-07-01T05:00:00.000Z").sha == c2
+    # Genuinely before the first commit ⇒ still lands on it (open lower bound).
+    assert commitjoin.window_for(w, "2026-07-01T03:00:00.000Z").sha == c1
+    # Genuinely after the newest ⇒ no window, never a wrapped-around match.
+    assert commitjoin.window_for(w, "2026-07-01T09:00:00.000Z") is None
+
+
+def test_the_inclusive_upper_bound_holds_on_a_non_utc_bound(repo):
+    """The same-second boundary, where it is actually reachable. The module's contract
+    is *an edit made at the same second as the commit is part of it*; c2's bound is
+    08:30:00Z written as `14:00:00+05:30`, so an edit at exactly 08:30:00Z is c2's. A
+    raw compare reads `08` < `09` and gives it to c1 instead."""
+    c1 = _commit(repo, {"a.txt": "1\n"}, "2026-07-01T09:00:00+05:30")   # 03:30Z
+    c2 = _commit(repo, {"b.txt": "2\n"}, "2026-07-01T14:00:00+05:30")   # 08:30Z
+    w = commitjoin.commit_windows(repo)
+    assert commitjoin.window_for(w, "2026-07-01T08:30:00Z").sha == c2
+    assert commitjoin.window_for(w, "2026-07-01T08:30:00.000Z").sha == c2
+    # Anywhere inside that second is still c2 — `%cI` carries no sub-second, so cage
+    # does not have the precision to push .999 into the next window.
+    assert commitjoin.window_for(w, "2026-07-01T08:30:00.999Z").sha == c2
+    assert commitjoin.window_for(w, "2026-07-01T08:30:01Z") is None
+    # The lower bound stays exclusive across representations: 03:30:00Z is c1's own
+    # instant, so it belongs to c1, not to the window that opens there.
+    assert commitjoin.window_for(w, "2026-07-01T03:30:00Z").sha == c1
+
+
+def test_a_pure_utc_repo_keeps_the_bound_it_already_gets_right(repo):
+    """**Not a red fixture — a guard.** Git renders `%cI` as `…Z` (never `+00:00`)
+    when the offset is zero, so in a pure-UTC repo the bounds already share the
+    probes' shape and `.` (0x2E) sorting below `Z` (0x5A) makes sub-second probes
+    land in the right window *by accident*. This currently passes and must keep
+    passing: it is what forbids a millisecond normal form, which would push
+    `12:00:00.999Z` out of the commit stamped `12:00:00` and break the inclusive
+    bound in the one case that works today."""
+    a = _commit(repo, {"a.txt": "1\n"}, "2026-07-01T10:00:00+00:00")
+    b = _commit(repo, {"b.txt": "2\n"}, "2026-07-01T12:00:00+00:00")
+    w = commitjoin.commit_windows(repo)
+    assert [x.hi for x in w] == ["2026-07-01T10:00:00Z", "2026-07-01T12:00:00Z"]
+    assert commitjoin.window_for(w, "2026-07-01T10:00:00.000Z").sha == a
+    assert commitjoin.window_for(w, "2026-07-01T10:00:00Z").sha == a
+    assert commitjoin.window_for(w, "2026-07-01T12:00:00.999Z").sha == b
+    assert commitjoin.window_for(w, "2026-07-01T12:00:01.000Z") is None
+
+
+def test_mixed_offset_history_sorts_chronologically_not_lexicographically(repo):
+    """Local commits plus a GitHub-web/CI merge stamped `+00:00`. c1 is 06:30Z and c2
+    is 09:00Z, so c2 is later — but the raw strings sort `09…+00:00` *below*
+    `12…+05:30` and reverse them, building a window whose bounds run backwards."""
+    c1 = _commit(repo, {"a.txt": "1\n"}, "2026-07-01T12:00:00+05:30")   # 06:30Z
+    c2 = _commit(repo, {"b.txt": "2\n"}, "2026-07-01T09:00:00+00:00")   # 09:00Z
+    w = commitjoin.commit_windows(repo)
+    assert [x.sha for x in w] == [c1, c2]
+    assert w[0].lo == "" and w[0].hi < w[1].hi      # never a negative window
+    assert commitjoin.window_for(w, "2026-07-01T08:00:00.000Z").sha == c2
+
+
+def test_capture_on_a_non_utc_repo_records_the_commit_the_work_landed_in(repo, tmp_path):
+    """End to end, and the reason it matters: `originrecord` freezes a row by
+    `(sha, agent, session, method)`, so a sha chosen by a skewed compare is wrong
+    forever — the fix is forbidden from rewriting it."""
+    body = f"def one():\n    return '{PLANT}'\n"
+    tr = _transcript(tmp_path / "logs" / "sess-ist.jsonl", "sess-ist", [
+        {"ts": "2026-07-01T05:00:00.000Z", "tool": "Write",
+         "file": str(repo / "mod.py"), "content": body},
+    ])
+    _commit(repo, {"seed.txt": "s\n"}, "2026-07-01T09:00:00+05:30")      # 03:30Z
+    landed = _commit(repo, {"mod.py": body}, "2026-07-01T14:00:00+05:30")  # 08:30Z
+    root = tmp_path / "ledger"
+    summary = authorcapture.capture(root, [tr], repo=repo, cursor={})
+    assert summary["rows"] == 1
+    rows = ledger.provenance(root)
+    assert [r["sha"] for r in rows] == [landed]
+    assert rows[0]["agent_lines"] == 2
+
+
 def test_windows_fail_open_outside_a_repo(tmp_path):
     assert commitjoin.commit_windows(tmp_path) == []
     assert commitjoin.toplevel(tmp_path) is None

@@ -1,0 +1,7 @@
+# Append-only event log — machine-local, may carry holdings counts.
+# Point CAGE_LEDGER at elgar to keep even the counts private (plan §10).
+ledger/
+# Generated dashboards.
+out/
+# Machine-local hook buffers (pending edits, session state).
+state/

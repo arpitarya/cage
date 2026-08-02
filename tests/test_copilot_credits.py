@@ -151,6 +151,91 @@ def test_cli_cumulative_credits_are_delta_not_double_counted(tmp_path):
     assert sum(r["credits"] for r in rows) == pytest.approx(0.90)
 
 
+# ── the delta must land on a row the loop actually EMITS ──────────────────────
+#
+# `prev_cred` advances once per shutdown, before the per-model loop. A model whose
+# token counters did not move is skipped (`if not (din or dout): continue`) — so if
+# the credit delta was pinned to a fixed index and *that* model idled, the delta went
+# on the floor: no row carried it, the cursor had already moved, and no debug line was
+# written. Billed spend, permanently undercounted. Dict order decided whether it
+# happened, which is why the fix is a deterministic pick among emitted rows.
+
+def _shutdown(prem, models):
+    return json.dumps({"type": "session.shutdown",
+                       "timestamp": "2026-06-14T11:00:00Z",
+                       "data": {"totalPremiumRequests": prem,
+                                "modelMetrics": {m: {"usage": {"inputTokens": tin,
+                                                               "outputTokens": tout}}
+                                                 for m, (tin, tout) in models.items()}}})
+
+
+def test_the_credit_delta_survives_when_the_first_listed_model_idles(tmp_path):
+    """A resumed session whose second shutdown used only model B. Model A is still
+    first in `modelMetrics` and its counters have not moved, so it emits no row."""
+    ev = tmp_path / "events.jsonl"
+    ev.write_text(
+        _shutdown(0.33, {"a": (100, 10), "b": (50, 5)}) + "\n" +
+        _shutdown(0.90, {"a": (100, 10), "b": (500, 50)}) + "\n", encoding="utf-8")
+    rows = transcript.parse_copilot_calls(ev, session="s")
+    assert all(r["model"] != "a" or r["tokens_in"] for r in rows)   # 'a' idled in #2
+    # The full billed total survives — this summed to 0.33 before the fix.
+    assert sum(r.get("credits") or 0 for r in rows) == pytest.approx(0.90)
+
+
+def test_the_delta_lands_on_the_largest_row_not_on_dict_order(tmp_path):
+    """Deterministic and explicable: the biggest token mover carries the shutdown's
+    credits. Ties break on model name, so re-parsing is byte-identical."""
+    ev = tmp_path / "events.jsonl"
+    ev.write_text(_shutdown(1.5, {"small": (10, 1), "big": (900, 90)}) + "\n",
+                  encoding="utf-8")
+    rows = {r["model"]: r for r in transcript.parse_copilot_calls(ev, session="s")}
+    assert rows["big"]["credits"] == pytest.approx(1.5)
+    assert rows["small"].get("credits") is None
+
+
+def test_a_credit_delta_with_no_emitting_model_is_not_silently_dropped(tmp_path):
+    """Every model idled but GitHub still billed. Dropping it undercounts real spend
+    forever, so a zero-token carrier row keeps it — a true statement (this shutdown
+    billed N credits and moved no tokens), never a fabricated call."""
+    ev = tmp_path / "events.jsonl"
+    ev.write_text(_shutdown(0.33, {"a": (100, 10)}) + "\n" +
+                  _shutdown(0.90, {"a": (100, 10)}) + "\n", encoding="utf-8")
+    rows = transcript.parse_copilot_calls(ev, session="s")
+    assert sum(r.get("credits") or 0 for r in rows) == pytest.approx(0.90)
+    carrier = [r for r in rows if not r["tokens_in"] and not r["tokens_out"]]
+    assert len(carrier) == 1 and carrier[0]["credits"] == pytest.approx(0.57)
+
+
+def test_a_counter_that_goes_backwards_never_produces_negative_dollars(tmp_path):
+    """A store rewrite or a reset on resume makes the cumulative counter drop. Stored
+    verbatim that is a negative delta, quietly shrinking every USD total. Treat it as
+    a reset: the new cumulative value IS the delta."""
+    ev = tmp_path / "events.jsonl"
+    ev.write_text(_shutdown(5.0, {"a": (100, 10)}) + "\n" +
+                  _shutdown(1.0, {"a": (200, 20)}) + "\n", encoding="utf-8")
+    rows = transcript.parse_copilot_calls(ev, session="s")
+    assert all((r.get("credits") or 0) >= 0 for r in rows)
+    assert sum(r.get("credits") or 0 for r in rows) == pytest.approx(6.0)
+
+
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), float("-inf")])
+def test_a_non_finite_counter_is_absent_and_costs_no_other_row(tmp_path, bad):
+    """`json.dumps`/`json.loads` both accept bare `NaN`/`Infinity` — so a store can
+    emit one and Python will read it back. `int()` *raises* on both, and that exception
+    escaped the parser and cost **the whole file's rows**, which is a far bigger loss
+    than the one bad field. Absent ≠ a recorded 0.0, and the tokens still land."""
+    ev = tmp_path / "events.jsonl"
+    ev.write_text(json.dumps({
+        "type": "session.shutdown", "timestamp": "2026-06-14T11:00:00Z",
+        "data": {"totalPremiumRequests": bad,
+                 "modelMetrics": {"a": {"usage": {"inputTokens": 100,
+                                                  "outputTokens": 10}}}}}) + "\n",
+        encoding="utf-8")
+    rows = transcript.parse_copilot_calls(ev, session="s")
+    assert len(rows) == 1 and rows[0]["tokens_in"] == 100   # the tokens survive
+    assert "credits" not in rows[0] and "premium" not in rows[0]
+
+
 # ── 2 · rung selection ────────────────────────────────────────────────────────
 
 def test_rung1_prices_a_model_no_table_can_match(root):

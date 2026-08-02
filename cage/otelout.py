@@ -82,7 +82,9 @@ def _saved_usd(r: dict, calls_by_id: dict, idx: dict, pol: dict) -> float | None
     if receiptprice.eligible(r, calls_by_id):
         res = receiptprice.resolve(r, idx, pol)
         return res[0] if res is not None else None  # None = UNPRICED, omit
-    return convert.saved_usd(r, calls_by_id.get(r.get("call"), {}), pol)
+    # The Optional variant: an unpriced model must OMIT the field, not export a
+    # hard 0.0 that reads as "this saving was worth nothing".
+    return convert.saved_usd_opt(r, calls_by_id.get(r.get("call"), {}), pol)
 
 
 def _savings_row(r: dict, calls_by_id: dict, idx: dict, pol: dict) -> dict:

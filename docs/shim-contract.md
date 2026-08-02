@@ -10,7 +10,7 @@ applies-to: cage/data/shims/graphify (POSIX sh) · cage/data/shims/graphify.cmd 
 tested against. Two implementations of an unwritten contract drift; this is the
 written one.
 
-**Also the first artifact of the [tool-integration-contract](proposals/tool-integration-contract.md)** —
+**Also the first artifact of the [tool-integration-contract](proposals/tool-integration-contract.proposal.md)** —
 every future tool interceptor implements this same shape, with only the tool name,
 the cage verb and the marker strings changing.
 

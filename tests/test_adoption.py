@@ -141,13 +141,30 @@ def test_linked_call_join_is_exact_and_named_separately(root):
 
 def test_ambiguous_session_stays_unknown_rather_than_picking_one(root):
     """Two agents share a session id ⇒ genuinely ambiguous. Resolving it to either name
-    would invent a fact, so the row stays unknown."""
+    would invent a fact, so the row stays unknown — under its OWN reason.
+
+    It used to be filed as `unjoined`, whose rendered sentence says *"the agent turn
+    behind it was not captured — a capture gap worth chasing"*. For a shared session
+    that is a **false fact**: nothing was missed, and there is no single right answer
+    to chase. A view whose entire value is a boundary between three unknowns cannot
+    afford to describe one of them as another."""
     _call(root, "c_1", agent="claude-code", session="shared")
     _call(root, "c_2", agent="copilot", session="shared")
     _saving(root, session="shared")
     att = adoption.summarize(root)["attribution"]
     assert att["attributed"] == 0
+    assert att["unknown"] == [{"tool": "graphify", "reason": adoption.AMBIGUOUS, "rows": 1}]
+    text = adoption.render_adoption(adoption.summarize(root))
+    assert "capture gap worth chasing" not in text   # the sentence that would lie
+    assert "no single right answer" in text
+
+
+def test_a_genuinely_unjoined_row_keeps_the_capture_gap_reading(root):
+    """The split must stay a split: a link that matches *nothing* really is a gap."""
+    _saving(root, session="nobody-has-this-session")
+    att = adoption.summarize(root)["attribution"]
     assert att["unknown"] == [{"tool": "graphify", "reason": adoption.UNJOINED, "rows": 1}]
+    assert "capture gap worth chasing" in adoption.render_adoption(adoption.summarize(root))
 
 
 def test_never_invoked_is_phrased_as_no_evidence(root):

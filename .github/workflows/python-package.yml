@@ -23,6 +23,12 @@ env:
   # degrades glyphs on non-UTF consoles, but tests/the runner compare exact output —
   # run everything UTF-8 like a real modern terminal.
   PYTHONUTF8: "1"
+  # Opts THIS repo's CI into the dogfood snapshot's *age* assertion
+  # (tests/test_dogfood_freshness.py). It is off by default everywhere else on
+  # purpose: the snapshot derives from the maintainer's own `~/.cage`, so a fork
+  # cannot refresh it, and an unconditional 60-day gate turned every machine red on
+  # a calendar date with no code change. The structural half runs regardless.
+  CAGE_DOGFOOD_FRESHNESS: "1"
 
 jobs:
   build:

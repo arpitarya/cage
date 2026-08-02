@@ -228,7 +228,7 @@ cage data export --csv calls --since 30d -o calls.csv   # raw ledger rows for a 
 
 ## The `$0` guarantee
 
-Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 1401 tests; `cage demo` reproduces the worked attribution example against a real ledger.
+Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 1441 tests; `cage demo` reproduces the worked attribution example against a real ledger.
 
 **Honest limits.** Marginal-by-fixed-order is defensible and `$0`, but it is an *ordering convention*, not a Shapley value (that's a deferred audit mode). And a counterfactual cell is an honest reconstruction, never an invoice — the `method` column says so on every row, on purpose.
 
@@ -236,7 +236,7 @@ Every derived view is parse / arithmetic over the log — **no LLM call, ever, o
 
 Latest release below — full history and detail in [CHANGELOG.md](CHANGELOG.md).
 
-- **v0.44.1 (2026-08-02) — golden fixture drift fix.** Re-blessed a stale golden fixture (`cage prices list` output had drifted to the new `[meta] cage_version`) that broke CI on `main` after v0.44.0. No behavior change. See [CHANGELOG.md](CHANGELOG.md).
+- **v0.45.0 (2026-08-03) — a correctness pass: nothing here was caught by a test.** Ten fixes from a v0.37.0→v0.44.0 review: dropped Copilot shutdown credits, a timezone bug misplacing authorship joins on non-UTC machines, 16-bit row-id collisions (measured 1-in-229, now 32-bit), a hook exit code that could block every Bash call in a session, and more. See [CHANGELOG.md](CHANGELOG.md).
 
 ## The name
 

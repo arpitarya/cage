@@ -3,10 +3,22 @@ doc: regression — finding: `ids.new_id` collides, and a collision silently dro
 date: 2026-08-02
 severity: MEDIUM — real data loss, low per-event probability, silent
 found: diagnosing a red CI run on main (test_study, one call short)
-status: OPEN (filed as **ID-ENTROPY**)
+status: RESOLVED 2026-08-02 (unreleased, v0.45.0) — random field widened 16 → 32 bits
 ---
 
 # `ids.new_id` has 16 bits of entropy per millisecond, and dedupe turns a collision into a lost row
+
+> **RESOLVED 2026-08-02** (unreleased, v0.45.0). The fix proposed below was applied
+> verbatim — `secrets.randbelow(0x100000000):08x`, 32 bits. Re-measured the same way
+> immediately after: **0 duplicates in 200,000 sequential ids** (was 874). The two
+> consequences flagged as "check before applying" both held: `transcript._composite_id`'s
+> parity comment was corrected in the same change, and no test needed its width
+> assertion changed (`test_transcript.py:275`'s `len == 17` exercises the
+> *deterministic* uuid-less path, which does not call `new_id`). Entropy width is now a
+> **contract test**, not a statistic — `tests/test_substrate.py` asserts `randbelow` is
+> called with `0x100000000`, because a statistical test for a 1-in-4-billion event is
+> either vacuous or flaky. **Ids already written keep their 16-bit risk forever** and
+> are never rewritten. Body below is the original published finding, unedited.
 
 **The claim:** two rows created in the same millisecond have a ~1/65,536 chance of
 being assigned the same id, and because every merge path dedupes **by id**, the loser

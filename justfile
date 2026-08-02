@@ -19,9 +19,11 @@ demo:
     {{python}} -m cage insights attrib
     {{python}} -m cage insights matrix
 
-# Install the engine (editable) so repo edits live-reflect in the `cage` binary.
-install:
-    ./install.sh
+# Wire cage's own repo at project level (Claude only — SELFWIRE, 2026-08-02).
+# `--hooks` is opt-in and a bare `cage setup` silently *removes* it on a re-run, so
+# this recipe exists to make the correct invocation the easy one, not a remembered flag.
+wire:
+    {{python}} -m cage setup --claude --hooks
 
 # Build cage.pyz locally (a smoke build — the release asset is CI-built only).
 pyz:

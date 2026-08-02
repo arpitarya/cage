@@ -27,7 +27,10 @@ def _composite_id(agent: str, session: str, model: str, tokens_in: int,
     (a Claude turn with no `uuid`). Folded into `call_id` so `make_call`/`CALL_FIELDS`
     are unchanged; same `(agent, session, model, tokens_in, tokens_out, cached_in, ts)`
     ⇒ same id, so re-parsing the same transcript dedupes in `ledger.append_new` instead
-    of minting a fresh random id each run. Same `c_`+15-char shape as the uuid path.
+    of minting a fresh random id each run. Same `c_`+15-char shape as the uuid path —
+    the two *deterministic* paths agree at 15; `ids.new_id`'s random path is
+    deliberately wider (19), because entropy width is a correctness property there and
+    is irrelevant here (these ids carry none — they are a hash of the turn).
 
     Empirically defensive: no usage-bearing Claude turn observed lacks a `uuid`; this
     closes the one path where `make_call` would otherwise fall back to a random id."""
@@ -345,9 +348,17 @@ _COPILOT_CLI_CREDIT_KEYS = ("totalPremiumRequests", "total_premium_requests")
 
 
 def _first_int(d: dict, keys: tuple[str, ...]) -> int:
+    """First numeric value among ``keys``, as an int; 0 when absent or unusable.
+
+    **Non-finite values are skipped, not converted.** `json.loads` accepts bare `NaN`
+    / `Infinity` (they are not legal JSON, but Python's decoder allows them by
+    default), and `int()` *raises* on both — `ValueError` for NaN, `OverflowError` for
+    an infinity. That exception used to escape the parser and cost the whole file's
+    rows, which is a far bigger loss than the one bad field."""
+    import math
     for k in keys:
         v = d.get(k)
-        if isinstance(v, (int, float)):
+        if isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v):
             return int(v)
     return 0
 
@@ -360,10 +371,16 @@ def _first_float(d: dict, keys: tuple[str, ...]) -> float | None:
     Returns ``None`` when no key is present or the value is not a number, so the
     caller can keep *absent* distinct from a recorded ``0.0`` (`schema.make_call`'s
     `credits` sentinel). `bool` is excluded explicitly — it is an `int` subclass, and
-    a `True` credit is malformed data, not the number 1."""
+    a `True` credit is malformed data, not the number 1.
+
+    A non-finite value (`NaN`/`Infinity`, which `json.loads` accepts) also reads as
+    **absent**: a non-finite dollar figure is worse than no figure at all, and absent
+    is a fact cage already knows how to render."""
+    import math
     for k in keys:
         v = d.get(k)
-        if isinstance(v, (int, float)) and not isinstance(v, bool):
+        if (isinstance(v, (int, float)) and not isinstance(v, bool)
+                and math.isfinite(v)):
             return float(v)
     return None
 
@@ -432,7 +449,7 @@ def parse_copilot_calls(events_path: Path, session: str = "") -> list[dict]:
         # (import-ledger plan §2.1 — archived; PLAN.md has no §2.1);
         # stamp only its per-shutdown delta, on the first model row, so it never multi-counts.
         cum_prem = _first_int(data, _COPILOT_CLI_CREDIT_KEYS)
-        prem_delta = cum_prem - prev_prem
+        prem_delta = cum_prem if cum_prem < prev_prem else cum_prem - prev_prem
         prev_prem = cum_prem
         # `credits` is the SAME counter read as a float, and it exists because `premium`
         # structurally cannot carry it: `totalPremiumRequests` is fractional in every real
@@ -441,11 +458,24 @@ def parse_copilot_calls(events_path: Path, session: str = "") -> list[dict]:
         # `premium` is left exactly as it was (legacy int contract, its id scheme
         # untouched); the pricing ladder reads `credits` on BOTH copilot surfaces and never
         # falls back to `premium`. Absent counter ⇒ absent credits, never a fabricated 0.
+        # A cumulative counter that goes DOWN means the store reset or was rewritten
+        # (a resume can restart it), not that GitHub refunded you. Stored verbatim the
+        # negative delta would quietly shrink every USD total that sums it. Read it as
+        # a reset instead: the new cumulative value **is** the delta, because it counts
+        # billing since the reset. Clamping to 0 would be the other option and is
+        # worse — it silently discards real spend, which is the defect above.
         cum_cred = _first_float(data, _COPILOT_CLI_CREDIT_KEYS)
-        cred_delta = None if cum_cred is None else cum_cred - prev_cred
+        cred_delta = None if cum_cred is None else (
+            cum_cred if cum_cred < prev_cred else cum_cred - prev_cred)
         if cum_cred is not None:
             prev_cred = cum_cred
         suffix = "" if ordinal == 0 else f"s{ordinal:03d}"  # ord 0 → legacy id, byte-identical
+        # Build the shutdown's rows FIRST, then place the billing delta on one of them.
+        # `prev_cred` has already advanced at this point, so a delta pinned to a fixed
+        # index whose model happened to idle was dropped on the floor — no row carried
+        # it, the cursor had moved, nothing was logged, and billed spend was
+        # undercounted permanently. Dict order decided whether that happened.
+        emitted: list[tuple[int, dict]] = []
         for i, (model, m) in enumerate(metrics.items()):
             if not isinstance(m, dict):
                 continue
@@ -458,15 +488,49 @@ def parse_copilot_calls(events_path: Path, session: str = "") -> list[dict]:
             prev[model] = (cin, cout, ccached)
             if not (din or dout):   # this shutdown added nothing for this model
                 continue
-            rows.append(schema.make_call(
+            emitted.append((i, schema.make_call(
                 route="chat", provider=_copilot_provider(model), model=model,
                 tokens_in=din, tokens_out=dout, cached_in=dcached,
                 session=session, agent="copilot", ts=ts, surface="cli",
-                premium=prem_delta if i == 0 else 0,
-                credits=cred_delta if i == 0 else None,
-                call_id=f"c_cop{sid[:12]}{i:03d}{suffix}"))
+                call_id=f"c_cop{sid[:12]}{i:03d}{suffix}")))
+        _place_billing_delta(emitted, prem_delta, cred_delta, session=session, ts=ts,
+                             sid=sid, suffix=suffix)
+        rows.extend(row for _i, row in emitted)
         ordinal += 1
     return rows
+
+
+def _place_billing_delta(emitted: list[tuple[int, dict]], prem_delta: int,
+                         cred_delta: float | None, *, session: str, ts,
+                         sid: str, suffix: str) -> None:
+    """Stamp one shutdown's session-level billing counters onto exactly ONE of its rows.
+
+    **The carrier is the largest token mover, ties broken by model name** — a rule that
+    is deterministic (a re-parse produces byte-identical rows), explicable, and
+    independent of `modelMetrics`' dict order. It is *not* an attribution claim: the
+    counter is computed by GitHub over the whole shutdown, so no single row truly owns
+    it. Splitting it across the rows is a genuine basis fork and belongs in
+    `docs/compare/copilot-pricing-basis.compare.md`, not in a defect fix.
+
+    When **every** model idled and a non-zero credit delta still arrived, a zero-token
+    carrier row is appended rather than dropping it. That row is a true statement — this
+    shutdown billed N credits and moved no tokens — and dropping it instead undercounts
+    real billed spend forever, which is the defect this function exists to close.
+    Mutates ``emitted`` in place. Never raises."""
+    if emitted:
+        _i, carrier = max(emitted, key=lambda p: (p[1]["tokens_in"], p[1]["model"]))
+        if prem_delta:
+            carrier["premium"] = prem_delta
+        if cred_delta is not None:
+            carrier["credits"] = cred_delta
+        return
+    if not cred_delta and not prem_delta:
+        return                      # nothing idled away — nothing to carry
+    emitted.append((0, schema.make_call(
+        route="chat", provider="copilot", model="copilot/unknown",
+        tokens_in=0, tokens_out=0, session=session, agent="copilot", ts=ts,
+        surface="cli", premium=prem_delta, credits=cred_delta,
+        call_id=f"c_cop{sid[:12]}bil{suffix}")))
 
 
 def _copilot_chat_extension(req: dict) -> bool:

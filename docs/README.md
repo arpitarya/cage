@@ -21,25 +21,18 @@ spec.
 
 ## Active work
 
-- [claude-md-doc-case.proposed.md](claude-md-doc-case.proposed.md) — **CC-CLAUDEMD-DOCCASE**:
-  the CLAUDE.md ALL-CAPS entry-point list omits `FORMULAS.md` now that DOC-CASE renamed
-  it, written and **held for Arpit's review**. Apply / amend / decline, then delete it.
+- [chats-author.handoff.md](chats-author.handoff.md) +
+  [chats-author.prompt.md](chats-author.prompt.md) — **CHATS-AUTHOR**: the `agent%`
+  authorship column on `cage insights chats`
+  ([proposal](proposals/chats-agent-authorship-column.proposal.md)). **Unblocked 2026-08-02** —
+  its Phase-0 gate (REV-TS) failed once, then REV-TS landed
+  ([archived](archive/v0.45-rev-ts.handoff.md)); the gate now passes.
 
-- [claude-md-hr1.proposed.md](claude-md-hr1.proposed.md) — **HR-CLAUDEMD**: the
-  CLAUDE.md architecture bullet for agent-vs-human v2, written and **held for
-  Arpit's review**. Everything else in HR1's doc checklist is applied; steering
-  files are never rewritten silently. Apply / amend / decline, then delete it.
-
-- [claude-md-copilot-credits.proposed.md](claude-md-copilot-credits.proposed.md) —
-  **CC-CLAUDEMD**: the CLAUDE.md edits for the copilot pricing ladder (per-call cost,
-  unit→USD, config-file placement, the substrate field), written and **held for Arpit's
-  review** for the same reason. Everything else in the feature's doc checklist is applied.
-
-- [claude-md-dogfood.proposed.md](claude-md-dogfood.proposed.md) —
-  **CLAUDE-DOGFOOD**: a short "Dogfood snapshot" section mirroring "Regression &
-  capture reports", written and **held for Arpit's review**. Everything else in
-  DOGFOOD's doc checklist is applied (the `just test` count was refreshed directly —
-  a mechanical number, not new guidance).
+- [steering-edits-pending.proposal.md](proposals/steering-edits-pending.proposal.md) —
+  **STEERING-EDITS**: the four held CLAUDE.md edits (authorship bullet · copilot credit
+  ladder · `FORMULAS.md` entry point · dogfood section), merged into one file 2026-08-03
+  and re-verified at HEAD — **none applied**. One read, four verdicts; an applied section
+  is deleted from the file.
 
 ## The lab manual
 

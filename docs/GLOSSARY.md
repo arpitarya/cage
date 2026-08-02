@@ -220,7 +220,7 @@ tested against ([docs/shim-contract.md](shim-contract.md)): behaviours **B1–B8
 (binding on every twin) and divergences **D1–D7** (real and permanent — cmd has no
 `exec`, so the real binary runs as a child process). Two implementations of an unwritten
 contract drift; this is the written one, and the first artifact of the
-[tool-integration-contract](proposals/tool-integration-contract.md).
+[tool-integration-contract](proposals/tool-integration-contract.proposal.md).
 
 **hook bypass** — an agent hook that invokes graphify by **absolute path**, so the
 command never traverses PATH: cage's interceptor can't see it, and a hook isn't a
@@ -282,6 +282,16 @@ never `0`: *nothing joined here* and *this cost nothing* are different claims.
 
 **commit window** — commit *i* owns `(ts_{i-1}, ts_i]`, upper bound inclusive. The rule
 that places an edit or a call on a commit without ever consulting `HEAD`-at-import.
+Its bounds are in the **UTC normal form**, normalized at construction.
+
+**UTC normal form** — `YYYY-MM-DDTHH:MM:SSZ`, sub-seconds **truncated**, the single
+shape every timestamp is converted to before any comparison in the authorship join
+([commitjoin.py](../cage/commitjoin.py) `norm_ts`). It exists because git renders
+`%cI` in the *committer's own* offset while calls and transcripts stamp UTC, and
+ordering strings across offset representations is meaningless. **Seconds, not
+milliseconds** — `%cI` has no sub-second, so finer precision would push an edit made
+inside the commit's own second out of it and break the inclusive bound
+([finding](regression/2026-08-02-finding-commit-window-timestamp-skew.md)).
 
 **attested time** — minutes a person asserted with `cage task time`, stored as
 `human_minutes` + `human_minutes_method="attested"`. Rendered `*`, always outranks the

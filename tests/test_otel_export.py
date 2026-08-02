@@ -160,3 +160,43 @@ def test_agent_project_filters_apply_to_calls_only(root, capsys):
     # the receipt (linked to the excluded claude call) still exports — receipts
     # have no agent field to filter on, and pricing needs the full call set.
     assert len(doc["cage.savings"]) == 1
+
+
+# ── "omitted, never zero" must survive an UNPRICED model (REV-HARDEN P2) ──────
+
+def test_an_unpriced_linked_receipt_omits_saved_usd_rather_than_exporting_zero(tmp_path):
+    """`policy.price` returns a zero row for a model it cannot price, so
+    `prices.input_cost_usd` yields a hard `0.0` that is indistinguishable from a real
+    zero. Exported, that is a fabricated dollar figure — the one thing this document
+    format promises never to emit.
+
+    The review filed this against `otelout`, which is wrong: its omit-on-None logic is
+    already correct. The `0.0` is produced one level down in `convert`, which is where
+    the fix belongs — putting it in `otelout` would mean a second copy of the pricing
+    ladder there, and the credits rung already drifted between two copies once."""
+    from cage import convert, otelout, policy, schema
+    pol = policy.load(None)
+    call = schema.make_call(route="chat", provider="nobody", model="no-such-model",
+                            tokens_in=100, tokens_out=10, call_id="c_u")
+    rec = schema.make_receipt(tool="graphify", raw_alternative=5000, actual=1000,
+                              call="c_u")
+    assert convert.saved_usd(rec, call, pol) == 0.0          # the legacy shape stands
+    assert convert.saved_usd_opt(rec, call, pol) is None      # ...but it is UNPRICED
+
+    doc = json.loads(otelout.render([call], [rec], [call], pol))
+    row = doc["cage.savings"][0]
+    assert "cage.saved_usd" not in row, row
+    assert row["cage.saved"] == 4000.0 and row["cage.method"]   # counts still exported
+
+
+def test_a_genuinely_zero_saving_still_exports_its_zero(tmp_path):
+    """The distinction the Optional exists for: absent because unpriceable is not the
+    same fact as priced and worth nothing."""
+    from cage import convert, policy, schema
+    pol = policy.load(None)
+    call = schema.make_call(route="chat", provider="anthropic",
+                            model="claude-opus-4-8", tokens_in=100, tokens_out=10,
+                            call_id="c_z")
+    rec = schema.make_receipt(tool="graphify", raw_alternative=1000, actual=1000,
+                              call="c_z")
+    assert convert.saved_usd_opt(rec, call, pol) == 0.0

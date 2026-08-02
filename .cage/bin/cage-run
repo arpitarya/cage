@@ -1,0 +1,23 @@
+#!/bin/sh
+# cage-run — cage-managed runtime resolver (committed; identical on every machine).
+# Resolves the cage CLI at run time so no wired file carries an absolute path.
+# cage absent => exit 0 silently (fail-open: agents keep working, no capture).
+# CAGE_RUN_PYTHON=1 skips the exe probe (restricted endpoints — `cage query
+# restricted-env`). See `cage query portable-wiring`. Regenerate with `cage setup`.
+if [ "$CAGE_RUN_PYTHON" = "1" ]; then
+  if command -v python3 >/dev/null 2>&1 && python3 -c "import cage" >/dev/null 2>&1; then
+    exec python3 -m cage "$@"
+  fi
+  exit 0
+fi
+if command -v cage >/dev/null 2>&1; then exec cage "$@"; fi
+for c in "$HOME/.local/bin/cage" "$HOME/.local/pipx/venvs/cage/bin/cage"; do
+  if [ -x "$c" ]; then exec "$c" "$@"; fi
+done
+if [ -n "$VIRTUAL_ENV" ] && [ -x "$VIRTUAL_ENV/bin/cage" ]; then
+  exec "$VIRTUAL_ENV/bin/cage" "$@"
+fi
+if command -v python3 >/dev/null 2>&1 && python3 -c "import cage" >/dev/null 2>&1; then
+  exec python3 -m cage "$@"
+fi
+exit 0

@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# cage: graphify metering interceptor — routes queries through `cage data graphify` so
+# each query/path/explain files a token-saving receipt; stdout/exit pass through unchanged.
+# `graphify update .` and any non-query verb pass straight through (nothing to meter).
+# Installed by `cage setup`.
+#
+# Recursion guard (capture-precision §3.5): the "real" graphify is resolved by scanning
+# PATH and SKIPPING **every** cage interceptor — not just this dir. Two stacked shims
+# (e.g. a fresh one plus a stale `cage adopt` one) each used to strip only their own dir,
+# so they resolved to *each other* and recursed forever. Skipping all interceptors, plus
+# the CAGE_GRAPHIFY_SHIM re-entry guard below, makes a resolution loop impossible.
+set -euo pipefail
+
+# Second-layer guard: if we're already inside a cage metering shim, do not meter again —
+# go straight to the real binary. Breaks any residual loop cage's own resolution missed.
+if [ "${CAGE_GRAPHIFY_SHIM:-}" = "1" ]; then _CAGE_GF_REENTRY=1; else _CAGE_GF_REENTRY=0; fi
+
+# An interceptor is any `graphify` that routes through cage or self-identifies as one —
+# matches BOTH the current shim (`cage data graphify`) and a stale pre-rename adopt shim
+# (`cage graphify` / "graphify metering interceptor"), so neither can be picked as REAL.
+_cage_is_interceptor() { grep -Eq 'cage (data )?graphify|graphify metering interceptor' "$1" 2>/dev/null; }
+
+REAL=""
+_OIFS=$IFS; IFS=:
+for _d in $PATH; do
+  [ -n "$_d" ] || continue
+  _cand="$_d/graphify"
+  [ -x "$_cand" ] || continue
+  if _cage_is_interceptor "$_cand"; then continue; fi   # skip ALL cage shims
+  REAL="$_cand"; break
+done
+IFS=$_OIFS
+
+if [ -z "$REAL" ]; then
+  # Only cage interceptors are on PATH — the real graphify is not installed. Refuse to
+  # fall back to the bare name (that would re-enter a shim and recurse); fail cleanly.
+  echo "graphify: not found — only the metering interceptor shim is on PATH" >&2
+  exit 127
+fi
+
+if [ "$_CAGE_GF_REENTRY" = "0" ] \
+   && command -v cage >/dev/null 2>&1 && cage data graphify --help >/dev/null 2>&1; then
+  CAGE_GRAPHIFY_SHIM=1 exec cage data graphify -- "$REAL" "$@"
+fi
+exec "$REAL" "$@"   # cage absent, or re-entry → identical, unmetered behaviour

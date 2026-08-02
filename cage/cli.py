@@ -39,7 +39,8 @@ groups (run any group name for its commands):
   prices      list · unpriced · set · alias · route-tool · sync
   study       join · start · stop · report · id
   policy      diff · sync
-  data        export · cleanup · watch · serve · proxy · meter
+  data        export · cleanup · migrate-savings · watch · serve ·
+              proxy · meter · graphify
 
 $ cage report --since 7d          # the daily number
 $ cage insights verdict graphify  # is this tool paying for itself?
@@ -93,7 +94,12 @@ def _capture_flags(p: argparse.ArgumentParser) -> None:
 def _group(sub, name: str, help_text: str):
     """A command group (insights/task/authorship/data) — a subparser holding nested
     subparsers that dispatch to the same run functions. Bare `cage <group>` prints the
-    group's help (its command list); a chosen subcommand's own `fn` default wins."""
+    group's help (its command list); a chosen subcommand's own `fn` default wins.
+
+    NOTE: ``help_text`` is **not rendered anywhere** — it would appear in the parent's
+    subcommand listing, and the parent is the root, whose help `_RootParser.format_help`
+    replaces wholesale with `_ROOT_HELP`. The front door people actually read is that
+    literal, and `tests/test_cli_tiering.py` gates it against the live parser."""
     g = sub.add_parser(name, help=help_text)
     g.set_defaults(fn=lambda _a, _g=g: (_g.print_help(), 0)[1])
     return g.add_subparsers(dest=f"{name}_cmd", metavar="<command>", required=False)
@@ -717,6 +723,33 @@ def _command_token(argv: list[str]) -> str | None:
     return None
 
 
+def _hook_usage_failopen(scan: list[str]) -> None:
+    """Explain a rejected `cage hook` invocation, then let the caller exit 0.
+
+    **The direction is derived from `hookcmd.EVENTS`, not from a hand-maintained
+    migration map.** That is the same lesson `wiringscan` records at the top of its
+    own module — the detector (and here the fix-hint) must be the live thing, because
+    a hand-kept map of renamed events is exactly what goes stale in the release that
+    renames one. A rename therefore becomes a wiring migration with a printed fix, and
+    it cannot rot.
+
+    argparse has already written its own usage error to stderr; this adds the part an
+    agent (or a human reading a hook log) can act on. Never raises."""
+    import sys
+    try:
+        bad = next((a for a in scan[1:] if not a.startswith("-")), "")
+        print(f"cage hook: {'unknown event ' + repr(bad) if bad else 'incomplete invocation'} — "
+              f"this cage accepts: {', '.join(hookcmd.EVENTS)}. The wiring that called "
+              f"this is stale; re-run `cage setup --hooks` to rewrite it. "
+              f"Exiting 0 — a cage problem must never block your turn.", file=sys.stderr)
+        from cage import debuglog, paths
+        debuglog.event(paths.resolve_root(), event="hook", produced=False,
+                       skip_reason=f"usage-error:{bad or 'incomplete'}",
+                       detail="exited 0 instead of 2 (2 is the BLOCK verdict)")
+    except Exception:  # noqa: BLE001 — this IS the fail-open path; never raise from it
+        pass
+
+
 def main(argv: list[str] | None = None) -> int:
     import os
     import sys
@@ -742,7 +775,20 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     # argparse renders its own usage error + exits 2 here, before the try (stdlib).
-    args = build_parser().parse_args(argv)
+    try:
+        args = build_parser().parse_args(argv)
+    except SystemExit as exc:
+        # `cage hook` is the ONE verb where argparse's usage exit is not merely an
+        # error: **exit 2 IS the block verdict** (`hookcmd.BLOCK`), wired to
+        # `PreToolUse`/`Bash`. So a stale wired event name — the exact thing a rename
+        # produces, and the class this repo has already paid for twice — would block
+        # EVERY Bash call in the session, and silently, because a blocked tool call
+        # reads to the user as the agent refusing. Fail-open is absolute *inside*
+        # `hookcmd.run`; this is the boundary standing in front of it.
+        if tok == "hook" and exc.code == hookcmd.BLOCK:
+            _hook_usage_failopen(scan)
+            return 0
+        raise
     if getattr(args, "ledger", None):  # --ledger re-bases every Footprint to one sink (§3.7)
         os.environ["CAGE_BASE"] = str(args.ledger)
     try:

@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "cage": {
+      "command": "${CLAUDE_PROJECT_DIR:-.}/.cage/bin/cage-run",
+      "args": [
+        "mcp"
+      ]
+    }
+  }
+}
