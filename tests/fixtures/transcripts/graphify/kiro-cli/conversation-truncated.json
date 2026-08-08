@@ -1,0 +1,132 @@
+{
+ "conversation_id": "aaaaaaaa-0000-4000-8000-000000000002",
+ "next_message": null,
+ "history": [
+  {
+   "user": {
+    "content": {
+     "Prompt": {
+      "prompt": "[content stripped \u2014 counts only]"
+     }
+    },
+    "additional_context": "",
+    "images": null,
+    "timestamp": null,
+    "env_context": {
+     "env_state": {
+      "operating_system": "macos",
+      "current_working_directory": "/tmp/gfxrepo",
+      "environment_variables": []
+     }
+    }
+   },
+   "assistant": {
+    "ToolUse": {
+     "message_id": "m-1",
+     "content": "",
+     "tool_uses": [
+      {
+       "id": "tooluse_B",
+       "name": "execute_bash",
+       "orig_name": "execute_bash",
+       "args": {
+        "command": "graphify query \"how does the ledger append rows\"",
+        "working_dir": "/tmp/gfxrepo",
+        "summary": "[stripped]"
+       },
+       "orig_args": {
+        "command": "graphify query \"how does the ledger append rows\"",
+        "working_dir": "/tmp/gfxrepo",
+        "summary": "[stripped]"
+       }
+      }
+     ]
+    }
+   },
+   "request_metadata": {
+    "model_id": "auto",
+    "total_tokens": 1500,
+    "output_tokens": 200,
+    "uncached_input_tokens": 1300
+   }
+  },
+  {
+   "user": {
+    "content": {
+     "ToolUseResults": {
+      "tool_use_results": [
+       {
+        "tool_use_id": "tooluse_B",
+        "status": "Success",
+        "content": [
+         {
+          "Json": {
+           "exit_status": "0",
+           "stdout": "NODE append_row() [src=cage/ledger.py loc=L88 community=3]\nNODE _shard_for() [src=cage/ledger.py loc=L61 community=3]\nNODE read_kind() [src=cage/ledger.py loc=L120 community=3]\n  --> append_row() [calls] [EXTRACTED]\nNODE append_row() [src=cage/ledger.py loc=L88 community=3]\nNODE _shard_for() [src=cage/ledger.py loc=L61 community=3]\nNODE read_kind() [src=cage/ledger.py loc=L120 community=3]\n  --> append_row() [calls] [EXTRACTED]\nNODE append_row() [src=cage/ledger.py loc=L88 community=3]\nNODE _shard_for() [src=cage/ledger.py loc=L61 community=3]\nNODE read_kind() [src=cage/ledger.py loc=L120 community=3]\n  --> append_row() [calls] [EXTRACTED]\n\n... (truncated to ~2000 token budget)\n",
+           "stderr": ""
+          }
+         }
+        ]
+       }
+      ]
+     }
+    },
+    "additional_context": "",
+    "images": null,
+    "timestamp": null,
+    "env_context": {
+     "env_state": {
+      "operating_system": "macos",
+      "current_working_directory": "/tmp/gfxrepo",
+      "environment_variables": []
+     }
+    }
+   },
+   "assistant": {
+    "Response": {
+     "message_id": "m-2",
+     "content": "[content stripped \u2014 counts only]"
+    }
+   },
+   "request_metadata": {
+    "model_id": "auto",
+    "total_tokens": 900,
+    "output_tokens": 30
+   }
+  }
+ ],
+ "valid_history_range": [
+  0,
+  2
+ ],
+ "transcript": [],
+ "tools": {
+  "native___": [
+   {
+    "ToolSpecification": {
+     "name": "execute_bash"
+    }
+   },
+   {
+    "ToolSpecification": {
+     "name": "fs_read"
+    }
+   }
+  ]
+ },
+ "context_manager": {},
+ "context_message_length": null,
+ "latest_summary": null,
+ "model_info": {
+  "model_name": "auto",
+  "model_id": "auto",
+  "context_window_tokens": 1000000,
+  "rate_unit": "Credit"
+ },
+ "file_line_tracker": {},
+ "mcp_enabled": false,
+ "mcp_last_checked": null,
+ "mcp_server_versions": {},
+ "mcp_disabled_due_to_api_failure": false,
+ "user_turn_metadata": []
+}

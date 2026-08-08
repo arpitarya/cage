@@ -72,7 +72,11 @@ def test_every_check_has_a_known_level(proj):
                      "path-interceptor",
                      # GF-LAUNCHER: launcher mode ∧ an installed interceptor together
                      "launcher-gap", "hook-bypass",
-                     "graph-staleness", "graphify-usage", "receipts", "ledger"}
+                     "graph-staleness", "graphify-usage",
+                     # which agent surfaces can file a graphify saving at all — read
+                     # beside `graphify-usage`: how often it RAN vs what could be FILED
+                     "graphify-coverage",
+                     "receipts", "ledger"}
     assert all(c["level"] in {"ok", "warn", "fail"} for c in res["checks"])
 
 

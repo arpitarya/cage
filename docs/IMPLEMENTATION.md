@@ -16,6 +16,165 @@ Entry format:
 
 ---
 
+## 2026-08-08 — GFX-COV field run: copilot VS Code verified; the capture earned two tests
+
+- **Verified on a real Copilot Agent chat:** one terminal `graphify query` filed a receipt
+  through the shipped route — **146,261 tokens saved**, raw 147,789 / actual 1,528 across
+  **72 cited files**, `modeled`, conf 0.6, session taken from the store. Re-run filed 0.
+  The PATH shim was deliberately not in play, so the store route was the only thing that
+  could file (had the shim fired, ADR 0005 deferral would have made the run prove nothing).
+- **The capture disproved two of my own fixture's assumptions**, and both are now tested:
+  (1) a real agent emits **`cd <repo> && graphify query …`** — `run_in_terminal` reuses one
+  shell — so **nothing had exercised `graphify_ops`' `&&` segment split**; it worked by
+  design, not by test. (2) The real part carries **no `resultDetails`**, so the field
+  carrier is the ANSI-stripped `terminalCommandOutput` fallback (~89% of real parts) —
+  pinned so a change cannot quietly make the preferred carrier mandatory.
+- **Fixture provenance upgraded from SHAPE-VERIFIED/CONTENT-SYNTHETIC to VERIFIED:**
+  `chatSession-graphify.jsonl` is the sanitized real record (structure verbatim, answer
+  abridged to the two planted files); `chatSession-report-read.jsonl` is a **new** fixture
+  built from a real `copilot_readFile` part — kept separate because the captured session
+  had no report read, and folding a synthetic part into a real capture would launder
+  invention into a fixture labelled real. Sanitization asserted: no user path, no username
+  anywhere under `tests/fixtures/transcripts/graphify/`.
+- Files: `docs/regression/2026-08-08-gfx-cov-vscode-field-run.md` (new) ·
+  `docs/regression/README.md` · `tests/fixtures/transcripts/graphify/copilot-vscode/*` ·
+  `tests/fixtures/transcripts/graphify/README.md` · `tests/test_graphify_vscode.py` (+2) ·
+  `docs/OPEN-WORK.md` (**GFX-COV-FIELD closed**, narrowed to **GFX-KIRO-RATE**).
+- Tests: **green, 1500 passed / 11 skipped** (1498 → 1500).
+- Next: the v0.47.0 release cut — the only thing left, and it needs Arpit's explicit go.
+
+## 2026-08-07 — GFX-COV field run: the kiro route verified on a real store
+
+- **Verified, not asserted:** the v0.47.0 kiro-CLI route read a real
+  `conversations_v2` store (kiro-cli 2.16.0) through the shipped code path and filed
+  **1 receipt — 3,545 tokens saved** (`graphify explain`, raw 3,620 / actual 75, modeled,
+  conf 0.6) — while **refusing** the other invocation, an ordinary
+  `graphify query` whose 6,039-char stdout ended in kiro's truncation marker. Re-run
+  filed 0. **Both branches of the guard execute on real traffic.**
+- **ADR 0006 scoping observed working:** a project-scoped sweep from a sandbox filed
+  nothing, because the real conversations are keyed to `~/my_programs/cage`. Only the
+  machine-ledger scope (`workspace=""`) saw them.
+- **The real ledger was not touched** — receipts went to a throwaway sandbox; `~/.cage`
+  still holds 0 graphify receipts and its 5 pre-existing savings rows from 2026-08-03.
+- **n = 2. Deliberately not published as a refusal rate** — it proves both paths run and
+  nothing more. ADR 0009's veto (reopen below a 10% file rate) needs a real usage sample.
+- Files: `docs/regression/2026-08-07-gfx-cov-kiro-field-run.md` (new) ·
+  `docs/regression/README.md` · `docs/OPEN-WORK.md` (GFX-COV-FIELD narrowed to its two
+  surviving residuals).
+- Tests: unchanged, **1498 passed / 11 skipped** (a field run, no code change).
+- Next: the copilot **VS Code** field half (needs a real Copilot chat), or the v0.47.0
+  release cut.
+
+## 2026-08-07 — GFX-COV **P3**: `--rescan-graphify` backfill + the loud coverage gap (green)
+
+- **`cage import --rescan-graphify`** — one helper, `importcmd.graphify_scan_set`, decides
+  which file set graphify detection walks: normally the sweep's own `files` (so detection
+  keeps inheriting the cursor), the source's **full match set** under the flag. Threaded
+  into all three legs (claude · copilot · the kiro-CLI credits leg). **Detection only** —
+  it feeds the graphify detectors and nothing else, so no call or credit row is re-ingested
+  (pinned by test); idempotent by receipt id.
+  The defect it closes: the cursor is keyed on `(size, mtime)`, which is right for calls
+  and wrong for savings — a route shipping *after* a session was ingested could never see
+  that session again. That is precisely how copilot VS Code and kiro stayed dark.
+- **`graphifytx.GRAPHIFY_COVERAGE` is ONE table** naming every agent surface, whether it
+  files receipts, and — for the one that cannot — the measured reason. Read by both
+  `cage doctor`'s new **`graphify-coverage`** check (rendered directly below
+  `graphify-usage`: how often graphify *ran* vs what could be *filed*) and the new
+  **`cage query graphify-coverage`** explainer, via `coverage_lines()`. A test asserts the
+  two word a gap identically — re-deriving either side would let one go stale silently.
+- Files: `cage/cli.py` · `cage/importcmd.py` · `cage/graphifytx.py` · `cage/doctorcmd.py` ·
+  `cage/explain.py` · `cage/explain_data.py` · `docs/CLI.md` ·
+  `tests/test_graphify_copilot.py` (+5) · `tests/test_doctor.py`.
+- Tests: **green, 1498 passed / 11 skipped** (1493 → 1498). `test_cli_reference.py`'s
+  bidirectional gate caught the undocumented flag before the suite did — the doc migration
+  worked as designed.
+- Next: P4 — the remaining docs pass (CHANGELOG, README, OPEN-WORK, WORKLOG, DOC-REGISTRY,
+  archive the pair) and the proposed CLAUDE.md edits.
+
+## 2026-08-07 — GFX-COV **P2**: the kiro-CLI graphify route + ADR 0009 (green)
+
+- **Implemented:** `transcript.parse_kiro_cli_tool_runs` (+ `_kiro_cli_tool_runs`) reads
+  completed tool runs out of `conversations_v2` — same read-only
+  `mode=ro&immutable=1` connection and same `workspace` tree scoping as the credits
+  parser. `graphifytx.detect_and_file_kiro_cli` detects `execute_bash` graphify runs and
+  `fs_read` report-reads and files through the shared `_file_query`/`_file_report_read`.
+- **ADR 0009 authored in the same change** —
+  `docs/adr/0009-kiro-cli-tool-run-bodies-read-transiently-never-persisted.md`. It does
+  **not** re-argue *counts persisted, content transient* (ADR **0008** already ratified
+  that for line-match authorship, and more strictly — it forbids even a line hash); it
+  records **where the boundary falls in this store**, which is the part 0008 could not
+  answer, because kiro's is the one store whose law is a written key whitelist. The
+  whitelist comment in `transcript.py` now names the carve-out and its single function.
+- **The truncation guard is the load-bearing part.** kiro caps tool stdout at ~2000 tokens
+  and appends `... (truncated to ~2000 token budget)`, cutting mid-token — pinned verbatim
+  as `transcript.KIRO_CLI_TRUNCATION_MARKER` and matched **anchored at end-of-string**. A
+  truncated run files nothing (under-counted `actual` ⇒ inflated saving). A test asserts
+  the anchoring specifically, using the rust-clippy false positive the VS Code corpus
+  actually produced.
+- **Wiring:** `importcmd._detect_graphify_kiro_cli` hangs off the credits leg
+  (`_ingest_credits`) deliberately — that leg has already resolved sink and tree
+  (ADR 0006), so the route never adds a second resolver. Scoping is pinned by test.
+- Files: `cage/transcript.py` · `cage/graphifytx.py` · `cage/importcmd.py` ·
+  `docs/adr/0009-*.md` (new) · `tests/test_graphify_kiro.py` (new, 16 tests) ·
+  fixtures under `tests/fixtures/transcripts/graphify/kiro-cli/`.
+- Tests: **green, 1493 passed / 11 skipped** (1477 → 1493).
+- Next: P3 — `cage import --rescan-graphify` + the loud-gap surfaces (doctor + explainer).
+
+## 2026-08-07 — GFX-COV **P1**: the copilot VS Code graphify route (green)
+
+- **Implemented:** `graphifytx.detect_and_file_copilot_vscode` — walks the chatSessions
+  patch stream's **three** part carriers, reads `run_in_terminal`
+  (`commandLine.original` · `cwd.path` · output) and `copilot_readFile`
+  (`invocationMessage.uris[].path`), and files through the existing
+  `_file_query`/`_file_report_read`. No new formula, no new confidence constant, no
+  schema change. `importcmd._detect_graphify_copilot` now **dispatches by store** instead
+  of `continue`-ing on `chatSessions/` — the F2 skip is gone.
+- **Carrier precedence (P0 verdict A):** `resultDetails.output[].value` (model-facing)
+  wins; ANSI-stripped `terminalCommandOutput.text` is the fallback. Pinned by test.
+- **Truncation guard is structural (P0 verdict C):** no output carrier, or
+  `terminalCommandState.exitCode != 0`/absent ⇒ file nothing + a `CAGE_DEBUG` skip event.
+  **No marker string is matched** — all 23 `truncat` hits in 1,132 real parts were rust
+  clippy lint output, and a test pins that a lint-bearing answer still files.
+- `_repo_of()` recovers the repo root from an absolute report path (a `copilot_readFile`
+  part carries no cwd, unlike a claude transcript record).
+- Files: `cage/graphifytx.py` · `cage/importcmd.py` · `tests/test_graphify_vscode.py` (new,
+  15 tests) · fixtures under `tests/fixtures/transcripts/graphify/copilot-vscode/`.
+- Tests: **green, 1477 passed / 11 skipped** (1462 → 1477). ADR-0005 acceptance tests
+  re-asserted for this route (two sessions ⇒ two receipts; shim-then-store ⇒ exactly one).
+- Next: P2 — the kiro-CLI route + its counts-never-content ADR in the same change.
+
+## 2026-08-07 — GFX-COV **P0**: real-store evidence gate complete (STOP — awaiting verdict)
+
+- **Probed, read-only, on real stores:** copilot VS Code `chatSessions` (VS Code 1.132.0,
+  157 files, 7,741 tool parts, 1,132 `run_in_terminal` runs) · kiro-cli 2.16.0
+  `conversations_v2` (19 conversations + 2 live probe runs made for this gate) · Kiro IDE
+  0.12.333 `workspace-sessions` (16 session files).
+- **The handoff's F2 assumption is FALSE.** `run_in_terminal` persists
+  `toolSpecificData.commandLine.original` (the command), `.cwd` (per-command, exact —
+  better than the planned `workspace.json` lookup) **and** the output, via two carriers:
+  `terminalCommandOutput.{text,lineCount}` (1,011/1,132) and `resultDetails.output[].value`
+  (133/1,132). The VS Code query route is buildable.
+- **kiro-CLI shapes pinned against a live `execute_bash` run:** `ToolUse.tool_uses[]` →
+  `{id, name, args:{command, working_dir}}`; the result lands in the **next** history entry
+  as `ToolUseResults.tool_use_results[] → {tool_use_id, status, content:[{Json:{exit_status,
+  stdout, stderr}}]}`. **kiro truncates stdout at ~2000 tokens** with the verbatim marker
+  `\n... (truncated to ~2000 token budget)\n` — reproduced on a real graphify query.
+- **Kiro IDE is unbuildable, confirmed not assumed — and for a different reason than the
+  handoff gave.** A richer per-workspace session store exists
+  (`workspace-sessions/<base64url(cwd)>/<id>.json`), and it *still* persists no assistant
+  output: 26/26 `promptLogs[].completion` are the empty string, zero tool blocks.
+- **No VS Code truncation marker exists** in 1,132 samples; all 23 candidate hits were the
+  command's own output (rust clippy `cast_possible_truncation`). A substring guard would
+  have false-positived. `lineCount` is not a truncation detector either (338/341
+  discrepancies are `\r`/ANSI redraws).
+- Files: `docs/research/2026-08-07-graphify-store-evidence.md` (new) ·
+  `tests/fixtures/transcripts/graphify/{README.md,copilot-vscode/*3,kiro-cli/*5,kiro-ide/*1}`
+  (new — no `expected.json`, so `test_fixture_corpus.py` does not pick them up).
+- Tests: **green, 1462 passed / 11 skipped** (unchanged — P0 added no code).
+- Next: **STOP.** Arpit's verdict on handoff OPEN QUESTIONS 1–2 (both answered by the
+  evidence) plus four new forks the evidence raised (A–D in the research doc §5). No P1
+  code until then.
+
 ## 2026-08-03 — CI-S18: the `build` gate goes green again (v0.46.1)
 
 - **Found while verifying the v0.46.0 release**, not reported by anyone: the `build` job

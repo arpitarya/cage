@@ -1,0 +1,51 @@
+{
+ "sessionId": "bbbbbbbb-0000-4000-8000-000000000001",
+ "title": "[content stripped \u2014 counts only]",
+ "workspacePath": "/tmp/gfxrepo",
+ "workspaceDirectory": "/tmp/gfxrepo",
+ "sessionType": "chat",
+ "active": false,
+ "autonomyMode": "Autopilot",
+ "history": [
+  {
+   "message": {
+    "role": "user",
+    "id": "u-1",
+    "content": [
+     {
+      "type": "text",
+      "text": "run graphify query on the ledger"
+     }
+    ]
+   },
+   "contextItems": [],
+   "editorState": {
+    "type": "doc",
+    "content": []
+   }
+  },
+  {
+   "message": {
+    "role": "user",
+    "id": "u-2",
+    "content": []
+   },
+   "contextItems": [],
+   "editorState": {
+    "type": "doc",
+    "content": []
+   },
+   "executionId": "e-1",
+   "promptLogs": [
+    {
+     "modelTitle": "auto",
+     "prompt": "<user>\nrun graphify query on the ledger",
+     "completion": "",
+     "completionOptions": {}
+    }
+   ]
+  }
+ ],
+ "contextItems": [],
+ "selectedModel": "auto"
+}

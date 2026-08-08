@@ -161,6 +161,10 @@ def build_parser() -> argparse.ArgumentParser:
     im.add_argument("--path", help="a transcript file or dir to scan (log-bearing agents only)")
     im.add_argument("--project", help="restrict to one repo's sessions (Claude only)")
     im.add_argument("--since", metavar="WINDOW", help="only transcripts modified within a window like 7d / 24h / 2w")
+    im.add_argument("--rescan-graphify", dest="rescan_graphify", action="store_true",
+                    help="re-run graphify savings detection over every matched log, ignoring "
+                         "the incremental cursor (backfills sessions ingested before a route "
+                         "shipped; detection only — no call/credit re-ingest, idempotent)")
     im.set_defaults(fn=clicmds.cmd_import)
 
     st = sub.add_parser("setup", help="make this project (or --global) metered: scaffold .cage/ + MCP wiring + graphify (capture is pull-based — `cage import`)",

@@ -742,6 +742,30 @@ def _graphify_usage(active: Path) -> tuple[str, str]:
     return _OK, detail
 
 
+def _graphify_coverage() -> tuple[str, str]:
+    """Which agent surfaces can file a graphify savings receipt at all, and — for the one
+    that cannot — *why not*, in the same words the explainer uses.
+
+    This exists because a zero is ambiguous and the ambiguity is expensive: an agent
+    showing no graphify savings could mean nobody ran it, or that cage has no route for
+    that surface. Through v0.46 the second was true for copilot VS Code and for kiro, and
+    nothing in the product said so — the numbers were simply, silently narrower than they
+    read. Informational, never a failure: a structural limit of somebody else's store is
+    not a fault in this installation. Reads `graphifytx.GRAPHIFY_COVERAGE`, the one table
+    the explainer reads too, so a gap can never be worded two ways."""
+    try:
+        from cage import graphifytx
+        lines = graphifytx.coverage_lines()
+        gaps = [row for row in graphifytx.GRAPHIFY_COVERAGE if not row[2]]
+    except Exception as exc:  # noqa: BLE001 — a diagnostic never crashes doctor
+        return _OK, f"graphify coverage check skipped: {exc}"
+    head = (f"graphify savings routes: {len(lines) - len(gaps)}/{len(lines)} surfaces file "
+            f"receipts" + (f"; {len(gaps)} structurally cannot" if gaps else ""))
+    return _OK, head + "\n     · " + "\n     · ".join(lines) + \
+        "\n     (`cage query graphify-coverage`; backfill an upgraded route with "\
+        "`cage import --rescan-graphify`)"
+
+
 def _receipts(active: Path, scan) -> tuple[str, str]:
     """Are there savings receipts to attribute? Zero receipts means `cage insights
     attrib` has nothing to work with — but the *reason* matters, and reporting it bare
@@ -964,6 +988,10 @@ def run(root: Path) -> dict:
         ("hook-bypass", *_hook_bypass(root)),
         ("graph-staleness", *_graph_staleness(root)),
         ("graphify-usage", *_graphify_usage(active)),
+        # Directly below `graphify-usage`: that line says how often graphify RAN,
+        # this one says which surfaces cage could have FILED from — a thin number
+        # is only readable with both.
+        ("graphify-coverage", *_graphify_coverage()),
         ("receipts", *_receipts(active, scan)),
         ("ledger", *_ledger_roundtrip()),
     ]

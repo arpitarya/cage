@@ -652,7 +652,25 @@ def parse_kiro_calls(token_log: Path, session: str = "") -> list[dict]:
 # `history[].assistant`, `content`, `text`, `transcript`, `next_message`, or the
 # `auth_kv` table: counts-never-content is hardest here because content and metadata
 # share the row (capture-precision §3.3).
+#
+# ONE scoped carve-out, ratified 2026-08-07:
+# [ADR 0009](docs/adr/0009-kiro-cli-tool-run-bodies-read-transiently-never-persisted.md).
+# `parse_kiro_cli_tool_runs` below reads `history[].assistant.ToolUse` and
+# `history[].user.content.ToolUseResults` — tool **commands and their stdout** — so the
+# graphify savings route can size a counterfactual on kiro like it does on claude. The
+# boundary that makes it safe is the same one the claude transcript route lives inside:
+# those bodies are **transient**. They are hashed and token-counted in memory and are
+# never returned to a writer, never stamped on a row, never logged. `_kiro_cli_credit_row`
+# — the *credits* parser, and everything that writes a ledger row from this store — is
+# unchanged and still bound by the whitelist above.
 _KIRO_CLI_TS_KEYS = ("stream_end_timestamp_ms", "request_start_timestamp_ms")
+
+# Kiro CLI truncates a tool's stdout and appends this marker verbatim, at the very end,
+# cutting mid-token. Pinned against a real `graphify query` on kiro-cli 2.16.0, 2026-08-07
+# (docs/research/2026-08-07-graphify-store-evidence.md). Matched **anchored at the end**,
+# never as a substring: a command whose own output discusses truncation must not be
+# mistaken for a truncated one (the false positive the VS Code corpus actually produced).
+KIRO_CLI_TRUNCATION_MARKER = "... (truncated to ~2000 token budget)"
 
 
 def _norm_cwd_key(p: str) -> str:
@@ -775,3 +793,110 @@ def parse_kiro_cli_credits(db_path: Path, workspace: str = "") -> list[dict]:
         con.close()
     rows.sort(key=lambda x: x["id"])  # deterministic order
     return rows
+
+
+def _kiro_cli_tool_runs(doc: dict, key: str) -> list[dict]:
+    """Every completed tool run in one kiro-CLI conversation, as
+    ``{op_kind, session, cwd, command|paths, stdout, exit_status, truncated}``.
+
+    **The ADR-0009 carve-out lives here** — this is the one function allowed to read
+    `history[].assistant.ToolUse` and `history[].user.content.ToolUseResults`. Everything
+    it returns is transient: the caller hashes and counts it, and nothing reaches a row.
+
+    Store shape, verified against a live `execute_bash` run (kiro-cli 2.16.0, 2026-08-07):
+    a `ToolUse` sits in one history entry and its results in the **next**, paired by
+    `tool_use_id`. `execute_bash` results are `{Json: {exit_status, stdout, stderr}}`;
+    `fs_read` results are `{Text: …}` and are not read at all (a report-read needs no
+    result body). A turn that errored before the follow-up leaves a use with no result —
+    it yields nothing rather than a half-sized saving."""
+    history = doc.get("history")
+    if not isinstance(history, list):
+        return []
+    uses: dict[str, dict] = {}
+    results: dict[str, dict] = {}
+    cwd_seen = ""
+    for entry in history:
+        if not isinstance(entry, dict):
+            continue
+        user = entry.get("user")
+        if isinstance(user, dict):
+            env = user.get("env_context")
+            if isinstance(env, dict) and isinstance(env.get("env_state"), dict):
+                cwd_seen = str(env["env_state"].get("current_working_directory") or "") or cwd_seen
+            content = user.get("content")
+            if isinstance(content, dict) and isinstance(content.get("ToolUseResults"), dict):
+                for res in content["ToolUseResults"].get("tool_use_results") or []:
+                    if isinstance(res, dict) and res.get("tool_use_id"):
+                        results[res["tool_use_id"]] = res
+        asst = entry.get("assistant")
+        if isinstance(asst, dict) and isinstance(asst.get("ToolUse"), dict):
+            for use in asst["ToolUse"].get("tool_uses") or []:
+                if isinstance(use, dict) and use.get("id"):
+                    uses[use["id"]] = use
+    out: list[dict] = []
+    for uid, use in uses.items():
+        args = use.get("args") if isinstance(use.get("args"), dict) else {}
+        name = use.get("name")
+        if name == "execute_bash":
+            res = results.get(uid)
+            if not isinstance(res, dict):
+                continue                      # the turn errored before the result landed
+            stdout = exit_status = None
+            for blk in res.get("content") or []:
+                if isinstance(blk, dict) and isinstance(blk.get("Json"), dict):
+                    j = blk["Json"]
+                    if isinstance(j.get("stdout"), str):
+                        stdout = j["stdout"]
+                        exit_status = str(j.get("exit_status", ""))
+            if stdout is None:
+                continue
+            out.append({"op_kind": "bash", "tool_use_id": uid,
+                        "command": str(args.get("command") or ""),
+                        "cwd": str(args.get("working_dir") or "") or cwd_seen or key,
+                        "stdout": stdout, "exit_status": exit_status,
+                        "truncated": stdout.rstrip().endswith(KIRO_CLI_TRUNCATION_MARKER)})
+        elif name == "fs_read":
+            paths_read = [str(op.get("path")) for op in (args.get("operations") or [])
+                          if isinstance(op, dict) and op.get("path")]
+            if paths_read:
+                out.append({"op_kind": "read", "tool_use_id": uid, "paths": paths_read,
+                            "cwd": str(args.get("working_dir") or "") or cwd_seen or key})
+    out.sort(key=lambda r: r["tool_use_id"])   # deterministic order
+    return out
+
+
+def parse_kiro_cli_tool_runs(db_path: Path, workspace: str = "") -> list[dict]:
+    """Every kiro-CLI conversation's completed tool runs, for the graphify savings route
+    (GFX-COV/P2). ``[{conversation_id, key, runs: [...]}]``.
+
+    Same read-only SQLite access, same ``workspace`` tree scoping and the same fail-open
+    discipline as :func:`parse_kiro_cli_credits` — it is the *same store*, read for a
+    different question. It writes nothing and returns bodies the caller must not persist;
+    see :data:`KIRO_CLI_TRUNCATION_MARKER` and ADR 0009 for the boundary."""
+    if not db_path.exists():
+        return []
+    try:
+        con = sqlite3.connect(f"file:{db_path}?mode=ro&immutable=1", uri=True)
+    except sqlite3.Error:
+        return []
+    con.row_factory = sqlite3.Row
+    out: list[dict] = []
+    try:
+        for r in con.execute("SELECT key, conversation_id, value FROM conversations_v2"):
+            key = r["key"] or ""
+            if workspace and not _under(key, workspace):
+                continue
+            try:
+                doc = json.loads(r["value"]) if r["value"] else {}
+                runs = _kiro_cli_tool_runs(doc, key)
+            except Exception:  # noqa: BLE001 — fail-open per conversation
+                continue
+            if runs:
+                out.append({"conversation_id": r["conversation_id"] or "", "key": key,
+                            "runs": runs})
+    except sqlite3.Error:
+        return out
+    finally:
+        con.close()
+    out.sort(key=lambda c: c["conversation_id"])   # deterministic order
+    return out

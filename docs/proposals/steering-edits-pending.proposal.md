@@ -9,7 +9,7 @@ held: not applied — CLAUDE.md is the file every agent reads first
 
 # Proposal — the steering edits waiting on one decision
 
-**Four** CLAUDE.md edits (A · B · C · D · F — E is gone, see below), all held for the
+**Five** CLAUDE.md edits (A · B · C · D · F · G — E is gone, see below), all held for the
 same reason: **the prompts that produced them forbid rewriting a steering file without a
 human read.**
 
@@ -33,6 +33,7 @@ E documented is real, and the next release refreshes it again.
 | **C** | `FORMULAS.md` joins the ALL-CAPS entry-point list | `:674–676` still omits it | ☐ apply ☐ amend ☐ decline |
 | **D** | a "Dogfood snapshot" section | absent; its anchor `## Regression & capture reports` exists | ☐ apply ☐ amend ☐ decline |
 | **F** | the chats bullet gains `agent%` + the **second** carve-out | the chats bullet ends at "no MCP tool"; no `agent%`, no second carve-out named | ☐ apply ☐ amend ☐ decline |
+| **G** | a **graphify savings routes** architecture bullet (v0.47.0 / GFX-COV) | no `graphifytx` anywhere in CLAUDE.md; no per-agent graphify coverage stated at all | ☐ apply ☐ amend ☐ decline |
 
 **On applying any row: delete that section from this file** — an applied edit is
 removed, never ticked, same law as OPEN-WORK. The file goes when the table is empty.
@@ -311,6 +312,65 @@ for declining is that FORMULAS §2.13 + `cage query chats-view` carry all of it.
 for applying is that the *cardinality of a stated law* is wrong in CLAUDE.md until this
 lands — an agent reading "a single scoped carve-out" would treat a second one as a
 violation.
+
+---
+
+---
+
+## G · A "graphify savings routes" architecture bullet
+
+*Raised 2026-08-07 by GFX-COV (v0.47.0). Held per the pair's §9.5: propose, never apply.*
+
+**⚠ The pair's own §9.5 was wrong about what is stale, and that matters more than the
+edit.** It said "the copilot-VSCode-skipped and kiro-token-log sentences in the adapters
+section go stale on ship". Verified against CLAUDE.md at HEAD:
+
+- There is **no copilot-VSCode-skipped sentence in CLAUDE.md at all.** The F2 skip lived
+  only in `importcmd._detect_graphify_copilot`'s docstring and in `graphifytx`'s — both
+  rewritten in the implementing change. Nothing to fix here.
+- The **kiro-token-log sentence is still true** and must NOT be touched: "Kiro's
+  `tokens_generated.jsonl` is coarse so the proxy stays its higher-fidelity fallback"
+  is about *call* metering. GFX-COV changed nothing about it — the new kiro route reads
+  the **CLI SQLite store**, a different file answering a different question.
+
+So the real gap is the opposite of a stale sentence: **CLAUDE.md never stated graphify
+savings coverage per agent in the first place** (`graphifytx` appears nowhere in it),
+which is why the two-of-three blind spot could persist unnoticed for as long as it did.
+The proposed edit is an **addition**, not a correction.
+
+**Where:** in *Adapters & agents*, directly after the existing **graphify interceptor is
+a TWIN PAIR** bullet — the interceptor is the *invocation-gated* capture path and these
+routes are what catch everything it misses; they read as one idea.
+
+**Proposed text:**
+
+> - **graphify savings file from FOUR of five agent surfaces, and the fifth says why not**
+>   ([graphifytx.py](cage/graphifytx.py), `cage query graphify-coverage`) — the interceptor
+>   above is invocation-gated, so every store-side route exists to catch what it misses. One
+>   counterfactual, one id scheme, one ADR-0005 deferral: claude transcripts · copilot **CLI**
+>   `events.jsonl` · copilot **VS Code** `chatSessions` (`run_in_terminal` → `commandLine.original`
+>   + `cwd.path` + output) · kiro **CLI** `conversations_v2` (`execute_bash`, [ADR 0009](docs/adr/0009-kiro-cli-tool-run-bodies-read-transiently-never-persisted.md)
+>   — bodies read **transiently**, hashes only, the one carve-out on that store's key whitelist).
+>   **Kiro IDE structurally cannot** (its store persists no assistant output — 26/26 empty
+>   completions when probed) and that is **named in `cage doctor` + the explainer, never a
+>   silent zero**. `GRAPHIFY_COVERAGE` is the ONE table both read.
+>   **Two refusals are load-bearing, not gaps:** kiro caps tool stdout at ~2000 tokens, so a
+>   truncated answer under-counts `actual` and files **nothing** (a lower confidence would
+>   dress up a number wrong in a known direction); and the VS Code guard matches **no marker
+>   string** — all 23 `truncat` hits across 1,132 real parts were the command's own clippy
+>   output, so it keys only on a missing output carrier or a non-zero exit.
+>   **The cursor is right for calls and wrong for savings** — a route shipping after a session
+>   was ingested can never see it again — so `cage import --rescan-graphify` walks the full
+>   match set, detection only, idempotent.
+
+**Why it is worth a bullet:** every other capture surface in that section states its
+coverage *and its limits*. This one shipped dark on two of three agents precisely because
+the always-loaded contract never said which agents it covered, so nothing contradicted the
+assumption. Evidence: [store probe](../research/2026-08-07-graphify-store-evidence.md).
+
+**If declined:** `cage query graphify-coverage` and ADR 0009 remain the living spec and
+nothing is lost operationally — the cost is that the next agent reading CLAUDE.md still
+cannot tell which agents graphify savings cover.
 
 ---
 

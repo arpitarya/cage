@@ -1,0 +1,134 @@
+{
+ "conversation_id": "aaaaaaaa-0000-4000-8000-000000000005",
+ "next_message": null,
+ "history": [
+  {
+   "user": {
+    "content": {
+     "Prompt": {
+      "prompt": "[content stripped \u2014 counts only]"
+     }
+    },
+    "additional_context": "",
+    "images": null,
+    "timestamp": null,
+    "env_context": {
+     "env_state": {
+      "operating_system": "macos",
+      "current_working_directory": "/tmp/gfxrepo",
+      "environment_variables": []
+     }
+    }
+   },
+   "assistant": {
+    "ToolUse": {
+     "message_id": "m-1",
+     "content": "",
+     "tool_uses": [
+      {
+       "id": "tooluse_F",
+       "name": "fs_read",
+       "orig_name": "fs_read",
+       "args": {
+        "operations": [
+         {
+          "mode": "Line",
+          "path": "/tmp/gfxrepo/graphify-out/GRAPH_REPORT.md"
+         }
+        ]
+       },
+       "orig_args": {
+        "operations": [
+         {
+          "mode": "Line",
+          "path": "/tmp/gfxrepo/graphify-out/GRAPH_REPORT.md"
+         }
+        ]
+       }
+      }
+     ]
+    }
+   },
+   "request_metadata": {
+    "model_id": "auto",
+    "total_tokens": 1500,
+    "output_tokens": 200,
+    "uncached_input_tokens": 1300
+   }
+  },
+  {
+   "user": {
+    "content": {
+     "ToolUseResults": {
+      "tool_use_results": [
+       {
+        "tool_use_id": "tooluse_F",
+        "status": "Success",
+        "content": [
+         {
+          "Text": "[content stripped \u2014 counts only]"
+         }
+        ]
+       }
+      ]
+     }
+    },
+    "additional_context": "",
+    "images": null,
+    "timestamp": null,
+    "env_context": {
+     "env_state": {
+      "operating_system": "macos",
+      "current_working_directory": "/tmp/gfxrepo",
+      "environment_variables": []
+     }
+    }
+   },
+   "assistant": {
+    "Response": {
+     "message_id": "m-2",
+     "content": "[content stripped \u2014 counts only]"
+    }
+   },
+   "request_metadata": {
+    "model_id": "auto",
+    "total_tokens": 900,
+    "output_tokens": 30
+   }
+  }
+ ],
+ "valid_history_range": [
+  0,
+  2
+ ],
+ "transcript": [],
+ "tools": {
+  "native___": [
+   {
+    "ToolSpecification": {
+     "name": "execute_bash"
+    }
+   },
+   {
+    "ToolSpecification": {
+     "name": "fs_read"
+    }
+   }
+  ]
+ },
+ "context_manager": {},
+ "context_message_length": null,
+ "latest_summary": null,
+ "model_info": {
+  "model_name": "auto",
+  "model_id": "auto",
+  "context_window_tokens": 1000000,
+  "rate_unit": "Credit"
+ },
+ "file_line_tracker": {},
+ "mcp_enabled": false,
+ "mcp_last_checked": null,
+ "mcp_server_versions": {},
+ "mcp_disabled_due_to_api_failure": false,
+ "user_turn_metadata": []
+}

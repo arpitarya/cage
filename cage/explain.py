@@ -112,7 +112,17 @@ def _live(pol: dict) -> dict:
         # the closed usage-row verdicts `insights adoption` reads (never re-derives) —
         # live from the one enumeration `usagelog.py` owns
         "outcomes": " · ".join(usagelog.OUTCOMES),
+        # which agent surfaces can file a graphify savings receipt — live from the ONE
+        # table `graphifytx.py` owns, the same one `cage doctor`'s graphify-coverage check
+        # renders, so a gap can never be worded two different ways in two places.
+        "coverage": _graphify_coverage_live(),
     }
+
+
+def _graphify_coverage_live() -> str:
+    """`graphifytx.GRAPHIFY_COVERAGE` as indented explainer lines."""
+    from cage import graphifytx
+    return "\n".join(f"    · {line}" for line in graphifytx.coverage_lines())
 
 
 def _sources_live(pol: dict) -> str:

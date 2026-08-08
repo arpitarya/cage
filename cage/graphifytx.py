@@ -220,9 +220,10 @@ def detect_and_file_copilot(root: Path, events_path: Path, session: str, *,
     Scope: the **query** route (the one the F1 evidence — command + result content —
     supports). Report-reads via copilot's `view` are handled symmetrically when the viewed
     path is the graph report/wiki (the `actual` comes from the file on disk, not the log).
-    The copilot **VS Code** store is deliberately NOT handled here: its `chatSessions`
-    log carries the command but no tool result (F2), so it can size no counterfactual —
-    a usage row without a receipt, filed elsewhere, never a fabricated saving."""
+    The copilot **VS Code** store has its own reader, `detect_and_file_copilot_vscode` —
+    a different on-disk format, not a different formula. (Through v0.46 it was skipped
+    outright on the F2 claim that it carried no tool result; that claim was measured false
+    on 2026-08-07 and the skip is gone.)"""
     counts = {"query": 0, "report_read": 0, "deferred": 0, "skipped": 0}
     try:
         cwd = ""
@@ -264,6 +265,228 @@ def detect_and_file_copilot(root: Path, events_path: Path, session: str, *,
             _file_report_read(root, session, fp, cwd, existing_ids, counts, pol)
     except Exception as e:  # fail-open: detection must never break the import
         debuglog.exception(root, "graphify.tx.copilot", e, pol=pol)
+    return counts
+
+
+_ANSI = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
+
+
+def _strip_ansi(text: str) -> str:
+    """Drop CSI escape sequences from a terminal buffer. Only ever applied to the VS Code
+    UI carrier (`terminalCommandOutput.text`), which is a *rendered* buffer: 197/1,011 real
+    parts carry escapes and 338 carry `\\r` redraws (2026-08-07 store evidence). The
+    model-facing `resultDetails` carrier is plain and is never passed through this."""
+    return _ANSI.sub("", text or "")
+
+
+def _vscode_parts(chat_session_path: Path):
+    """Yield every `toolInvocationSerialized` part in a VS Code `chatSessions/*.jsonl`,
+    plus the session id the store declares.
+
+    The store is a **patch stream** (`kind:0` snapshot · `kind:1` set-at-key ·
+    `kind:2` append-at-key), and tool parts reach a reader through **three** carriers —
+    `kind:0 → v.requests[].response`, `kind:2 k:["requests"] → v[].response`, and
+    `kind:2 k:["requests", i, "response"] → v[]`. All three are walked; the last is the
+    common one for a live session, and walking only one would silently see a fraction of
+    the runs. Shapes pinned against 157 real files / 7,741 tool parts
+    (docs/research/2026-08-07-graphify-store-evidence.md)."""
+    session = ""
+    parts: list[dict] = []
+
+    def collect(seq):
+        if isinstance(seq, list):
+            for p in seq:
+                if isinstance(p, dict) and p.get("kind") == "toolInvocationSerialized":
+                    parts.append(p)
+
+    for rec in _load_records(chat_session_path):
+        if not isinstance(rec, dict):
+            continue
+        v, k = rec.get("v"), rec.get("k")
+        if rec.get("kind") == 0 and isinstance(v, dict):
+            session = v.get("sessionId") or session
+            for req in v.get("requests") or []:
+                if isinstance(req, dict):
+                    collect(req.get("response"))
+        elif isinstance(k, list) and k:
+            if k[-1] == "requests" and isinstance(v, list):
+                for req in v:
+                    if isinstance(req, dict):
+                        collect(req.get("response"))
+            elif k[-1] == "response":
+                collect(v)
+    return session, parts
+
+
+def _vscode_terminal_answer(data: dict) -> str | None:
+    """The output text of one `run_in_terminal` part, or ``None`` when the store carries
+    no complete result — the **structural** truncation/failure guard (P0 verdict C).
+
+    Two carriers hold the output and they never agree: `resultDetails.output[].value` is
+    the **model-facing** result (the analogue of the claude route's `tool_result`) and is
+    preferred; `terminalCommandOutput.text` is the UI buffer and is the fallback, ANSI
+    stripped. 121/1,132 real parts carry neither.
+
+    **No marker string is matched, deliberately.** A sweep of 1,132 real terminal runs
+    found *zero* VS Code-inserted truncation markers — all 23 candidate hits were the
+    command's own output (rust clippy's `cast_possible_truncation`), so a substring guard
+    would have false-positived on lint output while never catching a real elision.
+    `lineCount` is not a detector either (338/341 of its discrepancies are `\\r` redraws).
+    Inventing a marker set here would fail *silently*, the class this project has paid
+    for twice — so the guard keys only on what the store actually states: a missing
+    output carrier, or a command that did not complete successfully."""
+    part_result = data.get("_result")
+    state = data.get("terminalCommandState")
+    # A command with no recorded terminal state, or one that failed, sizes no
+    # counterfactual — its output is partial or is an error message, never an answer.
+    if not isinstance(state, dict) or state.get("exitCode") != 0:
+        return None
+    if isinstance(part_result, dict) and isinstance(part_result.get("output"), list):
+        vals = [b.get("value") for b in part_result["output"]
+                if isinstance(b, dict) and isinstance(b.get("value"), str)]
+        if vals:
+            return "\n".join(vals)
+    out = data.get("terminalCommandOutput")
+    if isinstance(out, dict) and isinstance(out.get("text"), str) and out["text"]:
+        return _strip_ansi(out["text"])
+    return None
+
+
+def _repo_of(fp: str) -> str:
+    """The repo root implied by an **absolute** report/wiki path — everything above the
+    `graphify-out/` segment. The claude route reads a `cwd` off each transcript record;
+    a VS Code `copilot_readFile` part carries no cwd, but its `uris[].path` is absolute,
+    so the root the graph must resolve against is recoverable from the path itself.
+    ``""`` for a relative path (the caller's CWD fallback then applies, as before)."""
+    norm = (fp or "").replace("\\", "/")
+    head, sep, _ = norm.partition("graphify-out/")
+    if not sep or not head.startswith("/"):
+        return ""
+    return head.rstrip("/") or "/"
+
+
+def _uri_paths(msg) -> list[str]:
+    """Every file path in a markdown-string part's ``uris`` map. The structured `path`
+    is read, never the rendered `value` string — `invocationMessage.uris` is present on
+    2,932/2,932 real `copilot_readFile` parts."""
+    if not isinstance(msg, dict):
+        return []
+    uris = msg.get("uris")
+    if not isinstance(uris, dict):
+        return []
+    return [str(u["path"]) for u in uris.values()
+            if isinstance(u, dict) and isinstance(u.get("path"), str)]
+
+
+def detect_and_file_copilot_vscode(root: Path, chat_session_path: Path, session: str, *,
+                                   existing_ids: set, pol=None) -> dict:
+    """GFX-COV/P1: detect graphify use in one **copilot VS Code** `chatSessions/*.jsonl`
+    and file the same `modeled` receipts as the claude and copilot-CLI routes — the SAME
+    counterfactual, deterministic id and ADR-0005 deferral via `_file_query` /
+    `_file_report_read`, never a forked formula.
+
+    This store was skipped through v0.46 on the F2 assumption that it "carries the command
+    but no tool result". **That assumption was false**, and the 2026-08-07 field probe
+    retired it: a `run_in_terminal` part persists
+    ``toolSpecificData.commandLine.original`` (the command),
+    ``toolSpecificData.cwd.path`` (the cwd, *per command* — so no `workspace.json` lookup
+    is needed) and the output, via `resultDetails` or `terminalCommandOutput`. A
+    `copilot_readFile` part carries the read path in ``invocationMessage.uris[].path``,
+    which needs no result text at all — its `actual` comes from the file on disk.
+
+    Fail-open; returns the claude-shaped counts."""
+    counts = {"query": 0, "report_read": 0, "deferred": 0, "skipped": 0}
+    try:
+        declared, parts = _vscode_parts(chat_session_path)
+        session = declared or session
+        for p in parts:
+            tool = p.get("toolId")
+            if tool == "run_in_terminal":
+                data = p.get("toolSpecificData")
+                if not isinstance(data, dict):
+                    continue
+                line = data.get("commandLine")
+                command = line.get("original") if isinstance(line, dict) else line
+                ops = graphify_ops(str(command or ""))
+                if not ops:
+                    continue
+                cwd = ""
+                c = data.get("cwd")
+                if isinstance(c, dict) and isinstance(c.get("path"), str):
+                    cwd = c["path"]
+                elif isinstance(c, str):
+                    cwd = c
+                answer = _vscode_terminal_answer({**data, "_result": p.get("resultDetails")})
+                if answer is None:
+                    counts["skipped"] += len(ops)
+                    debuglog.event(root, pol=pol, event="receipt", tool="graphify",
+                                   produced=False, skip_reason="vscode-no-complete-result",
+                                   op=ops[0][0], route="vscode")
+                    continue
+                for op, argv in ops:
+                    _file_query(root, session, op, argv, answer, cwd, existing_ids,
+                                counts, pol)
+            elif tool == "copilot_readFile":
+                for fp in _uri_paths(p.get("invocationMessage")):
+                    if _is_report_path(fp):
+                        _file_report_read(root, session, fp, _repo_of(fp), existing_ids,
+                                          counts, pol)
+    except Exception as e:  # fail-open: detection must never break the import
+        debuglog.exception(root, "graphify.tx.copilot-vscode", e, pol=pol)
+    return counts
+
+
+def detect_and_file_kiro_cli(root: Path, db_path: Path, *, workspace: str = "",
+                             existing_ids: set, pol=None) -> dict:
+    """GFX-COV/P2: detect graphify use in the **kiro CLI** `conversations_v2` store and
+    file the same `modeled` receipts as every other route — one counterfactual, one id
+    scheme, one deferral (`_file_query` / `_file_report_read`).
+
+    kiro had no graphify route at all before this: `import_kiro` reads the IDE token log,
+    which carries no commands, and the CLI store's credits parser is bound to a numeric
+    whitelist. Reading tool bodies out of that store is a deliberate, ADR'd carve-out
+    (`transcript.parse_kiro_cli_tool_runs`, ADR 0009) — the bodies stay **transient**;
+    only hashes and counts are ever filed.
+
+    **The truncation guard is the load-bearing part.** kiro caps a tool's stdout at
+    ~2000 tokens and appends its own marker (`transcript.KIRO_CLI_TRUNCATION_MARKER`),
+    cutting mid-token. A truncated answer under-counts `actual`, which would *inflate*
+    the modeled saving — so it files nothing and says why. Most real `graphify query`
+    output exceeds that cap, so this route refusing is the expected common case, not a
+    fault; `fs_read` report-reads are unaffected (they need no result body).
+
+    ``workspace`` scopes the read to a project tree exactly as the credits sweep does —
+    receipts land in whatever sink that sweep is already writing to, never a second
+    resolver. Fail-open; returns the claude-shaped counts."""
+    counts = {"query": 0, "report_read": 0, "deferred": 0, "skipped": 0}
+    try:
+        from cage import transcript
+        for conv in transcript.parse_kiro_cli_tool_runs(db_path, workspace=workspace):
+            session = conv["conversation_id"]
+            for run in conv["runs"]:
+                if run["op_kind"] == "read":
+                    for fp in run["paths"]:
+                        if _is_report_path(fp):
+                            _file_report_read(root, session, fp,
+                                              run["cwd"] or _repo_of(fp),
+                                              existing_ids, counts, pol)
+                    continue
+                ops = graphify_ops(run["command"])
+                if not ops:
+                    continue
+                if run["truncated"] or run["exit_status"] not in ("0", 0):
+                    counts["skipped"] += len(ops)
+                    debuglog.event(
+                        root, pol=pol, event="receipt", tool="graphify", produced=False,
+                        skip_reason=("kiro-stdout-truncated" if run["truncated"]
+                                     else "kiro-nonzero-exit"),
+                        op=ops[0][0], route="kiro-cli")
+                    continue
+                for op, argv in ops:
+                    _file_query(root, session, op, argv, run["stdout"], run["cwd"],
+                                existing_ids, counts, pol)
+    except Exception as e:  # fail-open: detection must never break the import
+        debuglog.exception(root, "graphify.tx.kiro-cli", e, pol=pol)
     return counts
 
 
@@ -334,6 +557,39 @@ def _file_report_read(root, session, fp, cwd, existing_ids, counts, pol):
         counts["report_read"] += 1
         debuglog.event(root, pol=pol, event="receipt", tool="graphify", produced=True,
                        op="report-read", route="transcript")
+
+
+# ── graphify coverage: which agent surfaces can file a savings receipt, and why not ──
+# ONE table, read by `cage doctor`'s graphify-coverage check and by the `graphify-coverage`
+# explainer entry — never re-derived per view, so the two can't drift into disagreeing
+# about a gap. Each row is `(agent, surface, files_receipts, why)`; every `False` row
+# states a *measured* structural limit, never a guess or a "not yet".
+# Grounded in docs/research/2026-08-07-graphify-store-evidence.md (GFX-COV/P0).
+GRAPHIFY_COVERAGE = (
+    ("claude", "cli+vscode", True,
+     "transcript Bash tool_use paired with its tool_result (one store, both surfaces)"),
+    ("copilot", "cli", True,
+     "events.jsonl tool.execution_start/complete, paired by toolCallId"),
+    ("copilot", "vscode", True,
+     "chatSessions run_in_terminal — commandLine.original + cwd.path + output; a "
+     "copilot_readFile part covers report-reads"),
+    ("kiro", "cli", True,
+     "conversations_v2 execute_bash, paired by tool_use_id — BUT kiro caps tool stdout "
+     "at ~2000 tokens, so a long query answer is truncated and correctly files NOTHING; "
+     "fs_read report-reads are unaffected"),
+    ("kiro", "ide", False,
+     "the IDE store persists no assistant output at all — user turns only, and 26/26 "
+     "promptLogs completions were the empty string when probed (2026-08-07). There is no "
+     "command and no result to detect, so no counterfactual can be sized. Use the PATH "
+     "interceptor here (`cage doctor` checks it is live)"),
+)
+
+
+def coverage_lines() -> list[str]:
+    """`GRAPHIFY_COVERAGE` as one rendered line per surface — the shared body behind the
+    doctor check and the explainer, so a gap is worded identically wherever it is read."""
+    return [f"{agent}/{surface}: {'files receipts' if ok else 'CANNOT file'} — {why}"
+            for agent, surface, ok, why in GRAPHIFY_COVERAGE]
 
 
 def report_read_footnote(receipts: list[dict]) -> str:

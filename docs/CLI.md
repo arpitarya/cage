@@ -105,6 +105,14 @@ per-agent high-water cursor). Works with no hooks and no project.
 | `--path PATH` | a transcript file or dir to scan (log-bearing agents only) |
 | `--project PROJECT` | restrict to one repo's sessions (Claude only) |
 | `--since WINDOW` | only transcripts modified within a window like `7d` / `24h` / `2w` |
+| `--rescan-graphify` | re-run graphify savings detection over every matched log, ignoring the incremental cursor |
+
+`--rescan-graphify` is a **backfill**, and it exists because the cursor is right for
+calls and wrong for savings: an unchanged log is skipped, so a graphify route that ships
+*after* a session was ingested can never see that session again. Detection only — it
+re-ingests no call or credit rows — and idempotent by receipt id, so re-running it files
+nothing the second time. Use it once after upgrading into a release that adds a route
+(v0.47 added copilot VS Code and kiro CLI).
 
 Kiro's IDE log is a machine fact, not a project fact, so those rows route to `~/.cage`
 even during a project sweep

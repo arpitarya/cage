@@ -53,6 +53,31 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
   Stress-tested line named (same-file double-count across sessions) is **shipped as
   stated, not fixed**: per chat there is no diff to clamp against, so the commit view
   stays the arbiter for any single sha.
+- **GFX-COV is BUILT, all five phases, 2026-08-07 (v0.47.0, 1462/0 => 1498/0).** graphify
+  savings now file from copilot **VS Code** and kiro **CLI** as well as claude and
+  copilot-CLI; `cage import --rescan-graphify` backfills sessions the cursor already ate;
+  kiro **IDE** is a named gap in doctor + `cage query graphify-coverage`. Pair archived
+  (`docs/archive/v0.47-*`), evidence in
+  [research/2026-08-07-graphify-store-evidence.md](research/2026-08-07-graphify-store-evidence.md),
+  carve-out in [ADR 0009](adr/0009-kiro-cli-tool-run-bodies-read-transiently-never-persisted.md).
+- **The one thing to internalise about it: the blocking P0 gate paid for itself on the
+  first phase.** The pair's central premise - "F2: copilot's chatSessions carries the
+  command but no tool result" - was **false**, and had been for as long as the skip
+  existed. 1,132 real `run_in_terminal` parts carry the command, a per-command `cwd`, and
+  the output. Nobody had looked; the skip cited a finding that was never a measurement.
+  **If you inherit a capture gap justified by a store's shape, go read the store.**
+- **Two refusals in that work are load-bearing and must not be "fixed" into coverage.**
+  (a) kiro caps tool stdout at ~2000 tokens, so a long graphify answer files **nothing** -
+  a truncated answer under-counts `actual` and would *inflate* the saving; a lower
+  confidence would dress up a number wrong in a known direction. Its column looking thin
+  is the guard working. (b) The VS Code truncation guard deliberately matches **no marker
+  string**: all 23 `truncat` hits across the corpus were the command's own rust-clippy
+  output, so a substring guard refuses good receipts and catches no real elision. Both are
+  decisions backed by counts, recorded in ADR 0009's veto and in the research doc.
+- **Still open (GFX-COV-FIELD, needs a machine not a session):** no real graphify run has
+  ever been observed in a VS Code Copilot chat - the route is built on structural evidence
+  and its fixture is labelled SHAPE-VERIFIED / CONTENT-SYNTHETIC - and kiro's refusal rate
+  against real usage is unmeasured. It joins L1-FIELD and KIRO-MCP-FIELD in the human lane.
 - **Lessons from this session, in order of how much they would cost to relearn:**
   1. **A committed file can carry ONE spelling.** The handoff said write `python3` on
      POSIX and `py -3` on Windows for Kiro's MCP — both *committed*, which would churn
@@ -344,8 +369,14 @@ you touch any savings number.**
 
 ## Standing constraints (the human's active directives — do not violate silently)
 
-- **No commits in `cage`** — not a commit, tag, or release, until Arpit says so.
-  cage-lab commits freely in its own repo.
+- **~~No commits in `cage`~~ — LIFTED (confirmed 2026-08-08).** This sat here as an
+  *active* constraint through v0.44–v0.46.1, all of which were committed, tagged and
+  released — the line was stale for four releases and a reader had no way to tell.
+  Releases now follow CLAUDE.md's flow (bump + changelog → push `main` → tag →
+  `gh release create`, which **is** the PyPI publish trigger). Kept as a struck-through
+  line, not deleted, because the lesson is the point: **a standing constraint that the
+  work has already routed around is worse than no constraint** — it makes every other
+  line here less trustworthy. If a constraint stops binding, strike it the same day.
 - **Session names are always captured** (no opt-in flag) — a deliberate,
   manifest-only PII widening; row stores stay counts-never-content.
 - **Savings numbers must be exact: NOT WRONG, NOT DUPLICATED** — the id-deduped
@@ -434,6 +465,27 @@ you touch any savings number.**
 
 ## Maintainers
 
+- Claude (Opus 5) - 2026-08-07 - built GFX-COV (graphify savings for copilot-VSCode +
+  kiro-CLI, 1462/0 => 1498/0). **The lesson I'd want inherited: a spec's stated *reason* for
+  a gap is a claim, and claims about someone else's on-disk format are the cheapest of all
+  to falsify.** The whole pair was written around F2 - "chatSessions carries the command
+  but no tool result" - and ten minutes of reading 157 real files showed the store carries
+  the command, a per-command cwd, *and* the output through two carriers. The gate the pair
+  imposed on itself is the only reason that surfaced before the code was written to work
+  around a limit that did not exist. Second, and it cut the other way: **the same probe
+  that removed one guard justified another.** I went looking for VS Code's truncation
+  marker to build the handoff's guard and found that all 23 candidate hits in 1,132 parts
+  were rust clippy's `cast_possible_truncation` in the command's *own* output - so the
+  handoff's substring guard would have refused good receipts while catching nothing. Not
+  building it was the finding. Third: **check the ADR number before you write the ADR.**
+  Mine was 0009, not 0008 - and the real 0008 had already ratified *counts persisted,
+  content transient*, more strictly than I was about to re-argue it. Citing it instead of
+  restating it made the record shorter and stronger. Fourth, smaller: the pair's own
+  documentation-impact section named two CLAUDE.md sentences as going stale; **neither
+  existed in the form it claimed** (one is absent entirely, the other is about *call*
+  metering and is still true). The real gap was the opposite - CLAUDE.md never stated
+  graphify coverage at all, which is precisely why two-of-three could stay dark unnoticed.
+  Verify a doc-impact list against the file, not against the list.
 - Claude (Opus 5) — 2026-08-03 — built CHATS-AUTHOR (`agent%` on `cage insights
   chats`, 1442/0 ⇒ 1462/0). **The lesson I'd want inherited: a recorded fallback can be
   moot, and noticing that is the work.** The handoff said "demote the column behind

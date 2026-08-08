@@ -977,6 +977,38 @@ REGISTRY: tuple[Explanation, ...] = (
         "n/a — describes a wiring mechanism, not a number.",
         kind="concept", plan_ref="§5"),
     Explanation(
+        "graphify-coverage", ("graphify-coverage", "coverage", "which-agents", "surfaces",
+                              "rescan-graphify", "backfill", "kiro-graphify",
+                              "vscode-graphify", "graphify-gap", "truncated"),
+        "which agent surfaces can file a graphify savings receipt, and why the rest can't",
+        "a graphify saving is filed from whatever store an agent actually writes, so\n"
+        "  coverage is a property of THAT STORE, not of cage. Per surface:\n"
+        "{coverage}\n"
+        "  WHY THIS IS PRINTED AT ALL: a zero is ambiguous, and the ambiguity is\n"
+        "  expensive. An agent with no graphify savings might never have run graphify —\n"
+        "  or cage might have had no route for its store. Through v0.46 the second was\n"
+        "  true for copilot VS Code (skipped on an assumption that its chatSessions log\n"
+        "  carried no tool result — measured FALSE on 2026-08-07) and for kiro (no route\n"
+        "  existed at all), and nothing said so out loud.\n"
+        "  A `CANNOT file` row is a MEASURED structural limit of somebody else's store,\n"
+        "  never a to-do and never a guess. It is not a fault in your installation, and\n"
+        "  it is the reason that surface is honestly absent rather than silently zero.\n"
+        "  TRUNCATION REFUSES, IT DOES NOT ESTIMATE: kiro caps a tool's stdout at ~2000\n"
+        "  tokens and appends its own marker. A truncated answer under-counts `actual`,\n"
+        "  which would INFLATE the modeled saving — so a truncated run files nothing.\n"
+        "  Expect kiro query receipts to be sparse for that reason; its fs_read\n"
+        "  report-reads need no result body and are unaffected.\n"
+        "  BACKFILL: the import cursor skips an unchanged log, which is right for calls\n"
+        "  and wrong for savings — a route that ships after a session was ingested can\n"
+        "  never see it again. `cage import --rescan-graphify` re-runs detection over\n"
+        "  every matched log, ignoring the cursor. Detection only (no call/credit\n"
+        "  re-ingest), idempotent by receipt id.",
+        ("cage/graphifytx.py", "cage/importcmd.py", "cage/transcript.py",
+         "cage/doctorcmd.py", "docs/adr/0009-kiro-cli-tool-run-bodies-read-transiently-never-persisted.md",
+         "docs/research/2026-08-07-graphify-store-evidence.md"),
+        "n/a — describes which routes exist, not a number.",
+        kind="concept", plan_ref="§4.5"),
+    Explanation(
         # NB: keywords avoid the bare "wiring"/"stale"/"dead" stems already owned by
         # `stale-wiring` — this entry is about the ITEMIZED VIEW, not the detection.
         "wiring-inventory", ("wiring-inventory", "inventory", "installed-artifact",

@@ -363,6 +363,23 @@ def missing_path_globs(args, targets, pol: dict | None) -> list[str]:
             if a in agents.SURFACES and not paths.path_globs_for(a, pol)]
 
 
+def graphify_scan_set(args, src, pattern, files: list[Path]) -> list[Path]:
+    """The files **graphify detection** walks: normally the ones this sweep ingested (so
+    detection inherits the incremental cursor), but the source's **full match set** under
+    `cage import --rescan-graphify`.
+
+    Why the flag has to exist: the cursor is keyed on `(size, mtime)` and a log that has
+    not changed is skipped — correct for calls, wrong for savings. A route that ships
+    *after* a session was ingested can never see that session again, so every graphify run
+    before the route existed is permanently invisible. That is exactly what happened to
+    copilot VS Code (skipped through v0.46) and kiro (no route at all). Detection is
+    idempotent by receipt id, so a rescan is safe to re-run; it re-ingests **no** call or
+    credit rows, because it only ever feeds the graphify detectors."""
+    if not getattr(args, "rescan_graphify", False):
+        return files
+    return glob_source(src, pattern)
+
+
 def import_claude(root: Path, args, *, pol: dict | None = None, seen: set | None = None,
                   agent_cursor: dict | None = None, health: dict | None = None,
                   collect: list | None = None, import_id: str = "",
@@ -401,7 +418,8 @@ def import_claude(root: Path, args, *, pol: dict | None = None, seen: set | None
                               _surface_restamp(lambda f: transcript.parse_calls(
                                   f, session=f.stem, root=root, pol=pol), surface),
                               pol=pol, seen=seen, agent_cursor=agent_cursor, collect=collect, import_id=import_id)
-        _detect_graphify(root, files, gfx_ids, pol)
+        _detect_graphify(root, graphify_scan_set(args, src, pattern, files),
+                         gfx_ids, pol)
         # The authorship pass reads the source's FULL match set, not `files`: the call
         # cursor skips an unchanged transcript, and a session's last edits are almost
         # always committed after its transcript stops growing — so gating authorship on
@@ -460,7 +478,8 @@ def _surface_restamp(parse, surface: str):
 
 
 def _ingest_credits(root: Path, name: str, src: Path, files: list[Path], *,
-                    pol: dict | None = None, agent_cursor: dict | None = None) -> int:
+                    pol: dict | None = None, agent_cursor: dict | None = None,
+                    graphify_files: list[Path] | None = None) -> int:
     """Parse Kiro-CLI SQLite files into *credits* rows and append the ones not already
     recorded. Credits are their own ledger kind (`credits-<month>.jsonl`) with their own
     id namespace (`k_cred…`), so they never touch the call-id `seen` set or any call view.
@@ -491,9 +510,38 @@ def _ingest_credits(root: Path, name: str, src: Path, files: list[Path], *,
                     agent_cursor[str(f)] = sig
         except Exception as e:  # fail-open: an unreadable DB never aborts the sweep
             debuglog.exception(root, "import.credits", e, pol=pol, agent=name, file=str(f))
+    _detect_graphify_kiro_cli(root, files if graphify_files is None else graphify_files,
+                              workspace, pol)
     debuglog.event(root, pol=pol, event="import", agent=name, result="ok", src=str(src),
                    files=len(files), kind="credits", appended=total)
     return total
+
+
+def _detect_graphify_kiro_cli(root: Path, files: list[Path], workspace: str,
+                              pol: dict | None) -> None:
+    """GFX-COV/P2: graphify detection over the kiro-CLI store this sweep just read.
+
+    Hung off the credits leg deliberately — that leg has already resolved the one thing
+    the route must not decide for itself: **which sink and which tree**. Receipts land in
+    the same `root` the credit rows did, scoped by the same ``workspace``, so a project
+    sweep and a machine sweep each keep their own rows (ADR 0006) with no second resolver.
+    Fail-open per file; the savings-id snapshot is rebuilt here for the same reason the
+    claude and copilot legs rebuild theirs."""
+    from cage import graphifytx
+    try:
+        gfx_ids = {r.get("id") for r in ledger.receipts(root) if r.get("tool") == "graphify"}
+    except Exception as e:  # noqa: BLE001 — never break capture over the savings snapshot
+        debuglog.exception(root, "import.graphify-snapshot", e, pol=pol)
+        gfx_ids = set()
+    for f in files:
+        try:
+            counts = graphifytx.detect_and_file_kiro_cli(root, f, workspace=workspace,
+                                                         existing_ids=gfx_ids, pol=pol)
+            if counts["query"] or counts["report_read"] or counts["deferred"]:
+                debuglog.event(root, pol=pol, event="graphify-tx", agent="kiro",
+                               surface="cli", file=str(f), **counts)
+        except Exception as e:  # noqa: BLE001 — detection is best-effort, never a gate
+            debuglog.exception(root, "import.graphify-tx.kiro-cli", e, pol=pol, file=str(f))
 
 
 def import_custom_tools(root: Path, args, *, pol: dict | None = None,
@@ -517,8 +565,9 @@ def import_custom_tools(root: Path, args, *, pol: dict | None = None,
             files = _scan(root, name, s.path, s.glob, getattr(args, "since", None),
                           pol=pol, agent_cursor=agent_cursor)
             if s.fmt == "kiro-cli":  # SQLite credits store — a distinct row kind, not calls
-                credit_rows += _ingest_credits(root, name, s.path, files,
-                                               pol=pol, agent_cursor=agent_cursor)
+                credit_rows += _ingest_credits(
+                    root, name, s.path, files, pol=pol, agent_cursor=agent_cursor,
+                    graphify_files=graphify_scan_set(args, s.path, s.glob, files))
                 m += len(files)
                 continue
             base_parse = _PARSERS[s.fmt]
@@ -579,28 +628,35 @@ def import_copilot(root: Path, args, *, pol: dict | None = None, seen: set | Non
         total_rows += _ingest(root, "copilot", src, files,
                               _surface_restamp(_parse_copilot_any, surface),
                               pol=pol, seen=seen, agent_cursor=agent_cursor, collect=collect, import_id=import_id)
-        _detect_graphify_copilot(root, files, gfx_ids, pol)
+        _detect_graphify_copilot(root, graphify_scan_set(args, src, pattern, files),
+                                 gfx_ids, pol)
         total_files += len(files)
     return total_rows, total_files
 
 
 def _detect_graphify_copilot(root: Path, files: list[Path], gfx_ids: set,
                              pol: dict | None) -> None:
-    """F1: GC2 transcript-side graphify detection over copilot **CLI** `events.jsonl`
-    (command + result fidelity), reusing the claude counterfactual/id/deferral via
-    `graphifytx.detect_and_file_copilot`. The VS Code `chatSessions` store is skipped —
-    it carries the command but no tool result (F2), so it can size no query counterfactual
-    (usage row without a receipt, never a fabricated saving). Fail-open per file."""
+    """F1 + GFX-COV/P1: GC2 transcript-side graphify detection over **both** copilot
+    stores, reusing the claude counterfactual/id/deferral in either case.
+
+    Dispatch is on the on-disk store, the same split `_parse_copilot_any` makes: a
+    `chatSessions/` file is the VS Code extension's patch stream, everything else is the
+    CLI `events.jsonl`. The VS Code store was skipped outright through v0.46 on the F2
+    assumption that it carried no tool result — **the 2026-08-07 field probe disproved
+    that** (`run_in_terminal` persists the command, the cwd and the output; see
+    `graphifytx.detect_and_file_copilot_vscode`), so it now files like every other route.
+    Fail-open per file."""
     from cage import graphifytx
     for f in files:
-        if f.parent.name == "chatSessions":   # VS Code store — F2: no result, no receipt
-            continue
+        vscode = f.parent.name == "chatSessions"
+        detect = (graphifytx.detect_and_file_copilot_vscode if vscode
+                  else graphifytx.detect_and_file_copilot)
         try:
-            counts = graphifytx.detect_and_file_copilot(root, f, session=f.parent.name,
-                                                        existing_ids=gfx_ids, pol=pol)
+            counts = detect(root, f, session=f.stem if vscode else f.parent.name,
+                            existing_ids=gfx_ids, pol=pol)
             if counts["query"] or counts["report_read"] or counts["deferred"]:
                 debuglog.event(root, pol=pol, event="graphify-tx", agent="copilot",
-                               file=str(f), **counts)
+                               surface="vscode" if vscode else "cli", file=str(f), **counts)
         except Exception as e:  # noqa: BLE001 — detection is best-effort, never a gate
             debuglog.exception(root, "import.graphify-tx.copilot", e, pol=pol, file=str(f))
 

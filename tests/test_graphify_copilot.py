@@ -119,3 +119,89 @@ def test_copilot_shim_then_transcript_one_receipt(proj, monkeypatch):
     counts = graphifytx.detect_and_file_copilot(proj, ev, session="sess", existing_ids=_gfx_ids(proj))
     assert counts["deferred"] == 1
     assert len(_receipts(proj)) == 1        # still exactly one — converged across routes
+
+
+# ── GFX-COV/P3: the cursor-blind backfill (`cage import --rescan-graphify`) ──
+
+def test_rescan_graphify_backfills_a_cursor_consumed_session(proj, monkeypatch):
+    """The defect this flag exists for: the import cursor is keyed on (size, mtime) and
+    skips an unchanged log — right for calls, wrong for savings. A route that ships AFTER
+    a session was ingested can otherwise never see that session again, which is exactly
+    how copilot VS Code and kiro stayed dark. A rescan walks the full match set."""
+    from cage import clicmds, importcmd
+    from tests.srcseed import mkcage
+    mkcage(proj)
+    (proj / "store.py").write_text("x = 1\n" * 400)
+    answer = "NODE store [src=store.py loc=L1 community=0]\n"
+    home = proj / "copilot-home"
+    _write_events(home / "session-state" / "sess",
+                  _events(str(proj), 'graphify query "x"', answer))
+    for env in ("CLAUDE_CONFIG_DIR", "KIRO_DATA_DIR", "CAGE_VSCODE_USER"):
+        monkeypatch.setenv(env, str(proj / f"home-{env.lower()}"))
+    monkeypatch.setenv("COPILOT_HOME", str(home))
+    monkeypatch.chdir(proj)
+
+    def run(rescan: bool) -> int:
+        args = type("A", (), {"agent": "copilot", "since": None, "path": None,
+                              "project": None, "ledger": None, "quiet": True,
+                              "no_import": False, "rescan_graphify": rescan})()
+        assert clicmds.cmd_import(args) == 0
+        return len(_receipts(proj))
+
+    assert run(False) == 1                     # first sweep files the receipt
+    # Delete the receipt shards and re-import: the cursor now skips the file entirely,
+    # so an ordinary sweep cannot refile it — the exact hole the flag closes.
+    for shard in (proj / ".cage" / "ledger").rglob("savings-*.jsonl"):
+        shard.unlink()
+    assert _receipts(proj) == []
+    assert run(False) == 0                     # cursor-blind: an ordinary sweep is blind
+    assert run(True) == 1                      # the rescan reaches it
+    assert run(True) == 1                      # and is idempotent
+
+
+def test_rescan_graphify_reingests_no_call_rows(proj, monkeypatch):
+    """Detection only: the flag must never turn into a second call-ingest path."""
+    from cage import clicmds, ledger as _ledger
+    from tests.srcseed import mkcage
+    mkcage(proj)
+    (proj / "store.py").write_text("x = 1\n" * 400)
+    home = proj / "copilot-home"
+    _write_events(home / "session-state" / "sess",
+                  _events(str(proj), 'graphify query "x"',
+                          "NODE store [src=store.py loc=L1 community=0]\n"))
+    for env in ("CLAUDE_CONFIG_DIR", "KIRO_DATA_DIR", "CAGE_VSCODE_USER"):
+        monkeypatch.setenv(env, str(proj / f"home-{env.lower()}"))
+    monkeypatch.setenv("COPILOT_HOME", str(home))
+    monkeypatch.chdir(proj)
+    base = type("A", (), {"agent": "copilot", "since": None, "path": None, "project": None,
+                          "ledger": None, "quiet": True, "no_import": False,
+                          "rescan_graphify": False})()
+    clicmds.cmd_import(base)
+    calls_before = [c["id"] for c in _ledger.calls(proj)]
+    rescan = type("A", (), {**{k: getattr(base, k) for k in
+                               ("agent", "since", "path", "project", "ledger", "quiet",
+                                "no_import")}, "rescan_graphify": True})()
+    clicmds.cmd_import(rescan)
+    assert [c["id"] for c in _ledger.calls(proj)] == calls_before
+
+
+# ── GFX-COV/P3: the coverage table is ONE table, and every gap is named ─────
+
+def test_every_agent_surface_is_named_in_the_coverage_table():
+    """A surface missing from the table is a silent zero — the failure this whole pair
+    exists to end. Every agent in the product invariant must appear."""
+    from cage import agents
+    named = {row[0] for row in graphifytx.GRAPHIFY_COVERAGE}
+    assert set(agents.SURFACES) <= named
+
+
+def test_a_gap_is_worded_identically_in_doctor_and_the_explainer():
+    """One table, two readers. If a future change re-derives either side, a gap starts
+    being described two different ways and one of them goes stale silently."""
+    from cage import doctorcmd, explain
+    gap = next(row for row in graphifytx.GRAPHIFY_COVERAGE if not row[2])
+    _, detail = doctorcmd._graphify_coverage()
+    from cage import policy
+    body = explain.render(explain.match("graphify-coverage")[0], policy.load(None))
+    for text in (detail, body):
+        assert gap[3].split(" — ")[0][:60] in text

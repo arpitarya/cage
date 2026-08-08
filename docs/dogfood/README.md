@@ -33,3 +33,13 @@ the exact gate and the `CAGE_SKIP_DOGFOOD_FRESHNESS=1` bisect escape hatch.
 | [2026-08-02](2026-08-02.md) | `$9,921.4588` total (52,179 calls, 71% from cache reads); `attrib` has no real task-tagged data yet on this machine (only the `cage demo` seed) — omitted rather than faked; adoption shows 100% agent-attributable savings coverage, claude the only agent with attributed savings rows. |
 
 Latest always at [`latest.md`](latest.md).
+
+## Single-question deep-dives (not part of the report/adoption ritual)
+
+Named `<date>-<topic>.md` — outside the freshness gate (`test_dogfood_freshness.py`
+only scans pure `<date>.md` filenames), so these don't have to be refreshed on the
+60-day cadence and don't compete with `latest.md` for "the" snapshot.
+
+| date | topic | headline |
+|------|-------|----------|
+| [2026-08-03-authorship](2026-08-03-authorship.md) | authorship reconciliation (project ledger) | `cage authorship summary` shows 72% UNKNOWN (83/115 commits) because capture only started 2026-08-02, not because most commits aren't agent-authored; a fresh cursor-free re-scan of the same on-disk transcripts recovers 69 commits (60%) vs the live ledger's 32 (28%) — 41 commits are backfillable today, pointing at a cursor-freeze gap in `authorcapture.py` worth fixing. |

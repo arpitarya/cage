@@ -228,7 +228,7 @@ cage data export --csv calls --since 30d -o calls.csv   # raw ledger rows for a 
 
 ## The `$0` guarantee
 
-Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 1462 tests; `cage demo` reproduces the worked attribution example against a real ledger.
+Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 1500 tests; `cage demo` reproduces the worked attribution example against a real ledger.
 
 **Honest limits.** Marginal-by-fixed-order is defensible and `$0`, but it is an *ordering convention*, not a Shapley value (that's a deferred audit mode). And a counterfactual cell is an honest reconstruction, never an invoice — the `method` column says so on every row, on purpose.
 
@@ -236,7 +236,7 @@ Every derived view is parse / arithmetic over the log — **no LLM call, ever, o
 
 Latest release below — full history and detail in [CHANGELOG.md](CHANGELOG.md).
 
-- **v0.46.1 (2026-08-03) — CI green again.** The `build` job had been red on all nine legs since v0.45.0: scenario S18 asserted the *pre-hookless* heal, re-reading a settings file that cage correctly **removes** once its own entry is stripped. The harness now asserts that removal; no product code changed. (v0.46.0 shipped `agent%` on `cage insights chats` — see [CHANGELOG.md](CHANGELOG.md).)
+- **v0.47.0 (2026-08-07) — graphify savings now file from copilot VS Code and kiro.** The VS Code store was skipped on a belief that it carried no tool result; a probe of 1,132 real terminal runs disproved it. kiro CLI gains a route too — and refuses honestly when kiro truncates the answer it would have measured. `cage import --rescan-graphify` backfills sessions the cursor already consumed.
 
 ## The name
 
