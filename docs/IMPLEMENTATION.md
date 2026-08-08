@@ -16,6 +16,34 @@ Entry format:
 
 ---
 
+## 2026-08-08 — v0.47.1: the Windows break, and the reason it shipped
+
+- **v0.47.0's `build` job went red on both Windows legs** (26 failures). Every POSIX leg
+  and all three graphify legs were green. Two distinct faults:
+  1. **Product.** `graphifytx._repo_of` gated on `startswith("/")`. A Windows path is
+     `C:/…`, so it returned `""`, the graph resolved against the process CWD instead of the
+     repo, and the **copilot VS Code report-read route filed nothing on Windows** — no
+     error, just an absent receipt, which is indistinguishable from "graphify never ran".
+     Now matches `^(/|[A-Za-z]:/)`. **`Path.is_absolute()` is deliberately not used**: on
+     POSIX it calls `C:/x` relative and on Windows it calls `/tmp/x` relative (no drive),
+     so each OS would reject exactly the form the other produces.
+  2. **Harness.** The new fixture tests substituted `str(tmp_path)` into **raw JSON text**;
+     on Windows its backslashes are invalid JSON escapes ⇒ 26 `JSONDecodeError`s. Moved to
+     `tests/gfxfixture` — parse first, substitute in parsed strings, re-serialize.
+- **Why it shipped, which is the part worth keeping:** both faults were Windows-only and
+  every test that could have caught them was **also** Windows-only. The two new regression
+  tests run on **every** OS by construction (one asserts `_repo_of` against both absolute
+  conventions, one round-trips a `C:\Users\…` root through the loader), so the POSIX legs
+  alone would now fail. **Verified by mutation:** restoring the v0.47.0 predicate makes the
+  new test fail on macOS.
+- A small joke on itself, kept as a comment: the new test's own docstring broke collection
+  because `\U` in a non-raw docstring is a unicode escape — the same class of bug.
+- Files: `cage/graphifytx.py` · `tests/gfxfixture.py` (new) · `tests/test_graphify_vscode.py`
+  (+2) · `tests/test_graphify_kiro.py` · `cage/__init__.py` · `CHANGELOG.md` · `README.md` ·
+  `CLAUDE.md` · `tests/fixtures/goldens/P1.txt` (version line).
+- Tests: **green, 1502 passed / 11 skipped** (1500 → 1502).
+- Next: push, tag v0.47.1, release; confirm both Windows legs green.
+
 ## 2026-08-08 — GFX-COV field run: copilot VS Code verified; the capture earned two tests
 
 - **Verified on a real Copilot Agent chat:** one terminal `graphify query` filed a receipt

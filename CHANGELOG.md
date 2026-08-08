@@ -2,6 +2,38 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
+## v0.47.1 (2026-08-08) — Windows: the VS Code report-read route filed nothing
+
+**v0.47.0's `build` job went red on both Windows legs** (26 failures; every POSIX leg and
+all three graphify legs were green). Two distinct bugs, one of them a real product defect
+that would have been silent for Windows users.
+
+### Fixed
+
+- **`graphifytx._repo_of` rejected every Windows path.** It gated on `startswith("/")`, but
+  a Windows path is `C:/…`, so it returned `""` — the graph then resolved against the
+  process CWD instead of the repo, and **the copilot VS Code report-read route filed
+  nothing on Windows**. No error, no warning; just an absent receipt, which is
+  indistinguishable from "graphify was never used". It now accepts both conventions.
+  `Path.is_absolute()` is deliberately *not* used: on POSIX it calls `C:/x` relative, and
+  on Windows it calls `/tmp/x` relative (no drive), so each OS would reject exactly the
+  form the other produces.
+- **The new fixture tests substituted a temp path into raw JSON text.** On Windows
+  `str(tmp_path)` is `C:\Users\…`, whose backslashes become invalid escapes inside a JSON
+  string literal — hence 26 `JSONDecodeError`s. Fixture loading moved to
+  `tests/gfxfixture`, which parses first and re-serializes, so a path separator can never
+  reach a JSON literal unescaped again.
+
+### The gap that let it ship
+
+Both faults were **Windows-only**, and every test that could have caught them was itself
+Windows-only. The two new regression tests run on **every** OS by construction — one
+asserts `_repo_of` against both absolute conventions directly, the other round-trips a
+`C:\Users\…` root through the loader — so the POSIX legs alone would now fail. Verified by
+mutation: restoring the v0.47.0 predicate makes the new test fail on macOS.
+
+No behaviour change on POSIX; no schema, id or pricing change. Suite **1500 → 1502**.
+
 ## v0.47.0 (2026-08-07) — graphify savings now file from copilot VS Code and kiro
 
 **The graphify savings ledger was dark on two of three agents, and the reason was an

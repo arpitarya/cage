@@ -23,9 +23,9 @@ import pytest
 from cage import graphifymeter, graphifytx, ledger
 from cage.constants import (GRAPHIFY_RECEIPT_CONFIDENCE,
                             GRAPHIFY_REPORT_READ_CONFIDENCE)
+from tests.gfxfixture import PLACEHOLDER, dump_jsonl, load_jsonl
 
 FIXTURES = Path(__file__).parent / "fixtures" / "transcripts" / "graphify" / "copilot-vscode"
-PLACEHOLDER = "/tmp/gfxrepo"
 # The graphify answer text the fixtures carry — cited files must exist for a counterfactual.
 CITED = ("cage/ledger.py", "cage/graphifytx.py")
 
@@ -44,11 +44,11 @@ def proj(tmp_path, monkeypatch):
 def _plant(name: str, proj: Path) -> Path:
     """Copy a fixture into a real `workspaceStorage/<hash>/chatSessions/` layout with the
     placeholder repo root rewritten to this test's tmp dir."""
-    raw = (FIXTURES / name).read_text(encoding="utf-8").replace(PLACEHOLDER, str(proj))
+    lines = load_jsonl(FIXTURES / name, proj)
     dst = proj / "vscode-user" / "workspaceStorage" / "hash1" / "chatSessions"
     dst.mkdir(parents=True, exist_ok=True)
-    out = dst / (json.loads(raw.splitlines()[0])["v"]["sessionId"] + ".jsonl")
-    out.write_text(raw)
+    out = dst / (lines[0]["v"]["sessionId"] + ".jsonl")
+    out.write_text(dump_jsonl(lines), encoding="utf-8")
     return out
 
 
@@ -67,8 +67,7 @@ def _detect(proj: Path, path: Path, session: str = "s") -> dict:
 
 def _fixture_lines(proj: Path) -> list[dict]:
     """The real capture's records, repo root rewritten, ready to mutate per test."""
-    raw = (FIXTURES / "chatSession-graphify.jsonl").read_text(encoding="utf-8")
-    return [json.loads(x) for x in raw.replace(PLACEHOLDER, str(proj)).splitlines()]
+    return load_jsonl(FIXTURES / "chatSession-graphify.jsonl", proj)
 
 
 def _terminal_part(proj: Path) -> dict:
@@ -119,7 +118,7 @@ def test_the_session_id_comes_from_the_store_not_the_filename(proj):
     not depend on what the caller happened to pass."""
     path = _plant("chatSession-graphify.jsonl", proj)
     _detect(proj, path, session="whatever-the-caller-said")
-    declared = json.loads(path.read_text().splitlines()[0])["v"]["sessionId"]
+    declared = json.loads(path.read_text(encoding="utf-8").splitlines()[0])["v"]["sessionId"]
     assert [r["session"] for r in _receipts(proj) if r["op"] == "query"] == [declared]
 
 
@@ -140,7 +139,7 @@ def test_all_three_part_carriers_are_walked(proj):
 
     for i in range(3):
         p = proj / f"carrier{i}.jsonl"
-        p.write_text("\n".join(json.dumps(x) for x in carriers(f"c{i}")[i]) + "\n")
+        p.write_text(dump_jsonl(carriers(f"c{i}")[i]), encoding="utf-8")
         assert _detect(proj, p, session=f"c{i}")["query"] == 1, f"carrier {i} was not walked"
 
 
@@ -158,10 +157,10 @@ def test_the_real_agent_command_shape_is_a_cd_prefix(proj):
                 f"cd {proj} && echo graphify query x"):
         p = _one_terminal(proj, f"neg{abs(hash(cmd))}.jsonl", result=None,
                           buffer="NODE ledger [src=cage/ledger.py loc=L1 community=0]\n")
-        lines = [json.loads(x) for x in p.read_text().splitlines()]
+        lines = [json.loads(x) for x in p.read_text(encoding="utf-8").splitlines()]
         lines[0]["v"]["requests"][0]["response"][0]["toolSpecificData"]["commandLine"] = {
             "original": cmd, "toolEdited": cmd}
-        p.write_text("\n".join(json.dumps(x) for x in lines) + "\n")
+        p.write_text(dump_jsonl(lines), encoding="utf-8")
         assert _detect(proj, p)["query"] == 0, cmd
 
 
@@ -199,7 +198,7 @@ def test_a_missing_terminal_state_files_nothing(proj):
     lines = _fixture_lines(proj)
     lines[2]["v"][0]["response"][0]["toolSpecificData"]["terminalCommandState"] = None
     p = proj / "nostate.jsonl"
-    p.write_text("\n".join(json.dumps(x) for x in lines) + "\n")
+    p.write_text(dump_jsonl(lines), encoding="utf-8")
     assert _detect(proj, p)["query"] == 0
     assert [r for r in _receipts(proj) if r["op"] == "query"] == []
 
@@ -214,8 +213,46 @@ def test_no_marker_string_is_matched_so_lint_output_is_not_a_false_positive(proj
               "  = note: `-D clippy::cast-possible-truncation` implied by `-D warnings`\n")
     part["toolSpecificData"]["terminalCommandOutput"]["text"] += poison
     p = proj / "lint.jsonl"
-    p.write_text("\n".join(json.dumps(x) for x in lines) + "\n")
+    p.write_text(dump_jsonl(lines), encoding="utf-8")
     assert _detect(proj, p)["query"] == 1
+
+
+# ── cross-OS: the v0.47.0 Windows break, pinned so it cannot recur ──────────
+
+def test_repo_of_accepts_both_absolute_conventions_on_every_os():
+    r"""v0.47.0 shipped `_repo_of` gated on `startswith("/")`. On Windows every path is
+    `C:/…`, so it returned `""`, the graph resolved against the process CWD instead of the
+    repo, and **the report-read route silently filed nothing** — no error, just an absent
+    receipt. CI caught it only on the Windows legs.
+
+    This runs on every OS by construction, so the POSIX legs alone would now catch it.
+    `Path.is_absolute()` is deliberately not used: on POSIX it calls `C:/x` relative, and
+    on Windows it calls `/tmp/x` relative (no drive) — each OS would reject exactly the
+    form the other produces."""
+    assert graphifytx._repo_of("/repo/graphify-out/GRAPH_REPORT.md") == "/repo"
+    assert graphifytx._repo_of(r"C:\Users\x\repo\graphify-out\GRAPH_REPORT.md") == "C:/Users/x/repo"
+    assert graphifytx._repo_of("C:/Users/x/repo/graphify-out/wiki/index.md") == "C:/Users/x/repo"
+    # mixed separators, which is what a Windows store plus a POSIX-shaped fixture produces
+    assert graphifytx._repo_of(r"C:\Users\x/graphify-out/GRAPH_REPORT.md") == "C:/Users/x"
+    # still refuses a relative path — the CWD fallback is the caller's, not invented here
+    assert graphifytx._repo_of("repo/graphify-out/GRAPH_REPORT.md") == ""
+    assert graphifytx._repo_of("/repo/no-graph-here.md") == ""
+
+
+def test_a_windows_shaped_root_round_trips_through_the_fixture_loader(tmp_path):
+    r"""The other half of the v0.47.0 Windows break: the tests substituted `str(tmp_path)`
+    into **raw JSON text**, so a `C:\Users\…` root injected invalid `\U` escapes and 26
+    fixture-driven tests died with `JSONDecodeError`. `tests/gfxfixture` parses first and
+    re-serializes, so the separator can never reach a JSON literal unescaped.
+
+    (This docstring is raw for the same reason: `\U` in a plain docstring is a unicode
+    escape, and writing it unescaped broke collection of this very file.)"""
+    from tests.gfxfixture import _sub, dump_jsonl
+    src = [{"kind": 0, "v": {"cwd": f"{PLACEHOLDER}/graphify-out",
+                             "cmd": f'graphify query "x" # {PLACEHOLDER}'}}]
+    win = r"C:\Users\x\AppData\Local\Temp\pytest-0"
+    out = dump_jsonl([_sub(r, win) for r in src])
+    assert json.loads(out.strip())["v"]["cwd"] == win + "/graphify-out"   # parses cleanly
 
 
 # ── carrier precedence (P0 verdict A) ───────────────────────────────────────
@@ -233,8 +270,8 @@ def _one_terminal(proj: Path, name: str, *, result: str | None, buffer: str | No
         part["resultDetails"] = {"input": "", "isError": False,
                                  "output": [{"type": "text", "isText": True, "value": result}]}
     p = proj / name
-    p.write_text(json.dumps({"kind": 0, "v": {"sessionId": name, "requests": [
-        {"requestId": "r", "response": [part]}]}}) + "\n")
+    p.write_text(dump_jsonl([{"kind": 0, "v": {"sessionId": name, "requests": [
+        {"requestId": "r", "response": [part]}]}}]), encoding="utf-8")
     return p
 
 

@@ -352,15 +352,26 @@ def _vscode_terminal_answer(data: dict) -> str | None:
     return None
 
 
+_ABS = re.compile(r"^(/|[A-Za-z]:/)")   # POSIX root OR a Windows drive — both, on either OS
+
+
 def _repo_of(fp: str) -> str:
     """The repo root implied by an **absolute** report/wiki path — everything above the
     `graphify-out/` segment. The claude route reads a `cwd` off each transcript record;
     a VS Code `copilot_readFile` part carries no cwd, but its `uris[].path` is absolute,
     so the root the graph must resolve against is recoverable from the path itself.
-    ``""`` for a relative path (the caller's CWD fallback then applies, as before)."""
+    ``""`` for a relative path (the caller's CWD fallback then applies, as before).
+
+    **Absolute means both conventions, and this must not be narrowed to `startswith("/")`.**
+    It was, in v0.47.0, and the consequence was silent: on Windows every path is `C:/…`,
+    so the head never matched, `_repo_of` returned ``""``, the graph resolved against the
+    process CWD instead of the repo, and **the VS Code report-read route filed nothing** —
+    no error, just a missing receipt. `Path.is_absolute()` is not a substitute: on POSIX it
+    calls `C:/x` relative, and on Windows it calls `/tmp/x` relative (no drive), so each OS
+    would reject exactly the form the other produces. Fixed in v0.47.1."""
     norm = (fp or "").replace("\\", "/")
     head, sep, _ = norm.partition("graphify-out/")
-    if not sep or not head.startswith("/"):
+    if not sep or not _ABS.match(head):
         return ""
     return head.rstrip("/") or "/"
 

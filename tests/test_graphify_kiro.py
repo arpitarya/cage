@@ -20,9 +20,9 @@ import pytest
 from cage import graphifymeter, graphifytx, ledger, transcript
 from cage.constants import (GRAPHIFY_RECEIPT_CONFIDENCE,
                             GRAPHIFY_REPORT_READ_CONFIDENCE)
+from tests.gfxfixture import PLACEHOLDER, load_json
 
 FIXTURES = Path(__file__).parent / "fixtures" / "transcripts" / "graphify" / "kiro-cli"
-PLACEHOLDER = "/tmp/gfxrepo"
 CITED = ("cage/ledger.py", "cage/graphifytx.py")
 
 
@@ -44,10 +44,10 @@ def _db(proj: Path, *fixtures: str, key: str | None = None) -> Path:
     con.execute("CREATE TABLE IF NOT EXISTS conversations_v2 "
                 "(key TEXT, conversation_id TEXT, value TEXT, created_at INT, updated_at INT)")
     for name in fixtures:
-        raw = (FIXTURES / name).read_text(encoding="utf-8").replace(PLACEHOLDER, str(proj))
-        doc = json.loads(raw)
+        doc = load_json(FIXTURES / name, proj)
         con.execute("INSERT INTO conversations_v2 VALUES (?,?,?,?,?)",
-                    (key if key is not None else str(proj), doc["conversation_id"], raw, 0, 0))
+                    (key if key is not None else str(proj), doc["conversation_id"],
+                     json.dumps(doc), 0, 0))
     con.commit()
     con.close()
     return path
@@ -117,8 +117,7 @@ def test_the_truncation_marker_is_anchored_not_a_substring(proj):
     """The false positive the VS Code corpus actually produced: a command whose OWN
     output discusses truncation (rust clippy's `cast_possible_truncation`) must still
     file. Matching the marker as a substring anywhere would have refused this."""
-    raw = json.loads((FIXTURES / "conversation-graphify.json").read_text()
-                     .replace(PLACEHOLDER, str(proj)))
+    raw = load_json(FIXTURES / "conversation-graphify.json", proj)
     for entry in raw["history"]:
         content = (entry.get("user") or {}).get("content") or {}
         for res in (content.get("ToolUseResults") or {}).get("tool_use_results") or []:
@@ -138,8 +137,7 @@ def test_the_truncation_marker_is_anchored_not_a_substring(proj):
 
 
 def test_a_nonzero_exit_status_files_nothing(proj):
-    raw = json.loads((FIXTURES / "conversation-graphify.json").read_text()
-                     .replace(PLACEHOLDER, str(proj)))
+    raw = load_json(FIXTURES / "conversation-graphify.json", proj)
     for entry in raw["history"]:
         content = (entry.get("user") or {}).get("content") or {}
         for res in (content.get("ToolUseResults") or {}).get("tool_use_results") or []:
@@ -181,13 +179,12 @@ def test_workspace_scoping_excludes_another_projects_conversation(proj):
 # ── ADR 0005 acceptance tests, extended to kiro CLI ─────────────────────────
 
 def test_same_query_two_conversations_two_receipts(proj):
-    raw = (FIXTURES / "conversation-graphify.json").read_text().replace(PLACEHOLDER, str(proj))
     db = proj / "d.sqlite3"
     con = sqlite3.connect(db)
     con.execute("CREATE TABLE conversations_v2 "
                 "(key TEXT, conversation_id TEXT, value TEXT, created_at INT, updated_at INT)")
     for cid in ("conv-A", "conv-B"):
-        doc = json.loads(raw)
+        doc = load_json(FIXTURES / "conversation-graphify.json", proj)
         doc["conversation_id"] = cid
         con.execute("INSERT INTO conversations_v2 VALUES (?,?,?,?,?)",
                     (str(proj), cid, json.dumps(doc), 0, 0))
@@ -200,8 +197,7 @@ def test_shim_then_kiro_store_files_exactly_one_receipt(proj, monkeypatch):
     """Cross-route dedupe on kiro: the shim files live (session-empty id) and the store
     route recomputes that id and defers. `content_signature` is route-independent."""
     monkeypatch.chdir(proj)
-    doc = json.loads((FIXTURES / "conversation-graphify.json").read_text()
-                     .replace(PLACEHOLDER, str(proj)))
+    doc = load_json(FIXTURES / "conversation-graphify.json", proj)
     answer = next(blk["Json"]["stdout"]
                   for e in doc["history"]
                   for res in ((e.get("user") or {}).get("content") or {})

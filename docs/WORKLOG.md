@@ -12,6 +12,24 @@ by milestone) — the worklog is what *happened this session*.
 
 ---
 
+## 2026-08-08 — Claude Code — v0.47.0 released, then v0.47.1 for the Windows break
+
+- **Asked:** commit and release; patch if the build fails.
+- **Done:** released v0.47.0 (PyPI + pyz chain both green). The `build` job went red on
+  both Windows legs — 26 failures — so v0.47.1 fixes them and ships.
+- **The product bug was the scary kind: silent.** `_repo_of` gated on `startswith("/")`,
+  which no Windows path satisfies, so the VS Code report-read route filed **nothing** there
+  and looked exactly like "graphify was never used". That is the same silent-absence class
+  cage's whole coverage surface exists to end, reintroduced by me one release later.
+- **The lesson I'd want inherited:** *a Windows-only bug caught only by a Windows-only test
+  is a bug that ships.* Both regressions are now pinned by tests that run on every OS, and
+  I mutation-checked them — restoring the old predicate fails on macOS. If a fix is
+  platform-specific, make the *test* platform-agnostic or you have bought nothing.
+- Also: `open(p,"w").write(open(p).read()...)` truncated `cage/__init__.py` mid-bump —
+  the write handle opens before the read runs. Restored from git; read into a variable first.
+- **Open:** GFX-KIRO-RATE only.
+- **Next step:** confirm v0.47.1's Windows legs are green.
+
 ## 2026-08-08 — Claude Code — GFX-COV copilot VS Code field run (GFX-COV-FIELD closed)
 
 - **Asked:** VS Code field run done, proceed.
