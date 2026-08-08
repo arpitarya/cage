@@ -12,6 +12,23 @@ by milestone) — the worklog is what *happened this session*.
 
 ---
 
+## 2026-08-08 — Claude Code — v0.47.2: the Windows class, closed with a gate
+
+- **Asked:** (continuing) patch until the build is green.
+- **Done:** v0.47.1 cleared 25 of 26 Windows failures; v0.47.2 fixes the last one — the
+  same path-into-escaping-syntax bug in TOML instead of JSON — and adds a grep-gate so the
+  class cannot buy a third release. 1502 => 1503, no product code.
+- **What I'd want a successor to take from three releases in one day:** the *first* fix was
+  right and the *class* was not closed. Patching the instance I could see (JSON) left its
+  twin (TOML) live in the same file, and I only found it because CI ran again. **When a bug
+  is "a value crossing into a syntax that escapes", sweep every syntax before shipping** —
+  I did that sweep only after the second failure, and it took ten seconds.
+- **Second, smaller:** I nearly fixed it with a TOML literal string — correct, but a second
+  idiom for something the repo had already settled with `.as_posix()` in six tests. Search
+  before inventing, again.
+- **Open:** GFX-KIRO-RATE only.
+- **Next step:** confirm v0.47.2's Windows legs are green.
+
 ## 2026-08-08 — Claude Code — v0.47.0 released, then v0.47.1 for the Windows break
 
 - **Asked:** commit and release; patch if the build fails.

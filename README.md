@@ -228,7 +228,7 @@ cage data export --csv calls --since 30d -o calls.csv   # raw ledger rows for a 
 
 ## The `$0` guarantee
 
-Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 1502 tests; `cage demo` reproduces the worked attribution example against a real ledger.
+Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 1503 tests; `cage demo` reproduces the worked attribution example against a real ledger.
 
 **Honest limits.** Marginal-by-fixed-order is defensible and `$0`, but it is an *ordering convention*, not a Shapley value (that's a deferred audit mode). And a counterfactual cell is an honest reconstruction, never an invoice — the `method` column says so on every row, on purpose.
 
@@ -236,7 +236,7 @@ Every derived view is parse / arithmetic over the log — **no LLM call, ever, o
 
 Latest release below — full history and detail in [CHANGELOG.md](CHANGELOG.md).
 
-- **v0.47.1 (2026-08-08) — Windows fix.** v0.47.0's VS Code report-read route filed **nothing** on Windows: `_repo_of` gated on a leading `/`, which no `C:/…` path has, so it failed silently. Fixed, plus the fixture loader that broke 26 tests on Windows only — and both regressions are now pinned by tests that run on every OS. (v0.47.0 brought graphify savings to copilot VS Code and kiro — see [CHANGELOG.md](CHANGELOG.md).)
+- **v0.47.2 (2026-08-08) — Windows, finished.** The last failure was the same class as v0.47.1's one syntax layer over: a Windows path inside a TOML *basic* string, where `\U` is an escape. Fixed by using the `.as_posix()` convention six other tests already followed, plus a grep-gate so it can't buy a third release. (v0.47.0 brought graphify savings to copilot VS Code and kiro — see [CHANGELOG.md](CHANGELOG.md).)
 
 ## The name
 

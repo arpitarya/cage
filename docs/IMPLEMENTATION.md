@@ -16,6 +16,30 @@ Entry format:
 
 ---
 
+## 2026-08-08 — v0.47.2: the same Windows class, one syntax layer over
+
+- **v0.47.1 fixed 25 of 26.** The survivor was the *same* defect in TOML that v0.47.1 had
+  just fixed in JSON: the E2E kiro test wrote `paths = ["{proj / "data.sqlite3"}"]`, and on
+  Windows that is `C:\Users\…` inside a TOML **basic** string, where `\U` is an escape —
+  `tomllib` raises `Invalid hex value`, the source never resolves, the sweep files nothing.
+- **The fix was already the repo's convention**, not a new mechanism: `.as_posix()`, which
+  **six other `[sources]` tests here already use** and which is why they pass on Windows.
+  Mine was the only one in the suite not following it. (I had first written a TOML literal
+  string — correct, but a *second* idiom for a problem this repo had already ruled on.
+  INTERVIEW's "search before you invent" applied literally.)
+- **A grep-gate now closes the class:** `test_sources.py::test_no_test_writes_a_raw_path_
+  into_a_toml_basic_string`. Two things it taught while being written: its first pattern
+  had **the same blind spot as the bug** (a quote-excluding class skipped
+  `["{proj / "x"}"]`, the exact shipped form), and it flagged its own explanatory comment
+  until comment lines were skipped. Mutation-checked.
+- **The rule both patches share:** a filesystem path crossing into any escape-processing
+  syntax — JSON, a TOML basic string, a shell — needs an explicit conversion, never `str()`.
+- Files: `tests/test_graphify_kiro.py` · `tests/test_sources.py` (+1 gate) ·
+  `cage/__init__.py` · `CHANGELOG.md` · `README.md` · `CLAUDE.md` · goldens (version line).
+  **No product code changed in this release.**
+- Tests: **green, 1503 passed / 11 skipped**.
+- Next: confirm the Windows legs are green on v0.47.2.
+
 ## 2026-08-08 — v0.47.1: the Windows break, and the reason it shipped
 
 - **v0.47.0's `build` job went red on both Windows legs** (26 failures). Every POSIX leg

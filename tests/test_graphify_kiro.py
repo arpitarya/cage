@@ -265,9 +265,13 @@ def test_import_files_kiro_cli_receipts_into_the_sweeps_own_sink(proj, monkeypat
     _graph(proj)
     _db(proj, "conversation-graphify.json", "conversation-report-read.json")
     fp = paths.Footprint(proj)
+    # `.as_posix()` — the convention every other `[sources]` test here already uses, and
+    # the reason they pass on Windows. A raw `str(Path)` is `C:\Users\...`, and TOML
+    # *rejects* that inside a basic string (`\U` is an escape): `Invalid hex value`. This
+    # test was the only one in the suite not following the rule (v0.47.2).
     fp.policy.write_text(fp.policy.read_text(encoding="utf-8") + f'''
 [sources.kirocli]
-paths = ["{proj / "data.sqlite3"}"]
+paths = ["{(proj / "data.sqlite3").as_posix()}"]
 format = "kiro-cli"
 ''', encoding="utf-8")
     metering._policy_for.cache_clear()

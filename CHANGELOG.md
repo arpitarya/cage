@@ -2,6 +2,33 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
+## v0.47.2 (2026-08-08) — the same Windows class, one syntax layer over
+
+v0.47.1 fixed 25 of 26 Windows failures. The last one was **the same defect in TOML** that
+v0.47.1 had just fixed in JSON: `tests/test_graphify_kiro.py` wrote a `[sources]` path as
+`paths = ["{proj / "data.sqlite3"}"]`, and on Windows that is `C:\Users\…` inside a TOML
+**basic** string, where `\U` is an escape — `tomllib` raises `Invalid hex value`, so the
+source silently never resolves and the sweep files nothing.
+
+### Fixed
+
+- The E2E kiro test now uses **`.as_posix()`** — which is not a new idea, it is the
+  convention **six other `[sources]` tests here already follow**, and the reason they pass
+  on Windows. This test was the only one in the suite not following it.
+
+### Added — a gate, so this class cannot buy a third release
+
+- `tests/test_sources.py::test_no_test_writes_a_raw_path_into_a_toml_basic_string` greps
+  every test for a `[sources]` path interpolated into a TOML basic string without
+  `.as_posix()`. Mutation-checked: reintroducing the v0.47.1 spelling fails it on macOS.
+- Its first pattern had the same blind spot as the bug: a quote-excluding character class
+  skipped `paths = ["{proj / "data.sqlite3"}"]` — the exact form that shipped — so it is
+  non-greedy now.
+
+**The rule the two patches share, stated once:** *a filesystem path crossing into any
+escape-processing syntax — JSON, a TOML basic string, a shell — needs an explicit
+conversion, never `str()`.* Product code is untouched in this release. Suite **1502 → 1503**.
+
 ## v0.47.1 (2026-08-08) — Windows: the VS Code report-read route filed nothing
 
 **v0.47.0's `build` job went red on both Windows legs** (26 failures; every POSIX leg and

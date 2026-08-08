@@ -466,3 +466,36 @@ def test_sources_drift_reports_missing_and_in_sync(monkeypatch, tmp_path):
     partial = {"sources": {"claude": full["sources"]["claude"]}}  # only claude declared
     missing, _ = paths.sources_drift(partial)
     assert any(m.startswith("copilot") for m in missing)  # copilot default is missing
+
+
+def test_no_test_writes_a_raw_path_into_a_toml_basic_string():
+    """Grep-gate (v0.47.2): a `[sources]` path written as `"{some_path}"` **must** go
+    through `.as_posix()`.
+
+    On Windows `str(Path)` is `C:\\Users\\…`, and TOML treats `\\U` inside a basic string as
+    an escape — `tomllib` raises `Invalid hex value` and the source silently never
+    resolves. Six tests here already followed the rule; `test_graphify_kiro` did not, and
+    it cost a release (v0.47.1 → v0.47.2) after the same class had *already* cost one
+    (v0.47.0 → v0.47.1, a path substituted into raw JSON).
+
+    The rule generalises: **a filesystem path crossing into any escape-processing syntax
+    — JSON, TOML basic strings, shell — needs an explicit conversion, never `str()`.**
+    """
+    import re
+    from pathlib import Path as _P
+    bad = []
+    # non-greedy `.+?`, NOT `[^}"]+`: the form that actually shipped the bug was
+    # `paths = ["{proj / "data.sqlite3"}"]` — it contains inner quotes, so a
+    # quote-excluding class silently skips the one case this gate exists for.
+    pat = re.compile(r'(?:paths?\s*=\s*\[?)"\{(.+?)\}"')
+    for f in sorted((_P(__file__).parent).glob("test_*.py")):
+        for i, line in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):
+            if line.lstrip().startswith("#"):
+                continue          # prose about the rule is not a violation of it
+            for m in pat.finditer(line):
+                expr = m.group(1)
+                if ".as_posix()" not in expr:
+                    bad.append(f"{f.name}:{i}: {expr}")
+    assert not bad, (
+        "TOML path(s) written without `.as_posix()` — these break on Windows:\n  "
+        + "\n  ".join(bad))
