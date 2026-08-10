@@ -16,7 +16,7 @@ import hashlib
 import json
 import os
 import sqlite3
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from cage import schema
 
@@ -583,6 +583,73 @@ def _epoch_ms_iso(ms) -> str | None:
         return None
 
 
+def _uri_basename(uri: str) -> str:
+    """The basename of a `file://` URI (or a plain path), percent-decoded.
+
+    Percent-decoding is not cosmetic: VS Code stores `file:///Users/x/my%20project`, and
+    without it the stamped `project` is `my%20project` — which matches nothing a
+    `--project` filter or a commit join would ever look for. Windows drive URIs
+    (`file:///c%3A/...`) decode through the same path."""
+    from urllib.parse import unquote, urlparse
+    if not uri:
+        return ""
+    raw = uri
+    if "://" in raw:
+        parsed = urlparse(raw)
+        raw = parsed.path or ""
+    raw = unquote(raw).rstrip("/\\")
+    if not raw:
+        return ""
+    return PurePosixPath(raw.replace("\\", "/")).name
+
+
+def _vscode_project(chat_session_path: Path, first_cwd: str) -> str:
+    """The project basename for a whole VS Code chat-session file, or ``""``.
+
+    **The closest precedent is kiro CLI, not claude** — and getting that wrong is what
+    made this look easy. Claude's `cwd` sits on the very record the call row is built
+    from (`transcript.py:94`); here it does not: the per-request serialized fields carry
+    no cwd at all. So this resolves **one** project per *file*, before the row loop, the
+    way `parse_kiro_cli_calls` resolves a store-level cwd.
+
+    Two carriers, both evidenced by this repo's probe of 1,132 real parts across 157
+    files ([research](../docs/research/2026-08-07-graphify-store-evidence.md)):
+
+    1. ``workspaceStorage/<hash>/workspace.json`` → ``{"folder": "file:///…"}`` — ONE
+       read, covers every request in the file. Preferred for exactly that reason.
+    2. the first ``toolSpecificData.cwd.path`` on a `run_in_terminal` part — exact, but
+       **partial** (only requests that ran a terminal command carry one).
+
+    Three decisions, recorded here because each could reasonably have gone the other way:
+
+    - **Multi-root workspaces fall through, they are not guessed.** VS Code stores a
+      ``"workspace"`` key (a path to a `.code-workspace` file) instead of ``"folder"``,
+      and that file names *several* roots. Stamping the workspace file's basename would
+      put a whole chat's spend on a "project" that is not a working directory and may not
+      be where the work happened. So carrier 1 declines and carrier 2 gets a chance —
+      a terminal command's cwd is a real directory and is better evidence here than the
+      workspace file ever was.
+    - **A ``--path`` override must fail open to ``""``.** Under `--path`, the file is
+      read from a relocated tree where ``parents[1]`` is no longer the
+      ``workspaceStorage/<hash>`` dir, so a `workspace.json` found there could belong to
+      something else entirely. The layout is therefore *checked*, not assumed: the file's
+      own parent must be named ``chatSessions``. Failing to a blank project is the honest
+      outcome — an empty `project` is the legacy contract and reads as *unconfirmable*,
+      which is true, whereas a wrong basename silently moves another project's spend.
+    - **Basename only, percent-decoded** — the same PII guard as `scope` and
+      `tasks.jsonl`, never a full path.
+    """
+    if chat_session_path.parent.name == "chatSessions":
+        ws = chat_session_path.parents[1] / "workspace.json"
+        try:
+            folder = json.loads(ws.read_text(encoding="utf-8")).get("folder") or ""
+        except (OSError, ValueError, AttributeError):
+            folder = ""
+        if folder and (name := _uri_basename(folder)):
+            return name
+    return _uri_basename(first_cwd)
+
+
 def parse_copilot_vscode_calls(chat_session_path: Path, session: str = "") -> list[dict]:
     """Meter the Copilot VS Code *extension* from VS Code's own chat-session store
     (`<vscode-user>/workspaceStorage/<hash>/chatSessions/<session>.jsonl`).
@@ -623,6 +690,22 @@ def parse_copilot_vscode_calls(chat_session_path: Path, session: str = "") -> li
         for req in rec.get("v") or []:
             if isinstance(req, dict) and req.get("requestId"):
                 reqs[req["requestId"]] = req  # last write wins
+    # Carrier 2 for the project (see `_vscode_project`): the first `run_in_terminal`
+    # cwd in the file. Collected in the same pass — it is a *file*-level fact, not a
+    # per-row one, so it is resolved once before the row loop.
+    first_cwd = ""
+    for req in reqs.values():
+        parts = req.get("response")
+        for part in parts if isinstance(parts, list) else ():
+            if not isinstance(part, dict):
+                continue
+            cwd = ((part.get("toolSpecificData") or {}).get("cwd") or {}).get("path") or ""
+            if cwd:
+                first_cwd = cwd
+                break
+        if first_cwd:
+            break
+    project = _vscode_project(chat_session_path, first_cwd)
     rows: list[dict] = []
     for rid, req in reqs.items():
         if not _copilot_chat_extension(req):
@@ -638,6 +721,7 @@ def parse_copilot_vscode_calls(chat_session_path: Path, session: str = "") -> li
             route="chat", provider=_copilot_provider(model), model=model,
             tokens_in=inp, tokens_out=out, session=session, agent="copilot",
             ts=_epoch_ms_iso(req.get("timestamp")), surface="vscode",
+            project=project,
             credits=_first_float(req, _COPILOT_CREDIT_KEYS),
             call_id=f"c_cop{rid_hash}"))
     return rows

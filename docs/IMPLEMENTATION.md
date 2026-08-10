@@ -16,6 +16,52 @@ Entry format:
 
 ---
 
+## 2026-08-11 — agent-lane sweep P5: HR-COPILOT-JOIN — copilot VS Code rows carry a project
+
+- **Both claims verified first.** `parse_copilot_vscode_calls` built rows with no
+  `project=` (the only stamping sites in the package were claude and kiro-CLI), and
+  copilot/vscode is *already* whitelisted for window-joining — so `ts_fidelity` passed
+  and every row fell straight through to `commitjoin`'s `project` gate and was dropped
+  `NO_PROJECT`. **The join was built and could not fire for any copilot call, ever.**
+- **The handoff's framing correction is the load-bearing part, and it held.** The store
+  *does* carry a cwd, but "following the claude precedent … it window-joins for free" is
+  false: claude's `cwd` sits on the very record the row is built from, and here it does
+  not — the per-request serialized fields carry no cwd at all. The real precedent is
+  **kiro CLI**: a *store-level* cwd resolved once per file, before the row loop. Built
+  that way.
+- **Implemented:** `transcript._vscode_project` resolves one project per chat-session
+  file — `workspaceStorage/<hash>/workspace.json` → `{"folder": "file:///…"}` first (one
+  read, covers every request), falling back to the first `toolSpecificData.cwd.path`
+  (exact but partial — only requests that ran a terminal command), else `""`. Basename
+  only, percent-decoded, same PII guard as `scope`/tasks.
+- **The three decisions, made and recorded in the module docstring:**
+  1. **Multi-root workspaces fall through, they are not guessed.** VS Code stores a
+     `"workspace"` key (a `.code-workspace` path) naming *several* roots; stamping its
+     basename would put a whole chat's spend on something that is not a working
+     directory. Carrier 1 declines and carrier 2 gets a chance — a terminal command's cwd
+     is a real directory and is better evidence than the workspace file.
+  2. **A `--path` run fails open to `""`.** The log is read from a relocated tree where
+     `parents[1]` is no longer the `workspaceStorage/<hash>` dir, so a `workspace.json`
+     found there could belong to something else. The layout is **checked** — the file's
+     own parent must be named `chatSessions` — never assumed.
+  3. **Percent-decoding**, because `my%20project` matches nothing a `--project` filter or
+     a commit join would look for.
+- **The fixture gap the handoff flagged was real and is closed.** No `workspace.json`
+  existed anywhere in the repo, so the fix would have shipped untested against a golden
+  that legitimately stayed `project: ""`. Added a **sidecar** mechanism to
+  `tests/test_fixture_corpus.py` (files a store keeps *beside* the log that the parser
+  also reads, planted at their real relative layout — the parser checks that layout) and
+  planted one. `test_floor.py` needed none: it plants only CLI fixtures.
+- **Corrected on contact:** `schema.py`'s `project` docstring asserted "Copilot/Kiro leave
+  it empty" flatly — false for two of those four routes even before this change (kiro CLI
+  has stamped it since v0.36).
+- **Files:** `cage/transcript.py` · `cage/schema.py` · `tests/test_transcript.py` ·
+  `tests/test_commitjoin.py` · `tests/test_fixture_corpus.py` ·
+  `tests/fixtures/transcripts/copilot/vscode/{workspace.json,expected.json}` · `docs/*`.
+- **Tests:** green — **1600 ⇒ 1609**, 11 skipped. Removing the `project=` stamp fails the
+  golden corpus row-for-row.
+- **Next:** P6 — EXPORT-SCOPE (additive; three report-shaped views v0.48.0 missed).
+
 ## 2026-08-11 — agent-lane sweep P4: REV-HARDEN P4's judgment half (3 items, sha rewrite last)
 
 - **Landed 4.1 → 4.2 → 4.3, each verified first, the sha rewrite last** as the handoff

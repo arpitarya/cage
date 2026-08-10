@@ -84,8 +84,14 @@ def make_call(*, route: str, provider: str, model: str, tokens_in: int = 0,
     `project` is the optional working-dir **basename** the call ran under — a *derived
     attribution axis* (`cage report --project`, plan §3.7), deliberately separate from
     `scope` (the monorepo top-level dir). Basename only, never a full path (the same PII
-    guard as `scope`/tasks). Only logs that carry the cwd can set it (Claude transcripts
-    do; Copilot/Kiro leave it empty), so an empty `project` is the legacy contract.
+    guard as `scope`/tasks). Only logs that carry the cwd can set it, so an empty
+    `project` is the legacy contract. Three routes stamp it: Claude transcripts (a `cwd`
+    on the record itself), Kiro CLI (a store-level cwd), and — since 2026-08-11 — Copilot
+    **VS Code**, resolved once per chat-session file from `workspaceStorage/<hash>/
+    workspace.json` with the first `run_in_terminal` cwd as fallback
+    (`transcript._vscode_project`). Copilot **CLI** and Kiro **IDE** still leave it empty:
+    neither store carries a cwd at all. *(This docstring previously said "Copilot/Kiro
+    leave it empty" flatly — false for two of those four routes.)*
 
     Five more additive-optional fields (import-ledger plan §2.1), each **omitted when
     at its default** so an unstamped row stays byte-identical to the legacy contract,

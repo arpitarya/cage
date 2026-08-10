@@ -22,8 +22,11 @@
       "ok": true,
       "retries": 0,
       "scope": "",
-      "project": "",
+      "project": "my cage project",
       "surface": "vscode"
     }
-  ]
+  ],
+  "sidecars": {
+    "workspaceStorage/8896643500c164bd504dad986e3dcf48/workspace.json": "workspace.json"
+  }
 }

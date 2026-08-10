@@ -280,3 +280,33 @@ def test_head_and_windows_record_full_shas(tmp_path):
 
     assert len(cj.head(r)) == 40
     assert [len(w.sha) for w in cj.commit_windows(r)] == [40]
+
+
+def test_a_copilot_vscode_call_now_joins_instead_of_being_unconfirmable():
+    """HR-COPILOT-JOIN, asserted where it was broken. copilot/vscode is already
+    whitelisted for window-joining (`ts_fidelity` passes), so the row fell straight
+    through to the `project` gate and was dropped as NO_PROJECT — the join was built and
+    could not fire for any copilot call, ever. With the project stamped it places."""
+    w = cj.Window("a" * 40, "", "2026-07-01T10:00:00Z")
+    call = schema.make_call(route="chat", provider="", model="copilot/auto",
+                            tokens_in=100, tokens_out=10, agent="copilot",
+                            surface="vscode", project="orff",
+                            ts="2026-07-01T09:30:00Z", call_id="c_cop1")
+
+    joined = cj.join_calls([call], [w], {}, project="orff")
+    assert joined["by_sha"][w.sha]["calls"] == [call]
+    assert cj.NO_PROJECT not in {e["reason"] for e in joined["excluded"]}
+
+
+def test_an_unstamped_copilot_call_is_still_refused_not_adopted():
+    """The guard the fix must not weaken: a call with no project is *unconfirmable*, and
+    adopting it would pull another repo's spend onto these commits."""
+    w = cj.Window("a" * 40, "", "2026-07-01T10:00:00Z")
+    call = schema.make_call(route="chat", provider="", model="copilot/auto",
+                            tokens_in=100, tokens_out=10, agent="copilot",
+                            surface="vscode", ts="2026-07-01T09:30:00Z",
+                            call_id="c_cop2")
+
+    joined = cj.join_calls([call], [w], {}, project="orff")
+    assert not joined["by_sha"]
+    assert cj.NO_PROJECT in {e["reason"] for e in joined["excluded"]}

@@ -330,3 +330,96 @@ def test_copilot_vscode_chat_sessions_parse_and_rewrite_merge(tmp_path):
 # idempotently" behavior is covered end-to-end through `importcmd.run` in
 # tests/test_import_unified.py (the universal sweep), and the id-dedupe backstop by
 # `test_append_new_is_idempotent` above.
+
+
+# ── HR-COPILOT-JOIN: a project for copilot's VS Code rows ─────────────────────
+#
+# Every copilot/vscode call was `unconfirmable` at the commit join — the row carried no
+# `project`, and `commitjoin` drops an unstamped call rather than adopting it (adopting
+# would pull other repos' spend onto these commits). The join was built and could not
+# fire. The closest precedent is kiro CLI, NOT claude: claude's `cwd` sits on the very
+# record the row is built from, and here it does not — the per-request serialized fields
+# carry no cwd at all — so this resolves ONE project per file, before the row loop.
+
+def _vscode_store(tmp_path, requests, *, workspace=None, chat_dir=True):
+    """A VS Code chat-session file at its real relative layout, optionally beside the
+    `workspace.json` the parser prefers."""
+    hashdir = tmp_path / "workspaceStorage" / "8896643500c164bd504dad986e3dcf48"
+    d = hashdir / "chatSessions" if chat_dir else hashdir / "elsewhere"
+    d.mkdir(parents=True, exist_ok=True)
+    log = d / "sess-1.jsonl"
+    log.write_text(
+        json.dumps({"kind": 0, "v": {"sessionId": "sess-1"}}) + "\n"
+        + json.dumps({"kind": 2, "k": ["requests"], "v": requests}) + "\n",
+        encoding="utf-8")
+    if workspace is not None:
+        (hashdir / "workspace.json").write_text(json.dumps(workspace), encoding="utf-8")
+    return log
+
+
+def _req(rid="r1", **extra):
+    return {"requestId": rid, "timestamp": 1_780_000_000_000,
+            "modelId": "copilot/auto", "promptTokens": 100, "completionTokens": 10,
+            "agent": {"extensionId": {"value": "GitHub.copilot-chat"}}, **extra}
+
+
+def test_workspace_json_names_the_project_for_every_request(tmp_path):
+    """Carrier 1, and it is preferred because it is ONE read that covers every request
+    in the file — unlike the per-command cwd, which only exists on requests that ran a
+    terminal command."""
+    log = _vscode_store(tmp_path, [_req("r1"), _req("r2")],
+                        workspace={"folder": "file:///Users/dev/projects/orff"})
+    rows = transcript.parse_copilot_vscode_calls(log)
+    assert rows and {r["project"] for r in rows} == {"orff"}
+
+
+def test_a_percent_encoded_folder_is_decoded(tmp_path):
+    """Not cosmetic: `my%20project` matches nothing a `--project` filter or a commit
+    join would ever look for."""
+    log = _vscode_store(tmp_path, [_req()],
+                        workspace={"folder": "file:///Users/dev/my%20cage%20project"})
+    assert transcript.parse_copilot_vscode_calls(log)[0]["project"] == "my cage project"
+
+
+def test_a_multi_root_workspace_falls_through_to_the_terminal_cwd(tmp_path):
+    """DECISION. VS Code stores a `workspace` key (a `.code-workspace` path) instead of
+    `folder`, and that file names SEVERAL roots. Stamping its basename would put a whole
+    chat's spend on a "project" that is not a working directory. So carrier 1 declines
+    and carrier 2 gets a chance — a terminal command's cwd is a real directory and is
+    better evidence here than the workspace file ever was."""
+    log = _vscode_store(
+        tmp_path,
+        [_req(response=[{"toolSpecificData": {"cwd": {"path": "/Users/dev/anton"}}}])],
+        workspace={"workspace": "/Users/dev/all.code-workspace"})
+    assert transcript.parse_copilot_vscode_calls(log)[0]["project"] == "anton"
+
+
+def test_a_multi_root_workspace_with_no_cwd_stays_empty(tmp_path):
+    """…and with neither carrier it stays `""` — the legacy contract, which reads as
+    *unconfirmable*. That is true; a guessed basename would silently move spend."""
+    log = _vscode_store(tmp_path, [_req()],
+                        workspace={"workspace": "/Users/dev/all.code-workspace"})
+    assert transcript.parse_copilot_vscode_calls(log)[0]["project"] == ""
+
+
+def test_a_relocated_file_never_adopts_a_neighbouring_workspace_json(tmp_path):
+    """DECISION. Under `--path` the log is read from a relocated tree where `parents[1]`
+    is no longer the `workspaceStorage/<hash>` dir, so a `workspace.json` found there
+    could belong to something else entirely. The layout is CHECKED, not assumed — the
+    file's own parent must be named `chatSessions`. Fail open to `""`, never guess."""
+    log = _vscode_store(tmp_path, [_req()], chat_dir=False,
+                        workspace={"folder": "file:///Users/dev/not-this-one"})
+    assert transcript.parse_copilot_vscode_calls(log)[0]["project"] == ""
+
+
+def test_no_carrier_at_all_stays_the_legacy_contract(tmp_path):
+    log = _vscode_store(tmp_path, [_req()])
+    assert transcript.parse_copilot_vscode_calls(log)[0]["project"] == ""
+
+
+def test_the_project_is_a_basename_never_a_path(tmp_path):
+    """The same PII guard as `scope` and `tasks.jsonl`."""
+    log = _vscode_store(tmp_path, [_req()],
+                        workspace={"folder": "file:///Users/dev/secret/deep/orff"})
+    p = transcript.parse_copilot_vscode_calls(log)[0]["project"]
+    assert p == "orff" and "/" not in p and "dev" not in p

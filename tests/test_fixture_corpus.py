@@ -33,6 +33,14 @@ def _plant(fixture: Path, spec: dict, home: Path) -> None:
     dst = home / spec["plant"]
     dst.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(CORPUS / fixture / spec["log"], dst)
+    # Sidecars: files a store keeps BESIDE the log that the parser also reads — VS Code's
+    # `workspaceStorage/<hash>/workspace.json`, which is the only carrier that names the
+    # project for every request in a chat. Planted at their real relative layout, because
+    # the parser deliberately checks that layout before trusting the file.
+    for rel, src in (spec.get("sidecars") or {}).items():
+        side = home / rel
+        side.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(CORPUS / fixture / src, side)
 
 
 def _isolated_root(d, monkeypatch):
