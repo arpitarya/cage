@@ -840,6 +840,40 @@ REGISTRY: tuple[Explanation, ...] = (
         "n/a — describes an output format; every row still carries its own method tag.",
         kind="concept", plan_ref="§3.9"),
     Explanation(
+        "view-export", ("export", "view-export", "artifact", "output-dir", "stamp",
+                        "generated-at", "timestamp", "as-of", "run-stamp",
+                        "save-report", "write-report"),
+        "--export: every report/insight as a dated artifact, and where a clock may live",
+        "`--export` on `cage report` and every `cage insights` view writes the\n"
+        "  rendered view to disk. Bare ⇒ <ledger>/.cage/output/<view>-<stamp>/ holding\n"
+        "  EVERY format that view has (text · csv where it owns a render_csv · json).\n"
+        "  A path with a known suffix (.txt/.md/.csv/.json) ⇒ exactly that file in\n"
+        "  exactly that format; any other path ⇒ a per-run folder under it, so two\n"
+        "  runs of one view can never clobber each other. Asking for a format a view\n"
+        "  cannot produce is a refusal, never an empty file — an empty CSV reads as\n"
+        "  'no rows'.\n"
+        "  The determinism split, and it is the whole design: every ARTIFACT carries a\n"
+        "  generated-at metadata block with no flag to suppress it (a file outlives its\n"
+        "  terminal — a number with no as-of is unreadable), while STDOUT stays\n"
+        "  clock-free unless you pass `--stamp`. So `cage report` prints byte-identically\n"
+        "  with and without `--export`, and the golden/floor suites keep pinning a\n"
+        "  surface no clock can perturb. The stamp is metadata about the run, NEVER an\n"
+        "  input to a cell: delete every stamp and no derived figure moves.\n"
+        "  One block, three renderings — `# cage: k=v` lines for text and csv, a `cage`\n"
+        "  object for json — never re-worded per format. It names the view, the stamp,\n"
+        "  the cage version, the ledger read, and the DATA filters (--since/--by/--agent\n"
+        "  …); presentation switches (--usd/--all) stay out, because they change how a\n"
+        "  number looks and not what it means. CAGE_RUN_STAMP pins the clock for a\n"
+        "  byte-reproducible artifact.\n"
+        "  `--csv`/`--json` are unchanged on stdout AND to a path: a `--csv PATH` is a\n"
+        "  stream redirected to a file, `--export` is an artifact, and only the artifact\n"
+        "  grows the block. `.cage/output/` is deliberately NOT `.cage/out/` (that one\n"
+        "  is `cage data serve`'s docroot and is published on the loopback port), and no\n"
+        "  cleanup class prunes it — cage never deletes an artifact it wrote.",
+        ("cage/viewexport.py", "cage/runstamp.py", "cage/cliutil.py", "cage/cli.py"),
+        "n/a — metadata about a run; it never enters a cell, so no method tag changes.",
+        kind="concept", plan_ref="docs/compare/view-export-and-run-stamp.compare.md"),
+    Explanation(
         # NB: no "cage-run"/"workspacefolder" keywords — their "cage"/"work" stems
         # would steal generic "how does cage work"-style queries from `overview`.
         "portable-wiring", ("portable-wiring", "portable", "shim", "absolute-path",

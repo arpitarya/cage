@@ -16,6 +16,44 @@ Entry format:
 
 ---
 
+## 2026-08-10 — v0.48.0: the artifact surface (`--export`/`--stamp`) + the chats structural-empty fix
+
+- **Implemented (1):** `--export` on `cage report` + all 16 `cage insights` views.
+  `cage/runstamp.py` is the ONE clock call on a read surface (one metadata block, three
+  renderings: `# cage: k=v` for text/CSV, a `cage` object for JSON; `CAGE_RUN_STAMP`
+  pins it). `cage/viewexport.py` owns destinations (bare → `<ledger>/.cage/output/
+  <view>-<stamp>/`, known suffix → that file, other path → a per-run folder under it),
+  the available-format set, and the stderr confirmation. `cliutil.emit` became the ONE
+  chokepoint — export, then exactly one of CSV/JSON/text — which also deleted the
+  duplicated `csv_dest` branch from 15 handlers.
+- **The design decision, recorded:** stdout is byte-identical with and without
+  `--export`, so the determinism law is untouched and the goldens keep pinning a
+  clock-free surface. The stamp is mandatory in an artifact (a file outlives its
+  terminal), optional on stdout (`--stamp`). `--csv`/`--json` byte contracts unchanged,
+  stdout *and* to a path.
+- **Implemented (2):** `cage insights chats --agent kiro` named the filter for an
+  architectural fact. The empty view now evidences its structural reasons (credits rows
+  carry no calls; IDE rows route to the machine ledger, ADR 0006) and only for the agent
+  asked about; a genuinely empty filter keeps the old message. `kiro_routed_line` gained
+  a `verb` param so one phrasing names the right fix per view. Non-empty views footnote
+  credits usage they cannot show. `ledger.credits` is the third money-independent
+  carve-out — read for a refusal, never a cell.
+- **Files:** new `cage/runstamp.py` · `cage/viewexport.py` · `tests/test_view_export.py`
+  · `docs/compare/view-export-and-run-stamp.compare.md`; changed `cage/cli.py`
+  (`_export_flags`) · `cage/cliutil.py` · `cage/clicmds.py` · `cage/paths.py`
+  (`Footprint.output`) · `cage/chats.py` · `cage/report.py` · `cage/initcmd.py`
+  (gitignore heal) · `cage/explain_data.py` (`view-export`) · `docs/CLI.md` ·
+  `tests/test_chats.py` · `tests/test_doctor.py` · `.gitignore` · CHANGELOG · README.
+- **Tests:** green — **1503 → 1541** (32 new in `test_view_export.py`, 6 in
+  `test_chats.py`, 1 in `test_doctor.py`). Full suite run under the container's root
+  user, so `test_policysync.py::test_readonly_target_errors_cleanly_no_partial_write` is
+  deselected there (root ignores a read-only bit); it passes normally.
+- **Next:** tag/release v0.48.0 through the GitHub-release trigger (never publish from
+  local), then decide the `.cage/output/` growth question if a real machine reports a
+  number.
+
+---
+
 ## 2026-08-08 — v0.47.2: the same Windows class, one syntax layer over
 
 - **v0.47.1 fixed 25 of 26.** The survivor was the *same* defect in TOML that v0.47.1 had

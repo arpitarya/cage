@@ -58,12 +58,53 @@ def captured_read_root(args) -> Path:
     return r
 
 
-def emit(args, payload: dict, text: str) -> int:
-    """Print machine-readable JSON when ``--json`` is set, else the human text."""
+def _resolve(v):
+    """A renderer passed as a string, or as a zero-arg callable so an expensive render
+    is only paid for when it is actually emitted (`cage report`'s footer does I/O)."""
+    return v() if callable(v) else v
+
+
+def emit(args, payload: dict, text, *, csv=None, root=None) -> int:
+    """The ONE emit chokepoint for a read view: export artifacts if asked, then print
+    exactly one stream — CSV, JSON, or text.
+
+    ``--export`` is **additive and never touches stdout**: the view prints byte-for-byte
+    what it would have printed without the flag, and the write confirmation goes to
+    stderr (`viewexport.confirm`). That is what lets the golden and floor suites keep
+    asserting a byte-identical default surface while every view is exportable.
+
+    ``--stamp`` is the opposite direction — the *opt-in* half of the same block: it puts
+    the run stamp onto stdout, in whichever format is being emitted. Mandatory in an
+    artifact, optional on a terminal (`runstamp`'s docstring says why).
+
+    ``csv`` is the view's CSV renderer (string or callable) or ``None`` for a view that
+    has none; ``root`` is the already-resolved active-ledger root, so no second
+    resolution ladder appears here."""
+    from cage import runstamp
+    dest = csv_dest(args)            # validates output-format exclusivity first
+    stamped = getattr(args, "stamp", False)
+    view = getattr(args, "view", "") or ""
+    fields = (runstamp.block(view, root=root, args=args)
+              if (stamped or getattr(args, "export", None) is not None) else {})
+
+    if (export := getattr(args, "export", None)) is not None:
+        from cage import viewexport
+        written = viewexport.export(
+            export, view=view, root=root if root is not None else ledger_root(),
+            text=_resolve(text), csv_text=csv, payload=payload, args=args,
+            stamp=fields.get("generated_at"))
+        viewexport.confirm(written, quiet=quiet(args))
+
+    if dest is not None:
+        from cage import csvout
+        body = _resolve(csv)
+        return csvout.write(runstamp.prefix_csv(body, fields) if stamped else body, dest)
     if getattr(args, "json", False):
-        print(_json.dumps(payload, ensure_ascii=False, indent=2))
+        out = runstamp.wrap_json(payload, fields) if stamped else payload
+        print(_json.dumps(out, ensure_ascii=False, indent=2))
     else:
-        print(text)
+        body = _resolve(text)
+        print(runstamp.prefix_text(body, fields) if stamped else body)
     return 0
 
 

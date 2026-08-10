@@ -12,6 +12,33 @@ by milestone) — the worklog is what *happened this session*.
 
 ---
 
+## 2026-08-10 — Cowork (Claude Opus) — the artifact surface, and a message that blamed the wrong thing
+
+- **Asked:** (1) reports/insights carry a date+time — optional in the CLI, mandatory in
+  exports; (2) all of them exportable, default into an output dir inside `.cage`, or to a
+  named path; (3) fix `cage insights chats --agent kiro` printing *the filter is empty,
+  not the ledger*.
+- **Decided (Arpit, via a four-question fork):** the stamp lives in an **artifact-only
+  metadata block** (not a CSV column, not a sidecar); `--export` is a **capability, not a
+  side effect** — a plain `cage report` still just prints; bare `--export` writes **all
+  available formats** into a per-run folder. Recorded with the debate, the deliberately-
+  not-taken list and a reopen trigger in
+  [compare/view-export-and-run-stamp.compare.md](compare/view-export-and-run-stamp.compare.md).
+- **Done:** shipped as v0.48.0 (unreleased in tree). 1503 → 1541, suite green.
+- **The thing worth inheriting from (3):** the old message was *true and misleading at the
+  same time*, which is the hardest kind of wrong output to notice. Kiro's absence had two
+  causes cage already knew — credits rows carry no calls, IDE rows route to `~/.cage` —
+  and one of them (`kiro_routed_line`) was **computed and then thrown away** on the empty
+  path, three lines from where it would have been printed. When a view refuses, check that
+  the refusal path carries every explanation the success path does; an early `return` is
+  where honest output goes to die.
+- **Open:** `.cage/output/` has no cleanup class by design (cage never deletes an artifact
+  it wrote) — revisit only with a named volume number from a real machine. Bare `cage`
+  (the headline) has no `--export`; argparse would swallow the subcommand.
+- **Next step:** release v0.48.0 via the GitHub-release trigger.
+
+---
+
 ## 2026-08-08 — Claude Code — v0.47.2: the Windows class, closed with a gate
 
 - **Asked:** (continuing) patch until the build is green.

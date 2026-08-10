@@ -31,6 +31,7 @@ record_call / record_receipt  →  .cage/ledger/{calls,receipts,tasks}-YYYY-MM.j
   cage.toml (order/budgets/routing)      → report · attrib · matrix · budget · roi
   + prices.toml (model prices, [credits])   · compare · verdict · why · origin · chats
                                              + --scope (monorepo slice) · --team · ledger-sync (§3.6)
+                                             + --export → .cage/output/<view>-<stamp>/  (stamped artifact)
 ```
 
 Prices live in `prices.toml`; a legacy in-`cage.toml` prices block still reads via the
@@ -314,6 +315,38 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   it, and CSV never gates (`—` never enters CSV data; `$0.0000` is always a
   real zero). `constants.IMPORT_STALE_HOURS` gates the `last import` advice line
   (policy `[capture] import_stale_hours` wins).
+- **View export + the run stamp** ([viewexport.py](cage/viewexport.py),
+  [runstamp.py](cage/runstamp.py), compare doc
+  [view-export-and-run-stamp](docs/compare/view-export-and-run-stamp.compare.md);
+  `cage query view-export`) — `--export` on `cage report` and **every** `cage insights`
+  leaf (17 views) writes the rendered view to disk: bare ⇒
+  `<ledger>/.cage/output/<view>-<stamp>/` holding **every format that view has** (text ·
+  csv where it owns a `render_csv` · json), a path with a known suffix ⇒ that exact file
+  in that format, any other path ⇒ a per-run folder under it (**a directory destination
+  always gets one** — two runs of a view must never clobber each other). A format a view
+  cannot produce is a **typed refusal**, never an empty file (an empty CSV reads as *no
+  rows*). **`runstamp` is the ONE place a wall clock reaches a read surface**, and it is
+  admitted on terms that leave the determinism law exactly as strong: the stamp is never
+  an input to a cell (delete every stamp, no derived figure moves), **stdout stays
+  clock-free by default** so the goldens and `test_floor` keep pinning a surface no flag
+  can perturb (`tests/test_view_export.py::test_export_never_changes_stdout` is the
+  binding gate), and it is **mandatory in an artifact** with no suppression flag —
+  a file outlives its terminal, and a number with no as-of is unreadable. `--stamp` is
+  the opt-in stdout half. One block, three renderings (`# cage: k=v` for text/CSV, a
+  `cage` object for JSON) — never re-worded per format; it names the DATA filters and
+  never the presentation switches. `CAGE_RUN_STAMP` pins the clock. **`--csv`/`--json`
+  are untouched, on stdout AND to a path** — a `--csv PATH` is a stream redirected to a
+  file, `--export` is an artifact, and only the artifact grows the block; a preamble in
+  `--csv` would break the pinned column contract. `cliutil.emit` is the ONE chokepoint
+  (export → then exactly one of csv/json/text) — never a second per-handler csv branch.
+  **`.cage/output/` is deliberately NOT `.cage/out/`**: that one is `cage data serve`'s
+  docroot and a stdlib `http.server` is pointed straight at it, so sharing a directory
+  would publish every exported report on the loopback port. **No cleanup class prunes
+  it** — cage never deletes an artifact it wrote (`docs/OPEN-WORK.md` OUTPUT-GROWTH
+  carries the volume-gated reopen). Bare `cage` (the overview) has **no** `--export`: a
+  root-level optional-value flag would swallow the following subcommand. Adding a view =
+  `_export_flags(<parser>, "<verb path>")`; the fan-out is gated by
+  `test_every_report_and_insight_is_exportable` — **wire it in, never relax the set.**
 
 ## Must-Know Rules
 
@@ -757,7 +790,7 @@ the worked examples to copy.
 ## Dev
 
 ```bash
-just test          # python -m pytest -q   (1503 tests; +10 Windows-only skips, +1 opt-in dogfood-age skip)
+just test          # python -m pytest -q   (1541 tests; +10 Windows-only skips, +1 opt-in dogfood-age skip)
 just demo          # seed §4.4 + print attrib/matrix
 cage --version
 ```

@@ -225,7 +225,13 @@ def _gitignore(fp: paths.Footprint) -> None:
     needs_state = "state/" not in lines
     if needs_state:
         lines += ["# Machine-local hook buffers (pending edits, session state).", "state/"]
-    if fresh or needs_state:
+    # Same heal for output/: `--export` artifacts (`cage/viewexport.py`). They are
+    # regenerable views of a machine-local ledger and every one carries a wall-clock
+    # stamp, so committing them would churn a diff on every run for no shared value.
+    needs_output = "output/" not in lines
+    if needs_output:
+        lines += ["# Exported report/insight artifacts (`--export`).", "output/"]
+    if fresh or needs_state or needs_output:
         gi.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 

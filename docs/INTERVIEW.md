@@ -23,7 +23,25 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
 
 ---
 
-## State of play (2026-08-02 — pick up here on a model switch)
+## State of play (2026-08-10 — pick up here on a model switch)
+
+- **v0.48.0 sits unreleased in tree** (`__version__ = "0.48.0"`, suite **1541/0**). It
+  adds the **artifact surface**: `--export`/`--stamp` on `cage report` and all 16
+  `cage insights` views (`cage/viewexport.py` + `cage/runstamp.py`), and fixes
+  `cage insights chats --agent kiro` blaming the filter for an architectural fact.
+  Read CLAUDE.md's new **View export + the run stamp** bullet before touching either.
+- **The one thing to internalise about this work:** *a wall clock is allowed on a read
+  surface only because it can never reach a number, and stdout proves it.*
+  `tests/test_view_export.py::test_export_never_changes_stdout` asserts stdout is
+  byte-identical with and without `--export`, across six views. That is the same shape
+  as `tests/test_floor.py`'s bargain for the agent-surface ladder, and it binds the same
+  way: **if a future export feature needs stdout to move, the feature is wrong.** The
+  stamp is mandatory in a *file* (it outlives its terminal) and opt-in on a *terminal*.
+- **Next:** release v0.48.0 through the GitHub-release trigger (never publish from
+  local). Then the queue is unchanged: **NET-1** in your hands, tier 2's three decisions
+  in the agent lane, and the field-verification items that need a real machine.
+
+## State of play (2026-08-02 — historical)
 
 - **The agent-surface ladder is BUILT, all four phases, in one session.** L0 floor
   proof · L2 MCP · L1 hooks+steering · L3 skills. **1024/0 ⇒ 1125/0**, uncommitted in
@@ -465,6 +483,23 @@ you touch any savings number.**
 
 ## Maintainers
 
+- Claude (Opus 5) — 2026-08-10 — built the artifact surface (`--export`/`--stamp`) and
+  fixed the chats structural-empty message (1503/0 ⇒ 1541/0). **The lesson I'd want
+  inherited: when a new feature collides with a law here, the answer is almost never to
+  bend the law or to drop the feature — it is to find the axis the law was actually
+  about.** "No clocks in derived views" is about *numbers*, not about the absence of any
+  clock anywhere; once that was named, a mandatory stamp in files and a clock-free
+  stdout stopped being a compromise and became the design, with a test that is stronger
+  than the comment would have been. I would have reached that faster by asking what the
+  law protects before asking whether the feature fits it. Second, from the chats fix:
+  **an early `return` on a refusal path is where honest output goes to die.** The kiro
+  routing explanation was *computed and then thrown away* three lines from where it
+  would have printed — the success path had it, the empty path did not, and the empty
+  path is exactly the one where a reader most needs it. Check that every refusal carries
+  what its success twin carries. Third, smaller: a message can be **true and misleading
+  at the same time** ("the filter is empty, not the ledger" — both clauses correct,
+  the implication wrong), and that is the hardest class of wrong output to notice
+  because nothing about it looks like a bug.
 - Claude (Opus 5) - 2026-08-07 - built GFX-COV (graphify savings for copilot-VSCode +
   kiro-CLI, 1462/0 => 1498/0). **The lesson I'd want inherited: a spec's stated *reason* for
   a gap is a claim, and claims about someone else's on-disk format are the cheapest of all

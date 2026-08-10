@@ -239,7 +239,31 @@ def summarize(root: Path, pol: dict, since: str | None = None,
             "legacy_human": legacy_human,
             "unpriced_calls": sum(r["unpriced_calls"] for r in rows),
             "unpriced_tokens": sum(r["unpriced_tokens"] for r in rows),
-            "any_calls": bool(raw_calls)}
+            "any_calls": bool(raw_calls),
+            "credit_agents": _credit_agents(root)}
+
+
+def _credit_agents(root: Path) -> list[str]:
+    """Agents whose usage this ledger records as **credits** rather than token calls
+    (`ledger.credits` — kiro CLI today), normalized to their SURFACES name.
+
+    A **third** money-independent carve-out, on the same terms as the manifest-title and
+    provenance-count ones: it is read for a *refusal*, never for a cell. Nothing here
+    enters `rows`, no total moves, and deleting every credits shard changes no number in
+    this view — it only removes cage's ability to say *why* an agent is absent.
+
+    That "why" is the whole point. A credits row has no `tokens_in`/`tokens_out` and no
+    call at all (`schema.make_credit` — a call with `tokens_in=0` would be a lie), so an
+    agent recorded that way can never produce a chat row. Without this read the view says
+    *your filter matched nothing*, which reads as *you have no kiro usage* — and the
+    ledger sitting right there says otherwise. Absent-because-structural and
+    absent-because-empty are different facts, and cage never merges them."""
+    seen: dict[str, None] = {}
+    for row in ledger.credits(root):
+        a = _agents.row_surface(row.get("agent")) or row.get("agent") or ""
+        if a:
+            seen.setdefault(a, None)
+    return sorted(seen)
 
 
 # ── rendering ────────────────────────────────────────────────────────────────
@@ -250,14 +274,55 @@ next: cage import        pull every agent's usage into the ledger
       cage doctor        check capture is wired and healthy"""
 
 
-def _render_empty(data: dict) -> str:
+def _structural_reasons(data: dict, kiro_route: str) -> list[str]:
+    """Why this view is empty for reasons a *filter* did not cause — each one a fact
+    about where the rows live or what shape they were recorded in, evidenced from the
+    ledger rather than asserted.
+
+    Order is by how completely the reason explains the emptiness: a row shape that can
+    never produce a chat comes before a sink that merely holds the rows elsewhere.
+
+    Only reasons that apply to the **agent actually asked about** are listed. An
+    unfiltered empty view names every one it can see; `--agent copilot` is never told
+    about kiro."""
+    agent = data.get("agent") or "all"
+    want = None if agent == "all" else agent
+    out = []
+    for a in data.get("credit_agents") or []:
+        if want in (None, a):
+            out.append(
+                f"· {a}'s conversations are recorded as credits, not token calls — that\n"
+                f"  store reports no tokens at all, so those rows carry no call and no\n"
+                f"  chat row can exist for them (`cage query copilot-credits`)")
+    if kiro_route and want in (None, "kiro"):
+        out.append(kiro_route)
+    return out
+
+
+def _render_empty(data: dict, kiro_route: str = "") -> str:
+    """The empty view. **The filter is blamed only when the filter is the reason.**
+
+    `No chats match agent 'kiro' — the filter is empty, not the ledger` is a true
+    sentence about the filter and a misleading one about kiro: its IDE rows are a
+    machine fact routed to another sink (ADR 0006) and its CLI conversations are credit
+    rows that structurally cannot become chats. Both are things cage knows. Saying
+    *filter* when the answer is *architecture* sends a reader to check their typing
+    instead of the ledger they actually want — the same class of failure as an agent
+    showing no rows because capture silently broke."""
     filters = []
     if data.get("since"):
         filters.append(f"since {data['since']}")
     if data.get("agent") and data["agent"] != "all":
         filters.append(f"agent '{data['agent']}'")
+    label = " · ".join(filters)
+    if (reasons := _structural_reasons(data, kiro_route)):
+        head = (f"No chats for {label} — and the filter is not the reason:"
+                if filters else "No chats to show — the ledger has usage cage cannot "
+                                "render as a chat:")
+        return (f"{head}\n\n" + "\n".join(reasons) + "\n\n"
+                "next: cage report                         where that usage IS counted")
     if data.get("any_calls") and filters:
-        return (f"No chats match {' · '.join(filters)} — the filter is empty, "
+        return (f"No chats match {label} — the filter is empty, "
                 "not the ledger.\n\n"
                 "next: cage insights chats                 the unfiltered view")
     return _EMPTY
@@ -343,7 +408,7 @@ def render_chats(data: dict, disp=None, show_all: bool = False,
     disp = disp or _d.DEFAULT
     rows = data["rows"]
     if not rows:
-        return _render_empty(data)
+        return _render_empty(data, kiro_route)
     limit = None if show_all else CHATS_DEFAULT_ROWS
     shown = rows if limit is None else rows[:limit]
     cut = 0 if limit is None else max(0, len(rows) - limit)
@@ -388,6 +453,12 @@ def render_chats(data: dict, disp=None, show_all: bool = False,
         foot.caveat("· kiro (no session identity): its IDE log stamps every run under "
                     "the same constant session, so all of kiro's chats collapse into "
                     "this one row (`cage query kiro-routing`)")
+    if (credit := data.get("credit_agents")):
+        # No-silent-omission: this ledger holds usage that structurally cannot become a
+        # chat row, and a table that just doesn't show it reads as "there is none".
+        foot.gap(f"· {' · '.join(credit)} usage recorded as credits carries no calls, "
+                 f"so it has no\n  chat row here — `cage report` counts it "
+                 f"(`cage query copilot-credits`)")
     if kiro_route:
         foot.caveat(kiro_route)
     if data.get("unpriced_calls"):

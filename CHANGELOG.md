@@ -2,6 +2,86 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
+## v0.48.0 (2026-08-10) — every report and insight is an artifact
+
+Two asks, one collision with cage's determinism law, and the split that resolves it.
+
+**A number on a terminal and a number in a file are not the same object.** A terminal
+number is read now, in context, by the person who typed the command. A file outlives
+that context — so an exported table with no as-of is a number nobody can safely re-read.
+That is why the generated-at stamp is **mandatory in an artifact and optional on a
+terminal**, and it is the whole reason a wall clock can exist on a read surface at all
+without touching *no clocks in derived views*.
+
+### Added — `--export` on `cage report` and every `cage insights` view (17 views)
+
+- Bare `--export` writes **every format that view has** — text, CSV where it owns a
+  `render_csv`, JSON — into `<ledger>/.cage/output/<view>-<stamp>/`.
+- `--export PATH.csv` / `.json` / `.md` / `.txt` writes exactly that file in exactly that
+  format. Any other `PATH` gets a per-run folder under it: **two runs of one view never
+  clobber each other**, because an artifact whose job is to be the as-of record is
+  worthless once the previous as-of is gone.
+- A format a view cannot produce is a **typed refusal naming the gap**, never an empty
+  file — an empty CSV reads as *this view has no rows*, the one thing it must not be able
+  to say.
+- New: `cage/viewexport.py` (destinations, formats, confirmation) and `cage/runstamp.py`
+  (the ONE clock call on a read surface; `CAGE_RUN_STAMP` pins it). `--stamp` puts the
+  same block on stdout. `cage query view-export` explains it.
+
+### The determinism split, stated as a test
+
+`tests/test_view_export.py::test_export_never_changes_stdout` asserts stdout is
+**byte-identical with and without `--export`**, across six views. That is what keeps
+`tests/test_output_spec.py`'s goldens and `tests/test_floor.py`'s byte-identical
+assertions meaningful: they pin the default surface, and the default surface has no clock
+in it. The stamp is metadata *about the run* — delete every stamp and no derived figure
+moves. `--csv`/`--json` keep their existing byte contract on stdout **and to a path**: a
+`--csv PATH` is a stream redirected to a file, `--export` is an artifact, and only the
+artifact grows the block.
+
+The fan-out is gated too: `test_every_report_and_insight_is_exportable` walks the live
+parser, so a new insight that forgets `_export_flags` fails the suite instead of shipping
+un-exportable. Wire the new command in — never relax the set.
+
+### Fixed — `cage insights chats --agent kiro` blamed the filter for an architectural fact
+
+`No chats match agent 'kiro' — the filter is empty, not the ledger` is a true sentence
+about the filter and a **misleading one about kiro**, whose absence has two structural
+causes cage already knows: its CLI conversations are recorded as **credits** (a row shape
+with no tokens and no call, so no chat row can exist for them) and its IDE rows are a
+machine fact routed to `~/.cage` ([ADR 0006](docs/adr/0006-kiro-rows-are-machine-facts-not-project-facts.md)).
+Saying *filter* when the answer is *architecture* sends a reader to check their typing
+instead of the ledger they actually want — the same class of failure as an agent showing
+no rows because capture silently broke.
+
+- The empty view now names the structural reasons it can evidence, and only for the agent
+  actually asked about; a filter that really *is* the reason still gets the old message,
+  unchanged.
+- The kiro-routing line was **computed and then dropped** on the empty path — it is
+  threaded through now. `report.kiro_routed_line` grew a `verb` parameter so the one
+  phrasing can name the right runnable fix per view (one owner, never re-worded).
+- A **non-empty** chats view footnotes credits usage it cannot show (no-silent-omission:
+  a table that just doesn't show it reads as *there is none*).
+- Reading `ledger.credits` here is the **third** money-independent carve-out, on the same
+  terms as the manifest-title and provenance-count ones: read for a refusal, never for a
+  cell. `test_reading_credits_moves_no_number` pins it.
+
+### Also
+
+- `.cage/output/` is deliberately **not** `.cage/out/` — that one is `cage data serve`'s
+  docroot, and a stdlib `http.server` is pointed straight at it, so sharing a directory
+  would mean starting the dashboard quietly published every report anyone had ever
+  exported. `cage setup` gitignores the new dir and heals older footprints.
+- **No cleanup class prunes `.cage/output/`** — cage never deletes an artifact it wrote,
+  the same standing `ledger/savings/` has. Revisit only with a named volume number
+  (`docs/OPEN-WORK.md`).
+- Bare `cage` (the headline) has no `--export`: a root-level optional-value flag would
+  swallow the following subcommand (`cage --export report`). Named in the compare doc as a
+  choice, not left as an oversight.
+
+Built from: [docs/compare/view-export-and-run-stamp.compare.md](docs/compare/view-export-and-run-stamp.compare.md).
+Suite **1503 → 1541**.
+
 ## v0.47.2 (2026-08-08) — the same Windows class, one syntax layer over
 
 v0.47.1 fixed 25 of 26 Windows failures. The last one was **the same defect in TOML** that

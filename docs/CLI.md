@@ -51,6 +51,35 @@ They are global too, so `cage --no-import report` works. The one exception is
 meaning — it skips the export's own import-first refresh and emits the ledger exactly
 as-is.
 
+### Export flags
+
+`cage report` and every `cage insights` view take these two, so they are documented
+once here rather than repeated in each table
+([`cage/viewexport.py`](../cage/viewexport.py), `cage query view-export`):
+
+| Flag | Meaning |
+|---|---|
+| `--export [PATH]` | write this view to disk. Bare = `<ledger>/.cage/output/<view>-<stamp>/` holding every format the view has; `PATH.txt` / `.md` / `.csv` / `.json` = exactly that file; any other `PATH` = a per-run folder under it |
+| `--stamp` | prepend the generated-at metadata block to **stdout** too |
+
+Three rules make this safe to rely on:
+
+- **`--export` never changes stdout.** The view prints byte-for-byte what it would
+  have printed without the flag; the write confirmation goes to stderr. Pinned by
+  [`tests/test_view_export.py`](../tests/test_view_export.py).
+- **Every artifact carries the stamp; stdout does not unless you ask.** Mandatory in a
+  file (a number with no as-of outlives its terminal), optional on a terminal. Set
+  `CAGE_RUN_STAMP` to pin the clock for a byte-reproducible artifact.
+- **`--csv` and `--json` are unchanged**, on stdout *and* to a path — a `--csv PATH` is
+  a stream redirected to a file, `--export` is an artifact, and only the artifact grows
+  the block.
+
+A format the view cannot produce (`--export x.csv` on a view with no CSV renderer) is
+a refusal, not an empty file. Bare `cage` (the headline) has **no** `--export`: a
+root-level optional-value flag would swallow the following subcommand. `.cage/output/`
+is not `.cage/out/` (that one is `cage data serve`'s docroot), and no cleanup class
+prunes it — cage never deletes an artifact it wrote.
+
 ---
 
 ## Global
@@ -88,6 +117,9 @@ Where the spend went. Tokens are the default view; dollars are opt-in.
 | `--all-columns` | force the full column grid even without savings signal (for scripts wanting a fixed shape; CSV never gates) |
 | `--json` | machine-readable output |
 | `--csv [PATH]` | emit as CSV (stdout, or to `PATH`) |
+
+Plus the [export two](#export-flags) (`--export [PATH]` · `--stamp`) and the
+[capture-on-read three](#capture-on-read-flags).
 
 Savings printed here are **GROSS** — `raw_alternative − actual`, excluding the cost of
 *using* the tool. The word `gross` appears on every surface that prints the number;
@@ -192,7 +224,10 @@ rather than guessing.
 | `cage insights regression` | alert when cost-per-call drifts up (plan §8.3) |
 | `cage insights recommend` | cheapest-path: which tools to enable/skip (plan §8.4) |
 
-Flags, beyond the [capture-on-read three](#capture-on-read-flags):
+Flags, beyond the [capture-on-read three](#capture-on-read-flags) and the
+[export two](#export-flags) — **every view in this group takes `--export`/`--stamp`**
+([`tests/test_view_export.py`](../tests/test_view_export.py) gates the fan-out, so a
+new insight cannot ship un-exportable):
 
 | Command | Flags |
 |---|---|

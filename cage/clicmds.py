@@ -63,18 +63,21 @@ def cmd_report(args) -> int:
                            scope=getattr(args, "scope", None),
                            project=_project_filter(args),
                            team=getattr(args, "team", False))
-    if (dest := csv_dest(args)) is not None:
-        from cage import csvout
-        return csvout.write(report.render_csv(rep), dest)  # CSV never sees the ceiling (G4)
-    from cage import graphifymodel
-    # G4: the graphify day-one repo ceiling (modeled) surfaces in the footer. Read here
-    # (I/O) so render_report stays pure; silent in non-graphify projects. Uses cwd's
-    # graphify-out/, not the ledger root — the graph describes the working project.
-    ceiling = graphifymodel.repo_ceiling(r)
-    return emit(args, rep, report.render_report(
-        rep, last_import=importcmd.last_import(r), disp=display.resolve(args, pol),
-        stale_hours=policy.import_stale_hours(pol), health=importcmd.capture_health(r),
-        ceiling=ceiling, kiro_route=report.kiro_routed_line(r, pol)))
+
+    def text() -> str:
+        # G4: the graphify day-one repo ceiling (modeled) surfaces in the footer. Read
+        # here (I/O) so render_report stays pure; silent in non-graphify projects. Uses
+        # cwd's graphify-out/, not the ledger root — the graph describes the working
+        # project. **Lazy**: a plain `--csv` run never renders text, so it never pays
+        # for this read — and CSV still never sees the ceiling (G4).
+        from cage import graphifymodel
+        return report.render_report(
+            rep, last_import=importcmd.last_import(r), disp=display.resolve(args, pol),
+            stale_hours=policy.import_stale_hours(pol), health=importcmd.capture_health(r),
+            ceiling=graphifymodel.repo_ceiling(r),
+            kiro_route=report.kiro_routed_line(r, pol))
+
+    return emit(args, rep, text, csv=lambda: report.render_csv(rep), root=r)
 
 
 def cmd_overview(args) -> int:
@@ -93,10 +96,8 @@ def cmd_attrib(args) -> int:
     task = args.task or _latest_task(r)
     data = attribution.attribute(r, task, _policy(r), scope=getattr(args, "scope", None),
                                  team=getattr(args, "team", False))
-    if (dest := csv_dest(args)) is not None:
-        from cage import csvout
-        return csvout.write(attribution.render_csv(data), dest)
-    return emit(args, data, attribution.render_attrib(data))
+    return emit(args, data, attribution.render_attrib(data),
+                csv=lambda: attribution.render_csv(data), root=r)
 
 
 def cmd_matrix(args) -> int:
@@ -110,23 +111,21 @@ def cmd_matrix(args) -> int:
         serve.write_html(args.html, f"Matrix · {task}", {f"Matrix · {task}": text})
         print(f"✔ wrote {args.html}")
         return 0
-    return emit(args, data, text)
+    return emit(args, data, text, root=r)
 
 
 def cmd_budget(args) -> int:
     r = captured_read_root(args)
     verdict = budget.check(r, _policy(r), session=args.session,
                            scope=getattr(args, "scope", None))
-    return emit(args, verdict, budget.render_budget(verdict))
+    return emit(args, verdict, budget.render_budget(verdict), root=r)
 
 
 def cmd_roi(args) -> int:
     r = captured_read_root(args)
     data = roi.by_tool(r, _policy(r), since=args.since)
-    if (dest := csv_dest(args)) is not None:
-        from cage import csvout
-        return csvout.write(roi.render_csv(data), dest)
-    return emit(args, data, roi.render_roi(data))
+    return emit(args, data, roi.render_roi(data),
+                csv=lambda: roi.render_csv(data), root=r)
 
 
 def cmd_adoption(args) -> int:
@@ -135,10 +134,8 @@ def cmd_adoption(args) -> int:
     from cage import adoption
     r = captured_read_root(args)
     data = adoption.summarize(r, since=args.since)
-    if (dest := csv_dest(args)) is not None:
-        from cage import csvout
-        return csvout.write(adoption.render_csv(data), dest)
-    return emit(args, data, adoption.render_adoption(data))
+    return emit(args, data, adoption.render_adoption(data),
+                csv=lambda: adoption.render_csv(data), root=r)
 
 
 def cmd_chats(args) -> int:
@@ -148,12 +145,10 @@ def cmd_chats(args) -> int:
     r = captured_read_root(args)
     pol = _policy(r)
     data = chats.summarize(r, pol, since=args.since, agent=getattr(args, "agent", None))
-    if (dest := csv_dest(args)) is not None:
-        from cage import csvout
-        return csvout.write(chats.render_csv(data), dest)
     return emit(args, data, chats.render_chats(
         data, disp=display.resolve(args, pol), show_all=getattr(args, "all", False),
-        kiro_route=report.kiro_routed_line(r, pol)))
+        kiro_route=report.kiro_routed_line(r, pol, verb="insights chats")),
+        csv=lambda: chats.render_csv(data), root=r)
 
 
 def cmd_commits(args) -> int:
@@ -163,11 +158,9 @@ def cmd_commits(args) -> int:
     from cage import commitview
     r = captured_read_root(args)
     data = commitview.summarize(r, _policy(r), since=args.since)
-    if (dest := csv_dest(args)) is not None:
-        from cage import csvout
-        return csvout.write(commitview.render_csv(data), dest)
     return emit(args, render.envelope("commits", data) if args.json else data,
-                commitview.render_commits(data, show_all=getattr(args, "all", False)))
+                commitview.render_commits(data, show_all=getattr(args, "all", False)),
+                csv=lambda: commitview.render_csv(data), root=r)
 
 
 def cmd_commit(args) -> int:
@@ -175,11 +168,9 @@ def cmd_commit(args) -> int:
     from cage import commitview
     r = captured_read_root(args)
     data = commitview.summarize(r, _policy(r), sha=args.sha)
-    if (dest := csv_dest(args)) is not None:
-        from cage import csvout
-        return csvout.write(commitview.render_csv(data), dest)
     return emit(args, render.envelope("commit", data) if args.json else data,
-                commitview.render_commit(data, show_files=getattr(args, "files", False)))
+                commitview.render_commit(data, show_files=getattr(args, "files", False)),
+                csv=lambda: commitview.render_csv(data), root=r)
 
 
 def cmd_authorship_summary(args) -> int:
@@ -197,7 +188,7 @@ def cmd_authorship_summary(args) -> int:
 def cmd_why(args) -> int:
     lr = captured_read_root(args)
     data = provenance.explain(lr, args.call_id, pol=_policy(lr))
-    return emit(args, data, provenance.render_why(data, args.call_id))
+    return emit(args, data, provenance.render_why(data, args.call_id), root=lr)
 
 
 def cmd_serve(args) -> int:
@@ -343,11 +334,8 @@ def cmd_compare(args) -> int:
     if bad:
         raise CageError(f"unknown --by key(s) {bad}; choose from stack, scope, label")
     d = compare.summarize(r, _policy(r), by=by, scope=args.scope, label=args.label)
-    if (dest := csv_dest(args)) is not None:
-        from cage import csvout
-        return csvout.write(compare.render_csv(d), dest)
     return emit(args, render.envelope("compare", d) if args.json else d,
-                compare.render_compare(d))
+                compare.render_compare(d), csv=lambda: compare.render_csv(d), root=r)
 
 
 def cmd_estimate(args) -> int:
@@ -367,18 +355,16 @@ def cmd_estimate(args) -> int:
         recorded = args.record
     payload = {**d, **({"recorded": recorded} if recorded else {})}
     return emit(args, render.envelope("estimate", payload) if args.json else payload,
-                estimate.render_estimate(d, recorded))
+                estimate.render_estimate(d, recorded), root=r)
 
 
 def cmd_calibration(args) -> int:
     from cage import calibration
     r = captured_read_root(args)
     d = calibration.summarize(r, _policy(r))
-    if (dest := csv_dest(args)) is not None:
-        from cage import csvout
-        return csvout.write(calibration.render_csv(d), dest)
     return emit(args, render.envelope("calibration", d) if args.json else d,
-                calibration.render_calibration(d))
+                calibration.render_calibration(d),
+                csv=lambda: calibration.render_csv(d), root=r)
 
 
 def cmd_verdict(args) -> int:
@@ -386,7 +372,7 @@ def cmd_verdict(args) -> int:
     r = captured_read_root(args)
     d = verdict.compose(r, _policy(r), args.tool, since=args.since)
     return emit(args, render.envelope("verdict", d) if args.json else d,
-                verdict.render_verdict(d))
+                verdict.render_verdict(d), root=r)
 
 
 def cmd_prices(args) -> int:
@@ -478,19 +464,19 @@ def cmd_study(args) -> int:
 def cmd_regression(args) -> int:
     lr = captured_read_root(args)
     r = regression.detect(lr, since=args.since, tolerance=args.tolerance, pol=_policy(lr))
-    return emit(args, r, regression.render_regression(r))
+    return emit(args, r, regression.render_regression(r), root=lr)
 
 
 def cmd_recommend(args) -> int:
     lr = captured_read_root(args)
     r = recommend.recommend(lr, _policy(lr), since=args.since)
-    return emit(args, r, recommend.render_recommend(r))
+    return emit(args, r, recommend.render_recommend(r), root=lr)
 
 
 def cmd_forecast(args) -> int:
     lr = captured_read_root(args)
     f = forecast.project(lr, _policy(lr))
-    return emit(args, f, forecast.render_forecast(f))
+    return emit(args, f, forecast.render_forecast(f), root=lr)
 
 
 # ── adapters: proxy / meter / mcp / agents (plan §5, §6) ─────────────────────

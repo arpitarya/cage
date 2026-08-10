@@ -1182,6 +1182,18 @@ class Footprint:
         return self.base / "out"
 
     @property
+    def output(self) -> Path:
+        """The `--export` artifact directory (`cage/viewexport.py`) — dated, per-run
+        folders of exported reports and insights.
+
+        **Deliberately not :attr:`out`.** That one is `cage data serve`'s docroot: a
+        stdlib `http.server` is pointed straight at it, so every file inside is served
+        on the loopback port. An exported artifact is a *record*, not a page, and
+        sharing one directory would mean starting the dashboard quietly published every
+        report anyone had ever exported. Two homes, two purposes, no overlap."""
+        return self.base / "output"
+
+    @property
     def state(self) -> Path:
         return self.base / "state"
 

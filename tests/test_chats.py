@@ -477,6 +477,78 @@ def test_filtered_empty_names_the_filter_not_the_ledger(root, pol):
     assert "since 7d" in out
 
 
+# ── structural absence: the filter is blamed only when the filter is the reason ──
+#
+# `cage insights chats --agent kiro` printing "the filter is empty, not the ledger" is
+# a true sentence about the filter and a misleading one about kiro: its CLI
+# conversations are credits (no calls at all) and its IDE rows route to the machine
+# ledger (ADR 0006). Both facts are in cage's hands at render time. Saying *filter*
+# when the answer is *architecture* sends a reader to check their typing instead of
+# the ledger they actually want.
+
+def _credit(root: Path, *, session: str, agent: str = "kiro", credits: float = 3.5,
+            turns: int = 4, ts: str = "2026-07-01T10:00:00Z"):
+    """One kiro-CLI credits row — a different row shape with no tokens and no call."""
+    ledger.append_row(root, "credits", schema.make_credit(
+        session=session, credits=credits, agent=agent, turns=turns, ts=ts))
+
+
+def test_an_agent_recorded_as_credits_says_so_instead_of_blaming_the_filter(root, pol):
+    _call(root, "c_1", agent="claude-code", session="s1")
+    _credit(root, session="kc1")
+    out = chats.render_chats(chats.summarize(root, pol, agent="kiro"))
+    assert "recorded as credits, not token calls" in out
+    assert "the filter is empty, not the ledger" not in out
+    assert "cage report" in out          # where that usage IS counted
+
+
+def test_the_routed_sink_is_named_in_the_empty_view_too(root, pol):
+    """The kiro-routing line was computed and then dropped on the empty path — an
+    agent showing nothing is indistinguishable from an agent whose capture broke,
+    which is the failure this line exists to prevent."""
+    out = chats.render_chats(chats.summarize(root, pol, agent="kiro"),
+                             kiro_route="· kiro is not counted here — …")
+    assert "kiro is not counted here" in out
+
+
+def test_a_filter_that_really_is_the_reason_still_says_so(root, pol):
+    """The old message is not wrong, it was over-applied. An agent with no structural
+    reason gets it back, unchanged."""
+    _call(root, "c_1", agent="claude-code", session="s1")
+    _credit(root, session="kc1")
+    out = chats.render_chats(chats.summarize(root, pol, agent="copilot"))
+    assert "the filter is empty, not the ledger" in out
+    assert "recorded as credits" not in out   # copilot's absence has a different cause
+
+
+def test_a_filtered_view_is_never_told_about_another_agents_reason(root, pol):
+    _credit(root, session="kc1")
+    out = chats.render_chats(chats.summarize(root, pol, agent="claude"),
+                             kiro_route="· kiro is not counted here — …")
+    assert "kiro" not in out
+
+
+def test_a_non_empty_view_still_names_the_usage_it_cannot_show(root, pol):
+    """No-silent-omission: a table that just doesn't show credits usage reads as
+    'there is none', and the ledger sitting right there says otherwise."""
+    _call(root, "c_1", agent="claude-code", session="s1")
+    _credit(root, session="kc1")
+    out = chats.render_chats(chats.summarize(root, pol))
+    assert "recorded as credits carries no calls" in out
+
+
+def test_reading_credits_moves_no_number(root, pol):
+    """The third money-independent carve-out holds on the same terms as the first two:
+    read for a refusal, never for a cell. Delete every credits row and the rendered
+    table is byte-identical below the footer."""
+    _call(root, "c_1", agent="claude-code", session="s1")
+    before = chats.summarize(root, pol)
+    _credit(root, session="kc1")
+    after = chats.summarize(root, pol)
+    assert before["rows"] == after["rows"]
+    assert chats.render_csv(before) == chats.render_csv(after)   # CSV never sees it
+
+
 # ── --agent filter ───────────────────────────────────────────────────────────
 
 def test_agent_filter(root, pol):

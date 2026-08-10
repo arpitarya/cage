@@ -76,6 +76,35 @@ def _csv_flag(p: argparse.ArgumentParser) -> None:
                         "stay columns — see `cage query csv-output`")
 
 
+def _export_flags(p: argparse.ArgumentParser, view: str) -> None:
+    """The artifact surface every report and insight carries (`cage/viewexport.py`).
+
+    ``--export`` writes the view to disk: bare = `<ledger>/.cage/output/<view>-<stamp>/`
+    holding every format this view has, a path with a known suffix = exactly that file,
+    any other path = a per-run folder under it. **Additive** — stdout is byte-identical
+    with and without it, and the confirmation goes to stderr.
+
+    ``--stamp`` is the opt-in half of the same metadata block: mandatory in an artifact,
+    optional on a terminal (`runstamp`'s docstring says why the determinism law
+    survives). ``view`` is the parser's own verb path, and it is set HERE rather than at
+    the handler so the artifact's name and its `view=` field can never disagree with the
+    command that produced it.
+
+    Deliberately **not** on bare `cage` (the overview): a root-level `--export` with an
+    optional value would swallow the following subcommand (`cage --export report` would
+    export to a file named `report`). The headline banner is a terminal surface; `cage
+    report --export` is the artifact of the same ledger."""
+    p.add_argument("--export", nargs="?", const="", metavar="PATH",
+                   help="write this view to disk (default "
+                        ".cage/output/<view>-<stamp>/, every format it has; "
+                        "PATH.csv/.json/.md/.txt writes one file) — every artifact "
+                        "carries a generated-at stamp (`cage query view-export`)")
+    p.add_argument("--stamp", action="store_true",
+                   help="prepend the generated-at metadata block to stdout too "
+                        "(always present in an --export artifact)")
+    p.set_defaults(view=view)
+
+
 def _capture_flags(p: argparse.ArgumentParser) -> None:
     """Capture-on-read controls shared by every read surface (capture-architecture
     Phase 1). ``--no-import`` skips the lazy pre-read sweep for this invocation (env
@@ -142,6 +171,7 @@ def build_parser() -> argparse.ArgumentParser:
     _json_flag(rep)
     _csv_flag(rep)
     _capture_flags(rep)
+    _export_flags(rep, "report")
     rep.set_defaults(fn=clicmds.cmd_report)
 
     im = sub.add_parser("import", help="capture every agent's on-disk usage into the active ledger (the universal path)",
@@ -256,6 +286,7 @@ def build_parser() -> argparse.ArgumentParser:
     _json_flag(at)
     _csv_flag(at)
     _capture_flags(at)
+    _export_flags(at, "insights attrib")
     at.set_defaults(fn=clicmds.cmd_attrib)
 
     mx = insights.add_parser("matrix", help="counterfactual permutation table for a task (§4.4)",
@@ -269,6 +300,7 @@ def build_parser() -> argparse.ArgumentParser:
     _json_flag(mx)
     _html_flag(mx)
     _capture_flags(mx)
+    _export_flags(mx, "insights matrix")
     mx.set_defaults(fn=clicmds.cmd_matrix)
 
     ro = insights.add_parser("roi", help="saved $ per tool vs its own cost + latency")
@@ -276,6 +308,7 @@ def build_parser() -> argparse.ArgumentParser:
     _json_flag(ro)
     _csv_flag(ro)
     _capture_flags(ro)
+    _export_flags(ro, "insights roi")
     ro.set_defaults(fn=clicmds.cmd_roi)
 
     ad = insights.add_parser("adoption",
@@ -285,6 +318,7 @@ def build_parser() -> argparse.ArgumentParser:
     _json_flag(ad)
     _csv_flag(ad)
     _capture_flags(ad)
+    _export_flags(ad, "insights adoption")
     ad.set_defaults(fn=clicmds.cmd_adoption)
 
     ch = insights.add_parser("chats",
@@ -302,6 +336,7 @@ def build_parser() -> argparse.ArgumentParser:
     _json_flag(ch)
     _csv_flag(ch)
     _capture_flags(ch)
+    _export_flags(ch, "insights chats")
     ch.set_defaults(fn=clicmds.cmd_chats)
 
     cm = insights.add_parser("commits",
@@ -314,6 +349,7 @@ def build_parser() -> argparse.ArgumentParser:
     _json_flag(cm)
     _csv_flag(cm)
     _capture_flags(cm)
+    _export_flags(cm, "insights commits")
     cm.set_defaults(fn=clicmds.cmd_commits)
 
     cd = insights.add_parser("commit",
@@ -325,6 +361,7 @@ def build_parser() -> argparse.ArgumentParser:
     _json_flag(cd)
     _csv_flag(cd)
     _capture_flags(cd)
+    _export_flags(cd, "insights commit")
     cd.set_defaults(fn=clicmds.cmd_commit)
 
     vd = insights.add_parser("verdict",
@@ -334,6 +371,7 @@ def build_parser() -> argparse.ArgumentParser:
     vd.add_argument("--since", metavar="WINDOW", help="window like 30d / 2w (default: all history)")
     _json_flag(vd)
     _capture_flags(vd)
+    _export_flags(vd, "insights verdict")
     vd.set_defaults(fn=clicmds.cmd_verdict)
 
     bd = insights.add_parser("budget", help="session/day spend vs policy ceilings (§8.1)")
@@ -341,6 +379,7 @@ def build_parser() -> argparse.ArgumentParser:
     bd.add_argument("--scope", metavar="DIR", help="filter to one monorepo top-level dir (§3.6.2)")
     _json_flag(bd)
     _capture_flags(bd)
+    _export_flags(bd, "insights budget")
     bd.set_defaults(fn=clicmds.cmd_budget)
 
     cp = insights.add_parser("compare",
@@ -353,6 +392,7 @@ def build_parser() -> argparse.ArgumentParser:
     _json_flag(cp)
     _csv_flag(cp)
     _capture_flags(cp)
+    _export_flags(cp, "insights compare")
     cp.set_defaults(fn=clicmds.cmd_compare)
 
     es = insights.add_parser("estimate",
@@ -366,6 +406,7 @@ def build_parser() -> argparse.ArgumentParser:
                          "+ band bounds) so `cage insights calibration` can score it at close")
     _json_flag(es)
     _capture_flags(es)
+    _export_flags(es, "insights estimate")
     es.set_defaults(fn=clicmds.cmd_estimate)
 
     cb = insights.add_parser("calibration",
@@ -374,17 +415,20 @@ def build_parser() -> argparse.ArgumentParser:
     _json_flag(cb)
     _csv_flag(cb)
     _capture_flags(cb)
+    _export_flags(cb, "insights calibration")
     cb.set_defaults(fn=clicmds.cmd_calibration)
 
     wy = insights.add_parser("why", help="full provenance: a call + every receipt against it")
     wy.add_argument("call_id")
     _json_flag(wy)
     _capture_flags(wy)
+    _export_flags(wy, "insights why")
     wy.set_defaults(fn=clicmds.cmd_why)
 
     fc = insights.add_parser("forecast", help="project monthly spend vs the budget (§8.5)")
     _json_flag(fc)
     _capture_flags(fc)
+    _export_flags(fc, "insights forecast")
     fc.set_defaults(fn=clicmds.cmd_forecast)
 
     rg = insights.add_parser("regression", help="alert when cost-per-call drifts up (§8.3)")
@@ -392,12 +436,14 @@ def build_parser() -> argparse.ArgumentParser:
     rg.add_argument("--tolerance", type=float, default=0.2, help="drift fraction that trips the flag")
     _json_flag(rg)
     _capture_flags(rg)
+    _export_flags(rg, "insights regression")
     rg.set_defaults(fn=clicmds.cmd_regression)
 
     rc = insights.add_parser("recommend", help="cheapest-path: which tools to enable/skip (§8.4)")
     rc.add_argument("--since", metavar="WINDOW")
     _json_flag(rc)
     _capture_flags(rc)
+    _export_flags(rc, "insights recommend")
     rc.set_defaults(fn=clicmds.cmd_recommend)
 
     # ── group: task (the task-outcome axis the cost-impact views read) ─────────

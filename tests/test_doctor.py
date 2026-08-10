@@ -30,15 +30,25 @@ def test_init_gitignores_state_dir(proj):
 
 
 def test_gitignore_heals_older_footprint(proj):
-    # An older footprint missing `state/` gets healed on re-init, idempotently.
+    # An older footprint missing `state/`/`output/` gets healed on re-init, idempotently.
     fp = proj / ".cage"
     fp.mkdir(parents=True)
     (fp / ".gitignore").write_text("ledger/\nout/\n", encoding="utf-8")
     initcmd.run(proj)
     body = (fp / ".gitignore").read_text()
-    assert "state/" in body
+    assert "state/" in body and "output/" in body
     initcmd.run(proj)  # re-run adds no duplicate
     assert (fp / ".gitignore").read_text().count("state/") == 1
+    assert (fp / ".gitignore").read_text().count("output/") == 1
+
+
+def test_export_artifacts_are_gitignored_and_never_the_serve_docroot(proj):
+    """`--export` artifacts are regenerable and carry a wall clock, so committing them
+    churns a diff on every run. They also live in `output/`, NOT `out/` — that one is
+    `cage data serve`'s docroot and every file in it is published on the loopback port."""
+    initcmd.run(proj)
+    gi = (proj / ".cage" / ".gitignore").read_text()
+    assert "output/" in gi and "out/" in gi
 
 
 def test_ledger_roundtrip_always_ok(proj):

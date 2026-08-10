@@ -533,6 +533,20 @@ spec'd elsewhere.
   those rows are not independent evidence. And per chat there is no diff to clamp
   against (§2.14 clamps per commit), so two chats that proposed the same landed file
   each count its lines: **the commit view stays the arbiter for any single sha**.
+- **The third money-independent carve-out: `ledger.credits`, read for a *refusal*.**
+  A credits row has no `tokens_in`/`tokens_out` and no call at all
+  (`schema.make_credit` — a call with `tokens_in=0` would be a lie), so an agent
+  recorded that way **can never produce a chat row**. The view reads which agents those
+  are so an empty result can say *why*, and so a non-empty one can footnote the usage it
+  structurally cannot show (no-silent-omission). It moves no cell: delete every credits
+  shard and `rows` and the CSV are byte-identical (`tests/test_chats.py::
+  test_reading_credits_moves_no_number`).
+- **The filter is blamed only when the filter is the reason.** `No chats match agent
+  'kiro' — the filter is empty, not the ledger` is true about the filter and misleading
+  about kiro, whose absence is structural on two counts (credits above; IDE rows routed
+  to the machine ledger, [ADR 0006](adr/0006-kiro-rows-are-machine-facts-not-project-facts.md)).
+  The empty view names the reasons it can evidence, and only for the agent asked about;
+  an absence with no structural cause keeps the filter message unchanged.
 - Ranking (`tokens_in` desc, then session id) and the top-20 cut (`--all` lifts it) are
   render-time only — `chats.summarize()` returns every row un-truncated, so `--all` can
   never move a number, only how many rows are shown. CSV is never truncated. Explained

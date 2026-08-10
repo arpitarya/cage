@@ -346,7 +346,7 @@ def capture_warnings(health: dict | None) -> list[str]:
     return out
 
 
-def kiro_routed_line(root: Path, pol: dict | None = None) -> str:
+def kiro_routed_line(root: Path, pol: dict | None = None, verb: str = "report") -> str:
     """The footer line explaining why a **project** report shows no kiro (ADR 0006): its
     IDE rows are a machine fact and live in the machine ledger. ``""`` when kiro is not
     routed away (the machine ledger's own report, or an explicit ``--ledger``), or when
@@ -357,7 +357,12 @@ def kiro_routed_line(root: Path, pol: dict | None = None) -> str:
     exists to prevent. Impure (it resolves paths), so it is read at the CLI boundary and
     passed into the pure `render_report`, like `health` and `ceiling`. Deliberately does
     **not** read the machine ledger to count rows: a per-report cross-ledger read to
-    decorate a footnote is not worth it, and the line is true either way."""
+    decorate a footnote is not worth it, and the line is true either way.
+
+    ``verb`` is the command the runnable fix should name, so the *one* phrasing can be
+    reused by any view that shows no kiro (`cage insights chats` passes its own). It
+    varies the fix line only — the explanation itself is never re-worded per view, the
+    `netsaved.GROSS_NOTE` discipline."""
     from cage import paths
     sink = paths.kiro_routed(root)
     if sink is None:
@@ -370,7 +375,7 @@ def kiro_routed_line(root: Path, pol: dict | None = None) -> str:
     return (f"· kiro is not counted here — its IDE log carries no project, so its rows "
             f"are a machine fact and live in {paths.Footprint(sink).base}\n"
             f"  (`cage query kiro-routing`; read them with "
-            f"`cage --ledger {paths.Footprint(sink).base} report`)")
+            f"`cage --ledger {paths.Footprint(sink).base} {verb}`)")
 
 
 def _kiro_limits_caveat(rep: dict, usd: bool) -> str:

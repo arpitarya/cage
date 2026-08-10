@@ -228,7 +228,7 @@ cage data export --csv calls --since 30d -o calls.csv   # raw ledger rows for a 
 
 ## The `$0` guarantee
 
-Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 1503 tests; `cage demo` reproduces the worked attribution example against a real ledger.
+Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 1541 tests; `cage demo` reproduces the worked attribution example against a real ledger.
 
 **Honest limits.** Marginal-by-fixed-order is defensible and `$0`, but it is an *ordering convention*, not a Shapley value (that's a deferred audit mode). And a counterfactual cell is an honest reconstruction, never an invoice — the `method` column says so on every row, on purpose.
 
@@ -236,7 +236,7 @@ Every derived view is parse / arithmetic over the log — **no LLM call, ever, o
 
 Latest release below — full history and detail in [CHANGELOG.md](CHANGELOG.md).
 
-- **v0.47.2 (2026-08-08) — Windows, finished.** The last failure was the same class as v0.47.1's one syntax layer over: a Windows path inside a TOML *basic* string, where `\U` is an escape. Fixed by using the `.as_posix()` convention six other tests already followed, plus a grep-gate so it can't buy a third release. (v0.47.0 brought graphify savings to copilot VS Code and kiro — see [CHANGELOG.md](CHANGELOG.md).)
+- **v0.48.0 (2026-08-10) — every report and insight is an artifact.** `--export` on `cage report` and all 16 `cage insights` views writes the rendered view to `.cage/output/<view>-<stamp>/` in every format it has (text · CSV · JSON), or to any path you name. Every artifact carries a mandatory generated-at block; **stdout stays byte-identical with and without the flag**, so the determinism law is untouched and `--stamp` is the opt-in half. Also: `cage insights chats --agent kiro` now names the *structural* reason it is empty (credits rows carry no calls; IDE rows route to the machine ledger) instead of blaming your filter.
 
 ## The name
 

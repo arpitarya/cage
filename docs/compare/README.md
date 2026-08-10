@@ -32,3 +32,9 @@ Naming: `<topic>.compare.md`. Written in short points, not walls of prose.
   (unreleased). Living spec: [FORMULAS.md §1.1a](../FORMULAS.md) ·
   [PLAN.md §3.1](../PLAN.md) · `cage query copilot-credits`; the proposal it graduated
   through is [archived](../archive/v0.44-copilot-credits.proposal.md).
+- [view-export-and-run-stamp.compare.md](view-export-and-run-stamp.compare.md) — the
+  artifact surface: where a generated-at stamp may live, whether a read command writes a
+  file, and what bare `--export` produces. **DECIDED 2026-08-10 · IMPLEMENTED v0.48**
+  (unreleased): an artifact-only metadata block, `--export` as a capability not a side
+  effect, all available formats per run. Living spec: [CLI.md](../CLI.md) §Export flags ·
+  `cage query view-export`.
