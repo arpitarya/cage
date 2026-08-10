@@ -470,6 +470,84 @@ def test_every_agent_missing_a_capability_says_so(proj_at):
     assert lines[-1].startswith("all agents:") and "VS Code" in lines[-1]
 
 
+def test_the_posix_shell_limit_is_named_for_all_three(proj_at):
+    """P2.2. Every wired hook command is POSIX shell — claude's uses
+    `${CLAUDE_PROJECT_DIR:-.}` expansion, copilot's and kiro's are
+    `runshim.selflocating_command`'s `git rev-parse … ; exit 0` one-liner — and only
+    copilot's schema declares an interpreter (`bash`). kiro's declares none, so on a
+    Windows host with no POSIX shell its hook does not run.
+
+    It is asserted as an **all-agents** line rather than a `HOOK_GAPS` key on purpose,
+    and both halves of that are load-bearing: it is not per-agent (all three are
+    POSIX-shaped), and `HOOK_GAPS` structurally cannot hold it — a full-event-set agent
+    must stay disjoint from that table, and claude has the full set. Twinning kiro's
+    document is the other non-option: it is a committed file that must be byte-identical
+    on every machine."""
+    lines = agents.hook_gap_lines()
+    shell = [ln for ln in lines if ln.startswith("all agents:") and "POSIX" in ln]
+    assert len(shell) == 1, lines
+    assert "Windows" in shell[0]
+    assert "kiro" in shell[0]          # the agent whose schema names no interpreter
+    # Capture must not be implicated: L1 is not for capture, and a reader who thinks a
+    # Windows host loses tokens will go looking for a capture bug that does not exist.
+    assert "Capture is unaffected" in shell[0]
+    # And it is NOT smuggled into the per-agent table.
+    assert not any("POSIX" in gap for gap in agents.HOOK_GAPS.values())
+
+
+def test_copilot_never_claims_session_identity_or_auto_close(proj_at):
+    """P2.3. `hookcmd._session` reads `session_id` from *Claude Code's* stdin payload
+    shape and nothing else, so on copilot it returns `""`, `_open_tasks` finds nothing,
+    and `_session_end` closes zero tasks. The gap text used to end "session identity and
+    auto task-close are wired" — the precise overclaim this table exists to prevent."""
+    from cage import copilotwire
+    gap = agents.HOOK_GAPS["copilot"]
+    assert "are wired" not in gap
+    assert "DECLINES to auto-close" in gap
+    # And the event names are stated as cage's own, not as vendor facts.
+    assert "unverified" in gap
+
+    # The mechanism, not just the prose. Copilot's wired command carries no `--session`
+    # (`copilotwire._hook_command`) and cage parses no session id out of a Copilot
+    # payload, so a real end-event arrives session-less: the task stays OPEN, and the
+    # attestation still lands. Same refusal as kiro's, which is what the gap now says.
+    assert "--session" not in copilotwire._hook_command("session-end")
+    _call(proj_at, "t1", "s1")
+    assert hookcmd.run(_args("session-end", agent="copilot", session="")) == 0
+    assert tasks.read(proj_at) == {}, "copilot closed a task it cannot identify"
+    assert "copilot" in attest.agents_seen(proj_at)   # identity is still recorded
+
+
+def test_setup_status_never_prints_an_unqualified_hook_count_for_a_limited_agent(
+        proj_at, capsys, monkeypatch):
+    """P2.3, second half — the one the gap text alone does not fix. `cage setup --status`
+    prints `L1 hooks ×N` straight from the wired file's CONTENTS, independent of
+    `HOOK_GAPS`, so rewording the table left `copilot … [L1 hooks ×2]` reading as a
+    working auto-close. The qualifier is derived from the same one table."""
+    from cage import cli
+    agents.install(proj_at, hooks=True)
+    monkeypatch.chdir(proj_at)
+    # Through the LIVE parser, not a hand-built namespace — `--status` is a real front
+    # door and this assertion is about what a user actually sees.
+    args = cli.build_parser().parse_args(["setup", "--status"])
+    assert args.fn(args) == 0
+    out = capsys.readouterr().out
+
+    seen = 0
+    for surface in agents.SURFACES:
+        line = next((ln for ln in out.splitlines()
+                     if surface in ln and "L1 hooks" in ln), "")
+        if not line:
+            continue
+        seen += 1
+        if surface in agents.HOOK_GAPS:
+            assert "limited" in line, f"{surface} claims full L1: {line!r}"
+        else:
+            assert "limited" not in line, f"{surface} has no gap but is marked: {line!r}"
+    assert seen == len(agents.SURFACES), out
+    assert "L1 limits:" in out
+
+
 def test_the_capability_table_is_the_only_source_of_capabilities(proj_at):
     """Every agent appears in the table, and every event it lists is a real one — so
     output describing L1 cannot drift from what is actually installed."""

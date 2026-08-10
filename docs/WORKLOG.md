@@ -12,6 +12,34 @@ by milestone) — the worklog is what *happened this session*.
 
 ---
 
+## 2026-08-11 — Claude Code (Opus 5) — agent-lane sweep P2: REV-HARDEN P3 wiring hygiene
+
+- **Asked:** continue the sweep; P2 is the Opus-tier phase (wiring + a data-loss path).
+- **Done:** all five items, each verified as still-real before being fixed, three of them
+  by reproducing the failure in-process. `.gitattributes` LF pin on the POSIX twin ·
+  kiro's POSIX-only hook **named** in a new `agents.HOOK_SHELL_LIMIT` · copilot's
+  "auto-close is wired" overclaim removed **and** `cage setup --status`'s unqualified
+  `L1 hooks ×N` fixed · the non-dict hook entry · the four `wiringscan` bookkeeping bugs.
+- **The finding worth more than the fix:** the handoff named five crash sites for the
+  non-dict entry. There is a **sixth** — `claudewire`'s `enable=True` wiring loop — and
+  it is only reachable *once foreign entries are correctly preserved*, so fixing
+  preservation alone moves the crash instead of closing it. Also confirmed the silent
+  half in-process: an unreadable `hooks` value was coerced to `{}` and `path.unlink()`
+  destroyed a file's `myTeamSettings` on the **default** (`--no-hooks`) setup path.
+- **Decided (both gates honoured):** kiro's hook is **named, not twinned** — its document
+  is committed and byte-compared, so a per-OS command churns a mixed-OS team's diff; same
+  trade as the path-free MCP entry. And "nothing left to preserve" vs "a shape I don't
+  understand" are now **different branches**, with both opposing green tests intact.
+- **5a before 5b, as specified** — and the ordering constraint is now a test, not a note.
+  5a reproduced as five phantom `other` rows on a wired project; the stripper takes
+  **any** trailing parenthetical, since kiro's display is `" (L1 hook)"`, singular.
+- **Every fix mutation-checked:** reverting each guard kills its test. The new 5c tests
+  assert the **rendered rows** and doctor's text — the layer the old test skipped, which
+  is exactly how 5c stayed green.
+- **Open:** nothing from P3. Residual P4 items carried on the rewritten OPEN-WORK row.
+- **Next step:** P3 — REV-HARDEN P4's mechanical half (7 → 3 → 4 → 2 → 5-quotePath),
+  **not** batched with the judgment half.
+
 ## 2026-08-11 — Claude Code (Opus 5) — agent-lane sweep: P0 found done, P1 landed
 
 - **Asked:** execute the agent-lane sweep pair, starting at P1; P0 gated on Arpit's go.

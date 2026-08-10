@@ -63,9 +63,20 @@ HOOK_EVENTS: dict[str, tuple[str, ...]] = {
 # Why each agent is missing what it is missing. Keyed by agent; a missing key means the
 # agent has the full set. These are *platform* facts, not cage defects.
 HOOK_GAPS: dict[str, str] = {
+    # ⚠️ This entry used to end "session identity and auto task-close are wired". That was
+    # false on both counts and is the exact overclaim `HOOK_GAPS` exists to prevent.
+    # (a) `sessionStart`/`sessionEnd` are cage's OWN names, carried over from the v0.10
+    # implementation `copilotwire` still cleans up — no vendor evidence for either exists
+    # anywhere in this repo, so they may never fire at all. (b) Even when they do,
+    # `hookcmd._session()` reads `session_id` out of *Claude Code's* stdin payload shape,
+    # so on Copilot it returns `""`, `_open_tasks` finds nothing, and `_session_end`
+    # closes zero tasks — silently, the way a wired-and-working hook also looks.
     "copilot": ("no per-tool attestation and no budget block — cage has never written "
                 "or tested a Copilot pre-tool hook, and an unverified event name fails "
-                "silently; session identity and auto task-close are wired"),
+                "silently. The two wired event names are cage's own and unverified "
+                "against any Copilot doc, and cage reads no session id from a Copilot "
+                "payload — so the hook attests without a session and DECLINES to "
+                "auto-close, exactly as kiro's does"),
     "kiro": ("no session-start trigger exists, so the single `agentStop` hook carries "
              "no session id — cage attests the agent but DECLINES to auto-close a task "
              "rather than closing the most recent one by proximity"),
@@ -75,6 +86,35 @@ HOOK_GAPS: dict[str, str] = {
 HOOK_SURFACE_LIMIT = ("hooks are CLI-only: they do not fire under a VS Code extension, "
                       "so every L1 fact is a CLI-session fact")
 
+# The second all-agents limit, and it is a *Windows* one. Every wired hook command is
+# POSIX shell: claude's uses `${CLAUDE_PROJECT_DIR:-.}` parameter expansion and names the
+# extensionless `cage-run`; copilot's and kiro's are `runshim.selflocating_command`'s
+# `r="$(git rev-parse …)" && … ; exit 0` one-liner. Copilot's at least declares its
+# interpreter (the `"bash"` key); kiro's schema has no interpreter field at all, so on a
+# Windows host without a POSIX shell the hook does not run.
+#
+# **It is named, not twinned, and that is deliberate.** kiro's hook document is a
+# *committed* file that must be byte-identical on every machine
+# (`tests/test_agents.py::test_committed_wiring_never_carries_resolved_path` and the
+# byte-compare in `kirowire._wire_hooks`), so a per-OS command would reintroduce exactly
+# the committed-file fork this repo closed for kiro's MCP entry — two teammates running
+# `cage setup` on different OSes would churn the diff forever. Same trade, same verdict:
+# **a committed file can carry one spelling, so name the limit.**
+#
+# It belongs here rather than in `HOOK_GAPS` for two reasons: it is not per-agent (all
+# three are POSIX-shaped), and `HOOK_GAPS` structurally cannot hold it — an agent with
+# the full event set must stay disjoint from that table
+# (`tests/test_hooks_layer.py::test_the_capability_table_is_the_only_source_of_capabilities`),
+# and claude has the full set.
+#
+# Capture is unaffected either way: L1 is not for capture, so a Windows host with no
+# POSIX shell loses attestation and auto-close, never a metered token.
+HOOK_SHELL_LIMIT = ("hook commands are POSIX shell, so on Windows they need a POSIX "
+                    "shell on PATH (Git Bash/WSL) — copilot's declares `bash`, kiro's "
+                    "hook schema names no interpreter at all. Not twinned: the hook "
+                    "files are committed and must be byte-identical on every machine. "
+                    "Capture is unaffected — L1 is not for capture")
+
 
 def hook_gap_lines() -> list[str]:
     """One line per agent that cannot do everything L1 offers, plus the limit that
@@ -82,7 +122,10 @@ def hook_gap_lines() -> list[str]:
     absent for one agent is exactly the failure the three-agent invariant exists to
     prevent."""
     lines = [f"{a}: {HOOK_GAPS[a]}" for a in SURFACES if a in HOOK_GAPS]
-    return lines + [f"all agents: {HOOK_SURFACE_LIMIT}"]
+    # The VS Code limit stays LAST — it is the one that decides whether an L1 fact exists
+    # at all, where the shell limit only decides whether it fires on one OS.
+    return lines + [f"all agents: {HOOK_SHELL_LIMIT}",
+                    f"all agents: {HOOK_SURFACE_LIMIT}"]
 
 
 def install(root: Path, surfaces: tuple[str, ...] | None = None,

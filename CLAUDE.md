@@ -790,7 +790,7 @@ the worked examples to copy.
 ## Dev
 
 ```bash
-just test          # python -m pytest -q   (1545 tests; +10 Windows-only skips, +1 opt-in dogfood-age skip)
+just test          # python -m pytest -q   (1562 tests; +10 Windows-only skips, +1 opt-in dogfood-age skip)
 just demo          # seed §4.4 + print attrib/matrix
 cage --version
 ```
@@ -944,10 +944,30 @@ each agent only needs thin idiomatic wiring (`agents.py` orchestrates):
   limit (`attest.LIMIT`). Per-agent capability is **ONE table**, `agents.HOOK_EVENTS`,
   and **every gap is named in output** via `agents.HOOK_GAPS` (kiro has no session-start
   ⇒ its `agentStop` hook attests but **declines** to auto-close; copilot has no verified
-  pre-tool event ⇒ no attestation, no budget block). **No unverified host event name is
+  pre-tool event ⇒ no attestation, no budget block — **and its two wired event names are
+  cage's own, unverified against any vendor doc, while cage reads no session id from a
+  Copilot payload, so it attests without a session and declines auto-close the same way
+  kiro does**). A limit that is **not per-agent** goes in one of the two all-agents lines
+  instead, never smuggled into `HOOK_GAPS` — which structurally cannot hold it, since a
+  full-event-set agent must stay disjoint from that table: `HOOK_SURFACE_LIMIT` (hooks
+  are CLI-only) and `HOOK_SHELL_LIMIT` (every wired command is POSIX shell, so Windows
+  needs Git Bash/WSL; kiro's hook schema names no interpreter at all). The shell limit is
+  **named, not twinned** — the hook files are committed and byte-compared, so a per-OS
+  command would churn a diff on every `cage setup` in a mixed-OS team, the same trade
+  already settled for kiro's path-free MCP entry; and it costs no tokens, because L1 is
+  not for capture. **Any surface printing an installed-hook *count* must qualify it from
+  that same one table** (`clicmds`'s `L1 hooks ×N (limited …)`): the count reads file
+  *contents* and is otherwise independent of the gap text, so rewording `HOOK_GAPS` alone
+  left `cage setup --status` printing an unqualified `copilot … [L1 hooks ×2]`.
+  **No unverified host event name is
   ever invented** — an invented one fails silently, the class this project has already
   paid for twice. Every wired hook command is checked against the **live parser** by
-  `wiringscan` (F1, applied before the fact).
+  `wiringscan` (F1, applied before the fact). **A wired file cage did not write is
+  refused, never coerced:** a `hooks` value of an unreadable shape leaves the file
+  untouched (a non-dict entry is *foreign by construction* — cage only ever writes
+  `{"bash": …}`), because "nothing left to preserve" and "a shape I don't understand" are
+  different branches; conflating them deleted a user's whole file on the *default* setup
+  path.
 - **Steering/skills are one source, three deliveries** ([steering.py](cage/steering.py))
   — a `Doc` is authored once and rendered into `.claude/skills/<id>/SKILL.md` ·
   `.github/prompts/<id>.prompt.md` · `.kiro/steering/<id>.md`; only the ~10-line host

@@ -83,7 +83,19 @@ class Scan(NamedTuple):
     # byte-digest staleness check) were removed with the hook machinery. Nothing
     # populates it anymore — a stale *asset* is no longer a concept.
     stale_assets: list  # always []
-    interceptor_dead: bool   # bin/graphify probes a verb that no longer exists
+    interceptor_dead: bool   # ANY twin probes a verb that no longer exists
+    # Which twins specifically — `{"graphify.cmd"}` when only the Windows one is stale.
+    #
+    # The bool above is a genuine question ("is graphify metering broken anywhere?") and
+    # `doctorcmd._receipts` is right to ask it — a dead twin on either OS explains an
+    # empty receipts table. But it was ALSO being consumed as if it described *this*
+    # file: the inventory stamped BOTH twins `dead` when one was, and doctor's message
+    # named the twin this OS resolves regardless of which one carried the dead verb —
+    # so the fix instruction pointed at the wrong file. Hence a set beside the bool
+    # rather than in place of it; they answer different questions.
+    #
+    # Defaulted so `Scan(...)` construction elsewhere keeps its shape (it is public).
+    dead_interceptors: frozenset[str] = frozenset()
 
     @property
     def clean(self) -> bool:
@@ -203,10 +215,24 @@ def committed_artifacts(root: Path) -> list[tuple[str, str]]:
     out: list[tuple[str, str]] = []
     out += [(".claude/settings.json", c)
             for c in hook_commands(root / ".claude" / "settings.json")]
+    # Copilot's L1 hook is **repo-level** (`copilotwire`: repo-level so a teammate gets
+    # it on clone), so it is committed and belongs here. It was missed, which meant a
+    # dead verb in it was invisible to the headline `wiring` check — the one failure
+    # class this whole module exists to catch, in the file a teammate inherits.
+    out += [(".github/hooks/cage.json", c)
+            for c in hook_commands(root / ".github" / "hooks" / "cage.json", key="bash")]
     for rel, key in ((".mcp.json", "mcpServers"), (".vscode/mcp.json", "servers")):
         srv = cfgio.load_json(root / rel).get(key, {}).get("cage", {})
         if srv.get("command"):
             out.append((rel, srv["command"]))
+    # Kiro's MCP entry is committed too (path-free `python3 -m cage mcp`, v0.41) and
+    # takes the `command` + `args` idiom `user_artifacts` already uses for the
+    # user-level copy of the same file — the two halves must enumerate alike.
+    kiro_mcp = cfgio.load_json(root / ".kiro" / "settings" / "mcp.json")
+    srv = kiro_mcp.get("mcpServers", {}).get("cage", {})
+    if srv.get("command"):
+        out.append((".kiro/settings/mcp.json",
+                    " ".join([srv["command"], *srv.get("args", [])])))
     for hook in sorted((root / ".kiro" / "hooks").glob("*.kiro.hook")):
         cmd = cfgio.load_json(hook).get("then", {}).get("command", "")
         out.append((f".kiro/hooks/{hook.name}", cmd))
@@ -300,7 +326,7 @@ def run(root: Path, *, assets: bool = True) -> Scan:
 
     # Per-twin, so the finding names the file to fix rather than a generic
     # "bin/graphify" that may not even be the copy carrying the dead verb.
-    interceptor_dead = False
+    dead_shims: set[str] = set()
     for shim in paths.graphify_shims(root):
         if not shim.exists():
             continue
@@ -310,11 +336,12 @@ def run(root: Path, *, assets: bool = True) -> Scan:
             continue
         for verbs in verbs_in_shell(text):
             if not is_live_verb(verbs):
-                interceptor_dead = True
+                dead_shims.add(shim.name)
                 dead.append(Dead(f"bin/{shim.name}", " ".join(verbs),
                                  remediation(verbs), True))
 
-    return Scan(dead=dead, stale_assets=[], interceptor_dead=interceptor_dead)
+    return Scan(dead=dead, stale_assets=[], interceptor_dead=bool(dead_shims),
+                dead_interceptors=frozenset(dead_shims))
 
 
 # ── inventory (`cage doctor --wiring`) ───────────────────────────────────────────
@@ -402,10 +429,14 @@ def _claude_specs(root: Path) -> list[_Spec]:
     mcp = root / ".mcp.json"
     mcp_cmd = cfgio.load_json(mcp).get("mcpServers", {}).get("cage", {}).get("command", "")
     settings = cfgio.load_json(root / ".claude" / "settings.json").get("hooks") or {}
+    # `hook_commands` above already guards this shape; these two spec builders did not,
+    # so a hand-edited entry took `cage doctor --wiring` down as well as `cage setup`.
     hook_cmds = tuple(h.get("command", "") for entries in settings.values()
                       if isinstance(entries, list) for e in entries
-                      for h in e.get("hooks", [])
-                      if paths.cage_command_tail(h.get("command", "")) is not None)
+                      if isinstance(e, dict)
+                      for h in (e.get("hooks") if isinstance(e.get("hooks"), list) else [])
+                      if isinstance(h, dict)
+                      and paths.cage_command_tail(h.get("command", "")) is not None)
     return [_Spec("mcp", "project", ".mcp.json", True, bool(mcp_cmd),
                   (mcp_cmd,) if mcp_cmd else ()),
             _hook_spec(".claude/settings.json (L1 hooks)",
@@ -417,8 +448,12 @@ def _copilot_specs(root: Path) -> list[_Spec]:
     mcp = root / ".vscode" / "mcp.json"
     mcp_cmd = cfgio.load_json(mcp).get("servers", {}).get("cage", {}).get("command", "")
     hooks = cfgio.load_json(root / ".github" / "hooks" / "cage.json").get("hooks") or {}
-    hook_cmds = tuple(h.get("bash", "") for entries in hooks.values() for h in entries
-                      if paths.cage_tail_any(h.get("bash", "")) is not None)
+    if not isinstance(hooks, dict):
+        hooks = {}
+    hook_cmds = tuple(h.get("bash", "") for entries in hooks.values()
+                      if isinstance(entries, list) for h in entries
+                      if isinstance(h, dict)
+                      and paths.cage_tail_any(h.get("bash", "")) is not None)
     return [_Spec("mcp", "project", ".vscode/mcp.json", True, bool(mcp_cmd),
                   (mcp_cmd,) if mcp_cmd else ()),
             _hook_spec(".github/hooks/cage.json (L1 hooks)",
@@ -500,6 +535,24 @@ def _git_hook_foreign(root: Path) -> list[Artifact]:
     return out
 
 
+def _base_display(display: str) -> str:
+    """A spec display with any trailing annotation stripped — `".claude/settings.json
+    (L1 hooks)"` ⇒ `".claude/settings.json"`.
+
+    `covered` is matched against the RAW enumeration (`committed_artifacts` /
+    `user_artifacts`), whose displays are bare paths, but hook specs annotate theirs. A
+    suffixed key therefore never matched, and **every wired hook command re-listed as an
+    unexplained "other" leftover** — reproduced against this repo: four phantom
+    `.claude/settings.json` rows plus kiro's.
+
+    It strips **any** trailing parenthetical, not the literal `" (L1 hooks)"`, and that
+    is not defensiveness: kiro's display is `" (L1 hook)"` — **singular** — so the
+    obvious literal `removesuffix` fixes claude and copilot and leaves kiro silently
+    broken, which is the same two-of-three failure the whole `HOOK_GAPS` discipline
+    exists to prevent."""
+    return re.sub(r"\s*\([^()]*\)\s*$", "", display)
+
+
 def _leftover(root: Path, covered: set[str]) -> list[Artifact]:
     """Anything the raw enumeration finds that isn't part of a known agent's expected
     set — an orphaned pre-removal hook artifact or a stray cage command in an
@@ -551,7 +604,7 @@ def inventory(root: Path) -> Inventory:
         agent_items, rollup = _agent_inventory(agent, specs)
         items += agent_items
         rollups.append(rollup)
-        covered |= {s.display for s in specs if s.present}
+        covered |= {_base_display(s.display) for s in specs if s.present}
 
     items += _git_hook_foreign(root)
     items += _leftover(root, covered)
@@ -563,12 +616,17 @@ def inventory(root: Path) -> Inventory:
     for shim in paths.graphify_shims(root):
         if not shim.exists():
             continue
+        # Per-twin, not the global bool: one stale twin used to stamp BOTH rows `dead`,
+        # so a healthy copy was reported broken and the reader had no way to tell which
+        # file to fix. `tests/test_win_graphify_shim.py` pinned `scan.dead` but never
+        # these rendered rows, which is how it stayed green.
+        this_dead = shim.name in scan.dead_interceptors
         detail = ("probes a removed verb — every graphify call falls through UNMETERED "
-                  "and silently" if scan.interceptor_dead else
+                  "and silently" if this_dead else
                   "" if shim == primary else
                   f"the other twin — this OS resolves bin/{primary.name}, not this copy")
         items.append(Artifact("", "shim", "project", f"bin/{shim.name}",
-                              "dead" if scan.interceptor_dead else "current", detail))
+                              "dead" if this_dead else "current", detail))
     items += _path_winner(root, primary)
 
     return Inventory(items=items, rollups=rollups)

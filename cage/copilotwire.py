@@ -16,6 +16,7 @@ VS Code documents predefined-variable substitution in MCP server config.
 """
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 from cage import cfgio, paths, runshim
@@ -49,14 +50,40 @@ def _hook_command(sub: str) -> str:
 
 def _wire_hooks(root: Path, enable: bool) -> int:
     """Write (or clear) cage's repo-level hook entries. Foreign entries in the same
-    file are preserved; the file is removed only when nothing of anyone's is left."""
+    file are preserved; the file is removed only when nothing of anyone's is left.
+
+    **"Nothing left to preserve" and "a shape I don't understand" are different
+    branches, and conflating them was a data-loss bug.** The old code coerced a non-dict
+    `hooks` value to `{}` and fell straight through to `path.unlink()` — on the *default*
+    (`enable=False`) `cage setup` path, so an unrecognised file cost the user every
+    top-level key it held. Emptiness is a conclusion cage may only draw about a shape it
+    read; an unreadable shape means cage knows nothing, least of all that the file is
+    disposable. Refuse, and say so."""
     path = root / ".github" / "hooks" / "cage.json"
     data = cfgio.load_json(path)
-    hooks = data.get("hooks") if isinstance(data.get("hooks"), dict) else {}
+    raw = data.get("hooks")
+    if raw is not None and not isinstance(raw, dict):
+        # Branch 1 — unreadable. cage never wrote this; do not strip, do not wire, and
+        # above all do not unlink. Fail-open and NOT silent (`cage doctor --wiring`
+        # cannot see this file at all today, so stderr is the only channel).
+        print(f"· cage: left {path} alone — its `hooks` value is a "
+              f"{type(raw).__name__}, not a table cage wrote or understands",
+              file=sys.stderr)
+        return 0
+    hooks = raw or {}
     for event in list(hooks):                       # strip cage's own first: idempotent,
-        hooks[event] = [h for h in hooks[event]     # and makes `--hooks` a two-way switch
-                        if paths.cage_tail_any(h.get("bash", "")) is None]
-        if not hooks[event]:
+        entries = hooks[event]                      # and makes `--hooks` a two-way switch
+        if not isinstance(entries, list):
+            continue                                # same refusal, per event: preserve
+        # A non-dict entry is foreign by construction — cage only ever writes
+        # `{"bash": …}` — so it is KEPT, not skipped and not crashed on. `.get` on a
+        # bare string is what took `cage setup` and `cage doctor --wiring` down.
+        kept = [h for h in entries
+                if not isinstance(h, dict)
+                or paths.cage_tail_any(h.get("bash", "")) is None]
+        if kept:
+            hooks[event] = kept
+        else:
             del hooks[event]
     wired = 0
     if enable:
@@ -67,9 +94,10 @@ def _wire_hooks(root: Path, enable: bool) -> int:
         data["hooks"] = hooks
         cfgio.save_json(path, data)
     else:
-        # The FILE is cage's (it is named `cage.json`); only the entries inside it can
-        # be foreign. With no entries left there is nothing to preserve — remove it
-        # rather than leaving an empty shell in a teammate's diff.
+        # Branch 2 — read, understood, and genuinely empty. The FILE is cage's (it is
+        # named `cage.json`); only the entries inside it can be foreign. With no entries
+        # left there is nothing to preserve — remove it rather than leaving an empty
+        # shell in a teammate's diff. Reachable ONLY through the readable path above.
         path.unlink(missing_ok=True)
     return wired
 
@@ -79,8 +107,12 @@ def hook_status(root: Path) -> int:
     hooks = cfgio.load_json(root / ".github" / "hooks" / "cage.json").get("hooks", {})
     if not isinstance(hooks, dict):
         return 0
-    return sum(1 for entries in hooks.values() for h in entries
-               if paths.cage_tail_any(h.get("bash", "")) is not None)
+    # Both `isinstance` guards are load-bearing, not defensive noise: a hand-edited
+    # `{"sessionStart": ["cage import"]}` took this function — and `cage setup --status`
+    # through it — down with an AttributeError on a bare string.
+    return sum(1 for entries in hooks.values() if isinstance(entries, list)
+               for h in entries if isinstance(h, dict)
+               and paths.cage_tail_any(h.get("bash", "")) is not None)
 
 
 def install(root: Path, *, python_launcher: bool = False, hooks: bool = False) -> dict:

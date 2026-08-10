@@ -75,6 +75,13 @@ PATH_FREE_WIN = {"command": "py", "args": ["-3", "-m", "cage", "mcp"], "disabled
 # The command uses `runshim.selflocating_command` — Kiro documents neither the hook cwd
 # nor a workspace variable, so the committed one-liner locates the repo root via git and
 # exits 0 when either the repo or the shim is missing (fail-open, machine-independent).
+#
+# That one-liner is **POSIX shell**, and Kiro's hook schema has no interpreter field, so
+# on a Windows host with no POSIX shell this hook does not run. It is **named, not
+# twinned** (`agents.HOOK_SHELL_LIMIT`): this file is committed and byte-compared before
+# writing, so a per-OS command would churn a committed diff on every `cage setup` in a
+# mixed-OS team — the same trade already settled for Kiro's path-free MCP entry. Capture
+# is unaffected; L1 is not for capture.
 _HOOK_REL = ".kiro/hooks/cage.kiro.hook"
 
 

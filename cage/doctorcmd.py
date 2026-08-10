@@ -575,8 +575,14 @@ def _interceptor(root: Path, scan) -> tuple[str, str]:
                            "UNMETERED and silent. Fix: re-run `cage setup` (it writes "
                            "both twins)")
         return _WARN, "graphify interceptor not installed (ok if you don't use graphify)"
-    if scan.interceptor_dead:
-        return _FAIL, (f"bin/{shim.name} probes a verb that no longer exists — every "
+    if scan.dead_interceptors:
+        # Name the twin that actually carries the dead verb. This used to print
+        # `bin/{shim.name}` — the twin THIS OS resolves — whichever one was stale, so a
+        # POSIX dev with a dead `graphify.cmd` was told to look at a healthy file. It is
+        # still a failure either way: the other twin is what a teammate on the other OS
+        # runs, and a dead verb there is silently unmetered capture.
+        names = ", ".join(f"bin/{n}" for n in sorted(scan.dead_interceptors))
+        return _FAIL, (f"{names} probes a verb that no longer exists — every "
                        "graphify call falls through UNMETERED and silently; re-run "
                        "`cage setup --wire-only --<agent>` to refresh it")
     import os

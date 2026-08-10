@@ -131,6 +131,53 @@ def test_cmd_twin_is_crlf():
     assert raw.count(b"\r\n") == raw.count(b"\n") > 0
 
 
+def _check_attr(*paths_: Path) -> dict[str, dict[str, str]]:
+    """`git check-attr -a` — the *resolved* attributes, which is the only thing that
+    decides what a checkout writes. Parsing `.gitattributes` by hand would re-test the
+    pattern syntax rather than its effect."""
+    repo = Path(__file__).resolve().parents[1]
+    r = subprocess.run(["git", "check-attr", "-a", "--", *(str(p) for p in paths_)],
+                       cwd=repo, capture_output=True, text=True)
+    if r.returncode != 0:
+        pytest.skip(f"git check-attr unavailable: {r.stderr.strip()}")
+    out: dict[str, dict[str, str]] = {}
+    for line in r.stdout.splitlines():
+        path, attr, value = line.split(": ", 2)
+        out.setdefault(path, {})[attr] = value
+    return out
+
+
+def test_posix_twin_is_pinned_to_lf_in_the_working_tree():
+    """The twin of `test_cmd_twin_is_crlf`, and it asserts **the pin**, not the bytes.
+
+    A bytes assertion here would be blind in exactly the way this defect needs: the
+    file is LF today, so it would pass on a repo with no rule at all — which is what
+    `.gitattributes` had. And the blob is not where the risk lives. `core.autocrlf=true`
+    normalizes CRLF→LF *at commit*, so the committed bytes stay clean either way; what
+    it changes is the **working tree**, which `pyproject.toml`'s `data/shims/*` packages
+    verbatim into the wheel. A CRLF checkout ships `#!/usr/bin/env bash\\r` to every
+    user of that build — *bad interpreter*, and every graphify call silently unmetered.
+    `eol=lf` is the setting that binds the working tree, which is why it is the fix.
+    """
+    attrs = _check_attr(SH, CMD)
+    # `-a` prints nothing at all for a file with no attributes — which is precisely the
+    # unpinned state — so this must read as "no pin", never as a KeyError.
+    sh, cmd = attrs.get(str(SH), {}), attrs.get(str(CMD), {})
+
+    assert sh.get("text") == "set", f"the POSIX twin is unpinned: {sh}"
+    assert sh.get("eol") == "lf", f"the POSIX twin has no LF pin: {sh}"
+    # And the opposite pin on the .cmd is untouched — the two rules must not collapse
+    # into one blanket `* text=auto`, which would rewrite the batch file to LF.
+    assert cmd.get("text") == "unset", f"the Windows twin lost its -text pin: {cmd}"
+
+
+def test_the_committed_posix_twin_is_actually_lf():
+    """The pin's observable effect, kept beside it: a rule that is present but wrong
+    (mis-typed path, wrong attribute) would still leave CRLF in the tree."""
+    raw = SH.read_bytes()
+    assert b"\r\n" not in raw and raw.count(b"\n") > 0
+
+
 def test_cmd_twin_walk_is_flat_with_no_call_goto_backedge():
     """B8, re-derived from a real failure. An earlier draft used `call :subroutine`
     from inside a `for` loop plus a `goto` back-edge to re-enter it — reproduced on
@@ -195,6 +242,71 @@ def test_a_dead_verb_in_either_twin_is_reported_against_that_file(tmp_path):
     scan = wiringscan.run(tmp_path)
     assert scan.interceptor_dead
     assert [d.artifact for d in scan.dead] == ["bin/graphify.cmd"]
+
+
+def test_one_dead_twin_never_marks_the_healthy_one_dead(tmp_path):
+    """P2.5c. `interceptor_dead` is one global bool and was consumed as if it described
+    *this* file, so a single stale twin stamped BOTH inventory rows `dead` — a healthy
+    copy reported broken, with nothing to say which file to fix.
+
+    **This is the assertion that was missing.** The test above pins `scan.dead` and has
+    always passed; the defect lived one layer up, in the rendered rows. Asserting the
+    scan and not the render is exactly how it stayed green."""
+    (tmp_path / ".cage").mkdir(parents=True)
+    (tmp_path / "bin").mkdir()
+    (tmp_path / "bin" / "graphify").write_bytes(SH.read_bytes())          # healthy
+    (tmp_path / "bin" / "graphify.cmd").write_text(                       # dead verb
+        "@echo off\r\ncall cage graphify --help >nul 2>nul\r\n", encoding="utf-8")
+
+    scan = wiringscan.run(tmp_path)
+    assert scan.dead_interceptors == frozenset({"graphify.cmd"})
+    assert scan.interceptor_dead is True      # the bool still answers "anything dead?"
+
+    rows = {a.display: a for a in wiringscan.inventory(tmp_path).items
+            if a.kind == "shim"}
+    assert rows["bin/graphify.cmd"].status == "dead"
+    assert rows["bin/graphify"].status == "current", \
+        "a healthy twin was reported dead because the other one is"
+    assert "removed verb" not in rows["bin/graphify"].detail
+
+
+def test_doctor_names_the_twin_that_actually_carries_the_dead_verb(tmp_path, monkeypatch):
+    """P2.5c, the second consumer. Doctor's message interpolated the twin THIS OS
+    resolves, whichever one was stale — so a POSIX dev with a dead `graphify.cmd` was
+    pointed at a file with nothing wrong in it."""
+    (tmp_path / ".cage").mkdir(parents=True)
+    (tmp_path / "bin").mkdir()
+    primary = paths.graphify_shim_name()
+    other = "graphify.cmd" if primary == "graphify" else "graphify"
+    (tmp_path / "bin" / primary).write_bytes(
+        (SH if primary == "graphify" else CMD).read_bytes())
+    (tmp_path / "bin" / other).write_text(
+        "@echo off\r\ncall cage graphify --help >nul 2>nul\r\n"
+        if other.endswith(".cmd") else
+        "#!/usr/bin/env bash\ncage graphify --help >/dev/null 2>&1\n", encoding="utf-8")
+    monkeypatch.setenv("PATH", str(tmp_path / "bin"))
+
+    level, detail = doctorcmd._interceptor(tmp_path, wiringscan.run(tmp_path))
+    assert level == "fail"
+    # Compared as whole tokens: `bin/graphify` is a PREFIX of `bin/graphify.cmd`, so a
+    # substring check here silently passes (or fails) for the wrong reason.
+    named = {w for w in detail.replace(",", " ").split() if w.startswith("bin/")}
+    assert named == {f"bin/{other}"}, \
+        f"doctor named {named}, not the twin carrying the dead verb"
+
+
+def test_the_receipts_check_still_asks_the_global_question(tmp_path):
+    """The bool is KEPT, not replaced: `_receipts` genuinely wants *is anything dead* —
+    a stale twin on either OS explains an empty receipts table — and is correct as-is."""
+    (tmp_path / ".cage").mkdir(parents=True)
+    (tmp_path / "bin").mkdir()
+    (tmp_path / "bin" / "graphify").write_bytes(SH.read_bytes())
+    (tmp_path / "bin" / "graphify.cmd").write_text(
+        "@echo off\r\ncall cage graphify --help >nul 2>nul\r\n", encoding="utf-8")
+
+    scan = wiringscan.run(tmp_path)
+    level, detail = doctorcmd._receipts(tmp_path, scan)
+    assert level == "warn" and "interceptor is dead" in detail
 
 
 def test_the_wrong_twin_alone_is_a_doctor_failure(tmp_path, monkeypatch):

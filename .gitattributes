@@ -1,3 +1,17 @@
+# The graphify interceptor twins are the ONLY files whose line endings are behaviour,
+# not formatting — both are pinned, in opposite directions, and neither may be left to
+# a checkout's `core.autocrlf`.
+
 # The bundled Windows interceptor is a batch file: CRLF line endings, never
 # normalized by git on any platform. cmd.exe is the only consumer.
 cage/data/shims/graphify.cmd -text
+
+# The POSIX twin must be LF **in the working tree**, and that is the whole point of
+# `eol=lf` rather than a commit-time normalization. The blob was never at risk:
+# `core.autocrlf=true` normalizes CRLF→LF *on commit*, so it stays clean. The vector is
+# the other direction — working tree → package. A contributor with `autocrlf=true` gets
+# CRLF written into their checkout, `pyproject.toml`'s `data/shims/*` packages those
+# bytes verbatim, and `adoptcmd._install_shim` copies them to every user, whose shell
+# then reads `#!/usr/bin/env bash\r` and reports *bad interpreter*. Every graphify call
+# on that machine is silently unmetered — F1, arriving through a checkout setting.
+cage/data/shims/graphify text eol=lf

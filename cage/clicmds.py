@@ -578,7 +578,13 @@ def cmd_setup(args) -> int:
             skill = sum(1 for d in l3 if steering.paths_for(here, d)[surface].exists())
             extra = []
             if n:
-                extra.append(f"L1 hooks ×{n}")
+                # The count comes straight from the wired file's contents, so it says
+                # only that N hooks are INSTALLED — never that all N do what L1 offers.
+                # An unqualified `L1 hooks ×2` beside copilot read as auto-close working
+                # when copilot cannot produce a session id at all. Qualified from the ONE
+                # capability table, and the specific limit is in the block below.
+                limited = " (limited — see L1 limits)" if surface in agents.HOOK_GAPS else ""
+                extra.append(f"L1 hooks ×{n}{limited}")
             if doc:
                 extra.append(f"steering ×{doc}")
             if skill:

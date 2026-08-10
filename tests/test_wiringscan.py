@@ -352,3 +352,80 @@ def test_derived_views_are_byte_identical(proj, capsys):
     wiringscan.run(proj)
     assert cli.main(["--ledger", str(proj), "insights", "attrib"]) == 0
     assert capsys.readouterr().out == before
+
+
+# ── P2.5a/5b: the inventory's bookkeeping ─────────────────────────────────────
+
+def _wired(tmp_path) -> Path:
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    (proj / ".cage").mkdir()
+    agents.install(proj, hooks=True)
+    return proj
+
+
+def test_a_wired_hook_is_never_relisted_as_an_unexplained_leftover(tmp_path):
+    """5a. `covered` collected the SPEC display (`".claude/settings.json (L1 hooks)"`)
+    but `_leftover` matches against the raw enumeration's bare paths, so nothing ever
+    matched and every wired hook command re-listed as an `other` row. Reproduced
+    against this repo: four phantom `.claude/settings.json` rows plus kiro's."""
+    proj = _wired(tmp_path)
+    others = [a.display for a in wiringscan.inventory(proj).items
+              if a.kind == "other" and a.scope == "project"]
+    assert others == [], f"wired artifacts re-listed as leftovers: {others}"
+
+
+def test_the_annotation_stripper_handles_kiros_singular_display(tmp_path):
+    """5a's trap, pinned directly. kiro's spec display is `" (L1 hook)"` — SINGULAR —
+    so the obvious `.removesuffix(" (L1 hooks)")` fixes claude and copilot and leaves
+    kiro silently broken: two-of-three, the exact failure mode this repo keeps paying
+    for. Any trailing parenthetical is stripped instead."""
+    assert wiringscan._base_display(".kiro/hooks/cage.kiro.hook (L1 hook)") == \
+        ".kiro/hooks/cage.kiro.hook"
+    assert wiringscan._base_display(".claude/settings.json (L1 hooks)") == \
+        ".claude/settings.json"
+    assert wiringscan._base_display(".mcp.json") == ".mcp.json"
+    # And every hook spec cage actually builds round-trips to a real enumerated path.
+    proj = _wired(tmp_path)
+    enumerated = {d for d, _ in wiringscan.committed_artifacts(proj)}
+    for agent in agents.SURFACES:
+        for spec in wiringscan._SPECS[agent](proj):
+            if spec.kind == "hooks" and spec.present:
+                assert wiringscan._base_display(spec.display) in enumerated, spec.display
+
+
+def test_committed_enumeration_covers_every_committed_wired_file(tmp_path):
+    """5b. `.github/hooks/cage.json` (copilot's REPO-level L1 hook) and
+    `.kiro/settings/mcp.json` (the committed path-free MCP entry) were never walked, so
+    a dead verb in either was invisible to the headline `wiring` check — in files a
+    teammate inherits on clone, which is the whole reason they are committed."""
+    proj = _wired(tmp_path)
+    enumerated = {d for d, _ in wiringscan.committed_artifacts(proj)}
+    assert {".github/hooks/cage.json", ".kiro/settings/mcp.json"} <= enumerated, enumerated
+
+
+def test_a_dead_verb_in_copilots_repo_hook_is_now_visible(tmp_path):
+    """The consequence of 5b, asserted where it bites: before, this scan came back
+    clean and `cage doctor` reported OK while every copilot hook exited 1."""
+    proj = _wired(tmp_path)
+    path = proj / ".github" / "hooks" / "cage.json"
+    data = cfgio.load_json(path)
+    for entries in data["hooks"].values():
+        for h in entries:
+            h["bash"] = h["bash"].replace('cage-run" hook session-start',
+                                          'cage-run" adopt')
+    cfgio.save_json(path, data)
+
+    dead = {d.artifact for d in wiringscan.run(proj).dead}
+    assert ".github/hooks/cage.json" in dead, dead
+
+
+def test_5b_did_not_reintroduce_5as_duplicate_rows(tmp_path):
+    """The ordering constraint, made a test rather than a note: landing 5b first
+    multiplies 5a's phantom leftovers, because the two files it adds are exactly the
+    ones whose specs carry an annotated display."""
+    proj = _wired(tmp_path)
+    inv = wiringscan.inventory(proj)
+    displays = [a.display for a in inv.items if a.kind == "other"]
+    assert not any(d.startswith(".github/") or d.startswith(".kiro/") for d in displays), \
+        displays

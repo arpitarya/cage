@@ -188,3 +188,110 @@ def test_mcp_tools_list_and_call(seeded, monkeypatch):
 def test_mcp_unknown_method_errors():
     r = mcpserver._handle({"jsonrpc": "2.0", "id": 9, "method": "bogus"})
     assert r["error"]["code"] == -32601
+
+
+# ── a hook file cage did not write: refuse, never crash, never delete ──────────
+#
+# P2.4. `{"hooks": {"sessionStart": ["cage import"]}}` — a plausible hand edit — crashed
+# `cage setup`, `cage setup --status` and `cage doctor --wiring` alike with
+# `AttributeError: 'str' object has no attribute 'get'`, at SIX sites. The sharper half
+# was silent: a non-dict `hooks` VALUE was coerced to `{}`, fell through to
+# `path.unlink()` on the DEFAULT (`--no-hooks`) setup path, and took every other
+# top-level key in the user's file with it.
+#
+# The fix has to keep two invariants that pull in opposite directions, which is why
+# "nothing left to preserve" and "a shape I don't understand" are now different
+# branches: `test_copilot_migration_removes_stale_repo_hook` above requires the unlink
+# to STILL fire when only cage's own entries were there, and
+# `test_copilot_migration_preserves_foreign_repo_hooks` requires foreign entries to
+# survive. Both stay green.
+
+_FOREIGN = {"version": 1, "myTeamSettings": {"keep": "me"}}
+
+
+def _copilot_hookfile(proj, hooks):
+    from cage import cfgio
+    path = proj / ".github" / "hooks" / "cage.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    cfgio.save_json(path, {**_FOREIGN, "hooks": hooks})
+    return path
+
+
+def test_a_non_dict_hooks_table_is_left_alone_not_deleted(homes, capsys):
+    """The data-loss path, and it ran on the DEFAULT setup path (`hooks=False`).
+    Emptiness is a conclusion cage may only draw about a shape it actually read."""
+    from cage import copilotwire
+    proj = homes / "proj"
+    proj.mkdir()
+    path = _copilot_hookfile(proj, "not-a-dict")
+    before = path.read_bytes()
+
+    assert copilotwire._wire_hooks(proj, False) == 0     # the default `cage setup` path
+    assert path.exists(), "cage deleted a file whose shape it never understood"
+    assert path.read_bytes() == before                   # and did not rewrite it either
+    assert copilotwire._wire_hooks(proj, True) == 0      # --hooks refuses too
+    assert path.read_bytes() == before
+    # Fail-open, but never silent.
+    assert "left" in capsys.readouterr().err
+
+
+def test_a_non_dict_hook_entry_is_preserved_as_foreign_not_crashed_on(homes):
+    """cage only ever writes `{"bash": …}`, so a bare string is foreign BY
+    CONSTRUCTION — it must be kept, which is exactly what makes the file non-empty and
+    keeps the unlink from firing."""
+    from cage import cfgio, copilotwire
+    proj = homes / "proj"
+    proj.mkdir()
+    path = _copilot_hookfile(proj, {"sessionStart": ["cage import"]})
+
+    assert copilotwire._wire_hooks(proj, True) == len(agents.HOOK_EVENTS["copilot"])
+    assert copilotwire.hook_status(proj) == len(agents.HOOK_EVENTS["copilot"])
+    # Unwiring returns the file to exactly what it was — foreign key and entry intact.
+    assert copilotwire._wire_hooks(proj, False) == 0
+    data = cfgio.load_json(path)
+    assert data["myTeamSettings"] == {"keep": "me"}
+    assert data["hooks"]["sessionStart"] == ["cage import"]
+
+
+def test_claude_settings_survive_a_hook_shape_cage_never_wrote(homes):
+    """`.claude/settings.json` is the USER's file, not cage's, so coercing an
+    unreadable `hooks` value would have `data.pop("hooks")` strip a table cage never
+    understood."""
+    from cage import cfgio, claudewire
+    proj = homes / "proj"
+    (proj / ".claude").mkdir(parents=True)
+    settings = proj / ".claude" / "settings.json"
+    cfgio.save_json(settings, {"permissions": {"allow": ["Bash"]},
+                               "hooks": {"SessionStart": ["cage import"]}})
+    before = settings.read_bytes()
+
+    # The non-dict ENTRY case: cage wires around it, then unwires back to the byte.
+    assert claudewire._wire_hooks(proj, True) == len(agents.HOOK_EVENTS["claude"])
+    assert claudewire.hook_status(proj) == len(agents.HOOK_EVENTS["claude"])
+    assert cfgio.load_json(settings)["permissions"] == {"allow": ["Bash"]}
+    assert claudewire._wire_hooks(proj, False) == 0
+    assert settings.read_bytes() == before
+
+    # The non-dict TABLE case: refuse outright.
+    cfgio.save_json(settings, {"permissions": {"allow": ["Bash"]}, "hooks": "nope"})
+    guarded = settings.read_bytes()
+    assert claudewire._wire_hooks(proj, True) == 0
+    assert settings.read_bytes() == guarded
+
+
+def test_setup_and_status_survive_a_hand_edited_hook_file(homes, monkeypatch, capsys):
+    """End to end through the real front door — `cage setup` and `cage setup --status`
+    both walked straight into the AttributeError."""
+    from cage import cli
+    proj = homes / "proj"
+    proj.mkdir()
+    (proj / ".cage").mkdir()
+    _copilot_hookfile(proj, {"sessionStart": ["cage import"]})
+    monkeypatch.chdir(proj)
+
+    for argv in (["setup", "--all", "--wire-only", "--hooks"],
+                 ["setup", "--status"],
+                 ["setup", "--all", "--wire-only"]):
+        args = cli.build_parser().parse_args(argv)
+        assert args.fn(args) == 0, argv
+    capsys.readouterr()

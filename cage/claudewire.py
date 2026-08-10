@@ -16,6 +16,7 @@ variable is set in the spawned server's env, not the config parser's).
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 from cage import paths, runshim
@@ -74,15 +75,30 @@ def _wire_hooks(root: Path, enable: bool) -> int:
     settings = root / ".claude" / "settings.json"
     data = _load(settings)
     before = json.dumps(data, indent=2, sort_keys=True)
-    hooks = data.get("hooks")
-    if not isinstance(hooks, dict):
-        hooks = {}
+    raw = data.get("hooks")
+    if raw is not None and not isinstance(raw, dict):
+        # Unreadable shape. This file is the USER's `.claude/settings.json`, not cage's,
+        # so coercing to `{}` and continuing would have `data.pop("hooks")` below strip
+        # a hooks table cage never understood. Refuse — fail-open, but never silent.
+        print(f"· cage: left {settings} alone — its `hooks` value is a "
+              f"{type(raw).__name__}, not a table cage wrote or understands",
+              file=sys.stderr)
+        return 0
+    hooks = raw or {}
     # Always strip cage's own entries first: that makes the write idempotent AND makes
     # `--hooks` a two-way switch rather than an append that accumulates duplicates.
     for event, entries in list(hooks.items()):
-        kept = []
-        for e in entries if isinstance(entries, list) else []:
-            cmds = [h for h in e.get("hooks", []) if not _cage_entry(h.get("command", ""))]
+        if not isinstance(entries, list):
+            continue                     # per-event refusal: preserve a shape cage
+        kept = []                        # did not write, rather than dropping the event
+        for e in entries:
+            if not isinstance(e, dict):
+                kept.append(e)           # foreign by construction — keep it verbatim
+                continue
+            nested = e.get("hooks")
+            nested = nested if isinstance(nested, list) else []
+            cmds = [h for h in nested
+                    if not isinstance(h, dict) or not _cage_entry(h.get("command", ""))]
             if cmds:
                 kept.append({**e, "hooks": cmds})
             elif not e.get("hooks"):
@@ -96,7 +112,12 @@ def _wire_hooks(root: Path, enable: bool) -> int:
         for event, sub, matcher in _HOOK_EVENTS:
             entry = {"type": "command", "command": _hook_command(sub)}
             bucket = hooks.setdefault(event, [])
-            slot = next((e for e in bucket if e.get("matcher", "") == matcher), None)
+            # A SIXTH crash site, and it only becomes reachable once the strip loop above
+            # correctly PRESERVES foreign non-dict entries — they then flow into `bucket`
+            # and `.get` fails here instead. Fixing preservation without this would have
+            # moved the crash rather than closed it.
+            slot = next((e for e in bucket
+                         if isinstance(e, dict) and e.get("matcher", "") == matcher), None)
             if slot is None:
                 slot = {"hooks": []} if not matcher else {"matcher": matcher, "hooks": []}
                 bucket.append(slot)
@@ -161,9 +182,12 @@ def hook_status(root: Path) -> int:
     hooks = settings.get("hooks")
     if not isinstance(hooks, dict):
         return 0
+    # Every `isinstance` here is a crash this function actually took: a hand-written
+    # `{"SessionStart": ["cage import"]}` reached `.get` on a bare string.
     return sum(1 for entries in hooks.values() if isinstance(entries, list)
-               for e in entries for h in e.get("hooks", [])
-               if _cage_entry(h.get("command", "")))
+               for e in entries if isinstance(e, dict)
+               for h in (e.get("hooks") if isinstance(e.get("hooks"), list) else [])
+               if isinstance(h, dict) and _cage_entry(h.get("command", "")))
 
 
 def status(root: Path) -> bool:

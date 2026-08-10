@@ -16,6 +16,72 @@ Entry format:
 
 ---
 
+## 2026-08-11 — agent-lane sweep P2: REV-HARDEN P3 — wiring hygiene (five items)
+
+- **All five verified as still-real before any fix**, three of them by reproducing the
+  failure in-process. The handoff was right about all five and **wrong about none** — but
+  it under-counted one (below).
+- **2.1 `.gitattributes` LF pin.** `git check-attr -a` returned *no attributes at all*
+  for `cage/data/shims/graphify` — entirely unpinned, LF today, so latent. Added
+  `text eol=lf`. The mechanism is **working tree → package**, not the commit: `autocrlf`
+  normalizes CRLF→LF *at commit*, so the blob stays clean; what it changes is the
+  checkout, which `pyproject`'s `data/shims/*` packages verbatim, shipping
+  `#!/usr/bin/env bash\r` to every user of that build. Test asserts **the pin**, via
+  `git check-attr`, not the bytes — a bytes assertion passes on a repo with no rule.
+- **2.2 kiro's POSIX-only L1 hook — NAMED, not twinned.** New `agents.HOOK_SHELL_LIMIT`,
+  rendered as a second all-agents line. It cannot be a `HOOK_GAPS` key (a full-event-set
+  agent must stay disjoint from that table, and claude has the full set) and it is not
+  per-agent — **all three commands are POSIX shell**, claude's included. Twinning was
+  refused: kiro's hook document is committed and byte-compared, so a per-OS command
+  churns the diff on every `cage setup` in a mixed-OS team. Same trade as kiro's
+  path-free MCP entry.
+- **2.3 copilot's overclaim, both halves.** `HOOK_GAPS["copilot"]` ended *"session
+  identity and auto task-close are wired"* — false twice over: the two event names are
+  cage's own with no vendor evidence, and `hookcmd._session()` parses only Claude Code's
+  stdin shape, so on copilot it returns `""` and `_session_end` closes nothing. Reworded,
+  **and** `clicmds`'s `L1 hooks ×{n}` — which reads file *contents*, independent of the
+  gap text — now renders `(limited — see L1 limits)` for any agent in the one table.
+- **2.4 the non-dict hook entry: five crash sites, plus a sixth I found.** Reproduced:
+  `{"hooks": {"sessionStart": ["cage import"]}}` took `copilotwire._wire_hooks`,
+  `copilotwire.hook_status`, `claudewire._wire_hooks`, `claudewire.hook_status` and both
+  `wiringscan` spec builders down with `AttributeError: 'str' object has no attribute
+  'get'`. **The sixth is `claudewire`'s `enable=True` wiring loop** (`e.get("matcher")`)
+  — it only becomes reachable *once foreign entries are correctly preserved*, so fixing
+  preservation alone would have moved the crash rather than closed it.
+- **The data loss was the sharper half, and it is fixed as two branches.** A non-dict
+  `hooks` VALUE was coerced to `{}` and fell through to `path.unlink()` on the **default**
+  (`hooks=False`) `cage setup` path — reproduced destroying a file's `myTeamSettings`.
+  *"Nothing left to preserve"* and *"a shape I don't understand"* are now different
+  branches: emptiness is a conclusion cage may only draw about a shape it actually read.
+  Both opposing green tests stay green — the unlink still fires when only cage's entries
+  were present, foreign entries still survive — and a bare-string entry is now **kept as
+  foreign by construction** (cage only ever writes `{"bash": …}`).
+- **2.5a `covered` compared annotated displays against bare ones.** Reproduced on a wired
+  project: **five phantom `other` rows** (four `.claude/settings.json`, one kiro).
+  `_base_display` strips **any** trailing parenthetical — kiro's is `" (L1 hook)"`,
+  *singular*, so the literal `removesuffix` would have fixed two of three.
+- **2.5b `committed_artifacts` under-enumerated.** `.github/hooks/cage.json` (copilot's
+  repo-level hook) and `.kiro/settings/mcp.json` were never walked, so a dead verb in
+  either was invisible to the headline `wiring` check — verified by planting one and
+  watching the scan come back clean. Landed **after** 5a, as specified; a test now pins
+  that ordering constraint rather than leaving it a note.
+- **2.5c `interceptor_dead` is one bool applied per-twin.** New `Scan.dead_interceptors`
+  (a defaulted `frozenset`) beside it; the inventory and doctor's message read the set,
+  `doctorcmd._receipts` keeps the bool because *is anything dead* is genuinely its
+  question. Doctor no longer blames the healthy twin this OS happens to resolve.
+- **The tests that would have caught these are the point.** `test_win_graphify_shim.py`
+  pinned `scan.dead` but never the **rendered rows** — which is exactly how 5c stayed
+  green — so the new tests assert the inventory rows and doctor's text. All five items
+  were **mutation-checked**: reverting each guard kills its test.
+- **Files:** `.gitattributes` · `cage/agents.py` · `cage/claudewire.py` ·
+  `cage/copilotwire.py` · `cage/kirowire.py` · `cage/clicmds.py` · `cage/wiringscan.py` ·
+  `cage/doctorcmd.py` · `tests/test_win_graphify_shim.py` · `tests/test_hooks_layer.py` ·
+  `tests/test_agents.py` · `tests/test_wiringscan.py` · `docs/*` · `README.md` ·
+  `CLAUDE.md`.
+- **Tests:** green — **1545 ⇒ 1562**, 11 skipped.
+- **Next:** P3 — REV-HARDEN P4's low-blast-radius half (Sonnet-shaped; order 7 → 3 → 4 →
+  2 → 5-quotePath). **Not** to be batched with P4.
+
 ## 2026-08-11 — agent-lane sweep P1: CIGF-HERMETIC — the graphify CI leg is hermetic on a dev box
 
 - **Verified first, and the defect is exactly as filed.** With `HOME`/`CAGE_HOME`

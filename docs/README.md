@@ -27,9 +27,10 @@ spec.
   phases (release v0.48.0 · CIGF-HERMETIC · REV-HARDEN P3 · REV-HARDEN P4 ×2 ·
   HR-COPILOT-JOIN · EXPORT-SCOPE). All twelve REV-HARDEN items were **re-verified against
   the code 2026-08-10** — none already fixed, and the sources are wrong about their own
-  premises in eight places, corrected inline. Model: **Opus**. Progress: **29%** — P0 was
+  premises in eight places, corrected inline. Model: **Opus**. Progress: **43%** — P0 was
   **already released** when the pair was picked up (STOP gate moot), P1 CIGF-HERMETIC
-  landed 2026-08-11 with the real CI leg green **7/7 on a developer machine**.
+  landed 2026-08-11 with the real CI leg green **7/7 on a developer machine**, and
+  P2 REV-HARDEN-P3 closed all five wiring-hygiene items.
 
 - [steering-edits-pending.proposal.md](proposals/steering-edits-pending.proposal.md) —
   **STEERING-EDITS**: the four held CLAUDE.md edits (authorship bullet · copilot credit
