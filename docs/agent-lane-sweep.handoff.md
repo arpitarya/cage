@@ -35,8 +35,8 @@ this handoff, re-verify against the code and trust the code.
 
 | # | phase | tier | blast radius | gate |
 |---|---|---|---|---|
-| P0 | Release v0.48.0 | Sonnet | irreversible (PyPI) | **STOP — needs Arpit's explicit go in-session** |
-| P1 | CIGF-HERMETIC | Sonnet | build-time only | ⚠️ both tracker fixes are wrong; §P1 has the one that works |
+| P0 | Release v0.48.0 | Sonnet | irreversible (PyPI) | ✅ **DONE before pickup** — tagged, GH-released 2026-08-10, live on PyPI; the STOP gate is moot |
+| P1 | CIGF-HERMETIC | Sonnet | build-time only | ✅ **DONE 2026-08-11** — seeded `project/.cage` + temp-dir parent; real leg **7/7** on a dev box, real `~/.cage` byte-identical |
 | P2 | REV-HARDEN P3 — wiring hygiene (5 items) | Opus | wiring + a data-loss path | 5a before 5b |
 | P3 | REV-HARDEN P4 — low blast radius (5 items) | Sonnet | local | none |
 | P4 | REV-HARDEN P4 — judgment (3 items) | Opus | persisted rows | land P3 first |
@@ -48,9 +48,19 @@ the field P3's and P4's other tests will have just been written against.
 
 ---
 
-## P0 · Release v0.48.0 — STOP gate
+## P0 · Release v0.48.0 — ✅ DONE, the STOP gate is moot
 
-v0.48.0 is built, green and **unreleased in tree** (`__version__ = "0.48.0"`, suite
+**Corrected 2026-08-11: v0.48.0 was already released when this handoff was picked up,
+and this section was wrong on its central premise.** Verified against the four sources
+that cannot go stale: `v0.48.0` tagged **and present on `origin`**, GitHub release
+published `2026-08-10T18:55Z`, `cage-flux 0.48.0` live on PyPI, `HEAD == origin/main`.
+The release happened the same day this handoff was written. Nothing to tag, nothing to
+ask for. **The lesson is the one this repo keeps re-paying: a release claim in prose is
+never evidence** — `git ls-remote --tags origin` + `gh release view` + PyPI are.
+
+The original text follows, as history:
+
+> v0.48.0 is built, green and **unreleased in tree** (`__version__ = "0.48.0"`, suite
 1541/0). The release flow is in CLAUDE.md and is not negotiable:
 
 - bump + changelog are **already done**; verify, don't redo.
@@ -58,15 +68,19 @@ v0.48.0 is built, green and **unreleased in tree** (`__version__ = "0.48.0"`, su
 - **The GitHub release IS the publish trigger.** Never `uv publish` / `twine` / a local
   publish. `uv build` locally is fine as a smoke check; never upload the artifacts.
 
-**Two things to do before tagging, both from the session that built v0.48.0:**
+> **Two things to do before tagging, both from the session that built v0.48.0:**
+>
+> 1. Run `just test` **on Arpit's own machine/venv**. The suite that proved v0.48.0 ran on
+>    a sandbox Python 3.11, not his `.venv`.
+> 2. `_to_delete/` holds two scratch tarballs from that session. They are gitignored and
+>    harmless; delete or ignore.
+>
+> **Do not tag without an explicit go from Arpit in the session.** Publishing is the one
+> irreversible act in this queue.
 
-1. Run `just test` **on Arpit's own machine/venv**. The suite that proved v0.48.0 ran on
-   a sandbox Python 3.11, not his `.venv`.
-2. `_to_delete/` holds two scratch tarballs from that session. They are gitignored and
-   harmless; delete or ignore.
-
-**Do not tag without an explicit go from Arpit in the session.** Publishing is the one
-irreversible act in this queue.
+**Item 1 was done anyway and found a second stale number:** `just test` on the
+maintainer's own venv gives **1542**, not the 1541 recorded in `README.md`, `CLAUDE.md`,
+`INTERVIEW.md` and this handoff. Counts refreshed to 1545 as part of P1.
 
 ---
 

@@ -39,6 +39,26 @@ it monkeypatches the query/ledger-read seams and proves the check refuses to pas
 an empty or zero-saving result), so the vacuous-leg failure mode has a regression test,
 not just a comment.
 
+**Hermeticity is seeded, not inherited (CIGF-HERMETIC).** The obvious reading is that
+`_env`'s `HOME`/`CAGE_HOME` redirect is enough to keep the run off the developer's real
+`~/.cage`. It is the opposite: that redirect is *why* the leak existed. `find_project_root`
+excludes exactly two dirs — `global_base()` and `Path.home()/".cage"` — and under the
+sandbox env **both collapse to `sandbox/home/.cage`**, so the developer's real `~/.cage`
+stops being excluded and the upward walk from the sandbox adopts it as the "project root"
+(`cliutil.root()`, the path `setup`/`doctor` take — not `resolve_root`, which is the read
+path). Two independent guards close it, and the first is the load-bearing one:
+
+1. **`project/.cage` is seeded before any check runs.** `find_project_root` returns on the
+   *first* hit, so `cur == project` short-circuits before the walk can leave the sandbox —
+   wherever the sandbox lives, including under `--path ~`.
+2. `_sandbox_parent()` defaults to the OS temp dir rather than `REPO_ROOT.parent` (which on
+   a dev box sits under `$HOME`). Defence in depth only: on Windows `gettempdir()` is itself
+   under `USERPROFILE`, so this guard alone would not have held.
+
+The cost, stated: this gives up the "`.cage` scaffolded from nothing" property. No check
+ever asserted it (`check_setup_installs_both_twins` asserts only the two `bin/` twins) and
+`initcmd.run` is explicitly idempotent over an existing dir.
+
 Usage:
     python -m tools.cigraphify              # run every check, print a table
     python -m tools.cigraphify --keep       # keep the sandbox even on success
@@ -52,6 +72,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -90,6 +111,15 @@ def _rmtree(path: Path) -> None:
         shutil.rmtree(path, onexc=_onexc)
     else:
         shutil.rmtree(path, onerror=lambda f, p, e: _onexc(f, p, e))
+
+
+def _sandbox_parent(path: Path | None) -> Path:
+    """Where the sandbox is built. Defaults to the OS temp dir, **never**
+    ``REPO_ROOT.parent`` — on a developer box the repo sits under ``$HOME``, so a sandbox
+    beside it walks up into the real ``~/.cage`` (see the module docstring). This is the
+    *second* guard: on Windows ``gettempdir()`` is under ``USERPROFILE``, so the seeded
+    ``project/.cage`` is what actually makes the run hermetic."""
+    return path or Path(tempfile.gettempdir())
 
 
 def _env(sandbox: Path, project: Path, *, on_path: Path | None = None) -> dict:
@@ -186,7 +216,15 @@ def check_passthrough_is_transparent(project: Path, env: dict) -> str:
     runs, sorted digests are identical). A byte-for-byte comparison of two *separate*
     invocations would therefore test graphify's determinism, not cage's passthrough, and
     would flake in CI roughly always. cage's own determinism law is asserted where it
-    belongs — over derived views, in `check_derivation_is_deterministic`."""
+    belongs — over derived views, in `check_derivation_is_deterministic`.
+
+    **Known vacuity, stated rather than fixed:** if `check_setup_installs_both_twins`
+    failed, `project/bin` holds no shim, so `through` and `direct` are the *same*
+    unmetered invocation and this check passes having compared nothing. Same for
+    `check_doctor_reports_live` (no shim ⇒ nothing to report unhealthy). Both are
+    honest as written — `setup` is the check that fails — but do not read a green
+    `passthrough` as evidence of interception; `intercept` is the only check that
+    proves the shim ran."""
     shim_env = _env(Path(env["HOME"]).parent, project, on_path=project / "bin")
     through = _sh(f"graphify query {QUERY}", cwd=project, env=shim_env)
     direct = _sh(f"graphify query {QUERY}", cwd=project, env=env)
@@ -270,9 +308,14 @@ def main(argv: list[str] | None = None) -> int:
               "has nothing to test. The `absent` leg is the gate that always runs.")
         return 0
 
-    sandbox = (args.path or REPO_ROOT.parent) / f"cage-cigf-{int(time.time())}"
+    sandbox = _sandbox_parent(args.path) / f"cage-cigf-{int(time.time())}"
     project = sandbox / "proj"
     project.mkdir(parents=True)
+    # Seed the project footprint FIRST — `find_project_root` returns on the first hit, so
+    # this short-circuits the upward walk inside the sandbox before it can reach the
+    # developer's real `~/.cage` (module docstring, guard 1). `cage setup` is idempotent
+    # over an existing dir, so seeding costs only the "scaffolded from nothing" property.
+    (project / ".cage").mkdir(parents=True)
     (sandbox / "home").mkdir(parents=True)
     for src in sorted(CORPUS.glob("*.py")):
         shutil.copy2(src, project / src.name)

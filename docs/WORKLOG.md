@@ -12,6 +12,35 @@ by milestone) — the worklog is what *happened this session*.
 
 ---
 
+## 2026-08-11 — Claude Code (Opus 5) — agent-lane sweep: P0 found done, P1 landed
+
+- **Asked:** execute the agent-lane sweep pair, starting at P1; P0 gated on Arpit's go.
+- **Done (P0, no work needed):** verified before asking — **v0.48.0 was already
+  released**, a day before pickup. Tag on `origin`, GitHub release `2026-08-10T18:55Z`,
+  `cage-flux 0.48.0` on PyPI, `HEAD == origin/main`. The handoff, `OPEN-WORK.md`'s header
+  and `INTERVIEW.md` all still called it *unreleased in tree*. Corrected all three; the
+  STOP gate never needed to fire.
+- **Done (P1 CIGF-HERMETIC):** confirmed the defect first —
+  `find_project_root(<repo parent>)` returns the real `/Users/arpitarya` under the
+  sandbox env, because `_env`'s `HOME`/`CAGE_HOME` redirect collapses both entries of the
+  `excluded` set onto `sandbox/home/.cage`, un-excluding the real `~/.cage`. **The
+  hermeticity mechanism was the bug.** Fixed with the handoff's approach (seed
+  `project/.cage`, first-hit short-circuit) plus a `tempfile.gettempdir()` sandbox parent
+  as defence in depth — the two fixes the tracker named are both wrong and the docstring
+  now says why.
+- **Acceptance was the real leg, not the unit tests:** `python -m tools.cigraphify` ran
+  **7/7 on this machine** — the first time it has ever been runnable on a developer box —
+  and a before/after shasum manifest of `~/.cage`, `~/bin` and `~/CLAUDE.md` came back
+  **byte-identical**. The tracker's 3-of-7 failure claim was exact.
+- **Decided / recorded, not fixed:** `passthrough` and `doctor-live` pass *vacuously*
+  when `setup` has already failed (no shim ⇒ the metered and direct runs are the same
+  invocation). Honest as written; commented at the site so no one reads a green
+  `passthrough` as proof of interception.
+- **Open:** the suite baseline was **1542**, not the 1541 four docs carried — a second,
+  smaller staleness found on contact. Counts refreshed to **1545** everywhere.
+- **Next step:** P2 — REV-HARDEN P3 wiring hygiene (Opus, five items; 5a before 5b, and
+  kiro's hook gets a *named gap*, never a Windows twin).
+
 ## 2026-08-10 — Cowork (Claude Opus) — the agent-lane sweep, specced
 
 - **Asked:** a Claude Code prompt for the pending work — then, when offered a choice of

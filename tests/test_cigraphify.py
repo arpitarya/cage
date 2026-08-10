@@ -13,13 +13,20 @@ corpus — by monkeypatching the two seams `check_bare_graphify_is_intercepted` 
 empty or zero-saving result. This is the regression test for "the leg can pass while
 asserting nothing"; it is not a duplicate of `tools/cigraphify.py`'s own logic, since
 it exercises that exact function rather than restating its rule.
+
+The second group (CIGF-HERMETIC) pins the sandbox's **hermeticity** — that the leg
+cannot adopt the developer's real `~/.cage` as its project root. It asserts the
+mechanism (`paths.find_project_root` short-circuiting on the seeded `project/.cage`)
+rather than `main()`, which needs a real graphify install to reach the seeding.
 """
 from __future__ import annotations
 
+import tempfile
 from pathlib import Path
 
 import pytest
 
+from cage import paths
 from tools import cigraphify
 
 
@@ -96,3 +103,49 @@ def test_no_stdout_fails_loudly(tmp_path, monkeypatch):
 
     with pytest.raises(cigraphify.Fail, match="no stdout"):
         cigraphify.check_bare_graphify_is_intercepted(project, _env(tmp_path))
+
+
+# ── CIGF-HERMETIC: the sandbox must never adopt the real `~/.cage` ────────────────
+
+def _sandbox_under_a_home_with_a_global_ledger(tmp_path, monkeypatch):
+    """Reproduce the exact shape the leak needed: a sandbox nested under a dir that
+    *itself* carries a `.cage/` (the developer's real home), with `HOME`/`CAGE_HOME`
+    redirected into the sandbox the way `cigraphify._env` does."""
+    home = tmp_path / "devhome"
+    (home / ".cage").mkdir(parents=True)          # the developer's real global ledger
+    sandbox = home / "workspaces" / "cage-cigf-1"
+    project = sandbox / "proj"
+    project.mkdir(parents=True)
+    (sandbox / "home").mkdir(parents=True)
+    monkeypatch.setenv("HOME", str(sandbox / "home"))
+    monkeypatch.setenv("USERPROFILE", str(sandbox / "home"))
+    monkeypatch.setenv("CAGE_HOME", str(sandbox / "home"))
+    return home, project
+
+
+def test_without_the_seed_the_sandbox_adopts_the_real_home(tmp_path, monkeypatch):
+    """The negative control — this is the bug, and it is why `_env`'s redirect is not
+    enough on its own: with `HOME` and `CAGE_HOME` both pointing into the sandbox, the
+    two dirs `find_project_root` excludes collapse onto each other, so the real
+    `~/.cage` is no longer excluded and the upward walk claims it."""
+    home, project = _sandbox_under_a_home_with_a_global_ledger(tmp_path, monkeypatch)
+
+    assert paths.find_project_root(project) == home.resolve()
+
+
+def test_seeding_project_dotcage_keeps_the_walk_inside_the_sandbox(tmp_path, monkeypatch):
+    """The fix (`main()`'s `(project / ".cage").mkdir`): `find_project_root` returns on
+    the FIRST hit, so a seeded footprint short-circuits before the walk can leave the
+    sandbox — wherever the sandbox lives."""
+    _home, project = _sandbox_under_a_home_with_a_global_ledger(tmp_path, monkeypatch)
+    (project / ".cage").mkdir()
+
+    assert paths.find_project_root(project) == project.resolve()
+
+
+def test_sandbox_parent_defaults_off_the_repo(monkeypatch):
+    """Guard 2: the default parent is the OS temp dir, never `REPO_ROOT.parent` — which
+    on a developer box sits under `$HOME`. An explicit `--path` still wins."""
+    assert cigraphify._sandbox_parent(None) == Path(tempfile.gettempdir())
+    assert cigraphify._sandbox_parent(None) != cigraphify.REPO_ROOT.parent
+    assert cigraphify._sandbox_parent(Path("/somewhere/else")) == Path("/somewhere/else")

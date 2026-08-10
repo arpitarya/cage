@@ -23,7 +23,25 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
 
 ---
 
-## State of play (2026-08-10 — pick up here on a model switch)
+## State of play (2026-08-11 — pick up here on a model switch)
+
+- **v0.48.0 is RELEASED** (tagged, on `origin`, GitHub release `2026-08-10T18:55Z`,
+  `cage-flux 0.48.0` on PyPI, `HEAD == origin/main`). The section below said *unreleased
+  in tree* for a full day after it shipped, and so did `OPEN-WORK.md`'s header and the
+  agent-lane-sweep handoff's entire P0 STOP gate. **Never restate a release claim from
+  prose here** — `git ls-remote --tags origin`, `gh release view`, PyPI.
+- **The agent-lane sweep is under way** ([handoff](agent-lane-sweep.handoff.md) ·
+  [prompt](agent-lane-sweep.prompt.md), 29%). **P0 needed no work** (above); **P1
+  CIGF-HERMETIC is closed** — `tools/cigraphify` now seeds `project/.cage` so
+  `find_project_root` short-circuits inside the sandbox, and the `present` leg ran
+  **7/7 on a developer machine for the first time** with the real `~/.cage`/`~/bin`
+  proven byte-identical by a before/after shasum manifest. Suite **1542 ⇒ 1545**.
+- **Suite counts here were wrong too:** the real baseline was **1542**, not the 1541
+  this file, `README.md` and `CLAUDE.md` all carried. Corrected everywhere.
+- **Next:** P2 — REV-HARDEN P3 wiring hygiene (Opus; five items, 5a before 5b, and
+  kiro's hook gets a *named gap*, never a twin).
+
+## State of play (2026-08-10 — historical, and wrong about the release)
 
 - **v0.48.0 sits unreleased in tree** (`__version__ = "0.48.0"`, suite **1541/0**). It
   adds the **artifact surface**: `--export`/`--stamp` on `cage report` and all 16

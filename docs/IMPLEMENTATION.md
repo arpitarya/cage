@@ -16,6 +16,56 @@ Entry format:
 
 ---
 
+## 2026-08-11 — agent-lane sweep P1: CIGF-HERMETIC — the graphify CI leg is hermetic on a dev box
+
+- **Verified first, and the defect is exactly as filed.** With `HOME`/`CAGE_HOME`
+  redirected into the sandbox the way `cigraphify._env` does,
+  `paths.find_project_root(Path("/Users/arpitarya/my_programs"))` returns
+  `/Users/arpitarya` — the developer's real home. Both entries of the `excluded` set
+  (`global_base()` and `Path.home()/".cage"`) collapse onto `sandbox/home/.cage`, so the
+  real `~/.cage` stops being excluded and the upward walk from a sandbox built at
+  `REPO_ROOT.parent` adopts it. **The hermeticity mechanism was the bug.**
+- **Implemented:** two guards in `tools/cigraphify.py`. (1) `main()` seeds
+  `(project / ".cage").mkdir(parents=True)` *before* any check — `find_project_root`
+  returns on the first hit, so `cur == project` short-circuits before the walk can leave
+  the sandbox, wherever the sandbox lives (including under `--path ~`). (2) a new
+  `_sandbox_parent()` defaults the parent to `tempfile.gettempdir()` instead of
+  `REPO_ROOT.parent`. Guard 1 is the load-bearing one; guard 2 is defence in depth and
+  **cannot stand alone** — on Windows `gettempdir()` is under `USERPROFILE`.
+- **Both fixes the tracker named are wrong, and that is recorded in the module
+  docstring, not just here.** Pinning the root in `_env` via `CAGE_BASE` is impossible —
+  the resolver that bites is `cliutil.root()` → `find_project_root`, which has no
+  `CAGE_BASE` branch (only `resolve_root`, the *read* path, does). `gettempdir()` alone
+  is holed on Windows, which is the one OS this runner exists for.
+- **The property given up, stated:** ".cage scaffolded from nothing" no longer holds. No
+  check ever asserted it (`check_setup_installs_both_twins` asserts only the two `bin/`
+  twins) and `initcmd.run` is idempotent over an existing dir.
+- **Also recorded, not fixed:** `check_passthrough_is_transparent` and
+  `check_doctor_reports_live` pass **vacuously** when the `setup` check has already
+  failed — with no shim in `project/bin`, `through` and `direct` are the same unmetered
+  invocation. Honest as written (`setup` is the check that fails), but a green
+  `passthrough` is not evidence of interception; `intercept` is the only check that
+  proves the shim ran. Comment added at the site.
+- **Acceptance is the real leg, not the unit tests.** `python -m tools.cigraphify` was run
+  on this machine against the real installed graphify: **7/7 checks passed** (`setup` ·
+  `graph` 70 nodes · `intercept` 1 savings row ~2,562 tokens gross · `passthrough` ·
+  `doctor-live` · `doctor-dead` · `determinism`) — it had never been runnable on a
+  developer box before, and the tracker's 3-of-7 failure claim (`setup`, `intercept`,
+  `doctor-dead`) was exact. Hermeticity was proven by a **before/after shasum manifest of
+  `~/.cage`, `~/bin` and `~/CLAUDE.md`: byte-identical**, and the sandbox landed under
+  `/var/folders/…/T/`, not beside the repo.
+- **Files:** `tools/cigraphify.py` · `tests/test_cigraphify.py` · `docs/OPEN-WORK.md` ·
+  `docs/DOC-REGISTRY.md` · `README.md` · `CLAUDE.md`.
+- **Tests:** green — **1542 ⇒ 1545**, 11 skipped. Three added, and the first is a
+  **negative control that reproduces the bug**: without the seed,
+  `find_project_root(project)` returns the fake dev home. A regression test could not be
+  written against `main()` (it needs a real graphify install to reach the seeding), so
+  the tests pin the *mechanism* — the short-circuit — plus `_sandbox_parent`'s default.
+- **Correction to the trackers, found on contact:** the suite baseline was **1542**, not
+  the 1541 recorded in `INTERVIEW.md`, `README.md`, `CLAUDE.md` and the sweep handoff.
+  Counts refreshed to 1545.
+- **Next:** P2 — REV-HARDEN P3 wiring hygiene (five items, Opus; 5a before 5b).
+
 ## 2026-08-10 — v0.48.0: the artifact surface (`--export`/`--stamp`) + the chats structural-empty fix
 
 - **Implemented (1):** `--export` on `cage report` + all 16 `cage insights` views.

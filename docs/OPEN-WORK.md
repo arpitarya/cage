@@ -29,15 +29,22 @@ this file's own markers.
 deliberately unbumped — both false at HEAD, carried forward unchecked. That is the
 second time this header has gone stale in two days; its own markers are not ground
 truth.)*
-**State: v0.46.1 is released** — `v0.46.1` tagged, `__version__ = "0.46.1"`
-(`cage/__init__.py:19`). v0.46.1 is the CI-S18 fix (harness only, no product code);
-v0.46.0 shipped CHATS-AUTHOR. **Nothing is unreleased in tree.**
+**State: v0.48.0 is RELEASED** *(re-verified 2026-08-11 against the three sources that
+can't go stale, not against this file)* — `v0.48.0` tagged **and on `origin`**, GitHub
+release published `2026-08-10T18:55Z`, `cage-flux 0.48.0` live on PyPI, `__version__ =
+"0.48.0"` (`cage/__init__.py:19`), local `HEAD == origin/main`. **Nothing is unreleased
+in tree.** v0.48.0 shipped the artifact surface (`--export`/`--stamp`).
+*(⚠️ This header — and `INTERVIEW.md`, and the agent-lane-sweep handoff's whole P0 STOP
+gate — all still described v0.48.0 as *unreleased in tree* on 2026-08-11, a day after it
+shipped. **Fourth staleness in this header in a week.** Re-read `git tag
+--sort=-v:refname`, `git ls-remote --tags origin`, `gh release view` and
+`cage/__init__.py` before trusting any release claim here.)*
 **The `build` gate was RED on all nine legs from v0.45.0 to v0.46.0** and two releases
 shipped through it — fixed in v0.46.1. `publish-pypi` has no `needs` link to `build`
-(deliberate), so no published artifact was affected. *(This header has gone stale three times in three days; re-read
-`git tag --sort=-v:refname` and `cage/__init__.py` before trusting it again.)*
-Suite: **1462 pass / 0 fail / 11 skipped** — re-run and printed 2026-08-03 (+20 over the
-1442 baseline are CHATS-AUTHOR's own tests).
+(deliberate), so no published artifact was affected.
+Suite: **1545 pass / 0 fail / 11 skipped** — re-run on the maintainer's own venv
+2026-08-11 (+3 over the 1542 baseline are CIGF-HERMETIC's tests). *(The 1541 recorded in
+`README.md`, `CLAUDE.md` and `INTERVIEW.md` was itself one short of the real baseline.)*
 
 ## Pending
 
@@ -87,7 +94,6 @@ This is the whole point of the two-lane split, and as of 2026-08-02 **every item
 | **ADOPT-COV** | is half B's per-agent coverage real, or too thin? | measure on a lab run first |
 | **HR-FIELD** | the four-bucket split has only been read on **cage's own repo**, whose history is unusually doc- and artifact-heavy (80% `unattributed`) | run `cage insights commits` on a second, code-heavy repo; if `unattributed` still dominates, the per-file table is the surface that needs work, not the buckets |
 | **L1-FIELD** | **Claude leg field-verified 2026-08-02** (`just wire` → `cage setup --claude --hooks`, one of three — Copilot/Kiro untouched by design, no install available here). `PreToolUse`/`Bash` confirmed **host-fired, live, unprompted**: two ordinary Bash tool calls invoking `./bin/graphify` produced new rows in `.cage/state/attest.jsonl` with no manual step. The pre-existing hand-written graphify `Glob\|Grep` hook in `.claude/settings.json` survived the merge untouched, and every committed `.cage/` file is grep-clean of absolute paths/usernames. `SessionEnd`/auto-close is a **verified negative**, not an assumption: manually invoking the exact wired command with this session's real id showed `skip_reason: no-open-task-in-session` in the debug log — correct, because **no call in this ledger has ever carried a non-empty `task` field** (grep-confirmed across all 40k+ rows; no `tasks.jsonl` exists), so `_open_tasks` structurally cannot find anything to close under plain transcript capture. Source confirms the write path uses `outcome="auto"`, never `"ok"`, but a live **positive** case (a real auto-closed task) could not be produced without seeding a task, which was out of scope. True host-triggered `SessionEnd`/`SessionStart` firing (as opposed to a manual same-payload replay) was **not observed** — this session never actually ended. Also surprising: the `PreToolUse` firing happened inside a session whose own system prompt says "VSCode native extension environment," in tension with `attest.LIMIT`'s "hooks do not fire under a VS Code extension" claim ([finding](regression/2026-08-02-finding-hooks-fire-in-vscode-extension.md)) | wire one real machine each for Copilot and Kiro, confirm the hook fires and `cage setup --status` agrees; separately, resolve the `attest.LIMIT` tension the finding raises, and — independently — someone with a real task-tagged session should confirm the positive auto-close case actually writes `outcome="auto"` |
-| **CIGF-HERMETIC** | `tools/cigraphify` **cannot be run on a developer machine** — it builds its sandbox as a sibling of the repo, so on a dev box that path is under `$HOME`, and `paths.resolve_root` walks up and adopts the real `~/.cage`. `cage setup --project-only` then scaffolds into the *home* root and 3 of 7 checks fail (`setup`, `intercept`, `doctor-dead`). CI has no ancestor `.cage`, so it is green there and the gap is invisible — the same class as the cage-lab PATH rule: **a lab that is not hermetic against the developer's machine cannot be verified before pushing**. ⚠️ Running it from under `$HOME` **writes to the real `~/.cage`** (idempotent and non-destructive — ledger untouched, doctor green — but it is the user's live config) | make the sandbox hermetic against an ancestor `.cage`. ⚠️ **Both fixes this row used to name are wrong** (verified 2026-08-10): pinning the root in `_env` is *impossible* — the resolver that bites is `cliutil.root()`, which has no `CAGE_BASE` branch — and `tempfile.gettempdir()` is *holed on Windows*, where it sits under `USERPROFILE`. Seed `project/.cage` so `find_project_root` short-circuits on the first hit. The home writes are also broader than recorded here: `~/CLAUDE.md` and `~/bin/graphify{,.cmd}` too. Found 2026-08-03 while fixing CI-S18; picked up 2026-08-10 → [handoff](agent-lane-sweep.handoff.md) P1 | 
 | **KIRO-MCP-FIELD** | the committed path-free `python3 -m cage mcp` has never started on a real Kiro | open Kiro on a wired repo; if it does not start, **report it** — do not fall back to a gitignored absolute path |
 | **GFX-KIRO-RATE** | how often does kiro's ~2000-token stdout cap refuse a real graphify query? The field run was **n=2** (1 filed, 1 refused) — enough to prove both branches execute, not enough to be a rate ([kiro run](regression/2026-08-07-gfx-cov-kiro-field-run.md)). [ADR 0009](adr/0009-kiro-cli-tool-run-bodies-read-transiently-never-persisted.md)'s veto reopens the design **below a 10% file rate** — if typical `query` output sits above the cap, report-read-only may be the honest kiro answer. Everything else in GFX-COV-FIELD is closed: both routes are now verified on real data (kiro 2026-08-07, [copilot VS Code 2026-08-08](regression/2026-08-08-gfx-cov-vscode-field-run.md)) | accumulate real kiro-cli graphify usage, re-run the field script in the kiro run report, publish the rate to `docs/regression/`. No code change until the number exists |
 
