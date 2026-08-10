@@ -192,12 +192,17 @@ def check_bare_graphify_is_intercepted(project: Path, env: dict) -> str:
     extensionless entry, so the interceptor was structurally unreachable there. This
     assertion is the flipped form — it asserts the fix, not the gap."""
     shim_env = _env(Path(env["HOME"]).parent, project, on_path=project / "bin")
-    before = len(_savings_rows(project))
+    # An ID SET, not a positional slice. `_savings_rows` concatenates
+    # `sorted(rglob("*.jsonl"))`, so a row landing in an earlier-sorted shard shifts
+    # every later index and `rows[before:]` silently reads the wrong rows — or none.
+    # Latent in CI today (one shard), wrong in principle, and the kind of thing that
+    # only bites once the ledger spans a month boundary.
+    before = {x.get("id") for x in _savings_rows(project)}
     r = _sh(f"graphify query {QUERY}", cwd=project, env=shim_env)
     if not r.stdout.strip():
         raise Fail("intercepted graphify produced no stdout")
-    rows = _savings_rows(project)
-    new = [x for x in rows[before:] if x.get("tool") == "graphify"]
+    new = [x for x in _savings_rows(project)
+           if x.get("id") not in before and x.get("tool") == "graphify"]
     if not new:
         raise Fail("bare `graphify query` filed no savings row — the interceptor did "
                    "not reach cage (PATH/PATHEXT resolution, or a dead probe verb)")
@@ -275,6 +280,17 @@ def check_derivation_is_deterministic(project: Path, env: dict) -> str:
     byte-identical to an absent leg's."""
     a = _cage("report --no-import --csv", cwd=project, env=env, check=False)
     b = _cage("report --no-import --csv", cwd=project, env=env, check=False)
+    # Both runs must have SUCCEEDED and PRODUCED something before their equality means
+    # anything. With `check=False` and only `a.stdout != b.stdout` to go on, two crashed
+    # runs compared `"" == ""` and the check reported determinism it had never observed —
+    # the same vacuous-green class as the undersized corpus this module exists to prevent.
+    for label, r in (("first", a), ("second", b)):
+        if r.returncode != 0:
+            raise Fail(f"the {label} `cage report --csv` run exited {r.returncode} — "
+                       f"determinism was never actually compared\n{r.stderr}")
+        if not r.stdout.strip():
+            raise Fail(f"the {label} `cage report --csv` run printed nothing — "
+                       "two empty outputs are equal for the wrong reason")
     if a.stdout != b.stdout:
         raise Fail("two `cage report --csv` runs over one ledger disagree")
     calls = project / ".cage" / "ledger"

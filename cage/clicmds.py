@@ -157,6 +157,11 @@ def cmd_commits(args) -> int:
     resolved and no dollar column can appear (`commitview.py`'s docstring)."""
     from cage import commitview
     r = captured_read_root(args)
+    # ⚠️ No default `--since` here, deliberately — see OPEN-WORK **COMMITS-WINDOW**.
+    # The per-commit `git show` makes this view's cost grow with the whole history
+    # (measured: 6.4s for 20 rows on a 123-commit repo), but a *relative* default window
+    # would put a wall clock in the default path: the same ledger would render
+    # differently next month with no code change. That is a product fork, not a fix.
     data = commitview.summarize(r, _policy(r), since=args.since)
     return emit(args, render.envelope("commits", data) if args.json else data,
                 commitview.render_commits(data, show_all=getattr(args, "all", False)),

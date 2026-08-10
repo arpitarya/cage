@@ -19,9 +19,16 @@ _SHORTSTAT = re.compile(r"(\d+) files? changed(?:, (\d+) insertion)?(?:.*?(\d+) 
 
 
 def _git(root: Path, *args: str) -> str | None:
-    """Run a read-only git command; return stripped stdout, or None on any failure."""
+    """Run a read-only git command; return stripped stdout, or None on any failure.
+
+    **`core.quotePath=false` is not optional here.** With git's default, any path
+    containing a non-ASCII byte is emitted C-quoted — `"caf\\303\\251.py"` rather than
+    `café.py` — so every downstream path parse silently misses. It is passed as `-c`
+    *before* the subcommand, which is the only position git accepts, and set here rather
+    than at each call site so a new git read cannot forget it."""
     try:
-        out = subprocess.run(("git", "-C", str(root), *args), capture_output=True,
+        out = subprocess.run(("git", "-C", str(root), "-c", "core.quotePath=false",
+                              *args), capture_output=True,
                              text=True, timeout=5, check=True)
         return out.stdout.strip()
     except (OSError, subprocess.SubprocessError):

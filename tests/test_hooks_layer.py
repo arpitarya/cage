@@ -599,3 +599,91 @@ def test_steering_is_byte_identical_on_a_second_install(proj_at):
     agents.install(proj_at, hooks=True)
     assert {a: p.read_bytes()
             for a, p in steering.paths_for(proj_at, doc).items()} == first
+
+
+# ── P3.3: session-end sweeps unthrottled; session-start does not ──────────────
+
+def _capture_on(root, monkeypatch, **capture):
+    """Turn capture-on-read on with an explicit throttle, so the sweep gates are the
+    ones actually under test. `conftest` pins `CAGE_CAPTURE_ON_READ=0` for the whole
+    suite (the determinism/golden law), and the ENV wins over policy — so opting back
+    in means unsetting it, not just writing the toml."""
+    from cage import paths
+    monkeypatch.setenv("CAGE_CAPTURE_ON_READ", "1")
+    pol = paths.Footprint(root).policy
+    pol.parent.mkdir(parents=True, exist_ok=True)
+    opts = "\n".join(f"{k} = {v}" for k, v in capture.items())
+    pol.write_text(f"[capture]\nenabled = true\non_read = true\n{opts}\n",
+                   encoding="utf-8")
+
+
+def _sweeps(monkeypatch):
+    """Record whether the underlying pull sweep actually RAN.
+
+    `ensure_captured`'s return value cannot answer this: it is `None` both when the
+    throttle blocked the sweep and when the sweep ran and found nothing new ("zero new
+    ⇒ silent"). Those are the two states this defect is about telling apart, so the
+    observation has to be one level down."""
+    from cage import importcmd
+    ran = []
+    real = importcmd.run
+    monkeypatch.setattr(importcmd, "run",
+                        lambda root, agent, args: (ran.append(1), real(root, agent, args))[1])
+    return ran
+
+
+def test_force_skips_the_read_throttle(proj_at, monkeypatch):
+    """The mechanism, end to end: a second sweep inside the throttle window does not
+    run, and the same call with `force=True` does."""
+    from cage import importcmd
+    _capture_on(proj_at, monkeypatch, read_throttle_secs=3600)
+    ran = _sweeps(monkeypatch)
+
+    importcmd.ensure_captured(proj_at)
+    assert len(ran) == 1                     # first read: no prior stamp, sweeps
+    importcmd.ensure_captured(proj_at)
+    assert len(ran) == 1, "the throttle did not block the second sweep"
+    importcmd.ensure_captured(proj_at, force=True)
+    assert len(ran) == 2, "force did not skip the throttle"
+
+
+def test_session_end_sweeps_even_inside_the_read_throttle(proj_at, monkeypatch):
+    """`_session_end` sweeps BEFORE `_open_tasks`, and `ensure_captured` returns None
+    inside `read_throttle_secs` — so any read in the preceding window meant the
+    session's calls were never imported and its final tasks were silently un-closable.
+    A session ends exactly once; there is no later trigger to make up for it."""
+    from cage import importcmd
+    _capture_on(proj_at, monkeypatch, read_throttle_secs=3600)
+    importcmd.ensure_captured(proj_at)        # a read, moments before the session ends
+    ran = _sweeps(monkeypatch)
+
+    assert hookcmd.run(_args("session-end", session="s1")) == 0
+    assert ran, "session-end was throttled out of its own capture sweep"
+
+
+def test_session_start_stays_throttled_on_purpose(proj_at, monkeypatch):
+    """The divergence is deliberate and pinned so a reviewer cannot "tidy" it away:
+    session-start has no deadline (the session's calls do not exist yet) and the next
+    read — or the session's own end — sweeps anyway. Forcing both would re-scan a warm
+    ledger on every turn."""
+    from cage import importcmd
+    _capture_on(proj_at, monkeypatch, read_throttle_secs=3600)
+    importcmd.ensure_captured(proj_at)
+    ran = _sweeps(monkeypatch)
+
+    assert hookcmd.run(_args("session-start", session="s1")) == 0
+    assert not ran, "session-start swept unthrottled"
+
+
+def test_force_never_overrides_the_consumer_master_switch(proj_at):
+    """`force` skips the throttle, NOT `capture.enabled` — pausing metering has to
+    actually pause it — and not `--no-import` either. Both are decisions a user made;
+    the throttle is only an optimisation."""
+    from cage import importcmd, paths
+    pol = paths.Footprint(proj_at).policy
+    pol.parent.mkdir(parents=True, exist_ok=True)
+    pol.write_text("[capture]\nenabled = false\non_read = true\n", encoding="utf-8")
+
+    assert importcmd.ensure_captured(proj_at, force=True) is None
+    assert importcmd.ensure_captured(proj_at, _args("session-end", no_import=True),
+                                     force=True) is None

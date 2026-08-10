@@ -343,7 +343,9 @@ def build_parser() -> argparse.ArgumentParser:
                              help="one row per commit: tokens, human hours, and the "
                                   "agent / human~ / unattr / unkn line split "
                                   "(no USD on this surface, by design)")
-    cm.add_argument("--since", metavar="WINDOW", help="window like 7d / 24h / 2w")
+    cm.add_argument("--since", metavar="WINDOW",
+                    help="window like 7d / 24h / 2w (no default; each commit costs one "
+                         "`git show`, so a window is the way to bound a big history)")
     cm.add_argument("--all", action="store_true",
                     help="show every commit (default: the 20 newest)")
     _json_flag(cm)

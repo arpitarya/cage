@@ -11,13 +11,14 @@ every persisted `sha`, a capture change), and the tracker they come from is wron
 eight places. Phases P0/P1/P3/P6 are Sonnet-shaped and are marked so inline; a Sonnet
 session may take those alone.
 
-**Progress:** 43% — P0·P1·P2 done (2026-08-11), 4 of 7 phases remaining. 7 phases total
+**Progress:** 57% — P0·P1·P2·P3 done (2026-08-11), 3 of 7 phases remaining. 7 phases total
 (P0 release · P1 CIGF-HERMETIC · P2 REV-HARDEN P3 · P3 REV-HARDEN P4-mechanical ·
 P4 REV-HARDEN P4-judgment · P5 HR-COPILOT-JOIN · P6 EXPORT-SCOPE). **P0 required no
 work — it was already released when the pair was picked up** (see the handoff's
 corrected §P0); P1 landed with the real CI leg green 7/7 on a developer machine for the
 first time; P2 closed all five wiring-hygiene items and found a sixth crash site the
-proposal had missed.
+proposal had missed; P3 landed four of its five, and **raised the fifth as a fork**
+(COMMITS-WINDOW) rather than deciding it inside a fix commit.
 
 ---
 

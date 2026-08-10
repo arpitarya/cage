@@ -211,11 +211,19 @@ def summarize(root: Path, pol: dict, *, since: str | None = None,
         base["reason"] = f"{sha}: not a commit in this history"
         return base
     if cut is not None:
+        before_window = len(wanted)
         wanted = [w for w in wanted if (t := _iso(w.hi)) is not None and t >= cut]
+        # No silent caps: the window is now a DEFAULT, so a reader who never typed
+        # `--since` has to be told what it hid and how to see it.
+        base["windowed_out"] = before_window - len(wanted)
+    # A SET, membership-tested once per commit. `w not in wanted` over a list made the
+    # selection O(n²); the `git show` below dominates, but there is no reason to pay
+    # both.
+    keep = {w.sha for w in wanted}
 
     rows = []
-    for i, w in enumerate(windows):
-        if w not in wanted:
+    for w in windows:
+        if w.sha not in keep:
             continue
         grp = join["by_sha"].get(w.sha, {"calls": [], "via": {}})
         diff = linematch.commit_diff(r, w.sha)      # ONE git call per rendered commit
@@ -414,6 +422,9 @@ def _footer(data: dict, foot, *, cut: int = 0) -> str:
     t = data["totals"]
     if cut:
         foot.gap(f"· {cut} more commit(s) — --all to show")
+    if data.get("windowed_out"):
+        foot.gap(f"· {data['windowed_out']} commit(s) older than {data.get('since')} "
+                 "not read — --since WINDOW or --all")
     foot.caveat("· split = share of CLASSIFIED added lines. agent = matched an agent's "
                 "recorded\n  proposal (direct); human~ = added in a file that session "
                 "proposed but matching\n  nothing (ESTIMATED residual); unattr = added "

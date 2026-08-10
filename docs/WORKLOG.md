@@ -12,6 +12,37 @@ by milestone) — the worklog is what *happened this session*.
 
 ---
 
+## 2026-08-11 — Claude Code (Opus 5) — agent-lane sweep P3: REV-HARDEN P4, mechanical half
+
+- **Asked:** continue the sweep; P3 is the low-blast-radius half, order 7 → 3 → 4 → 2 → 5.
+- **Done:** four of five landed — the two `cigraphify` checks that asserted nothing ·
+  `_uncovered`'s missing repo filter · the unthrottled session-end sweep · quoted-path
+  line matching. All mutation-checked (1562 ⇒ 1583).
+- **STOPPED on item 2 (`commitview`'s default window) and filed a compare doc** rather
+  than deciding inside a fix commit. The obvious fix is a default `--since`, and it is
+  wrong: a *relative* default puts a wall clock in the default path, so the same ledger
+  renders differently next month — two goldens broke on exactly that, and INTERVIEW.md's
+  DOGFOOD lesson already says *make a published window absolute, never relative*. Measured
+  **6.4s for 20 rows on 123 commits**; a 90d default cut **zero** of them here, so it
+  would not have bounded the cost either. Landed the two uncontested halves (O(n²) scan →
+  set; a window that hides commits now says how many).
+  → [compare](compare/commits-view-cost-bound.compare.md), OPEN-WORK **COMMITS-WINDOW**.
+  **Needs Arpit's verdict; recommendation is Option B (cap the read by the row cap).**
+- **Three findings beyond the handoff:**
+  1. `core.quotePath` bites a **third** site it did not list — `tasks.git_snapshot`, which
+     stamps a mangled `scope` into the ledger, a persisted field.
+  2. A path with a **space** stays broken after the quotePath fix: git appends a literal
+     tab to the `+++` line, so the key never matches numstat's.
+  3. The handoff asked me to assert `_uncovered`'s `newest == ""` interaction. **That
+     branch is unreachable from `capture()`** (a zero-commit repo short-circuits first),
+     so it is unit-tested directly and recorded as unreachable rather than left looking
+     like coverage.
+- **Also corrected:** `constants.COMMITS_DEFAULT_ROWS`' comment claimed the row cap
+  "bounds cost". It never did — the cap is applied after every row is built — and that
+  false comment is why the cost problem stayed invisible.
+- **Next step:** P4 — the judgment half (Opus, 3 items, sha rewrite LAST), unless Arpit
+  wants COMMITS-WINDOW decided first.
+
 ## 2026-08-11 — Claude Code (Opus 5) — agent-lane sweep P2: REV-HARDEN P3 wiring hygiene
 
 - **Asked:** continue the sweep; P2 is the Opus-tier phase (wiring + a data-loss path).

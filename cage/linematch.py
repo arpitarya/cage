@@ -210,14 +210,29 @@ def match_commit(proposed_by_file: dict, added_by_file: dict,
 
 # ── reading a commit's added lines (transient, never persisted) ───────────────
 
-_DIFF_FILE = re.compile(r"^\+\+\+ b/(.*)$")
+# The trailing `\t?` is the SECOND half of the quoted-path defect, and it survives the
+# `core.quotePath=false` fix: git appends a literal tab to a `+++ b/<path>` line whenever
+# the path needs disambiguating — which a path containing a **space** always does. Without
+# it the capture is `"a b.py\t"`, which can never key-match the numstat name `a b.py`, so
+# the file is DROPPED for a reason that has nothing to do with encoding. A real trailing
+# tab in a filename cannot be confused with it: git C-quotes control characters regardless
+# of `quotePath`, so an unquoted trailing tab is always the disambiguator.
+_DIFF_FILE = re.compile(r"^\+\+\+ b/(.*?)\t?$")
 _NUMSTAT = re.compile(r"^(\d+|-)\t(\d+|-)\t(.+)$")
 
 
 def _git(root: Path, *args: str) -> str | None:
-    """Read-only git, 5s timeout, fail-open — the `tasks._git` idiom."""
+    """Read-only git, 5s timeout, fail-open — the `tasks._git` idiom.
+
+    **`core.quotePath=false` is not optional here.** With git's default, a path holding
+    any non-ASCII byte is emitted C-quoted, so `+++ "b/caf\\303\\251.py"` never matches
+    `_DIFF_FILE`, the file gets no `added` entry, and `match_commit` scores the landed
+    file **DROPPED** — three maps keyed three different ways for one file. It is passed
+    as `-c` before the subcommand (the only position git accepts) and set here rather
+    than at each call site, so a new git read cannot forget it."""
     try:
-        out = subprocess.run(("git", "-C", str(root), *args), capture_output=True,
+        out = subprocess.run(("git", "-C", str(root), "-c", "core.quotePath=false",
+                              *args), capture_output=True,
                              text=True, timeout=5, check=True, errors="replace")
         return out.stdout
     except (OSError, subprocess.SubprocessError):

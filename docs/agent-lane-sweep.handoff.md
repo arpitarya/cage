@@ -38,7 +38,7 @@ this handoff, re-verify against the code and trust the code.
 | P0 | Release v0.48.0 | Sonnet | irreversible (PyPI) | ✅ **DONE before pickup** — tagged, GH-released 2026-08-10, live on PyPI; the STOP gate is moot |
 | P1 | CIGF-HERMETIC | Sonnet | build-time only | ✅ **DONE 2026-08-11** — seeded `project/.cage` + temp-dir parent; real leg **7/7** on a dev box, real `~/.cage` byte-identical |
 | P2 | REV-HARDEN P3 — wiring hygiene (5 items) | Opus | wiring + a data-loss path | ✅ **DONE 2026-08-11** — all five, mutation-checked; a **sixth** crash site found beyond the five filed |
-| P3 | REV-HARDEN P4 — low blast radius (5 items) | Sonnet | local | none |
+| P3 | REV-HARDEN P4 — low blast radius (5 items) | Sonnet | local | ✅ **4 of 5 DONE 2026-08-11**; item 2 (`commitview` window) **raised as a fork**, not decided — [compare](compare/commits-view-cost-bound.compare.md) |
 | P4 | REV-HARDEN P4 — judgment (3 items) | Opus | persisted rows | land P3 first |
 | P5 | HR-COPILOT-JOIN | Opus | capture path | ⚠️ the tracker's framing is wrong; §P5 |
 | P6 | EXPORT-SCOPE | Sonnet | additive | none |

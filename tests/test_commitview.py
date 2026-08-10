@@ -377,3 +377,48 @@ def test_a_dirty_task_snapshot_does_not_donate_its_hours(world):
                  commit=world["c2"], human_minutes=90, files_changed=4)
     row = next(r for r in _summary(world)["rows"] if r["sha"] == world["c2"])
     assert row["hours"]["tier"] != commitview.ATTESTED
+
+
+# ── P3.4: window selection is a set, and what it hides is never silent ────────
+
+def test_the_since_window_selects_by_sha_membership(world):
+    """`wanted` was a list and `w not in wanted` ran inside the per-commit loop, so
+    selection was O(n²) on top of the one `git show` each row already costs. A set of
+    shas is the same selection; this pins that the *selection* did not change."""
+    every = {r["sha"] for r in _summary(world)["rows"]}
+    assert every == {world["c1"], world["c2"], world["c3"]}
+    only_one = _summary(world, sha=world["c2"])
+    assert [r["sha"] for r in only_one["rows"]] == [world["c2"]]
+
+
+def test_a_window_records_how_many_commits_it_hid(world):
+    """No silent caps. The row cap already footnotes its cut; a `--since` window that
+    drops commits from the *read* had no counterpart, so a narrow window looked like a
+    repo with less history rather than a view showing less of it."""
+    data = _summary(world, since="1h")
+    assert data["windowed_out"] == 3
+
+    # When the window empties the view entirely there is already an honest message —
+    # "the window is empty, not the repository" — so the count is the half that was
+    # missing: a window that hides SOME commits.
+    partial = {**data, "windowed_out": 2, "since": "1h",
+               "rows": _summary(world)["rows"][:1], "ok": True}
+    partial["totals"] = commitview._totals(partial["rows"])
+    text = commitview.render_commits(partial)
+    assert "2 commit(s) older than 1h not read" in text
+    assert "--since WINDOW or --all" in text
+
+
+def test_no_window_reports_nothing_hidden(world):
+    """The control: with no `--since`, nothing is windowed out and the footnote is
+    absent — a `0 commits older than None` line would be worse than silence."""
+    data = _summary(world)
+    assert not data.get("windowed_out")
+    assert "not read" not in commitview.render_commits(data)
+
+
+def test_the_detail_view_still_resolves_a_commit_outside_any_window(world):
+    """`cage insights commit <sha>` shares this summarizer, which is exactly why no
+    default window may be introduced inside it — an old sha must keep resolving."""
+    data = _summary(world, sha=world["c1"])
+    assert data["ok"] and [r["sha"] for r in data["rows"]] == [world["c1"]]

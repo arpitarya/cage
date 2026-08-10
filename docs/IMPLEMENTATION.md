@@ -16,6 +16,64 @@ Entry format:
 
 ---
 
+## 2026-08-11 — agent-lane sweep P3: REV-HARDEN P4's mechanical half (4 of 5 landed, 1 raised as a fork)
+
+- **Landed in the specified order 7 → 3 → 4 → 5; item 2 stopped at a decision.**
+- **3.1 (item 7) two `cigraphify` checks that asserted nothing.** `determinism` ran both
+  `cage report --csv` calls with `check=False` and compared only stdout, so two *crashed*
+  runs gave `"" == ""` ⇒ pass — the vacuous-green class this module exists to prevent,
+  inside the module itself. Now gates `returncode == 0` and non-empty output on both.
+  `intercept`'s `rows[before:]` was a positional slice over `sorted(rglob("*.jsonl"))`; a
+  row landing in an **earlier-sorted shard** shifts every index. Diffs an **id set** now.
+- **3.2 (item 3) `_uncovered` judged coverage over other repos' edits.** The raw parse
+  result went in unfiltered while `_repo_relative` was applied only to bucketing, so on a
+  repo whose newest commit is old, any newer edit *anywhere on the machine* held the
+  transcript uncovered — cursor never advanced, full re-parse every sweep, forever. New
+  `_in_repo` shares `_repo_relative` with `_bucket_edits`, so coverage and bucketing
+  finally agree on what "an edit in this repo" means.
+- **A correction to the handoff, and it changed a test:** it asked for the `newest == ""`
+  interaction to be asserted. **That branch is unreachable from `capture()`** — a repo
+  with no commits short-circuits at `skipped="no-commits"` before any transcript is
+  parsed. Recorded as such and unit-tested directly instead; a test that appears to
+  exercise a branch it cannot reach is worse than none.
+- **3.3 (item 4) unthrottled session-end sweep.** `ensure_captured` gained `force`, set by
+  `_session_end` **only**. It skips the **throttle** and deliberately not
+  `capture.enabled` (the consumer's master switch) or `--no-import` — both are decisions a
+  user made; the throttle is an optimisation. `_session_start` stays throttled, with a
+  comment and a test so the divergence cannot be "tidied" away. The test observes
+  `importcmd.run`, because `ensure_captured` returns `None` both when throttled *and*
+  when it swept and found nothing — the two states the defect is about telling apart.
+- **3.5 (item 5, first half) quoted paths — and a second defect the handoff did not
+  name.** No `core.quotePath` anywhere in the repo; git C-quotes any non-ASCII path, so
+  `+++ "b/caf\303\251.py"` missed `_DIFF_FILE` and every line the agent landed scored
+  **DROPPED**. Set inside all three `_git` helpers. **The second half survives that fix:**
+  git appends a literal **tab** to `+++ b/a b.py`, so a path with a **space** captured as
+  `"a b.py\t"` and could never key-match numstat's `a b.py`. `_DIFF_FILE` now absorbs it.
+  **And a third site the handoff's list omitted:** `tasks.git_snapshot` splits
+  `git diff --name-only` for its top-level-dirs guard, so a non-ASCII dir was stamped into
+  the ledger's `scope` as `"caf\303\251` — a persisted, never-rewritten field.
+- **There was no non-ASCII path fixture anywhere in `tests/` before this.** There are five
+  now, all mutation-checked.
+- **3.4 (item 2) `commitview`'s missing window — STOPPED, raised as a fork.** The two
+  uncontested halves landed: the O(n²) `w not in wanted` list scan is a sha set, and a
+  `--since` window that hides commits now reports how many (`windowed_out`) instead of
+  making the repo look shorter. **The default window did not**, and the reason is the
+  finding: a relative default puts a wall clock in the default path — the goldens' fixed
+  `2026-07-01` fixtures render differently once they age past it (two broke on exactly
+  that), and INTERVIEW.md's DOGFOOD lesson already ruled *make a published window
+  absolute, never relative*. Measured **6.4s for 20 rows on 123 commits**; a 90d default
+  cut **zero** of them, so it would not even have bounded the cost here.
+  `constants.COMMITS_DEFAULT_ROWS`' comment claimed the row cap bounded cost — it never
+  did (the cap is applied after every row is built), and that false comment is why this
+  stayed invisible. Corrected. Fork filed:
+  [compare](compare/commits-view-cost-bound.compare.md) + OPEN-WORK **COMMITS-WINDOW**.
+- **Files:** `tools/cigraphify.py` · `cage/authorcapture.py` · `cage/hookcmd.py` ·
+  `cage/importcmd.py` · `cage/commitview.py` · `cage/clicmds.py` · `cage/cli.py` ·
+  `cage/constants.py` · `cage/linematch.py` · `cage/originrecord.py` · `cage/tasks.py` ·
+  four test files · `docs/compare/commits-view-cost-bound.compare.md` · `docs/*`.
+- **Tests:** green — **1562 ⇒ 1583**, 11 skipped.
+- **Next:** P4 — REV-HARDEN P4's judgment half (Opus; the sha rewrite lands LAST).
+
 ## 2026-08-11 — agent-lane sweep P2: REV-HARDEN P3 — wiring hygiene (five items)
 
 - **All five verified as still-real before any fix**, three of them by reproducing the

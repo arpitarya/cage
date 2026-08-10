@@ -1096,7 +1096,8 @@ class _SweepArgs:
     since = None
 
 
-def ensure_captured(root: Path, args=None, *, pol: dict | None = None) -> dict | None:
+def ensure_captured(root: Path, args=None, *, pol: dict | None = None,
+                    force: bool = False) -> dict | None:
     """The **capture-on-read** primary path (capture-architecture Phase 1): lazily run
     the incremental sweep before a read returns, so any number a user sees was captured
     the instant before. Returns a counts-only summary of what became newly visible
@@ -1128,6 +1129,21 @@ def ensure_captured(root: Path, args=None, *, pol: dict | None = None) -> dict |
             return None
         prev_import = last_import(root)
         window = policy.read_throttle_secs(pol)
+        if force:
+            # `force` skips the THROTTLE only, and only one caller sets it:
+            # `hookcmd._session_end`, which sweeps so that the session's own calls (and
+            # therefore its tasks) are visible to `_open_tasks` a few lines later. Under
+            # the throttle that sweep returned `None`, so any read in the preceding
+            # window left the session's final tasks silently un-closable — and a session
+            # end happens exactly once, with no later trigger to make up for it.
+            #
+            # It deliberately does NOT bypass the two gates above it: `capture.enabled`
+            # is the consumer's master switch (pausing metering must actually pause it),
+            # and `--no-import` is an explicit per-invocation refusal. Both are decisions
+            # a user made; the throttle is only an optimisation.
+            debuglog.event(root, pol=pol, event="capture-on-read", action="forced",
+                           window=window)
+            window = 0
         if prev_import and window > 0:
             from cage import render
             secs = render.age_seconds(prev_import)

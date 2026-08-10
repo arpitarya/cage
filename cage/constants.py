@@ -240,10 +240,16 @@ AUTHORSHIP_ESTIMATE_HOURS = True
 AUTHORSHIP_MAX_EST_GAP = "4h"
 
 # `cage insights commits` default row cap — the `CHATS_DEFAULT_ROWS` precedent (a
-# flag, `--all`, not a policy knob; the cut is always footnoted, never silent). It
-# also bounds cost: each rendered commit costs one `git show`, so an unbounded
-# default on a large repo would be slow for a screen nobody reads past.
+# flag, `--all`, not a policy knob; the cut is always footnoted, never silent).
+#
+# ⚠️ It does NOT bound cost, and the comment here used to claim it did. The cap is
+# applied in `render_commits`, *after* `summarize` has already built a row — and run one
+# `git show --numstat` subprocess — for every commit in the history. Measured on cage's
+# own 123-commit repo: 6.4s to print 20 rows. Bounding that cost needs a decision
+# (a relative default `--since` would put a clock in the default path) — OPEN-WORK
+# **COMMITS-WINDOW**. `--since` remains the only bound, and it has no default.
 COMMITS_DEFAULT_ROWS = 20
+
 
 # `cage insights chats` default row cap (chats-view proposal, no-silent-caps rule). A
 # flag (`--all`), not a policy knob — unlike the DEFAULT_CONFIDENCE-style fallbacks

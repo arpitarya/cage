@@ -607,3 +607,163 @@ def test_import_claude_without_the_cursor_never_writes_provenance(repo, tmp_path
     importcmd.import_claude(root, A(), pol=pol, authorship_cursor={})
     assert [json.dumps(c, sort_keys=True) for c in ledger.calls(root)] == before
     assert len(ledger.provenance(root)) == 1
+
+
+# ── P3.2: coverage is judged over THIS repo's edits only ──────────────────────
+
+def test_an_edit_in_another_repo_never_holds_this_transcript_uncovered(repo, tmp_path):
+    """`_uncovered` was handed the raw parse result with no repo filter, while
+    `_repo_relative` was applied only to bucketing. So an edit in a DIFFERENT repo,
+    newer than this repo's newest commit, kept the transcript permanently uncovered —
+    and on a repo whose last commit is old, nearly every transcript on the machine has
+    some newer edit somewhere. The cursor never advanced and every sweep re-parsed
+    every file, forever."""
+    _commit(repo, {"seed.txt": "0\n"}, "2026-07-01T08:00:00+00:00")
+    elsewhere = tmp_path / "some-other-project"
+    elsewhere.mkdir()
+    tr = _transcript(tmp_path / "logs" / "sess-x.jsonl", "sess-x", [
+        # Inside this repo, and already committed above ⇒ covered.
+        {"ts": "2026-07-01T07:00:00.000Z", "tool": "Write",
+         "file": str(repo / "seed.txt"), "content": "0\n"},
+        # A LATER edit, but in a repo this sweep knows nothing about.
+        {"ts": "2026-07-01T09:00:00.000Z", "tool": "Write",
+         "file": str(elsewhere / "unrelated.py"), "content": "x = 1\n"}])
+    root, cursor = tmp_path / "ledger", {}
+
+    first = authorcapture.capture(root, [tr], repo=repo, cursor=cursor)
+    assert first["files_read"] == 1
+    assert first["uncovered"] == 0, "another repo's edit held this transcript open"
+    # The point of the fix: the cursor advances, so the steady state is a no-op.
+    assert authorcapture.capture(root, [tr], repo=repo, cursor=cursor)["files_read"] == 0
+
+
+def test_an_in_repo_edit_after_the_newest_commit_still_holds_it_open(repo, tmp_path):
+    """The control — the filter must not have turned coverage into "always covered".
+    An edit in THIS repo awaiting a commit is exactly what `uncovered` is for."""
+    _commit(repo, {"seed.txt": "0\n"}, "2026-07-01T08:00:00+00:00")
+    tr = _transcript(tmp_path / "logs" / "sess-y.jsonl", "sess-y", [
+        {"ts": "2026-07-01T09:00:00.000Z", "tool": "Write",
+         "file": str(repo / "later.py"), "content": "value = 'landed later on'\n"}])
+    root, cursor = tmp_path / "ledger", {}
+
+    assert authorcapture.capture(root, [tr], repo=repo, cursor=cursor)["uncovered"] == 1
+    assert authorcapture.capture(root, [tr], repo=repo, cursor=cursor)["files_read"] == 1
+
+
+def test_the_empty_newest_branch_is_unreachable_from_capture(repo, tmp_path):
+    """The handoff asked for the `newest == ""` interaction to be asserted. It cannot
+    be reached through `capture()`: a repo with no commits short-circuits at
+    `skipped="no-commits"` **before** any transcript is parsed, so `_uncovered` never
+    runs with an empty `newest`. Recorded here rather than left looking like coverage —
+    a test that appears to exercise a branch it cannot reach is worse than none.
+
+    The branch is therefore defensive only, and it is unit-tested directly below."""
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    tr = _transcript(tmp_path / "logs" / "sess-z.jsonl", "sess-z", [
+        {"ts": "2026-07-01T09:00:00.000Z", "tool": "Write",
+         "file": str(elsewhere / "unrelated.py"), "content": "x = 1\n"}])
+
+    res = authorcapture.capture(tmp_path / "ledger", [tr], repo=repo, cursor={})
+    assert res["skipped"] == "no-commits"
+    assert res["files_read"] == 0
+
+
+def test_uncovered_with_no_newest_commit_reads_the_filtered_list(repo, tmp_path):
+    """The defensive branch, exercised where it actually lives. `_uncovered` falls back
+    to `bool(edits)` when there is no newest commit — and because the caller now passes
+    the IN-REPO subset, a transcript that touched only other projects has nothing here
+    to wait for. Both halves asserted so the filter and the fallback stay in step."""
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    outside = [{"ts": "2026-07-01T09:00:00.000Z", "file": str(elsewhere / "u.py")}]
+    inside = [{"ts": "2026-07-01T09:00:00.000Z", "file": str(repo / "a.py")}]
+
+    assert authorcapture._in_repo(outside, repo) == []
+    assert authorcapture._in_repo(inside, repo) == inside
+    assert authorcapture._uncovered(authorcapture._in_repo(outside, repo), "") is False
+    assert authorcapture._uncovered(authorcapture._in_repo(inside, repo), "") is True
+    # Unfiltered — the pre-fix call — would have held it open on another repo's work.
+    assert authorcapture._uncovered(outside, "") is True
+
+
+# ── P3.5: paths git does not print plainly ────────────────────────────────────
+#
+# There was NO non-ASCII path fixture anywhere in `tests/` before this. Both defects
+# below are invisible to an ASCII-only corpus, and both end the same way: `commit_diff`
+# returns no `added` entry for the file, so `match_commit` scores every line the agent
+# genuinely landed as **DROPPED** — three maps keyed three different ways for one file.
+
+def _quoted_path_repo(repo):
+    """A commit touching a non-ASCII path and a path with a space — the two shapes git
+    does not print verbatim."""
+    return _commit(repo, {"café.py": "value = 'ünïcode content here'\n",
+                          "a b.py": "spaced = 'a path with a space in it'\n"},
+                   "2026-07-01T10:00:00+00:00")
+
+
+def test_a_non_ascii_path_is_read_not_c_quoted(repo):
+    """With git's default `core.quotePath`, `+++ "b/caf\\303\\251.py"` never matches
+    `_DIFF_FILE`. The flag has to be set INSIDE `_git` (and before the subcommand,
+    the only position git accepts), so a new git read cannot forget it."""
+    from cage import linematch
+    sha = _quoted_path_repo(repo)
+    diff = linematch.commit_diff(repo, sha)
+
+    assert "café.py" in diff["added"], diff["added"].keys()
+    assert "café.py" in diff["numstat"]
+    assert not any(k.startswith('"') or "\\3" in k for k in diff["added"]), \
+        "a C-quoted path leaked through as a key"
+
+
+def test_a_path_with_a_space_loses_gits_disambiguating_tab(repo):
+    """The half `core.quotePath=false` does NOT fix, and it is a separate defect: git
+    appends a literal tab to `+++ b/a b.py`, so the capture was `"a b.py\\t"` — a key
+    that can never match the numstat name `a b.py`."""
+    from cage import linematch
+    sha = _quoted_path_repo(repo)
+    diff = linematch.commit_diff(repo, sha)
+
+    assert "a b.py" in diff["added"], diff["added"].keys()
+    assert not any(k.endswith("\t") for k in diff["added"])
+    # The two maps must agree — disagreeing is exactly what scored a file DROPPED.
+    assert set(diff["added"]) == set(diff["numstat"])
+
+
+def test_an_agents_lines_in_such_a_file_are_KEPT_not_DROPPED(repo):
+    """The consequence, asserted where a reader would feel it: before the fix these
+    landed lines scored DROPPED — cage reporting the agent proposed work that never
+    shipped, when it shipped in a file git spelled differently."""
+    from cage import linematch
+    sha = _quoted_path_repo(repo)
+    diff = linematch.commit_diff(repo, sha)
+    proposed = {"café.py": ["value = 'ünïcode content here'"],
+                "a b.py": ["spaced = 'a path with a space in it'"]}
+
+    _matches, totals = linematch.match_commit(proposed, diff["added"], diff["binary"])
+    assert totals["kept"] == 2, totals
+    assert totals["dropped"] == 0, totals
+
+
+def test_numstat_reads_a_non_ascii_path_too(repo):
+    """`originrecord._git` is a second helper with its own subprocess call — the flag
+    belongs in both, or `cage authorship origin` disagrees with the line matcher about
+    which files a commit touched."""
+    from cage import originrecord
+    sha = _quoted_path_repo(repo)
+    names = {f for f, _a, _r in originrecord.commit_numstat(repo, sha)}
+    assert {"café.py", "a b.py"} <= names, names
+
+
+def test_a_non_ascii_top_level_dir_is_not_stamped_mangled(repo):
+    """A THIRD site, not in the handoff's list: `tasks.git_snapshot` splits
+    `git diff --name-only` on "/" for its top-level-dirs-only PII guard. C-quoting
+    makes that dir `"caf\\303\\251` — leading quote included — and `scope_for` stamps it
+    onto ledger rows, where it is persisted and never rewritten."""
+    from cage import tasks
+    _commit(repo, {"café/x.py": "x = 1\n"}, "2026-07-01T10:00:00+00:00")
+    # An UNSTAGED edit — `git diff --name-only` compares the work tree to the index.
+    (repo / "café" / "x.py").write_text("x = 2\n", encoding="utf-8")
+
+    assert tasks.git_snapshot(repo).get("dirs") == ["café"]
+    assert tasks.scope_for(repo) == "café"

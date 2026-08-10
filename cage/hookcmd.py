@@ -57,12 +57,18 @@ def _root() -> Path:
     return paths.resolve_root()
 
 
-def _sweep(root: Path) -> None:
+def _sweep(root: Path, *, force: bool = False) -> None:
     """The same all-agent pull sweep every other capture trigger runs — never a
     separate hook-only write path, so hook capture and pull capture cannot produce two
-    rows for one turn (ids dedupe in `hooks.append_new`; proven in test_hooks_layer)."""
+    rows for one turn (ids dedupe in `hooks.append_new`; proven in test_hooks_layer).
+
+    ``force`` skips the read throttle and is set by `_session_end` **only** — see there.
+    `_session_start` stays throttled deliberately: it has no deadline, a session's calls
+    do not exist yet, and the next read or the session's own end will sweep anyway. Do
+    not "fix" the divergence by forcing both; the throttle is what keeps a warm ledger
+    from being re-scanned on every turn."""
     from cage import importcmd
-    importcmd.ensure_captured(root)
+    importcmd.ensure_captured(root, force=force)
 
 
 def _open_tasks(root: Path, session: str) -> list[str]:
@@ -126,7 +132,11 @@ def _session_end(root: Path, args, agent: str) -> int:
     sweep is what makes the session's calls (and therefore its tasks) visible at all."""
     session = _session(args)
     attest.record_session(root, agent=agent, session=session, event="end")
-    _sweep(root)
+    # FORCED, unlike `_session_start`. `_open_tasks` two lines down can only see tasks
+    # whose calls are already in the ledger, and a session ends exactly once — a
+    # throttled no-op here has no later trigger to make up for it, so any read in the
+    # preceding throttle window left this session's tasks silently un-closable.
+    _sweep(root, force=True)
     from cage import tasks
     closed = []
     for tid in _open_tasks(root, session):

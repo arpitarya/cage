@@ -105,6 +105,13 @@ def _bucket_edits(edits, windows, repo: Path) -> dict:
 def _uncovered(edits, newest: str) -> bool:
     """Whether any edit is still waiting for a commit that has not been made yet.
 
+    **``edits`` must already be filtered to THIS repo** — see `_in_repo` and its caller.
+    Judging coverage over every edit in the transcript meant an edit in *another* repo,
+    newer than this repo's newest commit, held the transcript uncovered forever: on a
+    repo whose last commit is old, nearly every transcript on the machine has some newer
+    edit somewhere, so the cursor never advanced and every sweep re-parsed every file,
+    permanently.
+
     ``newest`` is already in the one normal form (it is a `Window` bound), so the edit
     side is normalized to match — this compare decides whether a transcript is re-read
     next sweep, and on a non-UTC repo the raw form gets it wrong by the offset. An edit
@@ -112,8 +119,19 @@ def _uncovered(edits, newest: str) -> bool:
     never be placed in a window either, so calling it uncovered would re-read the file
     forever waiting for a commit that could not help it."""
     if not newest:
+        # No commit in this repo yet. With the repo filter applied, a transcript that
+        # touched only OTHER repos has no in-repo edit to place and nothing here to wait
+        # for, so it is covered immediately — deliberate, and the interaction worth
+        # naming: before the filter, `bool(edits)` was true for those files too.
         return bool(edits)
     return any(commitjoin.norm_ts(e.get("ts") or "") > newest for e in edits)
+
+
+def _in_repo(edits, repo: Path) -> list:
+    """The subset of ``edits`` that touched files inside ``repo``. Shares
+    `_repo_relative` with `_bucket_edits` so coverage and bucketing agree on what
+    "an edit in this repo" means — they disagreed, which is the whole defect."""
+    return [e for e in edits if _repo_relative(e.get("file") or "", repo) is not None]
 
 
 def _residual(matches, landed, agent_lines: int) -> int:
@@ -196,7 +214,7 @@ def capture(root: Path, files, *, repo: Path | None = None, pol: dict | None = N
                 continue
             edits = transcript.parse_edits(f, session=f.stem)
             summary["files_read"] += 1
-            covered = not _uncovered(edits, newest)
+            covered = not _uncovered(_in_repo(edits, repo), newest)
             if not covered:
                 summary["uncovered"] += 1
             if sig is not None:

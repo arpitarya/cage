@@ -31,10 +31,10 @@ from tools import cigraphify
 
 
 class _FakeCompleted:
-    def __init__(self, stdout: str) -> None:
+    def __init__(self, stdout: str, returncode: int = 0) -> None:
         self.stdout = stdout
         self.stderr = ""
-        self.returncode = 0
+        self.returncode = returncode
 
 
 def _env(tmp_path: Path) -> dict:
@@ -149,3 +149,60 @@ def test_sandbox_parent_defaults_off_the_repo(monkeypatch):
     assert cigraphify._sandbox_parent(None) == Path(tempfile.gettempdir())
     assert cigraphify._sandbox_parent(None) != cigraphify.REPO_ROOT.parent
     assert cigraphify._sandbox_parent(Path("/somewhere/else")) == Path("/somewhere/else")
+
+
+# ── P3.1: two checks that asserted nothing ────────────────────────────────────
+
+def test_determinism_refuses_when_both_runs_crashed(tmp_path, monkeypatch):
+    """`check=False` on both runs plus a bare `a.stdout != b.stdout` meant two CRASHED
+    runs compared `"" == ""` and the check reported determinism it never observed —
+    the same vacuous-green class as an undersized corpus."""
+    monkeypatch.setattr(cigraphify, "_cage",
+                        lambda *a, **k: _FakeCompleted("", returncode=1))
+
+    with pytest.raises(cigraphify.Fail, match="exited 1"):
+        cigraphify.check_derivation_is_deterministic(tmp_path, _env(tmp_path))
+
+
+def test_determinism_refuses_when_both_runs_printed_nothing(tmp_path, monkeypatch):
+    """The subtler half: exit 0 but empty output is still two things equal for the
+    wrong reason."""
+    monkeypatch.setattr(cigraphify, "_cage", lambda *a, **k: _FakeCompleted(""))
+
+    with pytest.raises(cigraphify.Fail, match="printed nothing"):
+        cigraphify.check_derivation_is_deterministic(tmp_path, _env(tmp_path))
+
+
+def test_determinism_still_catches_a_real_disagreement(tmp_path, monkeypatch):
+    """The control: the new gates must not have swallowed the assertion they guard."""
+    outs = iter(["route,tokens\na,1\n", "route,tokens\na,2\n"])
+    monkeypatch.setattr(cigraphify, "_cage",
+                        lambda *a, **k: _FakeCompleted(next(outs)))
+
+    with pytest.raises(cigraphify.Fail, match="disagree"):
+        cigraphify.check_derivation_is_deterministic(tmp_path, _env(tmp_path))
+
+
+def test_intercept_diffs_an_id_set_not_a_positional_slice(tmp_path, monkeypatch):
+    """`_savings_rows` concatenates `sorted(rglob("*.jsonl"))`, so a row landing in an
+    EARLIER-sorted shard shifts every later index. `rows[before:]` then reads the wrong
+    rows — here it would return the pre-existing zero-saving row and Fail, while the
+    genuinely new receipt sits at index 0 and is never looked at.
+
+    Latent in CI today (one shard) and wrong in principle: it is exactly the failure a
+    ledger spanning a month boundary produces."""
+    project = tmp_path / "proj"
+    project.mkdir()
+    old = {"id": "r-old", "tool": "graphify", "raw_alternative": 50, "actual": 50}
+    new = {"id": "r-new", "tool": "graphify", "raw_alternative": 900, "actual": 100}
+    calls = {"n": 0}
+
+    def _rows(_project):
+        calls["n"] += 1
+        # Second read: the new row sorts FIRST (an earlier shard), ahead of the old one.
+        return [old] if calls["n"] == 1 else [new, old]
+
+    monkeypatch.setattr(cigraphify, "_sh", lambda *a, **k: _FakeCompleted("NODE x\n"))
+    monkeypatch.setattr(cigraphify, "_savings_rows", _rows)
+
+    assert "800" in cigraphify.check_bare_graphify_is_intercepted(project, _env(tmp_path))

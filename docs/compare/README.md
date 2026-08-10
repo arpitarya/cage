@@ -21,6 +21,13 @@ Naming: `<topic>.compare.md`. Written in short points, not walls of prose.
 
 ## Decided / awaiting verdict
 
+- [commits-view-cost-bound.compare.md](commits-view-cost-bound.compare.md) —
+  **COMMITS-WINDOW**: `cage insights commits` costs one `git show` per commit in the
+  whole history to print 20 rows (measured 6.4s / 123 commits). Three options (a default
+  relative `--since` · cap the READ by the row cap · leave it). **Proposed verdict B**;
+  A is rejected on the determinism law — a relative default puts a wall clock in the
+  default path — and on the measurement, since 90d cut zero commits here. Awaiting
+  Arpit's accept or override.
 - [gf-launcher-metering.compare.md](gf-launcher-metering.compare.md) — **GF-LAUNCHER**:
   how the graphify interceptor reaches cage when `--python-launcher` leaves no `cage` on
   PATH. Three options (setup-time twin variants · a runtime interpreter arm · accept the
