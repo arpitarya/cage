@@ -41,7 +41,16 @@ EXPECTED_VIEWS = {
     "insights budget", "insights compare", "insights estimate",
     "insights calibration", "insights why", "insights forecast",
     "insights regression", "insights recommend",
+    # EXPORT-SCOPE (2026-08-11): three report-shaped views v0.48.0's scope line missed.
+    # Keyed by PARSER LEAF PATH, which is what `_leaves()` walks — so `study` appears
+    # here bare even though its `view=` label is "study report": its action is a
+    # positional (`join|start|stop|report|id`), not a subparser, so the parser has no
+    # deeper leaf. `cmd_study` refuses `--export` on any action but `report`.
+    "authorship summary", "study", "task quality",
 }
+
+# The views whose `view=` label is not their parser leaf path (see above).
+VIEW_LABELS = {"study": "study report"}
 
 
 @pytest.fixture(autouse=True)
@@ -269,8 +278,9 @@ def test_every_exportable_view_names_itself():
     for path in sorted(EXPECTED_VIEWS):
         args = p.parse_args([*path.split(), *(["x"] if path == "insights commit" else []),
                              *(["graphify"] if path == "insights verdict" else []),
-                             *(["c_1"] if path == "insights why" else [])])
-        assert getattr(args, "view", None) == path
+                             *(["c_1"] if path == "insights why" else []),
+                             *(["report"] if path == "study" else [])])
+        assert getattr(args, "view", None) == VIEW_LABELS.get(path, path)
 
 
 # ── 6. the stamp itself ───────────────────────────────────────────────────────
@@ -295,3 +305,63 @@ def test_available_reports_only_what_the_view_actually_has():
     assert viewexport.available(text="x", payload={}) == ("text", "json")
     assert viewexport.available(text="x", csv_text="c", payload={}) == ("text", "csv",
                                                                         "json")
+
+
+# ── 7. EXPORT-SCOPE: the three report-shaped views v0.48.0's scope line missed ──
+
+def test_authorship_summary_exports_all_three_formats(go):
+    """It owns a `render_authorship_csv`, so its artifact must carry the CSV. It had no
+    `--export` at all because its handler kept a hand-rolled `csv_dest` branch instead
+    of routing through `emit` — the duplication the chokepoint exists to remove."""
+    _, err = go(["authorship", "summary", "--export"])
+    d = _outdir(go.root, "authorship summary")
+    assert sorted(p.name for p in d.iterdir()) == ["authorship-summary.csv",
+                                                   "authorship-summary.json",
+                                                   "authorship-summary.txt"]
+    assert str(d) in err
+
+
+def test_study_report_exports_all_three_formats(go):
+    """Same class, same cause — and it is the one that proves the point: the first wiring
+    here produced no CSV for a view that HAS a `render_csv`, because the hand-rolled
+    branch shadowed it. An artifact missing a format the view owns is the same lie as an
+    empty file, only quieter."""
+    go(["study", "report", "--export"])
+    d = _outdir(go.root, "study report")
+    assert sorted(p.name for p in d.iterdir()) == ["study-report.csv",
+                                                   "study-report.json",
+                                                   "study-report.txt"]
+
+
+def test_task_quality_exports_only_the_formats_it_has(go):
+    """`cage task quality` owns no CSV renderer, so `--export` writes text + JSON and
+    refuses CSV rather than writing an empty one (an empty CSV reads as *no rows*)."""
+    go(["task", "quality", "--export"])
+    d = _outdir(go.root, "task quality")
+    assert sorted(p.name for p in d.iterdir()) == ["task-quality.json",
+                                                   "task-quality.txt"]
+
+
+def test_a_study_marker_verb_refuses_export_rather_than_writing_one(go):
+    """`study`'s action is a POSITIONAL, so `--export` sits on the group and is reachable
+    from `join`/`start`/`stop`/`id` — none of which is a rendered view. It refuses, the
+    same way `--csv` already did; silently writing an artifact for a marker verb would be
+    worse than the refusal."""
+    for action in ("id", "stop"):
+        out, err = go(["study", action, "--export"], expect_exit=1)
+        assert "apply to `cage study report` only" in (out + err)
+        assert not (go.root / ".cage" / "output").exists()
+
+
+@pytest.mark.parametrize("argv", [
+    ["authorship", "summary"],
+    ["study", "report"],
+    ["task", "quality"],
+])
+def test_export_never_changes_these_views_stdout(go, argv):
+    """The binding gate, extended to the three new views: stdout is byte-identical with
+    and without `--export`. If a future export feature needs stdout to move, the feature
+    is wrong."""
+    plain, _ = go(argv)
+    exported, _ = go([*argv, "--export"])
+    assert plain == exported

@@ -183,11 +183,12 @@ def cmd_authorship_summary(args) -> int:
     from cage import commitview
     r = captured_read_root(args)
     data = commitview.summarize_authorship(r, _policy(r), since=args.since)
-    if (dest := csv_dest(args)) is not None:
-        from cage import csvout
-        return csvout.write(commitview.render_authorship_csv(data), dest)
+    # Through the ONE chokepoint, like the other exportable views — the hand-rolled
+    # `csv_dest` branch this replaced is exactly the duplication `emit` exists to remove
+    # (and is why this view had no `--export`).
     return emit(args, render.envelope("authorship-summary", data) if args.json else data,
-                commitview.render_authorship(data))
+                commitview.render_authorship(data),
+                csv=lambda: commitview.render_authorship_csv(data), root=r)
 
 
 def cmd_why(args) -> int:
@@ -245,7 +246,9 @@ def cmd_demo(_args) -> int:
 def cmd_quality(args) -> int:
     lr = captured_read_root(args)
     s = quality.summarize(lr, pol=_policy(lr))
-    return emit(args, s, quality.render_quality(s))
+    # No `csv=`: this view owns no `render_csv`, so `--export` refuses that format with a
+    # typed message rather than writing an empty file (an empty CSV reads as *no rows*).
+    return emit(args, s, quality.render_quality(s), root=lr)
 
 
 _LABEL = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,31}\Z")
@@ -426,6 +429,12 @@ def cmd_study(args) -> int:
     r = ledger_root()
     if args.action != "report" and getattr(args, "csv", None) is not None:
         raise CageError("--csv applies to `cage study report` only")
+    if args.action != "report" and (getattr(args, "export", None) is not None
+                                    or getattr(args, "stamp", False)):
+        # Same reason as `--csv` above: the flags live on the group because the action is
+        # a positional, but only `report` is a rendered VIEW. A marker verb has no
+        # artifact to write, and silently writing one would be worse than refusing.
+        raise CageError("--export/--stamp apply to `cage study report` only")
     if args.action == "id":
         mid = machine.machine_id(r)
         print(mid if mid else "not enrolled — `cage study join <phase>` (or `start`) "
@@ -444,11 +453,12 @@ def cmd_study(args) -> int:
         return 0
     if args.action == "report":
         d = study.summarize(r, _policy(r))
-        if (dest := csv_dest(args)) is not None:
-            from cage import csvout
-            return csvout.write(study.render_csv(d), dest)
+        # Through the ONE chokepoint. The hand-rolled `csv_dest` branch this replaced is
+        # why the first `--export` here silently produced no CSV for a view that owns a
+        # `render_csv` — an artifact missing a format it HAS is the same lie as an empty
+        # file, just quieter.
         return emit(args, render.envelope("study", d) if args.json else d,
-                    study.render_study(d))
+                    study.render_study(d), csv=lambda: study.render_csv(d), root=r)
     # join — one-command enrollment: scaffold → wire all four → start → doctor
     if not args.phase:
         raise CageError("cage study join needs the starting phase label (e.g. baseline)")

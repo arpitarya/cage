@@ -53,8 +53,9 @@ as-is.
 
 ### Export flags
 
-`cage report` and every `cage insights` view take these two, so they are documented
-once here rather than repeated in each table
+`cage report`, every `cage insights` view, and the three other report-shaped views —
+`cage authorship summary`, `cage study report`, `cage task quality` — take these two, so
+they are documented once here rather than repeated in each table
 ([`cage/viewexport.py`](../cage/viewexport.py), `cage query view-export`):
 
 | Flag | Meaning |
@@ -233,7 +234,7 @@ new insight cannot ship un-exportable):
 |---|---|
 | `cage insights attrib` | `--task ID` (default: most recent) · `--scope DIR` · `--team` · `--json` · `--csv [PATH]` |
 | `cage insights matrix` | `--task ID` · `--scope DIR` · `--usd` (adds the cost column; the token grid always renders) · `--json` · `--html PATH` (standalone page, no CDN) |
-| `cage insights roi` | `--since WINDOW` · `--json` · `--csv [PATH]` |
+| `cage insights roi` | `--since WINDOW` · `--json` · `--csv [PATH]` · `--export [PATH]` · `--stamp` |
 | `cage insights adoption` | `--since WINDOW` · `--json` · `--csv [PATH]` |
 | `cage insights chats` | `--since WINDOW` · `--agent {claude,copilot,kiro,all}` · `--all` (every chat; default is top 20 by `tokens_in`) · `--usd` · `--json` · `--csv [PATH]` |
 | `cage insights commits` | `--since WINDOW` · `--all` (every commit; default is the 20 newest) · `--json` · `--csv [PATH]` |
@@ -265,7 +266,7 @@ different claims. See `cage query agent-authorship`.
 |---|---|---|
 | `cage task outcome TASK` | close a task with its outcome (`ok` by default) | `--redo` (mark as needing a redo) · `--label WORD` (one short token: letters/digits/`._-`, ≤32 chars, for `cage insights compare` grouping — never a path or free text) |
 | `cage task time DURATION` | attest how long **you** spent on a task — `45m` · `2h` · `1h30m` · a bare number of minutes. Written as `human_minutes` + `human_minutes_method = "attested"` | `--task ID` (default: the most recent) |
-| `cage task quality` | quality-adjusted cost: cost per *successful* task (plan §8.2) | `--json` |
+| `cage task quality` | quality-adjusted cost: cost per *successful* task (plan §8.2) | `--json` · `--export [PATH]` · `--stamp` |
 
 `cage task time` is the **only** unmarked human number cage will ever print: it always
 outranks the wall-clock estimator in `cage insights commits` (rendered `*`, versus the
@@ -353,7 +354,7 @@ unenrolled ledger stamps nothing and stays byte-identical to legacy.
 | `cage study join PHASE` | enroll this machine: wire + start + doctor |
 | `cage study start PHASE` | switch phase (one short token) |
 | `cage study stop` | end the current phase |
-| `cage study report` | coverage first, then the paired delta |
+| `cage study report` | coverage first, then the paired delta. **`--export`/`--stamp` apply to this action only** — `study`'s action is a positional, so the flags sit on the group; a marker verb (`join`/`start`/`stop`/`id`) refuses them rather than writing an artifact it has nothing to put in |
 | `cage study id` | print the opaque machine id (never a hostname) |
 
 Flags: `--json` · `--csv [PATH]`. The sample unit is the **machine-day**; the paired

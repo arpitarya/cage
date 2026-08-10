@@ -12,6 +12,38 @@ by milestone) — the worklog is what *happened this session*.
 
 ---
 
+## 2026-08-11 — Claude Code (Opus 5) — agent-lane sweep P4·P5·P6: the sweep is closed
+
+- **Asked:** finish the sweep.
+- **Done (P4, the judgment half):** rename numstat names (`old => new`, `d/{a => b}/f.py`)
+  now resolve to the **destination** through one parser shared by both modules that keep
+  duplicate `_NUMSTAT` patterns · an `Edit`'s re-stated `old_string` context no longer
+  counts as `suggested` (**the design call: the subtraction lives in `linematch`,
+  because deciding "same line?" is *matching* and rule 1 says only it may normalize;
+  `transcript` transports raw text**) · **full shas** at all four write sites, joined
+  prefix-**symmetrically** so already-written short rows keep working, with an
+  **AMBIGUOUS** refusal that is distinct from `no-match`.
+- **Done (P5):** copilot VS Code rows carry a `project`, resolved once per file from
+  `workspace.json` with the first terminal `cwd` as fallback. Three decisions recorded in
+  the docstring (multi-root falls through, `--path` fails open to `""`, percent-decode).
+  Added a **sidecar** mechanism to the fixture corpus — there was no `workspace.json`
+  anywhere in the repo, so this would otherwise have shipped untested.
+- **Done (P6):** `--export`/`--stamp` on `authorship summary`, `study report`,
+  `task quality`; all three routed through `emit`.
+- **The finding I'd carry forward:** two of P6's three views were skipped in v0.48.0 for
+  the *same* reason — a hand-rolled `csv_dest` branch ahead of `emit`, exactly the
+  duplication the chokepoint was created to delete. It bit again mid-change: my first
+  wiring of `study report` produced an artifact with **no CSV for a view that owns a
+  `render_csv`**. A leftover of a refactor is not inert; it silently opts its file out of
+  everything the refactor later enables.
+- **Decided:** `full sha in the data, abbreviated in the display` — and the check that it
+  was right is that **zero goldens were re-blessed** across the whole sweep, because
+  `full[:7]` is exactly the `%h` the tables already showed.
+- **Open — needs your verdict:** **COMMITS-WINDOW**
+  ([compare](compare/commits-view-cost-bound.compare.md)), the sweep's only residual.
+  Recommendation: option B, bound the read by the row cap.
+- **Next step:** your call on COMMITS-WINDOW; then release v0.49.
+
 ## 2026-08-11 — Claude Code (Opus 5) — agent-lane sweep P3: REV-HARDEN P4, mechanical half
 
 - **Asked:** continue the sweep; P3 is the low-blast-radius half, order 7 → 3 → 4 → 2 → 5.
@@ -104,7 +136,7 @@ by milestone) — the worklog is what *happened this session*.
 
 - **Asked:** a Claude Code prompt for the pending work — then, when offered a choice of
   four items, "all of them, and anything more".
-- **Done:** wrote the [handoff](agent-lane-sweep.handoff.md)/[prompt](agent-lane-sweep.prompt.md)
+- **Done:** wrote the [handoff](archive/v0.49-agent-lane-sweep.handoff.md)/[prompt](archive/v0.49-agent-lane-sweep.prompt.md)
   pair covering every *buildable* item left in OPEN-WORK, in seven independently-landable
   phases. Filed **EXPORT-SCOPE** (three report-shaped views v0.48.0's scope line missed).
 - **The valuable part was not the prompt, it was the verification.** Every one of the

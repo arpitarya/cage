@@ -480,6 +480,7 @@ def build_parser() -> argparse.ArgumentParser:
     ql = task.add_parser("quality", help="quality-adjusted cost: cost per successful task (§8.2)")
     _json_flag(ql)
     _capture_flags(ql)
+    _export_flags(ql, "task quality")
     ql.set_defaults(fn=clicmds.cmd_quality)
 
     # ── group: authorship (who wrote which files + its git-notes distribution) ──
@@ -506,6 +507,7 @@ def build_parser() -> argparse.ArgumentParser:
     _json_flag(au)
     _csv_flag(au)
     _capture_flags(au)
+    _export_flags(au, "authorship summary")
     au.set_defaults(fn=clicmds.cmd_authorship_summary)
 
     authorship.add_parser("verify", help="report-only consistency check over the provenance ledger (never fails the build)").set_defaults(fn=clicmds.cmd_verify)
@@ -589,6 +591,10 @@ def build_parser() -> argparse.ArgumentParser:
     st2.add_argument("phase", nargs="?", help="phase label for join/start (one short token)")
     _json_flag(st2)
     _csv_flag(st2)
+    # `study` takes its action as a POSITIONAL, so these flags sit on the group and are
+    # meaningful for `report` only — exactly as `--csv` already is. `cmd_study` refuses
+    # them on any other action rather than writing an artifact for a marker verb.
+    _export_flags(st2, "study report")
     st2.set_defaults(fn=clicmds.cmd_study)
 
     # ── group: policy (unchanged; positional-action pattern) ───────────────────

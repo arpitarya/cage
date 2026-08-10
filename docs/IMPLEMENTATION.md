@@ -16,6 +16,35 @@ Entry format:
 
 ---
 
+## 2026-08-11 — agent-lane sweep P6: EXPORT-SCOPE — the last three report-shaped views
+
+- **Verified against the live parser first:** `cage authorship summary`, `cage study
+  report` and `cage task quality` had `--csv`/`--json` but no `--export`/`--stamp`.
+- **Implemented:** `_export_flags` on all three, and each handler routed through
+  `cliutil.emit(..., csv=…, root=…)`.
+- **The cause was the same in two of them, and it is worth naming:** both kept a
+  **hand-rolled `csv_dest` branch** ahead of `emit` — exactly the duplication the
+  chokepoint was created to delete in v0.48.0. That branch is why they were skipped, and
+  it bit again mid-change: the first wiring of `study report` produced an artifact with
+  **no CSV for a view that owns a `render_csv`**, because the branch shadowed it. An
+  artifact missing a format the view has is the same lie as an empty file, only quieter.
+- **`study` needed a decision:** its action is a **positional**
+  (`join|start|stop|report|id`), not a subparser, so the flags necessarily sit on the
+  group and are reachable from the marker verbs. `cmd_study` **refuses** them on any
+  action but `report`, mirroring the guard `--csv` already had — silently writing an
+  artifact for `cage study id` would be worse than the refusal.
+- **The gate did its job in both directions.** `EXPECTED_VIEWS` failed the moment the
+  flags appeared without being listed, naming all three. Its key is the parser **leaf
+  path**, so `study` is listed bare while its `view=` label is `study report` — recorded
+  in a `VIEW_LABELS` map rather than by loosening the assertion.
+- **`test_export_never_changes_stdout` extended to all three** — the binding gate of the
+  whole artifact surface, and the new views are held to it, not exempted from it.
+- **Files:** `cage/cli.py` · `cage/clicmds.py` · `tests/test_view_export.py` ·
+  `docs/CLI.md` · `docs/*`.
+- **Tests:** green — **1609 ⇒ 1616**, 11 skipped.
+- **Next:** the sweep is complete. **COMMITS-WINDOW** is the one open decision it raised
+  ([compare](compare/commits-view-cost-bound.compare.md)).
+
 ## 2026-08-11 — agent-lane sweep P5: HR-COPILOT-JOIN — copilot VS Code rows carry a project
 
 - **Both claims verified first.** `parse_copilot_vscode_calls` built rows with no

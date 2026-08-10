@@ -21,19 +21,6 @@ spec.
 
 ## Active work
 
-- [agent-lane-sweep.handoff.md](agent-lane-sweep.handoff.md) +
-  [agent-lane-sweep.prompt.md](agent-lane-sweep.prompt.md) — **the agent-lane sweep**:
-  every buildable item left in [OPEN-WORK.md](OPEN-WORK.md), in seven independently-landable
-  phases (release v0.48.0 · CIGF-HERMETIC · REV-HARDEN P3 · REV-HARDEN P4 ×2 ·
-  HR-COPILOT-JOIN · EXPORT-SCOPE). All twelve REV-HARDEN items were **re-verified against
-  the code 2026-08-10** — none already fixed, and the sources are wrong about their own
-  premises in eight places, corrected inline. Model: **Opus**. Progress: **57%** — P0 was
-  **already released** when the pair was picked up (STOP gate moot), P1 CIGF-HERMETIC
-  landed 2026-08-11 with the real CI leg green **7/7 on a developer machine**, and
-  P2 REV-HARDEN-P3 closed all five wiring-hygiene items, and P3 landed four of
-  REV-HARDEN P4's mechanical five — the fifth is a fork awaiting a verdict
-  ([COMMITS-WINDOW](compare/commits-view-cost-bound.compare.md)).
-
 - [steering-edits-pending.proposal.md](proposals/steering-edits-pending.proposal.md) —
   **STEERING-EDITS**: the four held CLAUDE.md edits (authorship bullet · copilot credit
   ladder · `FORMULAS.md` entry point · dogfood section), merged into one file 2026-08-03

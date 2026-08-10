@@ -25,13 +25,49 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
 
 ## State of play (2026-08-11 — pick up here on a model switch)
 
+- **The agent-lane sweep is CLOSED — all six phases, 1542/0 ⇒ 1616/0, zero goldens
+  re-blessed.** Pair archived to `docs/archive/v0.49-agent-lane-sweep.{handoff,prompt}.md`.
+  In tree as **v0.49, unreleased**; `__version__` is still `0.48.0` and the CHANGELOG
+  entry is not written — that is the next step, and it needs Arpit's go (the GitHub
+  release IS the PyPI trigger).
+- **One thing is waiting on you and nothing else is:** **COMMITS-WINDOW**
+  ([compare](compare/commits-view-cost-bound.compare.md)). `cage insights commits` runs
+  one `git show` per commit in the *whole* history to print 20 rows (measured 6.4s /
+  123 commits). The obvious fix — a default `--since` — is wrong, and that is the whole
+  doc: a **relative** default puts a wall clock in the default path, so the same ledger
+  renders differently next month. Recommendation: option B, bound the *read* by the row
+  cap. **Do not let a later session take option A quietly.**
+- **The one thing to internalise from this sweep:** *the tracker was wrong about its own
+  premises in eight places, and the handoff that corrected it was still wrong in four
+  more.* A sixth crash site the proposal never listed; a second quoted-path defect
+  (git's disambiguating tab) that survives the fix the handoff prescribed; a third
+  C-quoting site stamping a mangled `scope` into the ledger; and an
+  "assert this interaction" instruction pointing at a branch that is **unreachable**
+  from its caller. **Verify the defect before you fix it, every time — and when the
+  verification disagrees with the spec, that finding is the deliverable.** Every fix
+  here was mutation-checked precisely because green-on-arrival proves nothing: several
+  of these defects had passing tests that asserted the wrong layer.
+- **A refactor's leftovers are not inert.** Two of the three views v0.48.0's `--export`
+  scope line missed were missed for the *same* reason — a hand-rolled `csv_dest` branch
+  sitting ahead of `emit`, the exact duplication the chokepoint was built to delete. It
+  bit again mid-change: my first wiring of `study report` silently produced an artifact
+  with no CSV *for a view that owns a `render_csv`*. When you centralise something,
+  the files that did not get converted quietly opt out of everything you add later.
+- **The design call worth inheriting:** commit shas are now stored **full** and displayed
+  **abbreviated** (`SHORT_SHA_DISPLAY`). The evidence that the split is right is that
+  **no golden moved** — `full[:7]` is exactly the `%h` the tables already printed. When a
+  precision change and a display contract seem to collide, check whether they are
+  actually the same axis before trading one away.
+
+### Before the sweep
+
 - **v0.48.0 is RELEASED** (tagged, on `origin`, GitHub release `2026-08-10T18:55Z`,
   `cage-flux 0.48.0` on PyPI, `HEAD == origin/main`). The section below said *unreleased
   in tree* for a full day after it shipped, and so did `OPEN-WORK.md`'s header and the
   agent-lane-sweep handoff's entire P0 STOP gate. **Never restate a release claim from
   prose here** — `git ls-remote --tags origin`, `gh release view`, PyPI.
-- **The agent-lane sweep is under way** ([handoff](agent-lane-sweep.handoff.md) ·
-  [prompt](agent-lane-sweep.prompt.md), 29%). **P0 needed no work** (above); **P1
+- **The agent-lane sweep is under way** ([handoff](archive/v0.49-agent-lane-sweep.handoff.md) ·
+  [prompt](archive/v0.49-agent-lane-sweep.prompt.md), 29%). **P0 needed no work** (above); **P1
   CIGF-HERMETIC is closed** — `tools/cigraphify` now seeds `project/.cage` so
   `find_project_root` short-circuits inside the sandbox, and the `present` leg ran
   **7/7 on a developer machine for the first time** with the real `~/.cage`/`~/bin`
@@ -501,6 +537,21 @@ you touch any savings number.**
 
 ## Maintainers
 
+- Claude (Opus 5) — 2026-08-11 — ran the agent-lane sweep (six phases, 1542/0 ⇒ 1616/0).
+  **The lesson I'd want inherited: a spec's *defect list* deserves the same suspicion as
+  a spec's *fix list*.** This handoff had already re-verified the tracker and corrected it
+  in eight places — and it was still incomplete in four more, every one found by
+  reproducing the defect before touching it rather than by reading. The two that would
+  have cost the most are the ones that *survive the prescribed fix*: a path with a space
+  stays broken after `core.quotePath=false` because git appends a disambiguating tab, and
+  `claudewire`'s sixth crash site only becomes reachable **once you correctly preserve
+  foreign entries** — so fixing the five listed sites moves the crash instead of closing
+  it. Second: **when a fix needs a number to move, stop.** A default `--since` on
+  `insights commits` is the obvious cost fix and it broke two goldens; the goldens were
+  right and the fix was wrong, so it became a compare doc rather than a commit. Third,
+  the cheerful one: **the display/data split is usually available.** Full shas looked
+  like they had to churn every commit table, until "precision in the data, brevity in the
+  display" made the whole change golden-neutral.
 - Claude (Opus 5) — 2026-08-10 — built the artifact surface (`--export`/`--stamp`) and
   fixed the chats structural-empty message (1503/0 ⇒ 1541/0). **The lesson I'd want
   inherited: when a new feature collides with a law here, the answer is almost never to
