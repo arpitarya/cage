@@ -12,6 +12,31 @@ by milestone) — the worklog is what *happened this session*.
 
 ---
 
+## 2026-08-10 — Cowork (Claude Opus) — the agent-lane sweep, specced
+
+- **Asked:** a Claude Code prompt for the pending work — then, when offered a choice of
+  four items, "all of them, and anything more".
+- **Done:** wrote the [handoff](agent-lane-sweep.handoff.md)/[prompt](agent-lane-sweep.prompt.md)
+  pair covering every *buildable* item left in OPEN-WORK, in seven independently-landable
+  phases. Filed **EXPORT-SCOPE** (three report-shaped views v0.48.0's scope line missed).
+- **The valuable part was not the prompt, it was the verification.** Every one of the
+  twelve REV-HARDEN items plus CIGF-HERMETIC and HR-COPILOT-JOIN was re-read against code
+  before being specced. **None was already fixed** — but the sources were wrong about
+  their own premises in **eight** places, including two rows whose *stated fix cannot
+  work*: CIGF-HERMETIC's `CAGE_BASE` pin (the resolver that bites is `cliutil.root()`,
+  which has no such branch) and its `gettempdir()` alternative (holed on Windows, where
+  temp sits under `USERPROFILE`). Both rows corrected in place.
+- **What I'd want a successor to take from it:** this repo already knows its trackers go
+  stale and says so — but the failure mode that actually cost here was subtler than a
+  stale *status*. Three rows carried a stale **recommended fix**, which is worse, because
+  a status marker invites checking and a proposed fix invites implementing. **Verify the
+  remedy, not just the diagnosis, before you spec it.**
+- **Open:** P0 (release v0.48.0) is a STOP gate — it needs Arpit's explicit go, and a
+  `just test` on his own venv first.
+- **Next step:** run the prompt at P1.
+
+---
+
 ## 2026-08-10 — Cowork (Claude Opus) — the artifact surface, and a message that blamed the wrong thing
 
 - **Asked:** (1) reports/insights carry a date+time — optional in the CLI, mandatory in
