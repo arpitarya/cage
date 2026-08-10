@@ -62,7 +62,9 @@ def _commit(repo: Path, files: dict, when: str) -> str:
     subprocess.run(("git", "-C", str(repo), "commit", "-q", "-m", "c"),
                    check=True, capture_output=True,
                    env={**__import__("os").environ, **env})
-    return _git(repo, "rev-parse", "--short", "HEAD")
+    # FULL sha — what cage records since 2026-08-11 (`commitjoin.prefix_match`).
+    # A short one is exercised deliberately by the back-compat tests, not here.
+    return _git(repo, "rev-parse", "HEAD")
 
 
 def _transcript(path: Path, session: str, blocks: list[dict]) -> Path:
@@ -767,3 +769,156 @@ def test_a_non_ascii_top_level_dir_is_not_stamped_mangled(repo):
 
     assert tasks.git_snapshot(repo).get("dirs") == ["café"]
     assert tasks.scope_for(repo) == "café"
+
+
+# ── P4.1: a rename's numstat name is not a path ───────────────────────────────
+
+def test_numstat_path_resolves_every_rename_shape_git_emits():
+    """`git show --numstat` renders a rename in the NAME column, in two shapes, and
+    neither can key-match a `+++ b/<path>` line. Both degenerate braced forms are real
+    and are what the `/`-collapse exists for — a move *into* a dir has an empty old
+    side, a move *out of* one has an empty new side."""
+    from cage import linematch
+    assert linematch.numstat_path("old.py => new.py") == "new.py"
+    assert linematch.numstat_path("top.py => sub/top.py") == "sub/top.py"
+    assert linematch.numstat_path("d/{keep.py => moved.py}") == "d/moved.py"
+    assert linematch.numstat_path("d/{a => b}/f.py") == "d/b/f.py"
+    assert linematch.numstat_path("{ => d}/x.py") == "d/x.py"
+    assert linematch.numstat_path("d/{a => }/x.py") == "d/x.py"
+    # A path with no rename in it is returned untouched.
+    assert linematch.numstat_path("plain.py") == "plain.py"
+    assert linematch.numstat_path("café.py") == "café.py"
+
+
+def test_a_renamed_file_keys_to_where_it_landed(repo):
+    """The defect, end to end: `numstat` keyed the arrow string and `added` keyed the
+    real path, so a renamed file's counts went to a phantom entry and the file itself
+    got none. `cage insights commit` then rendered `old.py => new.py` as a path."""
+    from cage import linematch
+    _commit(repo, {"old.py": "alpha beta gamma\ndelta epsilon zeta\n"},
+            "2026-07-01T09:00:00+00:00")
+    _git(repo, "mv", "old.py", "new.py")
+    (repo / "new.py").write_text(
+        "alpha beta gamma\ndelta epsilon zeta\nlambda mu nu added\n", encoding="utf-8")
+    sha = _commit(repo, {}, "2026-07-01T10:00:00+00:00")
+
+    diff = linematch.commit_diff(repo, sha)
+    assert "new.py" in diff["numstat"], diff["numstat"]
+    assert not any("=>" in k for k in diff["numstat"]), diff["numstat"]
+    # The two maps agree again — disagreeing is the whole defect.
+    assert set(diff["added"]) <= set(diff["numstat"])
+
+
+def test_a_renamed_file_scores_KEPT_not_DROPPED(repo):
+    """The consequence a reader feels: the agent's landed line was scored against a key
+    nothing else used, so the file read as never having shipped."""
+    from cage import linematch
+    _commit(repo, {"old.py": "alpha beta gamma\n"}, "2026-07-01T09:00:00+00:00")
+    _git(repo, "mv", "old.py", "new.py")
+    (repo / "new.py").write_text("alpha beta gamma\nlambda mu nu added\n",
+                                 encoding="utf-8")
+    sha = _commit(repo, {}, "2026-07-01T10:00:00+00:00")
+
+    diff = linematch.commit_diff(repo, sha)
+    _m, totals = linematch.match_commit({"new.py": ["lambda mu nu added"]},
+                                        diff["added"], diff["binary"])
+    assert totals["kept"] == 1 and totals["dropped"] == 0, totals
+
+
+def test_originrecord_numstat_agrees_with_the_line_matcher_on_a_rename(repo):
+    """The two modules keep duplicate `_NUMSTAT` patterns, which is exactly how this
+    class of bug survives — so they share ONE rename parser."""
+    from cage import linematch, originrecord
+    _commit(repo, {"d/keep.py": "x = 1\n"}, "2026-07-01T09:00:00+00:00")
+    _git(repo, "mv", "d/keep.py", "d/moved.py")
+    sha = _commit(repo, {}, "2026-07-01T10:00:00+00:00")
+
+    names = {f for f, _a, _r in originrecord.commit_numstat(repo, sha)}
+    assert names == set(linematch.commit_diff(repo, sha)["numstat"]) or not names
+    assert not any("=>" in n for n in names), names
+    assert "d/moved.py" in names, names
+
+
+# ── P4.2: an Edit's context lines are not proposals ───────────────────────────
+
+def test_context_lines_are_transported_raw_never_normalized_in_transcript(tmp_path):
+    """`transcript` sits outside `linematch`'s normalizer boundary (rule 1), so it may
+    only carry `old_string` verbatim. If it ever starts comparing or normalizing, there
+    are two matchers and they will drift."""
+    from cage import transcript
+    tr = _transcript(tmp_path / "logs" / "s.jsonl", "s", [
+        {"ts": "2026-07-01T09:00:00.000Z", "tool": "Edit",
+         "file": str(tmp_path / "a.py"),
+         "old_string": "  anchor line above\n  the changed line\n",
+         "new_string": "  anchor line above\n  the NEW changed line\n"}])
+    edit = transcript.parse_edits(tr, session="s")[0]
+
+    assert edit["context"] == ["  anchor line above", "  the changed line"]
+    assert edit["lines"] == ["  anchor line above", "  the NEW changed line"]
+
+
+def test_subtract_context_removes_only_restated_lines():
+    """The subtraction consumes 1:1 like `match_file`, and never touches a sub-gate
+    line — those are not matchable on either side, and removing them would quietly move
+    lines out of `unknown`, which is never redistributed."""
+    from cage import linematch
+    proposed = ["anchor line above", "the NEW changed line", "anchor line above"]
+    context = ["anchor line above", "the old changed line"]
+    assert linematch.subtract_context(proposed, context) == \
+        ["the NEW changed line", "anchor line above"]     # one of two copies removed
+
+    # Normalization is the same one both sides use — indentation must not defeat it.
+    assert linematch.subtract_context(["    x = compute()"], ["x = compute()"]) == []
+    # Sub-gate lines survive on both sides.
+    assert linematch.subtract_context(["}", "}"], ["}"]) == ["}", "}"]
+    # No context ⇒ untouched.
+    assert linematch.subtract_context(["a b c d"], []) == ["a b c d"]
+
+
+def test_an_edits_unchanged_context_no_longer_inflates_suggested(repo, tmp_path):
+    """The defect end to end. `old_string` was read NOWHERE in the package, so every
+    anchor line an `Edit` re-stated entered `suggested` — and `kept_modified` with it,
+    via `modified = suggested - kept`."""
+    anchor = "def existing_function(argument):"
+    added = "    freshly_authored_line = 1"
+    _commit(repo, {"m.py": f"{anchor}\n    pass\n"}, "2026-07-01T09:00:00+00:00")
+    tr = _transcript(tmp_path / "logs" / "s.jsonl", "s", [
+        {"ts": "2026-07-01T09:30:00.000Z", "tool": "Edit", "file": str(repo / "m.py"),
+         "old_string": f"{anchor}\n    pass\n",
+         "new_string": f"{anchor}\n{added}\n    pass\n"}])
+    _commit(repo, {"m.py": f"{anchor}\n{added}\n    pass\n"},
+            "2026-07-01T10:00:00+00:00")
+
+    res = authorcapture.capture(tmp_path / "ledger", [tr], repo=repo, cursor={})
+    assert res["rows"] == 1
+    row = ledger.provenance(tmp_path / "ledger")[0]
+    # Only the ONE genuinely new line is a proposal; the re-stated anchor is not.
+    assert row["suggested"] == 1, row
+    assert row["kept"] == 1, row
+    assert not row.get("kept_modified"), row
+
+
+def test_a_multiedit_subtracts_each_blocks_own_context(repo, tmp_path):
+    """`MultiEdit` carries one `old_string` per edit; all of them are context."""
+    from cage import transcript
+    tr = _transcript(tmp_path / "logs" / "s.jsonl", "s", [
+        {"ts": "2026-07-01T09:00:00.000Z", "tool": "MultiEdit",
+         "file": str(repo / "m.py"),
+         "edits": [{"old_string": "first anchor line\n", "new_string": "first anchor line\nbrand new alpha\n"},
+                   {"old_string": "second anchor line\n", "new_string": "second anchor line\nbrand new beta\n"}]}])
+    e = transcript.parse_edits(tr, session="s")[0]
+    from cage import linematch
+    assert linematch.subtract_context(e["lines"], e["context"]) == \
+        ["brand new alpha", "brand new beta"]
+
+
+def test_write_and_notebook_have_no_context_to_subtract(tmp_path):
+    """Stated, not papered over: a `Write` carries a whole file body and a
+    `NotebookEdit` a whole cell — there is no `old_string`, so their unchanged lines
+    stay unsubtractable and their `suggested` stays inflated. There is no evidence in
+    the transcript to fix it with."""
+    from cage import transcript
+    tr = _transcript(tmp_path / "logs" / "w.jsonl", "w", [
+        {"ts": "2026-07-01T09:00:00.000Z", "tool": "Write",
+         "file": str(tmp_path / "a.py"), "content": "line one here\nline two here\n"}])
+    assert transcript.parse_edits(tr, session="w")[0]["context"] == []

@@ -16,6 +16,66 @@ Entry format:
 
 ---
 
+## 2026-08-11 — agent-lane sweep P4: REV-HARDEN P4's judgment half (3 items, sha rewrite last)
+
+- **Landed 4.1 → 4.2 → 4.3, each verified first, the sha rewrite last** as the handoff
+  required — it rewrites the field the other items' tests had just been written against.
+- **4.1 rename syntax.** `git show --numstat` renders a rename as `old.py => new.py` or
+  `d/{a => b}/f.py`; neither can key-match a `+++ b/<path>` line, so a renamed file's
+  counts went to a phantom key and the file itself scored **DROPPED**. New
+  `linematch.numstat_path` resolves both to the **destination** and is shared by
+  `commit_diff` and `originrecord.commit_numstat` — the two keep duplicate `_NUMSTAT`
+  patterns, which is exactly how this class survives. Both degenerate braced forms
+  (`{ => d}/x.py`, `d/{a => }/x.py`) are handled and tested; a path genuinely containing
+  `" => "` is inherently ambiguous in this porcelain and is documented as such.
+- **4.2 Edit context lines counted as `suggested`.** `old_string` was read **nowhere** in
+  the package. An `Edit`'s `new_string` is a replacement *block*, not a diff, so every
+  re-stated anchor line entered `suggested` — and `kept_modified` via
+  `modified = suggested − kept`.
+- **The design call, made and written down:** the subtraction lives in **`linematch`**
+  (`subtract_context`), not `transcript`. Deciding whether a proposed line is the same as
+  a context line *is* matching, and rule 1 of that module says only it may normalize for
+  matching; `transcript._context_lines` transports raw `old_string` and compares nothing.
+  Consumes 1:1, never touches a sub-gate line (that would move lines out of `unknown`).
+- **The harm is stated at its real size, not oversold** — inflation was certain; false
+  *agent credit* additionally needed a context line to coincide with a human-added one,
+  which `MIN_MATCH_CHARS` and 1:1 consumption make possible, not routine. The opposite
+  error (an agent legitimately re-adding an `old_string` line is now under-credited) is
+  in the docstring, with why that is the right direction to err. `Write`/`NotebookEdit`
+  have no `old_string`, so their inflation is **named, not fixed**. Historical rows keep
+  the old counts — provenance is frozen by its idempotency key.
+- **4.3 full shas + prefix-match + an ambiguity refusal.** All four write sites now record
+  40 characters (`commitjoin.head`, `commit_windows` `%H`, `tasks.git_snapshot`,
+  `originrecord.current_sha`). Both sides were `--short` and therefore agreed — *by
+  coincidence of the moment*: git's abbreviation length grows with the repo, so rows
+  written months apart stop comparing equal, **silently**.
+- **`commitjoin.prefix_match` is prefix-SYMMETRIC, and that is the whole back-compat
+  mechanism** — rows written before today carry short shas and are append-only. Wired
+  into every read: the task join, the provenance grouping, `_attested_minutes`, the
+  authorship summary, `originrecord._already_recorded` (an exact compare would have
+  written a *duplicate* row that the deterministic id cannot dedupe) and `for_sha`.
+- **⚠️ The proposal's symptom was backwards, as the handoff said.** Prefix matching
+  already existed and was already symmetric; what was missing is the **ambiguity
+  refusal**. `render_commit` takes `rows[0]` over an **oldest-first** sort, so an
+  ambiguous prefix rendered the **oldest** match confidently. `AMBIGUOUS` is a distinct
+  reason from `no-match` — *cannot tell which* and *do not have it* are different answers.
+- **The recorded decision: full in the data, abbreviated in the display**
+  (`constants.SHORT_SHA_DISPLAY = 7`), the same split as tokens vs `$`. **The goldens
+  needed no re-blessing** — `full[:7]` is exactly the `%h` a small repo already rendered —
+  so the output contract is untouched, which is the check that the split is right.
+  `--json`/`--csv` carry the full sha; an abbreviated *key* is what this change exists to
+  stop storing.
+- **One bug of my own, caught by a test:** the summary join keyed a side table by
+  `id(row)` across **two** `read_all` calls, which build fresh dicts — so it resolved
+  nothing and made every real row look `unmatched`. Read once, carry the pair.
+- **Files:** `cage/linematch.py` · `cage/transcript.py` · `cage/authorcapture.py` ·
+  `cage/commitjoin.py` · `cage/commitview.py` · `cage/originrecord.py` · `cage/tasks.py` ·
+  `cage/constants.py` · `tests/test_authorship_capture.py` · `tests/test_commitjoin.py` ·
+  `tests/test_commitview.py` · `tests/goldenseed.py` · `docs/FORMULAS.md` · `docs/*`.
+- **Tests:** green — **1583 ⇒ 1600**, 11 skipped. Both `prefix_match` mutants (drop
+  symmetry, drop the refusal) kill tests; so do 4.1's and 4.2's.
+- **Next:** P5 — HR-COPILOT-JOIN (a capture change; fail open to `""`, never guess).
+
 ## 2026-08-11 — agent-lane sweep P3: REV-HARDEN P4's mechanical half (4 of 5 landed, 1 raised as a fork)
 
 - **Landed in the specified order 7 → 3 → 4 → 5; item 2 stopped at a decision.**

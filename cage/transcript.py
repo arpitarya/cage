@@ -254,6 +254,37 @@ def _proposed_lines(name: str, inp: dict) -> list[str]:
     return []
 
 
+def _context_lines(name: str, inp: dict) -> list[str]:
+    """The lines an `Edit`/`MultiEdit` block was **replacing** (`old_string`).
+
+    An `Edit`'s `new_string` is a replacement *block*, not a diff: it re-states enough
+    surrounding lines to anchor the edit, and every one of those was already in the file.
+    Counting them as proposals inflates `suggested` — and, via
+    `modified = suggested - kept`, `kept_modified` too.
+
+    This function only **transports** the raw text. It deliberately does not compare or
+    normalize anything: `linematch` documents itself as the one normalizer, and matching
+    a proposal against a context line is a matching operation, so the subtraction lives
+    there (`linematch.subtract_context`). Normalizing on this side of that boundary is
+    how the two halves would drift apart.
+
+    `Write` and `NotebookEdit` have no `old_string` — they carry a whole file body or a
+    whole cell — so their unchanged lines stay unsubtractable and their `suggested`
+    stays inflated. Stated rather than papered over; there is no evidence in the
+    transcript to fix it with."""
+    if name == "Edit":
+        s = inp.get("old_string")
+        return s.splitlines() if isinstance(s, str) else []
+    if name == "MultiEdit":
+        out: list[str] = []
+        for e in inp.get("edits") or []:
+            s = e.get("old_string") if isinstance(e, dict) else None
+            if isinstance(s, str):
+                out.extend(s.splitlines())
+        return out
+    return []
+
+
 def parse_edits(transcript_path: Path, session: str = "") -> list[dict]:
     """Every edit an assistant turn **proposed**, with the text it proposed and the
     turn's timestamp — the direct evidence behind agent-vs-human authorship (v2 P1).
@@ -313,7 +344,9 @@ def parse_edits(transcript_path: Path, session: str = "") -> list[dict]:
             if not lines:
                 continue  # nothing proposed ⇒ nothing to match (never a human residual)
             out.append({"session": session, "file": fp, "ts": ts, "cwd": cwd,
-                        "lines": lines})
+                        "lines": lines,
+                        # Carried alongside, never subtracted here — see `_context_lines`.
+                        "context": _context_lines(name, inp)})
     return out
 
 

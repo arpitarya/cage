@@ -590,9 +590,30 @@ window contains that edit's own turn timestamp:
 ```
 normalize(line)  = collapse internal whitespace runs, strip ends   (ONE function, BOTH sides)
 matchable(line)  = len(normalize(line)) >= MIN_MATCH_CHARS          (= 4)
+proposed         = new_string lines − old_string lines              (MULTISET, 2026-08-11)
 kept             = |proposed ∩ added|   as MULTISETS — a proposed line is spent once
 suggested        = kept + kept_modified + dropped                   (exactly; asserted)
 ```
+
+**`proposed` subtracts re-stated context (2026-08-11).** An `Edit`'s `new_string` is a
+replacement *block*, not a diff — it repeats surrounding lines to anchor the edit, and
+those were already in the file. They were entering `suggested`, and `kept_modified` with
+them via `modified = suggested − kept`. `old_string` was read nowhere in the package
+before this. The subtraction is `linematch.subtract_context`, and it lives **in
+`linematch`** because deciding "is this proposed line the same as that context line" is
+matching, and rule 1 says only `linematch` may normalize for matching; `transcript`
+carries the raw text and compares nothing.
+
+- Consumes 1:1 and never touches a sub-gate line — removing one would move lines out of
+  `unknown`, which is never redistributed.
+- **The opposite error is real and deliberate:** an agent that legitimately *re-adds* a
+  line from `old_string` is now under-credited. That is the direction to err in — this
+  surface observes the agent precisely and lets the human be the residual, so an unearned
+  proposal is worse than a missed one.
+- `Write` / `NotebookEdit` carry a whole body or cell and have **no** `old_string`, so
+  their unchanged lines stay unsubtractable. Stated, not papered over.
+- Rows written before 2026-08-11 keep the inflated counts — provenance is frozen by its
+  idempotency key and is never backfilled.
 
 | persisted count | definition |
 |---|---|
@@ -602,6 +623,35 @@ suggested        = kept + kept_modified + dropped                   (exactly; as
 | `dropped` | proposed lines whose file is absent from the commit |
 | `agent_lines` | the added-line side of the same match (= `kept`; separate name, §3.5) |
 | `residual_lines` | matchable added lines in **this row's own landed files**, minus `agent_lines`, floored at 0 — the not-the-agent side of its own scope, and the denominator half of §2.13's `agent%`. Scoped to the row's landed files on purpose: `unattributed` is a commit fact, and folding it in would let every session on a commit claim the same lines |
+
+**Commit shas are stored FULL and displayed SHORT (2026-08-11).** `commitjoin.head`,
+`commit_windows` (`%H`), `tasks.git_snapshot` and `originrecord.current_sha` all record
+the full 40 characters; every table abbreviates to `constants.SHORT_SHA_DISPLAY` (7).
+`--json`/`--csv` carry the full sha — an abbreviated *key* is what this change exists to
+stop storing.
+
+- **Why, given both sides were `--short` and therefore agreed:** they agreed by
+  coincidence of the moment. Git's auto-abbreviation length grows with a repo's object
+  count, so rows written at 7 characters sit beside rows written at 8 and an
+  exact-equality join between them fails **silently** — a task's calls stop landing on
+  their commit, and an attestation stops beating the `~` estimate.
+- **Every read joins through `commitjoin.prefix_match`, which is prefix-SYMMETRIC** — a
+  stored short sha is a prefix of a full probe and vice versa — so rows written before
+  the change keep joining. They are append-only and can never be rewritten.
+- **A probe matching two commits is refused** (`AMBIGUOUS`), distinct from `no-match`:
+  *cannot tell which* and *do not have it* are different answers. This was the real
+  defect in the area — prefix matching already existed here, but `render_commit` takes
+  `rows[0]` over an **oldest-first** sort, so an ambiguous prefix rendered the *oldest*
+  match confidently.
+- Method tags are untouched: a window join stays `modeled`, an attestation stays
+  `attested`.
+
+**A rename's numstat name is not a path (2026-08-11).** `git show --numstat` renders a
+rename as `old.py => new.py` or `d/{a => b}/f.py`, neither of which can key-match a
+`+++ b/<path>` line. `linematch.numstat_path` resolves both to the **destination**, and
+is shared by `commit_diff` and `originrecord.commit_numstat` so the two duplicate
+`_NUMSTAT` patterns cannot disagree. Before it, a renamed file's counts went to a
+phantom key and the file itself scored `DROPPED`.
 
 Line **bodies** and line **hashes** are never persisted — a hash is a membership oracle
 over the source. Only these six integers, and only counts.

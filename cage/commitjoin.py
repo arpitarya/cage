@@ -126,10 +126,50 @@ def toplevel(start: Path) -> Path | None:
         return None
 
 
+# The refusal `prefix_match` returns when a probe matches more than one commit. It is a
+# distinct outcome from "no match": one means *cage cannot tell which*, the other means
+# *cage does not have it*, and collapsing them would let an ambiguous probe render a
+# confident answer for whichever commit happened to sort first.
+AMBIGUOUS = "ambiguous"
+
+
+def prefix_match(candidates, probe: str) -> tuple[str | None, str]:
+    """Resolve ``probe`` against ``candidates`` — ``(matched sha, reason)``.
+
+    **Symmetric on purpose, and that is the back-compat mechanism.** cage wrote *short*
+    shas (`%h`, `rev-parse --short`) into `tasks.jsonl` and `provenance.jsonl` until
+    2026-08-11 and now writes full ones; those rows are append-only and can never be
+    rewritten. So a match is accepted in either direction — a stored short sha is a
+    prefix of a full probe, and a short probe is a prefix of a stored full sha. Mixed
+    ledgers keep joining.
+
+    **Why full shas at all, given both sides were `--short` and therefore agreed:** they
+    agreed *by coincidence of the moment*. Git's auto-abbreviation length grows with a
+    repo's object count, so rows written at 7 characters sit beside rows written at 8,
+    and an exact-equality join between them fails **silently** — a task's calls quietly
+    stop landing on their commit, an attestation quietly loses to the estimate.
+    Prefix-symmetry makes the length irrelevant instead of merely postponing the day.
+
+    A probe matching two commits returns ``(None, AMBIGUOUS)``. That refusal is the real
+    fix in this area: prefix matching already existed on the read side, but with no
+    ambiguity check `render_commit` took ``rows[0]`` over an **oldest-first** sort — so an
+    ambiguous prefix silently rendered the *oldest* match, confidently and wrongly.
+    """
+    if not probe:
+        return None, "empty"
+    hits = {c for c in candidates
+            if c and (c.startswith(probe) or probe.startswith(c))}
+    if not hits:
+        return None, "no-match"
+    if len(hits) > 1:
+        return None, AMBIGUOUS
+    return hits.pop(), "ok"
+
+
 def head(root: Path) -> str:
-    """The short sha of ``HEAD``, or "" — used only as a *cursor* input (has the repo
+    """The full sha of ``HEAD``, or "" — used only as a *cursor* input (has the repo
     moved since we last looked?), never to attribute an edit. See the module docstring."""
-    out = _git(root, "rev-parse", "--short", "HEAD")
+    out = _git(root, "rev-parse", "HEAD")
     return out.strip() if out else ""
 
 
@@ -137,7 +177,10 @@ def commit_windows(root: Path) -> list[Window]:
     """Every commit reachable from HEAD as an ordered list of ownership windows,
     **oldest first**.
 
-    Read from ``git log --format=%h|%cI`` — the *committer* date, not the author date:
+    Read from ``git log --format=%H|%cI`` — **full** shas (a `%h` abbreviation's
+    length grows with the repo, so two rows written months apart stop comparing
+    equal; `prefix_match` is how already-written short rows still join) and the
+    *committer* date, not the author date:
     a rebase or a cherry-pick rewrites when a commit joined this history, and the
     window is about when the work landed here, not when it was first typed. Commits
     are re-sorted by timestamp rather than trusted in log order, so a repo carrying an
@@ -154,7 +197,7 @@ def commit_windows(root: Path) -> list[Window]:
     whose ``%cI`` will not parse is dropped from the list, matching the malformed-line
     filter beside it — a bound cage cannot place in time is worse than one less window.
     """
-    out = _git(root, "log", "--format=%h|%cI")
+    out = _git(root, "log", "--format=%H|%cI")
     if not out:
         return []
     pairs: list[tuple[str, str]] = []
@@ -342,9 +385,12 @@ def join_calls(calls: list[dict], windows: list[Window], tasks: dict | None = No
     for c in calls:
         tid = call_task.get(c.get("id", ""))
         if tid in task_sha:
-            sha = task_sha[tid]
-            if sha in shas:
-                _place(sha, c, VIA_TASK)
+            # Prefix-symmetric, so a task row written with a SHORT sha still lands on
+            # its full-sha window (and vice versa). An ambiguous probe is dropped, never
+            # placed on whichever commit happened to sort first.
+            resolved, _why = prefix_match(shas, task_sha[tid])
+            if resolved:
+                _place(resolved, c, VIA_TASK)
                 continue
             _drop(DANGLING_TASK, c)   # squashed/rebased/other-branch — never chased
             continue

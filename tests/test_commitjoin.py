@@ -234,3 +234,49 @@ def test_the_join_is_a_pure_function_of_its_inputs():
     assert {k: v["via"] for k, v in a["by_sha"].items()} == \
            {k: v["via"] for k, v in b["by_sha"].items()}
     assert a["unattributed"] == b["unattributed"]
+
+
+# ── P4.3: full shas + a prefix-symmetric join with an ambiguity refusal ────────
+
+def test_prefix_match_is_symmetric_in_both_directions():
+    """The back-compat mechanism. cage wrote SHORT shas until 2026-08-11 and writes full
+    ones now; those rows are append-only, so both shapes coexist forever and a match has
+    to work whichever side is abbreviated."""
+    full = "a852987f30a58879499e391267eba09ed4674688"
+    other = "c4908c70f51734f9328ce3f524f80b81fb25294b"
+
+    assert cj.prefix_match({full, other}, "a852987") == (full, "ok")
+    assert cj.prefix_match({"a852987", other}, full) == ("a852987", "ok")
+    assert cj.prefix_match({full, other}, full) == (full, "ok")
+
+
+def test_prefix_match_refuses_an_ambiguous_probe_rather_than_picking_one():
+    """A probe matching two commits is a refusal, and a DISTINCT one from "no match":
+    *cannot tell which* and *do not have it* are different answers, and collapsing them
+    is what let an ambiguous prefix render a confident wrong commit."""
+    a = "abc1230000000000000000000000000000000000"
+    b = "abc1231111111111111111111111111111111111"
+
+    assert cj.prefix_match({a, b}, "abc123") == (None, cj.AMBIGUOUS)
+    assert cj.prefix_match({a, b}, "abc1230") == (a, "ok")
+    assert cj.prefix_match({a, b}, "ffff") == (None, "no-match")
+    assert cj.prefix_match({a, b}, "") == (None, "empty")
+
+
+def test_head_and_windows_record_full_shas(tmp_path):
+    """The write side. Both were `--short`, which is why they agreed — by coincidence of
+    the moment: git's abbreviation length grows with the repo, so rows written months
+    apart stop comparing equal, silently."""
+    import subprocess
+    r = tmp_path / "repo"
+    r.mkdir()
+    for a in (("init", "-q", "-b", "main"), ("config", "user.email", "t@e.invalid"),
+              ("config", "user.name", "t")):
+        subprocess.run(("git", "-C", str(r), *a), check=True, capture_output=True)
+    (r / "a.txt").write_text("1\n", encoding="utf-8")
+    subprocess.run(("git", "-C", str(r), "add", "-A"), check=True, capture_output=True)
+    subprocess.run(("git", "-C", str(r), "commit", "-qm", "c"), check=True,
+                   capture_output=True)
+
+    assert len(cj.head(r)) == 40
+    assert [len(w.sha) for w in cj.commit_windows(r)] == [40]

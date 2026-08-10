@@ -15,7 +15,7 @@ import re
 import subprocess
 from pathlib import Path
 
-from cage import ledger, lockutil, paths, schema
+from cage import ledger, linematch, lockutil, paths, schema
 from cage.constants import PROVENANCE_CORROBORATION_BONUS, PROVENANCE_METHOD_TRUST
 
 _NUMSTAT = re.compile(r"^(\d+|-)\t(\d+|-)\t(.+)$")
@@ -39,7 +39,9 @@ def _git(root: Path, *args: str) -> str | None:
 
 
 def current_sha(root: Path) -> str | None:
-    return _git(root, "rev-parse", "--short", "HEAD")
+    # FULL sha — see `commitjoin.prefix_match` for why, and for how rows already
+    # written with a short one keep resolving.
+    return _git(root, "rev-parse", "HEAD")
 
 
 def working_tree_numstat(root: Path, path: str | None = None) -> list[tuple[str, int, int]]:
@@ -58,7 +60,7 @@ def working_tree_numstat(root: Path, path: str | None = None) -> list[tuple[str,
         added, removed, f = m.groups()
         if added == "-" or removed == "-":  # binary file — numstat reports "-"
             continue
-        rows.append((f, int(added), int(removed)))
+        rows.append((linematch.numstat_path(f), int(added), int(removed)))
     return rows
 
 
@@ -79,7 +81,9 @@ def commit_numstat(root: Path, sha: str) -> list[tuple[str, int, int]]:
         added, removed, f = m.groups()
         if added == "-" or removed == "-":
             continue
-        rows.append((f, int(added), int(removed)))
+        # A rename keys to its DESTINATION — the one parser, shared with `linematch`,
+        # so the two duplicate `_NUMSTAT` patterns cannot disagree about a rename.
+        rows.append((linematch.numstat_path(f), int(added), int(removed)))
     return rows
 
 
@@ -88,7 +92,11 @@ def read_all(root: Path) -> list[dict]:
 
 
 def for_sha(root: Path, sha: str) -> list[dict]:
-    return ledger.provenance_for_sha(root, sha)
+    """Rows for ``sha``, matched prefix-symmetrically — a caller holding a full sha must
+    still find rows written with a short one, and vice versa."""
+    return [r for r in read_all(root)
+            if (s := r.get("sha", "")) and sha
+            and (s.startswith(sha) or sha.startswith(s))]
 
 
 def confidence_for(method: str, *, corroborated: bool = False) -> float:
@@ -100,7 +108,15 @@ def confidence_for(method: str, *, corroborated: bool = False) -> float:
 
 
 def _already_recorded(root: Path, *, sha: str, agent: str, session_id: str, method: str) -> bool:
-    return any(r.get("sha") == sha and r.get("agent") == agent
+    """The idempotency guard. **Sha comparison is prefix-symmetric** because rows written
+    before 2026-08-11 carry a SHORT sha and can never be rewritten: an exact compare
+    against a full-sha probe would miss and write a second row for work already recorded,
+    which the deterministic row id cannot dedupe (the id folds the sha in, so the two
+    shapes hash differently)."""
+    def _same(stored: str) -> bool:
+        s = stored or ""
+        return bool(s) and bool(sha) and (s.startswith(sha) or sha.startswith(s))
+    return any(_same(r.get("sha", "")) and r.get("agent") == agent
               and r.get("session_id") == session_id and r.get("method") == method
               for r in read_all(root))
 

@@ -125,6 +125,52 @@ def match_file(proposed, added) -> tuple[int, int, int]:
     return len(prop), kept, kept
 
 
+def subtract_context(proposed, context) -> list[str]:
+    """Drop the lines a block was merely **re-stating** from the ones it proposed.
+
+    An `Edit` block's `new_string` is a replacement block, not a diff: it repeats
+    surrounding lines to anchor the edit, and those were already in the file. They were
+    entering `suggested` — and `kept_modified`, via ``modified = suggested - kept``.
+
+    **This lives here, not in `transcript.py`, and that is the design call.** Rule 1 of
+    this module is that normalization is one function applied to both sides and nothing
+    else in cage may normalize a line for matching. Deciding "is this proposed line the
+    same as that context line" *is* matching, so it obeys the same `normalize` + gate as
+    `match_file`; doing it on the transcript side would put a second, drifting
+    comparison outside the boundary rule 1 draws. `transcript._context_lines` therefore
+    only transports the raw `old_string`.
+
+    Consumes 1:1 through a multiset, exactly like `match_file` — three re-stated copies
+    of a line remove three, not every occurrence. **Sub-gate lines are never subtracted**
+    (rule 2): they are not matchable on either side, and removing them would quietly move
+    lines out of the `unknown` bucket, which is never redistributed.
+
+    **The opposite error, stated because it is real:** when an agent legitimately
+    *re-adds* a line that was in `old_string` — moving a line, or restoring one it just
+    deleted — that line is now subtracted and the agent is under-credited. That is the
+    deliberate direction to err in: this module's whole premise is to observe the agent
+    precisely and let the human be the residual, so an unearned proposal is a worse
+    failure than a missed one.
+
+    **Scope of the harm being fixed, honestly:** inflation of `suggested`/`kept_modified`
+    was certain. False *agent credit* additionally required a context line to coincide
+    with a genuinely human-added line, which `MIN_MATCH_CHARS` and 1:1 consumption make
+    possible but not routine. Historical provenance rows are frozen by their idempotency
+    key and keep the old, inflated counts; only rows written from here on are corrected.
+    """
+    if not context:
+        return list(proposed)
+    pool = Counter(n for c in context if matchable(n := normalize(c)))
+    out = []
+    for raw in proposed:
+        n = normalize(raw)
+        if matchable(n) and pool[n] > 0:
+            pool[n] -= 1
+            continue
+        out.append(raw)
+    return out
+
+
 def match_commit(proposed_by_file: dict, added_by_file: dict,
                  binary_files=()) -> tuple[list[FileMatch], dict]:
     """Match one session's proposals against one commit's added lines.
@@ -219,6 +265,39 @@ def match_commit(proposed_by_file: dict, added_by_file: dict,
 # of `quotePath`, so an unquoted trailing tab is always the disambiguator.
 _DIFF_FILE = re.compile(r"^\+\+\+ b/(.*?)\t?$")
 _NUMSTAT = re.compile(r"^(\d+|-)\t(\d+|-)\t(.+)$")
+# `git show --numstat` renders a RENAME in the name column, in one of two shapes, and
+# neither can ever key-match a `+++ b/<path>` line:
+#     old.py => new.py                 (plain)
+#     d/{a => b}/f.py                  (braced — a shared prefix and/or suffix)
+# The braced form's degenerate cases are real and must not be special-cased away:
+# `{ => d}/x.py` (moved INTO a dir, empty old) and `d/{a => }/x.py` (moved OUT, empty
+# new) — the latter is why the result is `/`-collapsed rather than concatenated blindly.
+_RENAME_BRACE = re.compile(r"^(.*)\{(.*) => (.*)\}(.*)$")
+
+
+def numstat_path(name: str) -> str:
+    """The **destination** path from a numstat name column.
+
+    A rename must resolve to where the file *landed*, because that is the key every
+    other map in this module uses — `added` comes from `+++ b/<path>`, which git always
+    writes as the new path. Left unparsed, `numstat` and `added` disagreed for every
+    renamed file: the counts went to a phantom key (`old.py => new.py`), the real file
+    got none, and `cage insights commit` rendered that arrow string as if it were a
+    path. Shared by `commit_diff` and `originrecord.commit_numstat` so the two cannot
+    drift — they already keep duplicate `_NUMSTAT` patterns, which is how this class of
+    bug survives.
+
+    A path genuinely containing " => " is not distinguishable here and would be
+    misread; git quotes control characters but not this, so the ambiguity is inherent to
+    the porcelain format. `-z` output would remove it and is a larger change.
+    """
+    if (m := _RENAME_BRACE.match(name)) is not None:
+        prefix, _old, new, suffix = m.groups()
+        joined = f"{prefix}{new}{suffix}"
+        return joined.replace("//", "/").strip("/") if "//" in joined else joined
+    if " => " in name:
+        return name.split(" => ", 1)[1]
+    return name
 
 
 def _git(root: Path, *args: str) -> str | None:
@@ -273,6 +352,7 @@ def commit_diff(root: Path, sha: str) -> dict:
             m = _NUMSTAT.match(line)
             if m:
                 a, r, f = m.groups()
+                f = numstat_path(f)   # a rename keys to where the file LANDED
                 if a == "-" or r == "-":
                     binary.add(f)
                 else:

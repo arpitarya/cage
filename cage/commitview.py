@@ -42,7 +42,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from cage import commitjoin, ledger, linematch, originrecord, render, tasks
-from cage.constants import COMMITS_DEFAULT_ROWS
+from cage.constants import COMMITS_DEFAULT_ROWS, SHORT_SHA_DISPLAY
 
 # The four buckets, in render order. A tuple so every renderer walks them identically.
 BUCKETS = ("agent", "human", "unattributed", "unknown")
@@ -196,17 +196,38 @@ def summarize(root: Path, pol: dict, *, since: str | None = None,
     calls = ledger.calls(root)
     join = commitjoin.join_calls(calls, windows, tasks.read(root),
                                  project=r.name, receipts=ledger.receipts(root))
+    # Provenance and task rows are keyed by whatever sha shape was current when they
+    # were written — SHORT before 2026-08-11, full after — and they are append-only, so
+    # both shapes coexist forever. Resolve each row onto a window sha once, here, rather
+    # than letting an exact `.get(w.sha)` miss silently further down.
+    all_shas = {w.sha for w in windows}
     prov: dict[str, list[dict]] = {}
     for row in originrecord.read_all(root):
-        prov.setdefault(row.get("sha", ""), []).append(row)
+        key, _why = commitjoin.prefix_match(all_shas, row.get("sha", ""))
+        prov.setdefault(key or row.get("sha", ""), []).append(row)
     base["provenance_rows"] = sum(len(v) for v in prov.values())
     base["excluded"] = join["excluded"]
     base["dirty_tasks"] = join["dirty_tasks"]
 
-    attested = _attested_minutes(root, join)
+    attested = _attested_minutes(root, join, all_shas)
     cut = ledger.since_cutoff(since)
     cap_s = _gap_seconds(base["max_est_gap"])
-    wanted = [w for w in windows if sha is None or w.sha.startswith(sha) or sha.startswith(w.sha)]
+    if sha:
+        # THE missing refusal. Prefix matching already existed here and was already
+        # symmetric — what it never did was notice a probe matching TWO commits.
+        # `render_commit` then took `rows[0]` over an **oldest-first** sort, so an
+        # ambiguous prefix rendered the OLDEST match, confidently. (The proposal recorded
+        # this symptom backwards, as "the newest".)
+        resolved, why = commitjoin.prefix_match({w.sha for w in windows}, sha)
+        if why == commitjoin.AMBIGUOUS:
+            hits = sorted(w.sha for w in windows if w.sha.startswith(sha))
+            base["reason"] = (f"{sha}: ambiguous — matches {len(hits)} commits "
+                              f"({', '.join(_short(h) for h in hits[:4])}"
+                              f"{', …' if len(hits) > 4 else ''}). Use more characters")
+            return base
+        wanted = [w for w in windows if w.sha == resolved]
+    else:
+        wanted = list(windows)
     if sha and not wanted:
         base["reason"] = f"{sha}: not a commit in this history"
         return base
@@ -260,11 +281,17 @@ def summarize(root: Path, pol: dict, *, since: str | None = None,
     return base
 
 
-def _attested_minutes(root: Path, join: dict) -> dict:
+def _attested_minutes(root: Path, join: dict, shas=()) -> dict:
     """``{sha: minutes}`` from `cage task time` (P4) — a task's attested minutes land on
     the commit its snapshot names. Only *clean* snapshots are trusted, the same guard
     `commitjoin._task_commits` applies: a task closed on a dirty tree names the prior
-    commit, and its hours belong to the next one."""
+    commit, and its hours belong to the next one.
+
+    **Keyed onto the WINDOW's sha, via `prefix_match`.** This is the "an attestation
+    always wins" break: a task row carrying a short `commit` never equalled a full window
+    sha, `attested.get(w.sha)` returned None, and `_hours` fell straight through to the
+    `~` estimate — silently replacing a person's own assertion about their time with an
+    inference, which is the one substitution this module is built to prevent."""
     out: dict[str, float] = {}
     for _tid, row in sorted(tasks.read(root).items()):
         mins, sha = row.get("human_minutes"), row.get("commit")
@@ -272,8 +299,10 @@ def _attested_minutes(root: Path, join: dict) -> dict:
             continue
         if int(row.get("files_changed", 0) or 0):
             continue
+        key, _why = commitjoin.prefix_match(shas, sha)
+        key = key or sha
         try:
-            out[sha] = out.get(sha, 0.0) + float(mins)
+            out[key] = out.get(key, 0.0) + float(mins)
         except (TypeError, ValueError):
             continue
     return out
@@ -374,6 +403,12 @@ def _date(ts: str) -> str:
     return (ts or "")[5:16].replace("T", " · ")
 
 
+def _short(sha: str) -> str:
+    """A sha for a HUMAN to read. Display only — `--json`/`--csv` carry the full one
+    (`constants.SHORT_SHA_DISPLAY`)."""
+    return (sha or "")[:SHORT_SHA_DISPLAY]
+
+
 def render_commits(data: dict, show_all: bool = False) -> str:
     """The list view. Tokens, hours and the four-way split, one row per commit."""
     from cage.display import Footer
@@ -393,7 +428,7 @@ def render_commits(data: dict, show_all: bool = False) -> str:
     body = []
     for r in rows if limit is None else shown:
         a = r["attributed"]
-        body.append([r["sha"], _date(r["ts"]), _tok(r["tokens_in"], a),
+        body.append([_short(r["sha"]), _date(r["ts"]), _tok(r["tokens_in"], a),
                      _tok(r["tokens_out"], a), _tok(r["cache_read"], a),
                      _tok(r["cache_write"], a), _hours_cell(r), _split_cell(r)])
     t = data["totals"]
@@ -481,7 +516,7 @@ def render_commit(data: dict, show_files: bool = False) -> str:
     # and no joinable call, so "3 sessions joined (unattributed)" was a contradiction.
     sess = f"{len(r['sessions'])} session(s) recorded" if r["sessions"] else "no session recorded"
     via = ("calls joined via " + "+".join(sorted(r["via"]))) if r["via"] else "no call joined"
-    head = (f"commit {r['sha']} · {(r['ts'] or '')[:16].replace('T', ' ')} · "
+    head = (f"commit {_short(r['sha'])} · {(r['ts'] or '')[:16].replace('T', ' ')} · "
             f"{data['branch']} · {who} · {sess} · {via}")
 
     lines = [head, ""]
@@ -599,14 +634,21 @@ def summarize_authorship(root: Path, pol: dict, *, since: str | None = None,
     keep = [w for w in windows
             if cut is None or ((t := _iso(w.hi)) is not None and t >= cut)]
     known = {w.sha for w in keep}
-    rows = [x for x in originrecord.read_all(root)
-            if cut is None or x.get("sha") in known or x.get("sha") not in
-            {w.sha for w in windows}]
-    in_window = [x for x in rows if x.get("sha") in known]
+    every = {w.sha for w in windows}
+    # Resolve each stored row onto a window sha ONCE — rows written before 2026-08-11
+    # carry short shas and would never equal a full window sha. `unmatched` is then a
+    # real finding ("recorded provenance whose commit is not in this history") instead of
+    # every pre-change row in the ledger.
+    # ONE read, and the resolution is carried as a pair — `read_all` builds fresh dicts
+    # on every call, so keying a side table by identity across two reads silently
+    # resolves nothing (and made every real row look unmatched).
+    placed = [(x, commitjoin.prefix_match(every, x.get("sha", ""))[0])
+              for x in originrecord.read_all(root)]
+    rows = [(x, w) for x, w in placed if cut is None or w in known or w is None]
+    in_window = [x for x, w in rows if w in known]
     out.update(ok=True, commits=len(keep), rows=len(in_window),
-               with_rows=len({x.get("sha") for x in in_window}))
-    out["unmatched"] = sorted({x.get("sha", "") for x in rows
-                               if x.get("sha") not in {w.sha for w in windows}} - {""})
+               with_rows=len({w for _x, w in rows if w in known}))
+    out["unmatched"] = sorted({x.get("sha", "") for x, w in rows if w is None} - {""})
     agents_, methods = {}, {}
     for x in in_window:
         agents_[x.get("agent", "") or "?"] = agents_.get(x.get("agent", "") or "?", 0) + 1

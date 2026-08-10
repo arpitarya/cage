@@ -97,8 +97,12 @@ def _bucket_edits(edits, windows, repo: Path) -> dict:
         rel = _repo_relative(e.get("file") or "", repo)
         if rel is None:
             continue  # another repo, or outside the work tree — never guessed at
+        # Re-stated context (`old_string`) is dropped before the lines are bucketed —
+        # an `Edit`'s `new_string` is a replacement block, not a diff. The subtraction
+        # itself belongs to `linematch` (rule 1: one normalizer, and this is matching).
+        proposed = linematch.subtract_context(e.get("lines") or [], e.get("context") or [])
         out.setdefault((w.sha, e.get("session") or ""), {}).setdefault(rel, []).extend(
-            e.get("lines") or [])
+            proposed)
     return out
 
 

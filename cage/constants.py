@@ -42,6 +42,15 @@ GRAPHIFY_RECEIPT_CONFIDENCE = 0.6  # a graphify receipt is modeled, never measur
 # none exist yet. Until it does, 0.3 is a placeholder that surfaces its own weakness in
 # the footnote; do NOT tune it by intuition (that would launder a guess into a number).
 GRAPHIFY_REPORT_READ_CONFIDENCE = 0.3  # UNVALIDATED — see note above (G.1)
+# Commit-sha DISPLAY width. The ledger stores FULL shas (`commitjoin.prefix_match`
+# explains why an abbreviation is unsafe to *store*), but a 40-character column would
+# wreck every commit table for no reader benefit — so precision lives in the data and
+# brevity in the display, the same split as tokens vs `$`. 7 is git's own minimum
+# `core.abbrev`, so a small repo's rendered sha is identical to the `%h` cage used to
+# store. **Display only:** `--json` and `--csv` carry the full sha, because those are
+# data and an abbreviated key is exactly what this change exists to stop storing.
+SHORT_SHA_DISPLAY = 7
+
 SINCE_WINDOW_DAYS = {"h": 1 / 24, "d": 1, "w": 7}  # `24h` / `7d` / `2w` → days
 
 # Ledger partition granularity (plan §3.6.1). Writers append to `calls-YYYY-MM.jsonl`

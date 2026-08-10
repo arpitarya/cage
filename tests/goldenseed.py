@@ -412,7 +412,9 @@ def _commit(root: Path, files: dict, when: str) -> str:
         p.write_text(body, encoding="utf-8", newline="\n")
     _git(root, "add", "-A")
     _git(root, "commit", "-q", "-m", "c", when=when)
-    return _git(root, "rev-parse", "--short", "HEAD")
+    # FULL sha — what cage records since 2026-08-11 (`commitjoin.prefix_match`);
+    # the rendered tables abbreviate for display (`constants.SHORT_SHA_DISPLAY`).
+    return _git(root, "rev-parse", "HEAD")
 
 
 _AGENT_SRC = ("def resolve(name):\n"

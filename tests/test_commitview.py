@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from cage import cli, commitview, ledger, originrecord, schema, tasks
+from cage import cli, commitjoin, commitview, ledger, originrecord, schema, tasks
 
 
 @pytest.fixture(autouse=True)
@@ -44,7 +44,9 @@ def _commit(repo: Path, files: dict, when: str) -> str:
     subprocess.run(("git", "-C", str(repo), "commit", "-q", "-m", "c"), check=True,
                    capture_output=True,
                    env={**os.environ, "GIT_COMMITTER_DATE": when, "GIT_AUTHOR_DATE": when})
-    return _git(repo, "rev-parse", "--short", "HEAD")
+    # FULL sha — what cage records since 2026-08-11 (`commitjoin.prefix_match`).
+    # A short one is exercised deliberately by the back-compat tests, not here.
+    return _git(repo, "rev-parse", "HEAD")
 
 
 AGENT_BODY = "def one():\n    return 'alpha beta gamma'\n"
@@ -131,7 +133,9 @@ def test_an_unattributed_commit_renders_a_dash_never_zero(world):
     text = commitview.render_commits(d)
     c1 = next(r for r in d["rows"] if r["sha"] == world["c1"])
     assert not c1["attributed"] and c1["tokens_in"] == 0
-    line = next(ln for ln in text.splitlines() if ln.startswith(world["c1"]))
+    # The TABLE abbreviates (display only); the row data carries the full sha.
+    line = next(ln for ln in text.splitlines()
+                if ln.startswith(commitview._short(world["c1"])))
     assert commitview.DASH in line and " 0 " not in line
     assert "unattributed — no joinable call" in text
     assert "never 0" in text
@@ -422,3 +426,81 @@ def test_the_detail_view_still_resolves_a_commit_outside_any_window(world):
     default window may be introduced inside it — an old sha must keep resolving."""
     data = _summary(world, sha=world["c1"])
     assert data["ok"] and [r["sha"] for r in data["rows"]] == [world["c1"]]
+
+
+# ── P4.3: a ledger holding BOTH sha shapes ────────────────────────────────────
+
+def test_a_short_sha_provenance_row_still_joins_to_a_full_sha_window(world):
+    """The back-compat case, and the one that matters: every provenance row written
+    before 2026-08-11 carries a short sha, is append-only, and can never be rewritten.
+    An exact join would have silently dropped all of them the day cage started
+    recording full shas — the buckets would read `unattr 100%` on work the agent
+    demonstrably did."""
+    short = world["c3"][:7]
+    originrecord.record_transcript(world["root"], sha=short, files=["after.txt"],
+                                   agent="claude-code", session_id="s_short",
+                                   suggested=1, kept=1, agent_lines=1)
+    row = next(r for r in _summary(world)["rows"] if r["sha"] == world["c3"])
+
+    assert row["suggested"] == 1 and row["kept"] == 1
+    assert "s_short" in row["sessions"]
+    # And it is NOT reported as provenance cage could not place.
+    d = commitview.summarize_authorship(world["root"], {}, repo=world["repo"])
+    assert short not in d["unmatched"], d["unmatched"]
+
+
+def test_an_attestation_written_with_a_short_sha_still_wins(world):
+    """The `attested always wins` break, pinned. A task row carrying a short `commit`
+    never equalled a full window sha, so `attested.get(w.sha)` returned None and
+    `_hours` fell through to the `~` ESTIMATE — a person's own assertion about their
+    time silently replaced by an inference."""
+    tasks.record(world["root"], "t_att", outcome="ok")
+    rows = tasks.read(world["root"])
+    rows["t_att"].update(commit=world["c2"][:7], human_minutes=90, files_changed=0)
+    ledger.append_row(world["root"], "tasks", rows["t_att"])
+
+    row = next(r for r in _summary(world)["rows"] if r["sha"] == world["c2"])
+    assert row["hours"]["tier"] == commitview.ATTESTED, row["hours"]
+    assert row["hours"]["value"] == 1.5
+
+
+def test_an_ambiguous_prefix_refuses_instead_of_rendering_the_oldest(world, monkeypatch):
+    """The real defect behind "full shas". Prefix matching already existed and was
+    already symmetric; what was missing was noticing TWO hits — and `render_commit`
+    takes `rows[0]` over an OLDEST-first sort, so an ambiguous probe rendered the
+    oldest match confidently. (The proposal recorded this symptom backwards.)"""
+    windows = commitjoin.commit_windows(world["repo"])
+    monkeypatch.setattr(commitjoin, "commit_windows", lambda _r: [
+        commitjoin.Window("abc1230000000000000000000000000000000000", "", "2026-07-01T09:00:00Z"),
+        commitjoin.Window("abc1231111111111111111111111111111111111",
+                          "2026-07-01T09:00:00Z", "2026-07-01T10:00:00Z")])
+
+    d = _summary(world, sha="abc123")
+    assert not d["ok"]
+    assert "ambiguous" in d["reason"] and "matches 2 commits" in d["reason"]
+    assert "more characters" in d["reason"]
+    # A longer probe resolves normally — the refusal is about the probe, not the repo.
+    assert _summary(world, sha="abc1230")["ok"]
+    del windows
+
+
+def test_a_sha_that_is_simply_absent_still_says_so(world):
+    """`no-match` and `ambiguous` must stay distinct messages: *cage does not have it*
+    and *cage cannot tell which* are different answers to the reader."""
+    d = _summary(world, sha="deadbeef")
+    assert not d["ok"]
+    assert "not a commit in this history" in d["reason"]
+    assert "ambiguous" not in d["reason"]
+
+
+def test_the_rendered_table_abbreviates_but_the_data_carries_the_full_sha(world):
+    """The recorded decision: precision in the data, brevity in the display — the same
+    split as tokens vs `$`. `--json`/`--csv` must never carry an abbreviated key, since
+    an abbreviated key is exactly what this change exists to stop storing."""
+    d = _summary(world)
+    assert all(len(r["sha"]) == 40 for r in d["rows"])
+    text = commitview.render_commits(d)
+    assert commitview._short(world["c2"]) in text
+    assert world["c2"] not in text                      # never the full 40 in a table
+    csv = commitview.render_csv(d)
+    assert world["c2"] in csv                           # but always in the data

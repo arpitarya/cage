@@ -38,7 +38,10 @@ def _git(root: Path, *args: str) -> str | None:
 def git_snapshot(root: Path) -> dict:
     """SHA / branch / diff counts / top-level dirs — fail-open, fields omitted if absent."""
     snap: dict = {}
-    sha = _git(root, "rev-parse", "--short", "HEAD")
+    # FULL sha: an abbreviation's length grows with the repo, so a short `commit`
+    # written today stops comparing equal to one written later. Readers join through
+    # `commitjoin.prefix_match`, which keeps already-written short rows working.
+    sha = _git(root, "rev-parse", "HEAD")
     if sha:
         snap["commit"] = sha
     branch = _git(root, "rev-parse", "--abbrev-ref", "HEAD")
