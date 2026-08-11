@@ -571,3 +571,28 @@ def test_cli_wiring(root, monkeypatch, capsys):
     assert cli.main(["insights", "chats", "--no-import", "--all"]) == 0
     assert cli.main(["insights", "chats", "--no-import", "--usd"]) == 0
     assert cli.main(["insights", "chats", "--no-import", "--agent", "copilot"]) == 0
+
+
+# ── COPILOT-PREMIUM-DEAD (closed 2026-08-11) ──────────────────────────────────
+
+def test_the_lossy_premium_duplicate_is_gone_from_both_tables(root, pol):
+    """`premium` is `floor(credits)` — the same counter as an int — so a column of it
+    beside `credits` could only ever agree-but-rounded or print `0`. Fails before the
+    fix: both tables carried the column."""
+    _call(root, "c_1", agent="copilot", session="s1", surface="cli", premium=2,
+          extra={"credits": 2.4})
+    data = chats.summarize(root, pol)
+    text, csv = chats.render_chats(data), chats.render_csv(data)
+    assert "premium" not in text.splitlines()[2]
+    assert "premium" not in csv.splitlines()[0].split(",")
+    # …and the counter it duplicated is still on both, unrounded in the data.
+    assert "credits" in text.splitlines()[2] and "credits" in csv.splitlines()[0]
+    assert "2.4" in csv
+
+
+def test_the_recorded_premium_survives_in_the_payload(root, pol):
+    """Removing a *column* is not removing a *fact*. The substrate field is untouched
+    (append-only rows already carry it) and `--json` — the raw-data surface — still
+    sums it. Precision in the data, brevity in the display."""
+    _call(root, "c_1", agent="copilot", session="s1", surface="cli", premium=3)
+    assert chats.summarize(root, pol)["rows"][0]["premium"] == 3

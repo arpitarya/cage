@@ -5,7 +5,7 @@
 The differentiating question no cost dashboard answers per-*chat*: which conversation
 spent the tokens, and (where the store carries a title) what was it about? The
 substrate already carries everything numeric — `session`, `agent`, `surface`,
-`tokens_in`, `tokens_out`, `cached_in`, `cache_write_in`, `premium` are all call-row
+`tokens_in`, `tokens_out`, `cached_in`, `cache_write_in`, `credits` are all call-row
 fields (plan §3.1) — so this is pure derive, no substrate change.
 
 **Mechanism (the proposal's five steps, binding):**
@@ -16,7 +16,7 @@ fields (plan §3.1) — so this is pure derive, no substrate change.
    hand-crafted legacy row, but the predicate is applied uniformly with every other
    money view rather than assumed absent).
 2. Group by `(agent, surface, session)` — the same bucket key
-   `importcmd._write_manifest` uses. Sum tokens/cached/cache-write/premium; reprice
+   `importcmd._write_manifest` uses. Sum tokens/cached/cache-write/credits; reprice
    per call via `prices.call_usd_match` (UNPRICED counted per row, never $0).
 3. Label — join `session → session_name` from `imports.jsonl`, **labels only** (the
    one carve-out `manifest.py`'s docstring now documents). No name ⇒ the session id.
@@ -173,6 +173,9 @@ def _new_bucket() -> dict:
     # credit renders `—`; a chat that recorded 0.0 renders `0.00`, and they are
     # different facts. `basis` tallies which ladder rung actually paid, per rung label,
     # so `priced_via` can name a mixed chat instead of picking a winner.
+    # `premium` is still summed and still in the payload (so `--json`, the raw-data
+    # surface, keeps the recorded fact) but is rendered by neither table — precision in
+    # the data, brevity in the display, the same split shas already follow.
     return {"calls": 0, "tokens_in": 0, "cached_in": 0, "cache_write_in": 0,
             "tokens_out": 0, "premium": 0, "cost": 0.0, "unpriced_calls": 0,
             "unpriced_tokens": 0, "credits": None, "credits_calls": 0, "basis": {}}
@@ -413,8 +416,16 @@ def render_chats(data: dict, disp=None, show_all: bool = False,
     shown = rows if limit is None else rows[:limit]
     cut = 0 if limit is None else max(0, len(rows) - limit)
 
+    # No `premium` column (COPILOT-PREMIUM-DEAD, closed 2026-08-11). It is
+    # `floor(credits)` — the SAME counter, read as an int — so it sat next to `credits`
+    # as a **lossy duplicate**: `totalPremiumRequests` is fractional in every real sample
+    # (0.33), `int()` floors it and `make_call`'s `if premium:` drops the key, so the
+    # column printed `0` for every row cage writes today and would merely round the
+    # column beside it when it did not. The FIELD is untouched — it is a recorded
+    # provider fact on append-only rows, and narrowing the substrate to delete it would
+    # lose that. A field with no display is fine; a column that can only mislead is not.
     head = ["chat", "agent", "surface", "calls", "tokens_in", "cached_in",
-            "cache_write", "tokens_out", "premium", "credits", "agent%"]
+            "cache_write", "tokens_out", "credits", "agent%"]
     if disp.usd:
         head.append("cost")
     rights = set(range(3, len(head)))
@@ -424,7 +435,7 @@ def render_chats(data: dict, disp=None, show_all: bool = False,
         cells = [_label(r), r["agent"], r["surface"] or "—", render.tok(r["calls"]),
                  render.tok(r["tokens_in"]), render.tok(r["cached_in"]),
                  render.tok(r["cache_write_in"]), render.tok(r["tokens_out"]),
-                 render.tok(r["premium"]), _credits_cell(r), _agent_cell(r)]
+                 _credits_cell(r), _agent_cell(r)]
         if disp.usd:
             cells.append(_cost_cell(r))
         table_rows.append(cells)
@@ -479,12 +490,12 @@ def render_csv(data: dict) -> str:
     full, unshortened label. Column contract: docs/FORMULAS.md § chats-view."""
     from cage import csvout
     head = ["chat", "agent", "surface", "session", "calls", "tokens_in", "cached_in",
-            "cache_write_in", "tokens_out", "premium", "credits", "agent_lines",
+            "cache_write_in", "tokens_out", "credits", "agent_lines",
             "residual_lines", "agent_pct", "cost_usd", "priced_via", "unpriced_calls",
             "unpriced_tokens", "method"]
     rows = [[r["title"], r["agent"], r["surface"], r["session"], r["calls"],
              r["tokens_in"], r["cached_in"], r["cache_write_in"], r["tokens_out"],
-             r["premium"], "" if r["credits"] is None else round(r["credits"], 6),
+             "" if r["credits"] is None else round(r["credits"], 6),
              *_authorship_csv(r),
              round(r["cost"], 6), creditprice.basis_of(r["basis"]), r["unpriced_calls"],
              r["unpriced_tokens"], creditprice.method_for(r["basis"])]
