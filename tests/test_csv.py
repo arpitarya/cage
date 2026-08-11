@@ -308,8 +308,6 @@ def test_view_csv_file_write_pins_lf(seeded, tmp_path, monkeypatch):
 
 @pytest.mark.parametrize("argv", [
     ["report", "--csv", "--json"],
-    ["study", "id", "--csv"],
-    ["study", "start", "phase1", "--csv"],
     ["data", "export", "--no-import", "--csv", "calls", "--format", "json"],
     ["data", "export", "--no-import", "--csv", "receipts", "--agent", "claude"],
     ["data", "export", "--no-import", "--csv", "tasks", "--project", "."],
@@ -319,6 +317,22 @@ def test_bad_flag_combinations_are_typed_errors(proj, monkeypatch, capsys, argv)
     monkeypatch.chdir(proj)
     assert cli.main(argv) == 1
     assert capsys.readouterr().err.startswith("error: ")
+
+
+@pytest.mark.parametrize("argv", [
+    ["study", "id", "--csv"],
+    ["study", "start", "phase1", "--csv"],
+])
+def test_csv_on_a_study_marker_verb_is_a_USAGE_error(proj, monkeypatch, capsys, argv):
+    """CLI-GAPS(b) moved this refusal from runtime to the parser. `report` is the only
+    study verb that is a rendered view, so it is the only one carrying `--csv`; a marker
+    verb no longer *has* the flag. Exit 2 (argparse usage), not 1 (a typed CageError) —
+    the earlier, cheaper failure, and the reason the conversion was worth doing."""
+    monkeypatch.chdir(proj)
+    with pytest.raises(SystemExit) as e:
+        cli.main(argv)
+    assert e.value.code == 2
+    assert "unrecognized arguments: --csv" in capsys.readouterr().err
 
 
 def test_cli_csv_views_exit_zero_and_match_library(seeded, monkeypatch, capsys):

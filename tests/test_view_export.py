@@ -42,15 +42,16 @@ EXPECTED_VIEWS = {
     "insights calibration", "insights why", "insights forecast",
     "insights regression", "insights recommend",
     # EXPORT-SCOPE (2026-08-11): three report-shaped views v0.48.0's scope line missed.
-    # Keyed by PARSER LEAF PATH, which is what `_leaves()` walks — so `study` appears
-    # here bare even though its `view=` label is "study report": its action is a
-    # positional (`join|start|stop|report|id`), not a subparser, so the parser has no
-    # deeper leaf. `cmd_study` refuses `--export` on any action but `report`.
-    "authorship summary", "study", "task quality",
+    # Keyed by PARSER LEAF PATH, which is what `_leaves()` walks. `study report` is a
+    # real leaf since CLI-GAPS(b) converted the group to subparsers — before that the
+    # action was a positional, `--export` sat on the group where every marker verb could
+    # reach it, and `cmd_study` refused it at runtime.
+    "authorship summary", "study report", "task quality",
 }
 
-# The views whose `view=` label is not their parser leaf path (see above).
-VIEW_LABELS = {"study": "study report"}
+# Every exportable view's `view=` label is now its parser leaf path — `study` was the
+# last exception and lost it with the subparser conversion.
+VIEW_LABELS: dict[str, str] = {}
 
 
 @pytest.fixture(autouse=True)
@@ -342,14 +343,16 @@ def test_task_quality_exports_only_the_formats_it_has(go):
                                                    "task-quality.txt"]
 
 
-def test_a_study_marker_verb_refuses_export_rather_than_writing_one(go):
-    """`study`'s action is a POSITIONAL, so `--export` sits on the group and is reachable
-    from `join`/`start`/`stop`/`id` — none of which is a rendered view. It refuses, the
-    same way `--csv` already did; silently writing an artifact for a marker verb would be
-    worse than the refusal."""
+def test_a_study_marker_verb_cannot_EVEN_ASK_for_an_export(go, capsys):
+    """`report` is the only study verb that is a rendered view, so after CLI-GAPS(b) it
+    is the only one that carries `--export`. A marker verb no longer refuses at runtime
+    — the flag does not exist on it, and argparse says so (exit 2) before any code runs.
+    What must not change either way: no artifact is written for a marker verb."""
+    del capsys
     for action in ("id", "stop"):
-        out, err = go(["study", action, "--export"], expect_exit=1)
-        assert "apply to `cage study report` only" in (out + err)
+        with pytest.raises(SystemExit) as e:
+            cli.main(["study", action, "--export"])
+        assert e.value.code == 2
         assert not (go.root / ".cage" / "output").exists()
 
 

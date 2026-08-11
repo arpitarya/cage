@@ -109,6 +109,7 @@ def _live(pol: dict) -> dict:
         # live from the one pinned constant, never a hard-coded literal in the text
         "semconv": constants.OTEL_SEMCONV_VERSION,
         "semconv_status": constants.OTEL_SEMCONV_STATUS,
+        "semconv_source": constants.OTEL_SEMCONV_SOURCE,
         # the closed usage-row verdicts `insights adoption` reads (never re-derives) —
         # live from the one enumeration `usagelog.py` owns
         "outcomes": " · ".join(usagelog.OUTCOMES),

@@ -531,8 +531,16 @@ def build_parser() -> argparse.ArgumentParser:
     _json_flag(ls)
     ls.set_defaults(fn=clicmds.cmd_ledger_sync)
 
-    # ── group: prices (unchanged; positional-action pattern) ───────────────────
-    pr = sub.add_parser("prices",
+    # ── group: prices ──────────────────────────────────────────────────────────
+    # CLI-GAPS(b), closed 2026-08-11. These three groups took their action as a
+    # POSITIONAL CHOICE, which made the front door asymmetric with every other group in
+    # two ways a user actually hits: `cage prices set --help` rendered the *group's*
+    # help rather than `set`'s, and the flag list was a flat union — `--input` appeared
+    # under `list`, `--apply` under `diff`. Real subparsers give each action its own
+    # help and its own flags, and an inapplicable flag is now an argparse usage error
+    # (exit 2) instead of a runtime refusal. `set_defaults(action=…)` keeps the handler
+    # dispatch byte-identical, so `pricescmd`/`policysync`/`study` are untouched.
+    pr_g = sub.add_parser("prices",
                         help="manage the price tables the ledger reprices against: "
                              "list · unpriced · set · alias · route-tool · sync (§3.3)",
                         epilog="examples:\n"
@@ -546,35 +554,47 @@ def build_parser() -> argparse.ArgumentParser:
                                "derived views re-price immediately — the ledger is never rewritten.\n"
                                "cage never fetches a price: research is yours (vendor pricing page).",
                         formatter_class=argparse.RawDescriptionHelpFormatter)
-    pr.add_argument("action", choices=["list", "unpriced", "set", "alias", "route-tool",
-                                       "sync"],
-                    help="list=rows+origin+meta · unpriced=$0 models+fix lines · "
-                         "set=insert/update a project row · alias=route a router "
-                         "pseudo-model · route-tool=price a tool's call-less receipts "
-                         "(§4.5) · sync=diff vs the installed bundle")
-    pr.add_argument("provider", nargs="?", help="set/alias: provider key ('-' = the "
-                    "empty provider some router rows stamp) · route-tool: the tool name")
-    pr.add_argument("model", nargs="?", help="set/alias: model id exactly as `cage "
-                    "prices unpriced` printed it")
-    pr.add_argument("--input", type=float, help="set: USD per MTok of input")
-    pr.add_argument("--output", type=float, help="set: USD per MTok of output")
-    pr.add_argument("--cache-read", dest="cache_read", type=float,
-                    help="set: USD per MTok of cached input (default: 0.1× input)")
-    pr.add_argument("--to", help="alias/route-tool: target price row as <provider>/<model>")
-    pr.add_argument("--remove", action="store_true",
-                    help="route-tool: delete the tool's route from the managed block")
-    pr.add_argument("--update", action="store_true",
-                    help="sync: apply bundled values to rows confirmed via --yes; "
-                         "restamp [meta] (default: dry-run)")
-    pr.add_argument("--yes", action="append", metavar="PROV/MODEL",
-                    help="sync --update: confirm one drifted row (repeatable; 'all' "
-                         "confirms every drifted row)")
-    pr.add_argument("--since", metavar="WINDOW", help="unpriced: window like 7d / 2w")
-    _json_flag(pr)
-    pr.set_defaults(fn=clicmds.cmd_prices)
+    pr_g.set_defaults(fn=lambda _a, _g=pr_g: (_g.print_help(), 0)[1])
+    pr = pr_g.add_subparsers(dest="prices_cmd", metavar="<command>", required=False)
 
-    # ── group: study (unchanged; positional-action pattern) ────────────────────
-    st2 = sub.add_parser("study",
+    def _prices(name: str, help_text: str):
+        q = pr.add_parser(name, help=help_text)
+        _json_flag(q)
+        q.set_defaults(fn=clicmds.cmd_prices, action=name)
+        return q
+
+    _prices("list", "every visible price row: bundled vs project, with [meta]")
+    pr_un = _prices("unpriced", "models billing $0 today, each with a runnable fix line")
+    pr_un.add_argument("--since", metavar="WINDOW", help="window like 7d / 2w")
+    pr_set = _prices("set", "insert or update one project price row (# cage:custom)")
+    pr_set.add_argument("provider", help="provider key ('-' = the empty provider some "
+                        "router rows stamp)")
+    pr_set.add_argument("model", help="model id exactly as `cage prices unpriced` "
+                        "printed it")
+    pr_set.add_argument("--input", type=float, help="USD per MTok of input")
+    pr_set.add_argument("--output", type=float, help="USD per MTok of output")
+    pr_set.add_argument("--cache-read", dest="cache_read", type=float,
+                        help="USD per MTok of cached input (default: 0.1× input)")
+    pr_al = _prices("alias", "route a router pseudo-model at a real price row")
+    pr_al.add_argument("provider", help="provider key ('-' = the empty provider)")
+    pr_al.add_argument("model", help="the router pseudo-model to route")
+    pr_al.add_argument("--to", help="target price row as <provider>/<model>")
+    pr_rt = _prices("route-tool", "price a tool's call-less receipts (plan §4.5)")
+    pr_rt.add_argument("provider", metavar="TOOL", help="the tool name")
+    pr_rt.add_argument("model", nargs="?", help=argparse.SUPPRESS)
+    pr_rt.add_argument("--to", help="target price row as <provider>/<model>")
+    pr_rt.add_argument("--remove", action="store_true",
+                       help="delete the tool's route from the managed block")
+    pr_sy = _prices("sync", "diff the project rows against the installed bundle")
+    pr_sy.add_argument("--update", action="store_true",
+                       help="apply bundled values to rows confirmed via --yes; "
+                            "restamp [meta] (default: dry-run)")
+    pr_sy.add_argument("--yes", action="append", metavar="PROV/MODEL",
+                       help="confirm one drifted row (repeatable; 'all' confirms every "
+                            "drifted row)")
+
+    # ── group: study ───────────────────────────────────────────────────────────
+    st_g = sub.add_parser("study",
                          help="fleet study: recorded phases + paired-by-machine deltas "
                               "across laptops (plan §4.9)",
                          epilog="examples:\n"
@@ -585,20 +605,31 @@ def build_parser() -> argparse.ArgumentParser:
                                 "  cage import bundle*.zip       # analyst: merge bundles (idempotent)\n"
                                 "  cage study report             # coverage first, then the paired delta",
                          formatter_class=argparse.RawDescriptionHelpFormatter)
-    st2.add_argument("action", choices=["join", "start", "stop", "report", "id"],
-                     help="join=enroll+wire+start · start/stop=phase markers · "
-                          "report=coverage+paired delta · id=print the opaque machine id")
-    st2.add_argument("phase", nargs="?", help="phase label for join/start (one short token)")
-    _json_flag(st2)
-    _csv_flag(st2)
-    # `study` takes its action as a POSITIONAL, so these flags sit on the group and are
-    # meaningful for `report` only — exactly as `--csv` already is. `cmd_study` refuses
-    # them on any other action rather than writing an artifact for a marker verb.
-    _export_flags(st2, "study report")
-    st2.set_defaults(fn=clicmds.cmd_study)
+    st_g.set_defaults(fn=lambda _a, _g=st_g: (_g.print_help(), 0)[1])
+    st2 = st_g.add_subparsers(dest="study_cmd", metavar="<command>", required=False)
 
-    # ── group: policy (unchanged; positional-action pattern) ───────────────────
-    po = sub.add_parser("policy",
+    def _study(name: str, help_text: str):
+        q = st2.add_parser(name, help=help_text)
+        _json_flag(q)
+        q.set_defaults(fn=clicmds.cmd_study, action=name, phase=None)
+        return q
+
+    st_join = _study("join", "enroll this machine: wire + start + doctor")
+    st_join.add_argument("phase", help="phase label (one short token)")
+    st_start = _study("start", "switch phase (opaque machine id, no hostname)")
+    st_start.add_argument("phase", help="phase label (one short token)")
+    _study("stop", "end the current phase")
+    _study("id", "print the opaque machine id")
+    st_rep = _study("report", "coverage first, then the paired-by-machine delta")
+    # `report` is the ONLY study verb that is a rendered VIEW, so it is the only one
+    # that carries the artifact/CSV surface. Before CLI-GAPS(b) these sat on the group
+    # (the action was a positional) and `cmd_study` refused them at runtime; now a
+    # marker verb simply has no such flag, and argparse says so as a usage error.
+    _csv_flag(st_rep)
+    _export_flags(st_rep, "study report")
+
+    # ── group: policy ──────────────────────────────────────────────────────────
+    po_g = sub.add_parser("policy",
                         help="upgrade the project policy.toml to the installed "
                              "bundle: diff · sync (§3.10)",
                         epilog="examples:\n"
@@ -609,16 +640,23 @@ def build_parser() -> argparse.ArgumentParser:
                                "tables delegate to `cage prices sync` (its summary embeds here).\n"
                                "Nothing ever auto-applies this — hints recommend, humans run.",
                         formatter_class=argparse.RawDescriptionHelpFormatter)
-    po.add_argument("action", choices=["diff", "sync"],
-                    help="diff=dry-run categorized view · sync=same view; --apply writes")
-    po.add_argument("--apply", action="store_true",
-                    help="sync: write adds/updates and stamp [meta] policy_version "
-                         "(default: dry-run)")
-    po.add_argument("--yes", action="append", metavar="SECTION.KEY",
-                    help="sync --apply: confirm one non-reconstructable row "
-                         "(repeatable; 'all' confirms every one shown)")
-    _json_flag(po)
-    po.set_defaults(fn=clicmds.cmd_policy)
+    po_g.set_defaults(fn=lambda _a, _g=po_g: (_g.print_help(), 0)[1])
+    po = po_g.add_subparsers(dest="policy_cmd", metavar="<command>", required=False)
+
+    def _policy_cmd(name: str, help_text: str):
+        q = po.add_parser(name, help=help_text)
+        _json_flag(q)
+        q.set_defaults(fn=clicmds.cmd_policy, action=name, apply=False, yes=None)
+        return q
+
+    _policy_cmd("diff", "dry-run: add/update/keep/orphan categories")
+    po_sy = _policy_cmd("sync", "the same view; --apply writes")
+    po_sy.add_argument("--apply", action="store_true",
+                       help="write adds/updates and stamp [meta] policy_version "
+                            "(default: dry-run)")
+    po_sy.add_argument("--yes", action="append", metavar="SECTION.KEY",
+                       help="confirm one non-reconstructable row (repeatable; 'all' "
+                            "confirms every one shown)")
 
     # ── group: data (capture, export, and local adapters) ──────────────────────
     data = _group(sub, "data",

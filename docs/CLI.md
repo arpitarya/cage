@@ -322,21 +322,22 @@ and split by lifecycle: `set`/`sync` write **`prices.toml`** (vendor facts);
 | `cage prices route-tool TOOL` | price a tool's call-less receipts (plan §4.5) |
 | `cage prices sync` | diff vs the installed bundle (dry-run by default) |
 
-| Flag | Meaning |
-|---|---|
-| `--input F` | `set`: USD per MTok of input |
-| `--output F` | `set`: USD per MTok of output |
-| `--cache-read F` | `set`: USD per MTok of cached input (default: 0.1× input) |
-| `--to P/M` | `alias` / `route-tool`: target price row as `<provider>/<model>` |
-| `--remove` | `route-tool`: delete the tool's route from the managed block |
-| `--update` | `sync`: apply bundled values to rows confirmed via `--yes`; restamp `[meta]` |
-| `--yes PROV/MODEL` | `sync --update`: confirm one drifted row (repeatable; `all` confirms every one) |
-| `--since WINDOW` | `unpriced`: window like `7d` / `2w` |
-| `--json` | machine-readable output |
+Each action is a **real subparser** since 2026-08-11 (CLI-GAPS(b)), so it owns its own
+flags and its own `--help`; a flag named below appears on that action alone.
 
-The two positionals are shared across actions: `provider` (`-` means the empty provider
-some router rows stamp; for `route-tool` it is the tool name) and `model` (exactly as
-`cage prices unpriced` printed it).
+| Flag | Owner |
+|---|---|
+| `--input F` · `--output F` · `--cache-read F` | `set` — USD per MTok of input / output / cached input (cache-read defaults to 0.1× input) |
+| `--to P/M` | `alias` · `route-tool` — target price row as `<provider>/<model>` |
+| `--remove` | `route-tool` — delete the tool's route from the managed block |
+| `--update` | `sync` — apply bundled values to rows confirmed via `--yes`; restamp `[meta]` |
+| `--yes PROV/MODEL` | `sync` — confirm one drifted row (repeatable; `all` confirms every one) |
+| `--since WINDOW` | `unpriced` — window like `7d` / `2w` |
+| `--json` | every action |
+
+Positionals: `set`/`alias` take `PROVIDER MODEL` (`-` means the empty provider some
+router rows stamp; the model exactly as `cage prices unpriced` printed it);
+`route-tool` takes the tool name. Bare `cage prices` prints the action list.
 
 **cage never fetches a price** — research is yours, off the code path. Repricing is
 derive-time, so fixing the table re-prices every historical row; the ledger is never
@@ -354,10 +355,12 @@ unenrolled ledger stamps nothing and stays byte-identical to legacy.
 | `cage study join PHASE` | enroll this machine: wire + start + doctor |
 | `cage study start PHASE` | switch phase (one short token) |
 | `cage study stop` | end the current phase |
-| `cage study report` | coverage first, then the paired delta. **`--export`/`--stamp` apply to this action only** — `study`'s action is a positional, so the flags sit on the group; a marker verb (`join`/`start`/`stop`/`id`) refuses them rather than writing an artifact it has nothing to put in |
+| `cage study report` | coverage first, then the paired delta — the **only** study action that is a rendered view, and so the only one carrying `--csv`/`--export`/`--stamp`. A marker verb does not have those flags at all (argparse usage error, exit 2); it used to reach them from the group and refuse at runtime |
 | `cage study id` | print the opaque machine id (never a hostname) |
 
-Flags: `--json` · `--csv [PATH]`. The sample unit is the **machine-day**; the paired
+Flags: `--json` on every action; `--csv [PATH]` · `--export [PATH]` · `--stamp` on
+`report` only. Bare `cage study` prints the action list. The sample unit is the
+**machine-day**; the paired
 delta is `estimated` with a work-mix caveat, gated on `MIN_COMPARE_N`
 machines-with-both-phases.
 
@@ -370,11 +373,11 @@ machines-with-both-phases.
 | `cage policy diff` | dry-run categorized view (add / update / keep / orphan) |
 | `cage policy sync` | the same view; `--apply` writes |
 
-| Flag | Meaning |
+| Flag | Owner |
 |---|---|
-| `--apply` | `sync`: write adds/updates and stamp `[meta] policy_version` |
-| `--yes SECTION.KEY` | `sync --apply`: confirm one non-reconstructable row (repeatable; `all` confirms every one shown) |
-| `--json` | machine-readable output |
+| `--apply` | `sync` — write adds/updates and stamp `[meta] policy_version`. **Not a flag on `diff`** (CLI-GAPS(b)): passing it there is an argparse usage error, not a runtime refusal |
+| `--yes SECTION.KEY` | `sync` — confirm one non-reconstructable row (repeatable; `all` confirms every one shown) |
+| `--json` | every action |
 
 Customized values are never modified and orphans never deleted; pricing tables delegate
 to `cage prices sync`. **Nothing ever auto-applies this** — hints recommend, humans run.
@@ -473,17 +476,17 @@ entry to `verbmap`, update this file, then sweep every wire module, `install.sh`
 
 ## Known gaps
 
-Recorded here rather than quietly worked around. Both are tracked in
-[OPEN-WORK.md](OPEN-WORK.md).
+Recorded here rather than quietly worked around; tracked in [OPEN-WORK.md](OPEN-WORK.md).
 
-1. **`cage data migrate-savings` is missing from the front door.** `cage --help` lists
-   seven of `data`'s eight commands; `migrate-savings` parses and runs, but a reader of
-   the group listing would not know it exists.
-2. **`prices`, `study` and `policy` take their action as a positional choice, not a
-   subparser.** So `cage prices set --help` renders the *group's* help, and the group's
-   flags are a flat union across all six actions — `--input` shows on `list`, `--yes`
-   on `set`. The four real groups behave the other way. Converting them is a front-door
-   change and would re-bless goldens, so it is filed, not slipped in.
+**None open.** Both entries that stood here are closed:
+
+1. ~~`cage data migrate-savings` missing from the front door~~ — fixed 2026-08-03
+   (CLI-GAPS(a)); `cage --help` now lists all eight of `data`'s commands, and the front
+   door is gated bidirectionally against the live parser.
+2. ~~`prices`/`study`/`policy` take their action as a positional choice~~ — converted to
+   real subparsers 2026-08-11 (CLI-GAPS(b)). Each action now owns its `--help` and its
+   own flags, so an inapplicable flag is an argparse usage error (exit 2) instead of a
+   flat union plus a runtime refusal. Every group in cage now behaves the same way.
 
 ---
 

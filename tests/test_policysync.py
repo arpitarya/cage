@@ -276,8 +276,14 @@ def test_diff_is_dry_run_and_refuses_apply(v016, capsys):
     assert cli.main(["policy", "diff"]) == 0
     capsys.readouterr()
     assert _policy_path(v016).read_bytes() == before
-    assert cli.main(["policy", "diff", "--apply"]) == 1
-    assert "dry-run view" in capsys.readouterr().err
+    # CLI-GAPS(b): `--apply` belongs to `sync` and no longer exists on `diff`, so the
+    # parser rejects it (exit 2) before any code runs. It used to be a flat union of the
+    # group's flags and a runtime CageError.
+    with pytest.raises(SystemExit) as e:
+        cli.main(["policy", "diff", "--apply"])
+    assert e.value.code == 2
+    assert "unrecognized arguments: --apply" in capsys.readouterr().err
+    assert _policy_path(v016).read_bytes() == before
 
 
 def test_already_in_sync_message_on_current_file(root, capsys):

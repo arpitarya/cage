@@ -280,8 +280,14 @@ def test_route_tool_family_target_notes_match_kind(root, capsys):
 
 
 def test_route_tool_typed_errors(root, capsys):
-    for argv in (["prices", "route-tool"],                                  # no tool
-                 ["prices", "route-tool", "graphify"],                      # no --to
+    # CLI-GAPS(b): the tool name is now a REQUIRED positional on `route-tool`'s own
+    # parser, so omitting it is an argparse usage error (exit 2) rather than a runtime
+    # refusal — caught earlier, and `route-tool --help` now documents only its own flags.
+    with pytest.raises(SystemExit) as e:
+        cli.main(["prices", "route-tool"])
+    assert e.value.code == 2
+    capsys.readouterr()
+    for argv in (["prices", "route-tool", "graphify"],                      # no --to
                  ["prices", "route-tool", "graphify", "--to", "nomodel"],   # no slash
                  ["prices", "route-tool", "graphify", "--to", "/m"],        # empty provider
                  ["prices", "route-tool", "a b", "--to", "x/y"],            # not one token

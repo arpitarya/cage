@@ -10,6 +10,7 @@ from cage import (adoptcmd, agents, attribution, budget, compare, demo, doctorcm
                   origin, paths, policy, provenance, proxy, quality, recommend, regression,
                   render, report, roi, serve, tasks, verifycmd, watchcmd)
 from cage.cliutil import captured_read_root, csv_dest, emit, ledger_root, root
+from cage.constants import COMMITS_DEFAULT_ROWS
 from cage.errors import CageError
 
 
@@ -157,12 +158,16 @@ def cmd_commits(args) -> int:
     resolved and no dollar column can appear (`commitview.py`'s docstring)."""
     from cage import commitview
     r = captured_read_root(args)
-    # ⚠️ No default `--since` here, deliberately — see OPEN-WORK **COMMITS-WINDOW**.
-    # The per-commit `git show` makes this view's cost grow with the whole history
-    # (measured: 6.4s for 20 rows on a 123-commit repo), but a *relative* default window
-    # would put a wall clock in the default path: the same ledger would render
-    # differently next month with no code change. That is a product fork, not a fix.
-    data = commitview.summarize(r, _policy(r), since=args.since)
+    # ⚠️ Still no default `--since`, deliberately — a *relative* default window would put
+    # a wall clock in the default path (the same ledger renders differently next month
+    # with no code change). COMMITS-WINDOW closed 2026-08-11 with verdict **B** instead:
+    # the cost is bounded by the ROW CAP, the axis this view is already paged on, and
+    # only on the **text** path. `--csv`/`--json` stay complete (CSV is never truncated)
+    # and pay full cost — honestly, rather than accidentally; `--all` lifts it everywhere.
+    full = (getattr(args, "all", False) or csv_dest(args) is not None
+            or getattr(args, "json", False) or getattr(args, "export", None) is not None)
+    data = commitview.summarize(r, _policy(r), since=args.since,
+                                limit=None if full else COMMITS_DEFAULT_ROWS)
     return emit(args, render.envelope("commits", data) if args.json else data,
                 commitview.render_commits(data, show_all=getattr(args, "all", False)),
                 csv=lambda: commitview.render_csv(data), root=r)
@@ -425,16 +430,12 @@ def cmd_migrate_savings(args) -> int:
 def cmd_study(args) -> int:
     """Fleet-study verbs (plan §4.9). Markers/report act on the *active* ledger
     (capture lands there); `join` additionally wires this project's agents."""
+    # No runtime refusal for `--csv`/`--export`/`--stamp` on a marker verb any more:
+    # CLI-GAPS(b) gave each study action its own parser, and only `report` — the one
+    # rendered VIEW here — carries them. A marker verb no longer *has* the flag, so
+    # argparse rejects it as a usage error (exit 2) before this function is reached.
     from cage import machine, study
     r = ledger_root()
-    if args.action != "report" and getattr(args, "csv", None) is not None:
-        raise CageError("--csv applies to `cage study report` only")
-    if args.action != "report" and (getattr(args, "export", None) is not None
-                                    or getattr(args, "stamp", False)):
-        # Same reason as `--csv` above: the flags live on the group because the action is
-        # a positional, but only `report` is a rendered VIEW. A marker verb has no
-        # artifact to write, and silently writing one would be worse than refusing.
-        raise CageError("--export/--stamp apply to `cage study report` only")
     if args.action == "id":
         mid = machine.machine_id(r)
         print(mid if mid else "not enrolled — `cage study join <phase>` (or `start`) "
