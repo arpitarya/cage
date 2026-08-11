@@ -34,7 +34,7 @@ def test_otel_call_fields_and_duration(root, capsys):
     cli.main(["data", "export", "--otel", "--no-import"])
     doc = json.loads(capsys.readouterr().out)
     span = doc["calls"][0]
-    assert span["gen_ai.system"] == "anthropic"
+    assert span["gen_ai.provider.name"] == "anthropic"
     assert span["gen_ai.request.model"] == "claude-opus-4-8"
     assert span["gen_ai.usage.input_tokens"] == 100
     assert span["gen_ai.usage.output_tokens"] == 50
@@ -53,7 +53,31 @@ def test_semconv_version_pinned_and_stamped(root, capsys):
     cli.main(["data", "export", "--otel", "--no-import"])
     doc = json.loads(capsys.readouterr().out)
     assert doc["cage.meta"]["semconv"] == constants.OTEL_SEMCONV_VERSION
-    assert doc["cage.meta"]["semconv_status"] == "pre-stable"
+    assert doc["cage.meta"]["semconv_status"].startswith("pre-stable")
+
+
+def test_the_pin_states_what_it_pins_never_a_bare_number(root, capsys):
+    """OTEL-SEMCONV-PIN. `1.42.0` alone was ambiguous the moment the GenAI conventions
+    left the main repo — it could name a main-repo release (which no longer defines
+    `gen_ai.*`) or a GenAI-repo release (which does not exist). A version stamped with
+    no referent is an uncheckable claim, so the document carries both."""
+    _seed(root)
+    cli.main(["data", "export", "--otel", "--no-import"])
+    meta = json.loads(capsys.readouterr().out)["cage.meta"]
+    assert meta["semconv_means"] == constants.OTEL_SEMCONV_VERSION_MEANS
+    assert meta["semconv_source"] == "open-telemetry/semantic-conventions-genai"
+    # The GenAI repo is untagged, so its maturity is STATED, never given a fake version.
+    assert "untagged" in meta["semconv_status"]
+
+
+def test_the_deprecated_provider_attribute_is_gone_and_not_twinned(root, capsys):
+    """`gen_ai.system` was renamed in semconv v1.37.0, five releases before the version
+    this export pins. Emitting BOTH names was rejected — a consumer that sums rather
+    than coalesces would double-count — so exactly one provider key may appear."""
+    _seed(root)
+    cli.main(["data", "export", "--otel", "--no-import"])
+    call = json.loads(capsys.readouterr().out)["calls"][0]
+    assert "gen_ai.provider.name" in call and "gen_ai.system" not in call
 
 
 def test_receipt_carries_cage_namespaced_savings_never_gen_ai(root, capsys):
@@ -128,7 +152,7 @@ def test_otel_writes_to_file(root, tmp_path, capsys):
     out = root / "export.otel.json"
     assert cli.main(["data", "export", "--otel", "--no-import", "-o", str(out)]) == 0
     doc = json.loads(out.read_text())
-    assert doc["calls"][0]["gen_ai.system"] == "anthropic"
+    assert doc["calls"][0]["gen_ai.provider.name"] == "anthropic"
     assert "otel" in capsys.readouterr().err
 
 
@@ -156,7 +180,7 @@ def test_agent_project_filters_apply_to_calls_only(root, capsys):
         unit="tokens", method="modeled", confidence=0.6))
     cli.main(["data", "export", "--otel", "--no-import", "--agent", "copilot"])
     doc = json.loads(capsys.readouterr().out)
-    assert [c["gen_ai.system"] for c in doc["calls"]] == ["openai"]
+    assert [c["gen_ai.provider.name"] for c in doc["calls"]] == ["openai"]
     # the receipt (linked to the excluded claude call) still exports — receipts
     # have no agent field to filter on, and pricing needs the full call set.
     assert len(doc["cage.savings"]) == 1

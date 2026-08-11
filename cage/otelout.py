@@ -2,19 +2,28 @@
 (docs/archive/v0.39-otel-export.handoff.md). One-way REPORTING, exactly like `--csv`: never an
 import source, never combined with `--study` (the fleet bundle stays jsonl).
 
-**The GenAI semantic conventions are pre-stable.** As of the targeted version
-(`constants.OTEL_SEMCONV_VERSION`, June 2026) the `gen_ai.*` attributes live in a
-dedicated repo, carry no 1.0, and names can still change between releases. That
-collides with cage's determinism law — same ledger + policy ⇒ same output — so cage
-never silently follows upstream: the targeted version is pinned in one constant and
-stamped in every emitted document's `cage.meta` block, exactly like `[meta]
-prices_version`. A spec bump is a deliberate, changelog'd change.
+**The GenAI semantic conventions are pre-stable, and the pin says exactly what it
+pins.** On main-repo release **v1.42.0 (2026-06-12)** every `gen_ai.*` convention was
+deprecated in `open-telemetry/semantic-conventions` and moved to the dedicated
+`open-telemetry/semantic-conventions-genai`, which as of 2026-08-11 carries **no tagged
+release** and is still `Status: Development` throughout. So `OTEL_SEMCONV_VERSION` names
+the *last main-repo release that defined these names* — a checkable claim — and the repo
+and maturity are stamped beside it rather than a version number nobody could verify
+(OTEL-SEMCONV-PIN; the pin's trigger is the GenAI repo cutting its first tag). That
+discipline exists because the convention collides with cage's determinism law — same
+ledger + policy ⇒ same output — so cage never silently follows upstream: the target is
+pinned in one place and stamped in every emitted document's `cage.meta` block, exactly
+like `[meta] prices_version`. A spec bump is a deliberate, changelog'd change.
 
 **Calls → `gen_ai.*` attributes**, only the ones the convention defines and cage can
 back with an honest value:
 
-- `gen_ai.system` = the call's `provider`, `gen_ai.request.model` = its `model` —
-  always present, required substrate fields.
+- `gen_ai.provider.name` = the call's `provider`, `gen_ai.request.model` = its `model`
+  — always present, required substrate fields. It was `gen_ai.system` until 2026-08-11;
+  that spelling was **renamed in semconv v1.37.0**, five releases before the version
+  this export pins, so cage was emitting a deprecated attribute while claiming a target
+  that had already dropped it. Emitting both names during a transition was rejected —
+  a consumer that sums rather than coalesces would double-count.
 - `gen_ai.usage.input_tokens` / `gen_ai.usage.output_tokens` = `tokens_in` /
   `tokens_out` — always present; a call row's whole point is a recorded count.
 - `gen_ai.client.operation.duration` = `latency_ms / 1000` (seconds) — the one
@@ -42,7 +51,8 @@ stable per-row key order, LF pinned, no clock, no randomness.
 from __future__ import annotations
 
 from cage import convert, receiptprice
-from cage.constants import OTEL_SEMCONV_STATUS, OTEL_SEMCONV_VERSION
+from cage.constants import (OTEL_SEMCONV_SOURCE, OTEL_SEMCONV_STATUS,
+                            OTEL_SEMCONV_VERSION, OTEL_SEMCONV_VERSION_MEANS)
 
 
 def _is_legacy_human(r: dict) -> bool:
@@ -56,7 +66,13 @@ def _call_span(call: dict) -> dict:
     span = {
         "cage.id": call.get("id", ""),
         "cage.ts": call.get("ts", ""),
-        "gen_ai.system": call.get("provider", ""),
+        # `gen_ai.provider.name`, NOT `gen_ai.system` — renamed in semconv **v1.37.0**,
+        # five releases before the version this export pins, so emitting the old spelling
+        # was claiming a target that had already removed it. Renamed 2026-08-11
+        # (OTEL-SEMCONV-PIN). Emitting BOTH names was considered and rejected: a consumer
+        # that sums rather than coalesces would double-count, and cage would be shipping
+        # a shape no version of the spec defines.
+        "gen_ai.provider.name": call.get("provider", ""),
         "gen_ai.request.model": call.get("model", ""),
         "gen_ai.usage.input_tokens": int(call.get("tokens_in", 0)),
         "gen_ai.usage.output_tokens": int(call.get("tokens_out", 0)),
@@ -122,6 +138,8 @@ def render(calls: list[dict], receipts: list[dict], all_calls: list[dict], pol: 
     doc = {
         "cage.meta": {
             "semconv": OTEL_SEMCONV_VERSION,
+            "semconv_means": OTEL_SEMCONV_VERSION_MEANS,
+            "semconv_source": OTEL_SEMCONV_SOURCE,
             "semconv_status": OTEL_SEMCONV_STATUS,
             "legacy_human_excluded": len(legacy),
         },

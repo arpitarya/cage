@@ -209,16 +209,30 @@ NET_ATTRIB_WINDOW_S = 120
 # Not tuned against outcomes — it is an ordering claim (net < gross), not a measurement.
 NET_SAVED_CONFIDENCE = 0.4
 
-# OTel GenAI semantic-convention version cage's `--otel` export targets
-# (`cage/otelout.py`, docs/archive/v0.39-otel-export.handoff.md). **The convention is pre-stable**:
-# as of this version the `gen_ai.*` attributes live in a dedicated repo, carry no 1.0,
-# and names can still change between releases. Cage's determinism law — same ledger +
-# policy ⇒ same output — means cage never silently follows upstream: this is the ONE
-# pinned target, stamped in every emitted document's `cage.meta` block, exactly like
-# `[meta] prices_version`. Bumping it is a deliberate, changelog'd change, never a
-# silent drift with an upstream release.
+# The OTel GenAI semantic-convention target of `cage data export --otel`
+# (`cage/otelout.py`, docs/archive/v0.39-otel-export.handoff.md). Cage's determinism law
+# — same ledger + policy ⇒ same output — means cage never silently follows upstream:
+# this is the ONE pinned target, stamped in every emitted document's `cage.meta` block,
+# exactly like `[meta] prices_version`. Bumping it is a deliberate, changelog'd change.
+#
+# **What the number NAMES, because "1.42.0" alone was ambiguous** (OTEL-SEMCONV-PIN,
+# closed 2026-08-11; [research](docs/research/2026-08-03-otel-genai-semconv-pin.md)). On
+# **2026-06-12, main-repo release v1.42.0**, every `gen_ai.*` convention was deprecated
+# in `open-telemetry/semantic-conventions` and moved to the dedicated
+# `open-telemetry/semantic-conventions-genai`. So 1.42.0 is the **last main-repo release
+# that defined these names** — a checkable fact, and the right thing to pin — but it says
+# nothing about the GenAI repo's own evolution since.
+#
+# **The GenAI repo has no version to pin, and that is recorded rather than invented.**
+# It carries no tagged release, its changelog holds only an `## Unreleased` section, and
+# every span/metric/attribute is still `Status: Development`. Citing a number there would
+# be fabricated precision, so `OTEL_SEMCONV_SOURCE` names the repo and
+# `OTEL_SEMCONV_STATUS` states the maturity instead. Re-point `_VERSION` at the GenAI
+# repo's own scheme the moment it cuts a tagged release — that is this pin's trigger.
 OTEL_SEMCONV_VERSION = "1.42.0"
-OTEL_SEMCONV_STATUS = "pre-stable"
+OTEL_SEMCONV_VERSION_MEANS = "last semantic-conventions release defining gen_ai.* (2026-06-12)"
+OTEL_SEMCONV_SOURCE = "open-telemetry/semantic-conventions-genai"
+OTEL_SEMCONV_STATUS = "pre-stable (Development; source repo untagged)"
 
 # ── authorship line-matching (agent-vs-human v2, P1) ─────────────────────────
 # The minimum-content gate. A proposed/added line whose NORMALIZED form is shorter

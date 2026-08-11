@@ -1,7 +1,7 @@
 ---
 doc: research — what `OTEL_SEMCONV_VERSION = "1.42.0"` actually pins, and whether `gen_ai.system` is still true
 date: 2026-08-03
-status: findings — a decision is OPEN (see §4)
+status: findings — **the decision is CLOSED, 2026-08-11: option (3), with (1) falling out of it** (see §4a). Living spec: `cage/constants.py` OTEL_SEMCONV_* · `cage/otelout.py` · FORMULAS/`cage query otel-export`
 ---
 
 # The OTel GenAI pin: `gen_ai.system` is deprecated, and the version number may not mean what cage thinks
@@ -70,12 +70,47 @@ Recommendation: **(3), with (1) falling out of it.** The attribute name is a sym
 the pin's referent is the actual defect, and fixing the symptom alone would leave
 `cage.meta` making a claim nobody can check.
 
-## 5 · What did not change
+## 4a · The decision (2026-08-11) — and the fact that reshaped option 3
 
-`cage/otelout.py` and `constants.OTEL_SEMCONV_VERSION` are untouched. The other four
-REV-HARDEN P2 items shipped in v0.45.0; this one is filed here instead, in the same
-shape as REV-CREDITS defect 2 (a basis fork routed to a compare doc rather than decided
-inside a fix commit).
+**Taken: (3), with (1) falling out of it.** Implemented the same day; `cage/otelout.py`
+and the constants block are no longer untouched.
+
+**The new fact, verified 2026-08-11:** `open-telemetry/semantic-conventions-genai`
+**has no tagged release at all** — its releases page is empty, its changelog holds only
+an `## Unreleased` section, and every span, metric, event and attribute in it is still
+`Status: Development`. The split itself is dated: main-repo **v1.42.0, 2026-06-12**,
+which deprecated `model/gen-ai/`, `model/openai/` and `model/mcp/` there and moved them.
+
+That kills option 3 *as written* — there is no GenAI-repo version to re-point the pin at
+— but it resolves the ambiguity in §2 completely, which was option 3's actual goal:
+
+| what cage now stamps | value | why it is checkable |
+|---|---|---|
+| `semconv` | `1.42.0` | the **last main-repo release that defined `gen_ai.*`** — a dated, verifiable fact |
+| `semconv_means` | that sentence, verbatim | the referent is stated, so the number cannot be read the wrong way |
+| `semconv_source` | `open-telemetry/semantic-conventions-genai` | where the names live *now* |
+| `semconv_status` | `pre-stable (Development; source repo untagged)` | maturity **stated**, not given a fabricated version |
+
+**No number was invented for the GenAI repo**, which is the whole discipline: a pin that
+cites an unverifiable version is worse than one that says why it cannot.
+
+**(1) fell out:** `gen_ai.system` → `gen_ai.provider.name`. It was deprecated five
+releases *before* the pinned one, so once the pin's referent is stated the old spelling
+is simply wrong. **Emitting both was rejected** on §3's grounds — a consumer that sums
+rather than coalesces would double-count. This is a **breaking change** for anything
+reading cage's `--otel` output; it is in the changelog with the migration.
+
+**The pin's trigger:** re-point `OTEL_SEMCONV_VERSION` at the GenAI repo's own scheme
+the moment that repo cuts its **first tagged release**. Not on an argument, not on a
+blog post — on a tag.
+
+## 5 · What did not change *(as of 2026-08-03 — superseded by §4a)*
+
+At the time of writing, `cage/otelout.py` and `constants.OTEL_SEMCONV_VERSION` were
+untouched. The other four REV-HARDEN P2 items shipped in v0.45.0; this one was filed
+here instead, in the same shape as REV-CREDITS defect 2 (a basis fork routed to a
+compare doc rather than decided inside a fix commit). **Both were decided and built on
+2026-08-11** — §4a above for this one.
 
 ## Sources
 
@@ -83,3 +118,9 @@ inside a fix commit).
 - [semantic-conventions releases](https://github.com/open-telemetry/semantic-conventions/releases)
 - [spring-ai #6668 — `gen_ai.system` deprecated, renamed to `gen_ai.provider.name`](https://github.com/spring-projects/spring-ai/issues/6668)
 - [The state of the OpenTelemetry GenAI semantic conventions (July 2026)](https://john-hodge.com/blog/opentelemetry-genai-semantic-conventions/)
+
+### Added 2026-08-11 (the §4a verification)
+
+- [open-telemetry/semantic-conventions-genai — releases](https://github.com/open-telemetry/semantic-conventions-genai/releases) — empty; no tag exists to pin
+- [OpenTelemetry's GenAI semantic conventions are NOT stable yet — what actually shipped in 2026](https://dev.to/azena-ai/opentelemetrys-genai-semantic-conventions-are-not-stable-yet-heres-what-actually-shipped-in-2026-3mke) — dates the split at main-repo v1.42.0, 2026-06-12
+- [Inside the LLM Call: GenAI Observability with OpenTelemetry](https://opentelemetry.io/blog/2026/genai-observability/)
