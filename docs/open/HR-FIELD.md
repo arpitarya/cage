@@ -1,0 +1,26 @@
+---
+item: HR-FIELD
+lane: your hands · standing note, not a task
+status: parked on you working in a second repo
+raised: 2026-08-02
+---
+
+# HR-FIELD — is the four-bucket split honest on a repo that isn't cage?
+
+**The bias is known and named.** The split has only ever been read on cage's own repo,
+which is unusually doc- and artifact-heavy: **80% `unattributed`**.
+
+Commands: [FIELD-RUNBOOK §4](../FIELD-RUNBOOK.md).
+
+## Decide the reading before you look
+
+| result on a code-heavy repo | conclusion |
+|---|---|
+| `unattributed` **drops** | the buckets are fine; cage's own repo was the outlier. **Close.** |
+| `unattributed` **still dominates** | the buckets are not the problem — **the per-file table is the surface that needs work.** Re-scopes the item rather than closing it |
+
+## Why it is a note, not a task
+
+It waits on you organically working in a second repo. Nobody is going to schedule this.
+Left in the queue as a standing note so the 80% figure is never quoted as a property of
+the *feature* when it is a property of *this repo*.

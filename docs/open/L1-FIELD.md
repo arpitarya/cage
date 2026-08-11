@@ -1,0 +1,63 @@
+---
+item: L1-FIELD
+lane: your hands (one sub-question is agent-buildable)
+status: open · 1 of 3 legs verified · Q3 answered 2026-08-12 (one residual, parked)
+raised: 2026-08-02
+---
+
+# L1-FIELD — do the copilot and kiro hooks actually fire?
+
+**Claude leg verified 2026-08-02.** Copilot and kiro have **never** been wired on a real
+machine, while `cage setup --status` already tells users auto-close is wired. That is a
+live honesty defect in shipped output, not a nice-to-have.
+
+Commands: [FIELD-RUNBOOK §1](../FIELD-RUNBOOK.md).
+
+## Three open questions
+
+| # | question | who can answer |
+|---|---|---|
+| 1 | does the copilot hook fire on a real Copilot? | your hands |
+| 2 | does the kiro hook fire on a real Kiro? | your hands |
+| 3 | ~~why does the attested-by-hook table read ZERO~~ **ANSWERED 2026-08-12** — one residual left, below | an agent, on the dev ledger — done |
+
+**Q3's cause: three producers hashed `args_hash` over different input.** The shim route
+folded in `argv[0]` — an absolute, machine-specific path — while the hook and the
+transcript route both hash the tail. The exact join could not fire.
+[Full finding](../regression/2026-08-12-l1-attest-args-hash-mismatch.md) ·
+raised by the [adopt-cov read](../regression/2026-08-11-adopt-cov-dev-ledger-read.md) §3.
+
+Fixed forward-only in `graphifymeter.run`; pinned by
+`test_the_real_interceptor_writes_a_row_the_attestation_can_join`, which fails without it
+with the exact field symptom. **The dev ledger's table stays empty until new runs land** —
+rows are never rewritten, so today's zero is history, not a live defect.
+
+**What Q3 leaves open — one residual, and it is not agent-buildable either:** the hook
+attests a *shell command line* and the interceptor an *argv*, so a piped invocation still
+misses, and all three real attestations are piped. Parked as
+[attest-join-command-normalization](../proposals/attest-join-command-normalization.proposal.md);
+its trigger is **a real join being observed** after the argv[0] fix — which needs Q1/Q2's
+hands, not an agent. A third cause (an attested run with no usage row at all) is
+**reported, not fixed**: half A counts runs the breadcrumb saw, and inventing one for a
+run cage did not observe is the fabrication this view exists to prevent.
+
+## What counts as a result (Q1/Q2)
+
+| observation | meaning |
+|---|---|
+| `attest.jsonl` grows during ordinary work | hook is host-fired and live |
+| file unchanged after real use | hook is **not** firing — report it, do not re-wire and retry |
+| `--status` says wired but nothing fires | status is asserting, not checking |
+
+## Traps
+
+- `cage setup --hooks` is **OFF by default** and re-running `cage setup` without it
+  **removes the hooks again**. A mid-test re-run silently unwires you.
+- Do the ten minutes of work **unscripted**. A driven session answers a different question.
+
+## Standing tension — do not resolve by one green run
+
+`attest.LIMIT` says hooks are CLI-only, but a `PreToolUse` hook fired inside a VS Code
+session ([finding](../regression/2026-08-02-finding-hooks-fire-in-vscode-extension.md)).
+Until this resolves: do not present L1's agent identity or auto task-close as "cage knows
+which agent ran" — **and do not delete the limit either.**
