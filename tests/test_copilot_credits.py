@@ -517,3 +517,88 @@ def test_rate_is_not_env_overridable(root, monkeypatch):
     c = _call(root, "c1", credits=2.0)
     pol = load_policy(paths.Footprint(root).policy)
     assert prices.call_usd_match(pol, c)[1] != creditprice.MATCH
+
+
+# ── REV-CREDITS defect 2 · one basis per shutdown (closed 2026-08-11) ─────────
+
+def _multi_model_shutdown(tmp_path, credits: float = 3.0):
+    """One shutdown, three models. GitHub computes `totalPremiumRequests` over ALL of
+    them, so exactly one row can carry it — and the other two must not then price a
+    second time off the token table."""
+    ev = tmp_path / "events.jsonl"
+    ev.write_text(json.dumps({
+        "type": "session.shutdown", "timestamp": "2026-06-14T11:00:00Z",
+        "data": {"totalPremiumRequests": credits, "modelMetrics": {
+            "claude-haiku-4.5": {"usage": {"inputTokens": 100, "outputTokens": 10}},
+            "claude-sonnet-4-6": {"usage": {"inputTokens": 9000, "outputTokens": 900}},
+            "gpt-5": {"usage": {"inputTokens": 500, "outputTokens": 50}}}}}) + "\n",
+        encoding="utf-8")
+    return transcript.parse_copilot_calls(ev, session="0f3c2b1a")
+
+
+def test_a_multi_model_shutdown_links_every_sibling_to_its_carrier(tmp_path):
+    """Fails before the fix: the two non-carrier rows carried no link at all, so
+    nothing downstream could tell that their billing had already been counted."""
+    rows = _multi_model_shutdown(tmp_path)
+    assert len(rows) == 3
+    carrier = [r for r in rows if "credits" in r]
+    assert len(carrier) == 1 and carrier[0]["model"] == "claude-sonnet-4-6"
+    others = [r for r in rows if r is not carrier[0]]
+    assert all(r["billed_with"] == carrier[0]["id"] for r in others)
+    assert "billed_with" not in carrier[0]      # a carrier bills for itself
+
+
+def test_the_shutdown_is_billed_once_not_once_per_model(tmp_path):
+    """THE defect. With a rate configured the carrier priced GitHub's figure for the
+    WHOLE shutdown and its two siblings priced their own tokens at cage's list rates —
+    the same spend billed twice, on two bases, inside one shutdown."""
+    from cage import prices
+    pol = {"billing": {"copilot": {"usd_per_credit": 0.04}},
+           "prices": {"copilot": {"claude-haiku-4.5": {"in_per_mtok": 1.0,
+                                                       "out_per_mtok": 5.0},
+                                  "gpt-5": {"in_per_mtok": 1.0, "out_per_mtok": 5.0}}}}
+    rows = _multi_model_shutdown(tmp_path, credits=3.0)
+    priced = [prices.call_usd_match(pol, r) for r in rows]
+    assert sum(usd for usd, _m, _k in priced) == pytest.approx(0.12)   # 3.0 × $0.04
+    assert {m for _u, m, _k in priced} == {"credits"}                  # ONE basis
+    # …and the $0 rows name where their dollars went, so it is never a bare zero.
+    zeros = [k for u, _m, k in priced if u == 0.0]
+    assert len(zeros) == 2 and all(k and k.startswith("c_cop") for k in zeros)
+
+
+def test_with_no_rate_the_whole_shutdown_falls_through_together(tmp_path):
+    """The suppression is conditional on the carrier actually pricing by credits. With
+    no `[billing.copilot] usd_per_credit` the carrier drops to rung 2, so its siblings
+    must too — otherwise the shutdown would price at one model's tokens, not all three."""
+    from cage import prices
+    rows = _multi_model_shutdown(tmp_path)
+    table: dict = {}
+    for r in rows:            # two of the three share a provider — merge, never clobber
+        table.setdefault(r["provider"], {})[r["model"]] = {
+            "input": 1.0, "output": 5.0, "cache_read": 0.1}
+    pol = {"prices": table}
+    matches = [prices.call_usd_match(pol, r)[1] for r in rows]
+    assert "credits" not in matches and all(m != "none" for m in matches)
+
+
+def test_a_shutdown_with_no_credits_is_byte_identical(tmp_path):
+    """No credit delta ⇒ no group basis to suppress ⇒ nothing stamped. The additive
+    field must never appear on a row that bills for itself."""
+    ev = tmp_path / "events.jsonl"
+    ev.write_text(json.dumps({
+        "type": "session.shutdown", "timestamp": "2026-06-14T11:00:00Z",
+        "data": {"modelMetrics": {
+            "claude-haiku-4.5": {"usage": {"inputTokens": 100, "outputTokens": 10}},
+            "gpt-5": {"usage": {"inputTokens": 500, "outputTokens": 50}}}}}) + "\n",
+        encoding="utf-8")
+    rows = transcript.parse_copilot_calls(ev, session="0f3c2b1a")
+    assert len(rows) == 2 and all("billed_with" not in r for r in rows)
+
+
+def test_a_recorded_zero_credit_still_covers_its_siblings(tmp_path):
+    """`is not None`, never truthiness: a shutdown that billed a real 0.0 has still been
+    billed as a group, so its siblings are still covered and must not price at tokens."""
+    rows = _multi_model_shutdown(tmp_path, credits=0.0)
+    carrier = [r for r in rows if r.get("credits") == 0.0]
+    assert len(carrier) == 1
+    assert sum("billed_with" in r for r in rows) == 2

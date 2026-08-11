@@ -24,10 +24,10 @@ Naming: `<topic>.compare.md`. Written in short points, not walls of prose.
 - [commits-view-cost-bound.compare.md](commits-view-cost-bound.compare.md) —
   **COMMITS-WINDOW**: `cage insights commits` costs one `git show` per commit in the
   whole history to print 20 rows (measured 6.4s / 123 commits). Three options (a default
-  relative `--since` · cap the READ by the row cap · leave it). **Proposed verdict B**;
-  A is rejected on the determinism law — a relative default puts a wall clock in the
-  default path — and on the measurement, since 90d cut zero commits here. Awaiting
-  Arpit's accept or override.
+  relative `--since` · cap the READ by the row cap · leave it). **DECIDED — B accepted 2026-08-11, built** (`commitview.summarize(limit=…)`, text path
+  only; dropped commits footnoted as *not read*);
+  A was rejected on the determinism law — a relative default puts a wall clock in the
+  default path — and on the measurement, since 90d cut zero commits here.
 - [gf-launcher-metering.compare.md](gf-launcher-metering.compare.md) — **GF-LAUNCHER**:
   how the graphify interceptor reaches cage when `--python-launcher` leaves no `cage` on
   PATH. Three options (setup-time twin variants · a runtime interpreter arm · accept the
@@ -35,13 +35,13 @@ Naming: `<topic>.compare.md`. Written in short points, not walls of prose.
 - [copilot-pricing-basis.compare.md](copilot-pricing-basis.compare.md) — Copilot
   cost: credits vs tokens vs both. **Proposed verdict C — both, one job each**
   (credits = what was billed; tokens = the cross-agent denominator), joined by a
-  ladder, never blended. **DECIDED — C accepted 2026-08-02 · IMPLEMENTED v0.44**
-  (unreleased). Living spec: [FORMULAS.md §1.1a](../FORMULAS.md) ·
+  ladder, never blended. **DECIDED — C accepted 2026-08-02 · IMPLEMENTED v0.44 · RELEASED**
+  (v0.44.0; corrected 2026-08-11 — this line said "unreleased" for nine days). Living spec: [FORMULAS.md §1.1a](../FORMULAS.md) ·
   [PLAN.md §3.1](../PLAN.md) · `cage query copilot-credits`; the proposal it graduated
   through is [archived](../archive/v0.44-copilot-credits.proposal.md).
 - [view-export-and-run-stamp.compare.md](view-export-and-run-stamp.compare.md) — the
   artifact surface: where a generated-at stamp may live, whether a read command writes a
-  file, and what bare `--export` produces. **DECIDED 2026-08-10 · IMPLEMENTED v0.48**
-  (unreleased): an artifact-only metadata block, `--export` as a capability not a side
+  file, and what bare `--export` produces. **DECIDED 2026-08-10 · IMPLEMENTED v0.48 · RELEASED** (v0.48.0, PyPI
+  2026-08-10; corrected 2026-08-11 — this line said "unreleased" the day after it shipped): an artifact-only metadata block, `--export` as a capability not a side
   effect, all available formats per run. Living spec: [CLI.md](../CLI.md) §Export flags ·
   `cage query view-export`.

@@ -34,6 +34,11 @@ def call_usd_match(pol: dict, call: dict) -> tuple[float, str, str | None]:
     here is inherited everywhere, with no per-view fork; that is why the credit ladder
     lands here rather than in any view.
 
+    Rung 0 (``credits``, matched key = the carrier's id) fires when the row carries a
+    `billed_with` link: the provider computed ONE billed figure over a group of calls and
+    it is already on the carrier, so this row contributes **$0.00 on the credits basis**
+    rather than being priced a second time off the token table (REV-CREDITS defect 2).
+
     Rung 1 (``credits``, `cage/creditprice.py`) wins when the row carries a **recorded
     billed credit** and a `[billing.<agent>] usd_per_credit` rate is configured — the
     provider's own computation beats cage's price table, and it prices `copilot/auto`,
@@ -53,6 +58,13 @@ def call_usd_match(pol: dict, call: dict) -> tuple[float, str, str | None]:
     (which resolves no model at all — that is the point of the rung).
     """
     from cage import creditprice
+    # Rung 0 — this row's billing lives on ANOTHER row (`billed_with`). Suppressed only
+    # when a rate exists for the agent, because that is exactly when the carrier actually
+    # priced by credits; with no rate the carrier falls through to rung 2 and so must its
+    # siblings, or the group would price at one model's tokens instead of all of them.
+    if (carrier := creditprice.billed_elsewhere(call)) and \
+            creditprice.rate_for(pol, call) is not None:
+        return 0.0, creditprice.MATCH, carrier
     credit_usd = creditprice.resolve(pol, call)
     if credit_usd is not None:
         return credit_usd, creditprice.MATCH, None

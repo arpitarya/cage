@@ -25,7 +25,8 @@ ORIGINS = ("human", "agent", "agent-autonomous", "unknown")
 CALL_FIELDS = ("id", "ts", "session", "task", "agent", "route", "provider", "model",
                "tokens_in", "tokens_out", "cached_in", "est_cost_usd",
                "latency_ms", "ok", "retries", "scope", "project",
-               "surface", "cache_write_in", "premium", "import_id", "credits")
+               "surface", "cache_write_in", "premium", "import_id", "credits",
+               "billed_with")
 RECEIPT_FIELDS = ("id", "ts", "call", "task", "tool", "unit", "raw_alternative",
                   "actual", "saved", "method", "confidence", "meta", "scope")
 SAVINGS_FIELDS = ("id", "ts", "import_id", "tool", "op", "session", "task", "unit",
@@ -70,6 +71,7 @@ def make_call(*, route: str, provider: str, model: str, tokens_in: int = 0,
               scope: str = "", project: str = "",
               surface: str = "", cache_write_in: int = 0, premium: int = 0,
               import_id: str = "", credits: float | None = None,
+              billed_with: str = "",
               ts: str | None = None, call_id: str | None = None) -> dict:
     """One ground-truth call row. `cached_in` ⊆ `tokens_in` (billed at discount).
 
@@ -125,6 +127,25 @@ def make_call(*, route: str, provider: str, model: str, tokens_in: int = 0,
       from tokens in either direction, so absence must stay absence**. Float, verbatim —
       the unit is deliberately not interpreted, so a vendor-side unit shift changes
       labels, never invents numbers. Never part of any id.
+    - `billed_with` — the id of the row that carries **this row's billing**, when the
+      provider computed ONE billed figure over a GROUP of calls (REV-CREDITS defect 2,
+      closed 2026-08-11; verdict *one basis per shutdown* in
+      `docs/compare/copilot-pricing-basis.compare.md`). A copilot-CLI `session.shutdown`
+      reports `totalPremiumRequests` over **every** model in that shutdown, so stamping
+      the delta on one row while its siblings fell through to tokens×table priced the
+      same spend twice — once billed, once at list rates.
+
+      It is a **recorded structural fact** (these rows came out of one shutdown, whose
+      billing the provider computed jointly), never a derived number. That distinction is
+      the whole reason the other option — splitting the credit pro-rata across the rows
+      by token share — was **rejected**: it would derive per-row credits from tokens,
+      which the standing `prices.toml` rule forbids in both directions.
+
+      Empty for every row that bills for itself, so an unstamped row is byte-identical to
+      the legacy contract. Never part of any id. `prices.call_usd_match` reads it as a
+      rung-0 suppression: a stamped row prices at **$0.00 on the credits basis**, with the
+      carrier's id as the matched key — *priced, elsewhere, by name*, which is neither a
+      fabricated zero nor UNPRICED.
     """
     row = {"id": call_id or ids.new_id("c"), "ts": ts or _now(), "session": session, "task": task,
            "agent": agent, "route": route, "provider": provider, "model": model,
@@ -142,6 +163,8 @@ def make_call(*, route: str, provider: str, model: str, tokens_in: int = 0,
         row["import_id"] = str(import_id)
     if credits is not None:   # `is not None`, never truthiness — 0.0 is a recorded zero
         row["credits"] = float(credits)
+    if billed_with:
+        row["billed_with"] = str(billed_with)
     return row
 
 

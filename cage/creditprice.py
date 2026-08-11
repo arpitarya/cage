@@ -1,14 +1,26 @@
 """The copilot pricing ladder — rung 1, recorded credits × your configured rate
 (COPILOT-CREDITS; verdict C of docs/archive/*copilot-pricing-basis.compare.md).
 
-A copilot row's USD resolves by a three-rung ladder, one rung per row, best signal
-first — the exact shape `receiptprice` uses for call-less token receipts:
+A copilot row's USD resolves by a four-rung ladder (rung 0 below), one rung per row,
+best signal first — the exact shape `receiptprice` uses for call-less token receipts:
 
 1. **credits × rate** — the row carries a recorded `credits` figure AND
    `[billing.<agent>] usd_per_credit` is set. This module.
 2. **tokens × price-table** — the existing exact/alias/family matching, unchanged
    (`policy.price_match`). Reached whenever rung 1 has nothing to say.
 3. **UNPRICED** — loud, counted, with runnable fix lines, exactly as today.
+
+**Rung 0 — billed on another row** (`billed_with`, REV-CREDITS defect 2). Some providers
+compute ONE billed figure over a GROUP of calls: a copilot-CLI `session.shutdown` reports
+`totalPremiumRequests` across **every** model in it. That figure lands on one carrier row,
+and every other row of the group carries a link to it. Such a row prices at **$0.00 on
+the credits basis** — *priced, elsewhere, by name* — because rung 2 would otherwise bill
+the same spend twice, once at GitHub's rate and once at cage's list rates. It reports the
+**same** `credits` match kind as rung 1 rather than a fourth one, deliberately: the
+shutdown priced on ONE basis, so every consumer that already excludes a credits-priced
+row from token-derived reasoning (report's `cache_usd` split, the mixed-basis footnote,
+`method_for`) inherits the right behaviour with no per-view fork. The carrier's id comes
+back as the matched key, so the link is never invisible.
 
 **Why rung 1 goes first.** Since 2026-06-01 Copilot bills usage-based AI Credits
 "calculated based on token consumption … using the listed API rates for each model"
@@ -83,6 +95,20 @@ def recorded(call: dict) -> float | None:
     if isinstance(v, bool) or not isinstance(v, (int, float)):
         return None
     return float(v)
+
+
+def billed_elsewhere(call: dict) -> str:
+    """The id of the row carrying this row's billing, or ``""`` when it bills for itself.
+
+    The ONE reader of `billed_with`, for the same reason `recorded` is the one reader of
+    `credits`: the *one basis per shutdown* rule (REV-CREDITS defect 2) has to mean the
+    same thing everywhere it is consulted. A provider that computes a single billed
+    figure over a group of calls has priced that group **once**; letting the group's
+    other rows fall through to rung 2 would price the same spend a second time at cage's
+    list rates. Non-string values are ``""`` — a malformed link suppresses nothing, which
+    fails toward the pre-existing behaviour rather than toward a silent $0."""
+    v = call.get("billed_with")
+    return v if isinstance(v, str) else ""
 
 
 def rate_for(pol: dict, call: dict) -> float | None:

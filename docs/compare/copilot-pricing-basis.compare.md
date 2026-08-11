@@ -1,6 +1,6 @@
 ---
 doc: compare — pricing basis for Copilot usage
-status: DECIDED — verdict C accepted by Arpit 2026-08-02; IMPLEMENTED v0.44 (unreleased) — living spec: ../FORMULAS.md §1.1a · ../PLAN.md §3.1 · `cage query copilot-credits`; the proposal it graduated through is archived at ../archive/v0.44-copilot-credits.proposal.md
+status: DECIDED — verdict C accepted by Arpit 2026-08-02, IMPLEMENTED v0.44; **reopened and re-decided 2026-08-11 for the multi-model shutdown (REV-CREDITS defect 2), IMPLEMENTED same day** — living spec: ../FORMULAS.md §1.1a · ../PLAN.md §3.1 · `cage query copilot-credits`; the proposal it graduated through is archived at ../archive/v0.44-copilot-credits.proposal.md
 raised: 2026-08-02 (fork surfaced by COPILOT-CREDITS — the store persists the billed credits cage drops)
 evidence: ../research/copilot-vscode-token-sources.md
 ---
@@ -120,6 +120,58 @@ actually routed to, GitHub's current rates).
 **Deliberately not taken:** deriving credits from tokens when unrecorded (forbidden
 by the standing `prices.toml` rule — absence stays absence); nano-AIU→USD conversion
 without a published rate card (would be invented precision).
+
+---
+
+## Reopened 2026-08-11 — the multi-model shutdown (REV-CREDITS defect 2) · **DECIDED**
+
+**Verdict: one basis per shutdown, carried by a recorded link.** Implemented same day.
+
+**The fork.** GitHub computes `totalPremiumRequests` over **every** model in a
+`session.shutdown`. Cage stamps that delta on one carrier row (largest token mover), so a
+multi-model shutdown priced the carrier by credits — GitHub's figure for the *whole*
+shutdown — while its siblings fell through to tokens×table. Rule 4 above says a cell
+never blends the axes; this blended them **inside one shutdown**, and it double-billed:
+the same spend counted once at GitHub's rate and again at cage's list rates.
+
+| # | option | verdict |
+|---|---|---|
+| **1** | split the credit **pro-rata by token share** across the shutdown's rows | ❌ **rejected** — it derives per-row credits *from tokens*, which the standing `prices.toml` rule forbids in **both** directions. It would also invent a per-model precision GitHub never published |
+| **2** | **one basis per shutdown** — the group prices once, on the carrier | ✅ **taken** |
+| **3** | leave it; footnote the double count | ❌ a footnote does not stop a wrong total being summed |
+
+**How 2 is made real without a derived number.** Every non-carrier row of a
+credit-bearing shutdown is stamped `billed_with = <carrier id>` — an additive-optional
+call field that is a **recorded structural fact** (these rows came out of one shutdown,
+whose billing the provider computed jointly), not a computation. `prices.call_usd_match`
+reads it as **rung 0**: the row prices at `$0.00` on the *credits* basis, with the
+carrier's id as the matched key — *priced, elsewhere, by name*, which is neither a
+fabricated `$0` nor UNPRICED.
+
+Three properties that made it the cheap option:
+
+- It reports the **same `credits` match kind** as rung 1, so every consumer already
+  excluding a credits-priced row from token-derived reasoning (report's `cache_usd`
+  split, the mixed-basis footnote, `method_for`) inherits it with **no per-view fork**.
+- The suppression is **conditional on a rate existing**. With none, the carrier itself
+  drops to rung 2, so its siblings must too — otherwise the shutdown would price at one
+  model's tokens instead of all of them.
+- A recorded `0.0` credit still covers the group (`is not None`, never truthiness): the
+  shutdown *was* billed as a group, and it billed zero.
+
+**The limit, stated not hidden — this fix is FORWARD-ONLY.** The ledger is append-only
+and rows are never rewritten, so multi-model shutdown rows captured before this change
+carry no link and still price on two bases. A re-import cannot heal them: `append_new`
+dedupes on the deterministic id. Carried in OPEN-WORK as **CREDITS-LEGACY-SPLIT**.
+
+### Reopen triggers for this half
+
+- **R4:** a provider other than copilot starts reporting a group-level billed figure →
+  `billed_with` is already agent-neutral, but re-check that "the carrier is the largest
+  token mover" is still the right pick for that store's shape.
+- **R5:** GitHub begins publishing `totalPremiumRequests` **per model** → rung 0 is no
+  longer needed for that store; each row carries its own credit and prices on rung 1.
+  Reopen with a store probe, not an argument.
 
 Graduates to: the COPILOT-CREDITS plan entry (capture) + a pricing-ladder line in
 FORMULAS on ship; ADR if the ladder rule proves load-bearing.

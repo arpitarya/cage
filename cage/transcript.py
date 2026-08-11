@@ -542,8 +542,20 @@ def _place_billing_delta(emitted: list[tuple[int, dict]], prem_delta: int,
     is deterministic (a re-parse produces byte-identical rows), explicable, and
     independent of `modelMetrics`' dict order. It is *not* an attribution claim: the
     counter is computed by GitHub over the whole shutdown, so no single row truly owns
-    it. Splitting it across the rows is a genuine basis fork and belongs in
-    `docs/compare/copilot-pricing-basis.compare.md`, not in a defect fix.
+    it.
+
+    **Which is why every OTHER row of a credit-bearing shutdown is stamped
+    `billed_with = <carrier id>`** (REV-CREDITS defect 2, closed 2026-08-11 — the fork
+    the docstring used to route to the compare doc, now decided there as *one basis per
+    shutdown*). Without it the carrier priced by credits — GitHub's figure for the
+    **whole** shutdown — while its siblings fell through to tokens×table, so a
+    multi-model shutdown billed the same spend twice, once at GitHub's rate and once at
+    cage's list rates. The link is a recorded structural fact about the shutdown; the
+    alternative, splitting the credit pro-rata by token share, was rejected for deriving
+    per-row credits from tokens, which is forbidden in both directions.
+
+    **A shutdown with no credit delta stamps nothing** — there is no group basis to
+    suppress, and its rows price by tokens exactly as before (byte-identical).
 
     When **every** model idled and a non-zero credit delta still arrived, a zero-token
     carrier row is appended rather than dropping it. That row is a true statement — this
@@ -556,6 +568,13 @@ def _place_billing_delta(emitted: list[tuple[int, dict]], prem_delta: int,
             carrier["premium"] = prem_delta
         if cred_delta is not None:
             carrier["credits"] = cred_delta
+            # One basis per shutdown: the carrier's credit figure covers every model in
+            # it, so its siblings must not price a second time off the token table.
+            # `is not None` (not truthiness) — a recorded 0.0 credit is still a recorded
+            # billing fact for the whole shutdown, and its siblings are still covered.
+            for _j, row in emitted:
+                if row is not carrier:
+                    row["billed_with"] = carrier["id"]
         return
     if not cred_delta and not prem_delta:
         return                      # nothing idled away — nothing to carry
