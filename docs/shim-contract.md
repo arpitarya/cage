@@ -19,7 +19,7 @@ doc encodes (both twins install on every OS · hand-paired, not templated · con
 `docs/`, not package data) are recorded in [ADR 0007](adr/0007-graphify-twin-pair-hand-paired-not-templated.md).
 
 - Behaviours **B1–B8** are binding on every twin.
-- Divergences **D1–D7** are real and permanent — cmd cannot do what sh does. They are
+- Divergences **D1–D8** are real and permanent — cmd cannot do what sh does. They are
   recorded, never papered over.
 - The anti-recursion proof is at the bottom. It is the reason this doc exists.
 
@@ -74,20 +74,38 @@ graphify metering interceptor   # the header self-identification
 
 ## B5 — Meter only when cage can actually do it
 
-Two probes, in order; either failing ⇒ run the real binary unmetered:
+**Two arms, tried in order.** The question is *can cage run*, never *is there a `cage`
+command* — those differ more often than they look. Both arms failing ⇒ run the real
+binary unmetered.
+
+**Arm 1 — the `cage` command.** Always tried first, so a standard install is unchanged
+in behaviour and in latency:
 
 1. a `cage` command resolves;
 2. `cage data graphify --help` exits 0 (the capability probe — this is what catches a
    renamed verb, the F1 root cause).
 
-The metered form is exactly `cage data graphify -- <REAL> <args…>`.
+**Arm 2 (B5b) — the interpreter.** Reached only when arm 1 misses. Same two-step shape,
+through `python3 -m cage` (sh) / `py -3` then `python` (cmd — divergence **D8**):
 
-**Known gap (both twins):** the probe wants a `cage` *command*. Under
-`cage setup --python-launcher` (`cage query restricted-env`) there is no `cage` on PATH,
-so the interceptor never meters — it degrades to correct, unmetered passthrough.
-Deliberately **not** fixed in the cmd twin alone: a one-sided fix is exactly the drift
-this contract exists to prevent. Tracked as **GF-LAUNCHER** in
-[OPEN-WORK.md](OPEN-WORK.md).
+3. the interpreter resolves;
+4. `<interpreter> -m cage data graphify --help` exits 0.
+
+The metered form is exactly `[<interpreter> -m ]cage data graphify -- <REAL> <args…>`.
+**B3's marker set needs no addition** — `cage data graphify` is still a substring of the
+arm-2 invocation, so twins still recognise and skip each other.
+
+**Why arm 2 exists (GF-LAUNCHER, verdict B accepted 2026-08-12).** `cage setup
+--python-launcher` (`cage query restricted-env`) removes the `cage` command *by design*,
+so under it neither twin could ever meter. The same miss covers a `cage.pyz` on
+`PYTHONPATH`, an unactivated venv, and any importable-but-not-on-PATH install — arm 2
+fixes the superset, not just launcher mode. Cost is one interpreter start (~50 ms warm)
+and only on the path that was already going to run unmetered.
+
+**What arm 2 does NOT claim.** Verified end to end on POSIX; **CI-asserted on Windows**,
+exactly as WIN-GF was. The honest statement is *"fixed on POSIX, CI-asserted on
+Windows"*, never *"fixed"*. It also does nothing for the non-shim routes (copilot VS
+Code, kiro) — see [restricted-environments.md](restricted-environments.md).
 
 ## B6 — Transparent passthrough
 
@@ -162,6 +180,7 @@ defeating the "cage absent" assumption), and never nothing.
 | **D4** | three `findstr /C:` literals instead of one `grep -E` alternation | findstr has no alternation | identical marker set, OR-ed, case-sensitive in both |
 | **D5** | `if exist` only — no execute-bit test | Windows has no execute bit | existence is the whole test |
 | **D6** | `%*` instead of `"$@"` | cmd has no argument array | quoting is preserved as *typed*, which is the closest available; this is why delayed expansion must be off (B7) at both lines that forward `%*` |
+| **D8** | arm 2 (B5b) says `py -3` then `python`, where sh says `python3` | `python3` is frequently absent on Windows; the launcher is `py -3`, with bare `python` as the fallback for a PATH install that has no launcher | two probes instead of one, tried in that order. Neither resolving means the call was always going to be unmetered. **Permanent** — it cannot be collapsed without breaking one OS or the other |
 | **D7** | the B4 message uses an ASCII hyphen where sh uses an em dash | a `.cmd` is read in the console's OEM codepage; an em dash renders as mojibake | one character of the shim's own diagnostic differs. graphify's own output is untouched. |
 
 **Fail-open last resort (cmd only).** If the PATH walk finds nothing — a pathologically

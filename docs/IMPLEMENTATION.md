@@ -16,6 +16,49 @@ Entry format:
 
 ---
 
+## 2026-08-12 — GF-LAUNCHER verdict B built: the interceptor reaches cage without a `cage` command
+
+- Implemented: **B5 arm 2** in both twins. When no `cage` command resolves, they probe
+  `python3 -m cage` (POSIX) / `py -3` then `python` (Windows, new permanent divergence
+  **D8**) and meter through it. Arm 1 is still tried first, so a standard install pays
+  no interpreter start. B3's marker set is **unchanged** — `cage data graphify` is still
+  a substring of the arm-2 invocation, so twins still skip each other.
+- `doctorcmd._launcher_gap` **inverted**: it no longer warns that launcher mode means
+  unmetered (that stopped being true). It asks whether the interpreter winning on PATH
+  can import cage — the `kiro-mcp` silent-start class — and warns only when it cannot.
+- **Verified by execution, not by grep.** `tests/test_gf_launcher_arm2.py` runs the POSIX
+  twin with no `cage` on PATH and asserts a real receipt lands; also that arm 1 wins
+  first, and that a genuinely-unreachable cage still passes through unmetered. The cmd
+  twin is contract-asserted + CI. Honest close: **fixed on POSIX, CI-asserted on
+  Windows** — never "fixed".
+- **One test was rewritten rather than relaxed.** `test_cmd_twin_reads_the_exit_code_on_its_own_line`
+  asserted `count("exit /b %ERRORLEVEL%") == 2`, a proxy for two branches; arm 2 makes it
+  four. Bumping the literal would have let the new branches ship unchecked, so it now
+  asserts the D1 **contract** — every `call` forwarding `%*` is followed immediately by
+  the exit line — which binds any number of branches, including future ones.
+- **A defect was found that the compare doc did not predict**, and it is not GF-LAUNCHER's:
+  B3's content check shells out to `grep`/`findstr`, so on a PATH where that tool does not
+  resolve, every candidate reads as *not an interceptor* and a twin selects **itself**,
+  re-execing forever. Measured as a 120s hang, pre-existing in every shipped version.
+  Filed as **SHIM-TOOL-DEPS** with the fork unresolved — a hang is a worse failure shape
+  than either a refusal or an unmetered run, which is the asymmetry that should decide it.
+- **A harness bug worth recording**: the first version of the arm-2 test set
+  `CAGE_BASE=<proj>` and read `ledger.receipts(proj)`. `CAGE_BASE` names the cage root
+  *directly*, so the shim wrote `<proj>/ledger/…` while the assertion read
+  `<proj>/.cage/ledger/…` — the feature worked and the test said it did not. Found by
+  reproducing the run by hand rather than by trusting the red.
+- Files: `cage/data/shims/graphify` · `cage/data/shims/graphify.cmd` · `cage/doctorcmd.py`
+  · `tests/test_gf_launcher_arm2.py` (new) · `tests/test_win_graphify_shim.py` ·
+  `docs/shim-contract.md` (B5b + D8) · `docs/restricted-environments.md` ·
+  `docs/compare/gf-launcher-metering.compare.md` (verdict accepted) ·
+  `docs/open/SHIM-TOOL-DEPS.md` (new) · `docs/open/GF-LAUNCHER.md` (deleted) ·
+  `docs/OPEN-WORK.md` · `CHANGELOG.md`
+- Tests: green — **1650 ⇒ 1655** (+5 arm-2; the cmd-twin exit-code test was rewritten,
+  not added).
+- Next: Arpit's call on SHIM-TOOL-DEPS' fork; the remaining queue is field work only.
+
+---
+
 ## 2026-08-12 — the agent lane refilled: P0·P1·P2 built, P3 read-only
 
 The four items in `docs/open-queue-agent-lane.handoff.md` — the only agent-buildable work
@@ -5013,3 +5056,55 @@ Also corrected: `compare/README.md` described v0.44 and v0.48 as *unreleased* (b
 shipped) and COMMITS-WINDOW as *awaiting verdict* (decided B and built). New:
 [FIELD-RUNBOOK.md](FIELD-RUNBOOK.md) — copy-paste procedures for the five hands-only
 items, every command checked against `cage 0.48.0`'s real `--help`.
+
+## 2026-08-12 — GF-LAUNCHER: verdict B accepted (decision recorded, nothing built)
+
+Arpit accepted **option B — an unconditional interpreter arm in B5** on the
+[gf-launcher-metering compare](compare/gf-launcher-metering.compare.md). The compare's
+status moved from *proposed verdict* to **DECIDED**; the item moved out of OPEN-WORK's
+*your decision* section into a new **agent lane — buildable now**, which had been empty
+since the 2026-08-11 sweep.
+
+**No code changed.** This entry records a decision, not a build.
+
+**What B decides:** B5's capability probe asks *"is there a `cage` command"* when it means
+*"can cage run"*. Arm 2 (`python3 -m cage data graphify --help`) is reached only when arm 1
+misses, so standard mode is unchanged in behaviour and latency, and the fix covers a
+**superset** of launcher mode — a `cage.pyz` on `PYTHONPATH`, an unactivated venv, any
+importable-but-not-on-PATH install.
+
+**What the build inherits, carried into [open/GF-LAUNCHER.md](open/GF-LAUNCHER.md) so it
+survives the compare doc:** both twins move together (ADR 0007); **D8** is a new permanent
+divergence (`python3` vs `py -3` with a `python` fallback) and must be registered in the
+shim contract; the **B3 marker set needs no change**, verified — `cage data graphify`
+remains a substring; `doctorcmd._launcher_gap` inverts from a `_WARN` into an
+importability check mirroring `kiro-mcp`; `tests/test_win_graphify_shim.py`'s B5 cases
+assume *cage absent ⇒ unmetered*, which is precisely what B changes; and the compare's
+invoker table is owed to `restricted-environments.md` regardless.
+
+**The honest close is bound in advance:** *"fixed on POSIX, CI-asserted on Windows"* —
+never *"fixed"*. B does nothing for the three non-shim rows (copilot VS Code, kiro, the
+human bare-terminal call).
+
+**An ADR is owed on ship** — B amends the B5 contract and adds a divergence, which is
+architecturally load-bearing rather than a patch note.
+
+**Reopen triggers survive the accept:** arm-2 probe above **250 ms** on a real target
+endpoint, or a Windows install where neither `py -3` nor `python` resolves while cage is
+importable — either pushes the call back toward A.
+
+## 2026-08-12 — OPEN-WORK header: the seventh staleness, and the counts removed
+
+`docs/OPEN-WORK.md`'s header read *"8 commits ahead of origin/main with 65
+staged-uncommitted files"* and *"Next: commit and push the 65 files"* after the commit
+that made those numbers **17 and 0**. Written before the commit, never revisited.
+
+`tests/test_queue_honesty.py` passed it, **correctly** — the gate exempts counts by
+design, because a count is true-at-writing and would redden on the very next commit.
+That exemption is the hole this fell through.
+
+**Fix: no count is written in the header any more.** It now states the *shape* (tree
+clean; HEAD ahead of origin and unpushed) and points at
+`git rev-list --count origin/main..HEAD` for the number. A number in prose is a number
+with no detector; the gate's exemption is sound, so the prose had to stop making the
+claim rather than the gate start checking it.

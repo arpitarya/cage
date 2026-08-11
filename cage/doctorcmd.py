@@ -653,11 +653,46 @@ def _launcher_gap(root: Path) -> tuple[str, str]:
     shim = next((p for p in paths.graphify_shims(root) if p.exists()), None)
     if shim is None:
         return _OK, "python-launcher mode; no graphify interceptor installed"
-    return _WARN, (f"python-launcher mode is on and bin/{shim.name} is installed, but "
-                   "the interceptor's capability probe needs a `cage` command on PATH — "
-                   "under this mode there is none, so graphify runs UNMETERED here "
-                   "(not a bug: a known trade-off of launcher mode). See "
-                   "`cage query graphify-shims` and docs/restricted-environments.md.")
+    interpreter, resolved = _arm2_interpreter()
+    if resolved:
+        return _OK, (f"python-launcher mode; bin/{shim.name} meters via the B5 arm-2 "
+                     f"interpreter ({interpreter} -m cage)")
+    return _WARN, (
+        f"python-launcher mode is on and bin/{shim.name} is installed, but neither a "
+        f"`cage` command nor an importable `{interpreter} -m cage` resolves here, so "
+        "graphify runs UNMETERED. Install cage into the interpreter that wins on PATH "
+        "(the same silent-start class `kiro-mcp` checks). See "
+        "`cage query graphify-shims` and docs/restricted-environments.md.")
+
+
+def _arm2_interpreter() -> tuple[str, bool]:
+    """`(spelling, importable)` for the B5 **arm 2** the twins fall back to when no `cage`
+    command resolves (GF-LAUNCHER verdict B, shim-contract B5b).
+
+    The check inverted with that build and the inversion is the point: the old text said
+    launcher mode means *unmetered, always*, which stopped being true the moment the
+    interceptor learned to reach cage through an interpreter. What is worth warning about
+    now is the same thing `kiro-mcp` warns about — **cage is importable by some other
+    interpreter than the one that wins on PATH**, which is silent in exactly the F1 way.
+
+    Probes the twins' own spellings, in the twins' own order (D8): `python3` on POSIX,
+    `py -3` then `python` on Windows. Fail-open — a probe that cannot run reports
+    not-importable rather than raising into doctor."""
+    import os as _os
+    import subprocess
+    spellings = ([("py", ["py", "-3"]), ("python", ["python"])] if _os.name == "nt"
+                 else [("python3", ["python3"])])
+    for name, argv in spellings:
+        if not shutil.which(argv[0]):
+            continue
+        try:
+            probe = subprocess.run([*argv, "-m", "cage", "data", "graphify", "--help"],
+                                   capture_output=True, timeout=30)
+        except (OSError, subprocess.SubprocessError):
+            continue
+        if probe.returncode == 0:
+            return name, True
+    return (spellings[0][0] if spellings else "python3"), False
 
 
 def _out_of_root_fix(ps) -> str:

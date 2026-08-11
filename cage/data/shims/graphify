@@ -38,8 +38,22 @@ if [ -z "$REAL" ]; then
   exit 127
 fi
 
-if [ "$_CAGE_GF_REENTRY" = "0" ] \
-   && command -v cage >/dev/null 2>&1 && cage data graphify --help >/dev/null 2>&1; then
-  CAGE_GRAPHIFY_SHIM=1 exec cage data graphify -- "$REAL" "$@"
+# B5: meter only when cage can actually RUN the verb — two arms, tried in order.
+# Arm 1 is the `cage` command and always wins first, so standard installs are unchanged
+# in both behaviour and latency.
+if [ "$_CAGE_GF_REENTRY" = "0" ]; then
+  if command -v cage >/dev/null 2>&1 && cage data graphify --help >/dev/null 2>&1; then
+    CAGE_GRAPHIFY_SHIM=1 exec cage data graphify -- "$REAL" "$@"
+  fi
+  # Arm 2 (B5b, GF-LAUNCHER verdict B): "no `cage` COMMAND" is not "no cage". The probe
+  # used to ask *is there a cage command*; the question it means is *can cage run*.
+  # `cage setup --python-launcher` removes the command by design, so under it BOTH twins
+  # metered nothing — but the same miss covers a cage.pyz on PYTHONPATH, an unactivated
+  # venv, and any importable-but-not-on-PATH install. Costs one interpreter start
+  # (~50 ms warm) and only on the path that was already going to run unmetered.
+  if command -v python3 >/dev/null 2>&1 \
+     && python3 -m cage data graphify --help >/dev/null 2>&1; then
+    CAGE_GRAPHIFY_SHIM=1 exec python3 -m cage data graphify -- "$REAL" "$@"
+  fi
 fi
-exec "$REAL" "$@"   # cage absent, or re-entry → identical, unmetered behaviour
+exec "$REAL" "$@"   # cage unreachable, or re-entry → identical, unmetered behaviour

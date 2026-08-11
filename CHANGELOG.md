@@ -81,6 +81,36 @@ of specific surfaces and are called out below.
   when written, and editing a dated record to keep one green would falsify the record.
   15 live dangles repaired.
 
+### Fixed — the graphify interceptor now meters without a `cage` command (GF-LAUNCHER, verdict B)
+
+- B5 gains a second arm: when no `cage` command resolves, both twins probe
+  `python3 -m cage` (POSIX) / `py -3` then `python` (Windows — new permanent divergence
+  **D8**) and meter through the interpreter. Arm 1 is tried first, so a standard install
+  is unchanged in behaviour and latency.
+- The probe asked *"is there a `cage` command"* when it means *"can cage run"*.
+  `--python-launcher` removes the command by design, but the same miss also covered a
+  `cage.pyz` on `PYTHONPATH`, an unactivated venv, and any importable-but-not-on-PATH
+  install — arm 2 fixes the **superset**.
+- **B3's marker set is unchanged**: `cage data graphify` is still a substring of the
+  arm-2 invocation, so the twins still recognise and skip each other.
+- `cage doctor`'s `launcher-gap` check **inverted** — it no longer warns that launcher
+  mode means unmetered, it asks whether the interpreter winning on PATH can import cage
+  (the `kiro-mcp` silent-start class) and warns only when it cannot.
+- **Fixed on POSIX, CI-asserted on Windows** — never plain "fixed". The POSIX twin is
+  proven by execution (`tests/test_gf_launcher_arm2.py` runs it with no `cage` on PATH
+  and asserts a receipt lands); the cmd twin by the contract tests, as WIN-GF was.
+
+### Found, not fixed — a twin can select itself and recurse (SHIM-TOOL-DEPS)
+
+- B3's content check shells out to `grep`/`findstr`. On a PATH where that tool does not
+  resolve, the check errors, **every** candidate reads as "not an interceptor", and the
+  twin claims itself as the real binary and re-execs forever. Measured as a 120-second
+  hang, not reasoned about.
+- **Pre-existing in every shipped version**, not introduced here, and the
+  `CAGE_GRAPHIFY_SHIM` re-entry guard does not catch it (that guard is set only on the
+  metering path). Filed with its fork unresolved: a hang is a worse failure shape than
+  either a refusal or an unmetered run.
+
 ### Fixed — the L1 attestation join could never fire on the interceptor route (L1-FIELD Q3)
 
 - `cage insights adoption`'s *"by agent — attested by an L1 hook"* table read **zero** for

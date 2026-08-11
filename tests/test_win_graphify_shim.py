@@ -105,10 +105,27 @@ def test_cmd_twin_disables_delayed_expansion_before_forwarding_args():
 def test_cmd_twin_reads_the_exit_code_on_its_own_line():
     """D1. `call "%REAL%" %* & exit /b %ERRORLEVEL%` looks right and is wrong: on one
     line `%ERRORLEVEL%` expands at parse time, before `call` has run, so the shim
-    reports the *previous* command's status. Passthrough is sacred (B6)."""
+    reports the *previous* command's status. Passthrough is sacred (B6).
+
+    Asserted as the CONTRACT, not as a branch count. This used to read
+    `count(...) == 2`, which was a proxy for "the metered branch and the direct branch";
+    GF-LAUNCHER's arm 2 legitimately makes it four, and bumping the literal would have
+    been the kind of assertion-relaxation that lets the third branch ship unchecked. So:
+    **every `call` that forwards the user's arguments must be followed immediately by
+    `exit /b %ERRORLEVEL%` on its own line** — which binds any number of branches,
+    including ones not written yet.
+    """
     text = CMD.read_text(encoding="utf-8")
     assert "& exit /b" not in text
-    assert text.count("exit /b %ERRORLEVEL%") == 2      # metered branch + direct branch
+    lines = [l.strip() for l in text.splitlines()]
+    forwards = [i for i, l in enumerate(lines)
+                if l.lower().startswith("call ") and "%*" in l]
+    assert len(forwards) >= 2, f"expected the metered and direct branches, got {forwards}"
+    for i in forwards:
+        assert lines[i + 1] == "exit /b %ERRORLEVEL%", (
+            f"{lines[i]!r} does not read its exit code on the next line: {lines[i+1]!r}")
+    # …and no forward may read it any other way.
+    assert text.count("exit /b %ERRORLEVEL%") == len(forwards)
 
 
 def test_cmd_twin_never_falls_back_to_the_bare_name():

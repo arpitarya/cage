@@ -53,26 +53,33 @@ importable ⇒ exit 0 silently, agents keep working, no capture.
   before committing to the mode. It is deliberately a runtime-only override: it
   never changes what `cage setup` writes.
 
-### GF-LAUNCHER — the graphify interceptor goes silently unmetered in this mode
+### GF-LAUNCHER — CLOSED 2026-08-12: the interceptor reaches cage through the interpreter
 
-**Launcher mode and the graphify interceptor cancel each other out, and nothing
-says so unless you read this far.** The interceptor's capability probe
-(`docs/shim-contract.md` behaviour B5) needs a `cage` *command* on PATH — it runs
-`cage data graphify --help` before deciding whether to meter. Python-launcher
-mode's entire point is that no such command exists: everything resolves through
-the interpreter instead. So under `--python-launcher`, **neither twin** (POSIX
-`bin/graphify` nor the Windows `bin/graphify.cmd`) can ever meter a graphify call
-— both degrade to correct, unmetered passthrough, silently.
+**Fixed on POSIX, CI-asserted on Windows.** Both twins gained a second capability arm
+(`docs/shim-contract.md` B5b): when no `cage` command resolves, they probe
+`python3 -m cage` (POSIX) / `py -3` then `python` (Windows, divergence D8) and meter
+through that. Launcher mode no longer silences the shim route.
 
-This is not a bug fix candidate here: a fix would have to teach the interceptor to
-call `python3 -m cage` / `py -3 -m cage` instead of probing for a `cage` command,
-and that must land in **both twins together** or the two drift apart, which is the
-exact failure class the shim contract exists to prevent (tracked as **GF-LAUNCHER**
-in `docs/OPEN-WORK.md` — a decision, not a patch). If you rely on graphify's shim
-route AND need launcher mode, know that the shim route stops filing savings the
-moment you flip it; `cage doctor` says so (`launcher-gap` check) when it sees both
-launcher mode and an installed interceptor at once. `cage query graphify-shims`
-covers the twin pair in full.
+The probe used to ask *"is there a `cage` command"* when the question it means is
+*"can cage run"*. Launcher mode is one way to make those differ; it is not the only one —
+arm 2 also covers a `cage.pyz` on `PYTHONPATH`, an unactivated venv, and any
+importable-but-not-on-PATH install.
+
+`cage doctor`'s `launcher-gap` check **inverted with the fix**: it no longer warns that
+launcher mode means unmetered. It now asks whether the interpreter that wins on PATH can
+import cage — the same silent-start class the `kiro-mcp` check exists for — and warns
+only when it cannot.
+
+**What this did NOT fix, stated so the gap is not mistaken for closed.** The shim route
+is one of several, and the others are untouched:
+
+| invoker | metered in launcher mode? | why |
+|---|---|---|
+| claude, any surface | yes | transcript route, PATH-independent |
+| copilot **CLI** | yes | transcript route |
+| copilot **VS Code** | no | store carries the command but no tool result (F2) |
+| kiro | no | no graphify detection on the kiro leg at all |
+| human, bare terminal call | **yes, now** | the shim route, via arm 2 |
 
 ## Tier 2 — `cage.pyz` (no pip, no PyPI access)
 

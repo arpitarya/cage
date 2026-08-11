@@ -1,14 +1,16 @@
 ---
 doc: compare — how the graphify interceptor finds cage when no `cage` is on PATH
-status: proposed verdict — awaiting Arpit's accept or override
+status: DECIDED — B accepted by Arpit 2026-08-12; not yet built
 decides: OPEN-WORK **GF-LAUNCHER**
 ---
 
 # GF-LAUNCHER — how the interceptor reaches cage with no `cage` on PATH
 
-**Proposed verdict: B — an unconditional interpreter arm in B5.** ~15 lines across the
-two twins; no new files, no policy read, no mode awareness, and it fixes a *superset* of
-launcher mode. **Nothing is built** — awaiting accept or override.
+**VERDICT: B — an unconditional interpreter arm in B5. ACCEPTED by Arpit 2026-08-12.**
+~15 lines across the two twins; no new files, no policy read, no mode awareness, and it
+fixes a *superset* of launcher mode. **Not yet built** — it is now queued agent work, and
+the build inherits every constraint in §*Proposed verdict* and §*Reopen-trigger* below,
+which stand unamended by the accept.
 
 **The fork:** `cage setup --python-launcher` removes the `cage` command by design, but
 [B5](../shim-contract.md)'s capability probe needs exactly that, so **neither twin**
@@ -91,7 +93,7 @@ Delete the item; keep the gap, state it louder.
 | new permanent divergence | none | **D8** — `python3` vs `py -3` | none |
 | verifiable on this machine | POSIX only | POSIX only | n/a |
 
-## Proposed verdict — **B**
+## Verdict — **B** · ACCEPTED 2026-08-12
 
 - It is the only option that treats the real defect: the probe asks *"is there a `cage`
   command"* when the question it means is *"can cage run"*. Launcher mode is one way to

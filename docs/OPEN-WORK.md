@@ -4,19 +4,25 @@ One line per open item. **Detail lives in [open/](open/), one file per item** �
 is an index and must stay one screen. Rules that outlive an item:
 [open/CONSTRAINTS.md](open/CONSTRAINTS.md). Procedures: [FIELD-RUNBOOK.md](FIELD-RUNBOOK.md).
 
-**⚠ Before trusting anything here, reconcile with git — this header had gone stale six
-times in a week.** As of 2026-08-12: `__version__` and latest tag are `0.48.0`; local
-`HEAD` is **8 commits ahead of `origin/main`** with **65 staged-uncommitted files** —
-the whole agent-lane sweep is real, verified in code, and **unpushed**. Suite **1639
-passed / 0 failed / 11 skipped**, measured 2026-08-12 (the previously-claimed figure was
-the same number, but it was an assertion until then). Ground truth is `git status` ·
-`git log origin/main..HEAD` · `git tag --sort=-v:refname` · `cage/__init__.py` — never
-this prose. **Since 2026-08-12 the checkable half of that is test-gated**
+**⚠ Before trusting anything here, reconcile with git — this header had gone stale
+SEVEN times in a week.** As of 2026-08-12: `__version__` and latest tag are `0.48.0`;
+the working tree is **clean**; local `HEAD` is **ahead of `origin/main` and unpushed** —
+run `git rev-list --count origin/main..HEAD` for the number. Suite **1639 passed / 0
+failed / 11 skipped**, measured 2026-08-12 (the previously-claimed figure was the same
+number, but it was an assertion until then).
+
+**No count is written in this header any more, deliberately.** The seventh staleness was
+"8 commits ahead / 65 staged files" surviving the commit that made it "17 / 0" — written
+before the commit, never revisited. The honesty gate exempts counts on purpose (they
+redden on the next commit), so a number in this prose is a number with no detector.
+Ground truth is `git status` · `git log origin/main..HEAD` ·
+`git tag --sort=-v:refname` · `cage/__init__.py` — never this prose. **Since 2026-08-12 the checkable half of that is test-gated**
 (`tests/test_queue_honesty.py`): a version, tag, or clean-and-pushed claim here that
 contradicts git fails the suite. Counts are deliberately *not* gated — they are
 true-at-writing and would redden on the next commit.
 
-**Next:** commit and push the 65 files. Then [NET-1](open/NET-1.md).
+**Next:** push. Then [NET-1](open/NET-1.md). The agent lane is **empty again** — GF-LAUNCHER
+verdict B was built 2026-08-12 (POSIX-verified, Windows CI-asserted).
 
 ## Your hands
 
@@ -32,7 +38,7 @@ true-at-writing and would redden on the next commit.
 
 | item | one line | state |
 |---|---|---|
-| [GF-LAUNCHER](open/GF-LAUNCHER.md) | under `--python-launcher` neither graphify twin meters | compare written, **verdict B awaiting your accept** |
+| [SHIM-TOOL-DEPS](open/SHIM-TOOL-DEPS.md) | with no `grep` on PATH a twin selects **itself** and re-execs forever — a hang, measured not reasoned | fork stated, **your call**; found 2026-08-12 building GF-LAUNCHER |
 
 ## Parked — do not pick up before the trigger fires
 

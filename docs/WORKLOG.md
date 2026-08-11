@@ -12,6 +12,34 @@ by milestone) — the worklog is what *happened this session*.
 
 ---
 
+## 2026-08-12 — Claude Code (Opus 5) — GF-LAUNCHER built; and the premise I got wrong
+
+- **Asked:** build every open item, then commit; then merge to main and report what is
+  pending.
+- **Done:** GF-LAUNCHER verdict B built in both twins (B5 arm 2 + divergence D8), the
+  doctor check inverted, five executing tests added. 1650 ⇒ 1656.
+- **I was wrong about the premise, and it is worth recording.** I told Arpit nine queue
+  items needed hardware he did not have. **Copilot and Kiro are both installed on this
+  machine.** I asserted an impossibility without probing for it — the exact failure this
+  repo already wrote a lesson about (OTEL-SEMCONV-PIN's recommendation was impossible
+  only because nobody checked). Probe first, then claim.
+- **Decided — a test was rewritten, not relaxed.** The cmd twin's exit-code test pinned
+  `count(...) == 2`, a proxy for two branches. Arm 2 makes it four. Bumping the number
+  would have let the new branches ship unchecked, so it now asserts the D1 contract
+  itself and binds branches not yet written.
+- **Found — SHIM-TOOL-DEPS.** With no `grep` on PATH a twin selects *itself* and recurses.
+  A 120-second hang in a test I expected to pass instantly. Pre-existing; filed with the
+  fork open, because a hang is the worst shape a fail-open path can fail in.
+- **A harness bug that lied in the safe direction, which is the dangerous one.** My first
+  arm-2 test set `CAGE_BASE=<proj>` and read `<proj>/.cage/…`; `CAGE_BASE` names the cage
+  root directly, so the receipt landed one directory up. The feature worked; the test said
+  it did not. Reproducing by hand — not trusting the red — is what found it.
+- **Open:** SHIM-TOOL-DEPS' fork is Arpit's. Everything else in the queue is field work
+  needing real usage, not code.
+- **Next step:** Arpit pushes (17 commits unpushed); then NET-1.
+
+---
+
 ## 2026-08-12 — Claude Code (Opus 5) — the agent lane refilled: the four buildable items
 
 - **Asked:** execute `docs/open-queue-agent-lane.handoff.md` — P0 finish the `docs/open/`
