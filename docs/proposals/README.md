@@ -42,22 +42,6 @@ Two more that bite in practice:
 
 Active (awaiting Arpit's accept or a trigger):
 
-- [steering-edits-pending.proposal.md](steering-edits-pending.proposal.md) — **the
-  four CLAUDE.md edits, in one sitting.** Raised by five programs (CHATS-AUTHOR added
-  **F** on 2026-08-03), merged because they patch one file and need one decision. Head
-  table carries a verdict box per edit; an applied section is deleted from the file, and
-  the file goes when the table empties. Re-verified at HEAD: none of the four applied.
-
-  **Item E is gone — applied in the v0.46.0 release**, being the one row the Must-Know
-  release rule already mandates. Its lesson outlives it: both source proposals hardcoded
-  a `just test` target (1354, 1391) and both fell *below* the file they patch, so either
-  would have **regressed** it. **A held patch decays against its target** — the count has
-  now been 1401 → 1441 → 1462 while this file existed.
-
-  **F is the one with teeth**: CLAUDE.md's chats bullet states the money-independence law
-  as **one** scoped carve-out, and v0.46.0 made it **two**. Until F lands, that bullet
-  understates a law's cardinality.
-
 - [net-positive-evidence-run.proposal.md](net-positive-evidence-run.proposal.md) — NET-1 protocol:
   5 closed tasks per arm, outcomes pre-committed. Arpit's hands, no code.
 - [tool-integration-contract.proposal.md](tool-integration-contract.proposal.md) — the paved road:
@@ -67,15 +51,42 @@ Active (awaiting Arpit's accept or a trigger):
   graphify; trigger: NET-1 still net-negative at n=5.
 - [policysync-synthetic-bundle.proposal.md](policysync-synthetic-bundle.proposal.md) — sync tests own a
   fake bundle; trigger: a **third** table removal (guard shipped 2026-08-01).
-- [copilot-credits-integrity.proposal.md](copilot-credits-integrity.proposal.md) — **defect, not
-  parked**: credit delta lost when the first-listed model idles; multi-model
-  shutdowns double-count (credits + tokens); negative-delta clamp; compare's
-  `measured` label. Same review.
-- [review-hardening.proposal.md](review-hardening.proposal.md) — the rest of the review's
-  confirmed findings, phased: dogfood **date bomb (~2026-10-02)** · `cage hook`
-  exit-2 = BLOCK collision · honest-refusal fixes · wiring hygiene · durable joins.
+- [attest-join-command-normalization.proposal.md](attest-join-command-normalization.proposal.md) —
+  the hook attests a *shell command line*, the interceptor an *argv*, so a piped
+  invocation still misses the L1 join; trigger: a real join observed after the
+  2026-08-12 argv[0] fix, leaving this as the only remaining blocker.
 
 ## Graduated (implemented → archived)
+
+- **copilot-credits-integrity** → **IMPLEMENTED, all four items** (archived 2026-08-11 as
+  [v0.49-copilot-credits-integrity.proposal.md](../archive/v0.49-copilot-credits-integrity.proposal.md)).
+  Verified in code, not off a marker: defect 1's delta placement is
+  `transcript._place_billing_delta` (carrier = largest token mover, ties by model name,
+  zero-token carrier row rather than a dropped delta); defect 2 is `billed_with` +
+  pricing rung 0 (REV-CREDITS defect 2); the clamp reads a decreasing counter as a reset
+  (`transcript.py:501-502`) with `math.isfinite` guards at `:394,:416`; the method law is
+  `compare.py:63` threading `creditprice.method_for`, weaker tag wins. **COPILOT-SIDECAR
+  is unaffected and still parked** — see OPEN-WORK tier 5.
+- **review-hardening (REV-HARDEN)** → **IMPLEMENTED, P0–P4** (archived 2026-08-11 as
+  [v0.49-review-hardening.proposal.md](../archive/v0.49-review-hardening.proposal.md)).
+  P0/P1 shipped v0.45.0; P2's two remaining items were already built at HEAD when
+  re-verified; P3 and P4 landed in the agent-lane sweep. **Two live constraints were
+  buried in its prose and have been rescued into OPEN-WORK's Standing constraints** —
+  copilot's "unverified on a real Copilot" gaps text, and *the detector is the live
+  parser* (P1's declined `verbmap.REMOVED` migration map). Nothing else in it still binds.
+
+- **steering-edits-pending (STEERING-EDITS)** → **IMPLEMENTED** 2026-08-11 (v0.49,
+  unreleased). All six held `CLAUDE.md` edits applied in one sitting (A · B · C · D ·
+  F · G; E had shipped with v0.46.0). **The build amended two of them**, and the
+  amendments matter more than the edits: **A** additionally records the commits view's
+  row-cap cost bound (COMMITS-WINDOW), and **B**'s per-call bullet gained a **rung 0**
+  the proposal could not have known about (REV-CREDITS defect 2's `billed_with`) — both
+  decided the same day. The chats bullet also lost its `premium` column
+  (COPILOT-PREMIUM-DEAD), a third amendment beyond **F**. Its own recorded lesson held
+  to the end: **a held patch decays against its target** — E's `just test` count moved
+  1401 → 1441 → 1462 → 1635 while the file existed, which is why it became a *rule*
+  rather than a number. [proposal](../archive/v0.49-steering-edits-pending.proposal.md)
+  · living spec: `CLAUDE.md`.
 
 - **chats-agent-authorship-column (CHATS-AUTHOR)** → **IMPLEMENTED** and RELEASED in v0.46.0
   2026-08-03 (1442/0 ⇒ 1462/0). `agent%` on `cage insights chats` — the v2

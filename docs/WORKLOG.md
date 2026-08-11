@@ -12,6 +12,79 @@ by milestone) — the worklog is what *happened this session*.
 
 ---
 
+## 2026-08-12 — Claude Code (Opus 5) — the agent lane refilled: the four buildable items
+
+- **Asked:** execute `docs/open-queue-agent-lane.handoff.md` — P0 finish the `docs/open/`
+  migration in the law, P1 build the queue-honesty gate, P2 diagnose the L1-attestation
+  zero, P3 report commit hygiene read-only.
+- **Done:** all four. Suite **1639 ⇒ 1650**, re-measured at both ends (the 1639 was
+  correct but had been an unverified assertion for eleven days). `CLAUDE.md` proposed as a
+  diff, not applied. Nothing pushed, tagged, or released.
+- **Decided — P2's cause is a fix, not a capture change.** The shim route hashed the full
+  argv (including `$REAL`, an absolute machine-specific path) while the hook and the
+  transcript route hash the tail, so an *exact* join could never fire. No new field, no
+  schema change, and `content_signature` already documented the exclusion — so it is a
+  producer violating a convention two others implement, which is a defect.
+- **And the fix is necessary, not sufficient — said out loud rather than shipped as a
+  win.** All three real attestations are piped, and the hook attests a *shell command
+  line* while the interceptor records an *argv*, so they still miss. Parked as a proposal
+  with an honest trigger rather than normalizing shell syntax on a guess. A third cause
+  (an attested run with no usage row) is reported and deliberately not fixed: inventing a
+  row for a run cage never observed is the fabrication the whole view exists to prevent.
+- **The archaeology was the load-bearing part.** All three attestations were reconstructed
+  from the Claude transcripts and re-hashed — the cause was *proved* against real rows
+  rather than inferred from reading two functions side by side.
+- **Lesson, and it is general: a test that builds both sides of a join with one side's
+  code proves nothing.** Every existing test fabricated its usage row with
+  `usagelog.args_hash(<tail>)` — the attestation's convention — so the disagreeing
+  producer was never exercised, and nine days of zero looked like a green suite.
+- **Lesson — falsify the real file, don't reason about the regex.** P1's gate passed its
+  own fixtures while reading *nothing* from the real header, twice: a past-tense clause
+  fused to a live claim across `.**`, and a matcher wanting bare `HEAD == origin/main`
+  when this repo writes `` `HEAD` is `origin/main` ``. Both were invisible from the green
+  result and both showed up the moment the real file was mutated.
+- **Open:** the proposed `CLAUDE.md` diff and the commit split are Arpit's calls. Nine
+  queue items were left untouched by design — they need real hands or an unfired trigger.
+- **Next step:** Arpit reviews the `CLAUDE.md` diff + commit split, then pushes the 65
+  files; then [NET-1](open/NET-1.md).
+
+---
+
+## 2026-08-11 — Claude Code (Opus 5) — the queue emptied: seven held decisions, taken
+
+- **Asked:** continue with all open items, do not wait, implement all of it.
+- **Done:** every buildable item and every held decision in tiers 2 and 3 of
+  `OPEN-WORK.md` — COMMITS-WINDOW · COPILOT-PREMIUM-DEAD · REV-CREDITS defect 2 ·
+  OTEL-SEMCONV-PIN · CLI-GAPS(b) · STEERING-EDITS · DOC-LINK-CHECK. Suite 1616 ⇒ **1639**.
+- **Decided — COMMITS-WINDOW: B.** Bound the read by the row cap, text path only. A
+  consequence worth stating rather than burying: the Σ row now covers only what was read,
+  so the footnote had to say *not read* rather than *not shown*.
+- **Decided — REV-CREDITS defect 2: one basis per shutdown.** The interesting part is
+  *why not pro-rata*: splitting a group credit by token share would derive credits from
+  tokens, which the standing rule forbids in both directions. The mechanism is a recorded
+  `billed_with` link + a pricing rung 0 that reports the **same** `credits` match kind as
+  rung 1 — deliberately, so every consumer already excluding credits-priced rows from
+  token reasoning inherits it with no per-view fork.
+- **The verification changed an answer.** OTEL-SEMCONV-PIN's recommended option 3
+  ("re-point the pin at the GenAI repo's versioning") turned out to be **impossible**: that
+  repo has no tagged release at all. So the pin states what `1.42.0` *means* instead of
+  citing a number nobody could check. A recommendation written from partial evidence is
+  not a decision.
+- **Two OPEN-WORK items were already built** and the file listed them as pending
+  (REV-HARDEN P2's adoption `--since`, the fabricated `$0`). Fourth staleness in that file
+  in a week — its markers are not evidence, the code is.
+- **DOC-LINK-CHECK's policy call is the item.** A naive walker is red on 155 links, and
+  ~140 of them are *correct history*. Repairing them would falsify dated records. So: LIVE
+  fails, HISTORY is exempt **and counted** — a silently-skipped corpus is how "we check
+  links" becomes "we check some links".
+- **The gate caught its own migration mid-flight**: archiving the steering proposal broke
+  two live links, and the test named both before the suite ran.
+- **Open:** `CREDITS-LEGACY-SPLIT` — defect 2's fix is forward-only and needs a *count*
+  from a real ledger before any code. Tier 4's field runs and NET-1 remain Arpit's.
+- **Next:** NET-1 (Arpit's hands). The agent lane is empty.
+
+---
+
 ## 2026-08-11 — Claude Code (Opus 5) — agent-lane sweep P4·P5·P6: the sweep is closed
 
 - **Asked:** finish the sweep.

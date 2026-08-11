@@ -12,20 +12,36 @@ spec.
 - [PLAN.md](PLAN.md) — the design of record: substrate contract, attribution
   engine, every plan-§ referenced from code and CLAUDE.md.
 - **[OPEN-WORK.md](OPEN-WORK.md) — the ONE plan of pending work, and ONLY that.**
+  Since 2026-08-11 it is an **index**: one line per item, one screen, nothing else.
   A completed item is **removed, never left ticked** — legal only once its outcome is
   in [IMPLEMENTATION.md](IMPLEMENTATION.md) and any evidence is published to
   [regression/](regression/), with residual limits carried forward as their own
-  items. So its length is a truthful measure of what is left. It also carries the
+  items. So its length is a truthful measure of what is left. **Test-gated**:
+  `tests/test_queue_honesty.py` fails the suite when the header's *checkable* claims
+  (version · tag · clean-and-pushed) contradict git — and stays silent when it makes
+  no claim, because a gate that reddens on every in-flight change teaches you to
+  ignore it.
+- **[open/](open/README.md) — the detail behind each index line, one file per item.**
+  Why it is open · what closes it · what binds a fix. Also
+  [open/CONSTRAINTS.md](open/CONSTRAINTS.md), the rules that outlive their originating
+  item (**not** open work). Adding an item = a file here **and** one line in the index;
+  a file with no index line is invisible, an index line with no file is a lie. Deleting
+  one is a citation migration, exactly as for any removed doc. It also carries the
   durable rules promoted out of the archived cycle plans, including the **ZERO dummy
   data** law.
 
 ## Active work
 
-- [steering-edits-pending.proposal.md](proposals/steering-edits-pending.proposal.md) —
-  **STEERING-EDITS**: the four held CLAUDE.md edits (authorship bullet · copilot credit
-  ladder · `FORMULAS.md` entry point · dogfood section), merged into one file 2026-08-03
-  and re-verified at HEAD — **none applied**. One read, four verdicts; an applied section
-  is deleted from the file.
+**None.** `docs/` root carries no loose handoff/prompt pair and no held proposal — a pair
+is created only when a phase in [OPEN-WORK.md](OPEN-WORK.md) is picked up, and archived
+on implement. The agent-lane refill, the last occupant, was built and green on 2026-08-12
+and [archived](archive/v0.49-open-queue-agent-lane.handoff.md) — handoff only, its prompt
+was handed over inline and never written here.
+
+**One thing it left open is not a pair and does not live here:** the `CLAUDE.md`
+*Documentation discipline* correction is **proposed, awaiting Arpit** — steering files are
+never silently rewritten, so the diff sits in that session's response and in
+[WORKLOG.md](WORKLOG.md), not as a doc in this tree.
 
 ## The lab manual
 

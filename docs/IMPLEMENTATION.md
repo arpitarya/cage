@@ -16,6 +16,154 @@ Entry format:
 
 ---
 
+## 2026-08-12 — the agent lane refilled: P0·P1·P2 built, P3 read-only
+
+The four items in `docs/open-queue-agent-lane.handoff.md` — the only agent-buildable work
+left in the queue. **Baseline re-measured before anything moved: 1639 passed / 0 failed /
+11 skipped.** The figure the queue had been carrying was correct, but it had been an
+assertion for eleven days.
+
+- **P0 — the `docs/open/` migration finished in the law.** The 2026-08-11 restructure had
+  moved the queue's detail into `docs/open/` and indexed it nowhere. `docs/README.md` now
+  lists it under *Current spec* beside the index it details (and re-describes OPEN-WORK as
+  an index, naming its new gate); `docs/DOC-REGISTRY.md` gained its row with the trigger
+  *an item opens, closes, or changes gate*. *Active work* re-opened for this handoff,
+  recorded as **handoff-only** — its prompt was handed over inline and never written to
+  `docs/`, so there is no `.prompt.md` to archive with it.
+  **The `CLAUDE.md` correction is PROPOSED, not applied** — surfaced as a diff for Arpit.
+- **P1 — `tests/test_queue_honesty.py`.** Fails only on a *contradiction* between the
+  queue header's checkable claims (version · tag · clean-and-pushed) and git; silent when
+  the header claims nothing; skips when ground truth is unavailable. Counts are not gated.
+  **Two false negatives were found by falsifying the real file, not by reading the
+  regex** — and both would have left the gate green while reading nothing: (a) the
+  past-tense filter swallowed a live claim fused to it across `.**`, (b) the matcher
+  wanted bare `HEAD == origin/main` while every claim in this repo is written
+  `` `HEAD` is `origin/main` ``. Each earned its own test. Mutation-checked in both
+  directions: stubbing `contradictions` reddens 4 tests, removing the past-tense filter
+  reddens exactly 1 — the right one.
+- **P2 — L1-FIELD Q3 answered, and one cause fixed.** Three producers write `args_hash`;
+  the shim route folded in `argv[0]` (`$REAL`, an absolute machine-specific path) while
+  the hook and transcript route hash the tail, so the exact join was structurally unable
+  to fire. Established by **reconstructing all three real attestations from the Claude
+  transcripts and re-hashing them**, not by inference. Fixed forward-only in
+  `graphifymeter.run`. **Judged a fix, not a capture change**: no new field, no schema
+  change, and the convention was already documented in `content_signature` and already
+  implemented by two of three producers. **Necessary, not sufficient** — a piped
+  invocation still misses (cause 2, parked as a proposal) and an attested run can have no
+  usage row at all (cause 3, reported not fixed). No test caught it because every existing
+  test built its usage row by hand with the *attestation's* convention, asserting one
+  side's code against itself.
+- **P3 — commit hygiene, read-only.** 65 staged files / 8 unpushed commits inventoried and
+  a split proposed in the session response. **Nothing pushed, tagged, or discarded.**
+- Nine of eleven queue items were **not touched, simulated, or prepared** — they need a
+  real Copilot/Kiro/second repo or a trigger that has not fired.
+
+- Implemented: `docs/README.md` + `docs/DOC-REGISTRY.md` (`open/` row) · new
+  `tests/test_queue_honesty.py` · `graphifymeter.run` hashes `cmd[1:]` + its first
+  real-interceptor test · `docs/regression/2026-08-12-l1-attest-args-hash-mismatch.md` ·
+  `docs/proposals/attest-join-command-normalization.proposal.md` · `docs/open/L1-FIELD.md`
+  Q3 · FORMULAS §2.11/§2.12 · CHANGELOG v0.49.0 · the queue header de-staled (47 → 65
+  files, suite figure now measured).
+- Files: `cage/graphifymeter.py` · `tests/test_queue_honesty.py` ·
+  `tests/test_hooks_layer.py` · `docs/{README,DOC-REGISTRY,OPEN-WORK,FORMULAS}.md` ·
+  `docs/open/L1-FIELD.md` · `docs/proposals/{README,attest-join-command-normalization}.md` ·
+  `docs/regression/{README,2026-08-12-l1-attest-args-hash-mismatch}.md` · `CHANGELOG.md`
+- Tests: **green — 1650 passed / 0 failed / 11 skipped** (1639 → 1650; +10 queue-honesty,
+  +1 real-interceptor join).
+- Archived on implement: the handoff moved to
+  `docs/archive/v0.49-open-queue-agent-lane.handoff.md` with its header naming the three
+  ways the build corrected it; `docs/README.md` *Active work* emptied, archive index and
+  CHANGELOG *Built from* updated, `INTERVIEW.md` state-of-play rewritten. **No prompt
+  doc exists to archive** — it was handed over inline, recorded rather than fabricated.
+- **OPENWORK-SECTION-REFS filed and CLOSED in the same session.** Five live citations
+  named OPEN-WORK sections the 2026-08-11 restructure deleted — found while drafting the
+  `CLAUDE.md` diff, whose line 953 was one of them. All five re-pointed at a surviving
+  home and made **explicitly past-tense** ("raised as §G.1; that section is gone — the
+  standing note is now here"), per the removed-doc citation rule: `constants.py` +
+  `FORMULAS.md` §2.10 (the 0.3 confidence note) · `pathshim.py` → `wiringscan` /
+  `cage query stale-wiring` · `viewexport.py` → `docs/open/OUTPUT-GROWTH.md` ·
+  `explain_data.py` (bare `OPEN-WORK.md` → a resolvable path) · `CLAUDE.md`'s lab-PATH
+  rule. **The residual is the interesting part and is carried forward in the item's
+  place:** `test_doc_links.py` structurally cannot see this class — they are bare prose,
+  not markdown links — and OPEN-WORK no longer *has* stable sections to anchor to, so the
+  honest fix is *stop citing sections*, not *gate them*. Recorded here rather than left as
+  a queue row, since nothing remains to do.
+- **The `CLAUDE.md` correction was APPLIED** (2026-08-12), on Arpit's explicit go — the
+  *Documentation discipline* OPEN-WORK bullet now describes the index-plus-`docs/open/`
+  shape, names the queue-honesty gate, and records **why counts are not gated**.
+- Next: Arpit's call on the proposed `CLAUDE.md` diff and the commit split; then push the
+  65 files, then [NET-1](open/NET-1.md).
+
+---
+
+## 2026-08-11 — the queue emptied: five held decisions taken, two doc programs built
+
+The seven items that made up tiers 2 and 3 of `OPEN-WORK.md`, closed in one session.
+**Every one of them was a decision that had been deliberately withheld from a fix
+commit**, so the record of *why* matters more than the diff.
+
+- **Implemented — COMMITS-WINDOW (verdict B).** `commitview.summarize(limit=…)` bounds
+  the read at the row cap, applied **before** the per-commit `git show` rather than after
+  every row has paid for one. Text path only: `--csv`/`--json` stay complete, `--all`
+  lifts it, `sha` (detail) is never capped. Dropped commits land in `limited_out` and are
+  footnoted as **not read** — the Σ row covers only what was read, so "N more" alone would
+  have let a bounded total read as a whole-history one. A default relative `--since` was
+  rejected (a wall clock in the default path; it also bounded *nothing* when measured).
+- **Implemented — COPILOT-PREMIUM-DEAD.** The `premium` column is gone from the chats
+  text table and CSV; the field is untouched and still summed into the payload, so
+  `--json` keeps the recorded fact. It is `floor(credits)` — a lossy duplicate of the
+  column beside it — and the earlier framing ("can only print 0") was itself an
+  over-claim: it prints 0 whenever credits < 1, and merely rounds otherwise.
+- **Implemented — REV-CREDITS defect 2 (one basis per shutdown).** New additive-optional
+  call field `billed_with` + pricing **rung 0**: every non-carrier row of a credit-bearing
+  copilot shutdown links to the carrier and prices at `$0.00` **on the credits basis**,
+  with the carrier's id as the matched key. Reports the **same** `credits` match kind as
+  rung 1 on purpose, so every consumer that already excludes a credits-priced row from
+  token-derived reasoning inherits it with no per-view fork. Suppression is conditional on
+  a rate existing. **Pro-rata by token share was rejected** — it would derive credits from
+  tokens. **Forward-only**; carried as `CREDITS-LEGACY-SPLIT`.
+- **Implemented — OTEL-SEMCONV-PIN.** Verification changed the answer: the GenAI repo has
+  **no tagged release** (changelog is `## Unreleased`, everything `Status: Development`),
+  so option 3 as written was impossible. The pin now *states what it pins* —
+  `OTEL_SEMCONV_VERSION_MEANS` + `_SOURCE` + a maturity string — rather than inventing a
+  version. `gen_ai.system` → `gen_ai.provider.name` (renamed in semconv v1.37.0, five
+  releases before the pinned one). Emitting both rejected: a consumer that sums rather
+  than coalesces would double-count. **Breaking for `--otel` consumers.**
+- **Implemented — CLI-GAPS(b).** `prices`/`study`/`policy` are real subparsers. Each
+  action owns its `--help` and its own flags, so an inapplicable flag is an argparse
+  usage error (exit 2) instead of a flat union plus a runtime refusal — `cmd_study`'s
+  `--csv`/`--export` refusals were deleted as unreachable, and `study report` became a
+  real parser leaf (`VIEW_LABELS` is now empty).
+- **Implemented — STEERING-EDITS.** All six held `CLAUDE.md` edits applied (A·B·C·D·F·G).
+  **Two landed amended by the same day's work**: A gained the commits cost bound, B's
+  per-call bullet gained rung 0. Proposal archived.
+- **Implemented — DOC-LINK-CHECK.** `tests/test_doc_links.py`: case-sensitive against
+  `git ls-files`, never the filesystem. **Policy: LIVE fails, HISTORY is exempt and
+  counted.** A naive walker was red on **155** links, nearly all history pointing at pairs
+  that gained a `vX.Y-` prefix when archived — those were correct when written, and
+  rewriting a dated record to keep a link green would falsify the record. Links inside
+  code spans/fences are illustrations, not citations. Repaired **15** live dangles.
+- **Two OPEN-WORK items were already built at HEAD** and the file still listed them as
+  pending: REV-HARDEN P2's adoption `--since` double-filter and the fabricated `$0`
+  (`convert.saved_usd_opt`). Fourth staleness in that file in a week — its markers are
+  not evidence.
+- Files: `cage/commitview.py` · `cage/clicmds.py` · `cage/constants.py` · `cage/chats.py`
+  · `cage/schema.py` · `cage/transcript.py` · `cage/creditprice.py` · `cage/prices.py` ·
+  `cage/otelout.py` · `cage/explain.py` · `cage/explain_data.py` · `cage/cli.py` ·
+  `CLAUDE.md` · `README.md` · `docs/{OPEN-WORK,FORMULAS,CLI,README,doc-size-discipline}.md`
+  · `docs/compare/copilot-pricing-basis.compare.md` ·
+  `docs/research/2026-08-03-otel-genai-semconv-pin.md` · `docs/{DOC-REGISTRY,INTERVIEW,WORKLOG}.md`
+  · `docs/proposals/README.md` → `docs/archive/v0.49-steering-edits-pending.proposal.md`
+  · `tests/` (7 files + new `test_doc_links.py`) · 3 chats goldens re-blessed ·
+  `tests/fixtures/transcripts/copilot/cli/expected.json`
+- Tests: **green — 1639 pass / 0 fail / 11 skipped** (from 1616). Every fix ships a test
+  that fails before it; the copilot-CLI fixture corpus proved defect 2 on real fixture
+  data (its expected rows are the multi-model shutdown case).
+- Next: **the agent lane is empty.** NET-1 and the field verifications are Arpit's;
+  `CREDITS-LEGACY-SPLIT` needs a count from a real ledger before any code.
+
+---
+
 ## 2026-08-11 — agent-lane sweep P6: EXPORT-SCOPE — the last three report-shaped views
 
 - **Verified against the live parser first:** `cage authorship summary`, `cage study
@@ -4798,3 +4946,70 @@ land · `cage query kiro-routing`.
   implementation paused on request; completion specced as Phase 0 of the handoff.
 - Next: Phase 0 items 1–9 in the handoff (wiringscan finish → doctor → explain
   registry → CI workflow → packaging → dummyrepo → docstrings → test triage → green).
+
+## 2026-08-11 — CREDITS-LEGACY-SPLIT: closed by a count, no code change
+
+**Outcome: option (a) — leave the ledger, state the limit.** The item was blocked on a
+number, not a decision. The number is **zero**.
+
+Counted across `.cage/ledger/calls-*.jsonl`: 48,069 rows; `claude-code` 47,986 and
+`copilot` 83 (vscode 57 / cli 26); 83 `(agent, session, surface, ts)` copilot groups;
+**0 groups carrying more than one model**. `credits-2026-08.jsonl` holds 3 rows, all
+`kiro` / `model: auto`, three distinct sessions. The double-basis defect requires a
+shutdown group of ≥2 rows; none exists in either shard family.
+
+REV-CREDITS defect 2's fix is forward-only, and with no legacy multi-model group there is
+nothing for it to have left behind. **No read-side group detector and no
+`cage data migrate-*` verb were built** — building either would have been code against a
+number nobody had measured, the exact failure the item was filed to prevent.
+
+**Stated limit, carried forward:** the count is *project* scope. `~/.cage` was unreachable
+from the environment that ran it, so a copilot-CLI shutdown with the cwd outside any
+project (the KIRO-CLI-SCOPE shape) is excluded. Evidence, reopen trigger and the re-run
+script: [regression/2026-08-11-credits-legacy-split-count.md](regression/2026-08-11-credits-legacy-split-count.md).
+
+## 2026-08-11 — ADOPT-COV: closed as filed, by its own pre-committed finding
+
+The item pre-committed to a result: *"if half B is empty there, the finding is that the
+shim route is structurally unattributable — report it."* Read against the real dev ledger,
+**half B is not empty and the shim route is not zero**:
+
+- half B attributes **7 of 9 savings rows (78%)** across **two** agents (claude 6,
+  copilot 1), both joined by session;
+- half A's **shim route shows 2 runs** (1 receipt, 1 non-measured) — the queue's standing
+  "the shim route has produced zero rows" was stale;
+- the structural limit **is already reported in the tool's own output, unprompted**:
+  *"the interceptor runs as a subprocess and cannot know which agent spawned it
+  (structural, not a capture gap)."*
+
+So the finding the item existed to produce is already shipping as honest output, and **no
+code is owed**. Adding an `agent` field to usage rows (or an env-stamped agent hint on the
+shim) remains a **capture change requiring its own proposal** — unchanged.
+
+**Residual limit carried forward to L1-FIELD, per the removal law:** the
+"attested by an L1 hook" table printed **zero rows** while the session-join produced
+seven, so attestation contributes nothing to coverage today despite a non-empty
+`.cage/state/attest.jsonl`. Evidence:
+[regression/2026-08-11-adopt-cov-dev-ledger-read.md](regression/2026-08-11-adopt-cov-dev-ledger-read.md).
+
+## 2026-08-11 — doc hygiene: two proposals archived, two constraints rescued
+
+`copilot-credits-integrity.proposal.md` and `review-hardening.proposal.md` were verified
+built **per file, against the code** (not in aggregate, and not off OPEN-WORK's markers)
+and moved to `archive/` with the `v0.49-` prefix.
+
+Two things that existed **only** in review-hardening's prose were moved into OPEN-WORK's
+*Standing constraints* before the file left `proposals/` — the failure mode the 2026-08-02
+cut recorded:
+
+1. copilot's lifecycle gaps text must say **"unverified on a real Copilot"** until
+   L1-FIELD verifies (`sessionStart`/`sessionEnd` are cage's own invented names;
+   `_session()` assumes Claude's payload shape).
+2. **The detector is the live parser** — P1 declined the filed `verbmap.REMOVED` migration
+   map because a hand-kept map goes stale in the release that renames an event. Where a
+   proposal and the shipped code disagree, the code wins.
+
+Also corrected: `compare/README.md` described v0.44 and v0.48 as *unreleased* (both
+shipped) and COMMITS-WINDOW as *awaiting verdict* (decided B and built). New:
+[FIELD-RUNBOOK.md](FIELD-RUNBOOK.md) — copy-paste procedures for the five hands-only
+items, every command checked against `cage 0.48.0`'s real `--help`.

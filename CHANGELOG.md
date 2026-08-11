@@ -2,6 +2,144 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
+## v0.49.0 (unreleased) — the queue emptied: seven held decisions, taken
+
+Seven items sat in `OPEN-WORK.md` for a reason: each was a **decision deliberately kept
+out of a fix commit**. This release takes all of them. Two are breaking-ish for readers
+of specific surfaces and are called out below.
+
+### Changed — `cage insights commits` is bounded by rows, not by history (COMMITS-WINDOW)
+
+- Every rendered row costs one `git show --numstat` **subprocess**, and the 20-row cap
+  was applied *after* every commit in the history had already paid for one — measured
+  **6.4s to print 20 rows from 123 commits**. The read is now capped at the row cap,
+  applied before the loop.
+- **Text path only.** `--csv`/`--json` stay complete and pay full cost — honestly rather
+  than accidentally — `--all` lifts it, and `cage insights commit <sha>` is never capped.
+- **The Σ row now covers what was read**, so the footnote says *not read*, not merely
+  *not shown*: `· N older commit(s) not read — … --all reads every commit`.
+- A default relative `--since` was **rejected**: a wall clock in the default path, and it
+  bounded nothing when measured. [compare](docs/compare/commits-view-cost-bound.compare.md)
+
+### Fixed — a multi-model Copilot shutdown is billed once, not once per model (REV-CREDITS defect 2)
+
+- GitHub computes `totalPremiumRequests` over **every** model in a `session.shutdown`.
+  Cage stamped that on one carrier row and let its siblings fall through to
+  tokens×table — so the same spend was priced twice, once at GitHub's rate and once at
+  cage's list rates.
+- New additive-optional call field **`billed_with`** (a recorded structural fact, never a
+  derived number) + pricing **rung 0**: a linked row prices at `$0.00` **on the credits
+  basis**, with the carrier's id as the matched key — *priced, elsewhere, by name*,
+  neither a fabricated `$0` nor UNPRICED.
+- **Splitting the credit pro-rata by token share was rejected** — it would derive per-row
+  credits from tokens, forbidden in both directions.
+- **Forward-only**: rows written before this are never rewritten and still split. Tracked
+  as `CREDITS-LEGACY-SPLIT`. [compare](docs/compare/copilot-pricing-basis.compare.md)
+
+### Changed — ⚠ `--otel` emits `gen_ai.provider.name`, not `gen_ai.system` (OTEL-SEMCONV-PIN)
+
+- **Breaking for consumers of `cage data export --otel`.** `gen_ai.system` was renamed in
+  semantic conventions **v1.37.0**, five releases before the version cage pins, so cage
+  was emitting a deprecated attribute while claiming a target that had dropped it.
+  **Migration:** read `gen_ai.provider.name`. Emitting *both* names was rejected — a
+  consumer that sums rather than coalesces would double-count.
+- **The pin now states what it pins.** `1.42.0` names the *last main-repo release that
+  defined `gen_ai.*`* (2026-06-12, when they moved to
+  `open-telemetry/semantic-conventions-genai`). That repo carries **no tagged release**
+  and is `Status: Development` throughout, so `cage.meta` stamps the source repo and the
+  maturity rather than a version nobody could verify — new `semconv_means` /
+  `semconv_source` keys. The pin re-points when that repo cuts its first tag.
+  [research](docs/research/2026-08-03-otel-genai-semconv-pin.md)
+
+### Changed — `prices`, `study` and `policy` take real subcommands (CLI-GAPS(b))
+
+- Their action was a positional choice, so `cage prices set --help` rendered the *group's*
+  help and the flags were a flat union (`--input` on `list`, `--apply` on `diff`). Each
+  action now owns its help and its own flags.
+- An inapplicable flag is an **argparse usage error (exit 2)** instead of a runtime
+  refusal: `cage study id --csv`, `cage policy diff --apply`. Bare `cage prices` /
+  `cage study` / `cage policy` print the action list.
+- `study report` is now a real parser leaf, so it is the only study action carrying
+  `--csv`/`--export`/`--stamp`.
+
+### Removed — the `premium` column on `cage insights chats` (COPILOT-PREMIUM-DEAD)
+
+- It is `floor(credits)` — the same counter as an int — so it stood beside `credits` as a
+  **lossy duplicate** that printed `0` for every row cage writes (`totalPremiumRequests`
+  is fractional; `int()` floors it and `make_call` omits the key).
+- The **field is untouched** and still summed into the payload, so `--json` keeps the
+  recorded fact. Precision in the data, brevity in the display.
+
+### Added — a doc link gate (DOC-LINK-CHECK)
+
+- `tests/test_doc_links.py` resolves every `.md` link **case-sensitively against
+  `git ls-files`**, never the filesystem — a citation broken only by case is invisible on
+  macOS and dead on GitHub (DOC-CASE's class).
+- **Policy: LIVE docs fail, HISTORY docs are exempt and counted.** A naive walker was red
+  on **155** links, nearly all `archive/`/`regression/`/WORKLOG/CHANGELOG entries pointing
+  at pairs that gained a `vX.Y-` prefix *when they were archived*; those links were true
+  when written, and editing a dated record to keep one green would falsify the record.
+  15 live dangles repaired.
+
+### Fixed — the L1 attestation join could never fire on the interceptor route (L1-FIELD Q3)
+
+- `cage insights adoption`'s *"by agent — attested by an L1 hook"* table read **zero** for
+  nine days while `state/attest.jsonl` held real rows. Three producers write `args_hash`
+  and two conventions were in use: the shim/native route hashed the **full argv**, the
+  hook and the transcript route the **tail**.
+- `argv[0]` on that route is `$REAL` — the *absolute, machine-specific* path the shim
+  resolves — so the key was unreproducible by anything else. `graphifymeter.run` now
+  hashes `cmd[1:]`, the exclusion `content_signature` already documented.
+- **Forward-only.** `args_hash` is a diagnostic `state/` field, never read by a money
+  view, and rows are never rewritten — so no number moves and existing rows keep their
+  keys until new runs land.
+- No test caught it because every test built its usage row by hand with the
+  *attestation's* convention, asserting one side's code against itself. The new test runs
+  the real interceptor.
+- **Two causes remain, stated not fixed:** a piped invocation still misses (the hook
+  attests a shell command line, the interceptor an argv) — parked as
+  `docs/proposals/attest-join-command-normalization.proposal.md`; and an attested run can
+  have no usage row at all. [Finding](docs/regression/2026-08-12-l1-attest-args-hash-mismatch.md).
+
+### Added — a queue honesty gate (QUEUE-HONESTY)
+
+- `tests/test_queue_honesty.py` fails the suite when `docs/OPEN-WORK.md`'s header makes a
+  **checkable claim that contradicts git** — version, latest tag, or clean-and-pushed.
+  The header had gone stale six times in a week and was the last uninstrumented drift
+  surface in the repo.
+- **Asserting `HEAD == origin/main` outright was rejected in pre-mortem**: it reddens on
+  every legitimate in-flight change, and a gate that cries wolf gets ignored. It fails
+  only on contradiction, is silent when the header claims nothing, and **skips** when
+  ground truth is unavailable (no git, no `origin`, a shallow clone).
+- **Counts are deliberately not gated** — "8 commits ahead", "47 staged files" are
+  true-at-writing and would redden on the next commit.
+- **A past-tense recital never fires.** The header narrates its own corrections; punishing
+  that would delete the record to stay green. Two false *negatives* were found by
+  falsifying the real file rather than reasoning about the regex: a past-tense clause
+  fused to a live claim across `.**`, and the repo's own backticked house style
+  (`` `HEAD` is `origin/main` ``) matching nothing at all.
+
+### Documentation
+
+- **`docs/open/` finished in the law** — the 2026-08-11 restructure had moved the queue's
+  detail into `docs/open/` but indexed it nowhere: `docs/README.md` now lists it beside
+  the index it details, and `docs/DOC-REGISTRY.md` carries its row and owner-trigger
+  (*an item opens, closes, or changes gate*).
+- **All six held `CLAUDE.md` steering edits applied** (STEERING-EDITS) — the authorship
+  bullet, the copilot credit ladder, `FORMULAS.md` in the entry-point list, the dogfood
+  section, the chats `agent%` + second carve-out, and the graphify-coverage bullet. Two
+  landed *amended* by the decisions above. Built from:
+  [proposal](docs/archive/v0.49-steering-edits-pending.proposal.md).
+- `docs/OPEN-WORK.md`'s fix lane is **empty**; its Implementation section had gone stale
+  describing two items that were already built at HEAD.
+- New queue item **OPENWORK-SECTION-REFS** — the restructure deleted OPEN-WORK's lettered
+  sections and five live citations still name them (`§I.2a`, `§B2`, `G.1`). They are bare
+  prose, not links, so the doc-link gate structurally cannot see them.
+- Suite **1616 → 1639 → 1650**. Built from:
+  [agent-lane sweep](docs/archive/v0.49-agent-lane-sweep.handoff.md) ·
+  [agent-lane refill](docs/archive/v0.49-open-queue-agent-lane.handoff.md) (handoff only —
+  its prompt was handed over inline and never written to `docs/`).
+
 ## v0.48.0 (2026-08-10) — every report and insight is an artifact
 
 Two asks, one collision with cage's determinism law, and the split that resolves it.

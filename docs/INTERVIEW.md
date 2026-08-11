@@ -23,7 +23,78 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
 
 ---
 
-## State of play (2026-08-11 — pick up here on a model switch)
+## State of play (2026-08-12 — pick up here on a model switch)
+
+- **The agent lane is empty again, and this time it is empty *because it was measured*,
+  not because it was worked through.** Of eleven queue items, **nine are structurally
+  unbuildable by an agent** — five need a real Copilot/Kiro/second repo or accumulated
+  real usage, four sit on triggers that have not fired. The four that were buildable are
+  done. **1639/0/11 ⇒ 1650/0/11.**
+- **Two decisions are waiting on Arpit and nothing should proceed past them:** the
+  `CLAUDE.md` *Documentation discipline* correction (proposed as a diff, **never
+  applied** — steering files are not silently rewritten) and the 9-commit split for the
+  **65 staged files / 8 unpushed commits**. Still `__version__` `0.48.0`, v0.49 in tree,
+  unreleased. Nothing was pushed or tagged.
+- **The header of `docs/OPEN-WORK.md` is now test-gated** (`tests/test_queue_honesty.py`)
+  — the last uninstrumented drift surface in the repo. It checks only *durable* claims
+  (version · tag · clean-and-pushed) and deliberately ignores counts, and it **skips**
+  rather than fails when git ground truth is unavailable.
+- **The thing to internalise from this session, and it generalises past this repo: a test
+  that builds both sides of a join with one side's code proves nothing.** L1's attested
+  table read zero for nine days behind a green suite, because every test fabricated its
+  usage row with `usagelog.args_hash(<tail>)` — the *attestation's* convention. The one
+  producer that disagreed (the shim route, folding in an absolute machine-specific
+  `argv[0]`) was never exercised. When you test a join, make at least one side come from
+  the real producer.
+- **Its twin, for prose gates: falsify the real file, don't reason about the regex.** The
+  queue gate passed all its own fixtures while reading **nothing** from the real header —
+  twice. A past-tense clause fused to a live claim across `.**`, and a matcher wanting
+  bare `HEAD == origin/main` when this repo writes `` `HEAD` is `origin/main` ``. Neither
+  was visible from a green result. Both surfaced the instant the real file was mutated.
+- **What I'd warn you about:** the pressure on a diagnosis phase is to end with a fix that
+  *looks* like it closed the thing. P2's fix closes **one of three** causes, and the other
+  two are named in the finding, the changelog, and the queue item rather than smoothed
+  over. All three real attestations are piped, so the table on the dev ledger will still
+  read zero — **the honest version of "fixed" here is "necessary, not sufficient."**
+- **A smaller warning, same family:** the handoff's own "47 staged files" was already
+  wrong when written (65). That is why the gate this session built refuses to check
+  counts — a number that is true only at the instant of writing is not a claim worth
+  gating, it is a claim worth not making.
+
+## State of play (2026-08-11 late — historical)
+
+- **The agent lane is EMPTY.** All seven items that made up tiers 2 and 3 of
+  `OPEN-WORK.md` were decided and built in one session: COMMITS-WINDOW ·
+  COPILOT-PREMIUM-DEAD · REV-CREDITS defect 2 · OTEL-SEMCONV-PIN · CLI-GAPS(b) ·
+  STEERING-EDITS · DOC-LINK-CHECK. **1616/0 ⇒ 1639/0.** In tree as **v0.49, unreleased**;
+  `__version__` is still `0.48.0`, the CHANGELOG entry **is** written, and the release
+  needs Arpit's go (the GitHub release IS the PyPI trigger).
+- **Two of them are reader-facing breaks and must not be released quietly:**
+  `--otel` now emits `gen_ai.provider.name` instead of `gen_ai.system` (renamed upstream
+  in semconv v1.37.0), and `cage insights chats` lost its `premium` column. Both are in
+  the changelog with the migration; neither moves a stored number.
+- **The one thing to internalise from this session:** *a recommendation written from
+  partial evidence is not a decision.* OTEL-SEMCONV-PIN's own research doc recommended
+  "re-point the pin at the GenAI repo's versioning" — and when I went to do it, that repo
+  turned out to have **no tagged release at all**. The option was impossible as written.
+  What shipped instead states what `1.42.0` *means* rather than citing a number nobody
+  could check. **Re-verify the premise of a recommendation before executing it**, even
+  when the recommendation is cage's own and was written eight days ago.
+- **The rule that decided the hardest call:** REV-CREDITS defect 2 had two candidate
+  fixes and the standing law picked one. Splitting a group credit pro-rata by token share
+  is *arithmetically* fine and **forbidden** — credits are never derived from tokens in
+  either direction. So the fix had to be a **recorded structural fact** (`billed_with`),
+  not a computation. When two fixes both work, check which one invents a number.
+- **`CLAUDE.md` is no longer behind the code.** All six held steering edits are applied,
+  and two landed *amended* by decisions taken the same day. The proposal that held them
+  recorded its own best lesson on the way out: **a held patch decays against its target**
+  — its `just test` number went 1401 → 1441 → 1462 → 1639 while it waited, which is why
+  it became a rule instead of a number.
+- **What I'd warn you about:** `docs/OPEN-WORK.md`'s §Implementation described two items
+  as pending that were **already built at HEAD**. That is the fourth wrong marker in that
+  file in a week. It is an excellent queue and a poor oracle — read the code.
+
+## State of play (2026-08-11 — the agent-lane sweep, historical)
 
 - **The agent-lane sweep is CLOSED — all six phases, 1542/0 ⇒ 1616/0, zero goldens
   re-blessed.** Pair archived to `docs/archive/v0.49-agent-lane-sweep.{handoff,prompt}.md`.
@@ -190,8 +261,8 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
   bar NOT WRONG, NOT DUPLICATED). Suite last green at **817 tests**. Do not
   commit, tag, or release until Arpit says so.
 - **In flight / immediate next:** execute
-  [cage-lab-setup.prompt.md](cage-lab-setup.prompt.md) (**Opus**, both sibling
-  checkouts) — create `../cage-lab` fresh per [cage-lab-plan.md](cage-lab-plan.md)
+  [cage-lab-setup.prompt.md](archive/v0.36-cage-lab-setup.prompt.md) (**Opus**, both sibling
+  checkouts) — create `../cage-lab` fresh per [cage-lab-plan.md](archive/v0.36-cage-lab.plan.md)
   v3 + [PLAN.md](PLAN.md) §11: the M/G correctness matrix, three-way auto-verify,
   the **eyeball surface** (source + ledger + derivation with line refs, side by
   side — Arpit verifies manually), his playground, then publish the baseline into
@@ -216,8 +287,25 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
 
 ## In flight + the single next step
 
-**Update 2026-08-03 (latest) — CHATS-AUTHOR is BUILT and green (1462/0). The single
-next step is the v0.46.0 release; the agent lane's next build is tier 2's decisions.**
+**Update 2026-08-11 (latest) — nothing is in flight. The single next step is the
+v0.49.0 release, and it needs Arpit's go.**
+
+- The agent lane has **no queued work**. The only item a future session could pick up
+  unprompted is **CREDITS-LEGACY-SPLIT**, and it is blocked on a *measurement*, not a
+  decision: how many multi-model copilot-CLI shutdown groups exist on a real ledger?
+  Defect 2's fix is forward-only (rows are append-only; `append_new` dedupes on the
+  deterministic id), so pre-2026-08-11 rows still price on two bases. **Do not rewrite
+  the ledger to fix this** — get the count first, then pick between stating the limit, a
+  read-side detector, and a one-off migration verb.
+- Everything else left in `OPEN-WORK.md` is **Arpit's hands**: NET-1 (unblocked, n=5 per
+  arm) and five field verifications that need a real machine — L1-FIELD's Copilot/Kiro
+  legs, KIRO-MCP-FIELD, HR-FIELD, ADOPT-COV, GFX-KIRO-RATE.
+- Tier 5 is parked **with triggers**, and the triggers are the point: GF-LAUNCHER,
+  TOOL-SDK, KIRO-CLI-SCOPE, OUTPUT-GROWTH, COPILOT-SIDECAR. OUTPUT-GROWTH in particular
+  reopens **only with a named size number from a real machine** — never re-argued from
+  first principles.
+
+**Update 2026-08-03 — CHATS-AUTHOR is BUILT and green (1462/0). (historical)**
 
 - **`cage insights chats` now carries `agent%`** — per chat, the share of evidenced
   landed lines that matched the agent's own proposals. It closed the last item the
@@ -425,7 +513,7 @@ you touch any savings number.**
 
 **Pre-2026-08-01 (still true unless superseded above):**
 
-- **Next step:** execute [cage-lab-setup.prompt.md](cage-lab-setup.prompt.md)
+- **Next step:** execute [cage-lab-setup.prompt.md](archive/v0.36-cage-lab-setup.prompt.md)
   (**Opus**, both sibling checkouts) — it is the only unbuilt pair in `docs/`
   root, and its prerequisites are all built and green.
 - Everything else specced today is **implemented** and archived under
@@ -507,6 +595,13 @@ you touch any savings number.**
   rule exists to prevent, and it went unseen for months because the dev filesystem is
   case-insensitive. When you add a doc citation, check the **tracked** name
   (`git ls-files`), not the one that happens to open.
+  **Closed mechanically 2026-08-11** (`tests/test_doc_links.py`) — and the *policy* is the
+  transferable part, not the walker. A naive gate was red on **155** links, ~140 of them
+  correct history: `archive/`/`regression/`/WORKLOG/CHANGELOG entries citing pairs that
+  gained a `vX.Y-` prefix **when they were archived**. Editing a dated record to keep a
+  link green would falsify the record. So the corpus splits — **live fails, history is
+  exempt and counted** — and the count is asserted, because a silently-shrinking corpus
+  is how "we check links" becomes "we check some links and nobody remembers which".
 - **Verify a log shape against real data before coding to a plan's claim.** The
   v0.36 plan asserted the Copilot VS Code title sits on the `kind:0` record; 143
   real sessions said otherwise (it's a `customTitle` patch record, with
@@ -537,6 +632,20 @@ you touch any savings number.**
 
 ## Maintainers
 
+- Claude (Opus 5) — 2026-08-11 (late) — emptied the queue: seven held decisions taken and
+  built (1616/0 ⇒ 1639/0), tiers 2 and 3 of OPEN-WORK deleted.
+  **The lesson I'd want inherited: when two fixes both work, take the one that does not
+  invent a number.** REV-CREDITS defect 2 could have been closed by splitting a group
+  credit pro-rata across its rows by token share — arithmetically clean, and forbidden,
+  because it derives credits from tokens. The fix that shipped records a *structural
+  fact* (`billed_with`) instead and lets the pricing ladder read it. Second, and it cost
+  me a rewrite: **re-verify the premise of a recommendation before executing it, even
+  cage's own.** The OTel research doc recommended re-pointing the pin at the GenAI repo's
+  versioning; that repo has no tagged release, so the recommended option did not exist. A
+  recommendation written from partial evidence is not a decision. Third, cheerfully:
+  **a decision doc pays for itself at execution time.** Five of these seven were decided
+  in minutes because someone had already written the options, the matrix and the reopen
+  trigger — the expensive part had been done, deliberately, before it was needed.
 - Claude (Opus 5) — 2026-08-11 — ran the agent-lane sweep (six phases, 1542/0 ⇒ 1616/0).
   **The lesson I'd want inherited: a spec's *defect list* deserves the same suspicion as
   a spec's *fix list*.** This handoff had already re-verified the tracker and corrected it
