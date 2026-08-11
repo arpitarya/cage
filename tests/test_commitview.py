@@ -504,3 +504,74 @@ def test_the_rendered_table_abbreviates_but_the_data_carries_the_full_sha(world)
     assert world["c2"] not in text                      # never the full 40 in a table
     csv = commitview.render_csv(d)
     assert world["c2"] in csv                           # but always in the data
+
+
+# ── COMMITS-WINDOW · the cost bound (verdict B, 2026-08-11) ───────────────────
+
+def _diff_calls(monkeypatch) -> list[str]:
+    """Spy on the ONE expensive thing this view does: one `git show --numstat`
+    subprocess per commit READ. Counting rendered rows would not have caught the
+    defect — the rows were always capped; the subprocesses never were."""
+    from cage import linematch
+    seen: list[str] = []
+    real = linematch.commit_diff
+
+    def spy(repo, sha):
+        seen.append(sha)
+        return real(repo, sha)
+
+    monkeypatch.setattr(commitview.linematch, "commit_diff", spy)
+    return seen
+
+
+def test_the_limit_bounds_the_subprocesses_not_just_the_rendered_rows(world, monkeypatch):
+    """The whole defect: `render_commits` capped the table at 20 *after* every commit in
+    the history had already paid for its own `git show`. Fails before the fix — three
+    commits were read no matter what the caller asked for."""
+    seen = _diff_calls(monkeypatch)
+    d = _summary(world, limit=1)
+    assert len(seen) == 1, f"read {len(seen)} commits for a 1-row view"
+    assert len(d["rows"]) == 1
+    assert d["limited_out"] == 2
+
+
+def test_the_limit_keeps_the_NEWEST_commits(world, monkeypatch):
+    """Capping on the rank axis means the rows a reader scans first, not an arbitrary
+    slice: `windows` is oldest-first and the table is newest-first."""
+    del monkeypatch
+    d = _summary(world, limit=1)
+    assert [r["sha"] for r in d["rows"]] == [world["c3"]]
+
+
+def test_the_commits_it_never_read_are_footnoted_never_silently_cut(world):
+    """No silent caps. And the Σ row now covers only what was read, so the footnote has
+    to say *not read*, not merely *not shown* — otherwise a bounded total reads as a
+    whole-history one."""
+    text = commitview.render_commits(_summary(world, limit=1))
+    assert "2 older commit(s) not read" in text
+    assert "--all" in text and "--csv/--json are never capped" in text
+
+
+def test_no_limit_reads_everything_byte_for_byte(world, monkeypatch):
+    """`--all` and the CSV/JSON paths lift the bound entirely — the trade accepted in
+    the compare doc is that they pay full cost, honestly rather than accidentally."""
+    seen = _diff_calls(monkeypatch)
+    d = _summary(world)
+    assert len(seen) == 3 and len(d["rows"]) == 3 and d["limited_out"] == 0
+
+
+def test_the_detail_view_is_never_capped_at_any_age(world, monkeypatch):
+    """`cage insights commit <sha>` must render a commit of any age — a cost bound on
+    the list view must never become a reachability bound on a specific commit."""
+    seen = _diff_calls(monkeypatch)
+    d = _summary(world, sha=world["c1"], limit=1)      # the OLDEST commit
+    assert d["ok"] and [r["sha"] for r in d["rows"]] == [world["c1"]]
+    assert seen == [world["c1"]] and d["limited_out"] == 0
+
+
+def test_the_limit_never_moves_a_number_for_the_rows_it_did_read(world):
+    """Determinism: bounding the read is a cost decision, never a value one. Every cell
+    of a row that survives the cap is byte-identical to its uncapped self."""
+    full = {r["sha"]: r for r in _summary(world)["rows"]}
+    for r in _summary(world, limit=1)["rows"]:
+        assert r == full[r["sha"]]

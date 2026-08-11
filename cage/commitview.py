@@ -167,12 +167,28 @@ def _repo(root: Path, repo: Path | None) -> Path | None:
 
 
 def summarize(root: Path, pol: dict, *, since: str | None = None,
-              repo: Path | None = None, sha: str | None = None) -> dict:
+              repo: Path | None = None, sha: str | None = None,
+              limit: int | None = None) -> dict:
     """The ONE data structure every renderer consumes — list, detail, CSV and JSON.
 
     ``sha`` narrows to a single commit and adds the per-file breakdown (the detail
     view); otherwise every commit in the ``since`` window is summarized. Pure derive
-    over the ledger + `git show`; no clock, no pricing, no mutation."""
+    over the ledger + `git show`; no clock, no pricing, no mutation.
+
+    ``limit`` is the **cost bound** (OPEN-WORK COMMITS-WINDOW, verdict B accepted
+    2026-08-11 — [compare](../docs/compare/commits-view-cost-bound.compare.md)). Every
+    row costs one `linematch.commit_diff` → `git show --numstat` **subprocess**, so an
+    uncapped read makes this view O(*history*) while the screen is O(*rows*): measured
+    **6.4s to print 20 rows from 123 commits**. It keeps the **newest** ``limit``
+    commits — capping on the axis the view is already paged on — and stays a pure
+    function of the ledger + repo. The rejected alternative was a default relative
+    ``--since``, which would put a **wall clock in the default path** (the same ledger
+    renders differently next month) and did not bound cost at all when measured.
+
+    **Only the text path passes it.** ``--csv``/``--json`` stay complete and pay full
+    cost (CSV is never truncated), ``--all`` lifts it, and ``sha`` (the detail view)
+    is never capped — a commit of any age must be readable. The commits it drops are
+    counted into ``limited_out`` and footnoted, never silently cut."""
     from cage import policy
     r = _repo(root, repo)
     base = {"repo": "", "branch": "", "since": since, "sha": sha, "rows": [],
@@ -180,7 +196,7 @@ def summarize(root: Path, pol: dict, *, since: str | None = None,
             "dirty_tasks": 0, "estimate_on": policy.authorship_estimate_hours(pol),
             "max_est_gap": policy.authorship_max_est_gap(pol),
             "coverage": "", "joinability": commitjoin.joinability_note(),
-            "totals": {}, "provenance_rows": 0}
+            "totals": {}, "provenance_rows": 0, "limited_out": 0}
     if r is None:
         base["reason"] = "not a git repository — these views are per-commit"
         return base
@@ -237,6 +253,13 @@ def summarize(root: Path, pol: dict, *, since: str | None = None,
         # No silent caps: the window is now a DEFAULT, so a reader who never typed
         # `--since` has to be told what it hid and how to see it.
         base["windowed_out"] = before_window - len(wanted)
+    # THE cost bound. `windows` is oldest-first, so the newest `limit` commits are the
+    # tail — and they are the ones a reader scans first (`rows.reverse()` below). Applied
+    # BEFORE the loop, which is the whole point: `render_commits`' 20-row cap was applied
+    # after every row had already paid for its own `git show`.
+    if limit is not None and sha is None and len(wanted) > limit:
+        base["limited_out"] = len(wanted) - limit
+        wanted = wanted[-limit:]
     # A SET, membership-tested once per commit. `w not in wanted` over a list made the
     # selection O(n²); the `git show` below dominates, but there is no reason to pay
     # both.
@@ -451,12 +474,25 @@ def render_commits(data: dict, show_all: bool = False) -> str:
     return out + _footer(data, Footer(), cut=cut)
 
 
+# Kept as a backstop, not as the bound: a caller that summarizes without `limit` (a test,
+# `--all`, the CSV path re-rendered as text) still pages at the same number. The cost is
+# bounded upstream, in `summarize`.
+
+
 def _footer(data: dict, foot, *, cut: int = 0) -> str:
     """Every caveat these views owe the reader, in one place so the two surfaces
     cannot footnote the same number differently."""
     t = data["totals"]
     if cut:
         foot.gap(f"· {cut} more commit(s) — --all to show")
+    # The no-silent-caps half of the cost bound. These commits were not merely hidden,
+    # they were never READ — so every figure above, the Σ row included, is over the rows
+    # shown. Saying only "N more" would let a bounded total read as a whole-history one.
+    if data.get("limited_out"):
+        foot.gap(f"· {data['limited_out']} older commit(s) not read — the default view "
+                 f"reads the newest {COMMITS_DEFAULT_ROWS} (one `git show` each), so the "
+                 "Σ row\n  covers those only. --all reads every commit; "
+                 "--csv/--json are never capped")
     if data.get("windowed_out"):
         foot.gap(f"· {data['windowed_out']} commit(s) older than {data.get('since')} "
                  "not read — --since WINDOW or --all")

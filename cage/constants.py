@@ -253,10 +253,14 @@ AUTHORSHIP_MAX_EST_GAP = "4h"
 #
 # ⚠️ It does NOT bound cost, and the comment here used to claim it did. The cap is
 # applied in `render_commits`, *after* `summarize` has already built a row — and run one
-# `git show --numstat` subprocess — for every commit in the history. Measured on cage's
-# own 123-commit repo: 6.4s to print 20 rows. Bounding that cost needs a decision
-# (a relative default `--since` would put a clock in the default path) — OPEN-WORK
-# **COMMITS-WINDOW**. `--since` remains the only bound, and it has no default.
+# `git show --numstat` subprocess — for every commit READ. Measured on cage's own
+# 123-commit repo before the bound: 6.4s to print 20 rows. COMMITS-WINDOW closed
+# 2026-08-11 with verdict B, so this number is now **both** the page size and the cost
+# bound: `commitview.summarize(limit=…)` applies it *before* the per-commit `git show`,
+# on the **text** path only (`--csv`/`--json` stay complete, `--all` lifts it). A default
+# relative `--since` was rejected — it would put a wall clock in the default path and it
+# bounded nothing when measured. Dropped commits are counted into `limited_out` and
+# footnoted; raising this raises the default cost linearly.
 COMMITS_DEFAULT_ROWS = 20
 
 
