@@ -367,6 +367,39 @@ def test_adoption_names_the_agent_once_a_hook_attested_it(proj_at):
     assert "VS Code" in text and "CLI sessions only" in text
 
 
+def test_the_real_interceptor_writes_a_row_the_attestation_can_join(proj_at, monkeypatch):
+    """L1-FIELD Q3, as a test. The attested table read **zero** on the dev ledger for
+    nine days while `attest.jsonl` held real rows, and no test caught it because every
+    test above builds its usage row with `usagelog.args_hash(<tail>)` by hand — the
+    attestation's own convention. The one producer that disagreed was never exercised.
+
+    So this one runs the **actual interceptor**. `graphifymeter.run` receives argv[0] as
+    the shim passes it (`exec cage data graphify -- "$REAL" "$@"`) — an *absolute,
+    machine-specific* path — so a key that folds argv[0] in cannot match an attestation
+    from any other machine, or from the same machine spelled differently. Hash the tail:
+    it is what `content_signature` already documents dropping, and what the transcript
+    route already does.
+    """
+    from cage import graphifymeter
+    monkeypatch.chdir(proj_at)
+    (proj_at / "store.py").write_text("x = 1\n" * 500)
+    real = proj_at / "bin" / "graphify"          # the resolved binary, as `$REAL` is
+    real.parent.mkdir(parents=True, exist_ok=True)
+    real.write_text("#!/usr/bin/env python3\nimport sys\n"
+                    "sys.stdout.write('NODE store [src=store.py loc=L1 community=0]\\n')\n")
+    real.chmod(0o755)
+
+    assert hookcmd.run(_args("tool", agent="claude", command="graphify query how")) == 0
+    assert graphifymeter.run(proj_at, [str(real), "query", "how"], task="t") == 0
+
+    data = adoption.summarize(proj_at)
+    assert data["usage"]["by_agent"] == {"present": True, "unattested": 0,
+                                        "agents": [{"agent": "claude", "runs": 1}]}, (
+        "the interceptor's usage row and the hook's attestation disagree on args_hash — "
+        "the exact join cannot fire, and the attested table renders empty while both "
+        "stores hold rows for the same run")
+
+
 def test_unattested_runs_are_never_read_as_nobody(proj_at):
     _usage(proj_at, ["query", "x"])
     _usage(proj_at, ["query", "unseen"])

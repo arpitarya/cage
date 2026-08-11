@@ -36,7 +36,9 @@ GRAPHIFY_RECEIPT_CONFIDENCE = 0.6  # a graphify receipt is modeled, never measur
 # is deliberately lower-confidence, still `modeled`, and footnoted apart from query
 # receipts (never conflated). Reviewable heuristic ⇒ constants, not policy.
 #
-# ⚠️ UNVALIDATED (OPEN-WORK G.1, 2026-07-29): the 0.3 is a *guess*, not a tuned figure.
+# ⚠️ UNVALIDATED (raised 2026-07-29 as OPEN-WORK §G.1; that file is now an index and
+# the section is gone — the standing note lives in FORMULAS §2.10): the 0.3 is a *guess*,
+# not a tuned figure.
 # It has never been scored against measured outcomes — `insights calibration` needs
 # report-read receipts with recorded task outcomes to compute an actual hit-rate, and
 # none exist yet. Until it does, 0.3 is a placeholder that surfaces its own weakness in

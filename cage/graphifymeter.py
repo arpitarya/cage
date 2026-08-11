@@ -265,7 +265,14 @@ def run(root: Path, argv: list[str], task: str = "") -> int:
     before = _graphify_receipt_ids(root) if op else None
     import time
     from cage import usagelog
-    ah = usagelog.args_hash(cmd)
+    # **The tail, never argv[0]** (L1-FIELD Q3). The shim invokes us as
+    # `cage data graphify -- "$REAL" "$@"`, so `cmd[0]` is an *absolute, machine-specific*
+    # path — folding it in produced a key nothing else could reproduce, and the exact
+    # `args_hash` join in `cage insights adoption`'s attested table read zero for nine
+    # days while both stores held rows for the same run. `content_signature` already
+    # documents dropping argv[0], and the transcript route already does; this was the one
+    # producer that disagreed.
+    ah = usagelog.args_hash(cmd[1:])
     t0 = time.monotonic()
     try:
         proc = subprocess.run(_resolve_argv(cmd), capture_output=True, text=True,

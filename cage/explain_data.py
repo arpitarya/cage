@@ -728,8 +728,9 @@ REGISTRY: tuple[Explanation, ...] = (
         "Copilot persists the credits GitHub itself billed — per request in VS\n"
         "  Code's chatSessions store (copilotCredits), per shutdown in the CLI's\n"
         "  totalPremiumRequests. Cage records that figure VERBATIM as the call\n"
-        "  field `credits` and resolves each copilot dollar by a 3-rung ladder,\n"
+        "  field `credits` and resolves each copilot dollar by a 4-rung ladder,\n"
         "  one rung per row, at the single pricing choke point:\n"
+        "    0. billed on ANOTHER row  — $0.00, credits basis. See ONE BASIS below.\n"
         "    1. credits × [billing.<agent>] usd_per_credit  — when the row carries\n"
         "       a recorded credit AND you configured a rate. Tag: modeled.\n"
         "    2. tokens × price table  — the usual exact/alias/family matching.\n"
@@ -745,6 +746,19 @@ REGISTRY: tuple[Explanation, ...] = (
         "  Credits are never derived from tokens, in either direction: an absent\n"
         "  credit stays absent (it falls through to rung 2), and a recorded 0.0 is\n"
         "  a REAL zero that prices at $0.0000 — a different fact from absence.\n"
+        "  ONE BASIS PER BILLING GROUP (rung 0). GitHub computes\n"
+        "  totalPremiumRequests over EVERY model in a session.shutdown, so that one\n"
+        "  figure lands on a carrier row and every sibling carries `billed_with` =\n"
+        "  the carrier's id. A linked row prices at $0.00 ON THE CREDITS BASIS, with\n"
+        "  the carrier's id as the matched key — priced, elsewhere, by name. Without\n"
+        "  it the carrier billed GitHub's whole-shutdown figure while its siblings\n"
+        "  billed their own tokens at list rates: the same spend, twice.\n"
+        "  `billed_with` is a RECORDED STRUCTURAL FACT, never a computation — which\n"
+        "  is why the alternative, splitting the credit pro-rata by token share, was\n"
+        "  rejected: it would derive per-row credits from tokens. The suppression\n"
+        "  needs a configured rate (with none the carrier itself falls to rung 2, so\n"
+        "  its group must too). Forward-only: rows written before 2026-08-11 carry no\n"
+        "  link and are never rewritten.\n"
         "  A total spanning both bases is footnoted with the split (never blended\n"
         "  silently); CSV names the winning basis per row in `priced_via`\n"
         "  (credits-rate | token-table | mixed).",
@@ -1131,14 +1145,14 @@ REGISTRY: tuple[Explanation, ...] = (
          "cage/usagelog.py", "cage/graphifymeter.py"),
         "usage rows carry NO method (diagnostic); receipts + forward model are modeled,\n"
         "  never measured — report-reads visibly weaker than query receipts.",
-        kind="concept", plan_ref="archive/v0.36-graphify-capture.plan.md GC0–GC5 (pending: OPEN-WORK.md)"),
+        kind="concept", plan_ref="archive/v0.36-graphify-capture.plan.md GC0–GC5 (pending: docs/OPEN-WORK.md)"),
     Explanation(
         "otel-export", ("otel", "opentelemetry", "otel-export", "genai", "gen_ai",
                         "semconv", "semantic-convention", "langfuse", "helicone",
                         "otlp", "vendor", "pre-stable"),
         "`cage data export --otel`: calls as gen_ai.* attributes, savings cage-namespaced",
         "one-way REPORTING JSON, exactly like --csv (never an import source; --study\n"
-        "  stays jsonl): calls → gen_ai.system / gen_ai.request.model /\n"
+        "  stays jsonl): calls → gen_ai.provider.name / gen_ai.request.model /\n"
         "  gen_ai.usage.input_tokens / output_tokens, plus\n"
         "  gen_ai.client.operation.duration (seconds) when latency_ms is known —\n"
         "  omitted, never zero, when it isn't. Receipts/savings have NO GenAI\n"
@@ -1149,7 +1163,17 @@ REGISTRY: tuple[Explanation, ...] = (
         "  PRE-STABLE** ({semconv}, {semconv_status}) — names can still change\n"
         "  upstream, so cage pins the targeted version in one constant and stamps it\n"
         "  in every document's cage.meta block; a spec bump is a deliberate,\n"
-        "  changelog'd change, never silent drift.",
+        "  changelog'd change, never silent drift.\n"
+        "  WHAT THE PIN NAMES: {semconv} is the LAST release of\n"
+        "  open-telemetry/semantic-conventions that defined gen_ai.* — on 2026-06-12\n"
+        "  they were deprecated there and moved to {semconv_source}, which carries no\n"
+        "  tagged release and is Status: Development throughout. Cage states the repo\n"
+        "  and the maturity rather than inventing a version number for it; the pin\n"
+        "  re-points the moment that repo cuts its first tag.\n"
+        "  gen_ai.system was RENAMED to gen_ai.provider.name in semconv v1.37.0 —\n"
+        "  before the pinned release — so cage emits the new name only. Emitting both\n"
+        "  during a transition was rejected: a consumer that sums rather than\n"
+        "  coalesces would double-count.",
         ("cage/otelout.py", "cage/exportcmd.py", "cage/constants.py"),
         "cage.method survives on every savings row — a modeled/estimated figure can\n"
         "  never arrive at a vendor looking measured; calls are the ledger's own\n"
@@ -1195,7 +1219,7 @@ REGISTRY: tuple[Explanation, ...] = (
         "`cage insights chats`: one row per chat, titled where the store has a title",
         "GROUPED off the ledger alone, by (agent, surface, session) — the same bucket\n"
         "  key the import manifest uses. Sums tokens_in/cached_in/cache_write_in/\n"
-        "  tokens_out/premium per bucket; reprices per call (UNPRICED counted, never\n"
+        "  tokens_out/credits per bucket; reprices per call (UNPRICED counted, never\n"
         "  a silent $0). Top {chats_default_rows} rows by tokens_in desc, --all lifts it\n"
         "  (the cut is footnoted — no silent caps).\n"
         "  THE ONE CARVE-OUT: a title is joined from imports.jsonl for a DISPLAY LABEL\n"
@@ -1295,6 +1319,12 @@ REGISTRY: tuple[Explanation, ...] = (
         "  never backfilled), while a recorded 0 is the real finding that everything\n"
         "  matchable matched the agent. Omitting it at 0 would make those two\n"
         "  indistinguishable — the same absent-vs-zero law as credits' None sentinel.\n"
+        "  COST BOUND: every rendered row costs one `git show --numstat` SUBPROCESS, so\n"
+        "  the list view READS only the newest {commits_default_rows} commits and footnotes\n"
+        "  the rest as NOT READ (the total row covers what was read). --all reads every\n"
+        "  commit; --csv/--json are never capped; `commit <sha>` is never capped at any\n"
+        "  age. A default relative --since was rejected — it would put a wall clock in\n"
+        "  the default path, so the same ledger would render differently next month.\n"
         "  HOURS, three visibly distinct tiers: * attested (`cage task time`) ALWAYS wins ·\n"
         "  ~ estimated = wall-clock − agent turn-span, floored at 0, refused past\n"
         "  [authorship] max_est_gap ({max_est_gap}) and refused outright when no agent span\n"

@@ -1,0 +1,57 @@
+---
+doc: proposal — normalize a shell command line to an argv before hashing it, so an L1 attestation joins a piped invocation
+status: proposed
+raised: 2026-08-12
+trigger: a real attested invocation observed joining after the argv[0] fix — i.e. the residual is the ONLY thing left blocking a non-zero attested table
+---
+
+# Proposal — normalize the attested command line before hashing
+
+**The claim:** the L1 `args_hash` join now agrees on *what part of argv* to hash, but not
+on *what an argv is*. The hook attests a **shell command line**; the interceptor records
+the **argv graphify received**. Every real attestation on the dev ledger is piped, so all
+three still miss.
+
+**Do not build this yet.** The argv[0] fix ships first and is expected to make plain
+invocations join. Until a real join is *observed*, a normalizer would be tuned against a
+symptom nobody has seen resolve.
+
+## The gap, exactly
+
+| side | sees | example |
+|---|---|---|
+| `attest.record_tool` | the host's command string, `shlex.split` | `['query','x','2>&1','\|','head','-3']` |
+| `graphifymeter.run` | the argv the process was exec'd with | `['query','x']` |
+
+Evidence: [2026-08-12 — the args_hash mismatch](../regression/2026-08-12-l1-attest-args-hash-mismatch.md)
+§4, where all three reconstructed real commands carry a pipeline.
+
+## Why it is a decision, not a defect
+
+- **Stripping is guessing.** `graphify query x | head -3` and `graphify query x` are the
+  same *invocation* but not the same *command*; deciding they hash alike is a semantic
+  call about what the join means, not a bug fix.
+- **The blast radius is the honest-unknown rule.** Over-normalizing merges two distinct
+  runs into one hash, and `attest.tool_agents` then resolves a genuinely-ambiguous key
+  to `UNKNOWN` — degrading a fact into a refusal. Under-normalizing leaves the table
+  empty. Both failure modes are silent.
+- **It is shell-shaped, and cage supports three agents on two shells.** A normalizer that
+  understands POSIX pipelines and not `cmd.exe` would work on two agents and quietly not
+  on the third — the gap class `HOOK_GAPS` exists to name rather than hide.
+
+## Sketch (if picked up)
+
+- Cut the argv at the first shell metacharacter (`|`, `;`, `&&`, `||`, `>`, `<`, `2>&1`)
+  **in `attest` only** — the interceptor's argv is already clean and must not be touched.
+- Drop a leading `cd <dir> &&` prefix; the copilot VS Code route already had to learn
+  that real agents emit it ([field run](../regression/2026-08-08-gfx-cov-vscode-field-run.md)).
+- **Never normalize argv[0] spelling into the hash** — it is excluded entirely, which is
+  the whole point of the fix this proposal sits behind.
+- Fans out to all three agents or names the gap in output; no silent per-agent behaviour.
+
+## Deliberately not taken
+
+**Joining by timestamp proximity.** The two rows sit 2 seconds apart on the dev ledger
+and it would "work" today. `adoption` refuses proximity joins by design — half B says so
+in its own output — and buying a populated table with the one heuristic the view exists
+to reject would make the number worth less than the blank it replaced.

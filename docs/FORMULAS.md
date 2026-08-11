@@ -60,9 +60,22 @@ Code: [creditprice.resolve](../cage/creditprice.py), reached from
 
 | rung | applies when | tag |
 |---|---|---|
+| 0 · `credits-rate`, **$0.00** | the row carries `billed_with` (its billing is on another row) **and** a rate is configured | `modeled` |
 | 1 · `credits-rate` | the row carries a recorded `credits` **and** a rate is configured | `modeled` |
 | 2 · `token-table` | otherwise, if the model resolves a price row (§1.1) | `measured` |
 | 3 · UNPRICED | neither | none — loud, counted, two runnable fixes |
+
+- **Rung 0 · one basis per shutdown** (REV-CREDITS defect 2, closed 2026-08-11 —
+  [compare](compare/copilot-pricing-basis.compare.md)). GitHub computes
+  `totalPremiumRequests` over **every** model in a `session.shutdown`, so the figure
+  lands on one carrier row and every sibling carries `billed_with = <carrier id>`. Such a
+  row prices at `$0.00` **on the credits basis** with the carrier's id as the matched key
+  — *priced, elsewhere, by name*. Without it the carrier billed GitHub's whole-shutdown
+  figure while its siblings billed their own tokens at list rates: the same spend twice.
+  Splitting the credit pro-rata by token share was **rejected** — it would derive per-row
+  credits from tokens, forbidden in both directions. The suppression is conditional on a
+  rate existing (with none, the carrier falls to rung 2 and so must the group).
+  **Forward-only:** rows written before the change are never rewritten and still split.
 
 - **Why rung 1 outranks a perfectly good price row:** since 2026-06-01 a Copilot
   credit *is* GitHub's own tokens×rates computation, done with what cage cannot see —
@@ -375,7 +388,8 @@ actual          = toks(GRAPH_REPORT.md read)
 - `op = "report-read"`, `confidence = GRAPHIFY_REPORT_READ_CONFIDENCE (0.3)` — a weaker
   inference than a query citing exact files, so **lower confidence, still `modeled`, and
   footnoted apart** (`graphifytx.report_read_footnote`), never conflated with a query.
-- **⚠️ The 0.3 is UNVALIDATED (OPEN-WORK G.1):** a placeholder, never scored against
+- **⚠️ The 0.3 is UNVALIDATED** (raised 2026-07-29 as OPEN-WORK §G.1, a section the
+  2026-08-11 restructure removed; **this bullet is now the standing note**): a placeholder, never scored against
   measured outcomes — `insights calibration` has no report-read receipts with recorded
   outcomes to score yet. The footnote says so; the figure is not tuned by intuition.
 - Deduped per `(session, file, graph-mtime bucket)` — one per read, not per line.
@@ -429,6 +443,13 @@ outcome}`, [usagelog](../cage/usagelog.py)). **Never priced, never read by a mon
 — it lives in `state/`, so it can't move a reported number (tested byte-identical).
 `args_hash` is a hash, never the query text (counts-never-content).
 
+**It is `sha1(argv[1:])` — the tail, `argv[0]` excluded — on every route.** The shim
+invokes the meter as `cage data graphify -- "$REAL" "$@"`, so `argv[0]` is an absolute,
+machine-specific path; folding it in makes a key nothing else can reproduce. This is the
+same exclusion `graphifymeter.content_signature` documents (§2.10), and the reason the
+§2.12 attestation join read zero for nine days
+([finding](regression/2026-08-12-l1-attest-args-hash-mismatch.md)).
+
 ### 2.12 Adoption — **no method**: counts of recorded rows, never an estimate
 
 `cage insights adoption` ([adoption.py](../cage/adoption.py)) makes no claim that needs a
@@ -444,7 +465,9 @@ agent*. Two halves, never blended — they have different precision:
   A usage row has no `agent` field, so half A was agent-blind by construction. A hook
   runs *inside* the agent, so `cage hook tool --agent X` records an attestation
   ([attest.py](../cage/attest.py), `state/attest.jsonl`) keyed by the **same
-  `args_hash`** the usage row already carries — an exact join, never proximity. With no
+  `args_hash`** the usage row already carries (§2.11 — the **tail**, on both sides; one
+  producer disagreed until 2026-08-12 and the join could not fire at
+  all) — an exact join, never proximity. With no
   attestations the block is **absent entirely**, not empty: `by_agent.present = False`
   and the renderer emits nothing, so a hookless project's output is byte-identical to
   before L1 existed. An `args_hash` **two agents attested resolves to unknown**, never a
@@ -491,7 +514,8 @@ spec'd elsewhere.
 | `chat` | `imports.jsonl` `session_name` (last-write-wins per `(agent, session)`) → the session id → `(no session)` |
 | `agent` / `surface` | `calls.agent` (mapped via `agents.row_surface`) / `calls.surface` |
 | `calls` | count of call rows in the bucket |
-| `tokens_in` / `cached_in` / `cache_write_in` / `tokens_out` / `premium` | summed straight off the matching call field |
+| `tokens_in` / `cached_in` / `cache_write_in` / `tokens_out` | summed straight off the matching call field |
+| ~~`premium`~~ | **no column since 2026-08-11** (COPILOT-PREMIUM-DEAD). It is `floor(credits)` — the same counter as an int — so it stood beside `credits` as a lossy duplicate that printed `0` for every row cage writes (`totalPremiumRequests` is fractional; `int()` floors, `make_call` omits). Still summed into the payload, so `--json` keeps the recorded fact; the *field* is untouched |
 | `credits` | summed `calls.credits`, or `—` when **no** call in the bucket recorded one (absence, not zero — §1.1a). Text renders 2dp; CSV carries the full float and leaves the cell **empty** when absent, so `—` never enters data |
 | `agent%` | `agent_lines / (agent_lines + residual_lines)` over the provenance rows sharing this chat's `(agent, session)` — **read** from §2.14's recorded counts, never re-matched. Refuses (`—`, footnoted) three ways; see below |
 | `agent_lines` / `residual_lines` (CSV only) | the two sums the share is built from, raw counts. **Empty — not `0` — on a refusal**, like `credits` |

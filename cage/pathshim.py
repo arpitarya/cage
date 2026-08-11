@@ -8,7 +8,9 @@ real machine an adopt-era shim in another repo won on PATH, probed the pre-renam
 pre-rename bare `graphify` verb (now `cage data graphify`), failed its own capability
 guard, fell through to `exec "$REAL"`,
 and ran graphify **unmetered and silently** for nine days while `cage doctor`, run
-inside cage, reported ✅ (OPEN-WORK §B2).
+inside cage, reported ✅ (the finding was filed 2026-07-30 as OPEN-WORK §B2; the queue is
+now an index and that section is gone — the mechanism is `wiringscan.py` and
+`cage query stale-wiring`).
 
 So this module resolves `graphify` **the way the shell does** — walk `PATH`, first
 executable wins — and classifies that one file:
