@@ -255,6 +255,16 @@ Not to be confused with **`[credits]`** (the vendor rate card's per-model `per_m
 multipliers, in `prices.toml`) or with Kiro-CLI **credit rows** (a whole different row
 kind, `schema.make_credit`).
 
+**`billed_with`** — the `billed_with` call field: the id of the row that carries *this*
+row's billing, when the provider computed **one** billed figure over a **group** of calls
+(a Copilot-CLI `session.shutdown` reports `totalPremiumRequests` across every model in
+it). A linked row is **rung 0**: it prices at `$0.00` on the *credits* basis with the
+carrier's id as the matched key — *priced, elsewhere, by name*, which is neither a
+fabricated `$0` nor UNPRICED. A **recorded structural fact**, never a derived number:
+splitting the group credit pro-rata by token share was rejected precisely because it
+would derive credits from tokens. Empty = this row bills for itself.
+[creditprice.billed_elsewhere](../cage/creditprice.py), FORMULAS §1.1a, PLAN §3.1.
+
 **`[billing.<agent>] usd_per_credit`** — *your* plan's rate for one billed credit, and
 the switch that turns rung 1 on. Lives in `cage.toml`, not `prices.toml`, because it is
 a decision about your own plan that must survive a `cage prices sync` — vendor facts

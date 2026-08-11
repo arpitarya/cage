@@ -30,6 +30,7 @@ record_call / record_receipt  →  .cage/ledger/{calls,receipts,tasks}-YYYY-MM.j
                                               ▼  derive ($0, no model)
   cage.toml (order/budgets/routing)      → report · attrib · matrix · budget · roi
   + prices.toml (model prices, [credits])   · compare · verdict · why · origin · chats
+                                             · commits · commit · adoption
                                              + --scope (monorepo slice) · --team · ledger-sync (§3.6)
                                              + --export → .cage/output/<view>-<stamp>/  (stamped artifact)
 ```
@@ -53,7 +54,13 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   additive optional `project` (working-dir basename, same PII guard; empty = legacy) — a
   *derived* `cage report --project` view, deliberately distinct from `scope`'s monorepo
   axis (plan §3.7). The long-lived logs are month-partitioned behind
-  `ledger.append_row`/`read_kind` (plan §3.6.1).
+  `ledger.append_row`/`read_kind` (plan §3.6.1). Calls also carry an additive optional
+  `credits` (the provider's own billed figure, verbatim) — the one additive field whose
+  default is a `None` sentinel rather than zero, because absence and a recorded `0.0` are
+  different billing facts (plan §3.1) — and `billed_with`, the id of the row carrying
+  **this** row's billing when the provider computed one figure over a *group* of calls
+  (REV-CREDITS defect 2). `billed_with` is a recorded structural fact, never a derived
+  number, and is empty for every row that bills for itself.
 - **Config file** ([paths.py](cage/paths.py) `Footprint.policy`) — the project config
   is `.cage/cage.toml` (the policy layer). It was `policy.toml` through v0.35; the
   rename is **non-breaking** — `policy.toml` is still read as a fallback and migrated
@@ -61,8 +68,14 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   `cage.toml` wins (`cage doctor` names the ignored leftover; a one-line stderr warning
   fires at load). The resolved name lives in **ONE place**, `Footprint.policy`; writers
   (`pricestoml`/`policysync`) and `cleanup.NEVER` (which protects **both** names) follow
-  it. Bundled default `data/cage.toml`, read-only at runtime. `cage query config-file`
-  explains it.
+  it. Bundled default `data/cage.toml`, read-only at runtime. The same rule decides
+  where a **billing rate** lives: `[billing.<agent>] usd_per_credit` is in `cage.toml`,
+  because your plan's overage rate must survive a `cage prices sync` that replaces
+  `prices.toml` wholesale. It is deliberately **not** spelled `[credits.<agent>]` —
+  `[credits]` is the vendor rate card's per-model `per_mtok` table and is in
+  `policy._PRICE_SECTIONS`, so a rate filed there would be read from the prices file and
+  merge as **absent** in every project that has one. The collision is silent, which is
+  exactly why the section is named differently. `cage query config-file` explains it.
 - **Prices file** ([paths.py](cage/paths.py) `Footprint.prices`) — model prices are a
   **vendor rate card** with the opposite lifecycle to policy (replaced wholesale by
   `cage prices sync`, never hand-preserved), so they live in `.cage/prices.toml`:
@@ -155,10 +168,45 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   lexicographic) → loudly UNPRICED with a **runnable** per-tool fix line. One
   implementation; roi/report/attrib/verdict thread the once-per-view `build()` join
   through it; rung footnoted in text, `priced_via` in CSV; USD keeps the receipt's
-  method. Linked receipts never enter the ladder.
+  method. Linked receipts never enter the ladder. **Credits never enter this dispatch**:
+  a *call*'s dollars may resolve by billed credits (see the per-call bullet), but a
+  *receipt*'s `saved` is tokens/usd/ms/gco2 only, and `receiptprice`'s ladder is
+  untouched by COPILOT-CREDITS.
 - **Per-call cost** ([prices.py](cage/prices.py) `call_usd`) — `report`/`budget`
   **recompute** each call from `tokens × policy` at derive time, falling back to the
-  stored `est_cost_usd` only when the model is unpriced. A token-only meter (the
+  stored `est_cost_usd` only when the model is unpriced.
+  **The copilot exception, and the one choke point.** `call_usd_match` is the ONE place
+  a call becomes dollars — `call_usd` wraps it, and every USD consumer (report · budget ·
+  chats · compare · verdict · roi · netsaved · study · forecast · quality · freshness ·
+  doctor) reaches a dollar through one of the two — so a pricing rung added there is
+  inherited with **no per-view fork** (grep-pinned by `tests/test_copilot_credits.py`).
+  Since v0.44 a copilot row resolves by a ladder
+  ([creditprice.py](cage/creditprice.py), FORMULAS §1.1a): **rung 0, billed on another
+  row** (`billed_with`) → **recorded `credits` × the configured `[billing.<agent>]
+  usd_per_credit`** → **tokens × price table** → loudly UNPRICED. Rung 1 wins over the
+  table outright, because since 2026-06-01 a Copilot credit *is* GitHub's own
+  tokens×rates computation done with what cage cannot see (what `copilot/auto` routed to,
+  GitHub's current rates) — so it prices that router **exactly** with no price-table row.
+  **Rung 0 is *one basis per group*** (REV-CREDITS defect 2): GitHub computes
+  `totalPremiumRequests` over **every** model in a `session.shutdown`, so the figure
+  lands on one carrier row and every sibling links to it and prices at `$0.00` **on the
+  credits basis**, with the carrier's id as the matched key — *priced, elsewhere, by
+  name*, neither a fabricated `$0` nor UNPRICED. Without it a multi-model shutdown billed
+  the same spend twice. Splitting the credit pro-rata by token share was **rejected**: it
+  would derive per-row credits from tokens, forbidden in both directions.
+  It is **`modeled`, never `measured`**: the count is a recorded fact, the dollar is a
+  rate the user set and cage cannot check against an invoice, and **any aggregate
+  containing one credits-priced row degrades to `modeled`** (`creditprice.method_for`) —
+  the weaker tag always wins, or a configured rate would read as an invoice. **Rate unset
+  ≠ rate zero:** unset skips the rung (and rung 0's suppression with it — the carrier
+  falls to tokens, so the group must too) and credits render as a *count*, never a
+  dollar; `0.0` is a real rate that prices at $0.0000. **Absence ≠ a recorded zero**, and
+  credits are **never derived from tokens in either direction** — so `schema.make_call`'s
+  `credits` defaults to a `None` sentinel rather than the usual omit-at-zero idiom, the
+  one additive field that breaks that pattern and the only way both facts survive. A
+  total spanning both bases prints the split (never blended silently); CSV names the
+  basis per row in `priced_via`. `cage query copilot-credits` explains it.
+  A token-only meter (the
   transcript meter never sets `est_cost_usd`) thus still costs out, and a
   self-costing provider Cage can't tokenize keeps its figure. Derive-time only — the
   ledger is never rewritten. A call prices only if `(provider, model)` is in the
@@ -180,7 +228,17 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   parses fine and is excluded from money views by `report._is_legacy_human`, with the
   exclusion **counted and footnoted** on `cage report` — silently dropping it from a
   total was the one option ruled out. `cage query savings-axis` explains it;
-  `tests/test_legacy_ledger.py` pins it.
+  `tests/test_legacy_ledger.py` pins it. **A v2 exists and it is a different question
+  (v0.43).** `cage insights commits` / `commit <sha>` rebuilt agent-vs-human **per
+  commit**, and nothing amputated came back: no rate, no USD, no `gap_ms`, no `minutes`
+  unit, no derived attention, no `cage human`. What it adds is *line-level evidence* and
+  a human that is an explicitly-labelled residual. **The standing guard is the
+  load-bearing part: no USD, rate or valuation appears on any authorship surface** —
+  structurally, not by policy (`commitview.py` imports no pricing module, asserted by AST
+  in the suite). Hours exist only as an attestation (`cage task time`, rendered `*`) or a
+  guarded `~` estimate that **refuses four ways** rather than print fog — including when
+  no agent span joined, where `wall − nothing` would render the raw commit gap as effort.
+  That last refusal is v1's exact mistake, caught in this build by smoking the real repo.
 - **Task record** ([tasks.py](cage/tasks.py)) — `tasks.jsonl`, one row per task
   (last-write-wins by `id`), git-snapshotted at task close (SessionEnd / `cage
   outcome`). **Shelled out to git, never imported; fail-open** (non-repo/detached ⇒
@@ -208,7 +266,60 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   **report-only and always exits 0** (never a CI gate). Widens the PII surface to
   repo-relative file *paths* (vs. `tasks.jsonl`'s top-level-dirs-only) — justified
   in plan §3.5 — but counts-never-content still holds: no diff bodies, no commit
-  messages, paths validated repo-relative at construction time.
+  messages, paths validated repo-relative at construction time. The line-match counts
+  are omitted at 0 with **one deliberate exception**: `residual_lines` is written
+  **including 0** (`schema.PROVENANCE_ZERO_BEARING_COUNTS`) because **presence of the key
+  is the version gate** for `agent%` — absent means the row predates the count, a
+  recorded `0` means everything matchable matched the agent, and frozen rows are never
+  backfilled.
+- **Authorship, per commit** ([linematch.py](cage/linematch.py) matcher,
+  [commitjoin.py](cage/commitjoin.py) windows + call join,
+  [authorcapture.py](cage/authorcapture.py) the pass,
+  [commitview.py](cage/commitview.py) the views;
+  [ADR 0008](docs/adr/0008-line-match-authorship-counts-persisted-content-transient.md),
+  FORMULAS §2.14) — the agent-vs-human axis, rebuilt at a unit you can `git show`.
+  **Never observe the human; observe the agent precisely and let the human be the
+  residual.** A Claude transcript records the exact text an `Edit`/`Write`/
+  `MultiEdit`/`NotebookEdit` block proposed; at import that text is matched
+  **transiently, in memory** against the added lines of the commit whose *window*
+  contains the edit. **Only counts persist — no line body and no line *hash*** (a hash
+  is a membership oracle over the source; it is named because it is the obvious "safe"
+  shortcut and is not one). Five additive-optional provenance counts, omitted at 0, so
+  `schema_ver` stays 1. **Windows, never `HEAD`-at-import**: commit *i* owns
+  `(ts_{i-1}, ts_i]`, upper bound inclusive, and work after the newest commit is left
+  **unrecorded** this sweep — idempotency picks it up exactly once when its commit
+  exists, and guessing a commit that does not exist yet would be wrong forever.
+  Every bound and probe is in **ONE UTC normal form** (`YYYY-MM-DDTHH:MM:SSZ`,
+  sub-seconds truncated; `commitjoin.norm_ts`), normalized at `Window` construction so
+  a raw `%cI` bound cannot be built — git renders each commit in the *committer's own*
+  offset, and the compare is a string compare. **Seconds, not milliseconds:** `%cI`
+  has no sub-second, so finer precision would push an edit made inside the commit's
+  own second out of it and break the inclusive bound
+  ([finding](docs/regression/2026-08-02-finding-commit-window-timestamp-skew.md)).
+  **FOUR line buckets, never three, and none is redistributed:** `agent` (matched a
+  proposal — read from the row, *never* re-matched at render time) · `human~` (in a
+  file that session *did* propose, matching nothing — a real human tweak, `estimated`
+  by construction) · `unattributed` (in a file **no** session proposed: a person, a
+  vendored tree, or generated output — cage does not guess) · `unknown` (sub-gate or
+  binary). The fourth bucket exists **because it was measured**: a single `human`
+  bucket printed 76.6% on cage's own repo, 89% of it one commit of generated JSON
+  ([dogfood](docs/regression/2026-08-02-p1-authorship-dogfood.md)) — a residual
+  presented as a finding is the v1 mistake in new clothes. **Coverage is per-agent and
+  stated** (`authorcapture.COVERAGE_GAPS`): claude only; copilot and kiro persist no
+  edit payload and render `—` with the reason, never `0%`. The call→commit join reuses
+  `taskgroup.join_rows` (task-id first, window fallback) and **never forks a second
+  join**; a task closed on a **dirty tree** is not trusted (its sha is the *prior*
+  commit), and a call with **no `project` stamp is *unconfirmable*, not adopted** —
+  otherwise a global ledger would pull every other repo's spend onto these commits.
+  **`[authorship] capture` / `CAGE_AUTHORSHIP` is its own consent switch**, separate
+  from `[capture] enabled`: this is the one path that reads a repository's *diffs*,
+  and metering spend is a different permission from reading code. **The list view's
+  read is bounded by the row cap** (`commitview.summarize(limit=…)`, COMMITS-WINDOW):
+  every row costs one `git show` subprocess, so the text path reads only the newest
+  `COMMITS_DEFAULT_ROWS` commits and footnotes the rest as *not read*; `--csv`/`--json`
+  stay complete, `--all` lifts it, and the detail view is never capped. A default
+  relative `--since` was rejected — a wall clock in the default path. `cage query
+  agent-authorship` explains it.
 - **Cost-impact surface** ([taskgroup.py](cage/taskgroup.py), [compare.py](cage/compare.py),
   [estimate.py](cage/estimate.py), [calibration.py](cage/calibration.py),
   [verdict.py](cage/verdict.py) — plan §4.7–§4.8, §8.8) — the closed-task join
@@ -265,7 +376,15 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   semantic conventions are pre-stable** (own repo, no 1.0, names can still change) —
   the targeted version is pinned in `constants.OTEL_SEMCONV_VERSION` and stamped in
   every document's `cage.meta` block; a spec bump is a deliberate, changelog'd
-  change, same discipline as `prices_version`. **Receipts/savings have no GenAI
+  change, same discipline as `prices_version`. **The pin states what it pins**
+  (OTEL-SEMCONV-PIN, 2026-08-11): `1.42.0` is the *last main-repo release that defined
+  `gen_ai.*`* — on 2026-06-12 they were deprecated there and moved to
+  `open-telemetry/semantic-conventions-genai`, which carries **no tagged release** and is
+  `Status: Development` throughout, so cage stamps the repo and the maturity rather than
+  inventing a version for it; the pin re-points when that repo cuts its first tag. The
+  provider attribute is `gen_ai.provider.name` — `gen_ai.system` was renamed in semconv
+  v1.37.0, *before* the pinned release. Emitting **both** was rejected: a consumer that
+  sums rather than coalesces would double-count. **Receipts/savings have no GenAI
   equivalent** — cage-namespaced under `cage.savings[].cage.*`, never an invented
   `gen_ai.*` name; `cage.saved` is GROSS, `cage.saved_usd` prices through the same
   `receiptprice` ladder every other view uses and is omitted (never `$0`) on an
@@ -295,15 +414,28 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
 - **Chats view** ([chats.py](cage/chats.py), FORMULAS §2.13) — `cage insights
   chats`: one row per chat, titled where the store has a title. Pure derive over
   `calls`, grouped by `(agent, surface, session)` — the same bucket key the import
-  manifest uses. **The one law amendment**: `manifest.py`'s "never read by a derived
-  view" contract gains a single scoped carve-out — a title is joined from
-  `imports.jsonl` for a **display label only**; deleting the manifest moves **zero**
-  numeric cells (pinned by `tests/test_chats.py`). Kiro-IDE's constant session id
+  manifest uses. **The law amendments are now TWO, and both are scoped**: `manifest.py`'s
+  "never read by a derived view" contract is read for a **title** (display label only),
+  and `provenance.jsonl` is read for **counts** by the `agent%` column. Both hold on the
+  same terms — deleting either file moves **zero** numeric cells (pinned by
+  `tests/test_chats.py`). Kiro-IDE's constant session id
   already collapses every run into one row (`kiro (no session identity)`, never a
   fabricated per-chat identity); kiro-CLI conversations are `credits` rows and don't
   appear here. Top-20 by `tokens_in`, `--all` lifts it (footnoted cut, no silent
   caps); CSV never truncated. Local-only by construction — no `--team`, no MCP tool.
-  `cage query chats-view` explains it.
+  · **`agent%`** is per chat the share of *evidenced lines in files that chat touched*
+  that matched the agent's own proposals — `agent_lines / (agent_lines + residual_lines)`
+  over the provenance rows sharing `(agent, session)`; **read, never re-derived** (no
+  matcher, no git at render), so it can never disagree with the commit view. It
+  **refuses three ways** and `—` is never 0% (coverage · no landed evidence · pre-upgrade
+  rows), while a *measured* `0%` renders `0%`. Scope is not a share of the chat's work —
+  `unattributed` is commit-scoped and outside the denominator; per chat there is no diff
+  to clamp against, so **the commit view stays the arbiter for any single sha**. No
+  USD/rate/minutes ever touches it. · **No `premium` column** (COPILOT-PREMIUM-DEAD,
+  2026-08-11): it is `floor(credits)`, so it stood beside `credits` as a lossy duplicate
+  that printed `0` for every row cage writes. The *field* is untouched and still in the
+  payload, so `--json` keeps the recorded fact — precision in the data, brevity in the
+  display. `cage query chats-view` explains it.
 - **Display honesty** ([display.py](cage/display.py)) — the ONE display-context
   home (plan Phases 1+2). `Display` carries the resolved presentation switches
   (`usd`: tokens are the default, dollars opt-in — flag > env `CAGE_USD` >
@@ -607,10 +739,26 @@ contact, not later. The maintained set, each with a standing owner-trigger (the
 freshness tracker is [docs/DOC-REGISTRY.md](docs/DOC-REGISTRY.md) — a change that
 fires a trigger updates the doc *and* bumps its row):
 
-- **[docs/OPEN-WORK.md](docs/OPEN-WORK.md)** — the **single plan of pending work**, and
-  the only place unfinished work is tracked. `docs/` root carries no loose
-  handoff/prompt pairs; a pair is created only when a phase there is picked up, and
-  archived on implement.
+- **[docs/OPEN-WORK.md](docs/OPEN-WORK.md)** — the **single index of pending work**, and
+  the only place unfinished work is tracked. **One line per item, one screen** (since
+  2026-08-11); the detail lives in **[docs/open/](docs/open/README.md)**, one file per
+  item — why it is open, what closes it, what binds a fix — beside
+  [open/CONSTRAINTS.md](docs/open/CONSTRAINTS.md), the rules that outlive their
+  originating item (**not** open work). **Adding an item = a file there AND one line
+  here**: a file with no index line is invisible, an index line with no file is a lie.
+  **Deleting an item file is a citation migration**, exactly as for any removed doc.
+  `docs/` root carries no loose handoff/prompt pairs; a pair is created only when a
+  phase there is picked up, and archived on implement.
+  **The header's checkable claims are test-gated** ([tests/test_queue_honesty.py](tests/test_queue_honesty.py)):
+  a version, tag, or clean-and-pushed assertion that contradicts git fails the suite. It
+  fails **only on a contradiction**, is silent when the header claims nothing, and skips
+  when git ground truth is unavailable — asserting `HEAD == origin/main` outright was
+  pre-mortem-**rejected**, because a gate that reddens on every legitimate in-flight
+  change trains its maintainer to ignore it, which is worse than no gate. **Counts are
+  deliberately NOT gated** ("8 commits ahead", "47 staged files"): they are true only at
+  the instant of writing, and the handoff that specified this gate was itself wrong about
+  one. A number true only when written is not a claim worth gating — it is a claim worth
+  not making.
   **Maintained continuously — always up to date, never rebuilt from memory later.**
   It is updated in the *same* change as the work, on every one of these triggers:
   an item is finished (remove it) · new work is discovered or a defect is found
@@ -706,7 +854,7 @@ fires a trigger updates the doc *and* bumps its row):
 
 Note: ALL-CAPS entry-point/tracker files (CLAUDE.md, CHANGELOG.md, README.md and
 AGENTS.md at root; IMPLEMENTATION.md, PLAN.md, INTERVIEW.md, GLOSSARY.md, WORKLOG.md,
-DOC-REGISTRY.md under `docs/`) carry no frontmatter; lowercase docs may.
+DOC-REGISTRY.md, FORMULAS.md under `docs/`) carry no frontmatter; lowercase docs may.
 
 **Documentation style — no large paragraphs.** Authored docs (guides, handoffs,
 prompts, examples, ADRs, compare/proposal docs) are written in **short points**,
@@ -790,7 +938,7 @@ the worked examples to copy.
 ## Dev
 
 ```bash
-just test          # python -m pytest -q   (1616 tests; +10 Windows-only skips, +1 opt-in dogfood-age skip)
+just test          # python -m pytest -q   (1639 tests; +10 Windows-only skips, +1 opt-in dogfood-age skip)
 just demo          # seed §4.4 + print attrib/matrix
 cage --version
 ```
@@ -833,6 +981,25 @@ When you (an agent) run cage-lab by hand, still drop the dated report + a priori
 `*-fixes.md` into `docs/regression/` and add the row to its README index. The latest
 findings and their fix checklist are the input for the next round of cage fixes; see
 `docs/regression/latest-capture-report.md`.
+
+## Dogfood snapshot (refresh periodically)
+
+`docs/dogfood/` publishes cage's own real `~/.cage` ledger numbers so the README
+never has to chase them — design of record:
+[dogfood-report.handoff.md](docs/archive/v0.44-dogfood-report.handoff.md) (archived
+on implement; the living pattern is `docs/dogfood/README.md`).
+
+To refresh: on the dev machine, run the three allowlisted commands — `cage report`,
+`cage insights attrib`, `cage insights adoption` — over the same absolute window
+(all-time, no `--since`), paste the output verbatim (method tags intact) into a new
+`docs/dogfood/<YYYY-MM-DD>.md`, and copy it over `latest.md`. **Never**
+`cage insights chats` or `cage report --project` in a snapshot — chat titles and
+working-dir basenames leak private project names, and this repo is public.
+**Never author a number** — if a command has nothing real to show (an empty task
+ledger, say), the snapshot states that instead of fabricating one.
+`tests/test_dogfood_freshness.py` fails once `latest.md` is >60 days old or its
+`snapshot_date` disagrees with the newest filename; `CAGE_SKIP_DOGFOOD_FRESHNESS=1`
+is the bisect/old-tag escape hatch.
 
 ## Adapters & agents (one ledger, many surfaces)
 
@@ -1125,6 +1292,24 @@ each agent only needs thin idiomatic wiring (`agents.py` orchestrates):
   B5) — `cage doctor`'s `launcher-gap` check names it (GF-LAUNCHER,
   [docs/restricted-environments.md](docs/restricted-environments.md)); a fix must move
   both twins together.
+- **graphify savings file from FOUR of five agent surfaces, and the fifth says why not**
+  ([graphifytx.py](cage/graphifytx.py), `cage query graphify-coverage`) — the interceptor
+  above is invocation-gated, so every store-side route exists to catch what it misses. One
+  counterfactual, one id scheme, one ADR-0005 deferral: claude transcripts · copilot **CLI**
+  `events.jsonl` · copilot **VS Code** `chatSessions` (`run_in_terminal` → `commandLine.original`
+  + `cwd.path` + output) · kiro **CLI** `conversations_v2` (`execute_bash`, [ADR 0009](docs/adr/0009-kiro-cli-tool-run-bodies-read-transiently-never-persisted.md)
+  — bodies read **transiently**, hashes only, the one carve-out on that store's key whitelist).
+  **Kiro IDE structurally cannot** (its store persists no assistant output — 26/26 empty
+  completions when probed) and that is **named in `cage doctor` + the explainer, never a
+  silent zero**. `GRAPHIFY_COVERAGE` is the ONE table both read.
+  **Two refusals are load-bearing, not gaps:** kiro caps tool stdout at ~2000 tokens, so a
+  truncated answer under-counts `actual` and files **nothing** (a lower confidence would
+  dress up a number wrong in a known direction); and the VS Code guard matches **no marker
+  string** — all 23 `truncat` hits across 1,132 real parts were the command's own clippy
+  output, so it keys only on a missing output carrier or a non-zero exit.
+  **The cursor is right for calls and wrong for savings** — a route shipping after a session
+  was ingested can never see it again — so `cage import --rescan-graphify` walks the full
+  match set, detection only, idempotent.
 - **CI has a graphify axis (CI-GF, v0.38.0)** — `python-package.yml`'s `build` job is
   the `absent` leg (cage must never *require* graphify); the `graphify` job is the
   `present` leg on all three OSes: pinned real graphify (PyPI **`graphifyy`**, not npm),

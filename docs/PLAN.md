@@ -116,6 +116,7 @@ This is the invoice-grade truth; provider `usage` fields are authoritative.
   "scope": "",                  // optional monorepo top-level dir (§3.6.2)
   "project": "cage",            // optional working-dir basename — derived attribution axis (§3.7)
   "credits": 1.382565,          // optional BILLED credits, verbatim — rung 1 of the pricing ladder
+  "billed_with": "",            // optional: id of the row carrying THIS row's billing (rung 0)
 }
 ```
 
@@ -125,6 +126,22 @@ monorepo top-level changed dir (§3.6.2); `project` is the working directory a c
 under (§3.7), a derived `cage report --project` view of the global ledger. Only logs that
 expose the cwd populate `project` (Claude transcripts do; Copilot/Kiro leave it
 empty).
+
+**`billed_with` — one basis per billing GROUP** (added 2026-08-11, REV-CREDITS defect 2;
+[compare](compare/copilot-pricing-basis.compare.md)). Some providers compute **one**
+billed figure over a *group* of calls: a Copilot-CLI `session.shutdown` reports
+`totalPremiumRequests` across **every** model in it. That figure lands on one carrier row
+and every sibling carries this link to it. A linked row prices at **`$0.00` on the
+credits basis** with the carrier's id as the matched key — *priced, elsewhere, by name* —
+because rung 2 would otherwise bill the same spend a second time at cage's list rates.
+
+It is a **recorded structural fact**, never a derived number, and that distinction is the
+whole reason the alternative — splitting the credit pro-rata across the group by token
+share — was rejected: it would derive per-row credits from tokens, forbidden in both
+directions. Empty for every row that bills for itself, so an unstamped row is
+byte-identical to the legacy contract; never part of any id. The suppression is
+conditional on a configured rate (with none, the carrier falls to rung 2 and so must the
+group). **Forward-only** — rows written before the change are never rewritten.
 
 **`credits` — the billed figure, and the one field where absence ≠ zero.** Additive and
 optional: the credit amount the *provider itself* billed for this call, recorded
@@ -925,12 +942,12 @@ future attention measurement inherits it.
 
 ### 4.11 graphify capture — usage rows · transcript detection · forward model
 
-Plan of record: [graphify-capture.plan.md](graphify-capture.plan.md) (GC0–GC6).
+Plan of record: [graphify-capture.plan.md](archive/v0.36-graphify-capture.plan.md) (GC0–GC6).
 Closes the gap that every existing graphify route is **invocation-gated** while the
 real saving is often invocation-less (the agent reads `GRAPH_REPORT.md` instead of
 scanning files). Five landed phases (GC0–GC5), one follow-up (GC6/G1):
 
-- **GC0** — probe verdict ([plan §3.0](graphify-capture.plan.md)): claude ships; copilot
+- **GC0** — probe verdict ([plan §3.0](archive/v0.36-graphify-capture.plan.md)): claude ships; copilot
   cli is detectable but out of scope (finding filed); kiro is HONEST-LIMIT.
 - **GC1** — a diagnostic **usage row** per graphify run (`state/graphify-usage.jsonl`),
   never priced, never in a money view (byte-identical, tested).
@@ -1193,7 +1210,7 @@ The leverage is in the **spec and the contract**, so lock those first.
 
 Cage's numbers are verified from **outside**: a sibling repo `../cage-lab` that
 installs the shipped artifact and checks it against independently derived
-references. Detailed plan of record: [docs/cage-lab-plan.md](cage-lab-plan.md);
+references. Detailed plan of record: [docs/cage-lab-plan.md](archive/v0.36-cage-lab.plan.md);
 this section is the durable summary.
 
 **Laws.** Black-box (never `import cage`; drive the binary) · independently
@@ -1230,7 +1247,7 @@ for the human maintainer (own venv + ledger + real logs via read-only symlinks +
 cheat-sheet). The automated runner never touches it; it refreshes only on
 explicit command.
 
-**The golden set** ([cage-lab-golden-set.plan.md](cage-lab-golden-set.plan.md)).
+**The golden set** ([cage-lab-golden-set.plan.md](archive/v0.36-golden-set.plan.md)).
 Rather than wait for the right situations to appear in ad-hoc logs, cage-lab
 **drives the real agents** (`golden/drive.py` → Claude / Copilot / Kiro CLIs)
 through a curated question set covering every capture dimension — cache
