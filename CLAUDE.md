@@ -482,6 +482,16 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
 
 ## Must-Know Rules
 
+- **Triage before work: a human-blocked queue STOPS the session (Arpit, 2026-08-12).**
+  Before doing anything, read `docs/OPEN-WORK.md` and ask: *is any item agent-closable
+  right now?* If everything remaining needs Arpit — his hands, a ratification, a
+  decision, a push — the session's **first** output is the blocked-on-Arpit list in
+  ≤3 lines, and then it stops. No invented scope, no doc polishing, no "discovered
+  work" to fill the hours. "Next: Arpit reviews…" as the *closing* line of a long
+  session is the failure mode this rule exists to prevent; as the *opening* line it
+  is the rule followed. His time and tokens are money — cage itself can price a
+  session (`cage report`); say the cost out loud rather than running long against a
+  blocked queue. Applies to Cowork and Claude Code alike.
 - **$0 / stdlib only** — `dependencies = []`. ML is opt-in extras (`[embeddings]`,
   `[ml]`), never imported on the default path.
 - **Fail-open everywhere on the write path** — `ledger.append` returns `False`, it
@@ -938,7 +948,7 @@ the worked examples to copy.
 ## Dev
 
 ```bash
-just test          # python -m pytest -q   (1639 tests; +10 Windows-only skips, +1 opt-in dogfood-age skip)
+just test          # python -m pytest -q   (1655 tests; +10 Windows-only skips, +1 opt-in dogfood-age skip)
 just demo          # seed §4.4 + print attrib/matrix
 cage --version
 ```

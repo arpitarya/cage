@@ -12,6 +12,26 @@ by milestone) — the worklog is what *happened this session*.
 
 ---
 
+## 2026-08-12 — Cowork — the stop-rule: a blocked queue must be said, not filled
+
+- **Asked:** why did hours of sessions across cage/fux/milo close nothing? Then:
+  "ai agent should have told me sooner — money, time, everything is being wasted."
+- **Found:** items *were* closing (suite 1616 ⇒ 1650 across eleven items over two
+  days) — but closed items are deleted, not ticked, so the wins were invisible; and
+  everything left is blocked on Arpit (push · hands-only tier · the CLAUDE.md diff
+  review). The failure: that fact kept landing as the *last* line of long worklog
+  entries instead of the first output, and nothing ever priced the spend — in the
+  repo whose product is pricing exactly that.
+- **Done:** on Arpit's explicit instruction, a new **first Must-Know rule** in
+  CLAUDE.md — *triage before work: a human-blocked queue stops the session* with a
+  ≤3-line blocked-on-Arpit list as the first output, no invented scope, cost said
+  out loud (`cage report`). Same rule added to fux and milo. DOC-REGISTRY row bumped.
+- **Open:** unchanged — push, then the hands-only tier. (A concurrent Claude Code
+  session built GF-LAUNCHER while this entry was being written — see below.)
+- **Next:** Arpit reviews the pending CLAUDE.md diff + commit split, then pushes.
+
+---
+
 ## 2026-08-12 — Claude Code (Opus 5) — GF-LAUNCHER built; and the premise I got wrong
 
 - **Asked:** build every open item, then commit; then merge to main and report what is

@@ -4,25 +4,19 @@ One line per open item. **Detail lives in [open/](open/), one file per item** �
 is an index and must stay one screen. Rules that outlive an item:
 [open/CONSTRAINTS.md](open/CONSTRAINTS.md). Procedures: [FIELD-RUNBOOK.md](FIELD-RUNBOOK.md).
 
-**⚠ Before trusting anything here, reconcile with git — this header had gone stale
-SEVEN times in a week.** As of 2026-08-12: `__version__` and latest tag are `0.48.0`;
-the working tree is **clean**; local `HEAD` is **ahead of `origin/main` and unpushed** —
-run `git rev-list --count origin/main..HEAD` for the number. Suite **1639 passed / 0
-failed / 11 skipped**, measured 2026-08-12 (the previously-claimed figure was the same
-number, but it was an assertion until then).
+**⚠ Before trusting anything here, reconcile with git — this header had gone stale six
+times in a week.** As of 2026-08-12: `__version__` is `0.49.0`, released today; the
+matching tag is cut by the release flow, never by hand. Suite **1655 passed / 0 failed /
+11 skipped**, measured. Ground truth is `git status` · `git log origin/main..HEAD` ·
+`git tag --sort=-v:refname` · `cage/__init__.py` — never this prose. **Since 2026-08-12
+the checkable half of that is test-gated** (`tests/test_queue_honesty.py`): a version,
+tag, or clean-and-pushed claim here that contradicts git fails the suite — it caught this
+very release, where the header still said `0.48.0` after the bump. Counts are
+deliberately *not* gated: they are true-at-writing and would redden on the next commit.
 
-**No count is written in this header any more, deliberately.** The seventh staleness was
-"8 commits ahead / 65 staged files" surviving the commit that made it "17 / 0" — written
-before the commit, never revisited. The honesty gate exempts counts on purpose (they
-redden on the next commit), so a number in this prose is a number with no detector.
-Ground truth is `git status` · `git log origin/main..HEAD` ·
-`git tag --sort=-v:refname` · `cage/__init__.py` — never this prose. **Since 2026-08-12 the checkable half of that is test-gated**
-(`tests/test_queue_honesty.py`): a version, tag, or clean-and-pushed claim here that
-contradicts git fails the suite. Counts are deliberately *not* gated — they are
-true-at-writing and would redden on the next commit.
-
-**Next:** push. Then [NET-1](open/NET-1.md). The agent lane is **empty again** — GF-LAUNCHER
-verdict B was built 2026-08-12 (POSIX-verified, Windows CI-asserted).
+**Next:** [NET-1](open/NET-1.md) — the only item that answers why cage exists. The agent
+lane is **empty**: GF-LAUNCHER verdict B shipped in v0.49.0 (POSIX-verified, Windows
+CI-asserted), leaving [SHIM-TOOL-DEPS](open/SHIM-TOOL-DEPS.md) as your one open decision.
 
 ## Your hands
 

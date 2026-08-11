@@ -2,7 +2,7 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
-## v0.49.0 (unreleased) — the queue emptied: seven held decisions, taken
+## v0.49.0 (2026-08-12) — the queue emptied, and the agent lane with it
 
 Seven items sat in `OPEN-WORK.md` for a reason: each was a **decision deliberately kept
 out of a fix commit**. This release takes all of them. Two are breaking-ish for readers
@@ -165,7 +165,7 @@ of specific surfaces and are called out below.
 - New queue item **OPENWORK-SECTION-REFS** — the restructure deleted OPEN-WORK's lettered
   sections and five live citations still name them (`§I.2a`, `§B2`, `G.1`). They are bare
   prose, not links, so the doc-link gate structurally cannot see them.
-- Suite **1616 → 1639 → 1650**. Built from:
+- Suite **1616 → 1655**. Built from:
   [agent-lane sweep](docs/archive/v0.49-agent-lane-sweep.handoff.md) ·
   [agent-lane refill](docs/archive/v0.49-open-queue-agent-lane.handoff.md) (handoff only —
   its prompt was handed over inline and never written to `docs/`).
