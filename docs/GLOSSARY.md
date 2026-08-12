@@ -220,7 +220,7 @@ tested against ([docs/shim-contract.md](shim-contract.md)): behaviours **B1–B8
 (binding on every twin) and divergences **D1–D7** (real and permanent — cmd has no
 `exec`, so the real binary runs as a child process). Two implementations of an unwritten
 contract drift; this is the written one, and the first artifact of the
-[tool-integration-contract](proposals/tool-integration-contract.proposal.md).
+[tool-integration-contract](archive/v0.49-tool-integration-contract.proposal.md).
 
 **hook bypass** — an agent hook that invokes graphify by **absolute path**, so the
 command never traverses PATH: cage's interceptor can't see it, and a hook isn't a

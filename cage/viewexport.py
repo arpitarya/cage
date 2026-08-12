@@ -33,8 +33,9 @@ it in here would make one flag mean two things.
 Deliberately NOT in this module: any pruning of `.cage/output/`. `cleanup.py` is a
 closed allowlist and this directory is not on it, so cage will never delete an
 artifact it wrote — the same standing `ledger/` has. Growth is the user's to manage
-([docs/open/OUTPUT-GROWTH.md](../docs/open/OUTPUT-GROWTH.md) carries the open question of
-whether it ever earns a class — volume-gated reopen only).
+([docs/archive/v0.49-output-growth.item.md](../docs/archive/v0.49-output-growth.item.md)
+recorded the question of whether it ever earns a class; it was closed unactioned
+2026-08-12 with no size number ever measured).
 """
 from __future__ import annotations
 

@@ -16,6 +16,87 @@ Entry format:
 
 ---
 
+## 2026-08-12 — WORK-DIR: the five session-tracking docs moved to root `work/`
+
+- **Implemented:** on Arpit's explicit instruction, `IMPLEMENTATION.md`, `INTERVIEW.md`,
+  `MACHINE.md`, `OPEN-WORK.md`, `WORKLOG.md` moved from `docs/` to a new root `work/`
+  directory via `git mv` (history preserved). `docs/` stays the design/reference tree;
+  `work/` is now the session-tracking tree. Every live-doc markdown link that resolved
+  through the old `docs/<file>` path was mechanically rewritten (a script that mirrors
+  `tests/test_doc_links.py`'s own resolve logic, run across every tracked `.md` file
+  except `docs/archive/**`, `docs/regression/**`, and `CHANGELOG.md`, which stay
+  frozen history) — 11 live files changed, plus the moved docs' own outgoing links.
+  `tests/test_doc_links.py`'s `HISTORY_FILES` set (which exempts `WORKLOG.md`/
+  `IMPLEMENTATION.md` from the dangling-link gate) was repointed to the new `work/`
+  paths; `tests/test_queue_honesty.py`'s `QUEUE` constant likewise. `CLAUDE.md`'s
+  ALL-CAPS-tracker-location note, the *Documentation discipline* section's five
+  bullets, and every other prose/link mention across `CLAUDE.md`/`docs/DOC-REGISTRY.md`/
+  `docs/PLAN.md`/`docs/README.md`/`docs/CLI.md`/`docs/cage-lab/README.md`/
+  `docs/compare/README.md`/`docs/doc-size-discipline.md`/`cage/explain_data.py` were
+  hand-fixed where the script's mechanical link rewrite didn't reach (bare prose,
+  backtick-only mentions, a stale `§I.2a` section citation). **On a separate explicit
+  instruction, `work/OPEN-WORK.md` was additionally stripped** from a header +
+  11-row closure table down to a bare "the queue is empty" statement — the closure
+  history remains in `docs/archive/` and this file, just no longer indexed from
+  OPEN-WORK.md itself.
+- **Found in passing, fixed on contact:** `docs/restricted-environments.md` had been
+  deleted a *second* time (first was the v0.36 hookless sweep, restored then because
+  eight source files still cited it — see the 2026-08-11 `GF-LAUNCHER` entry below) by
+  the prior uncommitted session's queue-closure sweep, with no citation migration and
+  no recorded decision to remove it — six live citations across `CLAUDE.md`, `README.md`,
+  `docs/DOC-REGISTRY.md`, `docs/compare/gf-launcher-metering.compare.md` (×2), and
+  `docs/shim-contract.md` went dangling. Restored via `git checkout HEAD --
+  docs/restricted-environments.md` rather than migrating the citations, since every
+  citing doc still describes its content as current.
+- **Files:** `work/{IMPLEMENTATION,INTERVIEW,MACHINE,OPEN-WORK,WORKLOG}.md` (moved),
+  `CLAUDE.md`, `docs/DOC-REGISTRY.md`, `docs/PLAN.md`, `docs/README.md`, `docs/CLI.md`,
+  `docs/cage-lab/README.md`, `docs/compare/README.md`, `docs/doc-size-discipline.md`,
+  `cage/explain_data.py`, `tests/test_doc_links.py`, `tests/test_queue_honesty.py`,
+  `docs/restricted-environments.md` (restored).
+- **Tests:** green, 1655 passed / 11 skipped (`just test`'s pinned count unchanged —
+  no test added or removed, only two tests' path constants updated).
+- **Next:** commit, then Arpit's follow-on instruction (merge to main, delete stale
+  branches, publish a new version) — see `WORKLOG.md` for the check-in on that.
+
+## 2026-08-12 — the queue closed wholesale: 16 docs archived unbuilt, OPEN-WORK emptied
+
+- **Implemented: nothing.** This is a *decision* recorded, not work built — Arpit
+  instructed that all open items and all parked proposals be closed and archived. Every
+  one of the 16 was `status: proposed` or blocked on his hands/decision; **none was
+  built**, so each archive header says *closed by decision, never built* and names what
+  it left unresolved, rather than the usual *implemented, living spec is X*.
+- **Archived (11 items):** NET-1 · SHIM-TOOL-DEPS · L1-FIELD · KIRO-MCP-FIELD · HR-FIELD ·
+  GFX-KIRO-RATE · TOOL-SDK · COPILOT-SIDECAR · POLICYSYNC-FIXTURE · KIRO-CLI-SCOPE ·
+  OUTPUT-GROWTH → `docs/archive/v0.49-*.item.md`.
+- **Archived (5 proposals):** net-positive-evidence-run · tool-integration-contract ·
+  larger-lab-corpus · policysync-synthetic-bundle · attest-join-command-normalization →
+  `docs/archive/v0.49-*.proposal.md`.
+- **Archived (3 directory docs):** `open/CONSTRAINTS.md` · `open/README.md` ·
+  `proposals/README.md`. **`docs/open/` and `docs/proposals/` no longer exist.**
+- **What this leaves unresolved, stated once so it is not lost:** cage has still never
+  measured a tool netting positive (NET-1); **SHIM-TOOL-DEPS is a measured defect closed
+  unfixed** — with no `grep` on PATH the shipped POSIX twin selects itself and re-execs
+  forever, a reproduced 120s hang; and `cage setup --status` still tells users copilot/kiro
+  auto-close is wired with no machine ever having verified it (L1-FIELD Q1/Q2).
+- **CONSTRAINTS.md is the one that could quietly cost something.** It was never open work.
+  Its rules were archived with the directory and **not migrated into CLAUDE.md**; its
+  header splits them into those enforced mechanically (`tests/test_floor.py`,
+  `agents.SURFACES`, `wiringscan`, `attest.LIMIT`) and five carried by prose alone, which
+  are now at risk: the frozen lab corpus, the "unverified on a real Copilot" honesty
+  requirement, the `--hooks`-off-by-default trap, F2's UNTESTED VS Code receipt limit, and
+  the `test_portable_wiring.py`-never-existed correction.
+- **Files:** `docs/OPEN-WORK.md` (rewritten as an empty queue + closure table) ·
+  `docs/archive/` (+16 files, new sweep section in its README) · `CLAUDE.md` (three rules:
+  compare-on-a-fork, the proposal lifecycle, the OPEN-WORK maintained-doc bullet; plus the
+  OUTPUT-GROWTH citation) · `docs/README.md` · `docs/DOC-REGISTRY.md` (6 rows) ·
+  `docs/FIELD-RUNBOOK.md` · `docs/GLOSSARY.md` · `docs/shim-contract.md` ·
+  `docs/compare/README.md` · `docs/cage-lab/README.md` · `cage/viewexport.py`.
+- **Tests:** see the verification note in the same-day WORKLOG entry.
+- **Next:** Arpit deletes the two now-empty directories and `_to_delete/`, and decides
+  whether SHIM-TOOL-DEPS stays closed — it is the only closure that is a live defect
+  rather than an unstarted idea.
+
+
 ## 2026-08-12 — GF-LAUNCHER verdict B built: the interceptor reaches cage without a `cage` command
 
 - Implemented: **B5 arm 2** in both twins. When no `cage` command resolves, they probe
@@ -135,7 +216,7 @@ assertion for eleven days.
   *Documentation discipline* OPEN-WORK bullet now describes the index-plus-`docs/open/`
   shape, names the queue-honesty gate, and records **why counts are not gated**.
 - Next: Arpit's call on the proposed `CLAUDE.md` diff and the commit split; then push the
-  65 files, then [NET-1](open/NET-1.md).
+  65 files, then [NET-1](../docs/open/NET-1.md).
 
 ---
 
@@ -234,7 +315,7 @@ commit**, so the record of *why* matters more than the diff.
   `docs/CLI.md` · `docs/*`.
 - **Tests:** green — **1609 ⇒ 1616**, 11 skipped.
 - **Next:** the sweep is complete. **COMMITS-WINDOW** is the one open decision it raised
-  ([compare](compare/commits-view-cost-bound.compare.md)).
+  ([compare](../docs/compare/commits-view-cost-bound.compare.md)).
 
 ## 2026-08-11 — agent-lane sweep P5: HR-COPILOT-JOIN — copilot VS Code rows carry a project
 
@@ -392,7 +473,7 @@ commit**, so the record of *why* matters more than the diff.
   `constants.COMMITS_DEFAULT_ROWS`' comment claimed the row cap bounded cost — it never
   did (the cap is applied after every row is built), and that false comment is why this
   stayed invisible. Corrected. Fork filed:
-  [compare](compare/commits-view-cost-bound.compare.md) + OPEN-WORK **COMMITS-WINDOW**.
+  [compare](../docs/compare/commits-view-cost-bound.compare.md) + OPEN-WORK **COMMITS-WINDOW**.
 - **Files:** `tools/cigraphify.py` · `cage/authorcapture.py` · `cage/hookcmd.py` ·
   `cage/importcmd.py` · `cage/commitview.py` · `cage/clicmds.py` · `cage/cli.py` ·
   `cage/constants.py` · `cage/linematch.py` · `cage/originrecord.py` · `cage/tasks.py` ·
@@ -884,7 +965,7 @@ commit**, so the record of *why* matters more than the diff.
   **v1.37.0**, before cage's pinned 1.42.0) — but verifying it surfaced that the GenAI
   conventions moved to their own repository, so the pinned version string may not name
   what cage thinks. Filed as
-  [research](regression/../research/2026-08-03-otel-genai-semconv-pin.md) with three
+  [research](../docs/research/2026-08-03-otel-genai-semconv-pin.md) with three
   options and a recommendation; `otelout` and the pin are untouched.
 - **CLI-GAPS(a):** `cage --help` advertised six of `data`'s eight commands. Fixed *and*
   **gated bidirectionally against the live parser** — a command that exists but is
@@ -1092,7 +1173,7 @@ commit**, so the record of *why* matters more than the diff.
   runs "inside a VSCode native extension environment," yet the hook fired anyway,
   in tension with the documented `attest.LIMIT` ("hooks do not fire under a VS Code
   extension") — see
-  [finding](regression/2026-08-02-finding-hooks-fire-in-vscode-extension.md). Cleaned
+  [finding](../docs/regression/2026-08-02-finding-hooks-fire-in-vscode-extension.md). Cleaned
   the one synthetic test row (a manually-piped `cage hook` invocation used to prove the
   command works in isolation) out of `attest.jsonl` before finishing, leaving only the
   two genuinely host-fired rows.
@@ -1352,7 +1433,7 @@ commit**, so the record of *why* matters more than the diff.
     different permission from metering spend.
   - `importcmd.glob_source` extracted so the pass and `_scan` share ONE glob.
 - **Phase gate — PASSED, with one design defect found and fixed:**
-  [regression/2026-08-02-p1-authorship-dogfood.md](regression/2026-08-02-p1-authorship-dogfood.md).
+  [regression/2026-08-02-p1-authorship-dogfood.md](../docs/regression/2026-08-02-p1-authorship-dogfood.md).
   103 commits × 81 real transcripts (123 MB), 4.2 s → **69 rows / 25 commits**, re-run 0.
   **The join is sound: 68.7% verbatim match inside files a session proposed.**
   `MIN_MATCH_CHARS` **frozen at 4** with a 1→12 sweep (rate flat at 41.1–41.2%; 1→4
@@ -1425,7 +1506,7 @@ commit**, so the record of *why* matters more than the diff.
 ## 2026-08-02 — CHATS-VIEW: `cage insights chats` built, single phase (1125/0 ⇒ 1148/0)
 
 - **Milestone:** the per-chat detail view, per
-  [docs/archive/v0.42-chats-view.proposal.md](archive/v0.42-chats-view.proposal.md) —
+  [docs/archive/v0.42-chats-view.proposal.md](../docs/archive/v0.42-chats-view.proposal.md) —
   a new derived view, no substrate change, single phase.
 - **Implemented:**
   - **`cage/chats.py`** — `summarize()` groups `ledger.calls` by `(agent, surface,
@@ -1575,7 +1656,7 @@ commit**, so the record of *why* matters more than the diff.
 ## 2026-08-02 — AGENT-L0 **P0**: skill residue cleared, the floor proven (1024/0 ⇒ 1039/0)
 
 - **Milestone:** phase P0 of the agent-surface program
-  ([handoff](archive/v0.41-agent-surface.handoff.md) · [prompt](archive/v0.41-agent-surface.prompt.md)) — gate met,
+  ([handoff](../docs/archive/v0.41-agent-surface.handoff.md) · [prompt](../docs/archive/v0.41-agent-surface.prompt.md)) — gate met,
   P1 unblocked.
 - **Implemented:**
   - **`tests/test_floor.py` (new, 15 tests) — the floor proof, built *before* the layers
@@ -2238,7 +2319,7 @@ commit**, so the record of *why* matters more than the diff.
 ## 2026-08-01 — K2 finished: routed leg, CLI scoping, read-side, and the tests (supersedes the entry below)
 
 - **Milestone:** K2 executed end-to-end from
-  [the archived prompt](archive/v0.36-kiro-routing.prompt.md). **Supersedes the
+  [the archived prompt](../docs/archive/v0.36-kiro-routing.prompt.md). **Supersedes the
   "⚠️ Tests: NOT PINNED / K-TEST" line in the entry below** — `tests/test_kiro_routing.py`
   (27 tests) now pins the routing, the CLI scoping and both caveat texts.
 
@@ -2317,7 +2398,7 @@ land · `cage query kiro-routing`.
 
 - **Milestone:** closes OPEN-WORK **K2** and **K3/K4**. Found in the working tree during
   a Cowork reconciliation — built by the executing session, not yet logged here.
-- **K2 — kiro capture routing** (per [ADR 0006](adr/0006-kiro-rows-are-machine-facts-not-project-facts.md)):
+- **K2 — kiro capture routing** (per [ADR 0006](../docs/adr/0006-kiro-rows-are-machine-facts-not-project-facts.md)):
   - `paths.kiro_routed(root)` — returns the kiro-IDE sink only when it **differs** from
     `root`'s ledger, else `None`. The single predicate the sweep branches on. Compared on
     the resolved **ledger dir**, not the root, which collapses both `CAGE_BASE` and
@@ -2544,7 +2625,7 @@ land · `cage query kiro-routing`.
     double-summing: kiro's log has no project/session/ts, so importing into a *new*
     project pulls its whole global history — per-project kiro cost has never been
     correct. Decision recorded as
-    [ADR 0006](adr/0006-kiro-rows-are-machine-facts-not-project-facts.md): kiro rows go
+    [ADR 0006](../docs/adr/0006-kiro-rows-are-machine-facts-not-project-facts.md): kiro rows go
     to the **global ledger only**, explicit `--ledger`/`CAGE_BASE` still winning.
     Also established that kiro ids are stable across ledgers, so every id-merging path
     was already safe.
@@ -2972,7 +3053,7 @@ land · `cage query kiro-routing`.
 ## 2026-07-28 — graphify capture GC0–GC5 (usage rows · transcript detection · forward model)
 - Implemented: the full graphify-capture handoff (GC0–GC5); GC6/G1 remains out of scope.
   - **GC0** — probed real logs (24 copilot-cli sessions, 145 copilot-vscode files, kiro
-    token log). Verdict in [graphify-capture.plan.md §3.0](graphify-capture.plan.md):
+    token log). Verdict in [graphify-capture.plan.md §3.0](../docs/graphify-capture.plan.md):
     claude ships; copilot-cli *does* carry command+result (`tool.execution_*`,
     `arguments.command`/`result.content`) → out of scope, finding filed; copilot-vscode
     partial; kiro HONEST-LIMIT.
@@ -2984,7 +3065,7 @@ land · `cage query kiro-routing`.
     `modeled` receipt reusing the shim counterfactual; Reads of `GRAPH_REPORT.md`/`wiki/**`
     → distinct `report-read` receipt (conf 0.3, footnoted apart). Corpus computation shared
     with GC5b (`repoceiling.py`).
-  - **GC3** ([ADR 0005](adr/0005-graphify-receipt-ids-session-inclusive-cross-route-deferral.md))
+  - **GC3** ([ADR 0005](../docs/adr/0005-graphify-receipt-ids-session-inclusive-cross-route-deferral.md))
     — deterministic session-inclusive ids (`graphifymeter.receipt_id`) + content-key
     deferral; shim stamps `session=""` (root-cause fix). Both acceptance tests pass: same
     query/two sessions ⇒ two receipts; shim+transcript/one session ⇒ one receipt. Added
@@ -3841,7 +3922,7 @@ land · `cage query kiro-routing`.
   end-to-end on the **real** session `8073abba` — legacy row 70,071 → re-import →
   **107,581 exact** (+37,510, the exact V3 undercount) → third import **+0**. Proves V3
   goes 8/8 → **227,298** without spending on the paid re-run.
-- **Records:** [ADR 0004](adr/0004-append-only-delta-rows-and-separate-by-schema.md)
+- **Records:** [ADR 0004](../docs/adr/0004-append-only-delta-rows-and-separate-by-schema.md)
   (append-only delta rows + separate-by-schema, with veto condition);
   `docs/regression/2026-07-28-capture-precision-fixes.md`; proposed CLAUDE.md edits parked
   in `docs/proposals/claude-md-sources-authority.md` (**propose, don't apply**).
@@ -5009,7 +5090,7 @@ number nobody had measured, the exact failure the item was filed to prevent.
 **Stated limit, carried forward:** the count is *project* scope. `~/.cage` was unreachable
 from the environment that ran it, so a copilot-CLI shutdown with the cwd outside any
 project (the KIRO-CLI-SCOPE shape) is excluded. Evidence, reopen trigger and the re-run
-script: [regression/2026-08-11-credits-legacy-split-count.md](regression/2026-08-11-credits-legacy-split-count.md).
+script: [regression/2026-08-11-credits-legacy-split-count.md](../docs/regression/2026-08-11-credits-legacy-split-count.md).
 
 ## 2026-08-11 — ADOPT-COV: closed as filed, by its own pre-committed finding
 
@@ -5033,7 +5114,7 @@ shim) remains a **capture change requiring its own proposal** — unchanged.
 "attested by an L1 hook" table printed **zero rows** while the session-join produced
 seven, so attestation contributes nothing to coverage today despite a non-empty
 `.cage/state/attest.jsonl`. Evidence:
-[regression/2026-08-11-adopt-cov-dev-ledger-read.md](regression/2026-08-11-adopt-cov-dev-ledger-read.md).
+[regression/2026-08-11-adopt-cov-dev-ledger-read.md](../docs/regression/2026-08-11-adopt-cov-dev-ledger-read.md).
 
 ## 2026-08-11 — doc hygiene: two proposals archived, two constraints rescued
 
@@ -5054,13 +5135,13 @@ cut recorded:
 
 Also corrected: `compare/README.md` described v0.44 and v0.48 as *unreleased* (both
 shipped) and COMMITS-WINDOW as *awaiting verdict* (decided B and built). New:
-[FIELD-RUNBOOK.md](FIELD-RUNBOOK.md) — copy-paste procedures for the five hands-only
+[FIELD-RUNBOOK.md](../docs/FIELD-RUNBOOK.md) — copy-paste procedures for the five hands-only
 items, every command checked against `cage 0.48.0`'s real `--help`.
 
 ## 2026-08-12 — GF-LAUNCHER: verdict B accepted (decision recorded, nothing built)
 
 Arpit accepted **option B — an unconditional interpreter arm in B5** on the
-[gf-launcher-metering compare](compare/gf-launcher-metering.compare.md). The compare's
+[gf-launcher-metering compare](../docs/compare/gf-launcher-metering.compare.md). The compare's
 status moved from *proposed verdict* to **DECIDED**; the item moved out of OPEN-WORK's
 *your decision* section into a new **agent lane — buildable now**, which had been empty
 since the 2026-08-11 sweep.
@@ -5073,7 +5154,7 @@ misses, so standard mode is unchanged in behaviour and latency, and the fix cove
 **superset** of launcher mode — a `cage.pyz` on `PYTHONPATH`, an unactivated venv, any
 importable-but-not-on-PATH install.
 
-**What the build inherits, carried into [open/GF-LAUNCHER.md](open/GF-LAUNCHER.md) so it
+**What the build inherits, carried into [open/GF-LAUNCHER.md](../docs/open/GF-LAUNCHER.md) so it
 survives the compare doc:** both twins move together (ADR 0007); **D8** is a new permanent
 divergence (`python3` vs `py -3` with a `python` fallback) and must be registered in the
 shim contract; the **B3 marker set needs no change**, verified — `cage data graphify`

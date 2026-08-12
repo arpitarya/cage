@@ -7,13 +7,13 @@ deterministic, independent of any AI tool.
 Design of record: [docs/PLAN.md](docs/PLAN.md). Read it before changing
 the substrate contract or the attribution engine.
 
-Maintainer handoff: [docs/INTERVIEW.md](docs/INTERVIEW.md)
+Maintainer handoff: [work/INTERVIEW.md](work/INTERVIEW.md)
 — the outgoing model's exit interview (intent, scar tissue, how to work with the
 human). **Every agent maintaining this repo reads it after this file; a departing
 maintainer appends its own lessons there.** It is context, never spec — where it
 disagrees with this file or the plan, this file and the plan win.
 
-**Build log: [IMPLEMENTATION.md](docs/IMPLEMENTATION.md) — always maintained.** After
+**Build log: [IMPLEMENTATION.md](work/IMPLEMENTATION.md) — always maintained.** After
 **every small milestone** (a green checkpoint, a commit, a phase step — not just a
 release), append an entry: date · milestone · what was implemented · files touched ·
 test status · next step. Create the file if absent; newest entries first. It is a
@@ -474,8 +474,9 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   **`.cage/output/` is deliberately NOT `.cage/out/`**: that one is `cage data serve`'s
   docroot and a stdlib `http.server` is pointed straight at it, so sharing a directory
   would publish every exported report on the loopback port. **No cleanup class prunes
-  it** — cage never deletes an artifact it wrote (`docs/OPEN-WORK.md` OUTPUT-GROWTH
-  carries the volume-gated reopen). Bare `cage` (the overview) has **no** `--export`: a
+  it** — cage never deletes an artifact it wrote (OUTPUT-GROWTH carried the
+  volume-gated reopen and was closed unactioned 2026-08-12, no size number ever
+  measured: [archive/v0.49-output-growth.item.md](docs/archive/v0.49-output-growth.item.md)). Bare `cage` (the overview) has **no** `--export`: a
   root-level optional-value flag would swallow the following subcommand. Adding a view =
   `_export_flags(<parser>, "<verb path>")`; the fan-out is gated by
   `test_every_report_and_insight_is_exportable` — **wire it in, never relax the set.**
@@ -483,7 +484,7 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
 ## Must-Know Rules
 
 - **Triage before work: a human-blocked queue STOPS the session (Arpit, 2026-08-12).**
-  Before doing anything, read `docs/OPEN-WORK.md` and ask: *is any item agent-closable
+  Before doing anything, read `work/OPEN-WORK.md` and ask: *is any item agent-closable
   right now?* If everything remaining needs Arpit — his hands, a ratification, a
   decision, a push — the session's **first** output is the blocked-on-Arpit list in
   ≤3 lines, and then it stops. No invented scope, no doc polishing, no "discovered
@@ -492,6 +493,19 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   is the rule followed. His time and tokens are money — cage itself can price a
   session (`cage report`); say the cost out loud rather than running long against a
   blocked queue. Applies to Cowork and Claude Code alike.
+- **Probe before claiming impossibility (Arpit, 2026-08-12).** Any claim of the form
+  "item X needs hardware/tooling that isn't here" must cite a dated row in
+  [work/MACHINE.md](work/MACHINE.md); if the row is missing, the probe is the next
+  action, not the assumption. Born of a real failure: nine queue items were called
+  hardware-blocked while Copilot and Kiro were installed the whole time.
+- **Two strikes → a gate (Arpit, 2026-08-12).** A failure class the WORKLOG records
+  twice becomes a test or mechanical gate in the same change that records the second
+  occurrence. The OPEN-WORK header went stale **seven times** before
+  `tests/test_queue_honesty.py` existed; the lesson tax is capped at two from now on.
+- **Every WORKLOG entry ends with a `Cost:` line (Arpit, 2026-08-12)** — the
+  session's spend from `cage report` (this repo's own product; dogfood it). If
+  unmeasurable, write `Cost: unmeasured — <why>`. Waste that is priced gets stopped;
+  waste that is prose gets repeated.
 - **$0 / stdlib only** — `dependencies = []`. ML is opt-in extras (`[embeddings]`,
   `[ml]`), never imported on the default path.
 - **Fail-open everywhere on the write path** — `ledger.append` returns `False`, it
@@ -626,11 +640,14 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   multiple viable options, write a *compare doc* in [docs/compare/](docs/compare/)
   **first** — debate, matrix, grounded references, a proposed verdict Arpit accepts
   or overrides, and a reopen-trigger — before committing to a plan. This is a
-  standing rule. An idea worth keeping but not being built now gets a *proposal
-  doc* in [docs/proposals/](docs/proposals/) (`status: proposed`, same rigor) —
-  parked, not lost; it graduates to a compare doc or plan entry when picked up
-  (and keeps a `# v2:` idea out of the code). A settled fork graduates to a plan
-  entry and, on ship, an ADR; the compare doc stays as the evidence behind it.
+  standing rule. **`docs/proposals/` no longer exists** — on 2026-08-12 Arpit closed
+  every parked idea unbuilt and the directory was archived, so an idea worth keeping
+  but not being built now gets **one line in [work/OPEN-WORK.md](work/OPEN-WORK.md)**
+  with its trigger, not a file of its own (this still keeps a `# v2:` idea out of the
+  code). If a parked-idea home is ever re-established, the four-rule format contract to
+  copy is in [archive/v0.49-proposals-readme.md](docs/archive/v0.49-proposals-readme.md).
+  A settled fork graduates to a plan entry and, on ship, an ADR; the compare doc stays
+  as the evidence behind it.
 - **Research gets its own doc, always — in [docs/research/](docs/research/).**
   Whenever a session does research — an external-source investigation, a store/format
   probe, a competitive or ecosystem survey, anything whose output is *findings rather
@@ -653,30 +670,18 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   that is deliberately historical ("the generated `docs/cli-output-spec.md` was
   removed in the hookless rebuild") is correct and must read as past tense. Sweep with:
   `grep -rho "docs/[a-z0-9-]*\.md" cage/*.py | sort -u` and test each target exists.
-- **A proposal has a lifecycle too — parked in `proposals/`, ARCHIVED once
-  IMPLEMENTED.** `docs/proposals/` must read as *ideas not yet built*, exactly as
-  `docs/` root reads as *work not yet done*. The four states:
-  **proposed** (`status: proposed`, awaiting accept or a trigger) → **picked up**
-  (a handoff/prompt pair is written; the proposal gains a one-line pointer to it and
-  stays put — it is still the rationale) → **implemented** (the work is built and
-  green) → **archived**.
-  **The change that implements a proposal must, in that same change:** (1) move it to
-  `docs/archive/vX.Y-<name>.proposal.md`, (2) prepend the archive header naming the
-  version and **where the living spec now lives** (contract, ADR, plan section — a
-  built proposal is never the spec), (3) record the outcome in
-  [IMPLEMENTATION.md](docs/IMPLEMENTATION.md), (4) move its index entry in
-  `proposals/README.md` to the **Graduated** list with links to the archived proposal
-  and the living spec, and (5) carry forward anything still unbuilt as its own
-  proposal or OPEN-WORK item. A **declined** proposal is treated the same way, with
-  the decision and decider in the header; a *superseded* one names its successor.
-  **Where an archived proposal disagrees with the living spec, the spec wins** —
-  implementation routinely corrects the proposal that motivated it, and that
-  correction is the valuable part (see
+- **A proposal has a lifecycle too — and as of 2026-08-12 there is nowhere to park
+  one.** `docs/proposals/` was emptied and archived when Arpit closed the whole queue;
+  the five parked ideas are `docs/archive/v0.49-*.proposal.md`, each headed *closed by
+  decision, never built*. **This rule is retained because the archive lifecycle still
+  binds**: where an archived proposal disagrees with the living spec, **the spec wins** —
+  implementation routinely corrects the proposal that motivated it, and that correction
+  is the valuable part (see
   [v0.38-windows-graphify-interceptor.proposal.md](docs/archive/v0.38-windows-graphify-interceptor.proposal.md),
-  wrong on both the packaging source and the recursion guard).
-  An implemented proposal still sitting in `proposals/` is a bug of the same class as a
-  ticked-but-present OPEN-WORK item: it inflates the queue of open ideas and makes the
-  directory lie about what is still on the table.
+  wrong on both the packaging source and the recursion guard). Should the directory be
+  re-established, the full four-state lifecycle (proposed → picked up → implemented →
+  archived) and the archive-on-implement checklist are preserved verbatim in
+  [archive/v0.49-proposals-readme.md](docs/archive/v0.49-proposals-readme.md).
 - **Handoff/prompt docs have a lifecycle — active in `docs/`, archived once
   IMPLEMENTED.** New feature work is specced as a pair: `docs/<feature>.handoff.md`
   + `docs/<feature>.prompt.md`. While the work is unbuilt they live in `docs/` root
@@ -727,7 +732,7 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
     (which has no fixed total, so the ratio drifts every time work is discovered)
     and never an effort guess. It must be *countable*, so a reader can check it.
   - **Count against evidence, not against ticks** — the phase index,
-    [IMPLEMENTATION.md](docs/IMPLEMENTATION.md), `docs/archive/` and the code decide
+    [IMPLEMENTATION.md](work/IMPLEMENTATION.md), `docs/archive/` and the code decide
     what is built. A ✅ in the prompt itself is an assertion, not proof; this is the
     same trap the OPEN-WORK rule names, and it bites hardest here because a prompt
     is read by an agent that will act on the number.
@@ -749,14 +754,14 @@ contact, not later. The maintained set, each with a standing owner-trigger (the
 freshness tracker is [docs/DOC-REGISTRY.md](docs/DOC-REGISTRY.md) — a change that
 fires a trigger updates the doc *and* bumps its row):
 
-- **[docs/OPEN-WORK.md](docs/OPEN-WORK.md)** — the **single index of pending work**, and
-  the only place unfinished work is tracked. **One line per item, one screen** (since
-  2026-08-11); the detail lives in **[docs/open/](docs/open/README.md)**, one file per
-  item — why it is open, what closes it, what binds a fix — beside
-  [open/CONSTRAINTS.md](docs/open/CONSTRAINTS.md), the rules that outlive their
-  originating item (**not** open work). **Adding an item = a file there AND one line
-  here**: a file with no index line is invisible, an index line with no file is a lie.
-  **Deleting an item file is a citation migration**, exactly as for any removed doc.
+- **[work/OPEN-WORK.md](work/OPEN-WORK.md)** — the **single index of pending work**, and
+  the only place unfinished work is tracked. **One line per item, one screen.**
+  `docs/open/` held that detail one-file-per-item from 2026-08-11 until 2026-08-12,
+  when Arpit closed the whole queue and the directory was archived — so **an item is now
+  one line here**, with detail inline or in a handoff/prompt pair in `docs/` root.
+  The standing constraints that lived beside it did **not** lapse with the directory:
+  [archive/v0.49-open-queue-constraints.md](docs/archive/v0.49-open-queue-constraints.md)
+  names which are enforced mechanically and which are now carried by prose alone.
   `docs/` root carries no loose handoff/prompt pairs; a pair is created only when a
   phase there is picked up, and archived on implement.
   **The header's checkable claims are test-gated** ([tests/test_queue_honesty.py](tests/test_queue_honesty.py)):
@@ -782,7 +787,7 @@ fires a trigger updates the doc *and* bumps its row):
   **A completed item is REMOVED from OPEN-WORK, never left ticked** — the file must read
   as *what is still to do*, so a reader can trust its length. Removal is only legal once
   the work is recorded elsewhere: **before deleting an item, append its outcome to
-  [IMPLEMENTATION.md](docs/IMPLEMENTATION.md)** (what was built · files · tests · next
+  [IMPLEMENTATION.md](work/IMPLEMENTATION.md)** (what was built · files · tests · next
   step) **and, if it produced evidence, publish it to [regression/](docs/regression/)**.
   Carry forward anything still live — a residual limit, an open decision, a follow-up —
   as its own item rather than losing it with the parent. A ticked-but-present item and a
@@ -793,19 +798,19 @@ fires a trigger updates the doc *and* bumps its row):
   `docs/archive/`, `IMPLEMENTATION.md`, and the code before declaring an item
   pending or done. On 2026-08-01 this file listed two already-built items as
   pending precisely because its markers had gone stale.
-- **[docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)** — the build log. Append at
+- **[work/IMPLEMENTATION.md](work/IMPLEMENTATION.md)** — the build log. Append at
   **every small milestone** (green checkpoint, commit, phase step): date ·
   milestone · what was built · files · test status · next step. Green/in-progress/
   failed/blocked all get an entry — an execution that skips it left the milestone
-  unrecorded. Newest first. It lives under `docs/` alongside the plan and the other
-  maintained docs.
-- **[docs/WORKLOG.md](docs/WORKLOG.md)** — the running per-session handoff. Append
+  unrecorded. Newest first. It lives under root `work/`, alongside the other
+  session-tracking docs — not under `docs/`, which stays the design/reference tree.
+- **[work/WORKLOG.md](work/WORKLOG.md)** — the running per-session handoff. Append
   every substantive exchange: asked · done · decided/open · single next step.
   Newest first. **This covers every working surface — Claude Code executions AND
   Cowork/chat strategy sessions alike**: a decision made in conversation (a scope
   call, a directive, a plan revision) is worklog material even when no code moved;
   the agent in that conversation appends the entry before the session ends.
-- **[docs/INTERVIEW.md](docs/INTERVIEW.md)** — the **exit interview**: notes from
+- **[work/INTERVIEW.md](work/INTERVIEW.md)** — the **exit interview**: notes from
   the outgoing maintainer-model to every future one (read it after this file).
   Write it the way a departing engineer briefs their replacement — not a status
   page, but *what I learned, what I'd warn you about, what I'd do next and why*.
@@ -863,8 +868,9 @@ fires a trigger updates the doc *and* bumps its row):
   that proposals/plan/IMPLEMENTATION link to as evidence, never spec.
 
 Note: ALL-CAPS entry-point/tracker files (CLAUDE.md, CHANGELOG.md, README.md and
-AGENTS.md at root; IMPLEMENTATION.md, PLAN.md, INTERVIEW.md, GLOSSARY.md, WORKLOG.md,
-DOC-REGISTRY.md, FORMULAS.md under `docs/`) carry no frontmatter; lowercase docs may.
+AGENTS.md at root; PLAN.md, GLOSSARY.md, DOC-REGISTRY.md, FORMULAS.md under `docs/`;
+IMPLEMENTATION.md, INTERVIEW.md, MACHINE.md, OPEN-WORK.md, WORKLOG.md under `work/`)
+carry no frontmatter; lowercase docs may.
 
 **Documentation style — no large paragraphs.** Authored docs (guides, handoffs,
 prompts, examples, ADRs, compare/proposal docs) are written in **short points**,
@@ -976,7 +982,7 @@ driver** — `export PATH="$LAB/bin:$LAB/.venv/bin:$PATH"` — never relying on 
 activation. The run **proves its own PATH** (`command -v graphify` written into the run
 manifest) and `SETUP.md` names the exact builds. This does **not** cover VS Code
 extension subprocesses, which inherit VS Code's launch environment — those stay
-per-machine-verified. (docs/OPEN-WORK.md §I.2a)
+per-machine-verified.
 
 **Standing rule: after every cage-lab testing/capture run, publish the findings into
 [`docs/regression/`](docs/regression/) here, dated** — so they live with cage, are

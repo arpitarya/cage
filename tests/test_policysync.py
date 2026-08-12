@@ -53,7 +53,8 @@ def v016(root):
 # exercise generic sync mechanics (keep-customized, update-stale-default,
 # confirm-bucket, orphan-warning). Naming it here once means a bundle removal
 # is a one-line re-point instead of a five-test rewrite; see
-# docs/proposals/policysync-synthetic-bundle.md.
+# docs/archive/v0.49-policysync-synthetic-bundle.proposal.md
+# (closed unbuilt 2026-08-12 — this named-constant guard is the shipped mitigation).
 _EXAMPLE_TABLE, _EXAMPLE_KEY = "quality", "signal"
 _EXAMPLE_DEFAULT = "task_ok"
 
@@ -69,7 +70,7 @@ def test_borrowed_example_table_still_in_bundle():
         "cage.toml, so those tests are testing nothing. Re-point them at another "
         "actively-shipped scalar key (it must also survive _strip_to_v016, which "
         "removes [meta], [cleanup] and import_before_export). See "
-        "docs/proposals/policysync-synthetic-bundle.md."
+        "docs/archive/v0.49-policysync-synthetic-bundle.proposal.md (closed unbuilt)."
     )
 
 

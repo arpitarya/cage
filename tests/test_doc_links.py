@@ -15,10 +15,10 @@ links were correct when written, and rewriting a dated record to keep a link gre
 falsify the record. So the corpus splits, and the split is the decision:
 
 - **LIVE** — the docs a reader navigates as *current*: root `*.md`, `docs/*.md`,
-  `docs/adr/`, `docs/compare/`, `docs/proposals/`, `docs/example/`, `docs/cage-lab/`,
-  `docs/dogfood/`, `docs/research/`. **A dangling link here FAILS.**
+  `docs/adr/`, `docs/compare/`, `docs/example/`, `docs/cage-lab/`,
+  `docs/dogfood/`, `docs/research/`, `work/*.md`. **A dangling link here FAILS.**
 - **HISTORY** — dated, append-only records: `docs/archive/**`, `docs/regression/**`,
-  `docs/WORKLOG.md`, `docs/IMPLEMENTATION.md`, `CHANGELOG.md`. **Exempt from failure**,
+  `work/WORKLOG.md`, `work/IMPLEMENTATION.md`, `CHANGELOG.md`. **Exempt from failure**,
   because a link that pointed at a then-live doc is *true as history*.
 
 **The exemption is counted, never silent** (`test_history_dangle_count_is_reported`) —
@@ -39,7 +39,7 @@ REPO = Path(__file__).resolve().parents[1]
 
 # A doc tree that is a dated record, not a live surface. See the module docstring.
 HISTORY_DIRS = ("docs/archive/", "docs/regression/")
-HISTORY_FILES = {"docs/WORKLOG.md", "docs/IMPLEMENTATION.md", "CHANGELOG.md"}
+HISTORY_FILES = {"work/WORKLOG.md", "work/IMPLEMENTATION.md", "CHANGELOG.md"}
 
 _LINK = re.compile(r"\[[^\]]*\]\(([^)\s]+?\.md)(#[^)]*)?\)")
 _FENCE = re.compile(r"^\s*(```|~~~)")

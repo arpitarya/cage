@@ -1,0 +1,91 @@
+# Claude Code prompt: chats-credits — kiro-CLI conversations as chat rows
+
+**Model:** Sonnet — additive, fully-specced view change; every design decision is locked
+in the handoff, no diagnosis required.
+**Progress:** 0% — not started.
+
+You are extending `cage insights chats` to render kiro-CLI **credit** conversations as
+chat rows, and removing the refusal whose "next: `cage report` — where that usage IS
+counted" pointer is false (nothing reads `ledger.credits` except that refusal). The full
+spec is `docs/chats-credits.handoff.md` — read it first; its **Definition of done** and
+**Non-negotiables** are binding. Where this prompt and the handoff disagree, the handoff
+wins.
+
+## Context to load first
+
+1. `CLAUDE.md` (triage rule included — this item IS the agent-closable work), then
+   `work/OPEN-WORK.md`.
+2. `docs/chats-credits.handoff.md` — the spec.
+3. Code: `cage/chats.py` · `cage/ledger.py` (`credits`, l. 201) · `cage/schema.py`
+   (`make_credit`, l. 245) · `cage/creditprice.py` (`rate_for`/`fmt`/`method_for`/
+   `basis_of`) · `cage/agents.py` (`row_surface`).
+4. Contracts: `docs/FORMULAS.md` §2.13 · `cage/explain_data.py` (`chats-view`) ·
+   `tests/test_chats.py` · `tests/test_output_spec.py` + `tests/fixtures/goldens/` ·
+   `tests/test_floor.py` (must pass untouched).
+
+## Task
+
+In `cage/chats.py::summarize`, additionally read `ledger.credits(root, since=…)`
+(already collapsed last-write-wins per conversation) and emit one chat row per
+conversation, bucketed by the existing `_bucket_key` normalization and marked
+`from_credits`. Render per the handoff's locked decisions:
+
+- Text: `calls` + all four token cells `—`; `credits` filled (recorded `0.0` → `0.00`,
+  never `—`). CSV: those cells **empty**, never `0`.
+- Rank: `(-tokens_in, -(credits or 0.0), session)`.
+- Cost: `[billing.kiro] usd_per_credit` set ⇒ `credits × rate`, basis `credits-rate`,
+  method `modeled`; unset ⇒ cost `—`, credits stay a count (rate unset ≠ rate zero);
+  rate `0.0` ⇒ `$0.0000`. CSV `method`: `estimated` unpriced, `modeled` rate-priced.
+- Remove the credits structural refusal + footer gap; add the one-phrasing footer caveat
+  (credits-only store, token cells `—`). agent% refuses via existing `COVERAGE_GAPS`.
+- Credits never enter any token aggregate (`tokens_in`, `unpriced_tokens`, …).
+
+## Required workflow
+
+1. **Triage** — read `work/OPEN-WORK.md`; if it does not yet carry this item, add its
+   one-liner as pickup (same change).
+2. **Explore** the files above before writing anything. Verify the handoff's "Current
+   state" facts against the live code; if any disagree, STOP and report before coding.
+3. **Plan** — list the exact functions/tests/docs you'll touch; confirm it matches the
+   handoff's §3 scope; then implement.
+4. **Implement incrementally**, suite green at each step. Derive-only: no writer, no
+   schema, no `report.py` money path, no MCP change.
+5. **Docs in the same change** — every §9.5 checkbox in the handoff: FORMULAS §2.13,
+   explainer registry, both docstrings, CHANGELOG, IMPLEMENTATION.md, WORKLOG (with a
+   `Cost:` line from `cage report`, or `Cost: unmeasured — <why>`), OPEN-WORK (remove
+   this line, ADD the discovered follow-up: "`cage report` reads no `ledger.credits`
+   row — decide whether report gains a credits count line"), DOC-REGISTRY rows.
+   **CLAUDE.md**: propose the chats-bullet edit and flag it explicitly in your final
+   summary for Arpit's review — never silently rewrite it.
+6. **Archive on implement** — suite green ⇒ move
+   `docs/chats-credits.{handoff,prompt}.md` → `docs/archive/vX.Y-chats-credits.*` with
+   the one-line header ("implemented for vX.Y (unreleased)" if untagged), update
+   `docs/README.md` + `docs/archive/README.md` indexes, set this file's **Progress** to
+   100% as part of the move.
+7. **Verify** — `just test` fully green; goldens re-blessed only after you eyeball the
+   diff (`CAGE_BLESS_GOLDENS=1 pytest tests/test_output_spec.py`); `test_floor` and
+   `test_cli_reference` untouched and green; manual
+   `cage insights chats --agent kiro` shows the conversation row(s).
+
+## Constraints (hard)
+
+- Determinism (no clock/random in derive) · method law (never `measured`; weaker tag
+  wins) · absence ≠ zero (`—`/empty vs recorded 0) · axes never blended silently · no
+  silent caps · CSV never gates · $0 stdlib only · three-agents invariant untouched.
+- Do NOT: touch substrate/writers/importcmd · add a report credits line (OPEN-WORK line
+  only) · touch kiro IDE routing or ADR 0006 · add an MCP tool · relax any assertion in
+  `test_floor`/`test_cli_reference` to get green.
+
+## Acceptance criteria (self-check before finishing)
+
+- [ ] Every Definition-of-done box in the handoff §2 is true.
+- [ ] New tests in `tests/test_chats.py` per handoff §9; full suite green.
+- [ ] No surviving text anywhere claims `cage report` counts kiro credits.
+- [ ] All §9.5 docs updated; pair archived; OPEN-WORK reflects reality.
+- [ ] CLAUDE.md edit surfaced for review in the final summary.
+
+## Guardrails
+
+- STOP and ask if: a "Current state" fact is stale, the golden diff surprises you,
+  `test_floor` reddens, or any step seems to need a substrate/writer change.
+- Never delete ledger data; never rewrite append-only files.

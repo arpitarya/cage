@@ -11,29 +11,32 @@ spec.
 
 - [PLAN.md](PLAN.md) — the design of record: substrate contract, attribution
   engine, every plan-§ referenced from code and CLAUDE.md.
-- **[OPEN-WORK.md](OPEN-WORK.md) — the ONE plan of pending work, and ONLY that.**
-  Since 2026-08-11 it is an **index**: one line per item, one screen, nothing else.
-  A completed item is **removed, never left ticked** — legal only once its outcome is
-  in [IMPLEMENTATION.md](IMPLEMENTATION.md) and any evidence is published to
+- **[OPEN-WORK.md](../work/OPEN-WORK.md) — the ONE plan of pending work, and ONLY that.**
+  It lives in root `work/`, not `docs/` (moved 2026-08-12). It is an **index**: one
+  line per item, one screen, nothing else. **The queue is empty** — Arpit closed
+  every item and every parked proposal unbuilt, and the file states only that;
+  the closure history lives in [archive/](archive/) and [IMPLEMENTATION.md](../work/IMPLEMENTATION.md),
+  not here. A completed item is **removed, never left ticked** — legal only once its outcome is
+  in [IMPLEMENTATION.md](../work/IMPLEMENTATION.md) and any evidence is published to
   [regression/](regression/), with residual limits carried forward as their own
   items. So its length is a truthful measure of what is left. **Test-gated**:
   `tests/test_queue_honesty.py` fails the suite when the header's *checkable* claims
   (version · tag · clean-and-pushed) contradict git — and stays silent when it makes
   no claim, because a gate that reddens on every in-flight change teaches you to
   ignore it.
-- **[open/](open/README.md) — the detail behind each index line, one file per item.**
-  Why it is open · what closes it · what binds a fix. Also
-  [open/CONSTRAINTS.md](open/CONSTRAINTS.md), the rules that outlive their originating
-  item (**not** open work). Adding an item = a file here **and** one line in the index;
-  a file with no index line is invisible, an index line with no file is a lie. Deleting
-  one is a citation migration, exactly as for any removed doc. It also carries the
-  durable rules promoted out of the archived cycle plans, including the **ZERO dummy
-  data** law.
+- **`open/` is gone** (2026-08-12). It held one file per open item from 2026-08-11;
+  when the queue was closed wholesale every item moved to
+  [archive/](archive/) as `v0.49-*.item.md`. An item is now **one line in the index**,
+  with detail inline or in a handoff/prompt pair here in `docs/` root. The standing
+  constraints that lived beside it did **not** lapse —
+  [archive/v0.49-open-queue-constraints.md](archive/v0.49-open-queue-constraints.md)
+  names which are enforced mechanically and which are now prose-only, including the
+  **ZERO dummy data** law.
 
 ## Active work
 
 **None.** `docs/` root carries no loose handoff/prompt pair and no held proposal — a pair
-is created only when a phase in [OPEN-WORK.md](OPEN-WORK.md) is picked up, and archived
+is created only when a phase in [OPEN-WORK.md](../work/OPEN-WORK.md) is picked up, and archived
 on implement. The agent-lane refill, the last occupant, was built and green on 2026-08-12
 and [archived](archive/v0.49-open-queue-agent-lane.handoff.md) — handoff only, its prompt
 was handed over inline and never written here.
@@ -41,7 +44,7 @@ was handed over inline and never written here.
 **One thing it left open is not a pair and does not live here:** the `CLAUDE.md`
 *Documentation discipline* correction is **proposed, awaiting Arpit** — steering files are
 never silently rewritten, so the diff sits in that session's response and in
-[WORKLOG.md](WORKLOG.md), not as a doc in this tree.
+[WORKLOG.md](../work/WORKLOG.md), not as a doc in this tree.
 
 ## The lab manual
 
@@ -58,7 +61,10 @@ never silently rewritten, so the diff sits in that session's response and in
 
 The maintained doc set, governed by the *Documentation discipline* section of
 [`../CLAUDE.md`](../CLAUDE.md). Freshness is tracked in
-[DOC-REGISTRY.md](DOC-REGISTRY.md).
+[DOC-REGISTRY.md](DOC-REGISTRY.md). **Four of these live in root `work/`, not
+`docs/`** (moved 2026-08-12) — `WORKLOG.md`, `INTERVIEW.md`, `IMPLEMENTATION.md`,
+and `OPEN-WORK.md` above; `MACHINE.md` moved with them. Each bullet below links
+to its real location.
 
 - **[CLI.md](CLI.md) — every `cage` command in one place.** The 5 daily verbs, the 7
   groups, the 4 hidden plumbing commands and every flag, plus the removed-verb
@@ -71,16 +77,16 @@ The maintained doc set, governed by the *Documentation discipline* section of
 - [GLOSSARY.md](GLOSSARY.md) — every recurring term, defined once against the code.
 - [FORMULAS.md](FORMULAS.md) — every computed number: formula · code home ·
   method tag · the knobs that move it.
-- [WORKLOG.md](WORKLOG.md) — the running per-session handoff (append every
+- [WORKLOG.md](../work/WORKLOG.md) — the running per-session handoff (append every
   exchange, Claude Code and Cowork/chat alike).
-- [INTERVIEW.md](INTERVIEW.md) — the **exit interview**: notes from the outgoing
+- [INTERVIEW.md](../work/INTERVIEW.md) — the **exit interview**: notes from the outgoing
   maintainer-model to every future one. Read it after CLAUDE.md.
 - [DOC-REGISTRY.md](DOC-REGISTRY.md) — the doc freshness tracker (triggers +
   last-verified).
 - [architecture-flow.mermaid](architecture-flow.mermaid) — the one-way data flow as
   a diagram (also linked from the README).
 - [example/](example/) — copy-from contracts: cli · debug · setup · toml-config.
-- [IMPLEMENTATION.md](IMPLEMENTATION.md) — the build log.
+- [IMPLEMENTATION.md](../work/IMPLEMENTATION.md) — the build log.
 - [dogfood/](dogfood/README.md) — cage's own ledger, published as dated snapshots
   (append-only, mirrors [regression/](regression/README.md)); linked from the README,
   version-free. Freshness guarded by `tests/test_dogfood_freshness.py` (60-day gate).
@@ -90,7 +96,10 @@ The maintained doc set, governed by the *Documentation discipline* section of
 - [adr/](adr/) — architecture decision records (the durable *why*; each ends with a
   veto condition). Author new ones from [adr/TEMPLATE.md](adr/TEMPLATE.md).
 - [compare/](compare/) — decision records for forks (debate + matrix + verdict +
-  reopen-trigger); [proposals/](proposals/) — parked ideas (`status: proposed`).
+  reopen-trigger). `proposals/` is gone (2026-08-12): all five parked ideas were closed
+  unbuilt and are [archive/](archive/)`v0.49-*.proposal.md`; the format contract to copy
+  if it is re-established is
+  [archive/v0.49-proposals-readme.md](archive/v0.49-proposals-readme.md).
 - [regression/](regression/) — dated cage-lab capture/regression reports (data, not
   spec).
 - [archive/README.md](archive/README.md) — every shipped handoff/prompt/build-prompt

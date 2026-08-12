@@ -65,7 +65,7 @@ The homes already exist: `regression/` (measurements) · `archive/` (shipped spe
 ```bash
 python3 - <<'EOF'
 import re,sys
-for l in open(sys.argv[1] if len(sys.argv)>1 else 'docs/OPEN-WORK.md'):
+for l in open(sys.argv[1] if len(sys.argv)>1 else 'work/OPEN-WORK.md'):
     if l.startswith('|') and '---' not in l:
         r=re.sub(r'\[([^\]]*)\]\([^)]*\)',r'\1',l).replace('*','').replace('`','').rstrip()
         if len(r)>120: print(f"OVER {len(r)}: {r[:70]}")

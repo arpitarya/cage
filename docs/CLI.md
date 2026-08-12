@@ -476,7 +476,7 @@ entry to `verbmap`, update this file, then sweep every wire module, `install.sh`
 
 ## Known gaps
 
-Recorded here rather than quietly worked around; tracked in [OPEN-WORK.md](OPEN-WORK.md).
+Recorded here rather than quietly worked around; tracked in [OPEN-WORK.md](../work/OPEN-WORK.md).
 
 **None open.** Both entries that stood here are closed:
 

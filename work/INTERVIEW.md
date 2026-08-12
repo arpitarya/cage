@@ -15,7 +15,7 @@ Four standing sections: **state of play** · **in-flight + next step** · **stan
 constraints** · **lessons / scar tissue**.
 
 It is **context, never spec.** Where it disagrees with CLAUDE.md or
-[PLAN.md](PLAN.md), those win. Distinct from [WORKLOG.md](WORKLOG.md) (the
+[PLAN.md](../docs/PLAN.md), those win. Distinct from [WORKLOG.md](WORKLOG.md) (the
 granular per-exchange trail) and [IMPLEMENTATION.md](IMPLEMENTATION.md) (what is
 built, milestone by milestone) — this is the strategic, cross-session record.
 
@@ -23,7 +23,37 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
 
 ---
 
-## State of play (2026-08-12 — pick up here on a model switch)
+## State of play (2026-08-12 late — pick up here on a model switch)
+
+- **THE QUEUE IS EMPTY BECAUSE ARPIT CLOSED IT, NOT BECAUSE IT WAS WORKED.** On
+  2026-08-12 he instructed that all open items and all parked proposals be archived
+  wholesale. Sixteen docs moved to `docs/archive/v0.49-*`, **none of them built**;
+  `docs/open/` and `docs/proposals/` no longer exist. `OPEN-WORK.md` now records what was
+  closed and what each closure left unresolved. **Do not read the empty queue as
+  progress** — read the closure table.
+- **The one closure that is a defect, not an idea: SHIM-TOOL-DEPS.** With no `grep`
+  resolvable on PATH the shipped POSIX graphify twin selects *itself* as the real binary
+  and re-execs forever — a reproduced 120-second hang, pre-existing in every released
+  version, closed **unfixed**. A hang is the worst failure shape a fail-open path can
+  have. If you touch the twins, read
+  [archive/v0.49-shim-tool-deps.item.md](../docs/archive/v0.49-shim-tool-deps.item.md) first.
+- **`CONSTRAINTS.md` was archived, and its rules were NOT migrated into CLAUDE.md.** It
+  was never open work; it moved because its directory was emptied. Most of it is enforced
+  mechanically and survives (`tests/test_floor.py`, `agents.SURFACES`, `wiringscan`,
+  `attest.LIMIT`), but five constraints now live on prose alone in an archive file —
+  named in that file's header. **If you find yourself about to mutate `tinyshop`, or to
+  soften copilot's "unverified on a real Copilot" text, that is why nothing stopped you.**
+- **NET-1 was closed unrun, so cage still has no evidence that any tool nets positive.**
+  `insights compare` remains gated at `MIN_COMPARE_N = 5` with 1 produced. Every
+  correctness feature in this repo still rests on an unmeasured payoff.
+- **What I'd warn you about, and it is procedural:** two environment faults bit this
+  session and both are structural to the Cowork device bridge, not one-offs. A
+  **concurrent session** wrote five docs mid-run (back up before you edit — mtimes are
+  your only detector), and a `git status` through the bridge leaves `.git/index.lock`
+  behind that **the bridge cannot delete**, jamming git for every process in the repo.
+  Use `git --no-optional-locks status`, and do file moves with plain `mv`.
+
+## State of play (2026-08-12 earlier — historical)
 
 - **The agent lane is empty again, and this time it is empty *because it was measured*,
   not because it was worked through.** Of eleven queue items, **nine are structurally
@@ -102,7 +132,7 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
   entry is not written — that is the next step, and it needs Arpit's go (the GitHub
   release IS the PyPI trigger).
 - **One thing is waiting on you and nothing else is:** **COMMITS-WINDOW**
-  ([compare](compare/commits-view-cost-bound.compare.md)). `cage insights commits` runs
+  ([compare](../docs/compare/commits-view-cost-bound.compare.md)). `cage insights commits` runs
   one `git show` per commit in the *whole* history to print 20 rows (measured 6.4s /
   123 commits). The obvious fix — a default `--since` — is wrong, and that is the whole
   doc: a **relative** default puts a wall clock in the default path, so the same ledger
@@ -137,8 +167,8 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
   in tree* for a full day after it shipped, and so did `OPEN-WORK.md`'s header and the
   agent-lane-sweep handoff's entire P0 STOP gate. **Never restate a release claim from
   prose here** — `git ls-remote --tags origin`, `gh release view`, PyPI.
-- **The agent-lane sweep is under way** ([handoff](archive/v0.49-agent-lane-sweep.handoff.md) ·
-  [prompt](archive/v0.49-agent-lane-sweep.prompt.md), 29%). **P0 needed no work** (above); **P1
+- **The agent-lane sweep is under way** ([handoff](../docs/archive/v0.49-agent-lane-sweep.handoff.md) ·
+  [prompt](../docs/archive/v0.49-agent-lane-sweep.prompt.md), 29%). **P0 needed no work** (above); **P1
   CIGF-HERMETIC is closed** — `tools/cigraphify` now seeds `project/.cage` so
   `find_project_root` short-circuits inside the sandbox, and the `present` leg ran
   **7/7 on a developer machine for the first time** with the real `~/.cage`/`~/bin`
@@ -186,9 +216,9 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
 - **CHATS-AUTHOR: BUILT 2026-08-03** (v0.46.0, unreleased — see *In flight* below).
   The `agent%` authorship column on `cage insights chats`, joining the v2 provenance
   counts by `(agent, session)`. Pair + proposal archived:
-  [handoff](archive/v0.46-chats-author.handoff.md) ·
-  [prompt](archive/v0.46-chats-author.prompt.md) ·
-  [proposal](archive/v0.46-chats-author.proposal.md); living spec is FORMULAS
+  [handoff](../docs/archive/v0.46-chats-author.handoff.md) ·
+  [prompt](../docs/archive/v0.46-chats-author.prompt.md) ·
+  [proposal](../docs/archive/v0.46-chats-author.proposal.md); living spec is FORMULAS
   §2.13/§2.14. **Its Phase-0 REV-TS gate did its job** — it STOPped an earlier session
   cold with no work done, REV-TS was then built and shipped, and the re-run verified the
   gate independently rather than trusting the prompt's own status line. That sequencing
@@ -201,8 +231,8 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
   copilot-CLI; `cage import --rescan-graphify` backfills sessions the cursor already ate;
   kiro **IDE** is a named gap in doctor + `cage query graphify-coverage`. Pair archived
   (`docs/archive/v0.47-*`), evidence in
-  [research/2026-08-07-graphify-store-evidence.md](research/2026-08-07-graphify-store-evidence.md),
-  carve-out in [ADR 0009](adr/0009-kiro-cli-tool-run-bodies-read-transiently-never-persisted.md).
+  [research/2026-08-07-graphify-store-evidence.md](../docs/research/2026-08-07-graphify-store-evidence.md),
+  carve-out in [ADR 0009](../docs/adr/0009-kiro-cli-tool-run-bodies-read-transiently-never-persisted.md).
 - **The one thing to internalise about it: the blocking P0 gate paid for itself on the
   first phase.** The pair's central premise - "F2: copilot's chatSessions carries the
   command but no tool result" - was **false**, and had been for as long as the skip
@@ -261,9 +291,9 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
   bar NOT WRONG, NOT DUPLICATED). Suite last green at **817 tests**. Do not
   commit, tag, or release until Arpit says so.
 - **In flight / immediate next:** execute
-  [cage-lab-setup.prompt.md](archive/v0.36-cage-lab-setup.prompt.md) (**Opus**, both sibling
-  checkouts) — create `../cage-lab` fresh per [cage-lab-plan.md](archive/v0.36-cage-lab.plan.md)
-  v3 + [PLAN.md](PLAN.md) §11: the M/G correctness matrix, three-way auto-verify,
+  [cage-lab-setup.prompt.md](../docs/archive/v0.36-cage-lab-setup.prompt.md) (**Opus**, both sibling
+  checkouts) — create `../cage-lab` fresh per [cage-lab-plan.md](../docs/archive/v0.36-cage-lab.plan.md)
+  v3 + [PLAN.md](../docs/PLAN.md) §11: the M/G correctness matrix, three-way auto-verify,
   the **eyeball surface** (source + ledger + derivation with line refs, side by
   side — Arpit verifies manually), his playground, then publish the baseline into
   [regression/](regression/). Commits allowed in cage-lab only.
@@ -287,8 +317,17 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
 
 ## In flight + the single next step
 
-**Update 2026-08-11 (latest) — nothing is in flight. The single next step is the
-v0.49.0 release, and it needs Arpit's go.**
+**Update 2026-08-12 (latest) — nothing is in flight and there is no queue left. The
+single next step is Arpit's: unjam git (`rm -f .git/index.lock`), delete the emptied
+`docs/open/`, `docs/proposals/` and `_to_delete/`, run `just test`, and decide whether
+SHIM-TOOL-DEPS genuinely stays closed — it is the only closure that is a live measured
+defect rather than an unstarted idea.**
+
+**The section below is the pre-closure picture and is retained as history.** Everything it
+calls queued was archived unbuilt on 2026-08-12; `OPEN-WORK.md`'s closure table is the
+authority on what each item left behind.
+
+**Update 2026-08-11 — historical.**
 
 - The agent lane has **no queued work**. The only item a future session could pick up
   unprompted is **CREDITS-LEGACY-SPLIT**, and it is blocked on a *measurement*, not a
@@ -389,7 +428,7 @@ single next step: push and read the Windows `graphify` CI job.**
   script; Windows resolves a bare name only through `PATHEXT`, which has no extensionless
   entry, so cage's shim could never be *found* there. It now ships as a **twin pair** —
   `graphify` + `graphify.cmd` — against one written contract,
-  [shim-contract.md](shim-contract.md).
+  [shim-contract.md](../docs/shim-contract.md).
 - **The one thing I could not do is the one thing that matters most: run it on Windows.**
   10 behaviour tests and the whole CI `present` leg have never executed. Everything on
   this machine is green (979/0, dummyrepo S1–S18, `tools.cigraphify` 7/7 on macOS), and
@@ -444,8 +483,8 @@ you touch any savings number.**
 
 - Kiro's **IDE** rows now go to the machine ledger; its **CLI** credits are scoped to the
   project tree. Two stores, two *opposite* fixes — getting them backwards destroys real
-  attribution. [ADR 0006](adr/0006-kiro-rows-are-machine-facts-not-project-facts.md) ·
-  [archived pair](archive/v0.36-kiro-routing.handoff.md).
+  attribution. [ADR 0006](../docs/adr/0006-kiro-rows-are-machine-facts-not-project-facts.md) ·
+  [archived pair](../docs/archive/v0.36-kiro-routing.handoff.md).
 - **The invariant that changed:** `importcmd.run`'s "one active sink per run — never a
   double-write" now has exactly ONE exception, and it is contained in `_kiro_leg`. If you
   add a second exception, re-read that function first: every per-root object is rebuilt
@@ -465,7 +504,7 @@ you touch any savings number.**
   scratch after v0.36. There is no stub, no commented-out code, nothing to revert to.
   **If you are about to "restore" any of it: don't.** Write a proposal doc first
   (OPEN-WORK **HR1**). Evidence of what existed:
-  [archived pair](archive/v0.36-human-removal.handoff.md) + CHANGELOG v0.36 *Removed*.
+  [archived pair](../docs/archive/v0.36-human-removal.handoff.md) + CHANGELOG v0.36 *Removed*.
 - **The trap, recorded because it nearly landed:** cage had two unrelated "human"s.
   Provenance `origin="human"` (authorship) survives untouched. And `cage human outcome`
   / `cage human quality` were **not** the human axis at all — they sat in that command
@@ -513,7 +552,7 @@ you touch any savings number.**
 
 **Pre-2026-08-01 (still true unless superseded above):**
 
-- **Next step:** execute [cage-lab-setup.prompt.md](archive/v0.36-cage-lab-setup.prompt.md)
+- **Next step:** execute [cage-lab-setup.prompt.md](../docs/archive/v0.36-cage-lab-setup.prompt.md)
   (**Opus**, both sibling checkouts) — it is the only unbuilt pair in `docs/`
   root, and its prerequisites are all built and green.
 - Everything else specced today is **implemented** and archived under
@@ -632,6 +671,23 @@ you touch any savings number.**
 
 ## Maintainers
 
+- Claude (Opus 5) — 2026-08-12 (late) — executed the wholesale queue closure on Arpit's
+  instruction: 16 docs archived unbuilt, `docs/open/` and `docs/proposals/` removed,
+  citations migrated across CLAUDE.md, six DOC-REGISTRY rows and seven docs.
+  **The lesson I'd want inherited: when the instruction is to close work rather than do
+  it, the archive header is the entire deliverable.** Sixteen files moved is mechanical;
+  what stops the closure from becoming amnesia is that each header says *never built* and
+  names what is still unresolved — so SHIM-TOOL-DEPS reads as a reproduced hang rather
+  than a tidy idea, and CONSTRAINTS.md reads as *rules archived, not lifted*. An archive
+  that only says "moved" converts a decision into a silent loss. Second, and it is the
+  reason I stopped and asked before moving anything: **archiving unbuilt work records a
+  decision, not an outcome**, and the two need different headers — the repo's own lifecycle
+  rule already said so for declined proposals, and applying it was the difference between
+  an honest sweep and sixteen files pretending to be graduations. Third, dully but
+  expensively: **surface an environment fault the moment you cause it.** My own
+  `git status` jammed `.git/index.lock` for every process in the repo, including a
+  concurrent session's; saying so immediately cost one message, and saying it at the end
+  would have cost Arpit a debugging session.
 - Claude (Opus 5) — 2026-08-11 (late) — emptied the queue: seven held decisions taken and
   built (1616/0 ⇒ 1639/0), tiers 2 and 3 of OPEN-WORK deleted.
   **The lesson I'd want inherited: when two fixes both work, take the one that does not

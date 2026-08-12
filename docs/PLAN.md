@@ -11,8 +11,8 @@
 Status: **the design of record — and substantially BUILT.** This document defines the
 category, the substrate, the attribution engine, and the build order. It was written at
 v0.1 when nothing existed; cage is now shipped and on PyPI, so **read it as the contract,
-not as a plan of unbuilt work.** [IMPLEMENTATION.md](IMPLEMENTATION.md) is what is
-actually built; [OPEN-WORK.md](OPEN-WORK.md) is what is left.
+not as a plan of unbuilt work.** [IMPLEMENTATION.md](../work/IMPLEMENTATION.md) is what is
+actually built; [OPEN-WORK.md](../work/OPEN-WORK.md) is what is left.
 
 > **How to read this file (2026-08-02).** Its **section numbers are a live addressing
 > scheme** — ~65 source files cite `plan §X` in comments — so a superseded section is
@@ -837,8 +837,9 @@ ledgers written before v0.36 still hold its rows.
   (the task-close verb §4.7/§4.8 depend on) and `cage human quality` → `cage task
   quality` (§8.2). Neither was ever part of this axis.
 - **Reconsideration is a fresh design, not a revert.** Any future agent-vs-human
-  measurement gets a proposal doc under `docs/proposals/` first; nothing was left
-  behind in the tree as a stub to restore.
+  measurement is written up as a compare doc under [compare/](compare/) first
+  (`docs/proposals/` was closed and archived 2026-08-12); nothing was left behind in
+  the tree as a stub to restore.
 
 ### 4.7 Measured stack comparison — `cage insights compare` (roadmap P2)
 

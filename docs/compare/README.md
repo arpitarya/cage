@@ -14,8 +14,10 @@
 A settled fork graduates to a plan entry and, when it ships, an
 [ADR](../adr/TEMPLATE.md). The compare doc stays as the evidence behind it.
 
-Distinct from [proposals/](../proposals/): a compare doc resolves a **fork** (two+
-live options now); a proposal parks an **idea** (worth keeping, not being built).
+There is no longer a `docs/proposals/` directory — every parked idea was closed unbuilt
+2026-08-12 (see [OPEN-WORK.md](../../work/OPEN-WORK.md)). A compare doc resolves a **fork** (two+
+live options now); if a parked-idea home is ever re-established, the format contract to
+copy is in [archive/v0.49-proposals-readme.md](../archive/v0.49-proposals-readme.md).
 
 Naming: `<topic>.compare.md`. Written in short points, not walls of prose.
 

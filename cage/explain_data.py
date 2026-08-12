@@ -1145,7 +1145,7 @@ REGISTRY: tuple[Explanation, ...] = (
          "cage/usagelog.py", "cage/graphifymeter.py"),
         "usage rows carry NO method (diagnostic); receipts + forward model are modeled,\n"
         "  never measured — report-reads visibly weaker than query receipts.",
-        kind="concept", plan_ref="archive/v0.36-graphify-capture.plan.md GC0–GC5 (pending: docs/OPEN-WORK.md)"),
+        kind="concept", plan_ref="archive/v0.36-graphify-capture.plan.md GC0–GC5"),
     Explanation(
         "otel-export", ("otel", "opentelemetry", "otel-export", "genai", "gen_ai",
                         "semconv", "semantic-convention", "langfuse", "helicone",

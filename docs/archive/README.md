@@ -175,3 +175,34 @@ header intact.
   itself; this is the rationale, and two of its edits landed *amended* by decisions taken
   the same day (the commits cost bound joined **A**, credit-ladder rung 0 joined **B**).
   [proposal](v0.49-steering-edits-pending.proposal.md)
+
+
+## 2026-08-12 — the queue closure (16 files, one sweep)
+
+**Arpit closed the entire open-work queue and every parked proposal wholesale**, at
+v0.49.0, rather than working them. **Nothing here was implemented** — that is what makes
+this sweep different from every other section on this page. Each file keeps its original
+text verbatim plus a header naming what its closure left unresolved.
+
+Indexed by this section deliberately, not by 16 rows in the table above: it was one
+decision with one outcome, and the outcome is recorded in
+[OPEN-WORK.md](../OPEN-WORK.md), which now reads as an empty queue.
+
+**Items** (`v0.49-<name>.item.md`): net-1 · shim-tool-deps · l1-field · kiro-mcp-field ·
+hr-field · gfx-kiro-rate · tool-sdk · copilot-sidecar · policysync-fixture ·
+kiro-cli-scope · output-growth.
+
+**Proposals** (`v0.49-<name>.proposal.md`): net-positive-evidence-run ·
+tool-integration-contract · larger-lab-corpus · policysync-synthetic-bundle ·
+attest-join-command-normalization.
+
+**Directory docs**: [v0.49-open-queue-readme.md](v0.49-open-queue-readme.md) ·
+[v0.49-proposals-readme.md](v0.49-proposals-readme.md) ·
+[v0.49-open-queue-constraints.md](v0.49-open-queue-constraints.md).
+
+**Two things a future reader must not misread.**
+[SHIM-TOOL-DEPS](v0.49-shim-tool-deps.item.md) is a **real, measured defect closed
+unfixed** — a reproduced 120-second hang in the shipped POSIX twin — not a parked idea.
+And [CONSTRAINTS.md](v0.49-open-queue-constraints.md) was **never open work**: it is here
+because its directory was emptied, and its rules were **not lifted**; its header names
+which are enforced mechanically and which now survive on prose alone.

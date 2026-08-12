@@ -1,4 +1,4 @@
-"""QUEUE-HONESTY — `docs/OPEN-WORK.md`'s header must not contradict git.
+"""QUEUE-HONESTY — `work/OPEN-WORK.md`'s header must not contradict git.
 
 The queue's header carries a reconciliation note, and **it has been wrong six times in
 a week** — most sharply on 2026-08-11, when it asserted *"local HEAD == origin/main,
@@ -39,7 +39,7 @@ import subprocess
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-QUEUE = REPO / "docs" / "OPEN-WORK.md"
+QUEUE = REPO / "work" / "OPEN-WORK.md"
 
 # A sentence that recites a *past* state — the header's own correction log. Never a claim.
 _PAST = re.compile(
@@ -129,7 +129,7 @@ def test_the_queue_header_does_not_contradict_git():
         import pytest
         pytest.skip("no git ground truth here (no repo, no tags) — unanswerable, not failed")
     bad = contradictions(QUEUE.read_text(encoding="utf-8"), **truth)
-    assert not bad, ("docs/OPEN-WORK.md's header contradicts git:\n" +
+    assert not bad, ("work/OPEN-WORK.md's header contradicts git:\n" +
                      "\n".join(f"  · {b}" for b in bad) +
                      "\nReconcile the header against git — never the other way round.")
 
