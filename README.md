@@ -236,7 +236,7 @@ Every derived view is parse / arithmetic over the log — **no LLM call, ever, o
 
 Latest release below — full history and detail in [CHANGELOG.md](CHANGELOG.md).
 
-- **v0.49.0 — the queue emptied, and the agent lane with it.** The graphify interceptor now meters **without a `cage` command on PATH** (it probes `python3 -m cage` / `py -3`, fixing launcher mode, a `cage.pyz`, and any importable-but-not-on-PATH install) · `cage insights commits` is bounded by its **row cap** instead of the whole history (6.4s → flat; `--csv`/`--json` stay complete) · a multi-model Copilot shutdown is billed **once**, on one basis, via a recorded `billed_with` link rather than priced twice · `prices`/`study`/`policy` take real subcommands · two new drift gates: doc links resolved case-sensitively against `git ls-files`, and the pending-work queue's header checked against git. ⚠ **Two reader-facing breaks:** `--otel` emits `gen_ai.provider.name` (`gen_ai.system` was renamed in semconv v1.37.0) and `cage insights chats` drops its `premium` column (it was `floor(credits)`; the field stays in `--json`).
+- **v0.49.1 — session-tracking docs move to root `work/`.** Docs-only, no functional change: `IMPLEMENTATION.md` / `INTERVIEW.md` / `MACHINE.md` / `OPEN-WORK.md` / `WORKLOG.md` moved out of `docs/` into a new root `work/` directory, `OPEN-WORK.md` cleared to a bare empty-queue statement, and a doc silently deleted by the prior release's cleanup restored.
 
 ## The name
 

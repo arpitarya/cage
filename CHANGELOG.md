@@ -2,6 +2,28 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
+## v0.49.1 (2026-08-12) — session-tracking docs move to root work/
+
+Docs-only. No functional or behavioral code change.
+
+- **WORK-DIR:** `IMPLEMENTATION.md`, `INTERVIEW.md`, `MACHINE.md`, `OPEN-WORK.md`, and
+  `WORKLOG.md` moved from `docs/` to a new root `work/` directory, on Arpit's explicit
+  instruction. `docs/` stays the design/reference tree; `work/` is the session-tracking
+  tree. Every live-doc link crossing the `docs/`↔`work/` boundary was mechanically
+  rewritten to match, `test_doc_links.py`'s `HISTORY_FILES` and `test_queue_honesty.py`'s
+  `QUEUE` constant repoint to the new paths, and `CLAUDE.md`'s doc-discipline section was
+  updated to describe the new locations.
+- **`OPEN-WORK.md` cleared**, on a further explicit instruction: the 11-row closure
+  table and standing-constraints section are gone, leaving a bare "the queue is empty"
+  statement. The closure history it recorded still lives in `docs/archive/` and
+  `work/IMPLEMENTATION.md`.
+- **Fixed:** `docs/restricted-environments.md` had been silently deleted a second time
+  (the same class of bug it was restored for once already, in the v0.36 hookless sweep)
+  by the v0.49.0 queue-closure sweep, leaving six citations dangling with no recorded
+  decision to remove it. Restored from `HEAD`.
+
+Suite: 1655 passed / 11 skipped (unchanged from v0.49.0 — no test added or removed).
+
 ## v0.49.0 (2026-08-12) — the queue emptied, and the agent lane with it
 
 Seven items sat in `OPEN-WORK.md` for a reason: each was a **decision deliberately kept
