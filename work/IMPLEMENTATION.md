@@ -16,6 +16,36 @@ Entry format:
 
 ---
 
+## 2026-08-13 — GRAPHIFY-CHATS: `cage insights graphify` built, per-chat graphify usage & GROSS saving
+
+- **Implemented:** new `cage/graphifychat.py` — `summarize()` reuses `chats.summarize`
+  verbatim for the chat universe and joins `ledger.savings` (`tool="graphify"`) onto it
+  by `session` alone (savings rows carry no agent). Per chat: `receipts`, `saved`,
+  `raw_alternative`, `actual` (sums), worst-case `method`/`confidence` (the
+  `attribution.receipts_by_tool` aggregation, inlined), `tokens = tokens_in + tokens_out`
+  (`None` when `from_credits`), `without = tokens + saved` (never clamped), `pct` (`None`
+  when `tokens` is `None` or `without <= 0`). Two tallies never fold into a row:
+  `unassignable` (shim's `session=""`, GC3) and `unmatched` (a session joining no chat).
+  `render_view`: default rows are receipt-bearing chats only (`--all-chats` lifts it),
+  ranked `(-saved, session)`, top-20 (`GRAPHIFY_CHATS_DEFAULT_ROWS`, `--all` lifts).
+  `render_csv`: untruncated, never filters by receipts, refused cells empty.
+- **Files:** `cage/graphifychat.py` (new), `cage/cli.py` (+`insights graphify` parser,
+  root-help group listing), `cage/clicmds.py` (+`cmd_graphify_chats`),
+  `cage/constants.py` (+`GRAPHIFY_CHATS_DEFAULT_ROWS`), `cage/explain_data.py`
+  (+`graphify-chats` entry), `cage/explain.py` (+live value),
+  `tests/test_graphifychat.py` (new, 23 tests), `tests/fixtures/cli-help.txt`,
+  `tests/test_view_export.py` (`EXPECTED_VIEWS`), `docs/FORMULAS.md` (§2.15),
+  `docs/CLI.md` (new command + flags rows, 54⇒55 commands, 16⇒17 insights views),
+  `CHANGELOG.md`, `docs/DOC-REGISTRY.md`.
+- **Tests:** `tests/test_graphifychat.py` (23, all green) + full suite green,
+  1704 passed / 11 skipped. Briefly 1703 passed / 1 failed
+  (`test_doc_links.py::test_every_live_doc_link_resolves`) while a concurrent
+  Cowork session's `docs/copilot-capture.md` work was still uncommitted in this
+  same tree — verified unrelated at the time (dangling links named files this
+  change never touched), and resolved once that session's docs landed.
+- **Next:** archive the handoff/prompt pair on implement; surface the CLAUDE.md
+  views-list edit for Arpit's review (never silently applied).
+
 ## 2026-08-13 — REPORT-CREDITS: `cage report` gains a credits column
 
 - **Implemented:** on Arpit's decision ("report should show credit and for token it

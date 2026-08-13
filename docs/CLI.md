@@ -1,7 +1,7 @@
 # CLI
 
 **Every `cage` command in one place.** 16 top-level entries — 5 daily verbs, 7 groups,
-4 hidden plumbing commands — resolving to **54 addressable commands**. The front door
+4 hidden plumbing commands — resolving to **55 addressable commands**. The front door
 (`cage --help`) shows only the curated five plus the group names; this file is the
 whole surface.
 
@@ -204,7 +204,7 @@ rather than guessing.
 
 ---
 
-## `cage insights` — 16 derived views
+## `cage insights` — 17 derived views
 
 | Command | What it answers |
 |---|---|
@@ -213,6 +213,7 @@ rather than guessing.
 | `cage insights roi` | saved $ per tool vs its own cost + latency |
 | `cage insights adoption` | do your agents actually invoke the tools you wired? (counts only — nothing here is priced) |
 | `cage insights chats` | per-chat detail: tokens/cached/cost by `(agent, surface, session)`, titled where the store has a title (local-only — no `--team`) |
+| `cage insights graphify` | per-chat graphify usage & GROSS saving: recorded tokens · the modeled without-graphify counterfactual · saved% (tokens-only — no `--usd`) |
 | `cage insights commits` | one row per commit: tokens, human hours, and the `agent / human~ / unattr / unkn` line split. **No USD on this surface, by design** (the v1 veto, kept) |
 | `cage insights commit SHA` | one commit in detail: tokens · origin + confidence · the four line buckets · suggested-vs-kept counts · per-file table · wall/agent/human time |
 | `cage insights verdict` | one-line answer: is this tool saving or costing? A pure composer over attrib/roi/regression/quality — computes no new statistics and refuses (`INSUFFICIENT DATA`) over approximating |
@@ -237,6 +238,7 @@ new insight cannot ship un-exportable):
 | `cage insights roi` | `--since WINDOW` · `--json` · `--csv [PATH]` · `--export [PATH]` · `--stamp` |
 | `cage insights adoption` | `--since WINDOW` · `--json` · `--csv [PATH]` |
 | `cage insights chats` | `--since WINDOW` · `--agent {claude,copilot,kiro,all}` · `--all` (every chat; default is top 20 by `tokens_in`) · `--usd` · `--json` · `--csv [PATH]` |
+| `cage insights graphify` | `--since WINDOW` · `--agent {claude,copilot,kiro,all}` · `--all` (every receipt-bearing chat; default is top 20 by `saved`) · `--all-chats` (include chats with no graphify receipts too) · `--json` · `--csv [PATH]` |
 | `cage insights commits` | `--since WINDOW` · `--all` (every commit; default is the 20 newest) · `--json` · `--csv [PATH]` |
 | `cage insights commit SHA` | positional `SHA` (short or full) · `--files` (every file; default is the 8 largest) · `--json` · `--csv [PATH]` |
 | `cage insights verdict TOOL` | positional `TOOL` (name as it appears on receipts, e.g. `graphify`) · `--since WINDOW` (default: all history) · `--json` |

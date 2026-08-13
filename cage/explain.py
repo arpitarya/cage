@@ -36,6 +36,7 @@ def _live(pol: dict) -> dict:
         "per_million": f"{constants.TOKENS_PER_MILLION:,}",
         "max_tools": constants.MAX_MATRIX_TOOLS,
         "chats_default_rows": constants.CHATS_DEFAULT_ROWS,
+        "graphify_chats_default_rows": constants.GRAPHIFY_CHATS_DEFAULT_ROWS,
         "commits_default_rows": constants.COMMITS_DEFAULT_ROWS,
         "min_match_chars": constants.MIN_MATCH_CHARS,
         # Live from the resolved policy, so a project that turned the estimator off or

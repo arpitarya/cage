@@ -31,9 +31,9 @@ daily:
   query       ask cage how any number or mechanism works
 
 groups (run any group name for its commands):
-  insights    attrib · matrix · roi · adoption · chats · commits · commit ·
-              verdict · budget · compare · estimate · calibration · why ·
-              forecast · regression · recommend
+  insights    attrib · matrix · roi · adoption · chats · graphify · commits ·
+              commit · verdict · budget · compare · estimate · calibration ·
+              why · forecast · regression · recommend
   task        outcome · time · quality
   authorship  origin · summary · verify · notes-sync · ledger-sync
   prices      list · unpriced · set · alias · route-tool · sync
@@ -338,6 +338,23 @@ def build_parser() -> argparse.ArgumentParser:
     _capture_flags(ch)
     _export_flags(ch, "insights chats")
     ch.set_defaults(fn=clicmds.cmd_chats)
+
+    gx = insights.add_parser("graphify",
+                             help="per-chat graphify usage & GROSS saving: recorded "
+                                  "tokens · without-graphify counterfactual · saved%% "
+                                  "(tokens-only — no --usd)")
+    gx.add_argument("--since", metavar="WINDOW", help="window like 30d / 2w")
+    gx.add_argument("--agent", choices=[*SURFACES, "all"], default="all",
+                    help="filter to one agent (default: all)")
+    gx.add_argument("--all", action="store_true",
+                    help="show every receipt-bearing chat (default: top 20 by saved)")
+    gx.add_argument("--all-chats", dest="all_chats", action="store_true",
+                    help="include chats with no graphify receipts too (gfx cells `—`)")
+    _json_flag(gx)
+    _csv_flag(gx)
+    _capture_flags(gx)
+    _export_flags(gx, "insights graphify")
+    gx.set_defaults(fn=clicmds.cmd_graphify_chats)
 
     cm = insights.add_parser("commits",
                              help="one row per commit: tokens, human hours, and the "

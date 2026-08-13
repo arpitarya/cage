@@ -12,6 +12,152 @@ by milestone) — the worklog is what *happened this session*.
 
 ---
 
+## 2026-08-13 — Claude Code — GRAPHIFY-CHATS: CLAUDE.md edit applied, committed
+
+- **Asked:** apply the previously-held CLAUDE.md views-list edit and commit the whole
+  GRAPHIFY-CHATS change.
+- **Done:** the proposed **Graphify per-chat view** bullet applied verbatim after the
+  existing *Chats view* bullet (~line 432) — Arpit's explicit go, so this is not a
+  silent rewrite. Committed.
+- **Open:** nothing.
+- **Cost:** unmeasured — see the prior entry below.
+
+## 2026-08-13 — Cowork — Claude per-chat usage fetch spec (research)
+
+- **Asked:** research how to fetch claude token in/out, cached in/out, and credits
+  per chat — which dir, which file, which row/props.
+- **Done:** `docs/research/2026-08-13-claude-per-chat-usage-fetch-spec.md` — the
+  Claude twin of the copilot fetch spec, verified on a LIVE 2.1.229 store (this
+  Cowork session's own `~/.claude/projects/`), not desk-only: full usage prop set
+  (cache TTL split, `thinking_tokens`, `server_tool_use`, `iterations[]`), the
+  subagent `subagents/agent-*.jsonl` layout, statusline JSON
+  (`cost.total_cost_usd` + `rate_limits` 5h/7d), SDK result messages, OTel
+  event/metric names. Firm no on credits: no credit unit exists for claude
+  anywhere on disk; `costUSD` died in v1.0.9.
+- **Found (filed in OPEN-WORK):** **CLAUDE-DEDUP** — one API response writes 1–5
+  assistant rows, all carrying usage (distinct `uuid`, same
+  `requestId`+`message.id`); cage keys calls by `uuid`, so claude spend is
+  inflated ~2–3× (3.17× measured). **CLAUDE-SUBAGENT-KEY** — subagent files swept
+  but session-keyed by filename stem → phantom chats in `cage insights chats`.
+- **Next:** Arpit reviews the two defect items; a fix handoff cuts straight from
+  the research doc's ranked list.
+- **Cost:** unmeasured — `cage` not runnable from the Cowork cloud session.
+
+## 2026-08-13 — Cowork — KIRO-USAGE research: per-chat tokens+credits fetch spec
+
+- **Asked:** the kiro analog of today's copilot spec — for every chat, how are
+  token in/out, cached in/out, and credits *supposed* to be fetched: which dir,
+  which file, which row, which prop.
+- **Done:** `docs/research/2026-08-13-kiro-per-chat-usage-fetch-spec.md`. Headline:
+  **the wire has all five, the disk has almost none** — the backend streams
+  `metadataEvent.tokenUsage {uncachedInput, output, cacheRead, cacheWrite, total}`
+  + `meteringEvent {unit:"credit", usage:<float>}` + `messageMetadataEvent`
+  (conversationId join key) per call, pinned against the smithy client in
+  aws/amazon-q-developer-cli and two reverse-engineered clients with real
+  captures (kirocc, kiro.rs). On disk: IDE persists only prompt/output (and a
+  second, better store cage didn't know — **`dev_data/devdata.sqlite`, table
+  `tokens_generated`, timestamped**, with a **2026-02-28 semantics cutover**:
+  tokens_prompt full-context → incremental); CLI persists only credits
+  (`usage_info`, already captured) — its `request_metadata` token slots exist
+  but are NULL (2.16.0 probe), a named upgrade-watch trigger. Cache per chat is
+  persisted **nowhere**; IDE credits **nowhere** (#8524). Ranked implement list:
+  proxy = only complete path · IDE importer → devdata.sqlite with the cutover
+  branch · CLI upgrade probe + `conversations` (non-v2) table enumeration ·
+  never import the community chars÷4 estimates.
+- **Open:** two real-store probes blocked on folder access from Cowork
+  (`~/Library/Application Support/{Kiro,kiro-cli}` not grantable) — §6 of the doc
+  has the exact read-only commands: devdata.sqlite schema, and whether IDE
+  session JSONs embed tokenUsage/credits.
+- **Cost:** unmeasured — `cage` not runnable from the Cowork cloud session.
+
+## 2026-08-13 — Claude Code — GRAPHIFY-CHATS built: `cage insights graphify`
+
+- **Asked:** build `cage insights graphify` per `docs/graphify-chats.{handoff,prompt}.md`
+  — one row per chat: recorded tokens, the modeled without-graphify counterfactual, and
+  the GROSS saved share, joined by session onto `chats.summarize`'s chat universe.
+- **Done:** `cage/graphifychat.py` (summarize + text/CSV render), CLI wiring under
+  `insights`, `tests/test_graphifychat.py` (23 tests: the join, unassignable/unmatched
+  tallies, refusal-vs-measured-zero, negative saved never clamped, determinism, flags,
+  empty-state diagnosis), `docs/FORMULAS.md` §2.15, `explain_data.py` entry, `docs/CLI.md`
+  (new command, 54⇒55 commands), `CHANGELOG.md`. Every §4 change-map fact in the handoff
+  verified against live code before building — none were stale.
+- **Decided:** "gfx uses"/"without gfx"/"saved"/"saved%" dash together for a zero-receipt
+  chat (only visible under `--all-chats`), while `tokens` renders regardless — a chat's
+  token count is a fact independent of whether graphify ever fired, so it is never part
+  of the "no usage" refusal. Not explicit in the handoff; a judgment call consistent with
+  the absence-vs-recorded-zero law every other view here follows.
+- **Open:** the CLAUDE.md views-list edit is proposed, not applied — flagged in this
+  session's final summary for Arpit's review, never silently rewritten (the HR1/
+  CHATS-CREDITS precedent). Ran concurrently with a Cowork research session in this same
+  tree investigating a *different* historical-graphify-detection question — no file
+  conflicts observed; see that session's own entry below for what it covered.
+- **Cost:** unmeasured — `cage report` reflects this machine's real ledger, not this
+  session's isolated work; no clean way to isolate this session's own spend from it.
+
+## 2026-08-13 — Cowork — research: historical graphify detection + with/without-graphify tokens
+
+- **Asked:** is there a way to get HISTORICAL data on whether graphify was used in a
+  chat or CLI across claude|kiro|copilot — and, where it was, the with/without-graphify
+  token counts.
+- **Done:** research only, no code (GRAPHIFY-CHATS build is mid-flight in this tree —
+  deliberately touched nothing but this log). Answer synthesized from v0.47.0 (GFX-COV),
+  ADR 0005/0007, formulas §2.7–2.10 and research/2026-08-07-graphify-store-evidence.md:
+  detection is ALREADY SHIPPED for 4/5 surfaces (claude cli+vscode · copilot cli ·
+  copilot vscode · kiro cli; kiro IDE structurally cannot), and history is reachable via
+  `cage import --rescan-graphify` (cursor-blind backfill). With/without tokens = the
+  gross counterfactual per receipt (raw_alternative = Σ toks(cited files on disk) vs
+  actual = toks(answer)); the per-chat rendering is exactly the in-flight
+  GRAPHIFY-CHATS view (`cage insights graphify`).
+- **Found (doc drift):** formulas.md §2.7 (~line 392) still says copilot **VS Code** is
+  "usage-row-only (F2)" and kiro HONEST-LIMIT — stale since v0.47.0 shipped both routes.
+  Not fixed here (collision risk with the in-flight session); needs a queue item.
+- **Open:** GFX-COV-FIELD remains hands-only — run `cage import --rescan-graphify` +
+  `cage query graphify-coverage` on the Mac. Expectation from the real-capture audit:
+  near-zero historical receipts (0 real receipts on 2026-07-22; 0 graphify commands in
+  1,132 real VS Code terminal runs probed 2026-08-07).
+- **Next:** on the Mac: `cage import --rescan-graphify`, then `cage insights graphify`
+  once GRAPHIFY-CHATS lands.
+- **Cost:** unmeasured — `cage` not runnable from the Cowork cloud session.
+
+## 2026-08-13 — Cowork — copilot-capture.md: the standing copilot-numbers one-pager
+
+- **Asked:** a to-the-point doc on how copilot numbers are captured, with an
+  executive-meeting section, updated whenever copilot capture changes.
+- **Done:** `docs/copilot-capture.md` — captured-today table (store → prop → row) ·
+  known gaps · the filed COPILOT-METRICS build · executive summary (plain language:
+  vendor's own records, credits are billing truth, dollars modeled never invoiced,
+  coverage partial by the vendor's doing, cache-write unreportable by anyone) ·
+  maintenance rule in frontmatter. Wired into the machinery: DOC-REGISTRY row
+  (trigger: ANY copilot capture change), docs/README living-docs bullet, a §9.5 box
+  in the COPILOT-METRICS handoff + prompt so the build updates it on land.
+- **Open:** nothing.
+- **Cost:** unmeasured — `cage` not runnable from the Cowork cloud session.
+
+## 2026-08-13 — Cowork — COPILOT-METRICS: per-chat copilot metrics ledger specced; pair filed
+
+- **Asked:** a separate ledger home for the copilot metrics from today's research —
+  `.cage/ledger/copilot/` with monthly per-chat files — researched, with a handoff
+  naming files/functions so the build is "a zap".
+- **Scope call (Arpit):** ALL FIVE stores, not just the always-on two — chatSessions ·
+  CLI session-state · agentHostUsage sidecar · extension debug-logs · OTel
+  `agent-traces.db`.
+- **Design locked:** own kind `copilot` → `copilot/chats-YYYY-MM.jsonl` (savings-tree
+  shard mechanism, credits-style collapse read); rows are store-verbatim facts at each
+  store's own grain (request / session-cumulative / model-call), id folds values so
+  grown sources append and the reader collapses; `cm_` id namespace, own seen-set;
+  gated stores get their own registry (`paths.copilot_metric_sources`), never
+  `agent_log_sources`; counts-never-content by whitelist on debuglog/otel (both
+  interleave prompt bodies); capture-only — no derived view reads it, byte-identity
+  test is the gate. Found + mapped a real dispatch bug: files in the two new
+  chatSessions roots would mis-parse as CLI events (`_parse_copilot_any` keys on
+  `parent.name == "chatSessions"`) — `_is_chat_session_file` fix is in the map.
+- **Filed:** `docs/copilot-metrics-ledger.{handoff,prompt}.md` (Model: Sonnet,
+  Progress: 0%); COPILOT-METRICS line added to OPEN-WORK; docs/README Active-work
+  section updated (was stale — said "None" while the graphify-chats pair sat filed).
+- **Open:** read surface (chats columns / `insights copilot`) and `export --csv
+  copilot` — parked as scope-out lines to be filed on implement.
+- **Cost:** unmeasured — `cage` not runnable from the Cowork cloud session.
+
 ## 2026-08-13 — Claude Code — REPORT-CREDITS: `cage report` gains a credits column
 
 - **Asked:** after CHATS-CREDITS shipped, explain what the filed REPORT-CREDITS?

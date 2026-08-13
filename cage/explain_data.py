@@ -1282,6 +1282,48 @@ REGISTRY: tuple[Explanation, ...] = (
         "  those are counts and a sort, not a claim about how a number was priced.",
         kind="concept", plan_ref="archive/v0.42-chats-view.proposal.md"),
     Explanation(
+        "graphify-chats", ("graphify-chats", "insights-graphify", "gfx-uses",
+                           "without-graphify", "graphify-saved", "per-chat-graphify",
+                           "saved-percent"),
+        "`cage insights graphify`: one row per chat — recorded tokens, the modeled "
+        "without-graphify counterfactual, and the GROSS saved share",
+        "REUSES chats.summarize verbatim for the chat universe (title, agent, surface,\n"
+        "  session, token sums) and joins ledger.savings rows (tool=graphify) onto it\n"
+        "  by SESSION ALONE — a savings row carries no agent field at all.\n"
+        "    tokens  = tokens_in + tokens_out          (the WITH-graphify world; None\n"
+        "                                                for a kiro-CLI credit chat —\n"
+        "                                                no token counts at all)\n"
+        "    without = tokens + Σsaved                 (the MODELED counterfactual;\n"
+        "                                                never clamped — a negative\n"
+        "                                                saved can push it below tokens)\n"
+        "    saved%  = 100 × Σsaved / without           (None when tokens is None or\n"
+        "                                                without <= 0)\n"
+        "  `tokens` is a real fact independent of graphify use — only the graphify-\n"
+        "  derived cells (gfx uses / without gfx / saved / saved%) dash for a chat with\n"
+        "  ZERO receipts, and only under --all-chats (the default view excludes such\n"
+        "  chats entirely). A chat WITH receipts whose saved sums to a real 0 renders\n"
+        "  0%, never a dash — no receipts at all is a different claim from a measured\n"
+        "  zero, the absence-vs-recorded-zero law every view in this registry follows.\n"
+        "  GROSS THROUGHOUT: per-chat NET is not computable (netsaved's attributable-\n"
+        "  cost rule needs a call-level tool-use mark this ledger doesn't carry), so\n"
+        "  this view is explicitly GROSS and says so on every render.\n"
+        "  method/confidence per chat are the WORST CASE across its joined receipts —\n"
+        "  least-trusted method wins, confidence is the min (the exact\n"
+        "  attribution.receipts_by_tool aggregation, inlined).\n"
+        "  TWO TALLIES NEVER REDISTRIBUTE into a chat row, footnoted apart:\n"
+        "  unassignable (the native shim's honest-empty session=\"\", GC3) and\n"
+        "  unmatched (a savings session joining no chat bucket at all).\n"
+        "  Which agent surfaces can file a graphify receipt at all is a DIFFERENT\n"
+        "  question — see `cage query graphify-coverage`.\n"
+        "  Tokens-only — no --usd on this view (the v0.36 no-blend law). Top\n"
+        "  {graphify_chats_default_rows} rows by saved desc, --all lifts it (footnoted,\n"
+        "  never silent); CSV is always untruncated and never filters by receipts.",
+        ("cage/graphifychat.py", "cage/chats.py", "cage/netsaved.py",
+         "cage/graphifytx.py"),
+        "modeled throughout — every graphify receipt is modeled or estimated, never\n"
+        "  measured; the per-chat aggregate carries the worst case among its receipts.",
+        kind="concept", plan_ref="docs/archive/v0.49-graphify-chats.handoff.md"),
+    Explanation(
         "agent-authorship", ("authorship", "agent-vs-human", "human", "who wrote",
                              "commits", "commit", "line-match", "suggested", "kept",
                              "residual", "unattributed", "provenance", "hours",

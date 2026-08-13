@@ -35,9 +35,14 @@ spec.
 
 ## Active work
 
-**None.** `docs/` root carries no loose handoff/prompt pair and no held proposal — a pair
-is created only when a phase in [OPEN-WORK.md](../work/OPEN-WORK.md) is picked up, and archived
-on implement. The agent-lane refill was built and green on 2026-08-12 and
+One pair (created when its [OPEN-WORK.md](../work/OPEN-WORK.md) item was picked up;
+archived on implement). GRAPHIFY-CHATS, the prior occupant, was built and green on
+2026-08-13 and [archived](archive/v0.49-graphify-chats.handoff.md).
+
+- **COPILOT-METRICS** — [copilot-metrics-ledger.handoff.md](copilot-metrics-ledger.handoff.md)
+  + [copilot-metrics-ledger.prompt.md](copilot-metrics-ledger.prompt.md) (filed
+  2026-08-13): the `.cage/ledger/copilot/` per-chat metrics ledger, grounded in
+  [research/2026-08-13-copilot-per-chat-usage-fetch-spec.md](research/2026-08-13-copilot-per-chat-usage-fetch-spec.md). The agent-lane refill was built and green on 2026-08-12 and
 [archived](archive/v0.49-open-queue-agent-lane.handoff.md) — handoff only, its prompt was
 handed over inline and never written here. CHATS-CREDITS, the next and last occupant, was
 built and green on 2026-08-13 and
@@ -77,6 +82,9 @@ to its real location.
   four doc-size rules (lead with the answer · one audience · evidence elsewhere ·
   hard budget), the fix procedure, and the retain/remove criteria.
 - [GLOSSARY.md](GLOSSARY.md) — every recurring term, defined once against the code.
+- [copilot-capture.md](copilot-capture.md) — how Copilot numbers are captured,
+  one page, executive-summary section included. **Updated in the same change as
+  any copilot capture change** (its DOC-REGISTRY trigger).
 - [FORMULAS.md](FORMULAS.md) — every computed number: formula · code home ·
   method tag · the knobs that move it.
 - [WORKLOG.md](../work/WORKLOG.md) — the running per-session handoff (append every

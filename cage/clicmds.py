@@ -152,6 +152,21 @@ def cmd_chats(args) -> int:
         csv=lambda: chats.render_csv(data), root=r)
 
 
+def cmd_graphify_chats(args) -> int:
+    """`cage insights graphify` — per-chat graphify usage & GROSS saving; tokens-only,
+    no `--usd` (graphify-chats handoff)."""
+    from cage import graphifychat
+    r = captured_read_root(args)
+    pol = _policy(r)
+    data = graphifychat.summarize(r, pol, since=args.since,
+                                  agent=getattr(args, "agent", None))
+    return emit(args, data, graphifychat.render_view(
+        data, show_all=getattr(args, "all", False),
+        all_chats=getattr(args, "all_chats", False),
+        kiro_route=report.kiro_routed_line(r, pol, verb="insights graphify")),
+        csv=lambda: graphifychat.render_csv(data), root=r)
+
+
 def cmd_commits(args) -> int:
     """`cage insights commits` — per-commit tokens, hours and the line split.
     **No USD**: nothing on this surface is priced, so no `display` context is

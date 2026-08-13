@@ -2,7 +2,7 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
-## v0.49.1 (2026-08-12, gains a second and third change 2026-08-13) — session-tracking docs move to root work/, kiro-CLI conversations get a chat row, and `cage report` gains a credits column
+## v0.49.1 (2026-08-12, gains a second, third and fourth change 2026-08-13) — session-tracking docs move to root work/, kiro-CLI conversations get a chat row, `cage report` gains a credits column, and a new per-chat graphify view
 
 - **WORK-DIR:** `IMPLEMENTATION.md`, `INTERVIEW.md`, `MACHINE.md`, `OPEN-WORK.md`, and
   `WORKLOG.md` moved from `docs/` to a new root `work/` directory, on Arpit's explicit
@@ -41,10 +41,26 @@ Full release notes. The README keeps a one-line summary per version; the detail 
   bug caught during the build (the first version silently understated a rated total,
   found by manually exercising `--by agent --usd` before writing tests). Resolves the
   REPORT-CREDITS? open question; removed from `work/OPEN-WORK.md`.
+- **GRAPHIFY-CHATS:** new `cage insights graphify` — one row per chat: recorded tokens
+  (the with-graphify world), the modeled without-graphify counterfactual
+  (`tokens + Σsaved`), and the GROSS saved share. Reuses `chats.summarize` verbatim for
+  the chat universe and joins `ledger.savings` (`tool="graphify"`) onto it by `session`
+  alone (a savings row carries no agent). Refusals are distinct from a measured zero: a
+  chat with no receipts dashes its graphify cells (shown only under `--all-chats`,
+  default view is receipt-bearing chats only); a kiro-CLI credit chat shows `saved` but
+  dashes `tokens`/`without gfx`/`saved%` (no token counts at all); a real `saved == 0`
+  renders `0%`. `saved` is never clamped — a negative value (and the `without gfx` it
+  produces) renders honestly. Two tallies never redistribute into a chat row:
+  `unassignable` (the native shim's honest-empty session, GC3) and `unmatched` (a
+  savings session joining no chat bucket). Tokens-only, no `--usd`. Derive-only: no
+  writer, route, or substrate change.
 
-Suite: 1679 passed / 11 skipped (1655 → 1662 CHATS-CREDITS, → 1679 REPORT-CREDITS —
-17 new in `tests/test_report_credits.py`). No golden re-blessed either time — neither
-feature's column renders for a ledger with no credits data.
+Suite: 1704 passed / 11 skipped (1655 → 1662 CHATS-CREDITS, → 1679 REPORT-CREDITS —
+17 new in `tests/test_report_credits.py`, → 1704 GRAPHIFY-CHATS — 23 new in
+`tests/test_graphifychat.py`; briefly 1703/1 while a concurrent session's
+`docs/copilot-capture.md` work was still uncommitted in this tree, unrelated and
+since resolved). No golden re-blessed for any of the three — none of their
+columns/views render for a ledger with no credits/graphify data.
 
 ## v0.49.0 (2026-08-12) — the queue emptied, and the agent lane with it
 

@@ -781,6 +781,57 @@ Knobs: `MIN_MATCH_CHARS` (constants — **not** policy: it changes what the buck
 *mean*) · `[authorship] capture` / `estimate_hours` / `max_est_gap` (+ `CAGE_AUTHORSHIP`,
 `CAGE_AUTHORSHIP_ESTIMATE`). Explained by `cage query agent-authorship`.
 
+### 2.15 Graphify per-chat view — `modeled`, GROSS throughout
+
+`cage insights graphify` ([graphifychat.py](../cage/graphifychat.py)) reuses
+`chats.summarize` verbatim for the chat universe (title, agent, surface, session,
+token sums) and joins `ledger.savings` rows (`tool="graphify"`) onto it by `session`
+alone — a savings row carries no agent field at all.
+
+```
+tokens   = tokens_in + tokens_out             (the chat's recorded, WITH-graphify world;
+                                                None when the chat is from_credits — a
+                                                kiro-CLI conversation has no token counts)
+Σsaved   = Σ saved over this session's graphify savings rows      (0 when receipts = 0)
+without  = tokens + Σsaved                    (the MODELED without-graphify counterfactual;
+                                                None when tokens is None; never clamped —
+                                                a negative `saved` can push it below tokens)
+saved%   = 100 × Σsaved / without              (None when tokens is None or without <= 0)
+```
+
+- **`tokens` is real regardless of graphify usage** — it is the chat's own recorded
+  fact, independent of whether any graphify receipt joined. Only the graphify-derived
+  cells (`gfx uses` / `without gfx` / `saved` / `saved%`) dash for a chat with zero
+  receipts, and only in `--all-chats` (the default view excludes them entirely) — a
+  receipt-less chat's "no usage" must never render as "measured zero saving", the same
+  absence-vs-recorded-zero law every other view in this file follows.
+- **A real zero renders `0%`.** A chat WITH receipts whose `raw_alternative == actual`
+  (`saved = 0`) is a *measured* zero and renders `0%`, never a dash — distinct from the
+  "no receipts at all" refusal above.
+- **A kiro-CLI credit chat** (`from_credits`) carries `saved` (a real receipt still
+  joined by session) but `tokens`/`without`/`saved%` dash — it has no token counts to
+  build a counterfactual from, footnoted.
+- **Never clamped.** `saved` can be negative (the answer cost more than the read it
+  avoided) and `without` can then fall below `tokens`; both render honestly.
+- **GROSS throughout** (`netsaved.GROSS_NOTE`, §2.1) — per-chat NET is not computable:
+  netsaved's attributable-cost rule needs a call-level tool-use mark this ledger
+  doesn't carry, so this view is explicitly GROSS and says so on every render.
+- **`method`/`confidence`** per chat are the worst-case across its joined receipts
+  (least-trusted method wins, confidence is the min) — the exact
+  `attribution.receipts_by_tool` aggregation, inlined. Always `modeled` in practice
+  (every graphify receipt is `modeled` or `estimated`, never `measured`).
+- **Two tallies never redistribute into a chat row**, footnoted apart: `unassignable`
+  (the native shim's honest-empty `session=""`, GC3) and `unmatched` (a savings session
+  joining no chat bucket — a different ledger root, a deleted call). Neither is folded
+  into any row's numbers.
+- **A session split across surfaces** (rare — savings rows carry no surface) attaches
+  its receipts to every chat bucket sharing that session, footnoted (`gfx_split`), the
+  `auth_split` precedent (§2.13).
+- Tokens-only — **no `--usd` on this view** (the v0.36 no-blend law). Ranking
+  `(-saved, session)`, top-20 (`GRAPHIFY_CHATS_DEFAULT_ROWS`), `--all` lifts the cut
+  (footnoted, never silent); CSV is always untruncated and never filters by receipts.
+  Explained by `cage query graphify-chats`.
+
 ## 3. The human axis — **removed in v0.36**
 
 Every formula that lived here (human cost `usd = minutes / 60 × rate`, derived

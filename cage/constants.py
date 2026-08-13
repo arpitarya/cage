@@ -286,3 +286,7 @@ COMMITS_DEFAULT_ROWS = 20
 # per-invocation one already served by `--all`.
 CHATS_DEFAULT_ROWS = 20
 
+# `cage insights graphify` default row cap (graphify-chats handoff §4) — the same
+# `CHATS_DEFAULT_ROWS` precedent: a flag (`--all`), not a policy knob.
+GRAPHIFY_CHATS_DEFAULT_ROWS = 20
+

@@ -454,6 +454,21 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   that printed `0` for every row cage writes. The *field* is untouched and still in the
   payload, so `--json` keeps the recorded fact — precision in the data, brevity in the
   display. `cage query chats-view` explains it.
+- **Graphify per-chat view** ([graphifychat.py](cage/graphifychat.py), FORMULAS
+  §2.15) — `cage insights graphify`: one row per chat — recorded tokens (the
+  with-graphify world), the modeled without-graphify counterfactual (`tokens +
+  Σsaved`), and the GROSS saved share. Reuses `chats.summarize` verbatim for the
+  chat universe and joins `ledger.savings` (`tool="graphify"`) onto it by
+  `session` alone — a savings row carries no agent field at all. `tokens` is a
+  fact independent of graphify use and always renders; only the graphify-derived
+  cells (`gfx uses`/`without gfx`/`saved`/`saved%`) dash for a zero-receipt chat,
+  and only under `--all-chats` (the default view is receipt-bearing chats only).
+  A measured `saved == 0` still renders `0%`, never a dash. `saved` is never
+  clamped — a negative value (and the `without gfx` it produces) renders
+  honestly. Two tallies never redistribute into a chat row: `unassignable` (the
+  native shim's honest-empty `session=""`, GC3) and `unmatched` (a savings
+  session joining no chat bucket). Tokens-only — no `--usd` (the v0.36
+  no-blend law). `cage query graphify-chats` explains it.
 - **Display honesty** ([display.py](cage/display.py)) — the ONE display-context
   home (plan Phases 1+2). `Display` carries the resolved presentation switches
   (`usd`: tokens are the default, dollars opt-in — flag > env `CAGE_USD` >

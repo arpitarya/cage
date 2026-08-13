@@ -2,10 +2,23 @@
 
 ## Agent-closable
 
-- **GRAPHIFY-CHATS** — new `cage insights graphify`: per-chat graphify usage + gross
-  saving (recorded tokens · without-graphify counterfactual · saved%), joined by the
-  savings rows' `session` to the chat universe. Spec + prompt:
-  `docs/graphify-chats.{handoff,prompt}.md` (filed 2026-08-13, picked up on paste).
+- **COPILOT-METRICS** — new ledger kind `.cage/ledger/copilot/chats-YYYY-MM.jsonl`:
+  per-chat Copilot tokens in/out · cached · credits · session credits · nano-AIU,
+  captured verbatim from all five stores (Arpit's scope call 2026-08-13). Spec + prompt:
+  `docs/copilot-metrics-ledger.{handoff,prompt}.md` (filed 2026-08-13, picked up on
+  paste). Grounding: `docs/research/2026-08-13-copilot-per-chat-usage-fetch-spec.md`.
+
+- **CLAUDE-DEDUP** — defect: the claude transcript parser records every assistant
+  row's usage, but one API response writes 1–5 rows (same `requestId` + `message.id`,
+  distinct `uuid`, each with a full usage copy) — claude spend is inflated ~2–3×
+  (3.17× measured live on 2.1.229). Fix: fold last-per-`(requestId, message.id)`,
+  call id from `requestId`. Grounding:
+  `docs/research/2026-08-13-claude-per-chat-usage-fetch-spec.md` (filed 2026-08-13).
+- **CLAUDE-SUBAGENT-KEY** — defect: subagent transcripts
+  (`<sessionId>/subagents/agent-*.jsonl`, current layout) are swept by the glob but
+  session-keyed by filename stem, so their spend lands in a phantom chat; key
+  `session` from each row's own `sessionId` (also covers legacy inline sidechains).
+  Same grounding doc (filed 2026-08-13).
 
 ## Arpit decides
 

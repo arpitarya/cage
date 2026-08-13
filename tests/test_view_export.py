@@ -37,7 +37,8 @@ SLUG = "20260810-084240"
 EXPECTED_VIEWS = {
     "report",
     "insights attrib", "insights matrix", "insights roi", "insights adoption",
-    "insights chats", "insights commits", "insights commit", "insights verdict",
+    "insights chats", "insights graphify", "insights commits", "insights commit",
+    "insights verdict",
     "insights budget", "insights compare", "insights estimate",
     "insights calibration", "insights why", "insights forecast",
     "insights regression", "insights recommend",
