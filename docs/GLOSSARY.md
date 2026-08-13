@@ -245,6 +245,75 @@ already collapses every run into one chat. Kiro-CLI conversations are `credits` 
 2026-08-13): `calls` and every token cell `—`, `credits` filled, cost priced only
 through `[billing.kiro] usd_per_credit`. [chats.py](../cage/chats.py).
 
+**copilot metrics row** — a `.cage/ledger/copilot/` row (`schema.make_copilot_metric`,
+COPILOT-METRICS) — a capture-only sibling to `calls`, never a widened call. Records,
+verbatim, per-chat Copilot facts the `calls` schema deliberately doesn't hold: per-model
+cached tokens (`model_totals`), `session_credits`, timing, and three gated stores'
+per-model-call figures. Collapsed last-write-wins per `(source, session, surface,
+request, call)` at read (`ledger.copilot_metrics`); read by no derived view yet.
+[schema.py](../cage/schema.py), [ledger.py](../cage/ledger.py), PLAN §3.11.
+
+**the five copilot stores** — the on-disk sources a copilot metrics row can come from:
+`chat` (VS Code chatSessions, always-on) · `cli` (Copilot CLI session-state, always-on,
+cumulative-verbatim) · `sidecar` / `debuglog` / `otel` (three opt-in, per-model-call,
+each gated behind a VS Code setting named in `cage doctor`'s `copilot-metrics` check).
+Not to be confused with the two stores the *calls* parser already reads (`chat`, `cli`
+above) — the metrics kind widens coverage to three more, never re-routes the first two.
+[transcript.py](../cage/transcript.py).
+
+**kiro metrics row** — a `.cage/ledger/kiro/` row (`schema.make_kiro_metric`,
+KIRO-METRICS) — a capture-only sibling to `calls`/`credits`, never a widened row of
+either. Records, store-verbatim, per-chat Kiro facts neither of those kinds holds:
+IDE `devdata.sqlite` per-call tokens **with timestamps** (`source="ide"`), CLI
+per-conversation credits/context/turns (`source="cli-conv"`), and CLI per-turn timing/
+size/tool-use metadata plus the CLI's NULL-today token slots (`source="cli-turn"`,
+the *kiro upgrade-watch*). Collapsed last-write-wins per `(source, session, turn,
+row_ref)` at read (`ledger.kiro_metrics`); read by no derived view yet. Routing
+inherits ADR 0006 unchanged: `ide` rows ride the routed machine sink, `cli-*` rows stay
+workspace-scoped. [schema.py](../cage/schema.py), [ledger.py](../cage/ledger.py),
+PLAN §3.12.
+
+**claude metrics row** — a `.cage/ledger/claude/` row (`schema.make_claude_metric`,
+CLAUDE-METRICS) — a capture-only sibling to `calls`, never a widened call. Records,
+correctly folded, per-chat Claude facts the `calls` schema deliberately doesn't hold:
+the cache-write TTL split (`ttl_5m`/`ttl_1h`), thinking tokens, server-tool call
+counts, and a sidechain (subagent) split. Collapsed last-write-wins per `session` at
+read (`ledger.claude_metrics`); read by no derived view yet. **No credits field at
+all** — no credit unit exists for Claude Code anywhere on disk. Dodges, does not fix,
+[the dedup law](../cage/transcript.py)'s absence in `parse_calls` (CLAUDE-DEDUP,
+CLAUDE-SUBAGENT-KEY stay open). [schema.py](../cage/schema.py),
+[ledger.py](../cage/ledger.py), PLAN §3.13.
+
+**THE DEDUP LAW** — the finding CLAUDE-METRICS is built to dodge: one Claude Code API
+response writes 1–5 assistant transcript rows (one per content block — text, thinking,
+each tool call), every one carrying a distinct `uuid` but the SAME `requestId` +
+`message.id` and a full copy of `usage`. Naive per-row summation (what `parse_calls`
+still does today) inflates output tokens ~2–3× (3.17× measured live). The law: fold
+last-per-`(requestId, message.id)` — the LATEST duplicate carries the final
+`output_tokens` (ccusage #888). `transcript._fold_claude_chat` applies it at capture;
+`row.raw_rows / row.requests` on the emitted claude-metrics row IS the inflation
+evidence, captured correctly. [transcript.py](../cage/transcript.py),
+[research/2026-08-13-claude-per-chat-usage-fetch-spec.md](research/2026-08-13-claude-per-chat-usage-fetch-spec.md).
+
+**session fileset** — the WHOLE set of transcript files one Claude Code chat can span:
+its main `<sessionId>.jsonl` plus every `<sessionId>/subagents/agent-*.jsonl` subagent
+transcript. `importcmd._claude_session_filesets` regroups a sweep's changed files into
+filesets before parsing (CLAUDE-METRICS handoff §4.5) — a subagent-only change still
+re-reads the whole fileset, EVEN the unchanged members, because a claude-metrics row is
+a whole-chat total, never a delta; parsing from a partial fileset would file a partial
+lie. A main file that doesn't exist (a subagent-only sweep whose parent transcript was
+never itself touched) keeps the fileset without it — the fold still keys chats on each
+row's own `sessionId`, not on the main file's presence. [importcmd.py](../cage/importcmd.py).
+
+**the kiro upgrade-watch** — the CLI SQLite store's `request_metadata` token slots
+(`uncached_input_tokens`/`output_tokens`/`cache_read_input_tokens`/
+`cache_write_input_tokens`) are schema-present but NULL on every real store probed so
+far (kiro-cli 2.16.0, 2026-08-13). `parse_kiro_cli_metrics` records them **only when
+non-NULL**, so a `cli-turn` row omits them today — correct, not a bug — and picks them
+up with zero code change the day Kiro starts filling them. `cage doctor`'s
+`kiro-metrics` check names which state it's in (armed vs. tripped) per project.
+[transcript.py](../cage/transcript.py), [doctorcmd.py](../cage/doctorcmd.py).
+
 **credit (billed)** — the `credits` call field: what the *provider itself* billed for
 one call, recorded verbatim. Copilot persists it per request in VS Code's chatSessions
 store (`copilotCredits`) and per shutdown in the CLI (`totalPremiumRequests`); since

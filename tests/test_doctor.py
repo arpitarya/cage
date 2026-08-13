@@ -70,6 +70,12 @@ def test_every_check_has_a_known_level(proj):
                      # billed-credit coverage — advisory beside `pricing`, never a fault:
                      # partial coverage is the vendor's logging, not the user's setup
                      "credits",
+                     # COPILOT-METRICS: same advisory tier, widened to the whole row
+                     "copilot-metrics",
+                     # KIRO-METRICS: the kiro twin of the same advisory tier
+                     "kiro-metrics",
+                     # CLAUDE-METRICS: the claude twin, plus a retention nudge
+                     "claude-metrics",
                      "prices-meta", "prices-age", "policy-version",
                      "state", "portability",
                      # the price of kiro's MCP going path-free/committable: *which*

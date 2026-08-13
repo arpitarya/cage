@@ -25,6 +25,12 @@ _ENV_SEED = [
      "path_globs": ["**/events.jsonl"]},
     {"name": "copilot", "path": "$CAGE_VSCODE_USER/workspaceStorage",
      "glob": "*/chatSessions/*.jsonl", "path_globs": ["**/chatSessions/*.jsonl"]},
+    # COPILOT-METRICS: two more chatSessions roots (`_builtin_log_sources`'s new
+    # copilot tuples) — kept in sync so a test can exercise them via `mkcage`.
+    {"name": "copilot", "path": "$CAGE_VSCODE_USER/globalStorage/emptyWindowChatSessions",
+     "glob": "*.jsonl", "path_globs": ["**/emptyWindowChatSessions/*.jsonl"]},
+    {"name": "copilot", "path": "$CAGE_VSCODE_USER/globalStorage/transferredChatSessions",
+     "glob": "*.jsonl", "path_globs": ["**/transferredChatSessions/*.jsonl"]},
     {"name": "kiro", "path": "$KIRO_DATA_DIR/dev_data/tokens_generated.jsonl", "glob": "*",
      "path_globs": ["*"]},
 ]

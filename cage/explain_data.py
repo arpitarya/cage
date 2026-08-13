@@ -767,6 +767,104 @@ REGISTRY: tuple[Explanation, ...] = (
         "rung 1: usd = credits × [billing.<agent>] usd_per_credit  (modeled)",
         kind="concept", plan_ref="§3.1, §3.3"),
     Explanation(
+        "copilot-metrics", ("copilot-metrics", "chats-ledger", "modeltotals",
+                            "session-credits", "nano-aiu", "sidecar", "debuglog",
+                            "otel", "agent-traces", "five-stores", "per-chat-metrics"),
+        "the .cage/ledger/copilot/ kind: per-chat Copilot usage, verbatim, from five stores",
+        "A capture-only sibling to `calls` — never widens that schema, never priced,\n"
+        "  never read by any derived view today. One row per (source, session, surface,\n"
+        "  request, call) key, from whichever of five on-disk stores the machine has:\n"
+        "    chat      VS Code chatSessions — per-request tokens + copilotCredits +\n"
+        "              sessionCopilotCredits + modelTotals (durable, ungated)\n"
+        "    cli       Copilot CLI session-state — per-shutdown CUMULATIVE totals,\n"
+        "              never delta'd (dodges the calls-parser delta-loss bug by\n"
+        "              construction)\n"
+        "    sidecar   agentHostUsage — per-model-call, real routed model, gated\n"
+        "    debuglog  copilot-chat debug-logs — per-request, no cached tokens, gated\n"
+        "    otel      agent-traces.db (SQLite, read-only) — per-model-call, cached\n"
+        "              tokens, gated\n"
+        "  `ledger.copilot_metrics()` collapses last-write-wins per key, winner = max\n"
+        "  (tokens_in+tokens_out, credits or -1, id) — a grown chatSessions request or a\n"
+        "  resumed CLI session appends a FRESH row (id folds the row's own values), the\n"
+        "  reader resolves the latest state. session_credits / a CLI row's cumulative\n"
+        "  totals are NEVER summed across a session's rows.\n"
+        "  Counts-never-content: debuglog/otel are whitelist reads (the SAME lines/tables\n"
+        "  carry prompt bodies right next to the numbers) — only the named fields are\n"
+        "  ever read. Absence ≠ zero for credits/session_credits/nano_aiu (None-sentinel,\n"
+        "  the `make_call.credits` law, generalized).",
+        ("cage/schema.py", "cage/ledger.py", "cage/transcript.py", "cage/importcmd.py"),
+        "n/a — capture-only, no computed number; every field is recorded verbatim.",
+        kind="concept", plan_ref="§3.11"),
+    Explanation(
+        "kiro-metrics", ("kiro-metrics", "chats-ledger", "devdata", "cli-conv",
+                        "cli-turn", "upgrade-watch", "tokens-generated", "kiro-cli",
+                        "three-grains", "per-chat-metrics"),
+        "the .cage/ledger/kiro/ kind: per-chat Kiro usage, store-verbatim, at three grains",
+        "A capture-only sibling to `calls`/`credits` — never widens either, never\n"
+        "  priced, never read by any derived view today. One row per\n"
+        "  (source, session, turn, row_ref) key, from whichever Kiro store the machine\n"
+        "  has:\n"
+        "    ide       IDE devdata.sqlite `tokens_generated` — per LLM call, the SAME\n"
+        "              counter `calls` already reads from the jsonl twin, plus a\n"
+        "              `timestamp` and a cursorable `id` the jsonl never carried\n"
+        "    cli-conv  CLI SQLite store, per conversation — credits (usage_info sum),\n"
+        "              context%, turn count; cumulative-verbatim, like `credits` rows\n"
+        "    cli-turn  same store, per history[] turn — populated timing/size/tool-use\n"
+        "              fields, PLUS the token slots that are NULL on every real store\n"
+        "              probed so far (the upgrade-watch: filled only when non-NULL,\n"
+        "              never estimated — chars÷4/cumulative/chunk-count are BANNED as\n"
+        "              token facts; `chunks` stays a chunk count, never `tokens_out`)\n"
+        "  Routing inherits ADR 0006, never re-decided: `ide` rows ride the routed kiro\n"
+        "  sink (`_kiro_leg`, machine ledger); `cli-conv`/`cli-turn` rows ride the same\n"
+        "  workspace scoping the `credits` leg already resolves.\n"
+        "  `ledger.kiro_metrics()` collapses last-write-wins per key, winner = max\n"
+        "  (turns, tokens_in+tokens_out, id) — a grown CLI conversation appends a FRESH\n"
+        "  row (id folds the row's own values), the reader resolves the latest state.\n"
+        "  A conversation's own growth rows are NEVER summed.\n"
+        "  Counts-never-content: the CLI parser reads only `request_metadata`/\n"
+        "  `user_turn_metadata`/`model_info` keys, never `history[].user`/`.assistant`/\n"
+        "  `content` — the same whitelist `_kiro_cli_credit_row` already honors. The IDE\n"
+        "  parser SELECTs four explicit columns only, never `SELECT *`. Absence ≠ zero\n"
+        "  for `credits` (None-sentinel, the `make_call.credits` law, generalized).\n"
+        "  Cache tokens and per-chat IDE credits are absent from every kiro row here\n"
+        "  because no on-disk Kiro store persists them at all — only the wire protocol\n"
+        "  does (proxy-only, out of scope; docs/research/2026-08-13-kiro-per-chat-usage-\n"
+        "  fetch-spec.md).",
+        ("cage/schema.py", "cage/ledger.py", "cage/transcript.py", "cage/importcmd.py"),
+        "n/a — capture-only, no computed number; every field is recorded verbatim.",
+        kind="concept", plan_ref="§3.12"),
+    Explanation(
+        "claude-metrics", ("claude-metrics", "chats-ledger", "dedup-law",
+                          "session-fileset", "requestid", "message-id", "cache-ttl",
+                          "ephemeral", "thinking-tokens", "server-tool-use",
+                          "sidechain", "subagent", "per-chat-metrics"),
+        "the .cage/ledger/claude/ kind: per-chat Claude usage, correctly folded",
+        "A capture-only sibling to `calls` — never widens that schema, never priced,\n"
+        "  never read by any derived view today. One row per chat (`session`), folded\n"
+        "  from the ONE transcript store both the CLI and VS Code extension share.\n"
+        "  THE DEDUP LAW (this kind's whole reason to exist): one API response writes\n"
+        "  1-5 assistant rows — same `requestId`+`message.id`, distinct `uuid`, a full\n"
+        "  copy of `usage` each — folded last-per-key at capture, so `raw_rows` (seen)\n"
+        "  vs `requests` (folded) IS the inflation evidence, captured correctly. Chat\n"
+        "  key = the row's own `sessionId`, so a subagent transcript\n"
+        "  (`<sessionId>/subagents/agent-*.jsonl`) joins its PARENT chat and splits into\n"
+        "  `sidechain_tokens_in/out` rather than landing in a phantom chat.\n"
+        "  `importcmd._claude_session_filesets` regroups a sweep's changed files into\n"
+        "  WHOLE session filesets first — a subagent-only change still re-reads the\n"
+        "  main file too, so the emitted row is never a partial total.\n"
+        "  `ledger.claude_metrics()` collapses last-write-wins per `session`, winner =\n"
+        "  max (requests, tokens_in+tokens_out, id) — a grown chat appends a FRESH row\n"
+        "  (id folds the row's own values), the reader resolves the latest state. A\n"
+        "  chat's own growth rows are NEVER summed.\n"
+        "  Dodges, does NOT fix, two calls-path defects (CLAUDE-DEDUP,\n"
+        "  CLAUDE-SUBAGENT-KEY — `parse_calls`/`_usage_to_row` untouched, both stay\n"
+        "  open OPEN-WORK items). No credits field at all — no credit unit exists for\n"
+        "  Claude Code anywhere on disk. Counts-never-content: only the assistant-row\n"
+        "  envelope + `message.usage` are ever read.",
+        ("cage/schema.py", "cage/ledger.py", "cage/transcript.py", "cage/importcmd.py"),
+        "n/a — capture-only, no computed number; every field is recorded verbatim.",
+        kind="concept", plan_ref="§3.13"),
+    Explanation(
         "cleanup", ("cleanup", "state-dir", "prune", "stale", "retention", "warn",
                     "debug-log-growth", "cursors", "pending-buffers"),
         "what `cage data cleanup` may touch — and what it never may",

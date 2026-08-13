@@ -12,6 +12,273 @@ by milestone) — the worklog is what *happened this session*.
 
 ---
 
+## 2026-08-14 — CLAUDE-METRICS: `.cage/ledger/claude/` built end to end
+
+- **Asked:** build the filed CLAUDE-METRICS prompt (pasted directly) — a new
+  capture-only ledger kind from Claude Code's transcript store, following the
+  handoff's §4 change map and mirroring COPILOT-METRICS'/KIRO-METRICS' already-
+  landed shapes (twin check: both had shipped, confirmed via grep before starting).
+- **Done:** triaged `work/OPEN-WORK.md` (CLAUDE-METRICS confirmed agent-closable,
+  CLAUDE-DEDUP/CLAUDE-SUBAGENT-KEY noted as separate, must-not-fix-here items),
+  read the handoff, the research spec, and the copilot/kiro precedents. Built in
+  order, `just test` green after each: substrate (`schema.make_claude_metric` — no
+  credits field at all, unlike every other kind's None-sentinel, because no credit
+  unit exists for Claude Code on disk) · paths (`Footprint.claude_dir`/
+  `claude_shard(s)`, `shard()` routing) · ledger collapse reader
+  (`claude_metrics_raw`/`claude_metrics`, winner = max by
+  `(requests, tokens_in+tokens_out, id)`) · THE DEDUP LAW as code
+  (`transcript._fold_claude_chat` — two passes over one parse: fold duplicate
+  assistant rows per `(chat_key, requestId, message.id)` last-wins, then accumulate
+  the survivors per chat; `raw_rows`/`requests` on the emitted row is the inflation
+  evidence) · `parse_claude_chat_metrics` (id folds recorded values, never `ts`) ·
+  import wiring (`_claude_session_filesets` regroups changed files into whole
+  session filesets — verified live that a subagent-only "changed" file still pulls
+  in its main file plus every subagent, even unchanged ones; `_ingest_claude_metrics`
+  mirrors `_ingest_copilot_metrics`) · doctor advisory (`_claude_metrics` — raw/
+  collapsed counts plus a >25-day retention nudge probing real transcript mtimes,
+  best-effort, never a doctor gate) · explainer entry · `docs/PLAN.md` §3.13. Wrote
+  `tests/test_claude_metrics.py` (30 tests across the full §9 list — substrate incl.
+  the no-credits-field assertion, the 3-duplicate-rows fold with `raw_rows=3,
+  requests=1`, legacy no-requestId uuid-keyed rows, subagent-to-parent join with
+  sidechain split, fileset regroup both directions incl. the orphan-subagent case,
+  a calls-path byte-identity pin proving `parse_calls` stayed inflated/mis-keyed
+  and untouched, id-fold-excludes-ts, collapse+since, ingest idempotency, growth,
+  full-sweep idempotency via `clicmds.cmd_import`, counts-never-content on raw
+  shard bytes, report/chats byte-identity, doctor advisory). Full suite green,
+  1798/11 skipped (1768 + 30 new), zero goldens re-blessed, zero collateral test
+  breakage beyond two expected updates (`test_doctor.py`'s exhaustive check-name
+  set gains `"claude-metrics"`; `test_debuglog.py`'s allowed debug-key set gains
+  `kind`/`filesets` for the new ingest event). Docs: `docs/GLOSSARY.md` (three
+  terms), `docs/claude-capture.md` (rewritten — new per-chat ledger section, the
+  two calls-path defects rescoped to `calls` only since CLAUDE-METRICS dodges
+  rather than fixes them, retention line now present-tense), `docs/DOC-REGISTRY.md`
+  (six rows bumped), `docs/README.md`/`docs/archive/README.md` updated, pair
+  archived to `docs/archive/v0.49-claude-metrics-ledger.{handoff,prompt}.md` with
+  internal links repointed for the new location.
+- **Decided:** fold key is scoped per chat (`(chat_key, requestId, message.id)`,
+  not the handoff's literal global `(requestId, message.id)`) — strictly safer
+  against a pathological cross-chat id collision, and semantically identical in
+  the normal case since `requestId` is effectively unique per turn per session;
+  documented as a judgment call, not a stale-fact stop. `session_hint` fallback
+  (used only when a row carries no `sessionId` at all) derives from the fileset's
+  first entry — the parent session-id directory name when that entry is a
+  subagent file, else its own stem — matching what `_claude_session_filesets`
+  already computes, so the caller and the parser never disagree about intent.
+- **Incident — disclosed, not buried:** the end-to-end CLI verification step
+  (`cage import --agent claude` twice, meant to run on a throwaway scratch dir)
+  didn't set the sandbox env vars the pytest suite sets automatically, so it ran
+  against the REAL `~/.cage` global ledger. Three fabricated rows landed
+  (`calls-2026-08.jsonl`, `imports.jsonl`, a new `ledger/claude/` dir), tagged
+  `session="sess1"`/`project="claude-scratch"` — unmistakably synthetic, so
+  identifiable and removable with confidence. Asked the user how to proceed
+  (AskUserQuestion) before touching their real ledger; on approval, confirmed
+  exactly one polluting trailing line per file and removed each surgically in
+  Python (not a blind truncate), deleted the fabricated directory, verified clean.
+  `cage.toml` also changed content across two follow-up `cage setup --global`
+  calls made while investigating (stabilized by the third) — `cage doctor` shows
+  it loading correctly with sane content, but the true pre-incident bytes weren't
+  backed up, so byte-exact "nothing else changed" can't be claimed; flagged rather
+  than asserted. Full IMPLEMENTATION.md detail there. Lesson for next time: any
+  live-CLI verification step must explicitly point `CLAUDE_CONFIG_DIR`/`CAGE_HOME`/
+  `CAGE_BASE` at a scratch dir before running, the same isolation `tests/conftest.py`
+  applies automatically — never assume a bare `cage` invocation is sandboxed.
+- **Open:** `work/OPEN-WORK.md`'s CLAUDE-METRICS line already replaced by its two
+  scope-out lines (a read surface, `--csv claude`) and the archive move is done;
+  the one remaining step is a proposed `CLAUDE.md` diff (ledger diagram + a
+  substrate bullet) for Arpit's review — never silently applied, matching the
+  copilot/kiro precedent.
+- **Cost:** unmeasured — `cage report` is cumulative over the whole `~/.cage`
+  ledger, not per-session, and this session deliberately avoided a second live
+  `cage import`/`cage report` run against the real ledger after the pollution
+  incident above.
+
+## 2026-08-14 — KIRO-METRICS: `.cage/ledger/kiro/` built end to end
+
+- **Asked:** build the filed KIRO-METRICS prompt (pasted directly) — a new
+  capture-only ledger kind from Kiro's IDE `devdata.sqlite` and CLI SQLite store,
+  following the handoff's §4 change map and mirroring COPILOT-METRICS' already-landed
+  design (verified it had shipped, staged uncommitted, before starting).
+- **Done:** read the handoff, the research spec, and every COPILOT-METRICS diff
+  (schema/paths/ledger/transcript/importcmd/doctorcmd/explain_data) to confirm the
+  twin shape before writing anything; wrote a file-by-file plan and paused for
+  approval per the prompt's own required workflow. Built in order: substrate
+  (`schema.make_kiro_metric` — `KIRO_METRIC_SOURCES`, omit-at-zero counts,
+  None-sentinel `credits`, the banned chars÷4/cumulative/chunk-count trio named in
+  the docstring) · paths (`Footprint.kiro_dir`/`kiro_metric_shard(s)`, the `shard()`
+  route, `kiro_devdata_db()`, deliberately not in `_builtin_log_sources`) · ledger
+  collapse reader (`kiro_metrics_raw`/`kiro_metrics`, winner = max by
+  `(turns, tokens_in+tokens_out, id)`) · transcript parsers — refactored
+  `parse_kiro_cli_credits` into a thin wrapper over a new `_kiro_cli_conversations`
+  extraction (byte-identical; the whole existing `test_kiro_routing.py` suite passed
+  unmodified as the regression pin), added `parse_kiro_cli_metrics` (conv + turn
+  rows, both `conversations_v2`/`conversations` tables enumerated) and
+  `parse_kiro_ide_metrics` (explicit 4-column SELECT, fail-open) · import wiring
+  (`_ingest_kiro_metrics` mirrors `_ingest_copilot_metrics` exactly; CLI leg hooks
+  into `_ingest_credits` inheriting its workspace scope, IDE leg hooks into
+  `import_kiro` inheriting the routed-sink root from `_kiro_leg` — zero new routing
+  code either side) · doctor advisory (`_kiro_metrics`, plus the upgrade-watch
+  surfacing armed-vs-tripped) · explainer entry · `docs/PLAN.md` §3.12. Wrote
+  `tests/test_kiro_metrics.py` (31 tests across the full §9 list — substrate, both
+  parsers incl. an extra-unknown-column IDE fixture and a non-NULL-token-slots CLI
+  fixture, the credits-wrapper regression pin, whitelist-on-bytes, idempotency,
+  growth+collapse, routing via a real `importcmd.run` sweep, since-skipping,
+  byte-identity, doctor). Full suite green, 1768/0 (1737 + 31 new), zero goldens
+  re-blessed, zero collateral test breakage this time (no new `_builtin_log_sources`
+  tuples, unlike COPILOT-METRICS). One doctor-surface test (`test_doctor.py`'s
+  exhaustive check-name set) updated to include `"kiro-metrics"`. Docs: `docs/GLOSSARY.md`
+  (two terms), `docs/kiro-capture.md` (three closed gaps moved out of Known gaps,
+  executive summary rewritten), `docs/DOC-REGISTRY.md` (three rows + this row bumped).
+- **Decided:** the `cli-conv` row's `credits` None-sentinel follows the handoff
+  literally — "sum when the `usage_info` list is present, else `None`" — which is
+  *looser* than `_kiro_cli_credit_row`'s existing "credits≤0 and context≤0 ⇒ no row
+  at all" skip; the metrics row is store-verbatim and must not inherit the credits
+  row's stricter zero-skip, so a conversation with an empty-but-present `usage_info`
+  list now correctly records a real `0.0` rather than omitting the field. Turn
+  `row_ref` is the turn's own `request_metadata.message_id` when present, else
+  omitted entirely (never falls back to the turn index) — the `turn` field alone
+  already keys the row uniquely, so a synthetic `row_ref` would just be a duplicate
+  of information already on the row. ADR 0006 needs no amendment — routing is
+  inherited from the two legs already resolving it, never re-decided.
+- **Open:** `work/OPEN-WORK.md`'s KIRO-METRICS line removal + its two scope-out
+  lines (a read surface, `--csv kiro`), the archive-on-implement move of the
+  handoff/prompt pair to `docs/archive/`, and a proposed `CLAUDE.md` diff (ledger
+  diagram + the kiro adapter bullet) are the immediate next steps — the prompt's
+  own instructions require the `CLAUDE.md` diff be proposed for Arpit's review, not
+  silently applied.
+- **Cost:** unmeasured — `cage report` is cumulative over the whole `~/.cage` ledger,
+  not per-session; this session's own token spend was not isolated.
+
+## 2026-08-14 — COPILOT-METRICS: `.cage/ledger/copilot/` built end to end
+
+- **Asked:** build the filed COPILOT-METRICS prompt — a new capture-only ledger kind
+  from all five on-disk Copilot stores, following the handoff's §4 change map.
+- **Done:** verified every §4 change-map fact against HEAD (one naming discrepancy,
+  `_builtin_sources` vs the real `_builtin_log_sources` — not a stale fact, just an
+  imprecise name in the handoff; proceeded). Built P0–P5 in order: substrate
+  (`schema.make_copilot_metric`, the None-sentinel/omit-at-zero/whitelist rules) ·
+  ledger collapse reader · five parsers (`_vscode_chat_requests` extracted as a pure
+  refactor first, pinned byte-identical) · import wiring (`_is_chat_session_file`,
+  `_ingest_copilot_metrics`, a new gated-store loop) · doctor advisory + explainer +
+  `docs/PLAN.md` §3.11. Wrote `tests/test_copilot_metrics.py` (33 tests, the full §9
+  list) and fixed 4 collateral tests the two new `_builtin_log_sources` copilot tuples
+  broke (exact-count assertions in `test_platform_paths.py`/`test_path_globs.py`) plus
+  one debuglog-event test whose "last src-bearing event" filter needed to exclude the
+  new `kind`-carrying event. Full suite green, 1737/0, zero goldens re-blessed.
+  Docs: `docs/GLOSSARY.md` (two terms), `docs/copilot-capture.md` (three closed gaps
+  moved out, executive summary rewritten), `work/OPEN-WORK.md` (COPILOT-METRICS
+  removed, two scope-out lines added).
+- **Decided:** `model_totals` whitelisting happens in the PARSER (raw store keys →
+  canonical shape) before `make_copilot_metric` sees it, not in the schema constructor
+  — mirrors how `make_call` never parses vendor JSON itself. CLI metrics rows carry no
+  top-level `tokens_in`/`tokens_out` per the handoff's literal field list, EXCEPT this
+  build sums them from `model_totals` after all — the handoff's generic collapse rule
+  (`max(tokens_in+tokens_out, credits or -1, id)`) is silently wrong for a CLI row
+  otherwise, since `request`/`call` are both empty and credits can plateau while tokens
+  still grow; summing a snapshot's own per-model breakdown into its own row is a
+  different operation from summing *across* a session's rows, so it doesn't violate the
+  never-sum rule.
+- **Open:** the two scope-out items (a read surface, `--csv copilot`) are parked, not
+  built. Ran the session mid-way into 7 other concurrent Claude Code sessions on this
+  same machine, with `work/OPEN-WORK.md`/`WORKLOG.md`/`docs/DOC-REGISTRY.md`/
+  `docs/README.md` mid-edit by what looks like a sibling KIRO-METRICS/CLAUDE-METRICS
+  session — exactly the concurrency CLAUDE-METRICS's own filed item warns against.
+  Proceeded carefully (re-read each shared file immediately before editing, small
+  targeted edits only, on Arpit's explicit go) rather than blocking; a genuine race
+  would have failed the Edit tool's exact-match loudly, not silently clobbered.
+  Archive-on-implement (moving the handoff/prompt pair to `docs/archive/`) and a
+  proposed `CLAUDE.md` diff (ledger diagram + a substrate bullet) are the next step,
+  held for a fresh read of these same files given the concurrent activity.
+- **Cost:** unmeasured — `cage report` is cumulative over the whole `~/.cage` ledger
+  (51,460 calls / 12.4B tokens in), not per-session.
+
+## 2026-08-13 — Cowork — kiro-capture.md: the standing kiro-numbers one-pager
+
+- **Asked:** the kiro analog of copilot-capture.md — to the point, with an
+  executive-meeting section, updated whenever anything changes for kiro numbers.
+- **Done:** `docs/kiro-capture.md` — captured-today table (store → prop → row,
+  incl. the ADR 0006 machine-ledger routing and the CLI workspace scoping) ·
+  known gaps with vendor-limitation ones marked as such (cache + per-chat IDE
+  credits persisted by NO kiro store — wire-only) · the filed KIRO-METRICS build ·
+  executive summary (own on-disk records; credits are billing truth for CLI;
+  the thinnest vendor records of any metered agent; per-project kiro refused as
+  fiction; dollars modeled never invoiced; trajectory) · same-change update rule
+  in frontmatter. Wired: DOC-REGISTRY row (trigger: ANY kiro capture change),
+  docs/README living-docs bullet, a §9.5 box in the KIRO-METRICS handoff + prompt
+  so the build updates it on land. Delivery note: the desktop bridge dropped
+  mid-task; the doc committed on reconnect, wiring in this pass.
+- **Open:** nothing.
+- **Cost:** unmeasured — `cage` not runnable from the Cowork cloud session.
+
+## 2026-08-13 — Cowork — claude-capture.md: the standing claude-numbers one-pager
+
+- **Asked:** a to-the-point doc on how claude numbers are captured, with an
+  executive-meeting section, updated whenever anything changes for claude capture.
+- **Done:** `docs/claude-capture.md` — captured-today table (store → prop → row,
+  incl. cache-write, which Copilot can't report) · known gaps & defects (the 2–3×
+  CLAUDE-DEDUP inflation stated plainly, subagent phantom chats, dropped values,
+  30-day retention) · the filed CLAUDE-METRICS build · executive summary (plain
+  language: vendor's own records, honesty flag on the inflation, no billed unit
+  exists so all dollars are modeled, vendor deletes records after ~30 days) ·
+  maintenance rule in frontmatter. Wired: DOC-REGISTRY row (trigger: ANY claude
+  capture change), docs/README living-docs bullet, a §9.5 box in the
+  CLAUDE-METRICS handoff + prompt so the build refreshes it on land (scope-out
+  line and §10 question removed — the doc now exists).
+- **Open:** nothing.
+- **Cost:** unmeasured — `cage` not runnable from the Cowork cloud session.
+
+## 2026-08-13 — Cowork — CLAUDE-METRICS: per-chat claude metrics ledger specced; pair filed
+
+- **Asked:** a separate ledger home for the claude numbers from today's research —
+  `.cage/ledger/claude/` with monthly per-chat files — researched, with a handoff
+  naming files/functions so the build is "a zap".
+- **Done:** `docs/claude-metrics-ledger.{handoff,prompt}.md`, the COPILOT-METRICS
+  twin. Design locked: own kind `claude` → `claude/chats-YYYY-MM.jsonl`; **chat
+  grain, whole-life totals** (one transcript file = one chat; kiro-credits
+  precedent); rows fold THE DEDUP LAW at capture (`(requestId, message.id)`
+  last-wins — the calls path's 2–3× inflation cannot enter this kind) and join
+  subagent files to the parent chat via the row's own `sessionId` behind a
+  session-fileset regroup (a changed subagent file re-reads the whole session —
+  kills partial totals); `clm_` id folds values → growth appends, reader collapses
+  last-per-session; **no credits field** (research doc's firm no); capture-only —
+  report/chats byte-identity is a test gate.
+- **Debate gate:** "fix the calls parser instead" rejected (schema drops TTL split /
+  thinking / server-tool / sidechain values); riskiest assumption (partial filesets)
+  mitigated by design; CLAUDE-DEDUP / CLAUDE-SUBAGENT-KEY stay open — this build
+  must not touch `parse_calls` (pinned by test).
+- **Open:** the pair must not build concurrently with COPILOT-METRICS or
+  KIRO-METRICS (shared schema/paths/ledger/importcmd); whichever lands later
+  re-verifies its change map and mirrors the landed twin.
+- **Cost:** unmeasured — `cage` not runnable from the Cowork cloud session.
+
+## 2026-08-13 — Cowork — KIRO-METRICS: per-chat kiro metrics ledger specced; pair filed
+
+- **Asked:** the kiro analog of COPILOT-METRICS — `.cage/ledger/kiro/` with monthly
+  per-chat files for the values from today's kiro research; researched, with a
+  handoff naming files/functions so the build is "a zap".
+- **Debate gate (changed the spec):** (1) the stores don't hold cache or per-chat
+  IDE credits → DoD rewritten **store-verbatim**; the row keeps
+  `cached_in/cached_out/credits` slots that stay honestly absent and auto-fill if
+  Kiro ever persists them — estimates (chars÷4 trio) named and banned. (2) a project
+  `.cage/ledger/kiro/` holding IDE rows would re-create the ADR 0006 double-count →
+  routing is **inherited, never re-decided**: IDE-source rows ride `_kiro_leg`'s
+  sink, CLI-source rows ride `_ingest_credits`' workspace scoping.
+- **Design locked:** own kind `kiro` → `kiro/chats-YYYY-MM.jsonl` (savings-shard
+  mechanism, twin of COPILOT-METRICS, order-independent with it); three grains
+  ("ide" per-call from devdata.sqlite — timestamped, explicit-column SELECT,
+  fail-open on the unverified schema; "cli-conv"; "cli-turn" from the
+  request_metadata whitelist); `km_` id namespace folding values, collapse
+  last-write-wins per `(source, session, turn, row_ref)`; both CLI tables
+  (`conversations_v2` + `conversations`) enumerated; doctor advisory that
+  ANNOUNCES non-NULL token slots (the upgrade-watch surfaced); capture-only —
+  byte-identity test on `report` + `insights chats` is the gate.
+- **Filed:** `docs/kiro-metrics-ledger.{handoff,prompt}.md` (Model: Sonnet,
+  Progress: 0%); KIRO-METRICS line added to OPEN-WORK.
+- **Open:** read surface, CSV export, the proxy capture of
+  `metadataEvent.tokenUsage`+`meteringEvent` (only path to cache/IDE credits), a
+  `kiro-capture.md` one-pager, and the two real-store probes (devdata schema;
+  session-JSON usage props) — scope-out lines to be filed on implement.
+- **Cost:** unmeasured — `cage` not runnable from the Cowork cloud session.
+
 ## 2026-08-13 — Claude Code — GRAPHIFY-CHATS: CLAUDE.md edit applied, committed
 
 - **Asked:** apply the previously-held CLAUDE.md views-list edit and commit the whole

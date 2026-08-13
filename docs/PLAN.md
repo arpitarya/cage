@@ -711,6 +711,162 @@ changes no derived number). Writes are the `pricestoml` surgery: comment-
 preserving, lock + re-parse + atomic replace, per-file typed refusal on exotic
 TOML, idempotent (`--apply` twice ⇒ byte-identical no-op).
 
+## 3.11 Copilot metrics — `.cage/ledger/copilot/`, a fifth append-only kind
+
+`schema.make_copilot_metric` (`cage/schema.py`) records, verbatim, the per-chat usage
+figures Copilot's own stores carry that the `calls` schema (§3.1) deliberately does not
+widen to hold: `modelTotals` (per-model cached tokens), `sessionCopilotCredits`,
+`elapsedMs`/`timeSpentWaiting`, and three opt-in stores' per-model-call figures. These
+are copilot-native facts at three different grains — per-request (chatSessions),
+per-session-cumulative (CLI), per-model-call (three gated stores) — so they get their
+own kind, the way kiro-CLI usage got its own `credits-<month>.jsonl` row shape rather
+than a widened `calls` row.
+
+**Five sources, one row shape, one closed enum** (`schema.COPILOT_METRIC_SOURCES =
+("chat", "cli", "sidecar", "debuglog", "otel")`): two always-on and durable (chat, cli),
+three opt-in behind a VS Code setting (sidecar, debuglog, otel — named per-source in
+`cage doctor`'s advisory `copilot-metrics` check). `agent` is always `"copilot"`.
+Counts are omit-at-zero; `credits`/`session_credits`/`nano_aiu` are **None-sentinel**,
+never omit-at-zero — the same law `credits` already breaks that pattern for on a `calls`
+row (§3.1), and for the same reason: a store recording a real `0.0` and a store
+recording nothing are different facts.
+
+**Storage**: `Footprint.copilot_dir` / `copilot_shard(ts)` / `copilot_shards()` route
+through the SAME per-source-tree mechanism `savings/<tool>/` already uses (smallest
+diff, precedent already tested) — `ledger/copilot/chats-<month>.jsonl`, not a
+generalization of the calls `shard()` scheme.
+
+**Collapse, not delta.** `ledger.copilot_metrics()` reads every shard and keeps the
+latest row per `(source, session, surface, request, call)` — winner = max by
+`(tokens_in + tokens_out, credits or -1, id)`, the `ledger.credits()` collapse
+generalized to a wider key. A parser mints `metric_id` by folding the row's own
+recorded values into a hash, so a grown chatSessions request or a resumed CLI session
+appends a FRESH row (never rewrites the append-only past) and the reader resolves the
+latest state. **Never sum** `session_credits` or a CLI row's cumulative totals across a
+session's own rows — each already IS the cumulative-as-of-capture figure.
+
+**Counts-never-content, twice over.** Two of the five stores interleave prompt bodies
+with the numbers on the SAME line/table (debuglog's `attrs.userRequest`/
+`attrs.inputMessages`; otel's `span_attributes`/`span_events`) — both parsers read a
+strict field whitelist and never touch the body fields at all, transiently or otherwise
+(the same discipline ADR 0009 established for kiro-CLI's tool-run bodies).
+
+**Capture-only, deliberately.** No derived view reads this kind in its first build — no
+`report`/`insights chats` cell moves whether the `copilot/` tree exists or is deleted.
+A read surface (a `cage insights copilot` view, or new chats-view columns) is future
+work, parked in `work/OPEN-WORK.md`, not a `# v2:` stub in the code.
+
+## 3.12 Kiro metrics — `.cage/ledger/kiro/`, a sixth append-only kind
+
+`schema.make_kiro_metric` (`cage/schema.py`) records, verbatim, the per-chat usage
+figures Kiro's own on-disk stores carry that neither `calls` (§3.1) nor `credits`
+(the Kiro-CLI kind) deliberately hold: the IDE's timestamped `devdata.sqlite` twin of
+the jsonl token log, and the CLI's populated per-turn timing/size/tool-use metadata —
+plus the CLI's token slots, schema-present but NULL on every real store probed so far
+(the **upgrade-watch**: capture is pre-wired to record them the day Kiro fills them,
+with zero code change). These are Kiro-native facts at three grains — per-IDE-call,
+per-CLI-conversation, per-CLI-turn — so they get their own kind, the `make_copilot_metric`
+precedent generalized to Kiro's stores (KIRO-METRICS handoff, the copilot twin one
+agent over).
+
+**Three sources, one row shape, one closed enum** (`schema.KIRO_METRIC_SOURCES =
+("ide", "cli-conv", "cli-turn")`), both always-on and durable — Kiro gates nothing
+behind an opt-in setting the way three of copilot's five stores do. `agent` is always
+`"kiro"`. Counts are omit-at-zero; `credits` is **None-sentinel**, never omit-at-zero
+— the same law `credits` already breaks that pattern for on a `calls` row (§3.1), and
+for the same reason: a store recording a real `0.0` and a store recording nothing are
+different facts. **Never estimated**: the community chars÷4 / cumulative-context /
+chunk-count trio is explicitly banned as a source for any token field — `chunks` is
+recorded as a chunk *count*, never repurposed as `tokens_out`. The 2026-02-28
+`tokens_prompt` semantics cutover (full-context before, incremental after) is recorded
+verbatim, never corrected, at capture — a derive-time concern, if it is ever needed.
+
+**Storage**: `Footprint.kiro_dir` / `kiro_metric_shard(ts)` / `kiro_metric_shards()`
+route through the SAME per-source-tree mechanism `copilot/`/`savings/<tool>/` already
+use — `ledger/kiro/chats-<month>.jsonl`, not a generalization of the calls `shard()`
+scheme. **Routing is inherited from ADR 0006, never re-decided**: `ide`-source rows
+ride the routed kiro sink (`_kiro_leg`, the machine ledger — `devdata.sqlite` has no
+project/session, same machine-fact reasoning as the jsonl log it twins); `cli-conv`/
+`cli-turn` rows ride the exact workspace scoping the `credits` leg (`_ingest_credits`)
+already resolves, inside the same call, no second scan.
+
+**Collapse, not delta.** `ledger.kiro_metrics()` reads every shard and keeps the latest
+row per `(source, session, turn, row_ref)` — winner = max by `(turns, tokens_in +
+tokens_out, id)`. IDE call-grain keys (`row_ref` = the store's own `id`) are unique per
+row, so the collapse is a no-op for them; it bites only on a grown CLI conversation,
+whose parser-minted `id` folds in the row's new values and appends a fresh row under
+the same key. **Never sum** a conversation's own growth rows across its history — each
+`cli-conv`/`cli-turn` row already IS the state as of its own capture.
+
+**Counts-never-content.** The CLI parser reads only `request_metadata`/
+`user_turn_metadata`/`model_info` keys — never `history[].user`/`.assistant`/`content`
+— the exact whitelist `_kiro_cli_credit_row` already honors, extended rather than
+duplicated (`_kiro_cli_conversations` is the one shared read both the credits parser
+and the metrics parser call). The IDE parser SELECTs four explicit columns only, never
+`SELECT *` — an unread extra column can never leak into a row.
+
+**Capture-only, deliberately.** No derived view reads this kind in its first build —
+no `report`/`insights chats` cell moves whether the `kiro/` tree exists or is deleted.
+Cache tokens and per-chat IDE credits stay absent from every row here because no
+on-disk Kiro store persists them at all (only the wire protocol does — proxy capture,
+out of scope, `docs/research/2026-08-13-kiro-per-chat-usage-fetch-spec.md`). A read
+surface and `--csv kiro` are future work, parked in `work/OPEN-WORK.md`.
+
+## 3.13 Claude metrics — `.cage/ledger/claude/`, a seventh append-only kind
+
+`schema.make_claude_metric` (`cage/schema.py`) records, correctly folded, the per-chat
+usage figures the transcript store carries that `calls` (§3.1) deliberately does not
+widen to hold: the cache-write TTL split (5m/1h — a real 1.6× price spread), thinking
+tokens, server-tool call counts, and a sidechain (subagent) split. One store, one row
+shape — the `make_copilot_metric`/`make_kiro_metric` precedent, generalized to
+Claude's single transcript store (CLAUDE-METRICS handoff, docs/research/2026-08-13-
+claude-per-chat-usage-fetch-spec.md).
+
+**THE DEDUP LAW is this kind's whole reason to exist.** One API response writes 1–5
+assistant rows (one per content block), every one carrying a distinct `uuid` but the
+SAME `requestId` + `message.id` and a full copy of `usage` — naive summation (what the
+`calls` parser does today, CLAUDE-DEDUP) inflates output tokens ~2–3×. This kind folds
+last-per-`(requestId, message.id)` **at capture**, correctly, by construction — it
+*dodges* CLAUDE-DEDUP and CLAUDE-SUBAGENT-KEY (chat key = the row's own `sessionId`,
+joining subagent transcripts to their parent), it does not fix either: `parse_calls`
+and `_usage_to_row` are untouched, and both defects stay open OPEN-WORK items on the
+*calls* path. **No credits field at all** — no credit unit exists for Claude Code
+anywhere on disk (the research doc's firm no; `costUSD` died in v1.0.9) — there is
+nothing a sentinel could ever distinguish, unlike `credits`/`copilot_metric.credits`.
+
+**Session filesets before parsing.** `importcmd._claude_session_filesets` regroups a
+sweep's changed files into WHOLE session filesets — a subagent path
+(`…/<sessionId>/subagents/agent-*.jsonl`) maps to its parent main file and the fileset
+expands to `[main] + every subagent file, even the unchanged ones` — because the
+emitted row is a whole-chat total, never a delta. Without it, a sweep that only
+touched a subagent file would file a partial-total row: correctness against partial
+sweeps, not an optimization.
+
+**Storage**: `Footprint.claude_dir` / `claude_shard(ts)` / `claude_shards()` route
+through the SAME per-source-tree mechanism `copilot/`/`kiro/`/`savings/<tool>/`
+already use — `ledger/claude/chats-<month>.jsonl`, not a generalization of the calls
+`shard()` scheme.
+
+**Collapse, not delta.** `ledger.claude_metrics()` reads every shard and keeps the
+latest row per `session` — winner = max by `(requests, tokens_in + tokens_out, id)`,
+the `ledger.credits()` collapse with `turns` generalized to `requests`. A parser mints
+`metric_id` by folding the chat's own recorded values (never `ts`) into a hash, so a
+chat that grew since its last capture appends a FRESH row (never rewrites the
+append-only past) and the reader resolves the latest state. **Never sum** a chat's own
+growth rows across its history — each already IS the chat's whole-life total as of its
+own capture, even across month shards (a chat spanning months keeps its latest row in
+the newest one, so a `--since` window that skips the early shard still returns it).
+
+**Counts-never-content.** Only the assistant-row envelope + `message.usage` are ever
+read — never `message.content`, `summary` titles, user rows' text, or
+`tool-results/`. `project` is the basename of the last-seen `cwd`, never a path.
+
+**Capture-only, deliberately.** No derived view reads this kind in its first build —
+no `report`/`insights chats` cell moves whether the `claude/` tree exists or is
+deleted. A read surface (chats-view columns, or `cage insights claude`) and
+`--csv claude` are future work, parked in `work/OPEN-WORK.md` — as is the calls-path
+fix for CLAUDE-DEDUP/CLAUDE-SUBAGENT-KEY, which this kind deliberately does not touch.
+
 ---
 
 ## 4. The attribution engine (the part that's actually novel)

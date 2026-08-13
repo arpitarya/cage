@@ -380,6 +380,72 @@ def graphify_scan_set(args, src, pattern, files: list[Path]) -> list[Path]:
     return glob_source(src, pattern)
 
 
+def _claude_session_filesets(files: list[Path]) -> list[list[Path]]:
+    """Regroup a sweep's changed claude files into WHOLE session filesets, so a chat's
+    CLAUDE-METRICS totals are never computed from a partial view (handoff §4.5, §8):
+
+    - a subagent path (`…/<sessionId>/subagents/agent-*.jsonl`) maps to its parent main
+      file `…/<sessionId>.jsonl`;
+    - every OTHER file is treated as a main file directly;
+    - each distinct main file expands to `[main] + sorted(<main's subagents dir>.glob(
+      "agent-*.jsonl"))` — **even the unchanged members**, because the emitted row is a
+      whole-chat total, not a delta;
+    - a main file whose path doesn't exist (a subagent-only change, or a subagent whose
+      parent transcript was never itself swept) keeps the fileset WITHOUT it — the fold
+      still keys chats on each row's own `sessionId`, never on this file's presence.
+
+    Distinct main files always land in distinct filesets — a sweep touching files from
+    two different chats regroups into two filesets, never merged."""
+    mains: dict[Path, None] = {}
+    for f in files:
+        main = (f.parent.parent.parent / (f.parent.parent.name + ".jsonl")
+               if f.parent.name == "subagents" else f)
+        mains.setdefault(main, None)
+    filesets: list[list[Path]] = []
+    for main in mains:
+        sub_dir = main.parent / main.stem / "subagents"
+        subs = sorted(sub_dir.glob("agent-*.jsonl")) if sub_dir.is_dir() else []
+        fileset = ([main] if main.exists() else []) + subs
+        if fileset:
+            filesets.append(fileset)
+    return filesets
+
+
+def _ingest_claude_metrics(root: Path, files: list[Path], *,
+                           pol: dict | None = None) -> int:
+    """Regroup `files` into whole session filesets (`_claude_session_filesets`) and
+    parse each into claude-metrics rows via `transcript.parse_claude_chat_metrics`,
+    appending the ones not already recorded (CLAUDE-METRICS handoff §4.5). Mirrors
+    `_ingest_copilot_metrics`/`_ingest_kiro_metrics`: own kind (`"claude"`), own id
+    namespace (`clm_`), own seen-set rebuilt fresh from `ledger.claude_metrics_raw`
+    each call — metrics rows never touch the call-id `seen` set or the call stderr
+    rollup (they are not calls). Fail-open per fileset, like `_ingest`.
+
+    **No own cursor** — this rides the calls sweep's already-cursor-filtered `files`
+    list (a changed file re-triggers regrouping of its whole fileset); a second,
+    independent cursor here would let a subagent-only change slip through both."""
+    seen_ids = {r.get("id") for r in ledger.claude_metrics_raw(root)}
+    filesets = _claude_session_filesets(files)
+    total = 0
+    for fileset in filesets:
+        f0 = fileset[0]
+        session_hint = (f0.parent.parent.name if f0.parent.name == "subagents"
+                        else f0.stem)
+        try:
+            rows = transcript.parse_claude_chat_metrics(fileset, session_hint=session_hint)
+        except Exception as e:  # fail-open: a broken/unreadable fileset never aborts the sweep
+            debuglog.exception(root, "import.claude-metrics", e, pol=pol, file=str(f0))
+            continue
+        for r in rows:
+            if r.get("id") not in seen_ids:
+                if ledger.append_row(root, "claude", r):
+                    seen_ids.add(r.get("id"))
+                    total += 1
+    debuglog.event(root, pol=pol, event="import", agent="claude", result="ok",
+                   kind="claude-metrics", filesets=len(filesets), appended=total)
+    return total
+
+
 def import_claude(root: Path, args, *, pol: dict | None = None, seen: set | None = None,
                   agent_cursor: dict | None = None, health: dict | None = None,
                   collect: list | None = None, import_id: str = "",
@@ -418,6 +484,11 @@ def import_claude(root: Path, args, *, pol: dict | None = None, seen: set | None
                               _surface_restamp(lambda f: transcript.parse_calls(
                                   f, session=f.stem, root=root, pol=pol), surface),
                               pol=pol, seen=seen, agent_cursor=agent_cursor, collect=collect, import_id=import_id)
+        # CLAUDE-METRICS: the SAME `files` this sweep just scanned, into the metrics
+        # kind — no rescan. Never folded into `total_rows`/`total_files` below: metrics
+        # rows are not calls, and the printed "imported N call(s)" summary must not
+        # count them (handoff §4.5).
+        _ingest_claude_metrics(root, files, pol=pol)
         _detect_graphify(root, graphify_scan_set(args, src, pattern, files),
                          gfx_ids, pol)
         # The authorship pass reads the source's FULL match set, not `files`: the call
@@ -451,12 +522,46 @@ def _detect_graphify(root: Path, files: list[Path], gfx_ids: set, pol: dict | No
             debuglog.exception(root, "import.graphify-tx", e, pol=pol, file=str(f))
 
 
+_CHAT_SESSION_DIRS = ("chatSessions", "emptyWindowChatSessions", "transferredChatSessions")
+
+
+def _is_chat_session_file(f: Path) -> bool:
+    """True for a file living in any of the three chatSessions-shaped roots
+    (COPILOT-METRICS handoff §4.5) — the normal per-workspace store plus the two
+    globalStorage roots added alongside it (`_builtin_log_sources`'s new copilot
+    tuples). Without this, a file under `emptyWindowChatSessions`/
+    `transferredChatSessions` mis-dispatches to the CLI `events.jsonl` parser: neither
+    sits in a directory literally named `chatSessions`, which is what `_parse_copilot_any`
+    and `_copilot_name` checked before this existed. `no-workspace/chatSessions/` needs
+    no entry here — its parent dir IS named `chatSessions`, already covered."""
+    return f.parent.name in _CHAT_SESSION_DIRS
+
+
 def _parse_copilot_any(f: Path) -> list[dict]:
     """Dispatch on the on-disk store: VS Code chat-session files (extension) parse via
     `parse_copilot_vscode_calls`; everything else is the CLI `events.jsonl` format."""
-    if f.parent.name == "chatSessions":
+    if _is_chat_session_file(f):
         return transcript.parse_copilot_vscode_calls(f, session=f.stem)
     return transcript.parse_copilot_calls(f, session=f.parent.name)
+
+
+def _parse_copilot_metrics_any(f: Path) -> list[dict]:
+    """The metrics twin of `_parse_copilot_any` (COPILOT-METRICS handoff §4.5): the
+    SAME dispatch, routed to the metrics parsers instead of the calls parsers."""
+    if _is_chat_session_file(f):
+        return transcript.parse_copilot_vscode_metrics(f, session=f.stem)
+    return transcript.parse_copilot_cli_metrics(f, session=f.parent.name)
+
+
+# The parser per gated-store tag (`paths.copilot_metric_sources()`'s third tuple
+# element) — COPILOT-METRICS handoff §4.5. `otel` takes the whole db path, not a
+# per-file match, since `_scan`'s glob for it (`"agent-traces.db"`) matches the db
+# file itself.
+_COPILOT_METRIC_PARSERS = {
+    "sidecar": lambda f: transcript.parse_copilot_sidecar_metrics(f, session=f.stem),
+    "debuglog": transcript.parse_copilot_debuglog_metrics,
+    "otel": transcript.parse_copilot_otel_metrics,
+}
 
 
 # The parser to reuse per declared `[sources.<name>] format` (plan Phase 4). The three
@@ -510,10 +615,87 @@ def _ingest_credits(root: Path, name: str, src: Path, files: list[Path], *,
                     agent_cursor[str(f)] = sig
         except Exception as e:  # fail-open: an unreadable DB never aborts the sweep
             debuglog.exception(root, "import.credits", e, pol=pol, agent=name, file=str(f))
+    # KIRO-METRICS: the SAME `files`/`workspace` this leg just resolved, into the
+    # metrics kind — no rescan, ADR 0006 scoping inherited rather than re-decided.
+    # Never folded into `total` above: metrics rows are not credits (handoff §4.5).
+    _ingest_kiro_metrics(root, files,
+                        lambda f: transcript.parse_kiro_cli_metrics(f, workspace=workspace),
+                        src=src, pol=pol, agent_cursor=agent_cursor)
     _detect_graphify_kiro_cli(root, files if graphify_files is None else graphify_files,
                               workspace, pol)
     debuglog.event(root, pol=pol, event="import", agent=name, result="ok", src=str(src),
                    files=len(files), kind="credits", appended=total)
+    return total
+
+
+def _ingest_copilot_metrics(root: Path, files: list[Path], parse, *, src: Path,
+                            pol: dict | None = None,
+                            agent_cursor: dict | None = None) -> int:
+    """Parse `files` into copilot-metrics rows via `parse` (dispatched per file by the
+    caller — chat vs cli metrics in the always-on leg, one of the three gated-store
+    parsers in the gated leg) and append the ones not already recorded
+    (COPILOT-METRICS handoff §4.5). Mirrors `_ingest_credits`: own kind (`"copilot"`),
+    own id namespace (`cm_`), own seen-set rebuilt fresh from `ledger.copilot_metrics_raw`
+    each call — metrics rows never touch the call-id `seen` set or the call stderr
+    rollup (they are not calls). Fail-open per file, like `_ingest`. Reuses the SAME
+    `files` list the caller already scanned — no second scan. `agent_cursor`, when
+    given, advances the same way `_ingest`'s does (cursor keys are per file path, so
+    sharing one dict with the calls leg or across the three gated stores never
+    collides)."""
+    seen_ids = {r.get("id") for r in ledger.copilot_metrics_raw(root)}
+    total = parsed = 0
+    for f in files:
+        try:
+            rows = parse(f)
+            parsed += len(rows)
+            for r in rows:
+                if r.get("id") not in seen_ids:
+                    if ledger.append_row(root, "copilot", r):
+                        seen_ids.add(r.get("id"))
+                        total += 1
+            if agent_cursor is not None:
+                sig = _file_sig(f)
+                if sig is not None:
+                    agent_cursor[str(f)] = sig
+        except Exception as e:  # fail-open: a broken/unreadable store never aborts the sweep
+            debuglog.exception(root, "import.copilot-metrics", e, pol=pol, file=str(f))
+    debuglog.event(root, pol=pol, event="import", agent="copilot", result="ok",
+                   src=str(src), kind="copilot-metrics", files=len(files),
+                   parsed=parsed, appended=total)
+    return total
+
+
+def _ingest_kiro_metrics(root: Path, files: list[Path], parse, *, src: Path,
+                         pol: dict | None = None,
+                         agent_cursor: dict | None = None) -> int:
+    """Parse `files` into kiro-metrics rows via `parse` (the CLI conv/turn parser in the
+    always-on CLI leg, the IDE devdata parser in the IDE leg) and append the ones not
+    already recorded (KIRO-METRICS handoff §4.5). Mirrors `_ingest_copilot_metrics`
+    exactly: own kind (`"kiro"`), own id namespace (`km_`), own seen-set rebuilt fresh
+    from `ledger.kiro_metrics_raw` each call — metrics rows never touch the call-id
+    `seen` set, the credits seen-set, or either rollup (they are neither calls nor
+    credits). Fail-open per file, like `_ingest`/`_ingest_credits`. Reuses the SAME
+    `files` list the caller already scanned — no second scan."""
+    seen_ids = {r.get("id") for r in ledger.kiro_metrics_raw(root)}
+    total = parsed = 0
+    for f in files:
+        try:
+            rows = parse(f)
+            parsed += len(rows)
+            for r in rows:
+                if r.get("id") not in seen_ids:
+                    if ledger.append_row(root, "kiro", r):
+                        seen_ids.add(r.get("id"))
+                        total += 1
+            if agent_cursor is not None:
+                sig = _file_sig(f)
+                if sig is not None:
+                    agent_cursor[str(f)] = sig
+        except Exception as e:  # fail-open: a broken/unreadable store never aborts the sweep
+            debuglog.exception(root, "import.kiro-metrics", e, pol=pol, file=str(f))
+    debuglog.event(root, pol=pol, event="import", agent="kiro", result="ok",
+                   src=str(src), kind="kiro-metrics", files=len(files),
+                   parsed=parsed, appended=total)
     return total
 
 
@@ -590,9 +772,10 @@ def import_custom_tools(root: Path, args, *, pol: dict | None = None,
 
 
 def _copilot_name(f: Path) -> str:
-    """A copilot file's session name: the VS Code chat title for a `chatSessions/` file,
-    ``""`` for a CLI `events.jsonl` (which carries no title — honest empty, plan §4)."""
-    if f.parent.name == "chatSessions":
+    """A copilot file's session name: the VS Code chat title for a chatSessions-shaped
+    file (any of `_CHAT_SESSION_DIRS`), ``""`` for a CLI `events.jsonl` (which carries no
+    title — honest empty, plan §4)."""
+    if _is_chat_session_file(f):
         return transcript.session_name_copilot_vscode(f)
     return ""
 
@@ -628,9 +811,25 @@ def import_copilot(root: Path, args, *, pol: dict | None = None, seen: set | Non
         total_rows += _ingest(root, "copilot", src, files,
                               _surface_restamp(_parse_copilot_any, surface),
                               pol=pol, seen=seen, agent_cursor=agent_cursor, collect=collect, import_id=import_id)
+        # COPILOT-METRICS: the SAME `files` this sweep just scanned, into the metrics
+        # kind — no rescan. Never folded into `total_rows`/`total_files` below: metrics
+        # rows are not calls, and the printed "imported N call(s)" summary must not
+        # count them (handoff §4.5).
+        _ingest_copilot_metrics(root, files, _parse_copilot_metrics_any, src=src,
+                                pol=pol, agent_cursor=agent_cursor)
         _detect_graphify_copilot(root, graphify_scan_set(args, src, pattern, files),
                                  gfx_ids, pol)
         total_files += len(files)
+    # The three gated-store legs (COPILOT-METRICS handoff §4.5, §4.2): opt-in,
+    # per-model-call stores that feed no calls parser — metrics only, own scan, own
+    # cursor bucket (cursor keys are per file path, so sharing `agent_cursor` with the
+    # always-on leg above never collides).
+    for gpath, gglob, tag in paths.copilot_metric_sources():
+        gfiles = _scan(root, "copilot", gpath, gglob, getattr(args, "since", None),
+                       pol=pol, agent_cursor=agent_cursor, health=health)
+        gparse = _COPILOT_METRIC_PARSERS[tag]
+        _ingest_copilot_metrics(root, gfiles, gparse, src=gpath, pol=pol,
+                                agent_cursor=agent_cursor)
     return total_rows, total_files
 
 
@@ -704,6 +903,17 @@ def import_kiro(root: Path, args, *, pol: dict | None = None, seen: set | None =
                               _surface_restamp(lambda f: transcript.parse_kiro_calls(f), surface),
                               pol=pol, seen=seen, agent_cursor=agent_cursor, collect=collect, import_id=import_id)
         total_files += len(files)
+    # KIRO-METRICS IDE leg (handoff §4.5): a single fixed file, not a glob — resolved
+    # directly rather than through `_scan`/`agent_log_sources` (`paths.kiro_devdata_db`
+    # is deliberately not a registered source; see its docstring). `import_kiro` already
+    # runs against the ROUTED SINK as `root` when kiro routes away (`_kiro_leg` calls
+    # `run_agent(sink, "kiro", ...)`, ADR 0006), so these rows land machine-side with
+    # zero new routing code — never folded into `total_rows`/`total_files` above:
+    # metrics rows are not calls.
+    devdata = paths.kiro_devdata_db()
+    if devdata.exists():
+        _ingest_kiro_metrics(root, [devdata], transcript.parse_kiro_ide_metrics,
+                            src=devdata, pol=pol, agent_cursor=agent_cursor)
     return total_rows, total_files
 
 

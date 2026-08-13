@@ -234,6 +234,162 @@ def savings(root: Path, since: str | None = None) -> list[dict]:
     return rows
 
 
+def copilot_metrics_raw(root: Path) -> list[dict]:
+    """Every copilot-metrics row, unfiltered (`copilot/chats-*.jsonl`, mirrors
+    `savings()` minus the ``since`` filter) — feeds the import sweep's seen-set, which
+    must see every id ever written regardless of any reporting window."""
+    foot = paths.Footprint(root)
+    rows: list[dict] = []
+    for sh in foot.copilot_shards():
+        rows.extend(read(sh))
+    return rows
+
+
+def _copilot_metric_key(row: dict) -> tuple:
+    return (row.get("source", ""), row.get("session", ""), row.get("surface", ""),
+            row.get("request", ""), row.get("call", ""))
+
+
+def _copilot_metric_score(row: dict) -> tuple:
+    return (row.get("tokens_in", 0) + row.get("tokens_out", 0),
+            row.get("credits") if row.get("credits") is not None else -1,
+            row.get("id", ""))
+
+
+def copilot_metrics(root: Path, since: str | None = None) -> list[dict]:
+    """Copilot-metrics rows (COPILOT-METRICS handoff §4.3), collapsed **last-write-wins
+    per `(source, session, surface, request, call)`** — the `credits()` collapse,
+    generalized to a wider key. Call-grain keys (the sidecar/debuglog/otel `call` field)
+    are unique per row, so the collapse is a no-op for them; it bites only on a grown
+    chatSessions request or a resumed CLI session, whose parser-minted `id` folds in the
+    row's new values and appends a fresh row under the same key.
+
+    Winner = max by `(tokens_in + tokens_out, credits or -1, id)` — the row carrying the
+    most usage wins; ties break on credits, then on id (append order). **Never sum**
+    `session_credits` or a CLI row's cumulative `model_totals` across a session's rows —
+    each row already IS the cumulative total as of its own capture, so summing would
+    double- or triple-count. ``since`` drops dated shards whose whole month predates the
+    cutoff (same partition win as `read_kind`). Capture-only: no derived view reads this
+    kind yet — an empty ledger with no `copilot/` tree returns []."""
+    foot = paths.Footprint(root)
+    cut = since_cutoff(since)
+    rows: list[dict] = []
+    for sh in foot.copilot_shards():
+        if cut is not None and _month_entirely_below(sh.name, cut):
+            continue
+        rows.extend(read(sh))
+    latest: dict[tuple, dict] = {}
+    for r in rows:
+        key = _copilot_metric_key(r)
+        cur = latest.get(key)
+        if cur is None or _copilot_metric_score(r) >= _copilot_metric_score(cur):
+            latest[key] = r
+    return sorted(latest.values(), key=lambda x: x.get("id", ""))
+
+
+def kiro_metrics_raw(root: Path) -> list[dict]:
+    """Every kiro-metrics row, unfiltered (`kiro/chats-*.jsonl`, mirrors
+    `copilot_metrics_raw()` minus the ``since`` filter) — feeds the import sweep's
+    seen-set, which must see every id ever written regardless of any reporting window."""
+    foot = paths.Footprint(root)
+    rows: list[dict] = []
+    for sh in foot.kiro_metric_shards():
+        rows.extend(read(sh))
+    return rows
+
+
+def _kiro_metric_key(row: dict) -> tuple:
+    return (row.get("source", ""), row.get("session", ""), row.get("turn", ""),
+            row.get("row_ref", ""))
+
+
+def _kiro_metric_score(row: dict) -> tuple:
+    return (row.get("turns", 0), row.get("tokens_in", 0) + row.get("tokens_out", 0),
+            row.get("id", ""))
+
+
+def kiro_metrics(root: Path, since: str | None = None) -> list[dict]:
+    """Kiro-metrics rows (KIRO-METRICS handoff §4.3), collapsed **last-write-wins per
+    `(source, session, turn, row_ref)`** — the `copilot_metrics()` collapse, generalized
+    to Kiro's grain keys. IDE call-grain keys (`row_ref` = the store's own `id`) are
+    unique per row, so the collapse is a no-op for them; it bites only on a grown CLI
+    conversation, whose parser-minted `id` folds in the row's new values and appends a
+    fresh row under the same key.
+
+    Winner = max by `(turns, tokens_in + tokens_out, id)` — the row reflecting the most
+    conversation growth wins; ties break on token volume, then on id (append order).
+    **Never sum** a conversation's own growth rows across its history — each `cli-conv`/
+    `cli-turn` row already IS the state as of its own capture, so summing would
+    double- or triple-count (the same law `copilot_metrics` states for `session_credits`).
+    ``since`` drops dated shards whose whole month predates the cutoff (same partition
+    win as `read_kind`). Capture-only: no derived view reads this kind yet — an empty
+    ledger with no `kiro/` tree returns []."""
+    foot = paths.Footprint(root)
+    cut = since_cutoff(since)
+    rows: list[dict] = []
+    for sh in foot.kiro_metric_shards():
+        if cut is not None and _month_entirely_below(sh.name, cut):
+            continue
+        rows.extend(read(sh))
+    latest: dict[tuple, dict] = {}
+    for r in rows:
+        key = _kiro_metric_key(r)
+        cur = latest.get(key)
+        if cur is None or _kiro_metric_score(r) >= _kiro_metric_score(cur):
+            latest[key] = r
+    return sorted(latest.values(), key=lambda x: x.get("id", ""))
+
+
+def claude_metrics_raw(root: Path) -> list[dict]:
+    """Every claude-metrics row, unfiltered (`claude/chats-*.jsonl`, mirrors
+    `copilot_metrics_raw()`/`kiro_metrics_raw()` minus the ``since`` filter) — feeds the
+    import sweep's seen-set, which must see every id ever written regardless of any
+    reporting window."""
+    foot = paths.Footprint(root)
+    rows: list[dict] = []
+    for sh in foot.claude_shards():
+        rows.extend(read(sh))
+    return rows
+
+
+def _claude_metric_score(row: dict) -> tuple:
+    return (row.get("requests", 0), row.get("tokens_in", 0) + row.get("tokens_out", 0),
+            row.get("id", ""))
+
+
+def claude_metrics(root: Path, since: str | None = None) -> list[dict]:
+    """Claude-metrics rows (CLAUDE-METRICS handoff §4.3), collapsed **last-write-wins
+    per `session`** — the `credits()` collapse, `turns` generalized to `requests`. A
+    chat that grew since its last capture appends a fresh row whose parser-minted id
+    folds in the new values (`schema.make_claude_metric`), so the shard is append-only
+    and a re-import adds zero rows — but a grown chat's totals must never be *summed*
+    with an earlier partial capture of the same chat, because each row already IS the
+    chat's whole-life total as of its own capture.
+
+    Winner = max by `(requests, tokens_in + tokens_out, id)` — the row reflecting the
+    most conversation growth wins; ties break on token volume, then on id (append
+    order). A chat spanning multiple months has rows in different shards; the collapse
+    resolves across all of them (the latest row lives in the newest month, so a
+    ``since`` window that skips an early shard still returns it). ``since`` drops dated
+    shards whose whole month predates the cutoff (same partition win as `read_kind`).
+    Capture-only: no derived view reads this kind yet — an empty ledger with no
+    `claude/` tree returns []."""
+    foot = paths.Footprint(root)
+    cut = since_cutoff(since)
+    rows: list[dict] = []
+    for sh in foot.claude_shards():
+        if cut is not None and _month_entirely_below(sh.name, cut):
+            continue
+        rows.extend(read(sh))
+    latest: dict[str, dict] = {}
+    for r in rows:
+        sess = r.get("session", "")
+        cur = latest.get(sess)
+        if cur is None or _claude_metric_score(r) >= _claude_metric_score(cur):
+            latest[sess] = r
+    return sorted(latest.values(), key=lambda x: x.get("id", ""))
+
+
 def receipts(root: Path, since: str | None = None) -> list[dict]:
     """Every savings receipt: an **id-deduped union** of the legacy `receipts.jsonl`
     shards with the dedicated `savings/<tool>/` tree (plan §3), the tree winning on a

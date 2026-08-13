@@ -187,7 +187,10 @@ def test_debug_log_carries_no_prompt_or_response_bodies(proj, monkeypatch):
                "traceback", "tool_name", "files_buffered", "skip", "sha_present",
                "buffers", "rows_written", "banner_shown", "src", "files", "parsed",
                "deduped", "note", "capture_enabled", "candidates",
-               "exists", "pattern", "files_matched"}
+               "exists", "pattern", "files_matched",
+               # CLAUDE-METRICS's own ingest event (_ingest_claude_metrics) —
+               # counts only, same discipline as every other debuglog event here.
+               "kind", "filesets"}
     for e in _events(proj):
         assert set(e).issubset(allowed), f"unexpected keys logged: {set(e) - allowed}"
 
@@ -221,8 +224,14 @@ def test_every_agent_import_logs_a_structured_event(proj, monkeypatch, tmp_path,
 
     importcmd.run(proj, agent, A())
     logged_in = paths.global_home() if paths.kiro_routed(proj) and agent == "kiro" else proj
+    # "kind" marks a non-calls sibling event (credits/copilot-metrics — COPILOT-METRICS
+    # gives copilot a second, differently-shaped "src"-bearing event on the SAME agent
+    # name) — excluded here because this test targets the *calls*-ingest contract
+    # specifically, the one `_ingest` (not `_ingest_credits`/`_ingest_copilot_metrics`)
+    # emits.
     detail = [e for e in _events(logged_in)
-              if e.get("agent") == agent and e.get("result") == "ok" and "src" in e]
+              if e.get("agent") == agent and e.get("result") == "ok" and "src" in e
+              and "kind" not in e]
     assert detail, f"no structured import event recorded for {agent}"
     d = detail[-1]
     assert {"files", "parsed", "appended", "deduped"} <= set(d)

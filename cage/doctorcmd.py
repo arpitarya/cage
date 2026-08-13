@@ -289,6 +289,140 @@ def _credits(root: Path) -> tuple[str, str]:
     return _OK, f"{where}; rate set ({shown}) — those rows price by credits × rate"
 
 
+# The VS Code setting that turns on each of the three opt-in Copilot-metrics stores
+# (COPILOT-METRICS handoff §4.6) — named here so an absent gated source tells the user
+# exactly how to enable it, the same "state, not a fault" discipline `_credits` uses.
+_COPILOT_METRIC_GATES = {
+    "sidecar": "chat.agentHost.agentDebugLog.enabled",
+    "debuglog": "github.copilot.chat.agentDebugLog.fileLogging.enabled",
+    "otel": "github.copilot.chat.otel.dbSpanExporter.enabled",
+}
+
+
+def _copilot_metrics(active: Path) -> tuple[str, str]:
+    """Per-source Copilot-metrics coverage: which of the five on-disk stores
+    (COPILOT-METRICS handoff §4.1/§4.4) has landed a row in `.cage/ledger/copilot/`, and
+    — for the three opt-in stores — the VS Code setting that turns it on when absent.
+
+    **Advisory only — the `_credits` precedent.** Absence of an opt-in store's rows is a
+    state (the setting is off, or nothing has been captured since it was turned on), not
+    a fault of this installation, so this check never warns or fails. Reads the ledger
+    directly (like `_credits`), not an on-disk file probe — it answers "what has cage
+    actually captured", the same question every other doctor line here answers."""
+    try:
+        rows = ledger.copilot_metrics_raw(active)
+    except Exception as exc:  # noqa: BLE001 — a diagnostic never crashes doctor
+        return _OK, f"copilot-metrics check skipped: {exc}"
+    counts: dict[str, int] = {}
+    for r in rows:
+        s = r.get("source", "?")
+        counts[s] = counts.get(s, 0) + 1
+    lines = []
+    for s in schema.COPILOT_METRIC_SOURCES:
+        n = counts.get(s, 0)
+        if n:
+            lines.append(f"{s}: {n} row(s)")
+        elif s in _COPILOT_METRIC_GATES:
+            lines.append(f"{s}: none yet — enable `{_COPILOT_METRIC_GATES[s]}`")
+        else:
+            lines.append(f"{s}: none yet")
+    return _OK, "copilot-metrics (.cage/ledger/copilot/): " + "; ".join(lines)
+
+
+def _kiro_metrics(active: Path) -> tuple[str, str]:
+    """Per-source Kiro-metrics coverage: which of the three grains (KIRO-METRICS
+    handoff §4.1/§4.4) has landed a row in `.cage/ledger/kiro/`, plus the
+    **upgrade-watch**: has kiro-cli started filling the `cli-turn` token slots that are
+    NULL on every real store probed so far?
+
+    **Advisory only — the `_copilot_metrics` precedent.** Absence of a grain's rows is
+    a state (kiro not installed, or no usage since last import), not a fault, so this
+    check never warns or fails. Reads the ledger directly, not an on-disk file probe —
+    "what has cage actually captured", the same question `_copilot_metrics` answers."""
+    try:
+        rows = ledger.kiro_metrics_raw(active)
+    except Exception as exc:  # noqa: BLE001 — a diagnostic never crashes doctor
+        return _OK, f"kiro-metrics check skipped: {exc}"
+    counts: dict[str, int] = {}
+    turn_upgraded = False
+    for r in rows:
+        s = r.get("source", "?")
+        counts[s] = counts.get(s, 0) + 1
+        if s == "cli-turn" and (r.get("tokens_in") or r.get("tokens_out")
+                                or r.get("cached_in") or r.get("cached_out")):
+            turn_upgraded = True
+    lines = []
+    for s in schema.KIRO_METRIC_SOURCES:
+        n = counts.get(s, 0)
+        if s == "ide":
+            lines.append(f"ide: {n} row(s)" if n
+                         else "ide: none yet — run the research §6 schema probe if "
+                              "Kiro IDE is in use")
+        elif s == "cli-turn":
+            if not n:
+                lines.append("cli-turn: none yet")
+            elif turn_upgraded:
+                lines.append(f"cli-turn: {n} row(s) — non-NULL token slots detected, "
+                             "per-turn kiro tokens are now exact")
+            else:
+                lines.append(f"cli-turn: {n} row(s), token slots NULL — "
+                             "upgrade-watch armed")
+        else:
+            lines.append(f"{s}: {n} row(s)" if n else f"{s}: none yet")
+    return _OK, "kiro-metrics (.cage/ledger/kiro/): " + "; ".join(lines)
+
+
+# Claude Code's own default sweep is 30 days (`cleanupPeriodDays`); nudging 5 days
+# early gives an import cadence a real chance to beat it (CLAUDE-METRICS handoff §4.6).
+_CLAUDE_RETENTION_NUDGE_DAYS = 25
+
+
+def _claude_metrics(active: Path) -> tuple[str, str]:
+    """Claude-metrics coverage (CLAUDE-METRICS handoff §4.6): raw vs collapsed chat
+    counts in `.cage/ledger/claude/`, plus a retention nudge — Claude Code auto-deletes
+    transcripts after ~30 days by default (`cleanupPeriodDays`), so a store whose newest
+    transcript is already >25 days old is close to losing history capture never reached.
+
+    **Advisory only — the `_copilot_metrics`/`_kiro_metrics` precedent**: an absent
+    store or store dir is a state (never imported yet, or Claude Code not in use), not
+    a fault. The retention nudge is the one path this check ever warns on — a real,
+    time-bound risk of losing data, unlike the vendor-optionality the copilot/kiro
+    checks report. Reads the ledger directly for counts (like `_credits`); the mtime
+    probe is a best-effort read of the real transcript store and never a diagnostic
+    gate — any failure there is swallowed, never surfaced as a warn/fail."""
+    try:
+        raw = ledger.claude_metrics_raw(active)
+        collapsed = ledger.claude_metrics(active)
+    except Exception as exc:  # noqa: BLE001 — a diagnostic never crashes doctor
+        return _OK, f"claude-metrics check skipped: {exc}"
+    if not raw:
+        return _OK, ("claude-metrics (.cage/ledger/claude/): none yet — "
+                     "run `cage import --agent claude`")
+    detail = (f"claude-metrics (.cage/ledger/claude/): {len(raw)} raw row(s), "
+             f"{len(collapsed)} chat(s)")
+    try:
+        pol = policy.load(paths.Footprint(active).policy)
+        newest = None
+        for src in paths.agent_log_sources("claude", pol):
+            for f in importcmd.glob_source(src.path, src.glob):
+                try:
+                    mtime = f.stat().st_mtime
+                except OSError:
+                    continue
+                if newest is None or mtime > newest:
+                    newest = mtime
+        if newest is not None:
+            age_days = (_dt.datetime.now(_dt.timezone.utc)
+                       - _dt.datetime.fromtimestamp(newest, _dt.timezone.utc)).days
+            if age_days > _CLAUDE_RETENTION_NUDGE_DAYS:
+                return _WARN, (detail + f" — newest transcript is {age_days}d old; "
+                              "Claude Code deletes transcripts after ~30 days by "
+                              "default (`cleanupPeriodDays`) — import regularly")
+    except Exception:  # noqa: BLE001 — the nudge is best-effort, never a doctor gate
+        pass
+    return _OK, detail
+
+
 def _bundled_prices(root: Path) -> tuple[str, str]:
     """Compare the project policy's [meta] against the installed bundle's — a newer
     bundle means researched price rows this project isn't using yet. Recommendation
@@ -1005,6 +1139,16 @@ def run(root: Path) -> dict:
         # Directly below `pricing`: a credits-priced row is exactly the row `pricing`
         # would otherwise have called UNPRICED, so the two lines answer one question.
         ("credits", *_credits(active)),
+        # Directly below `credits`: same "vendor-recorded facts, advisory only" tier,
+        # widened from the priced `credits` field to the whole COPILOT-METRICS row.
+        ("copilot-metrics", *_copilot_metrics(active)),
+        # Directly below `copilot-metrics`: the kiro twin of the same "vendor-recorded
+        # facts, advisory only" tier (KIRO-METRICS handoff §4.6).
+        ("kiro-metrics", *_kiro_metrics(active)),
+        # Directly below `kiro-metrics`: the claude twin of the same tier, plus a
+        # retention nudge neither copilot nor kiro's checks need (CLAUDE-METRICS
+        # handoff §4.6).
+        ("claude-metrics", *_claude_metrics(active)),
         ("prices-meta", *_bundled_prices(active)),
         ("prices-age", *_prices_age(active)),
         ("policy-version", *_policy_version(active)),

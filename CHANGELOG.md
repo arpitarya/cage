@@ -2,7 +2,7 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
-## v0.49.1 (2026-08-12, gains a second, third and fourth change 2026-08-13) — session-tracking docs move to root work/, kiro-CLI conversations get a chat row, `cage report` gains a credits column, and a new per-chat graphify view
+## v0.49.1 (2026-08-12, gains a second, third and fourth change 2026-08-13, a fifth, sixth and seventh 2026-08-14) — session-tracking docs move to root work/, kiro-CLI conversations get a chat row, `cage report` gains a credits column, a new per-chat graphify view, and new per-chat Copilot, Kiro, and Claude metrics ledgers
 
 - **WORK-DIR:** `IMPLEMENTATION.md`, `INTERVIEW.md`, `MACHINE.md`, `OPEN-WORK.md`, and
   `WORKLOG.md` moved from `docs/` to a new root `work/` directory, on Arpit's explicit
@@ -54,13 +54,56 @@ Full release notes. The README keeps a one-line summary per version; the detail 
   `unassignable` (the native shim's honest-empty session, GC3) and `unmatched` (a
   savings session joining no chat bucket). Tokens-only, no `--usd`. Derive-only: no
   writer, route, or substrate change.
+- **COPILOT-METRICS:** a new capture-only ledger kind, `.cage/ledger/copilot/`,
+  deliberately separate from `calls` — per-chat Copilot facts the `calls` schema never
+  widened to hold: per-model cached tokens, the authoritative `sessionCopilotCredits`
+  (max/last, never summed), and CLI cumulative totals recorded verbatim (never delta'd,
+  dodging the v0.44 CLI delta-loss bug by construction). From all five on-disk stores —
+  the two always-on ones plus three opt-in, per-model-call stores behind VS Code
+  settings (`agentHostUsage`, the extension's debug-logs, and a read-only SQLite OTel
+  store), each named in a new `cage doctor` advisory. Two more chatSessions roots
+  (`emptyWindowChatSessions`, `transferredChatSessions`) are now swept for **calls**
+  too. Counts-never-content on the two stores that interleave prompt bodies with the
+  numbers — a strict field whitelist, asserted on the raw serialized shard bytes, not
+  just the parsed row. Capture-only: no report/view reads the kind yet, pinned by a
+  byte-identity test.
+- **KIRO-METRICS:** the copilot twin, one agent over — a new capture-only ledger kind,
+  `.cage/ledger/kiro/`, deliberately separate from `calls`/`credits`: IDE per-call
+  tokens **with a timestamp for the first time** (`devdata.sqlite`, the jsonl log's
+  SQLite twin cage had never read), and per-CLI-turn timing/size/tool-use metadata —
+  plus a standing **upgrade-watch**: the CLI's token slots are schema-present but NULL
+  on every real store probed so far, recorded the instant they stop being NULL, zero
+  code change required. Zero new routing code — the IDE leg inherits the routed
+  machine-ledger sink (ADR 0006), the CLI leg inherits the workspace scope the credits
+  leg already resolves. `cage doctor` gains a per-source advisory naming the
+  upgrade-watch's armed/tripped state. Capture-only: no report/view reads the kind yet,
+  pinned by a byte-identity test.
+- **CLAUDE-METRICS:** the third and final agent in the trio — a new capture-only ledger
+  kind, `.cage/ledger/claude/`, deliberately separate from `calls`, and the only one of
+  the three with no credits field at all (no credit unit exists for Claude Code on
+  disk). Its reason to exist is THE DEDUP LAW: one API response writes 1-5 assistant
+  transcript rows sharing one `requestId`+`message.id` but each a distinct `uuid` and a
+  full copy of `usage` — `calls` still keys by `uuid` and counts every duplicate,
+  inflating Claude spend ~2-3× (a known, still-open defect, CLAUDE-DEDUP). This kind
+  folds last-per-`(requestId, message.id)` **at capture**, by construction — dodging,
+  not fixing, that defect and its sibling CLAUDE-SUBAGENT-KEY (subagent transcripts now
+  join their PARENT chat via the row's own `sessionId`, splitting into a sidechain
+  total, instead of landing in a phantom chat keyed by filename). A session-fileset
+  regroup re-reads a whole chat's files before parsing, so a subagent-only change never
+  files a partial total. `cage doctor` gains a per-source advisory plus a 25-day
+  transcript-retention nudge (Claude Code's own default sweep is 30 days). Capture-only:
+  no report/view reads the kind yet, pinned by a byte-identity test.
 
-Suite: 1704 passed / 11 skipped (1655 → 1662 CHATS-CREDITS, → 1679 REPORT-CREDITS —
+Suite: 1798 passed / 11 skipped (1655 → 1662 CHATS-CREDITS, → 1679 REPORT-CREDITS —
 17 new in `tests/test_report_credits.py`, → 1704 GRAPHIFY-CHATS — 23 new in
-`tests/test_graphifychat.py`; briefly 1703/1 while a concurrent session's
+`tests/test_graphifychat.py`, → 1737 COPILOT-METRICS — 33 new in
+`tests/test_copilot_metrics.py`, → 1768 KIRO-METRICS — 31 new in
+`tests/test_kiro_metrics.py`, → 1798 CLAUDE-METRICS — 30 new in
+`tests/test_claude_metrics.py`; briefly 1703/1 while a concurrent session's
 `docs/copilot-capture.md` work was still uncommitted in this tree, unrelated and
-since resolved). No golden re-blessed for any of the three — none of their
-columns/views render for a ledger with no credits/graphify data.
+since resolved). No golden re-blessed for any of the six — none of their
+columns/views render for a ledger with no credits/graphify/copilot-metrics/
+kiro-metrics/claude-metrics data.
 
 ## v0.49.0 (2026-08-12) — the queue emptied, and the agent lane with it
 

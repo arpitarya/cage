@@ -260,7 +260,10 @@ def test_setup_materializes_path_globs_and_resync_is_idempotent(tmp_path):
     assert fp.policy.read_text(encoding="utf-8") == text
 
     resolved = paths.path_globs_for("copilot", policy.load(fp.policy))
-    assert resolved == ["**/events.jsonl", "**/chatSessions/*.jsonl"]
+    # COPILOT-METRICS: two more chatSessions roots (emptyWindow/transferred).
+    assert resolved == ["**/events.jsonl", "**/chatSessions/*.jsonl",
+                        "**/emptyWindowChatSessions/*.jsonl",
+                        "**/transferredChatSessions/*.jsonl"]
 
 
 def test_a_hand_written_path_globs_is_honoured_verbatim(tmp_path):

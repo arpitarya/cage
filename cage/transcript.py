@@ -97,6 +97,181 @@ def parse_calls(transcript_path: Path, session: str = "",
     return rows
 
 
+# The whitelisted `message.usage` props CLAUDE-METRICS folds — every read here is
+# envelope + usage only (counts-never-content); see `_fold_claude_chat`.
+
+def _claude_chat_key(rec: dict, session_hint: str) -> str:
+    return rec.get("sessionId") or session_hint
+
+
+def _fold_claude_chat(files: list[Path], session_hint: str = "") -> dict[str, dict]:
+    """THE DEDUP LAW as code (CLAUDE-METRICS handoff §4.4) — one API response writes
+    1–5 assistant rows (one per content block), each carrying a distinct `uuid` but the
+    SAME `requestId` + `message.id` and a full copy of `usage`; naive per-row summation
+    inflates output tokens ~2–3× (the CLAUDE-DEDUP defect this kind is built to dodge,
+    not fix — `parse_calls` is untouched).
+
+    Streams every file in ``files`` (the caller's session fileset — main first, then
+    `subagents/*` sorted; `importcmd._claude_session_filesets` builds it). Two passes
+    over the SAME parsed records, never two file reads:
+
+    1. Fold: per `type=="assistant"` row with non-empty `message.usage`, key on
+       `(chat_key, requestId, message.id)` — both id parts empty (legacy rows) falls
+       back to `(chat_key, "uuid", uuid)` (no fold possible, none needed). **Last
+       occurrence wins** — a later duplicate's row REPLACES the entry wholesale (ccusage
+       #888: latest carries the final `output_tokens`). `chat_key` is the row's own
+       `sessionId`, else ``session_hint`` (the fileset's intended session id, resolved
+       by the caller even when the main file is missing — a subagent-only fileset) —
+       resolved BEFORE folding so duplicates of one request can never fold under two
+       different chat keys. `raw_rows` is counted here, per chat_key, over every
+       occurrence seen (pre-fold) — the fold-vs-raw ratio on the emitted row IS the
+       inflation evidence CLAUDE-DEDUP measures, captured correctly this time.
+    2. Accumulate: the SURVIVING (deduped) rows are summed into one accumulator per
+       chat_key — `input_tokens + cache_read_input_tokens + cache_creation_input_tokens`
+       → `tokens_in`; `output_tokens` → `tokens_out`; `cache_read_input_tokens` →
+       `cached_in`; `cache_creation_input_tokens` → `cache_write_in`;
+       `cache_creation.ephemeral_5m_input_tokens`/`ephemeral_1h_input_tokens` →
+       `ttl_5m`/`ttl_1h`; `output_tokens_details.thinking_tokens` → `thinking`;
+       `server_tool_use.web_search_requests`/`web_fetch_requests` → `web_search`/
+       `web_fetch`; `isSidechain` rows ALSO add their tokens to
+       `sidechain_tokens_in`/`sidechain_tokens_out`; per-`message.model` sums →
+       `model_totals`; `requests` counts surviving keys; `ts` = max row `timestamp`;
+       `project` = basename of the last-seen `cwd` (counts-never-content: basename
+       only, never a path).
+
+    Reads NOTHING else — no `summary` titles, no content blocks, no `tool-results/`.
+    Fail-open per file: a missing file is skipped, a bad line is skipped, an unreadable
+    file yields no rows from it (never raises into capture). A fileset that emits >1
+    chat_key (resume drift — a row's `sessionId` disagrees with the fileset's own
+    intended session) is correct behavior, not a bug."""
+    if not session_hint and files:
+        f0 = files[0]
+        session_hint = (f0.parent.parent.name if f0.parent.name == "subagents"
+                        else f0.stem)
+    folded: dict[tuple, dict] = {}
+    raw_rows: dict[str, int] = {}
+    for f in files:
+        if not f.exists():
+            continue
+        try:
+            text = f.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        for line in text.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rec = json.loads(line)
+            except ValueError:
+                continue
+            if rec.get("type") != "assistant":
+                continue
+            msg = rec.get("message") or {}
+            usage = msg.get("usage") or {}
+            if not usage:
+                continue
+            chat_key = _claude_chat_key(rec, session_hint)
+            raw_rows[chat_key] = raw_rows.get(chat_key, 0) + 1
+            req_id = rec.get("requestId") or ""
+            msg_id = msg.get("id") or ""
+            fold_key = ((chat_key, req_id, msg_id) if (req_id or msg_id)
+                       else (chat_key, "uuid", rec.get("uuid", "")))
+            folded[fold_key] = rec  # last occurrence wins — full row replaces prior
+
+    chats: dict[str, dict] = {}
+    for (chat_key, *_rest), rec in folded.items():
+        msg = rec.get("message") or {}
+        usage = msg.get("usage") or {}
+        acc = chats.setdefault(chat_key, {
+            "tokens_in": 0, "tokens_out": 0, "cached_in": 0, "cache_write_in": 0,
+            "ttl_5m": 0, "ttl_1h": 0, "thinking": 0, "web_search": 0, "web_fetch": 0,
+            "requests": 0, "sidechain_tokens_in": 0, "sidechain_tokens_out": 0,
+            "model_totals": {}, "ts": None, "project": ""})
+        inp = int(usage.get("input_tokens", 0) or 0)
+        cache_read = int(usage.get("cache_read_input_tokens", 0) or 0)
+        cache_write = int(usage.get("cache_creation_input_tokens", 0) or 0)
+        out = int(usage.get("output_tokens", 0) or 0)
+        tin = inp + cache_read + cache_write
+        acc["tokens_in"] += tin
+        acc["tokens_out"] += out
+        acc["cached_in"] += cache_read
+        acc["cache_write_in"] += cache_write
+        cc = usage.get("cache_creation") or {}
+        if isinstance(cc, dict):
+            acc["ttl_5m"] += int(cc.get("ephemeral_5m_input_tokens", 0) or 0)
+            acc["ttl_1h"] += int(cc.get("ephemeral_1h_input_tokens", 0) or 0)
+        otd = usage.get("output_tokens_details") or {}
+        if isinstance(otd, dict):
+            acc["thinking"] += int(otd.get("thinking_tokens", 0) or 0)
+        stu = usage.get("server_tool_use") or {}
+        if isinstance(stu, dict):
+            acc["web_search"] += int(stu.get("web_search_requests", 0) or 0)
+            acc["web_fetch"] += int(stu.get("web_fetch_requests", 0) or 0)
+        if rec.get("isSidechain"):
+            acc["sidechain_tokens_in"] += tin
+            acc["sidechain_tokens_out"] += out
+        model = msg.get("model", "") or ""
+        if model:
+            mt = acc["model_totals"].setdefault(
+                model, {"tokens_in": 0, "tokens_out": 0, "cached_in": 0, "cache_write_in": 0})
+            mt["tokens_in"] += tin
+            mt["tokens_out"] += out
+            mt["cached_in"] += cache_read
+            mt["cache_write_in"] += cache_write
+        acc["requests"] += 1
+        ts = rec.get("timestamp")
+        if ts and (acc["ts"] is None or ts > acc["ts"]):
+            acc["ts"] = ts
+        cwd = rec.get("cwd") or ""
+        if cwd:
+            acc["project"] = Path(cwd).name
+
+    for chat_key, n in raw_rows.items():
+        chats.setdefault(chat_key, {
+            "tokens_in": 0, "tokens_out": 0, "cached_in": 0, "cache_write_in": 0,
+            "ttl_5m": 0, "ttl_1h": 0, "thinking": 0, "web_search": 0, "web_fetch": 0,
+            "requests": 0, "sidechain_tokens_in": 0, "sidechain_tokens_out": 0,
+            "model_totals": {}, "ts": None, "project": ""})["raw_rows"] = n
+    return chats
+
+
+def parse_claude_chat_metrics(fileset: list[Path], session_hint: str = "") -> list[dict]:
+    """`_fold_claude_chat` → one `make_claude_metric` row per chat key (CLAUDE-METRICS
+    handoff §4.4). `metric_id` folds the chat's own recorded values (never `ts`, which
+    is data-derived and would otherwise fork the id on nothing but wall-clock noise) into
+    a sha1, so a grown chat (more tokens since the last capture) appends a FRESH row and
+    an unchanged one dedupes — `ledger.claude_metrics` resolves the latest per session at
+    read time (the `parse_copilot_*_metrics` id-fold precedent). Fail-open: `_fold_claude_chat`
+    already tolerates a missing/unreadable/malformed file or line."""
+    chats = _fold_claude_chat(fileset, session_hint=session_hint)
+    rows: list[dict] = []
+    for session, acc in chats.items():
+        model_totals = [{"model": m, **v} for m, v in sorted(acc["model_totals"].items())]
+        payload = json.dumps({
+            "tokens_in": acc["tokens_in"], "tokens_out": acc["tokens_out"],
+            "cached_in": acc["cached_in"], "cache_write_in": acc["cache_write_in"],
+            "ttl_5m": acc["ttl_5m"], "ttl_1h": acc["ttl_1h"], "thinking": acc["thinking"],
+            "web_search": acc["web_search"], "web_fetch": acc["web_fetch"],
+            "requests": acc["requests"], "raw_rows": acc.get("raw_rows", 0),
+            "sidechain_tokens_in": acc["sidechain_tokens_in"],
+            "sidechain_tokens_out": acc["sidechain_tokens_out"],
+            "model_totals": model_totals}, sort_keys=True, default=str)
+        metric_id = "clm_" + hashlib.sha1(f"{session}|{payload}"
+                                          .encode("utf-8")).hexdigest()[:16]
+        rows.append(schema.make_claude_metric(
+            session=session, project=acc["project"], model_totals=model_totals,
+            tokens_in=acc["tokens_in"], tokens_out=acc["tokens_out"],
+            cached_in=acc["cached_in"], cache_write_in=acc["cache_write_in"],
+            ttl_5m=acc["ttl_5m"], ttl_1h=acc["ttl_1h"], thinking=acc["thinking"],
+            web_search=acc["web_search"], web_fetch=acc["web_fetch"],
+            requests=acc["requests"], raw_rows=acc.get("raw_rows", 0),
+            sidechain_tokens_in=acc["sidechain_tokens_in"],
+            sidechain_tokens_out=acc["sidechain_tokens_out"],
+            ts=acc["ts"], metric_id=metric_id))
+    return rows
+
+
 def session_name_claude(transcript_path: Path) -> str:
     """The human-readable session name for a Claude transcript — the `summary` record's
     text (`{"type":"summary","summary":"…"}`, previously unused by the parser). Parse-only
@@ -378,6 +553,16 @@ _COPILOT_CACHE_KEYS = ("cacheReadTokens", "cache_read_tokens", "cacheReadInputTo
 # would multi-count (it is also absent from the store version probed).
 _COPILOT_CREDIT_KEYS = ("copilotCredits", "copilot_credits")
 _COPILOT_CLI_CREDIT_KEYS = ("totalPremiumRequests", "total_premium_requests")
+
+# The running whole-SESSION credits figure (COPILOT-METRICS handoff §4.4) — take
+# max/last per session, **never sum**: it already covers out-of-turn work like
+# compaction, so summing it across a session's own per-request rows would multi-count
+# the same spend `_COPILOT_CREDIT_KEYS` already counts once per request.
+_COPILOT_SESSION_CREDIT_KEYS = ("sessionCopilotCredits", "session_copilot_credits")
+# The nano-AIU figure — the finer-grain twin of `_COPILOT_CLI_CREDIT_KEYS`
+# (1 credit = 1e9 nano-AIU, research 2026-08-13). Recorded verbatim; the division is
+# derive-time work cage never does at capture.
+_COPILOT_NANO_AIU_KEYS = ("totalNanoAiu", "total_nano_aiu")
 
 
 def _first_int(d: dict, keys: tuple[str, ...]) -> int:
@@ -669,6 +854,36 @@ def _vscode_project(chat_session_path: Path, first_cwd: str) -> str:
     return _uri_basename(first_cwd)
 
 
+def _vscode_chat_requests(chat_session_path: Path, session: str = "") -> tuple[str, dict[str, dict]]:
+    """Read a VS Code chatSessions file once: resolve the session id (a `kind:0` state
+    record's `sessionId`, falling back to the caller-supplied value / the file stem) and
+    merge every `kind:2, k:["requests"]` mutation **last-write-wins by `requestId`** —
+    the store rewrites its requests array as the session grows, so a later line's copy
+    of a request always wins. Pure extraction (COPILOT-METRICS handoff §4.4) of the read
+    + merge loop `parse_copilot_vscode_calls` always performed, shared with
+    `parse_copilot_vscode_metrics` so the two parsers can never disagree about which
+    request state is current. Caller is responsible for the `chat_session_path.exists()`
+    early-out — this assumes the file is there."""
+    session = session or chat_session_path.stem
+    reqs: dict[str, dict] = {}
+    for line in chat_session_path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            rec = json.loads(line)
+        except ValueError:
+            continue
+        if rec.get("kind") == 0 and isinstance(rec.get("v"), dict):
+            session = rec["v"].get("sessionId") or session
+        if rec.get("kind") != 2 or rec.get("k") != ["requests"]:
+            continue
+        for req in rec.get("v") or []:
+            if isinstance(req, dict) and req.get("requestId"):
+                reqs[req["requestId"]] = req  # last write wins
+    return session, reqs
+
+
 def parse_copilot_vscode_calls(chat_session_path: Path, session: str = "") -> list[dict]:
     """Meter the Copilot VS Code *extension* from VS Code's own chat-session store
     (`<vscode-user>/workspaceStorage/<hash>/chatSessions/<session>.jsonl`).
@@ -692,23 +907,7 @@ def parse_copilot_vscode_calls(chat_session_path: Path, session: str = "") -> li
     falls through per row, and an absent credit stays absent, never derived from tokens."""
     if not chat_session_path.exists():
         return []
-    session = session or chat_session_path.stem
-    reqs: dict[str, dict] = {}
-    for line in chat_session_path.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            rec = json.loads(line)
-        except ValueError:
-            continue
-        if rec.get("kind") == 0 and isinstance(rec.get("v"), dict):
-            session = rec["v"].get("sessionId") or session
-        if rec.get("kind") != 2 or rec.get("k") != ["requests"]:
-            continue
-        for req in rec.get("v") or []:
-            if isinstance(req, dict) and req.get("requestId"):
-                reqs[req["requestId"]] = req  # last write wins
+    session, reqs = _vscode_chat_requests(chat_session_path, session)
     # Carrier 2 for the project (see `_vscode_project`): the first `run_in_terminal`
     # cwd in the file. Collected in the same pass — it is a *file*-level fact, not a
     # per-row one, so it is resolved once before the row loop.
@@ -746,6 +945,318 @@ def parse_copilot_vscode_calls(chat_session_path: Path, session: str = "") -> li
     return rows
 
 
+def _copilot_model_totals(req_or_metrics: dict, *, from_metrics: bool = False) -> tuple[list[dict], int]:
+    """`modelTotals` (`[{model, inputTokens, cachedTokens, outputTokens}]`, whole-turn
+    per-model sums including subagent calls and compaction — chatSessions) OR a CLI
+    shutdown's `modelMetrics` map (`{model: {usage: {...}}}`, cumulative-verbatim),
+    mapped to cage's `model_totals` shape (COPILOT-METRICS handoff §4.1/§4.4). Returns
+    the mapped list plus the summed cached-token figure — the only durable, ungated
+    cached-token source either store has. `[]`/`0` when the store carries none (only
+    agent-host chatSessions sessions supply `modelTotals` — research 2026-08-13)."""
+    out: list[dict] = []
+    cached = 0
+    if from_metrics:
+        items = [(model, (m.get("usage") if isinstance(m.get("usage"), dict) else m))
+                 for model, m in req_or_metrics.items() if isinstance(m, dict)]
+    else:
+        raw = req_or_metrics.get("modelTotals")
+        items = [(mt.get("model") or mt.get("modelId") or "", mt)
+                 for mt in raw if isinstance(mt, dict)] if isinstance(raw, list) else []
+    for model, u in items:
+        c = _first_int(u, _COPILOT_CACHE_KEYS)
+        out.append({"model": model, "tokens_in": _first_int(u, _COPILOT_IN_KEYS),
+                    "cached_in": c, "tokens_out": _first_int(u, _COPILOT_OUT_KEYS)})
+        cached += c
+    return out, cached
+
+
+def parse_copilot_vscode_metrics(chat_session_path: Path, session: str = "") -> list[dict]:
+    """Copilot-metrics rows from the VS Code chatSessions store — the `source="chat"`
+    leg of COPILOT-METRICS (handoff §4.4). Reuses `_vscode_chat_requests` (the same
+    read + last-write-wins merge `parse_copilot_vscode_calls` performs), so the two
+    parsers can never disagree about which request state is current.
+
+    One row per merged request carrying ANY signal — tokens, credits, or `modelTotals`
+    — the same zero-signal skip `parse_copilot_vscode_calls` applies (a request with
+    nothing recorded contributes no row). `cached_in` sums `modelTotals[].cachedTokens`
+    — the only durable, ungated cached-token figure this store has (agent-host sessions
+    only; a classic-extension session carries no `modelTotals` at all, so `cached_in`
+    is honestly 0 for it, never guessed). `credits` is the per-request `copilotCredits`;
+    `session_credits` is the running whole-session figure the store itself says to take
+    as max/last, never summed — exactly what `ledger.copilot_metrics`'s collapse does.
+
+    `metric_id` folds the row's own recorded values into a sha1: a grown request (more
+    tokens, a later credits figure) hashes to a NEW id and appends a fresh row rather
+    than silently overwriting a stale one; `ledger.copilot_metrics` resolves the latest
+    per key at read time. Same foreign-chat-provider guard as `parse_copilot_vscode_calls`
+    (`_copilot_chat_extension`) — other chat providers share this store and must never
+    be attributed to copilot. Counts-never-content: only the whitelisted usage props are
+    ever read, never a title, prompt, or response body."""
+    if not chat_session_path.exists():
+        return []
+    session, reqs = _vscode_chat_requests(chat_session_path, session)
+    project = ""
+    rows: list[dict] = []
+    for rid, req in reqs.items():
+        if not _copilot_chat_extension(req):
+            continue
+        md = (req.get("result") or {}).get("metadata") or {}
+        inp = _first_int(req, _COPILOT_IN_KEYS) or _first_int(md, _COPILOT_IN_KEYS)
+        out = _first_int(req, _COPILOT_OUT_KEYS) or _first_int(md, _COPILOT_OUT_KEYS)
+        model_totals, cached_in = _copilot_model_totals(req)
+        credits = _first_float(req, _COPILOT_CREDIT_KEYS)
+        session_credits = _first_float(req, _COPILOT_SESSION_CREDIT_KEYS)
+        if not (inp or out or model_totals or credits is not None
+                or session_credits is not None):
+            continue
+        if not project:  # file-level fact, resolved once (no per-row terminal-cwd scan
+            project = _vscode_project(chat_session_path, "")  # here — that stays calls-only)
+        model = req.get("modelId") or ""
+        payload = json.dumps({"in": inp, "out": out, "cached": cached_in,
+                              "mt": model_totals, "cr": credits, "scr": session_credits,
+                              "el": req.get("elapsedMs"), "wt": req.get("timeSpentWaiting")},
+                             sort_keys=True, default=str)
+        rows.append(schema.make_copilot_metric(
+            source="chat", session=session, surface="vscode", request=rid, model=model,
+            tokens_in=inp, tokens_out=out, cached_in=cached_in, model_totals=model_totals,
+            credits=credits, session_credits=session_credits,
+            elapsed_ms=_first_int(req, ("elapsedMs",)),
+            waiting_ms=_first_int(req, ("timeSpentWaiting",)),
+            project=project, ts=_epoch_ms_iso(req.get("timestamp")),
+            metric_id="cm_" + hashlib.sha1(f"chat|{session}|{rid}|{payload}"
+                                           .encode("utf-8")).hexdigest()[:16]))
+    return rows
+
+
+def parse_copilot_cli_metrics(events_path: Path, session: str = "") -> list[dict]:
+    """Copilot-metrics rows from a CLI session's `events.jsonl` — the `source="cli"`
+    leg of COPILOT-METRICS (handoff §4.4). One row per `session.shutdown` that carries a
+    `modelMetrics` map, recorded **cumulative-verbatim** — unlike `parse_copilot_calls`,
+    never delta'd: `model_totals` is the per-model cumulative usage map exactly as the
+    store wrote it (`inputTokens` already includes cache read+write — never add
+    `cacheReadTokens` to it), `credits` is the cumulative `totalPremiumRequests` (float,
+    verbatim — `int()` floors the real fractional values to 0), `nano_aiu` is the
+    cumulative `totalNanoAiu`. The row's own top-level `tokens_in`/`tokens_out`/
+    `cached_in` are the sum across `model_totals` — CLI has no other per-row token
+    figure, the same reason `parse_copilot_vscode_metrics` sums `modelTotals` into its
+    `cached_in`; summing a snapshot's OWN per-model breakdown into its own row total is
+    not the forbidden op — summing *across* a session's rows is.
+
+    `request`/`call` are both empty (this row describes the whole session's cumulative
+    state, not one request or one model call) — so every shutdown of a session collapses
+    to the SAME `ledger.copilot_metrics` key, and the reader keeping the highest-
+    tokens/credits row already resolves to the latest, largest cumulative snapshot with
+    no ordinal bookkeeping. This structurally dodges the v0.44 delta-loss bug (fixing it
+    in `parse_copilot_calls` is a separate, out-of-scope defect) and needs no ordinal
+    suffix the way that parser's id scheme does. `metric_id` folds the shutdown's own
+    payload, so an unchanged re-shutdown (nothing grew) dedupes and a resumed session
+    (larger cumulative) appends a fresh row."""
+    if not events_path.exists():
+        return []
+    session = session or events_path.parent.name
+    rows: list[dict] = []
+    for line in events_path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            rec = json.loads(line)
+        except ValueError:
+            continue
+        if rec.get("type") != "session.shutdown":
+            continue
+        data = rec.get("data") or {}
+        metrics = data.get("modelMetrics")
+        if not isinstance(metrics, dict):
+            continue
+        ts = rec.get("timestamp")
+        model_totals, cached_in = _copilot_model_totals(metrics, from_metrics=True)
+        tokens_in = sum(mt["tokens_in"] for mt in model_totals)
+        tokens_out = sum(mt["tokens_out"] for mt in model_totals)
+        credits = _first_float(data, _COPILOT_CLI_CREDIT_KEYS)
+        nano_aiu = _first_float(data, _COPILOT_NANO_AIU_KEYS)
+        if not (model_totals or credits is not None or nano_aiu is not None):
+            continue
+        payload = json.dumps({"mt": model_totals, "cr": credits, "na": nano_aiu},
+                             sort_keys=True, default=str)
+        rows.append(schema.make_copilot_metric(
+            source="cli", session=session, surface="cli",
+            tokens_in=tokens_in, tokens_out=tokens_out, cached_in=cached_in,
+            model_totals=model_totals, credits=credits, nano_aiu=nano_aiu, ts=ts,
+            metric_id="cm_" + hashlib.sha1(f"cli|{session}|{payload}"
+                                           .encode("utf-8")).hexdigest()[:16]))
+    return rows
+
+
+def parse_copilot_sidecar_metrics(path: Path, session: str = "") -> list[dict]:
+    """Copilot-metrics rows from the agent-host usage sidecar
+    (`<vscode-user>/agentHostUsage/<sanitizedSessionId>.jsonl`) — the `source="sidecar"`
+    leg of COPILOT-METRICS (handoff §4.4), gated behind
+    `chat.agentHost.agentDebugLog.enabled`. One row per line (`IAgentHostUsageRecord`):
+    `call=turnId`; `model` is the REAL routed model for this one call — the one thing
+    neither the chatSessions store nor the CLI's cumulative totals can give (both hide
+    behind the virtual `copilot/auto`). Tokens from `inputTokens`/`outputTokens`/
+    `cacheReadTokens`; `nano_aiu=totalNanoAiu` recorded verbatim — **never derive
+    `credits = nano_aiu / 1e9` at capture** (research 2026-08-13: 1 credit = 1e9
+    nano-AIU, but that division is derive-time work, if it ever happens at all).
+
+    `session` is the file stem — the store's own SANITIZED session id, recorded as-is
+    (it may not equal the chatSessions session id for the same chat; joining the two is
+    a read-surface problem, out of scope here, handoff §8). `id` folds the line's own
+    payload, so a re-import of an unchanged line dedupes and any change appends fresh.
+    Fail-open per line — a malformed line is skipped, not fatal to the file. Lifecycle
+    hazard named in the research, not handled here: the file is deleted when the host
+    reports `SessionRemoved`, ungated on the enabling setting — import promptly, the
+    ledger is the durable copy."""
+    if not path.exists():
+        return []
+    session = session or path.stem
+    rows: list[dict] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            rec = json.loads(line)
+        except ValueError:
+            continue
+        turn_id = rec.get("turnId") or ""
+        if not turn_id:
+            continue
+        inp = _first_int(rec, _COPILOT_IN_KEYS)
+        out = _first_int(rec, _COPILOT_OUT_KEYS)
+        cached = _first_int(rec, _COPILOT_CACHE_KEYS)
+        nano_aiu = _first_float(rec, _COPILOT_NANO_AIU_KEYS)
+        if not (inp or out or cached or nano_aiu is not None):
+            continue
+        model = rec.get("model") or ""
+        payload = json.dumps({"in": inp, "out": out, "cached": cached, "na": nano_aiu,
+                              "m": model}, sort_keys=True, default=str)
+        rows.append(schema.make_copilot_metric(
+            source="sidecar", session=session, call=turn_id, model=model,
+            tokens_in=inp, tokens_out=out, cached_in=cached, nano_aiu=nano_aiu,
+            ts=rec.get("ts"),
+            metric_id="cm_" + hashlib.sha1(f"sidecar|{session}|{turn_id}|{payload}"
+                                           .encode("utf-8")).hexdigest()[:16]))
+    return rows
+
+
+def parse_copilot_debuglog_metrics(path: Path) -> list[dict]:
+    """Copilot-metrics rows from the copilot-chat extension's debug logs
+    (`<vscode-user>/workspaceStorage/<hash>/GitHub.copilot-chat/debug-logs/<sessionId>/
+    *.jsonl`) — the `source="debuglog"` leg of COPILOT-METRICS (handoff §4.4), gated
+    behind `github.copilot.chat.agentDebugLog.fileLogging.enabled`.
+
+    **Whitelist read, strictly.** The same lines carry `attrs.userRequest` and
+    `attrs.inputMessages` — prompt bodies — right next to the numbers. Only
+    `attrs.model` / `attrs.inputTokens` / `attrs.outputTokens` / `attrs.ttft` / `ts` /
+    `spanId` are ever read into a row (ADR-0009 discipline: a transient whitelist read,
+    counts only — the body fields are never touched, not even to check their presence).
+    Only `type == "llm_request"` lines carry usage; every other span type is skipped.
+    **No cached-token field survives into this store** (the file serializer omits it,
+    even though the live Chat Debug view shows one) — least useful of the five stores
+    for cage, kept for completeness.
+
+    `session` is the containing `debug-logs/<sessionId>/` directory name — an
+    extension-internal id that may not equal the chatSessions session id for the same
+    chat (recorded verbatim; joining the two is a read-surface problem, out of scope
+    here, handoff §8). `call=spanId`. `id` folds the line's own whitelisted values."""
+    if not path.exists():
+        return []
+    session = path.parent.name
+    rows: list[dict] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            rec = json.loads(line)
+        except ValueError:
+            continue
+        if rec.get("type") != "llm_request":
+            continue
+        attrs = rec.get("attrs") or {}
+        if not isinstance(attrs, dict):
+            continue
+        span_id = rec.get("spanId") or ""
+        if not span_id:
+            continue
+        inp = _first_int(attrs, _COPILOT_IN_KEYS)
+        out = _first_int(attrs, _COPILOT_OUT_KEYS)
+        ttft = _first_int(attrs, ("ttft", "ttft_ms"))
+        if not (inp or out or ttft):
+            continue
+        model = attrs.get("model") or ""
+        payload = json.dumps({"in": inp, "out": out, "ttft": ttft, "m": model},
+                             sort_keys=True, default=str)
+        rows.append(schema.make_copilot_metric(
+            source="debuglog", session=session, call=span_id, model=model,
+            tokens_in=inp, tokens_out=out, ttft_ms=ttft, ts=rec.get("ts"),
+            metric_id="cm_" + hashlib.sha1(f"debuglog|{session}|{span_id}|{payload}"
+                                           .encode("utf-8")).hexdigest()[:16]))
+    return rows
+
+
+def parse_copilot_otel_metrics(db_path: Path) -> list[dict]:
+    """Copilot-metrics rows from the OTel SQLite span store
+    (`<vscode-user>/globalStorage/github.copilot-chat/agent-traces.db`) — the
+    `source="otel"` leg of COPILOT-METRICS (handoff §4.4), gated behind
+    `github.copilot.chat.otel.dbSpanExporter.enabled`. Opened `mode=ro`: cage never
+    writes, never migrates. Reads ONLY the denormalized `spans` table columns named
+    below — **never** `span_attributes`/`span_events` (they can carry message content
+    under `otel.captureContent`; those tables are simply never queried, a stricter
+    guard than `debuglog`'s field-level whitelist).
+
+    ``SELECT span_id, COALESCE(conversation_id, chat_session_id), COALESCE
+    (response_model, request_model), input_tokens, output_tokens, cached_tokens,
+    ttft_ms, start_time_ms FROM spans WHERE operation_name='chat'``. `call=span_id`;
+    `ts` from `start_time_ms` (epoch ms) via `_epoch_ms_iso`. This is the only
+    per-model-call cached-token source for the *classic* extension surface (the
+    sidecar covers only agent-host sessions).
+
+    Any `sqlite3.Error` — a schema surprise on this pre-1.0 store, a lock, a permission
+    error — returns `[]`: fail-open, never assert the schema. A WAL tail not yet
+    checkpointed is acceptably missed on this pass; cage never checkpoints (that
+    mutates the store)."""
+    if not db_path.exists():
+        return []
+    uri = f"file:{db_path}?mode=ro"
+    try:
+        con = sqlite3.connect(uri, uri=True)
+    except sqlite3.Error:
+        return []
+    rows: list[dict] = []
+    try:
+        cur = con.execute(
+            "SELECT span_id, COALESCE(conversation_id, chat_session_id), "
+            "COALESCE(response_model, request_model), input_tokens, output_tokens, "
+            "cached_tokens, ttft_ms, start_time_ms FROM spans WHERE operation_name='chat'")
+        for span_id, session, model, inp, out, cached, ttft, start_ms in cur:
+            if not span_id:
+                continue
+            inp = int(inp) if isinstance(inp, (int, float)) else 0
+            out = int(out) if isinstance(out, (int, float)) else 0
+            cached = int(cached) if isinstance(cached, (int, float)) else 0
+            ttft = int(ttft) if isinstance(ttft, (int, float)) else 0
+            if not (inp or out or cached):
+                continue
+            session = session or ""
+            model = model or ""
+            payload = json.dumps({"in": inp, "out": out, "cached": cached,
+                                  "ttft": ttft, "m": model}, sort_keys=True)
+            rows.append(schema.make_copilot_metric(
+                source="otel", session=session, call=str(span_id), model=model,
+                tokens_in=inp, tokens_out=out, cached_in=cached, ttft_ms=ttft,
+                ts=_epoch_ms_iso(start_ms),
+                metric_id="cm_" + hashlib.sha1(
+                    f"otel|{session}|{span_id}|{payload}".encode("utf-8")).hexdigest()[:16]))
+    except sqlite3.Error:
+        return rows
+    finally:
+        con.close()
+    return rows
+
+
 def parse_kiro_calls(token_log: Path, session: str = "") -> list[dict]:
     """Meter Kiro from its append-only usage log `dev_data/tokens_generated.jsonl` —
     one JSON object per LLM call: `{model, provider, promptTokens, generatedTokens}`.
@@ -779,15 +1290,99 @@ def parse_kiro_calls(token_log: Path, session: str = "") -> list[dict]:
     return rows
 
 
+def parse_kiro_ide_metrics(db_path: Path) -> list[dict]:
+    """Kiro-metrics rows from the IDE's timestamped twin of `parse_kiro_calls`'s jsonl
+    — `dev_data/devdata.sqlite`, table `tokens_generated` (the `source="ide"` leg of
+    KIRO-METRICS, handoff §4.4). The SAME counter as the jsonl, plus a `timestamp` and
+    a cursorable `id` the jsonl never carried.
+
+    Read-only (`mode=ro&immutable=1`); never writes, migrates, or locks the DB.
+    **Explicit-column SELECT, never `SELECT *`**: `id, tokens_prompt, tokens_generated,
+    timestamp` are the four columns the research probe assumed (2026-08-13 §6,
+    UNVERIFIED-COLUMNS — the real schema probe is still pending); any column beyond
+    those four stays unread until that probe confirms it, so an unexpected extra
+    column can never leak into a row. Rows where both counts are 0 are skipped, the
+    same rule `parse_kiro_calls` applies. Any `sqlite3.Error` — a missing table, a
+    schema surprise, a lock — returns `[]`: fail-open, never a crash, never a guess.
+
+    **The 2026-02-28 `tokens_prompt` semantics cutover is recorded verbatim, never
+    corrected, here**: before that date the store's `tokens_prompt` was the full
+    context sent per call; after, it is incremental. This parser stores the number
+    exactly as the row carries it either way — branching on it is a derive-time
+    concern, if it is ever needed.
+
+    `session="kiro"` (the store has none — the same honest constant `parse_kiro_calls`
+    uses) and `surface="ide"`. `row_ref=str(id)` is both provenance and the dedupe
+    anchor. `ts` from `timestamp`: tried as ISO-8601 text first, then as an epoch
+    ms/s number: `_epoch_ms_iso` per row (Kiro's exact text/epoch shape is another
+    piece of the pending schema probe) — a row whose `timestamp` parses neither way
+    still lands, just with no `ts` (the legacy unpartitioned shard, never lost)."""
+    if not db_path.exists():
+        return []
+    uri = f"file:{db_path}?mode=ro&immutable=1"
+    try:
+        con = sqlite3.connect(uri, uri=True)
+    except sqlite3.Error:
+        return []
+    rows: list[dict] = []
+    try:
+        cur = con.execute("SELECT id, tokens_prompt, tokens_generated, timestamp "
+                          "FROM tokens_generated ORDER BY id")
+        for row_id, tokens_prompt, tokens_generated, timestamp in cur:
+            inp = int(tokens_prompt) if isinstance(tokens_prompt, (int, float)) else 0
+            out = int(tokens_generated) if isinstance(tokens_generated, (int, float)) else 0
+            if not (inp or out):
+                continue
+            ts = _kiro_devdata_ts(timestamp)
+            rows.append(schema.make_kiro_metric(
+                source="ide", session="kiro", surface="ide", tokens_in=inp,
+                tokens_out=out, row_ref=str(row_id), ts=ts,
+                metric_id=f"km_ide{int(row_id):08d}"))
+    except sqlite3.Error:
+        return rows
+    finally:
+        con.close()
+    return rows
+
+
+def _kiro_devdata_ts(value) -> str | None:
+    """Best-effort `ts` for a `devdata.sqlite` row: try an ISO-8601 text timestamp
+    first, then an epoch ms/s number — Kiro's exact `timestamp` column shape is one of
+    the pending real-store probes (research 2026-08-13 §6). Returns ``None`` (never
+    raises) when neither reading is plausible, so the row still lands, just without a
+    `ts` (the legacy unpartitioned shard)."""
+    if isinstance(value, str) and value:
+        try:
+            text = value[:-1] + "+00:00" if value.endswith("Z") else value
+            dt = _dt.datetime.fromisoformat(text)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=_dt.timezone.utc)
+            return dt.astimezone(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.") + \
+                f"{dt.microsecond // 1000:03d}Z"
+        except ValueError:
+            pass
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        # Epoch seconds vs milliseconds: a millisecond value for "now" is ~13 digits;
+        # a second value is ~10. `_epoch_ms_iso` expects ms, so a second-scale number
+        # is scaled up first.
+        ms = value if value > 1e12 else value * 1000
+        return _epoch_ms_iso(ms)
+    return None
+
+
 # The Kiro CLI store is a SQLite DB, `conversations_v2(key=cwd, conversation_id,
-# value TEXT, created_at, updated_at)`. `value` is the whole conversation JSON — token
-# fields (`request_metadata.{total_tokens,uncached_input_tokens,output_tokens,…}`) are
-# NULL even with an explicit model (§0 probe), so usage is credits + context% only.
-# These are the ONLY keys the parser is allowed to touch inside `value` — a closed
-# whitelist of numeric/metadata fields. It NEVER reads `history[].user`,
-# `history[].assistant`, `content`, `text`, `transcript`, `next_message`, or the
-# `auth_kv` table: counts-never-content is hardest here because content and metadata
-# share the row (capture-precision §3.3).
+# value TEXT, created_at, updated_at)` (an older `conversations(key, value)` table may
+# also be present — enumerated by `_kiro_cli_conversations`, KIRO-METRICS handoff §4.4).
+# `value` is the whole conversation JSON — token fields
+# (`request_metadata.{total_tokens,uncached_input_tokens,output_tokens,…}`) are NULL
+# even with an explicit model (§0 probe; the KIRO-METRICS build records them the day
+# they stop being NULL — the upgrade-watch), so today's usage is credits + context% +
+# per-turn metadata only. The credits parser (`_kiro_cli_credit_row`) and the metrics
+# parser (`parse_kiro_cli_metrics`) share ONE whitelist of numeric/metadata fields —
+# `request_metadata` / `user_turn_metadata` / `model_info` keys only. Both NEVER read
+# `history[].user`, `history[].assistant`, `content`, `text`, `transcript`,
+# `next_message`, `latest_summary`, or the `auth_kv` table: counts-never-content is
+# hardest here because content and metadata share the row (capture-precision §3.3).
 #
 # ONE scoped carve-out, ratified 2026-08-07:
 # [ADR 0009](docs/adr/0009-kiro-cli-tool-run-bodies-read-transiently-never-persisted.md).
@@ -832,6 +1427,77 @@ def _under(key: str, root: str) -> bool:
     boundary, so ``/w/cage`` never swallows ``/w/cage-lab``."""
     k, r = _norm_cwd_key(key), _norm_cwd_key(root)
     return bool(r) and (k == r or k.startswith(r.rstrip(os.sep) + os.sep))
+
+
+_KIRO_CLI_TABLES = ("conversations_v2", "conversations")
+
+
+def _kiro_cli_conversations(db_path: Path, workspace: str = "") -> list[tuple[str, str, dict, object]]:
+    """Read the Kiro CLI SQLite store once, scoped to ``workspace`` (`_under`; empty =
+    unscoped, the whole machine — the caller's choice, ADR 0006 *Scope*), and yield
+    ``(key, conversation_id, doc, updated_at)`` for every conversation across whichever
+    of the two known tables exist. Extracted from `parse_kiro_cli_credits`
+    (KIRO-METRICS handoff §4.4) so `parse_kiro_cli_metrics` shares the exact same
+    read/scan/scope pass — the two parsers can never disagree about which
+    conversations are in scope.
+
+    **Enumerates BOTH tables**: `conversations_v2` (verified against a real store,
+    2026-08-01: `key, conversation_id, value, created_at, updated_at`) first, then the
+    older `conversations` table when present. Its column shape is not pinned (the
+    community tracker's version-era boundary contradicts cage's own 2.16.0
+    observation, so treat it as unverified) — read defensively: the `conversations_v2`
+    shape first, falling back to a bare `(key, value)` read (`conversation_id` lifted
+    from the JSON body itself, `updated_at` absent ⇒ `None`, so a row with no `ts`
+    still lands — the legacy unpartitioned shard, never lost). Either table missing
+    (or neither column shape matching) raises `sqlite3.OperationalError`, caught and
+    skipped per table — fail-open, never fatal to the sweep.
+
+    Read-only (`mode=ro&immutable=1`); never writes, migrates, or locks the DB. Opens
+    the DB connection once regardless of how many tables it reads."""
+    if not db_path.exists():
+        return []
+    uri = f"file:{db_path}?mode=ro&immutable=1"
+    try:
+        con = sqlite3.connect(uri, uri=True)
+    except sqlite3.Error:
+        return []
+    con.row_factory = sqlite3.Row
+    out: list[tuple[str, str, dict, object]] = []
+    try:
+        for table in _KIRO_CLI_TABLES:
+            try:
+                cur = con.execute(f"SELECT key, conversation_id, value, created_at, "
+                                  f"updated_at FROM {table}")
+                wide = True
+            except sqlite3.OperationalError:
+                try:
+                    cur = con.execute(f"SELECT key, value FROM {table}")
+                    wide = False
+                except sqlite3.OperationalError:
+                    continue  # neither column shape exists — this table is absent
+            try:
+                for r in cur:
+                    key = r["key"] or ""
+                    if workspace and not _under(key, workspace):
+                        continue
+                    try:
+                        doc = json.loads(r["value"]) if r["value"] else {}
+                    except (ValueError, TypeError):
+                        continue
+                    if not isinstance(doc, dict):
+                        continue
+                    if wide:
+                        cid = r["conversation_id"] or ""
+                        updated_at = r["updated_at"]
+                    else:
+                        cid = str(doc.get("conversation_id") or "")
+                        updated_at = None
+                    out.append((key, cid, doc, updated_at))
+            except sqlite3.Error:
+                continue
+    finally:
+        con.close()
+    return out
 
 
 def _kiro_cli_credit_row(conv_id: str, doc: dict, updated_at, key: str = "") -> dict | None:
@@ -884,50 +1550,135 @@ def parse_kiro_cli_credits(db_path: Path, workspace: str = "") -> list[dict]:
     """Meter Kiro CLI from its SQLite store, **read-only**, yielding *credits* usage rows
     (not call rows — Kiro CLI records no token counts; capture-precision §3.2–§3.4).
 
-    Opened `mode=ro&immutable=1` — cage never writes, never migrates, never locks the DB.
-    Reads only the `conversations_v2` table (never `auth_kv`) and, within each row's
-    `value` JSON, only the whitelisted numeric/metadata fields via `_kiro_cli_credit_row`
-    — never a prompt or response body. Fail-open per conversation; a driver/permission
-    error on the DB returns [].
+    A thin wrapper over `_kiro_cli_conversations` (KIRO-METRICS handoff §4.4 refactor —
+    byte-identical output to before the extraction, pinned by the existing
+    `tests/test_kiro_routing.py` suite) + `_kiro_cli_credit_row`, which does the actual
+    whitelisted-field extraction — never a prompt or response body. Fail-open per
+    conversation.
 
     ``workspace`` scopes the read to one **directory tree** — that directory or anything
     beneath it (`_under`). Empty reads every conversation on the machine, which is right
     for exactly one caller: a sweep into the machine ledger. Reading unscoped from a
-    *project* sweep is what double-counted kiro CLI across ledgers; `paths.kiro_cli_workspace`
-    is the one place that choice is made. The match is done in Python, not SQL, so the
-    normalization the key actually needs (`_norm_cwd_key`: symlinks, trailing separator,
-    per-platform case) is expressible — a near-miss here returns zero rows, which is
-    indistinguishable from "no kiro usage"."""
-    if not db_path.exists():
-        return []
-    uri = f"file:{db_path}?mode=ro&immutable=1"
-    try:
-        con = sqlite3.connect(uri, uri=True)
-    except sqlite3.Error:
-        return []
-    con.row_factory = sqlite3.Row
+    *project* sweep is what double-counted kiro CLI across ledgers;
+    `paths.kiro_cli_workspace` is the one place that choice is made."""
     rows: list[dict] = []
-    try:
-        for r in con.execute("SELECT key, conversation_id, value, created_at, updated_at "
-                             "FROM conversations_v2"):
-            key = r["key"] or ""
-            if workspace and not _under(key, workspace):
-                continue
-            try:
-                doc = json.loads(r["value"]) if r["value"] else {}
-            except (ValueError, TypeError):
-                continue
-            try:
-                row = _kiro_cli_credit_row(r["conversation_id"], doc, r["updated_at"], key)
-            except Exception:  # noqa: BLE001 — fail-open per conversation
-                row = None
-            if row is not None:
-                rows.append(row)
-    except sqlite3.Error:
-        return rows
-    finally:
-        con.close()
+    for key, cid, doc, updated_at in _kiro_cli_conversations(db_path, workspace):
+        try:
+            row = _kiro_cli_credit_row(cid, doc, updated_at, key)
+        except Exception:  # noqa: BLE001 — fail-open per conversation
+            row = None
+        if row is not None:
+            rows.append(row)
     rows.sort(key=lambda x: x["id"])  # deterministic order
+    return rows
+
+
+def parse_kiro_cli_metrics(db_path: Path, workspace: str = "") -> list[dict]:
+    """Kiro-metrics rows from the CLI SQLite store — the `source="cli-conv"`/
+    `source="cli-turn"` legs of KIRO-METRICS (handoff §4.4). Reuses
+    `_kiro_cli_conversations` (the same read + table-enumeration + scope
+    `parse_kiro_cli_credits` performs), so the two parsers can never disagree about
+    which conversations are in scope, and the same whitelist
+    (`request_metadata`/`user_turn_metadata`/`model_info` keys only).
+
+    One `source="cli-conv"` row per conversation carrying turns, a `usage_info` list,
+    or a context% signal: `credits` is the `usage_info` sum **when the list is
+    present, even if it sums to a real 0.0 — else `None`** (the None-sentinel law,
+    generalized from `make_call.credits`; distinct from `_kiro_cli_credit_row`'s
+    stricter "credits<=0 and context<=0 ⇒ no row at all" skip, which is a *credits
+    row* rule this store-verbatim kind does not inherit). `context_pct` is the last
+    non-null value across turns; `turns=len(history)`.
+
+    Plus one `source="cli-turn"` row per `history[]` entry carrying a
+    `request_metadata` dict: `chunks=len(time_between_chunks)` (a chunk COUNT, never
+    repurposed as `tokens_out`), `prompt_bytes`/`response_bytes`/`tool_uses`/
+    `context_pct` from their own populated fields, and — the **upgrade-watch** — the
+    CLI's `tokens_in`/`tokens_out`/`cached_in`/`cached_out` slots
+    (`uncached_input_tokens`/`output_tokens`/`cache_read_input_tokens`/
+    `cache_write_input_tokens`) recorded only when the store's own field is a real
+    number; all NULL today (kiro-cli 2.16.0, research 2026-08-13), so every `cli-turn`
+    row omits them via the schema's own omit-at-zero idiom — the day Kiro fills them,
+    capture picks them up with zero code change. `row_ref` is the turn's own
+    `request_metadata.message_id` when present, else omitted (the `turn` index alone
+    already keys the row uniquely).
+
+    `metric_id` folds each row's own recorded values into a sha1: a grown conversation
+    (more turns, a later credits/context figure) hashes to a NEW id for its `cli-conv`
+    row and appends a fresh row rather than silently overwriting a stale one;
+    `ledger.kiro_metrics` resolves the latest per key at read time."""
+    rows: list[dict] = []
+    for key, cid, doc, updated_at in _kiro_cli_conversations(db_path, workspace):
+        history = doc.get("history")
+        turns_list = history if isinstance(history, list) else []
+        turns = len(turns_list)
+        model = ""
+        mi = doc.get("model_info")
+        if isinstance(mi, dict):
+            model = str(mi.get("model_id") or mi.get("model_name") or "")
+        credits = None
+        utm = doc.get("user_turn_metadata")
+        usage = utm.get("usage_info") if isinstance(utm, dict) else None
+        if isinstance(usage, list):
+            total = 0.0
+            for u in usage:
+                if isinstance(u, dict) and str(u.get("unit", "")).startswith("credit"):
+                    v = u.get("value")
+                    if isinstance(v, (int, float)):
+                        total += float(v)
+            credits = round(total, 6)
+        context_pct = 0.0
+        for turn in turns_list:
+            rm = turn.get("request_metadata") if isinstance(turn, dict) else None
+            if isinstance(rm, dict) and isinstance(rm.get("context_usage_percentage"), (int, float)):
+                context_pct = float(rm["context_usage_percentage"])
+        project = Path(key).name if key else ""
+        conv_ts = _epoch_ms_iso(updated_at) if updated_at is not None else None
+        if turns or credits is not None or context_pct:
+            conv_payload = json.dumps({"turns": turns, "credits": credits,
+                                       "context": context_pct}, sort_keys=True, default=str)
+            rows.append(schema.make_kiro_metric(
+                source="cli-conv", session=str(cid), surface="cli", model=model,
+                credits=credits, context_pct=context_pct, turns=turns, ts=conv_ts,
+                project=project,
+                metric_id="km_" + hashlib.sha1(f"cli-conv|{cid}|{conv_payload}"
+                                               .encode("utf-8")).hexdigest()[:16]))
+        for idx, turn in enumerate(turns_list):
+            rm = turn.get("request_metadata") if isinstance(turn, dict) else None
+            if not isinstance(rm, dict):
+                continue
+            row_ref = str(rm.get("message_id") or "")
+            turn_ms = _first_int(rm, _KIRO_CLI_TS_KEYS)
+            turn_ts = _epoch_ms_iso(turn_ms) if turn_ms else None
+            chunks_field = rm.get("time_between_chunks")
+            chunks = len(chunks_field) if isinstance(chunks_field, list) else 0
+            tool_field = rm.get("tool_use_ids_and_names")
+            tool_uses = len(tool_field) if isinstance(tool_field, list) else 0
+            prompt_bytes = _first_int(rm, ("user_prompt_length",))
+            response_bytes = _first_int(rm, ("response_size",))
+            turn_context = _first_float(rm, ("context_usage_percentage",))
+            turn_context = turn_context if turn_context is not None else 0.0
+            model_id = str(rm.get("model_id") or "")
+            # The upgrade-watch: NULL on every real store probed so far (2.16.0) — the
+            # day Kiro fills these, capture records them with zero code change.
+            tin = _first_int(rm, ("uncached_input_tokens",))
+            tout = _first_int(rm, ("output_tokens",))
+            cin = _first_int(rm, ("cache_read_input_tokens",))
+            cout = _first_int(rm, ("cache_write_input_tokens",))
+            payload = json.dumps({"chunks": chunks, "tool_uses": tool_uses,
+                                  "prompt_bytes": prompt_bytes,
+                                  "response_bytes": response_bytes,
+                                  "context": turn_context, "tin": tin, "tout": tout,
+                                  "cin": cin, "cout": cout, "model": model_id},
+                                 sort_keys=True, default=str)
+            rows.append(schema.make_kiro_metric(
+                source="cli-turn", session=str(cid), surface="cli", turn=str(idx),
+                model=model_id, tokens_in=tin, tokens_out=tout, cached_in=cin,
+                cached_out=cout, context_pct=turn_context, chunks=chunks,
+                prompt_bytes=prompt_bytes, response_bytes=response_bytes,
+                tool_uses=tool_uses, row_ref=row_ref, ts=turn_ts, project=project,
+                metric_id="km_" + hashlib.sha1(f"cli-turn|{cid}|{idx}|{payload}"
+                                               .encode("utf-8")).hexdigest()[:16]))
+    rows.sort(key=lambda x: x["id"])
     return rows
 
 

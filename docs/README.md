@@ -35,23 +35,19 @@ spec.
 
 ## Active work
 
-One pair (created when its [OPEN-WORK.md](../work/OPEN-WORK.md) item was picked up;
-archived on implement). GRAPHIFY-CHATS, the prior occupant, was built and green on
-2026-08-13 and [archived](archive/v0.49-graphify-chats.handoff.md).
+Created when an [OPEN-WORK.md](../work/OPEN-WORK.md) item is picked up; archived on
+implement. COPILOT-METRICS, KIRO-METRICS, and CLAUDE-METRICS — the three per-chat
+metrics-ledger builds, one per agent — were all built and green on 2026-08-14 and
+archived, nothing currently sits in docs root:
+[copilot](archive/v0.49-copilot-metrics-ledger.handoff.md) ·
+[kiro](archive/v0.49-kiro-metrics-ledger.handoff.md) ·
+[claude](archive/v0.49-claude-metrics-ledger.handoff.md).
 
-- **COPILOT-METRICS** — [copilot-metrics-ledger.handoff.md](copilot-metrics-ledger.handoff.md)
-  + [copilot-metrics-ledger.prompt.md](copilot-metrics-ledger.prompt.md) (filed
-  2026-08-13): the `.cage/ledger/copilot/` per-chat metrics ledger, grounded in
-  [research/2026-08-13-copilot-per-chat-usage-fetch-spec.md](research/2026-08-13-copilot-per-chat-usage-fetch-spec.md). The agent-lane refill was built and green on 2026-08-12 and
-[archived](archive/v0.49-open-queue-agent-lane.handoff.md) — handoff only, its prompt was
-handed over inline and never written here. CHATS-CREDITS, the next and last occupant, was
-built and green on 2026-08-13 and
-[archived](archive/v0.49-chats-credits.handoff.md).
-
-**One thing it left open is not a pair and does not live here:** the `CLAUDE.md`
-*Documentation discipline* correction is **proposed, awaiting Arpit** — steering files are
-never silently rewritten, so the diff sits in that session's response and in
-[WORKLOG.md](../work/WORKLOG.md), not as a doc in this tree.
+**One thing each of the three left open is not a pair and does not live here:** a
+`CLAUDE.md` diff (ledger diagram line + a substrate bullet) is **proposed, awaiting
+Arpit** for each — steering files are never silently rewritten, so the diffs sit in
+those sessions' responses and in [WORKLOG.md](../work/WORKLOG.md), not as docs in
+this tree.
 
 ## The lab manual
 
@@ -85,6 +81,12 @@ to its real location.
 - [copilot-capture.md](copilot-capture.md) — how Copilot numbers are captured,
   one page, executive-summary section included. **Updated in the same change as
   any copilot capture change** (its DOC-REGISTRY trigger).
+- [claude-capture.md](claude-capture.md) — how Claude numbers are captured,
+  one page, executive-summary section included. **Updated in the same change as
+  any claude capture change** (its DOC-REGISTRY trigger).
+- [kiro-capture.md](kiro-capture.md) — how Kiro numbers are captured, one page,
+  executive-summary section included. **Updated in the same change as any kiro
+  capture change** (its DOC-REGISTRY trigger).
 - [FORMULAS.md](FORMULAS.md) — every computed number: formula · code home ·
   method tag · the knobs that move it.
 - [WORKLOG.md](../work/WORKLOG.md) — the running per-session handoff (append every

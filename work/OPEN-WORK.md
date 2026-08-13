@@ -2,11 +2,26 @@
 
 ## Agent-closable
 
-- **COPILOT-METRICS** — new ledger kind `.cage/ledger/copilot/chats-YYYY-MM.jsonl`:
-  per-chat Copilot tokens in/out · cached · credits · session credits · nano-AIU,
-  captured verbatim from all five stores (Arpit's scope call 2026-08-13). Spec + prompt:
-  `docs/copilot-metrics-ledger.{handoff,prompt}.md` (filed 2026-08-13, picked up on
-  paste). Grounding: `docs/research/2026-08-13-copilot-per-chat-usage-fetch-spec.md`.
+- **COPILOT-METRICS-READ** — read surface for `.cage/ledger/copilot/` (COPILOT-METRICS
+  shipped 2026-08-14, capture-only): either new `cage insights chats` columns or a
+  dedicated `cage insights copilot` view. Parked scope-out from COPILOT-METRICS §3 —
+  no derived view reads the kind yet.
+- **COPILOT-METRICS-CSV** — `cage data export --csv copilot` (raw-row export for the
+  new kind). Parked scope-out from COPILOT-METRICS §3.
+
+- **KIRO-METRICS-READ** — read surface for `.cage/ledger/kiro/` (KIRO-METRICS shipped
+  2026-08-14, capture-only): either new `cage insights chats` columns or a dedicated
+  `cage insights kiro` view. Parked scope-out from KIRO-METRICS §3 — no derived view
+  reads the kind yet.
+- **KIRO-METRICS-CSV** — `cage data export --csv kiro` (raw-row export for the new
+  kind). Parked scope-out from KIRO-METRICS §3.
+
+- **CLAUDE-METRICS-READ** — read surface for `.cage/ledger/claude/` (CLAUDE-METRICS
+  shipped 2026-08-14, capture-only): either new `cage insights chats` columns or a
+  dedicated `cage insights claude` view. Parked scope-out from CLAUDE-METRICS §3 —
+  no derived view reads the kind yet.
+- **CLAUDE-METRICS-CSV** — `cage data export --csv claude` (raw-row export for the
+  new kind). Parked scope-out from CLAUDE-METRICS §3.
 
 - **CLAUDE-DEDUP** — defect: the claude transcript parser records every assistant
   row's usage, but one API response writes 1–5 rows (same `requestId` + `message.id`,

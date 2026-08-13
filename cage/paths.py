@@ -465,6 +465,21 @@ def kiro_token_log() -> Path:
     return _first_existing(kiro_data_candidates()) / "dev_data" / "tokens_generated.jsonl"
 
 
+def kiro_devdata_db() -> Path:
+    """Kiro IDE's SQLite twin of `kiro_token_log` (KIRO-METRICS handoff §4.2):
+    `kiro.kiroagent/dev_data/devdata.sqlite`, table `tokens_generated` — the SAME
+    counter, plus a `timestamp` and a cursorable `id` the jsonl never carried. Same
+    `KIRO_DATA_DIR` override semantics as the jsonl. **UNVERIFIED-COLUMNS**: the exact
+    column list beyond `(id, tokens_prompt, tokens_generated, timestamp)` is pending
+    the real-store probe (research 2026-08-13 §6) — `transcript.parse_kiro_ide_metrics`
+    SELECTs only those four, explicit, so an unread extra column never breaks capture.
+
+    Deliberately **not** added to `_builtin_log_sources`/`sources_seed` — the calls
+    sweep must not start parsing a SQLite file with the jsonl parser; the kiro-metrics
+    leg (`importcmd.import_kiro`) resolves this path directly, single-file, no glob."""
+    return _first_existing(kiro_data_candidates()) / "dev_data" / "devdata.sqlite"
+
+
 def _builtin_log_sources(agent: str) -> list[tuple[Path, str, tuple[str, ...]]]:
     """The **seed** ``(source, glob, path_globs)`` log locations per agent
     (capture-precision §3.6, Directive A). No longer a runtime fallback — `cage setup`
@@ -488,7 +503,18 @@ def _builtin_log_sources(agent: str) -> list[tuple[Path, str, tuple[str, ...]]]:
         return [(copilot_home() / "session-state", "*/events.jsonl",
                  ("**/events.jsonl",)),
                 (vscode_user_dir() / "workspaceStorage", "*/chatSessions/*.jsonl",
-                 ("**/chatSessions/*.jsonl",))]
+                 ("**/chatSessions/*.jsonl",)),
+                # Two more chatSessions roots (research 2026-08-13 §"Deltas"/5):
+                # empty-window chats and sessions transferred between windows are
+                # invisible to the `workspaceStorage/*/chatSessions` glob above.
+                # `no-workspace/chatSessions/` is already matched by that glob —
+                # it is not a fourth tuple. Calls capture gains these chats too;
+                # `importcmd._is_chat_session_file` fixes the dispatch they'd
+                # otherwise mis-route into (neither sits in a `chatSessions/` dir).
+                (vscode_user_dir() / "globalStorage" / "emptyWindowChatSessions", "*.jsonl",
+                 ("**/emptyWindowChatSessions/*.jsonl",)),
+                (vscode_user_dir() / "globalStorage" / "transferredChatSessions", "*.jsonl",
+                 ("**/transferredChatSessions/*.jsonl",))]
     if agent == "kiro":
         return [(kiro_token_log(), "*", ("*",))]
     return []
@@ -922,6 +948,25 @@ def custom_tool_sources(pol: dict | None = None) -> list[LogSource]:
     return [s for s in resolve_log_sources(pol).sources if s.agent not in agents.SURFACES]
 
 
+def copilot_metric_sources() -> list[tuple[Path, str, str]]:
+    """The three **opt-in, per-model-call** Copilot metrics stores (COPILOT-METRICS
+    handoff §4.2, §5): sidecar / debuglog / otel. ``(path, glob, source-tag)`` — the
+    tag matches `schema.COPILOT_METRIC_SOURCES` and picks the parser in
+    `importcmd.import_copilot`.
+
+    **Deliberately NOT in `agent_log_sources`/`_builtin_log_sources`** — those feed
+    the *calls* parser, and none of these three stores is call-shaped (they only ever
+    yield `copilot` metrics rows). Each is gated behind a VS Code setting named in
+    `cage doctor`'s `copilot-metrics` check; absence of a gated store is a state, not
+    a fault. Windows layouts for all three are UNVERIFIED-LAYOUT (inferred from the
+    VS Code user-dir convention, not pinned on a real install)."""
+    user = vscode_user_dir()
+    return [(user / "agentHostUsage", "*.jsonl", "sidecar"),
+            (user / "workspaceStorage", "*/GitHub.copilot-chat/debug-logs/*/*.jsonl",
+             "debuglog"),
+            (user / "globalStorage" / "github.copilot-chat", "agent-traces.db", "otel")]
+
+
 # ── build-time descriptor for the generated `[sources]` comment block (docgen) ──
 # `tools/docgen --target policy` renders an inert, ~-relative `[sources]` block into
 # the bundled policy.toml from :func:`builtin_source_docs`. It is deliberately ENV-
@@ -1091,6 +1136,80 @@ class Footprint:
         legacy = sorted(base.glob("*/savings.jsonl"))
         return legacy + sorted(base.glob("*/savings-*.jsonl"))
 
+    @property
+    def copilot_dir(self) -> Path:
+        """The Copilot-metrics ledger sub-dir (COPILOT-METRICS handoff §4.2):
+        ``ledger/copilot/chats-<month>.jsonl``. A directory via the `savings_dir`
+        mechanism (smallest diff, precedent already tested), not a generalization of
+        `shard()` — this kind is a capture-only sibling to `savings/`, never a
+        second `calls`-shaped tree."""
+        return self.ledger / "copilot"
+
+    def copilot_shard(self, ts: str) -> Path:
+        """Month-partition path for a copilot-metrics row, from the row's own ``ts``
+        (`copilot/chats-2026-08.jsonl`) — mirrors `savings_shard`."""
+        month = ts[:7] if (ts and len(ts) >= 7 and ts[4] == "-") else ""
+        name = f"chats-{month}.jsonl" if month else "chats.jsonl"
+        return self.copilot_dir / name
+
+    def copilot_shards(self) -> list[Path]:
+        """Every readable copilot-metrics shard (`copilot/chats-*.jsonl`), sorted for a
+        deterministic concatenated read. Names match `ledger._SHARD_MONTH`, so
+        ``--since`` month-skipping is free. Only existing files are returned."""
+        base = self.copilot_dir
+        if not base.is_dir():
+            return []
+        return sorted(base.glob("chats*.jsonl"))
+
+    @property
+    def kiro_dir(self) -> Path:
+        """The Kiro-metrics ledger sub-dir (KIRO-METRICS handoff §4.2):
+        ``ledger/kiro/chats-<month>.jsonl``. Same `savings_dir`-style mechanism
+        `copilot_dir` uses — a capture-only sibling tree, never a second `calls`-shaped
+        kind. Routing (which ledger this lands in — the sink vs the sweep root) is
+        decided by the caller (ADR 0006), not by this path."""
+        return self.ledger / "kiro"
+
+    def kiro_metric_shard(self, ts: str) -> Path:
+        """Month-partition path for a kiro-metrics row, from the row's own ``ts``
+        (`kiro/chats-2026-08.jsonl`) — mirrors `copilot_shard`."""
+        month = ts[:7] if (ts and len(ts) >= 7 and ts[4] == "-") else ""
+        name = f"chats-{month}.jsonl" if month else "chats.jsonl"
+        return self.kiro_dir / name
+
+    def kiro_metric_shards(self) -> list[Path]:
+        """Every readable kiro-metrics shard (`kiro/chats-*.jsonl`), sorted for a
+        deterministic concatenated read. Names match `ledger._SHARD_MONTH`, so
+        ``--since`` month-skipping is free. Only existing files are returned."""
+        base = self.kiro_dir
+        if not base.is_dir():
+            return []
+        return sorted(base.glob("chats*.jsonl"))
+
+    @property
+    def claude_dir(self) -> Path:
+        """The Claude-metrics ledger sub-dir (CLAUDE-METRICS handoff §4.2):
+        ``ledger/claude/chats-<month>.jsonl``. Same `savings_dir`-style mechanism
+        `copilot_dir`/`kiro_dir` use — a capture-only sibling tree, never a second
+        `calls`-shaped kind."""
+        return self.ledger / "claude"
+
+    def claude_shard(self, ts: str) -> Path:
+        """Month-partition path for a claude-metrics row, from the row's own ``ts``
+        (`claude/chats-2026-08.jsonl`) — mirrors `copilot_shard`/`kiro_metric_shard`."""
+        month = ts[:7] if (ts and len(ts) >= 7 and ts[4] == "-") else ""
+        name = f"chats-{month}.jsonl" if month else "chats.jsonl"
+        return self.claude_dir / name
+
+    def claude_shards(self) -> list[Path]:
+        """Every readable claude-metrics shard (`claude/chats-*.jsonl`), sorted for a
+        deterministic concatenated read. Names match `ledger._SHARD_MONTH`, so
+        ``--since`` month-skipping is free. Only existing files are returned."""
+        base = self.claude_dir
+        if not base.is_dir():
+            return []
+        return sorted(base.glob("chats*.jsonl"))
+
     def shard(self, kind: str, ts: str) -> Path:
         """Month-partition path for ``kind`` (``calls``/``receipts``/``tasks``) derived
         from a row's own ``ts`` — ``calls-2026-06.jsonl`` (plan §3.6.1). Determinism:
@@ -1099,9 +1218,19 @@ class Footprint:
         somewhere readable. ``provenance`` is intentionally never partitioned (buffer).
 
         ``kind`` may be a ``("savings", tool)`` tuple, which routes into the per-source
-        savings tree via `savings_shard` (import-ledger plan §3)."""
+        savings tree via `savings_shard` (import-ledger plan §3). The plain strings
+        ``"copilot"``/``"kiro"``/``"claude"`` route into their own per-source metrics
+        trees via `copilot_shard`/`kiro_metric_shard`/`claude_shard` (COPILOT-METRICS
+        handoff §4.2, KIRO-METRICS handoff §4.2, CLAUDE-METRICS handoff §4.2), the same
+        mechanism."""
         if isinstance(kind, tuple) and kind and kind[0] == "savings":
             return self.savings_shard(kind[1], ts)
+        if kind == "copilot":
+            return self.copilot_shard(ts)
+        if kind == "kiro":
+            return self.kiro_metric_shard(ts)
+        if kind == "claude":
+            return self.claude_shard(ts)
         month = ts[:7] if (ts and len(ts) >= 7 and ts[4] == "-") else ""
         return self.ledger / (f"{kind}-{month}.jsonl" if month else f"{kind}.jsonl")
 

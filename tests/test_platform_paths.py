@@ -52,7 +52,10 @@ def test_sources_seed_covers_all_agents_and_kirocli():
     seed = paths.sources_seed()
     for a in agents.SURFACES:
         assert [e for e in seed if e["name"] == a], f"{a} missing from the sources seed"
-    assert len([e for e in seed if e["name"] == "copilot"]) == 2  # CLI + VS Code chatSessions
+    # CLI events + 3 chatSessions roots (workspaceStorage, emptyWindow, transferred) —
+    # COPILOT-METRICS: no-workspace/chatSessions is already matched by the
+    # workspaceStorage glob, so it is not a 5th tuple.
+    assert len([e for e in seed if e["name"] == "copilot"]) == 4
     assert [e for e in seed if e["name"] == "kirocli" and e.get("format") == "kiro-cli"]
     # With a materialized [sources] table, the per-agent accessor resolves them again.
     pol = {"sources": {"claude": {"paths": [e["path"] for e in seed if e["name"] == "claude"]}}}

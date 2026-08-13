@@ -287,6 +287,298 @@ CREDIT_FIELDS = ("id", "ts", "session", "agent", "model", "unit", "credits",
                  "turns", "context_pct", "method", "surface", "project")
 
 
+def make_claude_metric(*, session: str, project: str = "", surface: str = "",
+                       model_totals: list[dict] | None = None,
+                       tokens_in: int = 0, tokens_out: int = 0, cached_in: int = 0,
+                       cache_write_in: int = 0, ttl_5m: int = 0, ttl_1h: int = 0,
+                       thinking: int = 0, web_search: int = 0, web_fetch: int = 0,
+                       requests: int = 0, raw_rows: int = 0,
+                       sidechain_tokens_in: int = 0, sidechain_tokens_out: int = 0,
+                       ts: str | None = None, metric_id: str | None = None) -> dict:
+    """One **Claude metrics** row — a store-verbatim, correctly-folded per-chat usage
+    fact from the transcript store, kept deliberately separate from `make_call`
+    (CLAUDE-METRICS handoff §1). The `calls` schema (§3.1) doesn't hold the cache-TTL
+    split, thinking share, server-tool counts, or a sidechain split, and widening it
+    again would blur what a call row means; this kind exists so it never has to — the
+    `make_copilot_metric`/`make_kiro_metric` precedent, generalized to Claude's one
+    store. `agent` is always `"claude-code"`, `source` is always `"transcript"` (one
+    store; the constant keeps cross-kind symmetry with copilot's source enum).
+
+    Token semantics **match `make_call`**: `tokens_in` = uncached + cache-read +
+    cache-write; `cached_in` = read; `cache_write_in` = write. `ttl_5m + ttl_1h` should
+    equal `cache_write_in` when the store carries the TTL split (older rows may not —
+    then the two are simply omitted, never backfilled from the total).
+
+    **Counts are omit-at-zero** (the house idiom) — every numeric field here, unlike
+    `make_call.credits`/`make_copilot_metric.credits`: **no credits field exists at
+    all**, because no credit unit exists for Claude Code anywhere on disk (the research
+    doc's firm no) — there is nothing a sentinel could ever distinguish.
+
+    `raw_rows` = usage-bearing assistant rows seen before THE DEDUP LAW folds them;
+    `requests` = distinct folded `(requestId, message.id)` keys. The pair together IS
+    the inflation evidence the calls-path defect (CLAUDE-DEDUP) produces today —
+    `raw_rows / requests` on this row is the same ratio, captured correctly here.
+
+    `model_totals`: list of `{model, tokens_in, tokens_out, cached_in, cache_write_in}`,
+    keys whitelisted per entry — an unexpected key on the parser's accumulator can
+    never ride along into the ledger. Omitted entirely when empty.
+
+    `metric_id` is always supplied by the parser as a deterministic id that folds in
+    the row's own recorded values (the `make_credit`/`make_copilot_metric` turns-fold
+    idea, generalized) — so a grown chat (more tokens since the last capture) appends
+    a FRESH row rather than silently overwriting a stale one, and `ledger.claude_metrics`
+    resolves the latest per session at read time. ``None`` falls back to a fresh
+    random `clm_` id."""
+    row = {"id": metric_id or ids.new_id("clm"), "ts": ts or _now(),
+           "agent": "claude-code", "source": "transcript", "session": str(session)}
+    if surface:
+        row["surface"] = str(surface)
+    if tokens_in:
+        row["tokens_in"] = int(tokens_in)
+    if tokens_out:
+        row["tokens_out"] = int(tokens_out)
+    if cached_in:
+        row["cached_in"] = int(cached_in)
+    if cache_write_in:
+        row["cache_write_in"] = int(cache_write_in)
+    if ttl_5m:
+        row["ttl_5m"] = int(ttl_5m)
+    if ttl_1h:
+        row["ttl_1h"] = int(ttl_1h)
+    if thinking:
+        row["thinking"] = int(thinking)
+    if web_search:
+        row["web_search"] = int(web_search)
+    if web_fetch:
+        row["web_fetch"] = int(web_fetch)
+    if requests:
+        row["requests"] = int(requests)
+    if raw_rows:
+        row["raw_rows"] = int(raw_rows)
+    if sidechain_tokens_in:
+        row["sidechain_tokens_in"] = int(sidechain_tokens_in)
+    if sidechain_tokens_out:
+        row["sidechain_tokens_out"] = int(sidechain_tokens_out)
+    if model_totals:
+        row["model_totals"] = [
+            {"model": str(mt.get("model", "") or ""),
+             "tokens_in": int(mt.get("tokens_in", 0) or 0),
+             "tokens_out": int(mt.get("tokens_out", 0) or 0),
+             "cached_in": int(mt.get("cached_in", 0) or 0),
+             "cache_write_in": int(mt.get("cache_write_in", 0) or 0)}
+            for mt in model_totals]
+    if project:
+        row["project"] = str(project)
+    return row
+
+
+CLAUDE_METRIC_FIELDS = ("id", "ts", "agent", "source", "session", "surface",
+                        "tokens_in", "tokens_out", "cached_in", "cache_write_in",
+                        "ttl_5m", "ttl_1h", "thinking", "web_search", "web_fetch",
+                        "requests", "raw_rows", "sidechain_tokens_in",
+                        "sidechain_tokens_out", "model_totals", "project")
+
+
+# The five on-disk Copilot stores that carry per-chat usage numbers cage's `calls`
+# schema doesn't (COPILOT-METRICS, docs/copilot-metrics-ledger.handoff.md §4.1):
+# `chat` (VS Code chatSessions, per-request) · `cli` (Copilot CLI session-state,
+# per-session-cumulative) · `sidecar`/`debuglog`/`otel` (three opt-in, per-model-call
+# stores). A closed enum, like `UNITS`/`METHODS` — `make_copilot_metric` validates it.
+COPILOT_METRIC_SOURCES = ("chat", "cli", "sidecar", "debuglog", "otel")
+
+
+def make_copilot_metric(*, source: str, session: str, surface: str = "",
+                        request: str = "", call: str = "", model: str = "",
+                        tokens_in: int = 0, tokens_out: int = 0, cached_in: int = 0,
+                        model_totals: list[dict] | None = None,
+                        credits: float | None = None,
+                        session_credits: float | None = None,
+                        nano_aiu: float | None = None,
+                        elapsed_ms: int = 0, waiting_ms: int = 0, ttft_ms: int = 0,
+                        ts: str | None = None, project: str = "",
+                        metric_id: str | None = None) -> dict:
+    """One **Copilot metrics** row — a vendor-recorded usage fact from one of the five
+    on-disk stores, kept deliberately separate from `make_call` (COPILOT-METRICS handoff
+    §1). Widening the closed call schema again for facts at three different grains
+    (per-request / per-session-cumulative / per-model-call) would blur what a `calls` row
+    means; this kind exists so it never has to.
+
+    `agent` is always `"copilot"`; `source` is validated against
+    `COPILOT_METRIC_SOURCES` — every other field describes WHICH request/session/call
+    the row is about and WHAT the store recorded for it, verbatim, no derivation.
+
+    **Counts are omit-at-zero** (`tokens_in`/`tokens_out`/`cached_in`/`elapsed_ms`/
+    `waiting_ms`/`ttft_ms`) — the house idiom, same as `make_call`.
+
+    **`credits` / `session_credits` / `nano_aiu` are None-sentinel, never omit-at-zero**
+    — the same law `make_call.credits` already breaks the pattern for, and for the same
+    reason: a store that recorded a real `0.0` and a store that recorded nothing are
+    different facts, and absence must never collapse into a fabricated zero. Never
+    derived from one another or from tokens at capture — that division is derive-time
+    work, if it ever happens at all.
+
+    `model_totals` — the chatSessions store's new per-request, per-model usage list
+    (`[{model, inputTokens, cachedTokens, outputTokens}]`) — is read through a strict
+    whitelist: only the four named keys survive per entry, renamed to `model`/
+    `tokens_in`/`cached_in`/`tokens_out`, so an unexpected key on the store's dict can
+    never ride along into the ledger. Omitted entirely when empty.
+
+    `metric_id` is always supplied by a parser as a deterministic id that folds in the
+    row's own values (the `make_credit`/`make_savings` turns-fold idea, generalized) —
+    so a grown chatSessions request or a resumed CLI session appends a FRESH row rather
+    than silently losing the update, and `ledger.copilot_metrics` collapses to the
+    latest per key at read time. ``None`` falls back to a fresh random `cm_` id."""
+    if source not in COPILOT_METRIC_SOURCES:
+        raise ValueError(f"copilot-metric source {source!r} not in {COPILOT_METRIC_SOURCES}")
+    row = {"id": metric_id or ids.new_id("cm"), "ts": ts or _now(),
+           "agent": "copilot", "source": source, "session": str(session)}
+    if surface:
+        row["surface"] = str(surface)
+    if request:
+        row["request"] = str(request)
+    if call:
+        row["call"] = str(call)
+    if model:
+        row["model"] = str(model)
+    if tokens_in:
+        row["tokens_in"] = int(tokens_in)
+    if tokens_out:
+        row["tokens_out"] = int(tokens_out)
+    if cached_in:
+        row["cached_in"] = int(cached_in)
+    if model_totals:
+        row["model_totals"] = [
+            {"model": str(mt.get("model", "") or ""),
+             "tokens_in": int(mt.get("tokens_in", 0) or 0),
+             "cached_in": int(mt.get("cached_in", 0) or 0),
+             "tokens_out": int(mt.get("tokens_out", 0) or 0)}
+            for mt in model_totals]
+    if credits is not None:
+        row["credits"] = float(credits)
+    if session_credits is not None:
+        row["session_credits"] = float(session_credits)
+    if nano_aiu is not None:
+        row["nano_aiu"] = float(nano_aiu)
+    if elapsed_ms:
+        row["elapsed_ms"] = int(elapsed_ms)
+    if waiting_ms:
+        row["waiting_ms"] = int(waiting_ms)
+    if ttft_ms:
+        row["ttft_ms"] = int(ttft_ms)
+    if project:
+        row["project"] = str(project)
+    return row
+
+
+# The three grains a Kiro store actually persists usage at (KIRO-METRICS,
+# docs/kiro-metrics-ledger.handoff.md §4.1) — Kiro's own on-disk stores, not the wire
+# protocol (which carries more but is proxy-only, out of scope here): `ide` (IDE
+# `devdata.sqlite`, per LLM call, timestamped) · `cli-conv` (CLI SQLite store, per
+# conversation, cumulative-verbatim) · `cli-turn` (same store, per history turn — the
+# populated `request_metadata` fields, plus token slots that are NULL today but
+# schema-present). A closed enum, like `COPILOT_METRIC_SOURCES` — `make_kiro_metric`
+# validates it.
+KIRO_METRIC_SOURCES = ("ide", "cli-conv", "cli-turn")
+
+
+def make_kiro_metric(*, source: str, session: str = "", surface: str = "",
+                     turn: str = "", model: str = "", provider: str = "",
+                     tokens_in: int = 0, tokens_out: int = 0, cached_in: int = 0,
+                     cached_out: int = 0, credits: float | None = None,
+                     context_pct: float = 0.0, turns: int = 0, chunks: int = 0,
+                     prompt_bytes: int = 0, response_bytes: int = 0,
+                     tool_uses: int = 0, row_ref: str = "", ts: str | None = None,
+                     project: str = "", metric_id: str | None = None) -> dict:
+    """One **Kiro metrics** row — a store-verbatim usage fact from one of Kiro's two
+    on-disk stores, kept deliberately separate from `make_call`/`make_credit`
+    (KIRO-METRICS handoff §1). Widening either of those again for facts at three
+    different grains (per-IDE-call / per-CLI-conversation / per-CLI-turn) would blur
+    what those rows mean; this kind exists so it never has to — the `make_copilot_metric`
+    precedent, generalized to Kiro's stores.
+
+    `agent` is always `"kiro"`; `source` is validated against `KIRO_METRIC_SOURCES` —
+    every other field describes WHICH call/conversation/turn the row is about and WHAT
+    the store recorded for it, verbatim, no derivation.
+
+    **Counts are omit-at-zero** (`tokens_in`/`tokens_out`/`cached_in`/`cached_out`/
+    `turns`/`chunks`/`prompt_bytes`/`response_bytes`/`tool_uses`) — the house idiom.
+
+    **`credits` is None-sentinel, never omit-at-zero** — the same law `make_call.credits`
+    and `make_copilot_metric.credits` already break the pattern for: a store that
+    recorded a real `0.0` and a store that recorded nothing are different facts.
+
+    **Never estimated.** The community chars÷4 / cumulative-context / chunk-count trio
+    is explicitly BANNED as a source for `tokens_in`/`tokens_out`/`cached_in`/
+    `cached_out` — `chunks` is recorded as a chunk *count* (from
+    `len(request_metadata.time_between_chunks)`), never repurposed as a token figure.
+    `cached_in`/`cached_out`/the CLI `tokens_*` slots are filled ONLY when the store's
+    own `request_metadata` field is non-NULL — today that means every `cli-turn` row
+    omits them (the upgrade-watch: the day Kiro starts filling those fields, capture
+    picks them up with zero code change).
+
+    **The 2026-02-28 IDE semantics cutover is recorded, never corrected, here**: before
+    that date `tokens_prompt` was the full context per call; after, it is incremental.
+    A row's own `ts` is the only signal a derive-time reader has to branch on — this
+    constructor stores the store's number verbatim either way.
+
+    `row_ref` is the store's own row key (`devdata.sqlite`'s `id`, or the CLI turn's
+    `request_metadata.message_id`) — provenance, and the dedupe anchor.
+
+    `metric_id` is always supplied by a parser as a deterministic id that folds in the
+    row's own values (the `make_credit`/`make_copilot_metric` turns-fold idea) — so a
+    grown CLI conversation appends a FRESH row rather than silently losing the update,
+    and `ledger.kiro_metrics` collapses to the latest per key at read time. ``None``
+    falls back to a fresh random `km_` id."""
+    if source not in KIRO_METRIC_SOURCES:
+        raise ValueError(f"kiro-metric source {source!r} not in {KIRO_METRIC_SOURCES}")
+    row = {"id": metric_id or ids.new_id("km"), "ts": ts or _now(),
+           "agent": "kiro", "source": source}
+    if session:
+        row["session"] = str(session)
+    if surface:
+        row["surface"] = str(surface)
+    if turn:
+        row["turn"] = str(turn)
+    if model:
+        row["model"] = str(model)
+    if provider:
+        row["provider"] = str(provider)
+    if tokens_in:
+        row["tokens_in"] = int(tokens_in)
+    if tokens_out:
+        row["tokens_out"] = int(tokens_out)
+    if cached_in:
+        row["cached_in"] = int(cached_in)
+    if cached_out:
+        row["cached_out"] = int(cached_out)
+    if credits is not None:
+        row["credits"] = float(credits)
+    if context_pct:
+        row["context_pct"] = round(float(context_pct), 4)
+    if turns:
+        row["turns"] = int(turns)
+    if chunks:
+        row["chunks"] = int(chunks)
+    if prompt_bytes:
+        row["prompt_bytes"] = int(prompt_bytes)
+    if response_bytes:
+        row["response_bytes"] = int(response_bytes)
+    if tool_uses:
+        row["tool_uses"] = int(tool_uses)
+    if row_ref:
+        row["row_ref"] = str(row_ref)
+    if project:
+        row["project"] = str(project)
+    return row
+
+
+KIRO_METRIC_FIELDS = ("id", "ts", "agent", "source", "session", "surface", "turn",
+                      "model", "provider", "tokens_in", "tokens_out", "cached_in",
+                      "cached_out", "credits", "context_pct", "turns", "chunks",
+                      "prompt_bytes", "response_bytes", "tool_uses", "row_ref",
+                      "project")
+
+
 def _repo_relative(path: str) -> None:
     if path.startswith("/") or path.startswith("~") or ".." in Path(path).parts:
         raise ValueError(f"provenance file path must be repo-relative: {path!r}")

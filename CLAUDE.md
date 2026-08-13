@@ -38,6 +38,11 @@ record_call / record_receipt  →  .cage/ledger/{calls,receipts,tasks}-YYYY-MM.j
 Prices live in `prices.toml`; a legacy in-`cage.toml` prices block still reads via the
 fallback. **Vendor facts move, routing decisions stay.**
 
+Three capture-only per-chat metrics siblings — `.cage/ledger/{copilot,kiro,claude}/`
+— hold vendor-verbatim usage facts `calls`/`credits` deliberately don't widen to
+carry; never priced, read by no derived view yet (their own OPEN-WORK read-surface
+items).
+
 Long-lived logs are month-partitioned (writers append to a dated shard chosen from
 the row's own `ts`; readers glob + concatenate, legacy single files still read; `--since`
 skips below-cutoff months). provenance.jsonl is a local buffer only — canonical storage
@@ -1058,7 +1063,18 @@ each agent only needs thin idiomatic wiring (`agents.py` orchestrates):
 - **Meter:** `metering.py` (library), `proxy.py` + `usageparse.py` (any client you
   point a base URL at), `transcript.py` (Claude Code / Copilot CLI / Kiro session
   logs — `LOG_BEARING` is now all three of `agents.SURFACES`; Kiro's `tokens_generated.jsonl`
-  is coarse so the proxy stays its higher-fidelity fallback). Capture is **pull-based and
+  is coarse so the proxy stays its higher-fidelity fallback. A capture-only sibling
+  ledger, `.cage/ledger/kiro/` (KIRO-METRICS), records what that log's timestamped
+  SQLite twin `devdata.sqlite` and the CLI store's per-turn metadata carry beyond
+  `calls`/`credits` — never priced, not yet read by any derived view, an
+  upgrade-watch armed for the CLI's still-NULL token slots). transcript.py also feeds
+  a THIRD capture-only sibling, `.cage/ledger/claude/` (CLAUDE-METRICS): one row per
+  Claude Code chat, correctly folded — THE DEDUP LAW (fold duplicate assistant rows
+  per `(requestId, message.id)`, last wins) plus a subagent-to-parent join via each
+  row's own `sessionId` — deliberately dodging, not fixing, two open calls-path
+  defects (CLAUDE-DEDUP inflates `calls` ~2-3×; CLAUDE-SUBAGENT-KEY mis-keys
+  subagent spend there). No credits field — none exists for Claude Code on disk.
+  Capture is **pull-based and
   global** (plan §3.7): `cage import`/`cage data export` over a **resolved** ledger
   (`--ledger`/`CAGE_BASE` → project `.cage/` → global `~/.cage`, via `paths.resolve_root`)
   is the universal path that works with no hooks and no project.
