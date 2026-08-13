@@ -16,6 +16,69 @@ Entry format:
 
 ---
 
+## 2026-08-13 — REPORT-CREDITS: `cage report` gains a credits column
+
+- **Implemented:** on Arpit's decision ("report should show credit and for token it
+  should say N/A"), `report.summarize` now folds `ledger.credits` in on the `agent`
+  and default `route` dims (a synthetic `"credits"` route bucket, since a credits row
+  carries no `route` field; other dims left untouched — a credits row doesn't carry
+  `model`/`task` cleanly, and `cage insights chats` §2.13 already owns the
+  per-conversation view). A `credits` column appears only when the view actually
+  joined one (byte-identical text/CSV otherwise, no golden re-bless needed). A
+  credits-only group's `calls`/`tok in`/`tok out` render `—` in text / **empty** in
+  CSV; cost prices only through `[billing.<agent>] usd_per_credit`, the same rung
+  `chats.py` uses.
+  **Two real bugs found and fixed before writing tests, both via manual exercise of
+  the real ledger:** (1) a variable-name collision — the credits loop's local `cred`
+  clobbered the pre-existing `cred` dict (the COPILOT-CREDITS per-call ladder
+  summary), raising `TypeError: 'float' object is not subscriptable` on any
+  `--by agent` report; renamed to `cr_val`. (2) the TOTAL row's cost cell silently
+  DROPPED a rated credits dollar whenever any other group had real calls (`total["
+  calls"]` nonzero routed it past the credits-only branch straight to `g["usd"]`
+  alone) — understating spend, the one thing a total must never do. Fixed by summing
+  `usd + credits_usd` whenever `credits_rated`, in both `_cost_cell` and the CSV cell
+  builder, plus a matching fix to `net_usd` (was subtracting only `g["usd"]`, so `net
+  vs spend` could overstate a saving), and a new footnote naming the split
+  (`· total spans two pricing bases: …`) whenever both bases are non-zero.
+- **Files:** `cage/report.py` (`_new_group`, `summarize`, `_cost_cell`, `_row`,
+  `render_report`, `render_csv`), `tests/test_report_credits.py` (new, 17 tests
+  covering the render contract, the N/A cells, the rate ladder, the mixed-bucket sum,
+  CSV emptiness/method, `--since`, and determinism), `docs/FORMULAS.md` §1.7,
+  `CLAUDE.md` (new architecture bullet after "Per-call cost"), `CHANGELOG.md`,
+  `README.md`/`CLAUDE.md` test counts, `work/OPEN-WORK.md` (REPORT-CREDITS? removed).
+- **Tests:** green, 1662/0 ⇒ 1679/0. `test_floor.py`/`test_cli_reference.py`/
+  `test_output_spec.py` unchanged and green; no golden needed re-blessing.
+- **Next:** no agent-closable or Arpit-decides items remain from this thread;
+  `work/OPEN-WORK.md`'s CHATS-CREDITS-adjacent work is fully closed.
+
+## 2026-08-13 — CHATS-CREDITS: kiro-CLI conversations render as chat rows
+
+- **Implemented:** `cage insights chats` now reads `ledger.credits` alongside `calls`
+  and buckets a credits row into its own chat (never blended with a call bucket — a
+  trailing discriminator in the bucket key keeps the two shapes structurally apart).
+  A credits-only chat renders `calls` and all four token cells `—` (text) / empty
+  (CSV), `credits` filled, cost priced only through `[billing.<agent>] usd_per_credit`
+  (unset ⇒ `—`, `0.0` ⇒ `$0.0000`). Rank gains a second key
+  (`-tokens_in, -(credits or 0.0), session`). CSV `method` reports the row's own
+  `estimated` when unrated, `modeled` when rate-priced (a plain `creditprice.
+  method_for` on an empty basis would have overclaimed `measured`). The false
+  "`cage report` counts it" refusal and its `_credit_agents` machinery are gone —
+  nothing else ever read `ledger.credits`, so the fix pointer was never true for the
+  one agent that could trigger it. `agent%` refuses for kiro via the existing
+  `authorcapture.COVERAGE_GAPS` path, no new authorship logic.
+- **Files:** `cage/chats.py` (summarize, both renderers, docstring), `cage/ledger.py`
+  (`credits` docstring re-word), `tests/test_chats.py` (3 stale tests rewritten, 10
+  new), `docs/FORMULAS.md` §2.13, `cage/explain_data.py` (`chats-view`),
+  `docs/GLOSSARY.md` (`chat (view)`), `CHANGELOG.md`, `README.md` (test count),
+  `CLAUDE.md` (`just test` count — the chats-bullet correction is proposed, not
+  applied, see WORKLOG), `work/OPEN-WORK.md`.
+- **Tests:** green, 1662/0 (was 1655/0 — net +7: 3 rewritten in place, 7 wholly new).
+  `test_floor.py` / `test_cli_reference.py` / `test_output_spec.py` unchanged and
+  green; no golden needed re-blessing (no existing golden fixture records a credits
+  row).
+- **Next:** Arpit reviews the proposed `CLAUDE.md` chats-bullet edit (see WORKLOG); no
+  agent-closable work remains in `work/OPEN-WORK.md`.
+
 ## 2026-08-12 — WORK-DIR: the five session-tracking docs moved to root `work/`
 
 - **Implemented:** on Arpit's explicit instruction, `IMPLEMENTATION.md`, `INTERVIEW.md`,

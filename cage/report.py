@@ -24,8 +24,13 @@ def _new_group() -> dict:
     # unpriced_* ride in the same pass as the totals (one structure feeds text AND
     # csv — plan §3.9): the text view warns from `unpriced_detail`; the CSV shows
     # the same gap per group so a spreadsheet can't publish an understated total.
+    # `credits` starts at None, not 0.0 — the absent-vs-recorded-zero distinction
+    # every credits field in cage carries (REPORT-CREDITS, matching `chats.py`'s
+    # `_new_bucket`). A group no `ledger.credits` row ever joined stays None and
+    # renders `—`; one that joined a recorded `0.0` renders `0.00` — different facts.
     return {"calls": 0, "tokens_in": 0, "tokens_out": 0, "cached_in": 0, "usd": 0.0,
-            "cache_usd": 0.0, "unpriced_calls": 0, "unpriced_tokens": 0}
+            "cache_usd": 0.0, "unpriced_calls": 0, "unpriced_tokens": 0,
+            "credits": None, "credits_usd": 0.0, "credits_rated": False}
 
 
 def _cache_read_usd(pol: dict, provider: str, model: str, cached_in: int) -> float:
@@ -209,6 +214,39 @@ def summarize(root: Path, pol: dict, dim: str = "route", since: str | None = Non
             family[c.get("model") or "—"] = key or "—"
         elif match == "alias":
             alias[c.get("model") or "—"] = key or "—"
+    # REPORT-CREDITS: `ledger.credits` (kiro-CLI conversations — no call, no tokens)
+    # folds into the SAME `groups` dict as calls, on the two dims where a credits row
+    # has a clean, non-colliding key: `agent` (its own field) and the default `route`
+    # view (a synthetic "credits" bucket — a credits row carries no `route` at all, and
+    # bucketing it into the "—" catch-all would blend it with unrelated legacy rows).
+    # Every other dim (model/provider/day/task) is deliberately untouched — a credits
+    # row doesn't carry those fields cleanly, and CHATS-CREDITS already covers the
+    # per-conversation view (`cage insights chats`). Never folded into `usd`/`tokens_*`:
+    # a group's `credits` is its own field, read only by its own column.
+    unrated_agents: set[str] = set()
+    unrated_calls_n = 0
+    unrated_total = 0.0
+    if dim in ("route", "agent"):
+        raw_credits = ledger.credits(root)
+        credit_rows = ledger.by_project(ledger.by_scope(
+            (ledger.since(ledger.credits(root, since=since), since)
+             if since else raw_credits), scope), project)
+        for cr in credit_rows:
+            key = _key(cr, "agent") if dim == "agent" else "credits"
+            g = groups.setdefault(key, _new_group())
+            g.setdefault("agents", set()).add(cr.get("agent") or "lib")
+            cr_val = cr.get("credits")
+            if isinstance(cr_val, bool) or not isinstance(cr_val, (int, float)):
+                continue
+            g["credits"] = (g["credits"] or 0.0) + float(cr_val)
+            rate = creditprice.rate_for(pol, cr)
+            if rate is not None:
+                g["credits_usd"] += round(float(cr_val) * rate, 6)
+                g["credits_rated"] = True
+            else:
+                unrated_calls_n += 1
+                unrated_total += float(cr_val)
+                unrated_agents.add(cr.get("agent") or "")
     total = {"calls": sum(g["calls"] for g in groups.values()),
              "usd": sum(g["usd"] for g in groups.values()),
              "tokens_in": sum(g["tokens_in"] for g in groups.values()),
@@ -216,7 +254,18 @@ def summarize(root: Path, pol: dict, dim: str = "route", since: str | None = Non
              "cached_in": sum(g["cached_in"] for g in groups.values()),
              "cache_usd": sum(g["cache_usd"] for g in groups.values()),
              "unpriced_calls": sum(g["unpriced_calls"] for g in groups.values()),
-             "unpriced_tokens": sum(g["unpriced_tokens"] for g in groups.values())}
+             "unpriced_tokens": sum(g["unpriced_tokens"] for g in groups.values()),
+             "credits": (sum(g["credits"] or 0.0 for g in groups.values())
+                        if any(g["credits"] is not None for g in groups.values())
+                        else None),
+             "credits_usd": sum(g["credits_usd"] for g in groups.values()),
+             # Whether ANY group's credits actually priced — the TOTAL row's own cost
+             # cell reads this flag (never `credits_usd > 0`, which can't tell a real
+             # priced `$0.0000` from "nothing priced" — the same absence-vs-zero rule
+             # every credits figure in cage carries).
+             "credits_rated": any(g["credits_rated"] for g in groups.values())}
+    unrated_credits = {"calls": unrated_calls_n, "total": unrated_total,
+                       "agents": sorted(unrated_agents - {""})}
     unpriced_receipts = {"receipts": 0, "tokens": 0, "tools": set()}  # rung-3 refusals (§4.5)
     rung_models: set[tuple[str, str, str]] = set()  # (rung, tool, model) → usd-view footnotes
     if dim in SAVINGS_DIMS:  # second pass over receipts → saved + net (§3.1)
@@ -241,9 +290,13 @@ def summarize(root: Path, pol: dict, dim: str = "route", since: str | None = Non
             g.setdefault("saved_usd", 0.0)
             g.setdefault("saved_tokens", 0)
             g.setdefault("unpriced_saved_tokens", 0)
-            g["net_usd"] = g["saved_usd"] - g["usd"]
+            # Net is against the FULL spend, including a rated credits dollar — the
+            # same sum `_cost_cell` shows, so "net vs spend" can never overstate a
+            # saving by silently excluding money the cost column already counts.
+            g["net_usd"] = g["saved_usd"] - g["usd"] - (g["credits_usd"] if g["credits_rated"] else 0.0)
         total["saved_usd"] = total_saved
-        total["net_usd"] = total_saved - total["usd"]
+        total["net_usd"] = (total_saved - total["usd"]
+                            - (total["credits_usd"] if total["credits_rated"] else 0.0))
         total["saved_tokens"] = sum(g["saved_tokens"] for g in groups.values())
         total["unpriced_saved_tokens"] = sum(g["unpriced_saved_tokens"] for g in groups.values())
     unpriced_receipts["tools"] = sorted(unpriced_receipts["tools"])
@@ -267,6 +320,9 @@ def summarize(root: Path, pol: dict, dim: str = "route", since: str | None = Non
     cred["total"] = sum(v["total"] for v in cred_by_agent.values())
     return {"dim": dim, "since": since, "project": project, "scope": scope,
             "groups": groups, "credits": cred,
+            # `ledger_credits_unrated`: the REPORT-CREDITS rate-unset advisory — distinct
+            # from `credits` above (the pre-existing per-call COPILOT-CREDITS ladder dict).
+            "ledger_credits_unrated": unrated_credits,
             "total": total, "unpriced": sorted(unpriced), "family": family,
             "alias": alias, "unpriced_detail": dict(sorted(unpriced.items())),
             "unpriced_receipts": unpriced_receipts, "freshness": fresh,
@@ -501,11 +557,27 @@ def overview(root: Path, pol: dict, since: str | None = None) -> dict:
 def _cost_cell(g: dict, total: bool = False) -> str:
     """`—` is the only rendering of "couldn't price" — a group whose every call
     refused to price shows the dash, never `$0.0000` (a self-costed est fallback
-    keeps its real figure). A TOTAL over a partial gap says so inline."""
+    keeps its real figure). A TOTAL over a partial gap says so inline.
+
+    A **credits-only** group (`calls == 0`, REPORT-CREDITS) has no token-priced cost
+    at all — its cell prices only through the credits rate (`—` when unrated, a real
+    `$0.0000` when a configured `0.0` rate priced it). A group whose calls *and*
+    credits rows share one bucket (rare — an agent whose real calls and its
+    call-less credits conversations landed in the same root) **sums both** rather
+    than silently dropping the credits side — a total that quietly omitted a rated
+    dollar would understate spend, the one thing this cell must never do. The
+    caller states the split (`render_report`'s total-spans-two-bases footnote)
+    whenever both sides are non-zero, so the sum is never presented as one basis."""
     from cage.display import DASH
-    if g.get("unpriced_calls") and g["unpriced_calls"] == g["calls"] and not g["usd"]:
+    credits_usd = g["credits_usd"] if g.get("credits_rated") else 0.0
+    if not g["calls"]:
+        if g.get("credits") is not None:
+            return render.usd(credits_usd) if g.get("credits_rated") else DASH
         return DASH
-    cell = render.usd(g["usd"])
+    if (g.get("unpriced_calls") and g["unpriced_calls"] == g["calls"]
+            and not g["usd"] and not credits_usd):
+        return DASH
+    cell = render.usd(g["usd"] + credits_usd)
     if total and g.get("unpriced_calls"):
         cell += " (+ unpriced)"
     return cell
@@ -531,16 +603,31 @@ def _display_name(name: str, g: dict, dim: str) -> str:
     return name
 
 
-def _row(name: str, g: dict, savings_cols: bool, usd_view: bool, total: bool = False) -> list[str]:
-    cells = [name, render.tok(g["calls"]), render.tok(g["tokens_in"]),
-             render.tok(g["tokens_out"])]
+def _credits_cell(g: dict) -> str:
+    """`—` when this group joined no `ledger.credits` row, else the 2dp sum — the
+    same absent-vs-recorded-zero rule `chats.py`'s `_credits_cell` follows."""
+    from cage.display import DASH
+    return DASH if g.get("credits") is None else creditprice.fmt(g["credits"])
+
+
+def _row(name: str, g: dict, savings_cols: bool, usd_view: bool, total: bool = False,
+        has_credits: bool = False) -> list[str]:
+    from cage.display import DASH
+    # A credits-only group (calls == 0, REPORT-CREDITS) carries no token facts at
+    # all — `—` there is *absence*, never a fabricated `0`. A group with real calls
+    # renders its real counts even when it also carries credits (the rare mixed case).
+    no_calls = not g["calls"]
+    cells = [name, DASH if no_calls else render.tok(g["calls"]),
+             DASH if no_calls else render.tok(g["tokens_in"]),
+             DASH if no_calls else render.tok(g["tokens_out"])]
+    if has_credits:
+        cells.append(_credits_cell(g))
     if not usd_view and savings_cols:
         cells.append(render.tok(g.get("saved_tokens", 0)))
     if usd_view:
         cost = _cost_cell(g, total=total)
         cells.append(cost)
         if savings_cols:
-            from cage.display import DASH
             cells += _saved_cells(g, cost_dashed=cost == DASH)
     return cells
 
@@ -573,11 +660,21 @@ def render_report(rep: dict, last_import: str | None = None, disp=None,
         return _render_empty(rep)
     savings = "saved_usd" in rep["total"]  # only task/agent attribute receipts (§3.1)
     savings_cols = savings and (rep.get("has_receipts", True) or disp.all_columns)
-    rows = [_row(_display_name(name, g, rep["dim"]), g, savings_cols, disp.usd)
+    # REPORT-CREDITS: the column exists only when this view actually joined a
+    # `ledger.credits` row — an unrelated dim (model/provider/day/task) or a ledger
+    # with no credits at all stays byte-identical to before this feature.
+    has_credits = rep["total"].get("credits") is not None
+    rows = [_row(_display_name(name, g, rep["dim"]), g, savings_cols, disp.usd,
+                has_credits=has_credits)
             for name, g in sorted(rep["groups"].items(), key=lambda kv: -kv[1]["usd"])
-            if g["calls"]]  # 0-call receipt-only buckets never render (Phase 1.3)
-    rows.append(_row("TOTAL", rep["total"], savings_cols, disp.usd, total=True))
+            # 0-call receipt-only buckets never render (Phase 1.3); a 0-call CREDITS
+            # bucket does — it is the one thing this view exists to show.
+            if g["calls"] or g["credits"] is not None]
+    rows.append(_row("TOTAL", rep["total"], savings_cols, disp.usd, total=True,
+                     has_credits=has_credits))
     head = [rep["dim"], "calls", "tok in", "tok out"]
+    if has_credits:
+        head.append("credits")
     if not disp.usd and savings_cols:
         head.append("gross tok")  # K: gross, never bare "saved" (net-savings handoff)
     if disp.usd:
@@ -615,6 +712,25 @@ def render_report(rep: dict, last_import: str | None = None, disp=None,
         if cr.get("unrated_calls"):
             foot.gap(creditprice.unrated_line(cr["unrated_calls"], cr["unrated_total"],
                                               cr.get("unrated_agents", [])))
+        # REPORT-CREDITS: the rate-unset advisory for `ledger.credits` rows — a
+        # DIFFERENT population from `cr` above (calls that carry a `credits` field,
+        # COPILOT-CREDITS). These are call-less conversations, so the line says
+        # "conversation(s)", never "call(s)" — a credits row was never a call.
+        lcu = rep.get("ledger_credits_unrated") or {}
+        if lcu.get("calls"):
+            n = lcu["calls"]
+            foot.gap(f"· {n} conversation{'s' if n != 1 else ''} carry recorded credits "
+                     f"({creditprice.fmt(lcu['total'])} cr) — not priced; "
+                     f"{creditprice.rate_hint(lcu.get('agents', []))}")
+        # REPORT-CREDITS: a `cost`/TOTAL cell can now sum a token-priced dollar and a
+        # rate-priced credits dollar (`_cost_cell`, never silently dropping the
+        # credits side — the one thing a total must not do). Whenever both sides are
+        # non-zero the split is named, the same discipline `creditprice.split_footnote`
+        # already applies to the copilot per-call ladder above.
+        if rep["total"].get("credits_rated") and rep["total"]["usd"]:
+            foot.footnote(f"· total spans two pricing bases: {render.usd(rep['total']['usd'])} "
+                          f"from token-priced calls + {render.usd(rep['total']['credits_usd'])} "
+                          "from credits×rate (`cage query copilot-credits`)")
         t = rep["total"]
         # F5 (docs/regression/2026-07-22-capture-report.md): a headline like
         # "8.2B tokens, $7,046" reads as alarming when it's almost entirely
@@ -687,21 +803,45 @@ def render_csv(rep: dict) -> str:
     (net-savings handoff, K). Column contract in docs/FORMULAS.md §2."""
     from cage import csvout
     savings = "saved_usd" in rep["total"]
-    head = [rep["dim"], "calls", "tokens_in", "tokens_out", "cached_in", "cost_usd",
+    # REPORT-CREDITS: the column exists only when this view joined a `ledger.credits`
+    # row — an unaffected dim or a ledger with no credits stays byte-identical
+    # (the same conditional-column pattern the savings pair already uses above).
+    has_credits = rep["total"].get("credits") is not None
+    head = [rep["dim"], "calls", "tokens_in", "tokens_out", "cached_in",
+            *(("credits",) if has_credits else ()), "cost_usd",
             *(("gross_saved_usd", "net_vs_spend_usd") if savings else ()),
             "unpriced_calls", "unpriced_tokens", "method"]
     # Method law: `measured` is only true while every priced cell came from tokens ×
-    # price table. A credits-priced row makes the view's dollars partly a function of a
-    # configured rate, so the whole view degrades to `modeled` (`creditprice.method_for`).
-    # This is view-level, not per-group: the CSV's `cost_usd` rows share one basis
-    # statement, and a per-group tag would let a reader sum `measured` rows into a total
-    # that isn't.
-    method = creditprice.method_for({creditprice.CREDITS: rep.get("credits", {}).get("calls", 0)})
+    # price table. A credits-priced row (either basis — a call carrying its own
+    # `credits` field, COPILOT-CREDITS, or a call-less `ledger.credits` conversation,
+    # REPORT-CREDITS) makes the view's dollars partly a function of a configured rate,
+    # so the whole view degrades to `modeled` (`creditprice.method_for`). This is
+    # view-level, not per-group: the CSV's `cost_usd` rows share one basis statement,
+    # and a per-group tag would let a reader sum `measured` rows into a total that isn't.
+    credits_priced = (rep.get("credits", {}).get("calls", 0)
+                      + sum(1 for g in rep["groups"].values() if g.get("credits_rated")))
+    method = creditprice.method_for({creditprice.CREDITS: credits_priced})
     def cells(name, g):
-        return [name, g["calls"], g["tokens_in"], g["tokens_out"], g["cached_in"],
-                round(g["usd"], 6),
-                *((round(g["saved_usd"], 6), round(g["net_usd"], 6)) if savings else ()),
-                g["unpriced_calls"], g["unpriced_tokens"], method]
+        # A credits-only group (calls == 0) leaves calls/tokens_in/tokens_out/cached_in
+        # EMPTY, never `0` — the same absence-vs-measured-zero rule the text view's `—`
+        # follows (a `0` there would claim "we counted calls here and found none",
+        # when in fact no call was ever possible for this row).
+        no_calls = not g["calls"]
+        row = [name, "" if no_calls else g["calls"], "" if no_calls else g["tokens_in"],
+               "" if no_calls else g["tokens_out"], "" if no_calls else g["cached_in"]]
+        if has_credits:
+            row.append("" if g.get("credits") is None else round(g["credits"], 6))
+        # `cost_usd` sums the token-priced and rate-priced credits dollars — the same
+        # never-silently-drop-a-rated-dollar rule `_cost_cell` follows. Empty (not a
+        # fabricated `0`) only when NEITHER side ever priced this row.
+        rated_usd = g["credits_usd"] if g.get("credits_rated") else 0.0
+        if no_calls and g.get("credits") is not None and not g.get("credits_rated"):
+            row.append("")
+        else:
+            row.append(round(g["usd"] + rated_usd, 6))
+        row += ((round(g["saved_usd"], 6), round(g["net_usd"], 6)) if savings else ())
+        row += [g["unpriced_calls"], g["unpriced_tokens"], method]
+        return row
     rows = [cells(name, g)
             for name, g in sorted(rep["groups"].items(), key=lambda kv: -kv[1]["usd"])]
     rows.append(cells("TOTAL", rep["total"]))

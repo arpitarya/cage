@@ -212,6 +212,24 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   ledger is never rewritten. A call prices only if `(provider, model)` is in the
   table; the transcript meter stamps `provider="anthropic"`, so that key must carry
   the Claude rows (the bundled `data/cage.toml` does; a project policy must too).
+- **`ledger.credits` in `cage report` (REPORT-CREDITS, 2026-08-13)** — a **second,
+  distinct** credits mechanism from the ladder above: kiro-CLI conversations
+  (`schema.make_credit`) carry no call and no tokens at all, so they can't flow
+  through `call_usd_match`. `report.summarize` folds them in as their own group on
+  the `agent` and default `route` dims only (a synthetic `"credits"` bucket for
+  `route`, since a credits row has no `route` field — other dims are untouched, a
+  credits row doesn't carry `model`/`task` cleanly and `cage insights chats`, §2.13,
+  already owns the per-conversation view). A `credits` column appears only when this
+  view actually joined one (byte-identical CSV/text otherwise); a credits-only
+  group's `calls`/`tok in`/`tok out` render `—` in text, **empty** in CSV — never a
+  fabricated `0`. Priced only through `[billing.<agent>] usd_per_credit`, same rung
+  as `chats.py`. **The one number `cost`/`net vs spend`/CSV `cost_usd` must never
+  silently drop:** the rare group whose calls and credits rows share one bucket sums
+  both into the cell rather than keeping the token-priced half alone, and the report
+  states the split (`· total spans two pricing bases: …`) whenever both are non-zero
+  — found and fixed during the build itself (the first version quietly understated
+  a rated total). FORMULAS §1.7; `cage query copilot-credits` explains the ladder
+  both mechanisms share.
 - **The Tier-1 human axis is GONE (v0.36)** — `human.py`/`humanview.py`/`trend.py`/
   `attention.py`, `cage human`, `cage insights trend`, `matrix --human`,
   `calibration --human`, `[human.*]`, `CAGE_HUMAN_RATE`, `IDLE_CAP_MINUTES`, the
@@ -954,7 +972,7 @@ the worked examples to copy.
 ## Dev
 
 ```bash
-just test          # python -m pytest -q   (1655 tests; +10 Windows-only skips, +1 opt-in dogfood-age skip)
+just test          # python -m pytest -q   (1679 tests; +10 Windows-only skips, +1 opt-in dogfood-age skip)
 just demo          # seed §4.4 + print attrib/matrix
 cage --version
 ```

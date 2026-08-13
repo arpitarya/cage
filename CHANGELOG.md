@@ -2,9 +2,7 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
-## v0.49.1 (2026-08-12) — session-tracking docs move to root work/
-
-Docs-only. No functional or behavioral code change.
+## v0.49.1 (2026-08-12, gains a second and third change 2026-08-13) — session-tracking docs move to root work/, kiro-CLI conversations get a chat row, and `cage report` gains a credits column
 
 - **WORK-DIR:** `IMPLEMENTATION.md`, `INTERVIEW.md`, `MACHINE.md`, `OPEN-WORK.md`, and
   `WORKLOG.md` moved from `docs/` to a new root `work/` directory, on Arpit's explicit
@@ -21,8 +19,32 @@ Docs-only. No functional or behavioral code change.
   (the same class of bug it was restored for once already, in the v0.36 hookless sweep)
   by the v0.49.0 queue-closure sweep, leaving six citations dangling with no recorded
   decision to remove it. Restored from `HEAD`.
+- **CHATS-CREDITS:** `cage insights chats` now renders a kiro-CLI conversation as its
+  own chat row instead of refusing the whole view with a false "`cage report` counts
+  it" pointer — nothing ever read `ledger.credits` except that refusal. A credits-only
+  chat shows `calls` and all four token cells `—` (text) / empty (CSV), `credits`
+  filled, and prices only through the existing `[billing.kiro] usd_per_credit` rung
+  (unset ⇒ `—`, a real `0.0` ⇒ `$0.0000`). Rank gains a second key
+  (`-tokens_in, -(credits or 0.0), session`) so credits-only chats sort below every
+  token-bearing one. Derive-only: no substrate, writer, or MCP change. Discovered gap
+  filed to `work/OPEN-WORK.md`: `cage report` still reads no `ledger.credits` row, so
+  chats is the only surface counting kiro-CLI usage.
+- **REPORT-CREDITS:** `cage report` now folds `ledger.credits` in too, on the default
+  `route` view and `--by agent` — a new `credits` column (present only when this view
+  actually joined a credits row; every other dim, and a ledger with none, is
+  byte-identical to before). A credits-only group's `calls`/`tok in`/`tok out` render
+  `—` in text / empty in CSV; `credits` is filled and priced only through
+  `[billing.<agent>] usd_per_credit`, same rung `cage insights chats` already uses.
+  The rare group whose calls and credits rows share one bucket sums both into `cost`
+  rather than dropping the credits side, and the report names the split
+  (`· total spans two pricing bases: …`) whenever both are non-zero — this was a real
+  bug caught during the build (the first version silently understated a rated total,
+  found by manually exercising `--by agent --usd` before writing tests). Resolves the
+  REPORT-CREDITS? open question; removed from `work/OPEN-WORK.md`.
 
-Suite: 1655 passed / 11 skipped (unchanged from v0.49.0 — no test added or removed).
+Suite: 1679 passed / 11 skipped (1655 → 1662 CHATS-CREDITS, → 1679 REPORT-CREDITS —
+17 new in `tests/test_report_credits.py`). No golden re-blessed either time — neither
+feature's column renders for a ledger with no credits data.
 
 ## v0.49.0 (2026-08-12) — the queue emptied, and the agent lane with it
 

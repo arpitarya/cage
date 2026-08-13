@@ -240,8 +240,10 @@ not silently edit another project's files.
 `(agent, surface, session)` bucket, titled where `imports.jsonl` carries a name
 (display label only — deleting the manifest moves zero numeric cell, `manifest.py`).
 No name ⇒ the session id, never a fabricated title. Kiro-IDE's constant session id
-already collapses every run into one chat; kiro-CLI conversations are `credits` rows
-(no `tokens_in`/`tokens_out`) and never appear here. [chats.py](../cage/chats.py).
+already collapses every run into one chat. Kiro-CLI conversations are `credits` rows
+(no `tokens_in`/`tokens_out`) and render as their own chat too (CHATS-CREDITS,
+2026-08-13): `calls` and every token cell `—`, `credits` filled, cost priced only
+through `[billing.kiro] usd_per_credit`. [chats.py](../cage/chats.py).
 
 **credit (billed)** — the `credits` call field: what the *provider itself* billed for
 one call, recorded verbatim. Copilot persists it per request in VS Code's chatSessions

@@ -37,9 +37,11 @@ spec.
 
 **None.** `docs/` root carries no loose handoff/prompt pair and no held proposal — a pair
 is created only when a phase in [OPEN-WORK.md](../work/OPEN-WORK.md) is picked up, and archived
-on implement. The agent-lane refill, the last occupant, was built and green on 2026-08-12
-and [archived](archive/v0.49-open-queue-agent-lane.handoff.md) — handoff only, its prompt
-was handed over inline and never written here.
+on implement. The agent-lane refill was built and green on 2026-08-12 and
+[archived](archive/v0.49-open-queue-agent-lane.handoff.md) — handoff only, its prompt was
+handed over inline and never written here. CHATS-CREDITS, the next and last occupant, was
+built and green on 2026-08-13 and
+[archived](archive/v0.49-chats-credits.handoff.md).
 
 **One thing it left open is not a pair and does not live here:** the `CLAUDE.md`
 *Documentation discipline* correction is **proposed, awaiting Arpit** — steering files are

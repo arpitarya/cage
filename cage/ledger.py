@@ -204,9 +204,11 @@ def credits(root: Path, since: str | None = None) -> list[dict]:
     folds in a higher turn count (`schema.make_credit`), so the shard is append-only and
     a re-import adds zero rows — but a grown conversation's credits must never be *summed*
     with its earlier partial row. This reader keeps only the highest-turn row per
-    `session` (ties broken by id), the append-only analogue of `_latest_task`. Read by no
-    call-based view, so it can never perturb a token/cost number (determinism preserved);
-    an empty ledger with no credits shard returns []."""
+    `session` (ties broken by id), the append-only analogue of `_latest_task`. **Read by
+    `cage insights chats`** (CHATS-CREDITS) as its own row shape — a credits row gets its
+    own bucket there and never enters a token/cost aggregate, so reading it can never
+    perturb a *call*-derived number (determinism preserved on that axis); an empty ledger
+    with no credits shard returns []."""
     rows = read_kind(root, "credits", since=since)
     latest: dict[str, dict] = {}
     for r in rows:

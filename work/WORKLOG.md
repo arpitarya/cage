@@ -12,6 +12,143 @@ by milestone) — the worklog is what *happened this session*.
 
 ---
 
+## 2026-08-13 — Claude Code — REPORT-CREDITS: `cage report` gains a credits column
+
+- **Asked:** after CHATS-CREDITS shipped, explain what the filed REPORT-CREDITS?
+  open question meant; then, on the explanation, a direct decision — "the report
+  should show credit and for token it should say N/A." Before implementing, asked a
+  clarifying question on WHERE in `cage report`'s 6-dimension table it should land
+  (report is heavily-tested and convention-bound); confirmed answer: a new `credits`
+  column on the existing table, shown under `--by agent` and the default route view.
+- **Done:** `report.summarize` folds `ledger.credits` into the SAME `groups` dict as
+  calls, on `agent` (its own field) and a synthetic `"credits"` bucket for the
+  default `route` dim (credits rows carry no `route`, and bucketing into the `"—"`
+  catch-all would blend them with unrelated legacy rows). Token/calls cells dash for
+  a credits-only group; cost prices via `[billing.<agent>] usd_per_credit`.
+  **Manual testing before writing tests caught two real bugs the suite would not
+  have (no existing test exercised `--by agent` with any credits present):** a
+  variable-name collision (`cred` shadowed a pre-existing outer `cred` dict, crashing
+  every `--by agent` report with `TypeError: 'float' object is not subscriptable`),
+  and a silent-understatement bug (the TOTAL row's cost cell dropped a rated credits
+  dollar whenever any other group had real calls, because the `not g["calls"]`
+  branch guard only fired when the row's OWN calls were zero — TOTAL's calls are
+  never zero when anything else in the ledger had a call). Fixed both, then fixed
+  the same class of bug in `net vs spend` (was subtracting only the token-priced
+  half), then wrote 17 tests including one that pins the exact regression
+  ("the TOTAL row's cost cell dropped a rated credits dollar entirely"). Full suite
+  green, 1662/0 ⇒ 1679/0, no golden re-blessed (the column is absent whenever a view
+  has no credits data — conditional-column pattern already used for the savings
+  columns).
+- **Decided/open:** nothing left open — this closes the REPORT-CREDITS? question
+  filed 2026-08-12, and the CLAUDE.md architecture bullet documenting it was written
+  directly (new content describing a feature just built, not an edit to Arpit's
+  existing prose — distinct from the CHATS-CREDITS chats-bullet edit, which stays a
+  proposal awaiting review since it rewrites an existing sentence).
+- **Cost:** unmeasured — `cage report` is cumulative over the whole `~/.cage` ledger
+  (all sessions, all time; ~$12,916 all-time), not isolated to this session's own
+  spend, so it is not a usable per-session figure here.
+- **Next:** none from this thread. Concurrent Cowork sessions have since filed their
+  own unrelated work (GRAPHIFY-CHATS, a Copilot usage-fetch research doc) — not
+  touched here.
+
+## 2026-08-13 — Cowork — Copilot per-chat usage fetch spec: five sources, verified against today's upstream
+
+- **Asked:** research how to fetch Copilot token in/out, cached in/out, and credits
+  for every chat — exact dir, file, row, and prop for each value.
+- **Done:** verified against microsoft/vscode `main` + vscode-copilot-chat `main`
+  (2026-08-13 clones); published
+  [research/2026-08-13-copilot-per-chat-usage-fetch-spec.md](../docs/research/2026-08-13-copilot-per-chat-usage-fetch-spec.md).
+  Five sources mapped: chatSessions (always-on), CLI `~/.copilot/session-state`
+  (always-on), `agentHostUsage/` sidecar (debug-gated), extension `debug-logs/`
+  (fileLogging-gated — no cached tokens reach the file), and a NEW OTel SQLite
+  store `globalStorage/github.copilot-chat/agent-traces.db`
+  (`otel.dbSpanExporter.enabled` — per-call `cached_tokens`, SQL-queryable).
+- **Key deltas vs the 2026-08-02 research:** chatSessions now persists
+  `modelTotals[{model,inputTokens,cachedTokens,outputTokens}]` per request
+  (agent-host sessions) — durable, UNGATED cached tokens, retiring "sidecar is the
+  only cached source"; `sessionCopilotCredits` now exists (authoritative,
+  max-not-sum); credits ≡ `totalNanoAiu / 1e9`; three chatSessions roots cage's
+  glob misses (`emptyWindowChatSessions`, `no-workspace`, `transferredChatSessions`);
+  cache-WRITE tokens persisted nowhere — honest-empty stands.
+- **Open:** the doc's ranked items 1–7 (modelTotals capture, sessionCopilotCredits
+  collapse, extra-roots sweep, sidecar import, the v0.44 CLI credit-delta-loss fix,
+  optional agent-traces.db source).
+- **Next step:** run the doc's §Verification commands on the real store, then fold
+  items 1–3 into the next copilot capture work.
+
+## 2026-08-13 — Cowork — graphify-chats view specced (per-chat usage + saving); pair filed
+
+- **Asked:** a CLI showing per-chat graphify usage/saving (chat title · agent · total
+  tokens · with graphify · without graphify · % saved); create the Claude Code prompt
+  if no such view exists.
+- **Established first:** no such view exists — roi is per-tool, attribution/netsaved
+  per-task, `why` per-call; savings rows carry `session` (all four transcript routes
+  stamp the real chat id; the native shim stamps honest-empty `""`) but no `agent`.
+- **Design locked (debated):** "total tokens" ≡ "with graphify" — one column, identity
+  footnoted; `without = tokens + Σsaved` is a GROSS modeled counterfactual (GROSS_NOTE
+  verbatim, estimator-mixing caveat, worst-case method/confidence); per-chat NET ruled
+  structurally impossible (netsaved's attributable-cost rule) and scoped out; agent
+  stays the existing agent+surface pair; shim/unmatched rows footnoted, never
+  redistributed; tokens-only, no USD. New module `cage/graphifychat.py`, command
+  `cage insights graphify`.
+- **Filed:** `docs/graphify-chats.{handoff,prompt}.md` (Model: Sonnet, Progress: 0%);
+  GRAPHIFY-CHATS line added to OPEN-WORK. Sequencing gate (after CHATS-CREDITS) is
+  already satisfied — that work landed 2026-08-13 before this filing reached the queue.
+- **Open:** default row set (receipt-bearing chats only vs all chats — one-word flip at
+  plan time) · v2 `--tool` generalization (noted in the handoff, not built).
+- **Cost:** unmeasured — `cage` not runnable from the Cowork cloud session.
+- **Update (same day, on "make it a zap"):** handoff §4 rewritten as a researched
+  change map against post-CHATS-CREDITS code — the zap decision is REUSE
+  `chats.summarize` (titles/buckets/normalization/kiro-credit rows free) and join
+  savings by `session` alone; exact insertion points named (cli.py after the `ch`
+  block ~l. 340, `cmd_chats` clone at clicmds l. 142, `GRAPHIFY_CHATS_DEFAULT_ROWS`
+  beside constants l. 287, FORMULAS §2.15 after l. 598, explainer beside `chats-view`
+  l. 1216, CLI.md 16→17 views at l. 207 + both tables). Prompt's sequencing gate
+  removed (chats-credits landed).
+- **Next:** Arpit pastes `docs/graphify-chats.prompt.md` into Claude Code (Sonnet).
+
+
+## 2026-08-13 — Claude Code — CHATS-CREDITS: kiro-CLI conversations render as chat rows
+
+- **Asked:** execute the CHATS-CREDITS prompt/handoff pair — make `cage insights
+  chats` render a kiro-CLI credits conversation as its own chat row instead of
+  refusing the view with a false "`cage report` counts it" pointer.
+- **Done:** verified every "Current state" fact in the handoff against live code
+  before writing anything (all held). Extended `chats.summarize` to read
+  `ledger.credits` and bucket a credits row separately from a call row (a trailing
+  discriminator in the bucket key, so the two shapes can never blend even if a future
+  agent someday records both for the same session). Both renderers dash the token
+  cells / empty the CSV cells for a credits-only chat, price cost only through
+  `[billing.<agent>] usd_per_credit`, and tag CSV `method` from the row's own
+  recorded method when unrated (a plain `creditprice.method_for` on an empty basis
+  would have read an unrated credits chat as `measured`, which overclaims). Removed
+  the `_credit_agents` refusal machinery entirely — 3 existing tests asserted the old
+  refusal text and were rewritten to assert the new render; 10 new tests cover the
+  render contract, rank, rate-set/unset/zero, `--since`, the restated
+  money-independence carve-out, and the coverage-gap refusal. Full suite green,
+  1662/0 (1655 → 1662). No golden fixture needed re-blessing — none of them record a
+  credits row, so removing the refusal text changed nothing byte-pinned. Updated
+  `docs/FORMULAS.md` §2.13, `cage/explain_data.py`, `docs/GLOSSARY.md`,
+  `CHANGELOG.md` (amended into the still-untagged v0.49.1 entry — its "docs-only"
+  framing was no longer true), `README.md`'s test count, `CLAUDE.md`'s `just test`
+  count, `work/OPEN-WORK.md` (removed the item; the pre-filed REPORT-CREDITS?
+  follow-up updated to drop a citation to the now-deleted `_credit_agents`), and
+  archived the handoff/prompt pair to `docs/archive/`.
+- **Decided/open:** the handoff's proposed `CLAUDE.md` chats-bullet edit is **not
+  applied** — flagged here for Arpit's review, per the standing rule that steering
+  files are never silently rewritten. Proposed replacement for the sentence "kiro-CLI
+  conversations are `credits` rows and don't appear here" (in the *Adapters & agents*
+  → *Meter* bullet): "kiro-CLI conversations are `credits` rows, rendered by
+  `cage insights chats` (CHATS-CREDITS) as their own chat with token cells dashed."
+  Also still open (unchanged, filed 2026-08-12): **REPORT-CREDITS?** — should
+  `cage report` gain a credits count line, now that chats is the only surface
+  counting kiro-CLI usage.
+- **Cost:** unmeasured — `cage report` is cumulative over the whole `~/.cage` ledger
+  (all sessions, all time; $12,878.31 all-time, 34 calls unpriced), not isolated to
+  this session's own spend, so it is not a usable per-session figure here.
+- **Next:** Arpit reviews the proposed `CLAUDE.md` edit above (and REPORT-CREDITS?);
+  `work/OPEN-WORK.md`'s agent-closable section is empty again.
+
 ## 2026-08-12 — Claude Code — WORK-DIR: five session-tracking docs moved to root `work/`
 
 - **Asked:** clear `OPEN-WORK.md`, then move `IMPLEMENTATION.md`/`INTERVIEW.md`/

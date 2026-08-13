@@ -480,26 +480,19 @@ def test_filtered_empty_names_the_filter_not_the_ledger(root, pol):
 # ── structural absence: the filter is blamed only when the filter is the reason ──
 #
 # `cage insights chats --agent kiro` printing "the filter is empty, not the ledger" is
-# a true sentence about the filter and a misleading one about kiro: its CLI
-# conversations are credits (no calls at all) and its IDE rows route to the machine
-# ledger (ADR 0006). Both facts are in cage's hands at render time. Saying *filter*
-# when the answer is *architecture* sends a reader to check their typing instead of
-# the ledger they actually want.
+# a true sentence about the filter and a misleading one about kiro-IDE: its rows route
+# to the machine ledger (ADR 0006), a fact cage has in hand at render time. Saying
+# *filter* when the answer is *architecture* sends a reader to check their typing
+# instead of the ledger they actually want. (Kiro-CLI conversations used to carry a
+# second structural reason here — their credits rows carried no call at all, so no
+# chat row could exist for them. CHATS-CREDITS removed that limit: a credits row now
+# renders its own chat row, tested in the section below.)
 
 def _credit(root: Path, *, session: str, agent: str = "kiro", credits: float = 3.5,
             turns: int = 4, ts: str = "2026-07-01T10:00:00Z"):
     """One kiro-CLI credits row — a different row shape with no tokens and no call."""
     ledger.append_row(root, "credits", schema.make_credit(
         session=session, credits=credits, agent=agent, turns=turns, ts=ts))
-
-
-def test_an_agent_recorded_as_credits_says_so_instead_of_blaming_the_filter(root, pol):
-    _call(root, "c_1", agent="claude-code", session="s1")
-    _credit(root, session="kc1")
-    out = chats.render_chats(chats.summarize(root, pol, agent="kiro"))
-    assert "recorded as credits, not token calls" in out
-    assert "the filter is empty, not the ledger" not in out
-    assert "cage report" in out          # where that usage IS counted
 
 
 def test_the_routed_sink_is_named_in_the_empty_view_too(root, pol):
@@ -512,13 +505,13 @@ def test_the_routed_sink_is_named_in_the_empty_view_too(root, pol):
 
 
 def test_a_filter_that_really_is_the_reason_still_says_so(root, pol):
-    """The old message is not wrong, it was over-applied. An agent with no structural
-    reason gets it back, unchanged."""
+    """An agent with no rows at all (no calls, no credits) still gets the plain
+    filter-is-empty message — copilot's absence here has nothing to do with kiro's
+    credits row existing elsewhere in the ledger."""
     _call(root, "c_1", agent="claude-code", session="s1")
     _credit(root, session="kc1")
     out = chats.render_chats(chats.summarize(root, pol, agent="copilot"))
     assert "the filter is empty, not the ledger" in out
-    assert "recorded as credits" not in out   # copilot's absence has a different cause
 
 
 def test_a_filtered_view_is_never_told_about_another_agents_reason(root, pol):
@@ -528,25 +521,151 @@ def test_a_filtered_view_is_never_told_about_another_agents_reason(root, pol):
     assert "kiro" not in out
 
 
-def test_a_non_empty_view_still_names_the_usage_it_cannot_show(root, pol):
-    """No-silent-omission: a table that just doesn't show credits usage reads as
-    'there is none', and the ledger sitting right there says otherwise."""
+# ── CHATS-CREDITS: a kiro-CLI conversation is its own chat row ─────────────────
+
+def test_a_credit_conversation_renders_as_a_chat_row_not_a_refusal(root, pol):
+    """The defect this change fixes: a kiro-CLI conversation used to make the whole
+    view refuse with a false `cage report` pointer. It now renders like any other
+    chat — `calls` and all four token cells dashed (nothing was ever a call), the
+    old refusal text gone entirely."""
+    _credit(root, session="kc1", credits=3.5)
+    out = chats.render_chats(chats.summarize(root, pol, agent="kiro"))
+    assert "recorded as credits, not token calls" not in out
+    assert "carries no calls" not in out
+    assert "the filter is empty, not the ledger" not in out
+    lines = out.splitlines()
+    row = next(l for l in lines if l.startswith("kc1"))
+    cells = row.split()
+    assert cells[:2] == ["kc1", "kiro"]
+    # calls, tokens_in, cached_in, cache_write, tokens_out all dash; credits filled
+    assert cells[3:8] == ["—"] * 5
+    assert "3.50" in cells
+
+
+def test_a_non_empty_view_still_names_the_usage_it_shows(root, pol):
+    """The unfiltered view renders both the call chat and the credits chat, and
+    footnotes the credits-only-store limit rather than the old silent-omission gap
+    (there is no longer anything silently omitted)."""
     _call(root, "c_1", agent="claude-code", session="s1")
     _credit(root, session="kc1")
     out = chats.render_chats(chats.summarize(root, pol))
-    assert "recorded as credits carries no calls" in out
+    assert "s1" in out and "kc1" in out
+    assert "kiro CLI reports credits only" in out
 
 
-def test_reading_credits_moves_no_number(root, pol):
-    """The third money-independent carve-out holds on the same terms as the first two:
-    read for a refusal, never for a cell. Delete every credits row and the rendered
-    table is byte-identical below the footer."""
-    _call(root, "c_1", agent="claude-code", session="s1")
+def test_reading_credits_adds_a_row_and_moves_no_call_chat_cell(root, pol):
+    """The third money-independent carve-out, restated for the new shape: a credits
+    row can never perturb a *call* chat's cells — it only ever adds a row of its
+    own. Deleting the credits shard removes that row and changes nothing else."""
+    _call(root, "c_1", agent="claude-code", session="s1", tin=100, tout=10, cached=5)
+    _credit(root, session="kc1", credits=7.0)
     before = chats.summarize(root, pol)
-    _credit(root, session="kc1")
+    assert {r["session"] for r in before["rows"]} == {"s1", "kc1"}
+    s1_before = next(r for r in before["rows"] if r["session"] == "s1")
+
+    from cage import paths
+    for f in paths.Footprint(root).shards("credits"):
+        f.unlink()
     after = chats.summarize(root, pol)
-    assert before["rows"] == after["rows"]
-    assert chats.render_csv(before) == chats.render_csv(after)   # CSV never sees it
+    assert {r["session"] for r in after["rows"]} == {"s1"}
+    s1_after = after["rows"][0]
+    numeric_fields = ("calls", "tokens_in", "cached_in", "cache_write_in",
+                      "tokens_out", "premium", "cost", "unpriced_calls",
+                      "unpriced_tokens")
+    for f in numeric_fields:
+        assert s1_after[f] == s1_before[f], f"{f} moved"
+    assert chats.render_csv(before) != chats.render_csv(after)  # the credits row left
+
+
+def test_credit_row_csv_leaves_call_cells_empty_not_zero(root, pol):
+    """CSV never gates and never fabricates a zero: a credits-only chat's calls/token
+    cells are **empty**, distinct from a real `0`."""
+    import csv as _csv
+    import io
+    _credit(root, session="kc1", credits=1.25)
+    rows = list(_csv.DictReader(io.StringIO(
+        chats.render_csv(chats.summarize(root, pol)))))
+    r = rows[0]
+    for f in ("calls", "tokens_in", "cached_in", "cache_write_in", "tokens_out"):
+        assert r[f] == ""
+    assert r["credits"] == "1.25"
+
+
+def test_credit_row_rank_key_sorts_below_token_chats_and_by_credits_among_peers(root, pol):
+    """`(-tokens_in, -(credits or 0.0), session)` — a credits-only chat (tokens_in=0)
+    always sorts below any token-bearing chat, and among credits-only chats, higher
+    credits first."""
+    _call(root, "c_tok", agent="claude-code", session="s_tok", tin=10)
+    _credit(root, session="kc_lo", credits=1.0)
+    _credit(root, session="kc_hi", credits=9.0)
+    rows = chats.summarize(root, pol)["rows"]
+    assert [r["session"] for r in rows] == ["s_tok", "kc_hi", "kc_lo"]
+
+
+def test_credit_row_rate_set_prices_and_tags_modeled(root, pol):
+    rated = {**pol, "billing": {"kiro": {"usd_per_credit": 0.10}}}
+    _credit(root, session="kc1", credits=4.0)
+    data = chats.summarize(root, rated)
+    r = data["rows"][0]
+    assert r["cost"] == pytest.approx(0.40)
+    out = chats.render_chats(data, disp=__import__("cage.display", fromlist=["Display"]).Display(usd=True))
+    assert "$0.4000" in out
+    import csv as _csv
+    import io
+    csv_row = next(iter(_csv.DictReader(io.StringIO(chats.render_csv(data)))))
+    assert csv_row["method"] == "modeled"
+    assert csv_row["priced_via"] == "credits-rate"
+
+
+def test_credit_row_rate_unset_shows_dash_never_zero(root, pol):
+    """Rate unset ≠ rate zero: credits stay a count, cost is `—`, never `$0.0000`."""
+    from cage import display
+    _credit(root, session="kc1", credits=4.0)
+    data = chats.summarize(root, pol)
+    r = data["rows"][0]
+    assert r["cost"] == 0.0
+    out = chats.render_chats(data, disp=display.Display(usd=True))
+    row = next(l for l in out.splitlines() if l.startswith("kc1"))
+    assert row.rstrip().endswith("—")
+    import csv as _csv
+    import io
+    csv_row = next(iter(_csv.DictReader(io.StringIO(chats.render_csv(data)))))
+    assert csv_row["method"] == "estimated"
+    assert csv_row["priced_via"] == ""
+
+
+def test_credit_row_rate_zero_prices_at_real_zero(root, pol):
+    """A configured `0.0` rate is a real, priced zero — different from an unset rate."""
+    from cage import display
+    zeroed = {**pol, "billing": {"kiro": {"usd_per_credit": 0.0}}}
+    _credit(root, session="kc1", credits=4.0)
+    data = chats.summarize(root, zeroed)
+    out = chats.render_chats(data, disp=display.Display(usd=True))
+    row = next(l for l in out.splitlines() if l.startswith("kc1"))
+    assert "$0.0000" in row
+    import csv as _csv
+    import io
+    csv_row = next(iter(_csv.DictReader(io.StringIO(chats.render_csv(data)))))
+    assert csv_row["method"] == "modeled"
+
+
+def test_credit_row_since_filters_by_ts(root, pol):
+    _credit(root, session="kc_old", credits=1.0, ts="2020-01-01T00:00:00Z")
+    _credit(root, session="kc_new", credits=1.0)  # default ts: 2026-07-01T10:00:00Z
+    data = chats.summarize(root, pol, since="7d")
+    assert {r["session"] for r in data["rows"]} == set()
+    data_recent = chats.summarize(root, pol, since="100d")
+    assert {r["session"] for r in data_recent["rows"]} == {"kc_new"}
+
+
+def test_credit_row_agent_pct_refuses_via_existing_coverage_gap(root, pol):
+    """No new authorship logic: kiro is already in `authorcapture.COVERAGE_GAPS`, so
+    a credits chat's `agent%` refuses the same way a kiro call chat's would."""
+    from cage import authorcapture
+    _credit(root, session="kc1")
+    r = chats.summarize(root, pol)["rows"][0]
+    assert r["auth_refusal"] == chats.COVERAGE
+    assert authorcapture.coverage_note() in chats.render_chats(chats.summarize(root, pol))
 
 
 # ── --agent filter ───────────────────────────────────────────────────────────

@@ -2,17 +2,14 @@
 
 ## Agent-closable
 
-- **CHATS-CREDITS** — render kiro-CLI credit conversations as chat rows in
-  `cage insights chats` (credits column filled, token cells `—`); kills the false
-  "`cage report` counts it" refusal text. Spec + prompt:
-  `docs/chats-credits.{handoff,prompt}.md` (filed 2026-08-12, picked up on paste).
+- **GRAPHIFY-CHATS** — new `cage insights graphify`: per-chat graphify usage + gross
+  saving (recorded tokens · without-graphify counterfactual · saved%), joined by the
+  savings rows' `session` to the chat universe. Spec + prompt:
+  `docs/graphify-chats.{handoff,prompt}.md` (filed 2026-08-13, picked up on paste).
 
 ## Arpit decides
 
-- **REPORT-CREDITS?** — discovered 2026-08-12: `ledger.credits` is read by NO money
-  view (grep: only `chats._credit_agents`), so once CHATS-CREDITS lands, chats is the
-  only surface counting kiro-CLI usage. Decide whether `cage report` gains a credits
-  count line. (filed 2026-08-12)
+**None.**
 
 ## How this file is maintained
 

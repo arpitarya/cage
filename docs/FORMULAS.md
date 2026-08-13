@@ -186,6 +186,26 @@ credit row: schema.make_credit, method = "estimated", recorded not priced
 - **Method law:** a *proxy-measured* Kiro number could be `measured` — but that path
   does not exist for Kiro. The credit-derived number is `estimated`, always; the two
   are never blurred.
+- **Two read surfaces, both derive-only (REPORT-CREDITS, 2026-08-13).**
+  `cage insights chats` (§2.13) renders one row per conversation; `cage report`
+  (`report.py`) folds credits into its own `--by agent` / default `--by route`
+  table, a new `credits` column present only when this view actually joined a
+  `ledger.credits` row (other dims, and a ledger with none, are byte-identical to
+  before). A credits-only group's `calls`/`tok in`/`tok out` cells are `—` in text /
+  **empty** in CSV — absence, never a fabricated `0` — while its `credits` cell
+  carries the recorded figure. `cost` prices only through `[billing.<agent>]
+  usd_per_credit` — unset ⇒ `—`, a configured `0.0` ⇒ a real `$0.0000` — the same
+  ladder rung `creditprice.rate_for` already serves `chats.py`. **The one number a
+  report total must never silently drop:** a group whose calls and credits rows
+  share one bucket (rare — an agent whose calls and call-less credits conversations
+  land in the same ledger root) sums both into that cell rather than keeping only
+  the token-priced half, and `render_report` names the split
+  (`· total spans two pricing bases: …`) whenever both sides are non-zero — the same
+  discipline `creditprice.split_footnote` applies to the copilot per-call ladder.
+  `net vs spend` subtracts the same full sum, so a rated credits dollar can never
+  read as an uncounted saving. CSV `method` degrades to `modeled` whenever any group
+  priced via this rung (`creditprice.method_for`, weaker tag wins) — the same rule
+  as the existing per-call credits ladder, extended to cover this second population.
 
 ### 1.7a Kiro IDE cost — which *ledger* the rows are summed in
 
@@ -529,8 +549,25 @@ spec'd elsewhere.
   `tests/test_chats.py`'s money-independence test).
   Kiro-IDE stamps a constant session id, so its rows already collapse into one bucket by
   construction — `chat` renders the honest `kiro (no session identity)`, never a
-  fabricated per-run label. Kiro-CLI conversations are `credits` rows (no `tokens_in`/
-  `tokens_out`), so they never enter this table at all.
+  fabricated per-run label.
+- **Kiro-CLI conversations render too (CHATS-CREDITS, 2026-08-13)** — they are
+  `ledger.credits` rows (no `tokens_in`/`tokens_out`, no call at all), read alongside
+  `calls` and bucketed the same way, one row per `(agent, surface, session)`, kept
+  structurally apart from any call bucket by a trailing discriminator in the bucket key
+  so the two shapes can never blend. A credits-only chat renders `calls` and all four
+  token cells `—` in text / **empty** in CSV (absence, not a fabricated `0`); `credits`
+  is filled from the row exactly as any other chat's `credits` column. `cost` prices
+  only through the existing `[billing.<agent>] usd_per_credit` rung (`creditprice.
+  rate_for`) — unset ⇒ `—` (a count with nowhere to convert, not a `$0.0000`), `0.0` ⇒
+  a real `$0.0000`. CSV `method` is the row's own recorded method (`estimated`,
+  `schema.make_credit`'s default) when unrated, `modeled` when rate-priced — the
+  generic `creditprice.method_for` alone would read an all-empty `basis` as `measured`,
+  which overclaims a bucket that was never token-priced at all. Rank gains a second key:
+  `(-tokens_in, -(credits or 0.0), session)` — a credits-only chat (`tokens_in=0`)
+  always sorts below any token-bearing chat, and among its own kind, higher credits
+  first; this is ordering, never arithmetic, so it does not blend the two axes. No
+  manifest row exists for a kiro-CLI conversation today, so its title always falls back
+  to the session id (a future store-side title is a follow-up, not this change).
 - **No method tag on the grouping itself** — the same reasoning as §2.12: a sum and a
   sort are not a claim about how a number was priced. `cost` inherits `call_usd_match`'s
   tag exactly like `report` (§1), which means a bucket with any credits-priced row
@@ -557,20 +594,22 @@ spec'd elsewhere.
   those rows are not independent evidence. And per chat there is no diff to clamp
   against (§2.14 clamps per commit), so two chats that proposed the same landed file
   each count its lines: **the commit view stays the arbiter for any single sha**.
-- **The third money-independent carve-out: `ledger.credits`, read for a *refusal*.**
-  A credits row has no `tokens_in`/`tokens_out` and no call at all
-  (`schema.make_credit` — a call with `tokens_in=0` would be a lie), so an agent
-  recorded that way **can never produce a chat row**. The view reads which agents those
-  are so an empty result can say *why*, and so a non-empty one can footnote the usage it
-  structurally cannot show (no-silent-omission). It moves no cell: delete every credits
-  shard and `rows` and the CSV are byte-identical (`tests/test_chats.py::
-  test_reading_credits_moves_no_number`).
+- **The third money-independent carve-out, restated for the new shape.** `ledger.
+  credits` no longer feeds only a refusal — it feeds real rows — but the guarantee is
+  the same as the manifest-title and provenance-count carve-outs: a credits row can
+  never perturb a **call** chat's cells, only add a row of its own. Deleting the
+  credits shard removes the credits-only rows and changes zero numeric cell on any
+  call-based chat (`tests/test_chats.py::
+  test_reading_credits_adds_a_row_and_moves_no_call_chat_cell`).
 - **The filter is blamed only when the filter is the reason.** `No chats match agent
   'kiro' — the filter is empty, not the ledger` is true about the filter and misleading
-  about kiro, whose absence is structural on two counts (credits above; IDE rows routed
-  to the machine ledger, [ADR 0006](adr/0006-kiro-rows-are-machine-facts-not-project-facts.md)).
-  The empty view names the reasons it can evidence, and only for the agent asked about;
-  an absence with no structural cause keeps the filter message unchanged.
+  about kiro-IDE, whose absence is structural (IDE rows routed to the machine ledger,
+  [ADR 0006](adr/0006-kiro-rows-are-machine-facts-not-project-facts.md)). Kiro-CLI used
+  to carry a second structural reason (credits rows produced no chat at all); CHATS-
+  CREDITS removed it by giving those rows a real chat row, so the only structural
+  reason left is the IDE-routing one. The empty view names the reasons it can evidence,
+  and only for the agent asked about; an absence with no structural cause keeps the
+  filter message unchanged.
 - Ranking (`tokens_in` desc, then session id) and the top-20 cut (`--all` lifts it) are
   render-time only — `chats.summarize()` returns every row un-truncated, so `--all` can
   never move a number, only how many rows are shown. CSV is never truncated. Explained
