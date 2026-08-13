@@ -87,7 +87,7 @@ explicitly-labelled residual it never claims to have measured.**
   the resolution the source actually supports.
 - **A single `human` bucket, per the handoff's mock** — *lost to measurement.* On cage's
   own repo it printed **human~ 76.6%**, 89% of which was one commit of generated JSON
-  ([dogfood](../regression/2026-08-02-p1-authorship-dogfood.md) §4). A residual
+  ([dogfood](../../work/regression/2026-08-02-p1-authorship-dogfood.md) §4). A residual
   presented as a finding is precisely the v1 mistake.
 - **Detect generated files (`linguist-generated`, `.gitignore`, a size heuristic)** —
   *lost on inventing a fact.* `unattributed` already says the true thing.
@@ -98,10 +98,10 @@ explicitly-labelled residual it never claims to have measured.**
 ## Reference
 
 - Measured, on cage's own 103-commit repo against 81 real transcripts:
-  [docs/regression/2026-08-02-p1-authorship-dogfood.md](../regression/2026-08-02-p1-authorship-dogfood.md).
+  [work/regression/2026-08-02-p1-authorship-dogfood.md](../../work/regression/2026-08-02-p1-authorship-dogfood.md).
   The join test is §2 (68.7% match inside proposed files); the gate sweep is §3; the
   rejected single-bucket split is §4.
-- The autopsy this decision answers to: `docs/archive/v0.36-human-removal.handoff.md`
+- The autopsy this decision answers to: `work/archive/v0.36-human-removal.handoff.md`
   and `cage query savings-axis`.
 - Plan §3.5 (provenance: the PII line, corroboration, unknown-by-absence).
 

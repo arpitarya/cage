@@ -80,4 +80,4 @@ the enabling setting for each gated store. `cage query copilot-metrics` explains
 
 Standing rule (frontmatter `update-rule`): a change to any copilot parser, source
 path, schema field, or pricing rung updates this doc **in the same change** — stale
-here = a missing changelog entry. Tracked in [DOC-REGISTRY.md](DOC-REGISTRY.md).
+here = a missing changelog entry. Tracked in [DOC-REGISTRY.md](../work/DOC-REGISTRY.md).

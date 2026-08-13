@@ -72,7 +72,7 @@ def _may_write_under_cage(root: Path) -> bool:
     the *cwd* while the footprint re-bases onto the override, so the old ``root/.cage``
     test inspected a directory unrelated to the active sink and silently suppressed every
     event — the F6 receipt produce/skip trace included. That cost the F1 diagnosis its
-    instrument (`docs/regression/2026-07-24-f1-root-cause.md`). A bare cwd with neither
+    instrument (`work/regression/2026-07-24-f1-root-cause.md`). A bare cwd with neither
     ``.cage/`` nor an override is still refused, so debug never scatters."""
     return _explicit_log() or _explicit_base() or (root / ".cage").is_dir()
 

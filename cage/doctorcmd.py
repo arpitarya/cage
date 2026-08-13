@@ -184,7 +184,7 @@ def _capture_timeline(active: Path) -> tuple[str, str]:
 def _capture_quality(root: Path) -> tuple[str, str]:
     """Distinguishes a log-bearing agent that IS capturing rows from one whose
     capture is present but nearly worthless — ``tokens_out == 0`` across every
-    recorded call (F3, docs/regression/2026-07-22-capture-report.md). Kiro's
+    recorded call (F3, work/regression/2026-07-22-capture-report.md). Kiro's
     on-disk log is coarse *by design* (module docstring, cage/transcript.py:
     "output tokens often 0") and hits this in real use; the same signal is worth
     surfacing for any agent, so the check is agent-agnostic in mechanism.

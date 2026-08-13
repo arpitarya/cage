@@ -13,7 +13,7 @@ You're paying for an agent, a graph tool, a rules engine, maybe Copilot. At the 
 
 **Platforms:** macOS is field-validated (real extension sessions, the full manual capture matrix); Linux and Windows are CI-tested across the whole suite + scenario runner, plus a graphify leg that installs the real binary and meters real queries. The graphify PATH interceptor now ships as a **twin pair** — the bash shim and a `graphify.cmd` — so a bare `graphify` reaches cage on Windows too (Windows PATH lookup goes through `PATHEXT`, which has no extensionless entry, so the bash shim alone could never be found there). Windows is CI-asserted, not yet field-validated. On Windows, run `cage doctor --paths` first — it shows every log location cage probes on your machine and why any missed. Locked-down endpoint (AppLocker/WDAC blocks the exe, or no pip)? `cage setup --python-launcher` wires everything through the interpreter instead, and every release ships a single-file `cage.pyz` — **note that this turns the graphify shim route off too** (there's no `cage` command left on PATH for it to probe), so a launcher-mode project relies on the transcript route for graphify savings; see [restricted-environments.md](docs/restricted-environments.md).
 
-<p align="center"><em>Measured on itself: <a href="docs/dogfood/latest.md">cage's own ledger, real numbers, refreshed periodically</a>.</em></p>
+<p align="center"><em>Measured on itself: <a href="work/dogfood/latest.md">cage's own ledger, real numbers, refreshed periodically</a>.</em></p>
 
 ## The story
 
@@ -27,7 +27,7 @@ And the kicker — you built half of it. So when finance points at you and says 
 
 **Cage is the thing that ruins the fog.** It's the itemized receipt nobody asks for and everybody needs: the graph tool saved 27,000 tokens here, fux saved 6,400 there — **and what invoking them cost you, netted against it** — plus every other combo you *could've* run, priced out, each number stamped so you know which ones are real and which ones are some computer's best guess. It doesn't do synergy. It does arithmetic.
 
-And when cage's own numbers came back saying a session *with* the graph tool cost **more** than one without? It printed that too, labelled, instead of burying it. A savings tool you can't catch lying about savings is just the fog with a logo. ([The finding.](docs/regression/2026-08-01-finding-saved-is-gross.md))
+And when cage's own numbers came back saying a session *with* the graph tool cost **more** than one without? It printed that too, labelled, instead of burying it. A savings tool you can't catch lying about savings is just the fog with a logo. ([The finding.](work/regression/2026-08-01-finding-saved-is-gross.md))
 
 ## See it
 

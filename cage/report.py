@@ -34,7 +34,7 @@ def _new_group() -> dict:
 
 
 def _cache_read_usd(pol: dict, provider: str, model: str, cached_in: int) -> float:
-    """F5 (docs/regression/2026-07-22-capture-report.md): the cache-read-billed
+    """F5 (work/regression/2026-07-22-capture-report.md): the cache-read-billed
     slice of a call's cost alone — `cached_in` tokens at the model's real
     `cache_read` per-million rate, never a hardcoded discount fraction, so the
     split stays correct if pricing changes. A component of `prices.call_cost_usd`'s
@@ -435,7 +435,7 @@ def kiro_routed_line(root: Path, pol: dict | None = None, verb: str = "report") 
 
 
 def _kiro_limits_caveat(rep: dict, usd: bool) -> str:
-    """The kiro HONEST-LIMIT line (K3, [finding](docs/regression/2026-08-01-finding-kiro-rows-carry-no-time-session-project.md)),
+    """The kiro HONEST-LIMIT line (K3, [finding](work/regression/2026-08-01-finding-kiro-rows-carry-no-time-session-project.md)),
     stated where a kiro number could be misread. Kiro's IDE log records **no per-turn
     timestamp, no session id and no project**: its `ts` is stamped at import, `session` is
     the constant ``"kiro"``, and `project` is absent. So kiro rows cannot be ordered,
@@ -458,7 +458,7 @@ def _kiro_limits_caveat(rep: dict, usd: bool) -> str:
 
 
 def _surface_caveat(rep: dict) -> str:
-    """The `--by surface` HONEST-LIMIT line (K4, [finding](docs/regression/2026-08-01-finding-surface-attribution-is-agent-dependent.md)).
+    """The `--by surface` HONEST-LIMIT line (K4, [finding](work/regression/2026-08-01-finding-surface-attribution-is-agent-dependent.md)).
 
     Claude Code's CLI and its VS Code extension write the **same** store with no marker
     distinguishing them, so cage cannot know which surface produced a claude row. The empty
@@ -732,7 +732,7 @@ def render_report(rep: dict, last_import: str | None = None, disp=None,
                           f"from token-priced calls + {render.usd(rep['total']['credits_usd'])} "
                           "from credits×rate (`cage query copilot-credits`)")
         t = rep["total"]
-        # F5 (docs/regression/2026-07-22-capture-report.md): a headline like
+        # F5 (work/regression/2026-07-22-capture-report.md): a headline like
         # "8.2B tokens, $7,046" reads as alarming when it's almost entirely
         # prefix-cache re-reads billed at a discount. One line, real numbers —
         # no other report structure changes.

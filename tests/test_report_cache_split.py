@@ -1,4 +1,4 @@
-"""F5 — cache-vs-fresh split in `report --usd` (docs/regression/2026-07-22-capture-report.md).
+"""F5 — cache-vs-fresh split in `report --usd` (work/regression/2026-07-22-capture-report.md).
 
 The evidence: cached_in was 98.0% of tokens_in on a real ledger, and the headline
 "$7,046 spent" reads as alarming when almost all of it is 0.1x-billed prefix-cache

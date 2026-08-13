@@ -289,7 +289,7 @@ def _vscode_parts(chat_session_path: Path):
     `kind:2 k:["requests", i, "response"] → v[]`. All three are walked; the last is the
     common one for a live session, and walking only one would silently see a fraction of
     the runs. Shapes pinned against 157 real files / 7,741 tool parts
-    (docs/research/2026-08-07-graphify-store-evidence.md)."""
+    (work/research/2026-08-07-graphify-store-evidence.md)."""
     session = ""
     parts: list[dict] = []
 
@@ -575,7 +575,7 @@ def _file_report_read(root, session, fp, cwd, existing_ids, counts, pol):
 # explainer entry — never re-derived per view, so the two can't drift into disagreeing
 # about a gap. Each row is `(agent, surface, files_receipts, why)`; every `False` row
 # states a *measured* structural limit, never a guess or a "not yet".
-# Grounded in docs/research/2026-08-07-graphify-store-evidence.md (GFX-COV/P0).
+# Grounded in work/research/2026-08-07-graphify-store-evidence.md (GFX-COV/P0).
 GRAPHIFY_COVERAGE = (
     ("claude", "cli+vscode", True,
      "transcript Bash tool_use paired with its tool_result (one store, both surfaces)"),

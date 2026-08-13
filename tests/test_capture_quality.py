@@ -1,4 +1,4 @@
-"""F3 — capture is present but token-thin (docs/regression/2026-07-22-capture-report.md).
+"""F3 — capture is present but token-thin (work/regression/2026-07-22-capture-report.md).
 
 Distinct from `test_capture_health.py`'s triple-gated "installed but capturing
 nothing" warning (files==0): this is the narrower, separate signal for an agent

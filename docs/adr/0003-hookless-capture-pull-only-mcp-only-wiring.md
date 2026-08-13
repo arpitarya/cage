@@ -56,11 +56,11 @@ wires. No hook writer, no OS scheduler, no rendered skill/prompt/steering asset.
 
 ## Reference
 
-The 9-day silent-capture failure (F1, `docs/regression/`) is the grounding example: a
+The 9-day silent-capture failure (F1, `work/regression/`) is the grounding example: a
 wired-but-dead hook is worse than no hook, because it reads as installed. Plan of record
 for the pull-only rebuild + the import ledger it enables:
-[docs/cage-import-ledger-plan.md](../archive/v0.36-import-ledger-savings.plan.md); the executing
-handoff/prompt pair is archived at `docs/archive/v0.36-hookless-rebuild.*`.
+[docs/cage-import-ledger-plan.md](../../work/archive/v0.36-import-ledger-savings.plan.md); the executing
+handoff/prompt pair is archived at `work/archive/v0.36-hookless-rebuild.*`.
 
 ## Veto condition (when to revisit)
 

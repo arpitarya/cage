@@ -43,8 +43,8 @@ capture, deliberately kept OUT of `calls` so it can't inherit that path's defect
 
 Capture-only — no `report`/`insights chats` cell reads this kind yet (a read surface
 is parked, `work/OPEN-WORK.md`). No credits field: none exists for Claude Code.
-Spec: [claude-metrics-ledger.handoff.md](archive/v0.49-claude-metrics-ledger.handoff.md) ·
-evidence: [research/2026-08-13-claude-per-chat-usage-fetch-spec.md](research/2026-08-13-claude-per-chat-usage-fetch-spec.md).
+Spec: [claude-metrics-ledger.handoff.md](../work/archive/v0.49-claude-metrics-ledger.handoff.md) ·
+evidence: [research/2026-08-13-claude-per-chat-usage-fetch-spec.md](../work/research/2026-08-13-claude-per-chat-usage-fetch-spec.md).
 
 ## Known gaps & defects (open)
 
@@ -88,4 +88,4 @@ evidence: [research/2026-08-13-claude-per-chat-usage-fetch-spec.md](research/202
 
 Standing rule (frontmatter `update-rule`): a change to any claude parser, source
 path, schema field, or pricing updates this doc **in the same change** — stale
-here = a missing changelog entry. Tracked in [DOC-REGISTRY.md](DOC-REGISTRY.md).
+here = a missing changelog entry. Tracked in [DOC-REGISTRY.md](../work/DOC-REGISTRY.md).

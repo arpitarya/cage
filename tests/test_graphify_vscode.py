@@ -2,7 +2,7 @@
 
 This store was skipped outright through v0.46 on the "F2" claim that it carried the
 command but no tool result. The 2026-08-07 field probe measured that claim false
-(`docs/research/2026-08-07-graphify-store-evidence.md`, 157 real files / 1,132
+(`work/research/2026-08-07-graphify-store-evidence.md`, 157 real files / 1,132
 `run_in_terminal` parts): the store persists ``commandLine.original``, ``cwd.path`` and
 the output via `resultDetails` or `terminalCommandOutput`.
 

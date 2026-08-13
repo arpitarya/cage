@@ -120,7 +120,7 @@ def test_self_silencing_a_prior_row_clears_the_warning(tmp_path, monkeypatch):
 
 
 def test_first_ever_import_marks_the_agent_captured_same_run(tmp_path, monkeypatch):
-    # F2 regression (docs/regression/2026-07-22-capture-report.md): the VERY FIRST import
+    # F2 regression (work/regression/2026-07-22-capture-report.md): the VERY FIRST import
     # of an agent must record `captured=True` in the SAME run. The run-shared `captured`
     # set is snapshotted from the ledger *before* this run's appends, so a brand-new
     # surface isn't in it yet — before the fix it read `captured=False` until a *second*

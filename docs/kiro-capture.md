@@ -91,4 +91,4 @@ sink (machine ledger); `cli-conv`/`cli-turn` rows ride the same workspace scopin
 Standing rule (frontmatter `update-rule`): a change to any kiro parser, source
 path, schema field, routing decision, or pricing updates this doc **in the same
 change** — stale here = a missing changelog entry. Tracked in
-[DOC-REGISTRY.md](DOC-REGISTRY.md).
+[DOC-REGISTRY.md](../work/DOC-REGISTRY.md).

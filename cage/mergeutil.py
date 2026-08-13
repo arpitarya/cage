@@ -10,7 +10,7 @@ re-synced row must never read as a stronger method than its real input); the led
 passes nothing and keeps first-by-id (call/receipt ids never legitimately collide, so
 the policy is "document the rule, never silently overwrite"). **That invariant is only
 as true as `ids.new_id`'s entropy** — it was measurably false at 16 bits (~1 in 229 over
-200k ids, `docs/regression/2026-08-02-finding-call-id-collisions.md`), which is what
+200k ids, `work/regression/2026-08-02-finding-call-id-collisions.md`), which is what
 widening the random field to 32 bits fixed. A collision here is a *dropped row*, not a
 conflict to resolve, so the generator is this function's real precondition. Kept here, not in
 `notessync`, so `ledgersync` doesn't have to import the provenance module.

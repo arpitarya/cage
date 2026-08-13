@@ -212,13 +212,13 @@ NET_ATTRIB_WINDOW_S = 120
 NET_SAVED_CONFIDENCE = 0.4
 
 # The OTel GenAI semantic-convention target of `cage data export --otel`
-# (`cage/otelout.py`, docs/archive/v0.39-otel-export.handoff.md). Cage's determinism law
+# (`cage/otelout.py`, work/archive/v0.39-otel-export.handoff.md). Cage's determinism law
 # — same ledger + policy ⇒ same output — means cage never silently follows upstream:
 # this is the ONE pinned target, stamped in every emitted document's `cage.meta` block,
 # exactly like `[meta] prices_version`. Bumping it is a deliberate, changelog'd change.
 #
 # **What the number NAMES, because "1.42.0" alone was ambiguous** (OTEL-SEMCONV-PIN,
-# closed 2026-08-11; [research](docs/research/2026-08-03-otel-genai-semconv-pin.md)). On
+# closed 2026-08-11; [research](work/research/2026-08-03-otel-genai-semconv-pin.md)). On
 # **2026-06-12, main-repo release v1.42.0**, every `gen_ai.*` convention was deprecated
 # in `open-telemetry/semantic-conventions` and moved to the dedicated
 # `open-telemetry/semantic-conventions-genai`. So 1.42.0 is the **last main-repo release
@@ -245,7 +245,7 @@ OTEL_SEMCONV_STATUS = "pre-stable (Development; source repo untagged)"
 # edit. 4 is deliberately small: it excludes the punctuation noise and essentially
 # nothing else (`pass`, `else:` and `import x` all survive it).
 #
-# Tuned against the P1 dogfood on cage's own repo (docs/regression/) — raise it and
+# Tuned against the P1 dogfood on cage's own repo (work/regression/) — raise it and
 # the unknown bucket grows without the agent share moving; lower it and matches start
 # coming from lines that carry no information. A heuristic that must stay reviewable
 # ⇒ constants, not policy: it changes what a number MEANS, so it is not a per-project

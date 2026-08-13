@@ -66,7 +66,7 @@ Code: [creditprice.resolve](../cage/creditprice.py), reached from
 | 3 · UNPRICED | neither | none — loud, counted, two runnable fixes |
 
 - **Rung 0 · one basis per shutdown** (REV-CREDITS defect 2, closed 2026-08-11 —
-  [compare](compare/copilot-pricing-basis.compare.md)). GitHub computes
+  [compare](../work/compare/copilot-pricing-basis.compare.md)). GitHub computes
   `totalPremiumRequests` over **every** model in a `session.shutdown`, so the figure
   lands on one carrier row and every sibling carries `billed_with = <carrier id>`. Such a
   row prices at `$0.00` **on the credits basis** with the carrier's id as the matched key
@@ -176,7 +176,7 @@ credit row: schema.make_credit, method = "estimated", recorded not priced
   alike. There is no token count to measure, so no `measured`/`modeled` cost is
   derivable — only a credit-derived `estimated` one, always.
 - **The proxy route was tried and closed (P2, 2026-07-28 —
-  [`docs/regression/2026-07-28-kiro-proxy-probe.md`](regression/2026-07-28-kiro-proxy-probe.md)).**
+  [`work/regression/2026-07-28-kiro-proxy-probe.md`](../work/regression/2026-07-28-kiro-proxy-probe.md)).**
   `cage data meter` (the in-path proxy, [proxy.py](../cage/proxy.py)) sets only
   `ANTHROPIC_BASE_URL`/`OPENAI_BASE_URL`; kiro-cli honors **neither** — it routes to
   AWS CodeWhisperer / Amazon Q (`api.codewhisperer.service`/`api.q.service`), speaks
@@ -226,7 +226,7 @@ kiro-IDE rows → the machine ledger (~/.cage), one copy per machine
   ledger for the routed leg to run.
 - **Limit that survives:** a kiro-IDE row's `ts` is stamped at import, so it can be
   summed but never *windowed* — `--since` includes or excludes it by when the import
-  ran ([finding](regression/2026-08-01-finding-kiro-rows-carry-no-time-session-project.md)).
+  ran ([finding](../work/regression/2026-08-01-finding-kiro-rows-carry-no-time-session-project.md)).
   Pre-0.36 duplicated rows in a project ledger are never rewritten and still sum.
 
 ## 2. Savings
@@ -240,7 +240,7 @@ saved = raw_alternative − actual                       ← GROSS: avoided read
 - **It excludes the cost of *using* the tool** — the turn that invoked it, the
   round-trip, the context a hook injected, a re-read a thin answer provokes. So
   cage can truthfully print a large `saved` for a session that cost *more* than
-  its unassisted twin ([finding](regression/2026-08-01-finding-saved-is-gross.md)).
+  its unassisted twin ([finding](../work/regression/2026-08-01-finding-saved-is-gross.md)).
 - Every surface says `gross` for this number: `report`'s `gross`/`gross tok`
   columns, `attrib`'s `gross tok`/`gross $`, `roi`'s `gross saved`, the overview
   headline, the graphify ceiling/history band, and CSV's `gross_saved_*`. One
@@ -468,7 +468,7 @@ invokes the meter as `cage data graphify -- "$REAL" "$@"`, so `argv[0]` is an ab
 machine-specific path; folding it in makes a key nothing else can reproduce. This is the
 same exclusion `graphifymeter.content_signature` documents (§2.10), and the reason the
 §2.12 attestation join read zero for nine days
-([finding](regression/2026-08-12-l1-attest-args-hash-mismatch.md)).
+([finding](../work/regression/2026-08-12-l1-attest-args-hash-mismatch.md)).
 
 ### 2.12 Adoption — **no method**: counts of recorded rows, never an estimate
 
@@ -645,7 +645,7 @@ objects in stored rows).
 stamped `10:00:00` happened somewhere in `[10:00:00, 10:00:01)`. Finer precision would push
 an edit at `10:00:00.500` — plausibly *before* the commit — into the next window, breaking
 the inclusive bound. Evidence and the two claims this corrected:
-[finding](regression/2026-08-02-finding-commit-window-timestamp-skew.md).
+[finding](../work/regression/2026-08-02-finding-commit-window-timestamp-skew.md).
 
 **Line matching (capture, P1).** For each edit an agent proposed, in the commit whose
 window contains that edit's own turn timestamp:
@@ -743,7 +743,7 @@ human~        = matchable − unattributed − agent
 - **`unattributed` is not `human`.** A file nobody proposed may be human-written,
   vendored, or generated — cage has no evidence which. Measured: a single `human`
   bucket printed **76.6%** on cage's own repo, 89% of it one commit of generated JSON
-  ([dogfood](regression/2026-08-02-p1-authorship-dogfood.md) §4).
+  ([dogfood](../work/regression/2026-08-02-p1-authorship-dogfood.md) §4).
 - **`agent` is read from the row, never re-derived.** Re-matching at render time would
   be a second matcher, free to disagree with the one that wrote the row.
 - The split renders as a share of *classified* added lines, so the four sum to 100%.
@@ -982,7 +982,7 @@ cleanup days, price staleness, import staleness.
 ## Maintaining this file
 
 Update it in the same change as any formula, constant, or method-tag change —
-it is in [DOC-REGISTRY.md](DOC-REGISTRY.md) with that trigger. Cross-check
+it is in [DOC-REGISTRY.md](../work/DOC-REGISTRY.md) with that trigger. Cross-check
 against the live explainer registry ([explain_data.py](../cage/explain_data.py))
 and `cage query --list --kind calculation`: this file and the registry must
 agree, and the registry is the one that ships in the binary.

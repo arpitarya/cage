@@ -81,7 +81,7 @@ def test_first_ever_import_records_rows_new_and_rows_total(tmp_path, monkeypatch
 
 
 def test_first_import_agrees_with_capture_health(tmp_path, monkeypatch):
-    # Cross-check against the F2 fix (docs/regression/2026-07-22-capture-report.md):
+    # Cross-check against the F2 fix (work/regression/2026-07-22-capture-report.md):
     # capture.log's rows_new/rows_total must agree with cursors["_health"]["captured"]
     # for the very first import of an agent, in the SAME run.
     root = _isolate(tmp_path, monkeypatch)

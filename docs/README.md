@@ -4,7 +4,7 @@
 read surface). Most operational/subsystem docs were removed with the hook machinery
 and rendered assets — they described the pre-removal world and will be rebuilt on
 the new base. What remains here is **current spec**; everything in
-[`archive/`](archive/README.md) is **history** and must never be cited as current
+[`archive/`](../work/archive/README.md) is **history** and must never be cited as current
 spec.
 
 ## Current spec
@@ -27,9 +27,9 @@ spec.
 - **`open/` is gone** (2026-08-12). It held one file per open item from 2026-08-11;
   when the queue was closed wholesale every item moved to
   [archive/](archive/) as `v0.49-*.item.md`. An item is now **one line in the index**,
-  with detail inline or in a handoff/prompt pair here in `docs/` root. The standing
+  with detail inline or in a handoff/prompt pair in `../work/` root. The standing
   constraints that lived beside it did **not** lapse —
-  [archive/v0.49-open-queue-constraints.md](archive/v0.49-open-queue-constraints.md)
+  [archive/v0.49-open-queue-constraints.md](../work/archive/v0.49-open-queue-constraints.md)
   names which are enforced mechanically and which are now prose-only, including the
   **ZERO dummy data** law.
 
@@ -38,10 +38,10 @@ spec.
 Created when an [OPEN-WORK.md](../work/OPEN-WORK.md) item is picked up; archived on
 implement. COPILOT-METRICS, KIRO-METRICS, and CLAUDE-METRICS — the three per-chat
 metrics-ledger builds, one per agent — were all built and green on 2026-08-14 and
-archived, nothing currently sits in docs root:
-[copilot](archive/v0.49-copilot-metrics-ledger.handoff.md) ·
-[kiro](archive/v0.49-kiro-metrics-ledger.handoff.md) ·
-[claude](archive/v0.49-claude-metrics-ledger.handoff.md).
+archived, nothing currently sits in `work/` root:
+[copilot](../work/archive/v0.49-copilot-metrics-ledger.handoff.md) ·
+[kiro](../work/archive/v0.49-kiro-metrics-ledger.handoff.md) ·
+[claude](../work/archive/v0.49-claude-metrics-ledger.handoff.md).
 
 **One thing each of the three left open is not a pair and does not live here:** a
 `CLAUDE.md` diff (ledger diagram line + a substrate bullet) is **proposed, awaiting
@@ -51,7 +51,7 @@ this tree.
 
 ## The lab manual
 
-- **[cage-lab/](cage-lab/README.md) — how to build `../cage-lab` from scratch.** The
+- **[cage-lab/](../work/cage-lab/README.md) — how to build `../cage-lab` from scratch.** The
   lab is a **disposable** sibling repo; this directory is what recreates it, versioned
   in cage alongside the tool it tests. Setup (`.venv` + explicit PATH · the two
   workspaces · tool-owned installers) · run protocol (manifest-before-first-call ·
@@ -64,7 +64,7 @@ this tree.
 
 The maintained doc set, governed by the *Documentation discipline* section of
 [`../CLAUDE.md`](../CLAUDE.md). Freshness is tracked in
-[DOC-REGISTRY.md](DOC-REGISTRY.md). **Four of these live in root `work/`, not
+[DOC-REGISTRY.md](../work/DOC-REGISTRY.md). **Four of these live in root `work/`, not
 `docs/`** (moved 2026-08-12) — `WORKLOG.md`, `INTERVIEW.md`, `IMPLEMENTATION.md`,
 and `OPEN-WORK.md` above; `MACHINE.md` moved with them. Each bullet below links
 to its real location.
@@ -93,14 +93,14 @@ to its real location.
   exchange, Claude Code and Cowork/chat alike).
 - [INTERVIEW.md](../work/INTERVIEW.md) — the **exit interview**: notes from the outgoing
   maintainer-model to every future one. Read it after CLAUDE.md.
-- [DOC-REGISTRY.md](DOC-REGISTRY.md) — the doc freshness tracker (triggers +
+- [DOC-REGISTRY.md](../work/DOC-REGISTRY.md) — the doc freshness tracker (triggers +
   last-verified).
 - [architecture-flow.mermaid](architecture-flow.mermaid) — the one-way data flow as
   a diagram (also linked from the README).
 - [example/](example/) — copy-from contracts: cli · debug · setup · toml-config.
 - [IMPLEMENTATION.md](../work/IMPLEMENTATION.md) — the build log.
-- [dogfood/](dogfood/README.md) — cage's own ledger, published as dated snapshots
-  (append-only, mirrors [regression/](regression/README.md)); linked from the README,
+- [dogfood/](../work/dogfood/README.md) — cage's own ledger, published as dated snapshots
+  (append-only, mirrors [regression/](../work/regression/README.md)); linked from the README,
   version-free. Freshness guarded by `tests/test_dogfood_freshness.py` (60-day gate).
 
 ## Standing records
@@ -111,8 +111,8 @@ to its real location.
   reopen-trigger). `proposals/` is gone (2026-08-12): all five parked ideas were closed
   unbuilt and are [archive/](archive/)`v0.49-*.proposal.md`; the format contract to copy
   if it is re-established is
-  [archive/v0.49-proposals-readme.md](archive/v0.49-proposals-readme.md).
+  [archive/v0.49-proposals-readme.md](../work/archive/v0.49-proposals-readme.md).
 - [regression/](regression/) — dated cage-lab capture/regression reports (data, not
   spec).
-- [archive/README.md](archive/README.md) — every shipped handoff/prompt/build-prompt
+- [archive/README.md](../work/archive/README.md) — every shipped handoff/prompt/build-prompt
   and superseded draft. History, not spec.

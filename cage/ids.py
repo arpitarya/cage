@@ -18,7 +18,7 @@ def new_id(prefix: str) -> str:
     an *identity*, which turns a collision into a **silently dropped row** rather than a
     retry. At the original 16 bits that was measured at ~1 in 229 over 200k sequential
     ids and turned main red once (`test_study`, 37 calls where 38 were seeded):
-    `docs/regression/2026-08-02-finding-call-id-collisions.md`.
+    `work/regression/2026-08-02-finding-call-id-collisions.md`.
 
     A per-process counter is strictly stronger *within* a process and useless across
     them — two agents metering at once is the normal case here — so the width is the

@@ -1,5 +1,5 @@
 """The copilot pricing ladder — rung 1, recorded credits × your configured rate
-(COPILOT-CREDITS; verdict C of docs/archive/*copilot-pricing-basis.compare.md).
+(COPILOT-CREDITS; verdict C of work/archive/*copilot-pricing-basis.compare.md).
 
 A copilot row's USD resolves by a four-rung ladder (rung 0 below), one rung per row,
 best signal first — the exact shape `receiptprice` uses for call-less token receipts:

@@ -828,7 +828,7 @@ REGISTRY: tuple[Explanation, ...] = (
         "  for `credits` (None-sentinel, the `make_call.credits` law, generalized).\n"
         "  Cache tokens and per-chat IDE credits are absent from every kiro row here\n"
         "  because no on-disk Kiro store persists them at all — only the wire protocol\n"
-        "  does (proxy-only, out of scope; docs/research/2026-08-13-kiro-per-chat-usage-\n"
+        "  does (proxy-only, out of scope; work/research/2026-08-13-kiro-per-chat-usage-\n"
         "  fetch-spec.md).",
         ("cage/schema.py", "cage/ledger.py", "cage/transcript.py", "cage/importcmd.py"),
         "n/a — capture-only, no computed number; every field is recorded verbatim.",
@@ -984,7 +984,7 @@ REGISTRY: tuple[Explanation, ...] = (
         "  cleanup class prunes it — cage never deletes an artifact it wrote.",
         ("cage/viewexport.py", "cage/runstamp.py", "cage/cliutil.py", "cage/cli.py"),
         "n/a — metadata about a run; it never enters a cell, so no method tag changes.",
-        kind="concept", plan_ref="docs/compare/view-export-and-run-stamp.compare.md"),
+        kind="concept", plan_ref="work/compare/view-export-and-run-stamp.compare.md"),
     Explanation(
         # NB: no "cage-run"/"workspacefolder" keywords — their "cage"/"work" stems
         # would steal generic "how does cage work"-style queries from `overview`.
@@ -1151,7 +1151,7 @@ REGISTRY: tuple[Explanation, ...] = (
         "  re-ingest), idempotent by receipt id.",
         ("cage/graphifytx.py", "cage/importcmd.py", "cage/transcript.py",
          "cage/doctorcmd.py", "docs/adr/0009-kiro-cli-tool-run-bodies-read-transiently-never-persisted.md",
-         "docs/research/2026-08-07-graphify-store-evidence.md"),
+         "work/research/2026-08-07-graphify-store-evidence.md"),
         "n/a — describes which routes exist, not a number.",
         kind="concept", plan_ref="§4.5"),
     Explanation(
@@ -1420,7 +1420,7 @@ REGISTRY: tuple[Explanation, ...] = (
          "cage/graphifytx.py"),
         "modeled throughout — every graphify receipt is modeled or estimated, never\n"
         "  measured; the per-chat aggregate carries the worst case among its receipts.",
-        kind="concept", plan_ref="docs/archive/v0.49-graphify-chats.handoff.md"),
+        kind="concept", plan_ref="work/archive/v0.49-graphify-chats.handoff.md"),
     Explanation(
         "agent-authorship", ("authorship", "agent-vs-human", "human", "who wrote",
                              "commits", "commit", "line-match", "suggested", "kept",
@@ -1453,7 +1453,7 @@ REGISTRY: tuple[Explanation, ...] = (
         "    unkn    below the {min_match_chars}-char content gate, or a binary file    (structural)\n"
         "  The 4th bucket exists because a single `human` bucket printed 76.6% on cage's\n"
         "  own repo, 89% of it ONE commit of generated JSON. A residual presented as a\n"
-        "  finding is the v1 mistake (docs/regression/2026-08-02-p1-authorship-dogfood.md).\n"
+        "  finding is the v1 mistake (work/regression/2026-08-02-p1-authorship-dogfood.md).\n"
         "  SUGGESTED vs KEPT: suggested = kept + kept_modified + dropped, exactly. Counts,\n"
         "  never an acceptance percentage — the enum is the resolution the source supports.\n"
         "  RESIDUAL_LINES is the sixth count and the ONE written at zero: matchable added\n"

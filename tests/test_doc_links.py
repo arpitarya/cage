@@ -15,9 +15,9 @@ links were correct when written, and rewriting a dated record to keep a link gre
 falsify the record. So the corpus splits, and the split is the decision:
 
 - **LIVE** — the docs a reader navigates as *current*: root `*.md`, `docs/*.md`,
-  `docs/adr/`, `docs/compare/`, `docs/example/`, `docs/cage-lab/`,
-  `docs/dogfood/`, `docs/research/`, `work/*.md`. **A dangling link here FAILS.**
-- **HISTORY** — dated, append-only records: `docs/archive/**`, `docs/regression/**`,
+  `docs/adr/`, `work/compare/`, `docs/example/`, `work/cage-lab/`,
+  `work/dogfood/`, `work/research/`, `work/*.md`. **A dangling link here FAILS.**
+- **HISTORY** — dated, append-only records: `work/archive/**`, `work/regression/**`,
   `work/WORKLOG.md`, `work/IMPLEMENTATION.md`, `CHANGELOG.md`. **Exempt from failure**,
   because a link that pointed at a then-live doc is *true as history*.
 
@@ -38,7 +38,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 
 # A doc tree that is a dated record, not a live surface. See the module docstring.
-HISTORY_DIRS = ("docs/archive/", "docs/regression/")
+HISTORY_DIRS = ("work/archive/", "work/regression/")
 HISTORY_FILES = {"work/WORKLOG.md", "work/IMPLEMENTATION.md", "CHANGELOG.md"}
 
 _LINK = re.compile(r"\[[^\]]*\]\(([^)\s]+?\.md)(#[^)]*)?\)")

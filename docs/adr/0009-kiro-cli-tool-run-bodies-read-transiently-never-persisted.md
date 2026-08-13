@@ -17,7 +17,7 @@
   above. Any cross-agent reading of "does graphify pay" was structurally
   claude + copilot-CLI only (OPEN-WORK GF-AGENT-FIELD; NET-1 depends on it).
 - The 2026-08-07 field probe settled what the store actually holds
-  ([research](../research/2026-08-07-graphify-store-evidence.md)): a graphify run's
+  ([research](../../work/research/2026-08-07-graphify-store-evidence.md)): a graphify run's
   command lives at `history[].assistant.ToolUse.tool_uses[].args.command` and its output
   at `history[].user.content.ToolUseResults.tool_use_results[].content[].Json.stdout`.
   **Both are inside the whitelist's exclusion zone.** There is no adjacent metadata field
@@ -100,7 +100,7 @@ never be returned to a writer, stamped on a row, or logged.**
 
 - The field probe that established the shapes, the truncation marker, and that no
   metadata alternative exists:
-  [docs/research/2026-08-07-graphify-store-evidence.md](../research/2026-08-07-graphify-store-evidence.md)
+  [work/research/2026-08-07-graphify-store-evidence.md](../../work/research/2026-08-07-graphify-store-evidence.md)
   (kiro-cli 2.16.0, two live `execute_bash` runs, 19 conversations).
 - [ADR 0008](0008-line-match-authorship-counts-persisted-content-transient.md) — the
   ratified statement of *counts persisted, content transient*, and the stricter reading

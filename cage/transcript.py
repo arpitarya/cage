@@ -817,7 +817,7 @@ def _vscode_project(chat_session_path: Path, first_cwd: str) -> str:
     way `parse_kiro_cli_calls` resolves a store-level cwd.
 
     Two carriers, both evidenced by this repo's probe of 1,132 real parts across 157
-    files ([research](../docs/research/2026-08-07-graphify-store-evidence.md)):
+    files ([research](../work/research/2026-08-07-graphify-store-evidence.md)):
 
     1. ``workspaceStorage/<hash>/workspace.json`` → ``{"folder": "file:///…"}`` — ONE
        read, covers every request in the file. Preferred for exactly that reason.
@@ -1398,7 +1398,7 @@ _KIRO_CLI_TS_KEYS = ("stream_end_timestamp_ms", "request_start_timestamp_ms")
 
 # Kiro CLI truncates a tool's stdout and appends this marker verbatim, at the very end,
 # cutting mid-token. Pinned against a real `graphify query` on kiro-cli 2.16.0, 2026-08-07
-# (docs/research/2026-08-07-graphify-store-evidence.md). Matched **anchored at the end**,
+# (work/research/2026-08-07-graphify-store-evidence.md). Matched **anchored at the end**,
 # never as a substring: a command whose own output discusses truncation must not be
 # mistaken for a truncated one (the false positive the VS Code corpus actually produced).
 KIRO_CLI_TRUNCATION_MARKER = "... (truncated to ~2000 token budget)"

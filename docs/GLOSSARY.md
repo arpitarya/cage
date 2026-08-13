@@ -43,7 +43,7 @@ receipt (graphify/fux shims) prices via the ladder in
 per query: `raw_alternative − actual`, the *avoided read cost*. It excludes the cost of
 **using** the tool (the invoking turn, the round-trip, a hook's injected context), so a
 large gross and a session that cost more are both true at once
-([finding](regression/2026-08-01-finding-saved-is-gross.md)). Every surface says `gross`,
+([finding](../work/regression/2026-08-01-finding-saved-is-gross.md)). Every surface says `gross`,
 from one phrasing (`netsaved.GROSS_NOTE`).
 
 **cost of use** — what invoking a tool costs, as opposed to what the tool spends on
@@ -220,7 +220,7 @@ tested against ([docs/shim-contract.md](shim-contract.md)): behaviours **B1–B8
 (binding on every twin) and divergences **D1–D7** (real and permanent — cmd has no
 `exec`, so the real binary runs as a child process). Two implementations of an unwritten
 contract drift; this is the written one, and the first artifact of the
-[tool-integration-contract](archive/v0.49-tool-integration-contract.proposal.md).
+[tool-integration-contract](../work/archive/v0.49-tool-integration-contract.proposal.md).
 
 **hook bypass** — an agent hook that invokes graphify by **absolute path**, so the
 command never traverses PATH: cage's interceptor can't see it, and a hook isn't a
@@ -293,7 +293,7 @@ last-per-`(requestId, message.id)` — the LATEST duplicate carries the final
 `output_tokens` (ccusage #888). `transcript._fold_claude_chat` applies it at capture;
 `row.raw_rows / row.requests` on the emitted claude-metrics row IS the inflation
 evidence, captured correctly. [transcript.py](../cage/transcript.py),
-[research/2026-08-13-claude-per-chat-usage-fetch-spec.md](research/2026-08-13-claude-per-chat-usage-fetch-spec.md).
+[research/2026-08-13-claude-per-chat-usage-fetch-spec.md](../work/research/2026-08-13-claude-per-chat-usage-fetch-spec.md).
 
 **session fileset** — the WHOLE set of transcript files one Claude Code chat can span:
 its main `<sessionId>.jsonl` plus every `<sessionId>/subagents/agent-*.jsonl` subagent
@@ -390,7 +390,7 @@ shape every timestamp is converted to before any comparison in the authorship jo
 ordering strings across offset representations is meaningless. **Seconds, not
 milliseconds** — `%cI` has no sub-second, so finer precision would push an edit made
 inside the commit's own second out of it and break the inclusive bound
-([finding](regression/2026-08-02-finding-commit-window-timestamp-skew.md)).
+([finding](../work/regression/2026-08-02-finding-commit-window-timestamp-skew.md)).
 
 **attested time** — minutes a person asserted with `cage task time`, stored as
 `human_minutes` + `human_minutes_method="attested"`. Rendered `*`, always outranks the

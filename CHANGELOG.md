@@ -13,7 +13,7 @@ Full release notes. The README keeps a one-line summary per version; the detail 
   updated to describe the new locations.
 - **`OPEN-WORK.md` cleared**, on a further explicit instruction: the 11-row closure
   table and standing-constraints section are gone, leaving a bare "the queue is empty"
-  statement. The closure history it recorded still lives in `docs/archive/` and
+  statement. The closure history it recorded still lives in `work/archive/` and
   `work/IMPLEMENTATION.md`.
 - **Fixed:** `docs/restricted-environments.md` had been silently deleted a second time
   (the same class of bug it was restored for once already, in the v0.36 hookless sweep)
@@ -122,7 +122,7 @@ of specific surfaces and are called out below.
 - **The Σ row now covers what was read**, so the footnote says *not read*, not merely
   *not shown*: `· N older commit(s) not read — … --all reads every commit`.
 - A default relative `--since` was **rejected**: a wall clock in the default path, and it
-  bounded nothing when measured. [compare](docs/compare/commits-view-cost-bound.compare.md)
+  bounded nothing when measured. [compare](work/compare/commits-view-cost-bound.compare.md)
 
 ### Fixed — a multi-model Copilot shutdown is billed once, not once per model (REV-CREDITS defect 2)
 
@@ -137,7 +137,7 @@ of specific surfaces and are called out below.
 - **Splitting the credit pro-rata by token share was rejected** — it would derive per-row
   credits from tokens, forbidden in both directions.
 - **Forward-only**: rows written before this are never rewritten and still split. Tracked
-  as `CREDITS-LEGACY-SPLIT`. [compare](docs/compare/copilot-pricing-basis.compare.md)
+  as `CREDITS-LEGACY-SPLIT`. [compare](work/compare/copilot-pricing-basis.compare.md)
 
 ### Changed — ⚠ `--otel` emits `gen_ai.provider.name`, not `gen_ai.system` (OTEL-SEMCONV-PIN)
 
@@ -152,7 +152,7 @@ of specific surfaces and are called out below.
   and is `Status: Development` throughout, so `cage.meta` stamps the source repo and the
   maturity rather than a version nobody could verify — new `semconv_means` /
   `semconv_source` keys. The pin re-points when that repo cuts its first tag.
-  [research](docs/research/2026-08-03-otel-genai-semconv-pin.md)
+  [research](work/research/2026-08-03-otel-genai-semconv-pin.md)
 
 ### Changed — `prices`, `study` and `policy` take real subcommands (CLI-GAPS(b))
 
@@ -232,7 +232,7 @@ of specific surfaces and are called out below.
 - **Two causes remain, stated not fixed:** a piped invocation still misses (the hook
   attests a shell command line, the interceptor an argv) — parked as
   `docs/proposals/attest-join-command-normalization.proposal.md`; and an attested run can
-  have no usage row at all. [Finding](docs/regression/2026-08-12-l1-attest-args-hash-mismatch.md).
+  have no usage row at all. [Finding](work/regression/2026-08-12-l1-attest-args-hash-mismatch.md).
 
 ### Added — a queue honesty gate (QUEUE-HONESTY)
 
@@ -256,21 +256,21 @@ of specific surfaces and are called out below.
 
 - **`docs/open/` finished in the law** — the 2026-08-11 restructure had moved the queue's
   detail into `docs/open/` but indexed it nowhere: `docs/README.md` now lists it beside
-  the index it details, and `docs/DOC-REGISTRY.md` carries its row and owner-trigger
+  the index it details, and `work/DOC-REGISTRY.md` carries its row and owner-trigger
   (*an item opens, closes, or changes gate*).
 - **All six held `CLAUDE.md` steering edits applied** (STEERING-EDITS) — the authorship
   bullet, the copilot credit ladder, `FORMULAS.md` in the entry-point list, the dogfood
   section, the chats `agent%` + second carve-out, and the graphify-coverage bullet. Two
   landed *amended* by the decisions above. Built from:
-  [proposal](docs/archive/v0.49-steering-edits-pending.proposal.md).
+  [proposal](work/archive/v0.49-steering-edits-pending.proposal.md).
 - `docs/OPEN-WORK.md`'s fix lane is **empty**; its Implementation section had gone stale
   describing two items that were already built at HEAD.
 - New queue item **OPENWORK-SECTION-REFS** — the restructure deleted OPEN-WORK's lettered
   sections and five live citations still name them (`§I.2a`, `§B2`, `G.1`). They are bare
   prose, not links, so the doc-link gate structurally cannot see them.
 - Suite **1616 → 1655**. Built from:
-  [agent-lane sweep](docs/archive/v0.49-agent-lane-sweep.handoff.md) ·
-  [agent-lane refill](docs/archive/v0.49-open-queue-agent-lane.handoff.md) (handoff only —
+  [agent-lane sweep](work/archive/v0.49-agent-lane-sweep.handoff.md) ·
+  [agent-lane refill](work/archive/v0.49-open-queue-agent-lane.handoff.md) (handoff only —
   its prompt was handed over inline and never written to `docs/`).
 
 ## v0.48.0 (2026-08-10) — every report and insight is an artifact
@@ -350,7 +350,7 @@ no rows because capture silently broke.
   swallow the following subcommand (`cage --export report`). Named in the compare doc as a
   choice, not left as an oversight.
 
-Built from: [docs/compare/view-export-and-run-stamp.compare.md](docs/compare/view-export-and-run-stamp.compare.md).
+Built from: [work/compare/view-export-and-run-stamp.compare.md](work/compare/view-export-and-run-stamp.compare.md).
 Suite **1503 → 1541**.
 
 ## v0.47.2 (2026-08-08) — the same Windows class, one syntax layer over
@@ -424,7 +424,7 @@ structurally claude + copilot-CLI only — narrower than it read, silently.
 files and 1,132 `run_in_terminal` parts, VS Code persists the command
 (`toolSpecificData.commandLine.original`), the cwd **per command**, *and* the output. The
 evidence, the exact keys, and the versions probed are in
-[docs/research/2026-08-07-graphify-store-evidence.md](docs/research/2026-08-07-graphify-store-evidence.md).
+[work/research/2026-08-07-graphify-store-evidence.md](work/research/2026-08-07-graphify-store-evidence.md).
 
 ### Added
 
@@ -473,15 +473,15 @@ evidence, the exact keys, and the versions probed are in
 - Suite **1462 → 1500** (`tests/test_graphify_vscode.py`, `tests/test_graphify_kiro.py`,
   plus rescan and coverage tests).
 - **Both new routes are verified on real data, not just fixtures** —
-  [kiro CLI](docs/regression/2026-08-07-gfx-cov-kiro-field-run.md) (1 filed, 1 refused as
-  truncated) and [copilot VS Code](docs/regression/2026-08-08-gfx-cov-vscode-field-run.md)
+  [kiro CLI](work/regression/2026-08-07-gfx-cov-kiro-field-run.md) (1 filed, 1 refused as
+  truncated) and [copilot VS Code](work/regression/2026-08-08-gfx-cov-vscode-field-run.md)
   (146,261 tokens saved across 72 cited files). The VS Code capture **falsified two
   assumptions in the fixture it replaced**: a real agent emits `cd <repo> && graphify …`
   (nothing had exercised the `&&` split) and the real part carries no `resultDetails`
   (so the fallback carrier is the one that runs in the field). Both now tested.
-- Built from: [handoff](docs/archive/v0.47-graphify-agent-coverage.handoff.md) ·
-  [prompt](docs/archive/v0.47-graphify-agent-coverage.prompt.md) ·
-  [store evidence](docs/research/2026-08-07-graphify-store-evidence.md).
+- Built from: [handoff](work/archive/v0.47-graphify-agent-coverage.handoff.md) ·
+  [prompt](work/archive/v0.47-graphify-agent-coverage.prompt.md) ·
+  [store evidence](work/research/2026-08-07-graphify-store-evidence.md).
 
 ## v0.46.1 (2026-08-03) — CI green again: S18 asserted the pre-hookless heal
 
@@ -506,9 +506,9 @@ committed diff. The scenario died with `FileNotFoundError` **on the correct outc
 
 ## v0.46.0 (2026-08-03) — `agent%`: did this chat's tokens become code?
 
-Built from: [handoff](docs/archive/v0.46-chats-author.handoff.md) ·
-[prompt](docs/archive/v0.46-chats-author.prompt.md) ·
-[proposal](docs/archive/v0.46-chats-author.proposal.md).
+Built from: [handoff](work/archive/v0.46-chats-author.handoff.md) ·
+[prompt](work/archive/v0.46-chats-author.prompt.md) ·
+[proposal](work/archive/v0.46-chats-author.proposal.md).
 
 ### `cage insights chats` gains an `agent%` column
 
@@ -598,7 +598,7 @@ undercounted, with `modelMetrics`' dict order deciding whether it happened.
   independent of dict order. It is *not* an attribution claim: GitHub computes the
   counter over the whole shutdown, so **no** single row truly owns it. Splitting it
   across rows is a genuine basis fork and stays filed for
-  [the compare doc](docs/compare/copilot-pricing-basis.compare.md) — defect 2 was
+  [the compare doc](work/compare/copilot-pricing-basis.compare.md) — defect 2 was
   deliberately **not** decided inside a fix commit.
 - **When every model idled and credits still arrived**, a zero-token carrier row keeps
   the figure. That row is a true statement — this shutdown billed N credits and moved
@@ -646,7 +646,7 @@ undercounted, with `modelMetrics`' dict order deciding whether it happened.
   it surfaced a second problem that makes this a fork rather than a fix — the GenAI
   conventions moved to their own repository, so the pinned version string may not name
   what cage thinks it names. Findings and the three options:
-  [research](docs/research/2026-08-03-otel-genai-semconv-pin.md).
+  [research](work/research/2026-08-03-otel-genai-semconv-pin.md).
 
 ### `cage --help` advertised six of `data`'s eight commands (CLI-GAPS a)
 
@@ -700,7 +700,7 @@ perform.
 
 ### Row ids get 32 bits of randomness (ID-ENTROPY)
 
-Evidence: [finding](docs/regression/2026-08-02-finding-call-id-collisions.md).
+Evidence: [finding](work/regression/2026-08-02-finding-call-id-collisions.md).
 
 **`ids.new_id` had 16 bits of randomness per millisecond, and every merge path dedupes
 by id — so a collision was a silently dropped row, not a retry.** Measured on a real
@@ -727,10 +727,10 @@ was wrong.
 
 ### One UTC normal form for the authorship join (REV-TS)
 
-Built from: [proposal](docs/archive/v0.45-rev-ts.proposal.md) ·
-[handoff](docs/archive/v0.45-rev-ts.handoff.md) +
-[prompt](docs/archive/v0.45-rev-ts.prompt.md) ·
-[finding](docs/regression/2026-08-02-finding-commit-window-timestamp-skew.md).
+Built from: [proposal](work/archive/v0.45-rev-ts.proposal.md) ·
+[handoff](work/archive/v0.45-rev-ts.handoff.md) +
+[prompt](work/archive/v0.45-rev-ts.prompt.md) ·
+[finding](work/regression/2026-08-02-finding-commit-window-timestamp-skew.md).
 
 **Every authorship join on a non-UTC machine was placing edits and calls on the wrong
 commit.** `commitjoin` built commit windows from raw `git log --format=%cI` strings —
@@ -794,11 +794,11 @@ class the release checklist exists to catch.
 
 ## v0.44.0 (2026-08-02) — Copilot's own billing number, and the pricing ladder
 
-Built from: [proposal](docs/archive/v0.44-copilot-credits.proposal.md) ·
-[handoff](docs/archive/v0.44-copilot-credits.handoff.md) +
-[prompt](docs/archive/v0.44-copilot-credits.prompt.md) ·
-[compare verdict C](docs/compare/copilot-pricing-basis.compare.md) ·
-[store evidence](docs/research/2026-08-02-copilot-credit-fields-real-stores.md).
+Built from: [proposal](work/archive/v0.44-copilot-credits.proposal.md) ·
+[handoff](work/archive/v0.44-copilot-credits.handoff.md) +
+[prompt](work/archive/v0.44-copilot-credits.prompt.md) ·
+[compare verdict C](work/compare/copilot-pricing-basis.compare.md) ·
+[store evidence](work/research/2026-08-02-copilot-credit-fields-real-stores.md).
 
 **`copilot/auto` prices exactly now — with GitHub's own number, not a guess.** Copilot
 persists the credits it billed for each request; cage was dropping them, which is why
@@ -831,15 +831,15 @@ three-rung ladder at the single pricing choke point.
 - **Fixed, by widening:** copilot-CLI `totalPremiumRequests` is fractional (`0.33`) and
   the int `premium` field floored every real value to 0 and dropped the key — 13 CLI
   rows in a real ledger, not one carrying it. `credits` carries it as a float;
-  `premium` is untouched. [Finding](docs/research/2026-08-02-copilot-credit-fields-real-stores.md).
+  `premium` is untouched. [Finding](work/research/2026-08-02-copilot-credit-fields-real-stores.md).
 
 ## v0.43.0 (2026-08-02) — agent-vs-human, rebuilt per commit
 
-Built from: [proposal](docs/archive/v0.43-agent-vs-human-v2.proposal.md) ·
-[handoff](docs/archive/v0.43-agent-vs-human-v2.handoff.md) +
-[prompt](docs/archive/v0.43-agent-vs-human-v2.prompt.md) ·
+Built from: [proposal](work/archive/v0.43-agent-vs-human-v2.proposal.md) ·
+[handoff](work/archive/v0.43-agent-vs-human-v2.handoff.md) +
+[prompt](work/archive/v0.43-agent-vs-human-v2.prompt.md) ·
 [ADR 0008](docs/adr/0008-line-match-authorship-counts-persisted-content-transient.md) ·
-[dogfood evidence](docs/regression/2026-08-02-p1-authorship-dogfood.md).
+[dogfood evidence](work/regression/2026-08-02-p1-authorship-dogfood.md).
 
 The Tier-1 human axis was removed in v0.36 for inventing precision — a turn-gap
 heuristic priced at an hourly rate, rendered so it read as measured. This is its
@@ -902,9 +902,9 @@ binary). Nothing is redistributed.
 
 ## v0.42.0 (2026-08-02) — `cage insights chats`: one row per chat, titled where the store has a title
 
-Built from: [proposal](docs/archive/v0.42-chats-view.proposal.md) ·
-[handoff](docs/archive/v0.42-chats-view.handoff.md) +
-[prompt](docs/archive/v0.42-chats-view.prompt.md).
+Built from: [proposal](work/archive/v0.42-chats-view.proposal.md) ·
+[handoff](work/archive/v0.42-chats-view.handoff.md) +
+[prompt](work/archive/v0.42-chats-view.prompt.md).
 
 A new derived view, no substrate change: `cage insights chats` groups the ledger's
 `calls` by `(agent, surface, session)` — the same bucket key the import manifest
@@ -933,9 +933,9 @@ hookless capture is unchanged and is still the whole product; **L1** hooks, **L2
 and **L3** skills each sit on top of it, each opt-in, each two-way, and **none of them
 able to move a number**.
 
-Built from: [proposal](docs/archive/v0.41-agent-surface-layers.proposal.md) ·
-[handoff](docs/archive/v0.41-agent-surface.handoff.md) +
-[prompt](docs/archive/v0.41-agent-surface.prompt.md).
+Built from: [proposal](work/archive/v0.41-agent-surface-layers.proposal.md) ·
+[handoff](work/archive/v0.41-agent-surface.handoff.md) +
+[prompt](work/archive/v0.41-agent-surface.prompt.md).
 
 ### The gate, which is the actual story
 
@@ -1044,7 +1044,7 @@ against the **live parser** — a skill teaching a dead verb is the F1 class in 
   so half B's `no-link` remains structurally true.
 - The L1 hook shapes and the path-free Kiro MCP entry are unit- and CI-tested but have
   **not** been run on a real Claude Code / Copilot / Kiro install. Tracked as
-  **L1-FIELD** and **KIRO-MCP-FIELD** in [OPEN-WORK.md](docs/OPEN-WORK.md).
+  **L1-FIELD** and **KIRO-MCP-FIELD** in [OPEN-WORK.md](work/OPEN-WORK.md).
 
 ## v0.40.0 (2026-08-02) — tool-adoption view
 
@@ -1052,9 +1052,9 @@ Does the tool you installed actually get *used*? One new derived view answers it
 substrate change, no schema change, no new capture path — and no currency anywhere in
 it.
 
-Built from: [proposal](docs/archive/v0.40-insights-adoption.proposal.md) ·
-[handoff](docs/archive/v0.40-insights-adoption.handoff.md) +
-[prompt](docs/archive/v0.40-insights-adoption.prompt.md).
+Built from: [proposal](work/archive/v0.40-insights-adoption.proposal.md) ·
+[handoff](work/archive/v0.40-insights-adoption.handoff.md) +
+[prompt](work/archive/v0.40-insights-adoption.prompt.md).
 
 `cage insights adoption` — do the agents you wired actually **invoke** the tools you
 gave them? A derived view only: no new capture, no schema change, no new field. Its
@@ -1116,10 +1116,10 @@ Two independent tracks landed the same day: a new one-way export format, and a
 cleanup of what the v0.33.0 Codex-agent removal left behind. No substrate or
 determinism-law change in either.
 
-Built from: [OTel handoff](docs/archive/v0.39-otel-export.handoff.md) +
-[prompt](docs/archive/v0.39-otel-export.prompt.md) · [Codex-purge
-handoff](docs/archive/v0.39-codex-purge.handoff.md) +
-[prompt](docs/archive/v0.39-codex-purge.prompt.md).
+Built from: [OTel handoff](work/archive/v0.39-otel-export.handoff.md) +
+[prompt](work/archive/v0.39-otel-export.prompt.md) · [Codex-purge
+handoff](work/archive/v0.39-codex-purge.handoff.md) +
+[prompt](work/archive/v0.39-codex-purge.prompt.md).
 
 ### OTel GenAI export (OTEL)
 
@@ -1204,9 +1204,9 @@ extensionless bash script, and Windows resolves a bare `graphify` **only** throu
 never be *found*. The shim capture route was structurally absent there, and no amount
 of PATH ordering could rescue it.
 
-Built from: [handoff](docs/archive/v0.38-win-graphify-shim.handoff.md) ·
-[prompt](docs/archive/v0.38-win-graphify-shim.prompt.md) ·
-[CI harness handoff](docs/archive/v0.38-ci-graphify-matrix.handoff.md).
+Built from: [handoff](work/archive/v0.38-win-graphify-shim.handoff.md) ·
+[prompt](work/archive/v0.38-win-graphify-shim.prompt.md) ·
+[CI harness handoff](work/archive/v0.38-ci-graphify-matrix.handoff.md).
 
 - **A `graphify.cmd` twin ships as bundled data.** Plain text — no `.exe`, nothing
   compiled, no new dependency, and it works from `cage.pyz`. PowerShell was ruled out on
@@ -1300,7 +1300,7 @@ and the old one was selling a capability that no longer exists.
 - **The gross-vs-net honesty is now in the pitch, not just the code.** The story
   section states outright that cage's own paired run came back with the graph-tool arm
   costing *more*, and that it printed that rather than burying it, linking
-  [the finding](docs/regression/2026-08-01-finding-saved-is-gross.md). A new
+  [the finding](work/regression/2026-08-01-finding-saved-is-gross.md). A new
   parenthetical under the worked table marks it as seeded demo data and says where
   cage's own evidence actually stands — lab-validated capture on macOS across all
   three agents, and a net-positive verdict that is honestly **still open at n=1**,
@@ -1354,7 +1354,7 @@ test files (`test_graphify_copilot.py`/`test_graphify_transcript.py`/
   today's subprocess fix, which only helps once something has already located the
   shim by an exact path. A real fix needs a Windows-native twin with equivalent
   PATH-scan/recursion-guard logic — a feature-sized project, tracked as **WIN-GF** in
-  [docs/OPEN-WORK.md](docs/OPEN-WORK.md), not attempted here.
+  [docs/OPEN-WORK.md](work/OPEN-WORK.md), not attempted here.
 
 No substrate, schema, or CLI-surface change.
 
@@ -1403,11 +1403,11 @@ machinery and rendered agent assets), then build the **import-ledger plan** on t
 simplified base. Every new row field is additive-optional (absent ⇒ byte-identical
 legacy row); the determinism/method laws are untouched.
 
-Built from: [docs/archive/v0.36-hookless-rebuild.handoff.md](docs/archive/v0.36-hookless-rebuild.handoff.md)
-+ [docs/archive/v0.36-hookless-rebuild.prompt.md](docs/archive/v0.36-hookless-rebuild.prompt.md)
-· and [docs/archive/v0.36-names-and-savings-migration.handoff.md](docs/archive/v0.36-names-and-savings-migration.handoff.md)
-+ [docs/archive/v0.36-names-and-savings-migration.prompt.md](docs/archive/v0.36-names-and-savings-migration.prompt.md)
-· plan of record [docs/archive/v0.36-import-ledger-savings.plan.md](docs/archive/v0.36-import-ledger-savings.plan.md).
+Built from: [work/archive/v0.36-hookless-rebuild.handoff.md](work/archive/v0.36-hookless-rebuild.handoff.md)
++ [work/archive/v0.36-hookless-rebuild.prompt.md](work/archive/v0.36-hookless-rebuild.prompt.md)
+· and [work/archive/v0.36-names-and-savings-migration.handoff.md](work/archive/v0.36-names-and-savings-migration.handoff.md)
++ [work/archive/v0.36-names-and-savings-migration.prompt.md](work/archive/v0.36-names-and-savings-migration.prompt.md)
+· plan of record [work/archive/v0.36-import-ledger-savings.plan.md](work/archive/v0.36-import-ledger-savings.plan.md).
 
 ### Phase 0 — hookless (the removal, finished)
 
@@ -1476,8 +1476,8 @@ Built from: [docs/archive/v0.36-hookless-rebuild.handoff.md](docs/archive/v0.36-
 ### Config surfaces + `cage.toml` rename (2026-07-27)
 
 Two config changes, each additive and byte-identical when unused. Built from:
-[docs/config-surfaces-and-rename.handoff.md](docs/archive/v0.36-config-surfaces-and-rename.handoff.md)
-+ [docs/config-surfaces-and-rename.prompt.md](docs/archive/v0.36-config-surfaces-and-rename.prompt.md).
+[docs/config-surfaces-and-rename.handoff.md](work/archive/v0.36-config-surfaces-and-rename.handoff.md)
++ [docs/config-surfaces-and-rename.prompt.md](work/archive/v0.36-config-surfaces-and-rename.prompt.md).
 
 - **A source can now declare its `surface`.** `[sources.<x>] surface = "cli|vscode|ide"`
   (both the table and array-of-tables shapes) restamps every imported row's `surface` —
@@ -1496,9 +1496,9 @@ Two config changes, each additive and byte-identical when unused. Built from:
 ### Model prices split into `prices.toml` (2026-07-28)
 
 Vendor prices get their own file, apart from your policy. Built from:
-[docs/archive/v0.36-prices-toml.handoff.md](docs/archive/v0.36-prices-toml.handoff.md)
-+ [docs/archive/v0.36-prices-toml.prompt.md](docs/archive/v0.36-prices-toml.prompt.md)
-· plan of record [docs/archive/v0.36-prices-toml.plan.md](docs/archive/v0.36-prices-toml.plan.md).
+[work/archive/v0.36-prices-toml.handoff.md](work/archive/v0.36-prices-toml.handoff.md)
++ [work/archive/v0.36-prices-toml.prompt.md](work/archive/v0.36-prices-toml.prompt.md)
+· plan of record [work/archive/v0.36-prices-toml.plan.md](work/archive/v0.36-prices-toml.plan.md).
 **The money does not move** — `report`/`insights attrib`/`insights roi` are
 byte-identical before and after, verified on a real 40k-row ledger.
 
@@ -1527,8 +1527,8 @@ The whole-task *agent vs human* baseline is **gone**, deliberately and completel
 not deprecated. It will be reconsidered from scratch after this release
 (a proposal doc, not a `# v2:` stub in the tree).
 
-Built from: [docs/archive/v0.36-human-removal.handoff.md](docs/archive/v0.36-human-removal.handoff.md)
-+ [docs/archive/v0.36-human-removal.prompt.md](docs/archive/v0.36-human-removal.prompt.md).
+Built from: [work/archive/v0.36-human-removal.handoff.md](work/archive/v0.36-human-removal.handoff.md)
++ [work/archive/v0.36-human-removal.prompt.md](work/archive/v0.36-human-removal.prompt.md).
 
 **Note the *other* "human" is untouched.** Provenance `origin="human"`
 (`cage authorship origin|verify`, `schema.ORIGINS`) answers *who wrote a commit*,
@@ -1573,9 +1573,9 @@ never *what a person would have cost*. It shares a word and nothing else.
 
 Kiro is a paid tool and its cost was being counted more than once. Decision + veto
 condition: [ADR 0006](docs/adr/0006-kiro-rows-are-machine-facts-not-project-facts.md).
-Built from: [docs/archive/v0.36-kiro-routing.handoff.md](docs/archive/v0.36-kiro-routing.handoff.md)
-+ [docs/archive/v0.36-kiro-routing.prompt.md](docs/archive/v0.36-kiro-routing.prompt.md).
-Evidence: [the double-count finding](docs/regression/2026-08-01-finding-kiro-rows-double-count-across-ledgers.md).
+Built from: [work/archive/v0.36-kiro-routing.handoff.md](work/archive/v0.36-kiro-routing.handoff.md)
++ [work/archive/v0.36-kiro-routing.prompt.md](work/archive/v0.36-kiro-routing.prompt.md).
+Evidence: [the double-count finding](work/regression/2026-08-01-finding-kiro-rows-double-count-across-ledgers.md).
 
 - **Kiro IDE rows now land in the machine ledger (`~/.cage`), never a project `.cage/`.**
   `tokens_generated.jsonl` is ONE global append-only file carrying no project, no session
@@ -1615,9 +1615,9 @@ Evidence: [the double-count finding](docs/regression/2026-08-01-finding-kiro-row
 
 Cage's headline number was labelled more broadly than it was computed, in the one
 direction that flatters the tools cage exists to evaluate. Built from:
-[docs/archive/v0.36-net-savings.handoff.md](docs/archive/v0.36-net-savings.handoff.md)
-+ [docs/archive/v0.36-net-savings.prompt.md](docs/archive/v0.36-net-savings.prompt.md).
-Evidence: [the gross-vs-net finding](docs/regression/2026-08-01-finding-saved-is-gross.md).
+[work/archive/v0.36-net-savings.handoff.md](work/archive/v0.36-net-savings.handoff.md)
++ [work/archive/v0.36-net-savings.prompt.md](work/archive/v0.36-net-savings.prompt.md).
+Evidence: [the gross-vs-net finding](work/regression/2026-08-01-finding-saved-is-gross.md).
 
 - **`saved` is GROSS, and now says so everywhere.** `saved = raw_alternative − actual`
   is a per-query counterfactual — the *avoided read cost*. It never subtracted the cost
@@ -1659,8 +1659,8 @@ Evidence: [the gross-vs-net finding](docs/regression/2026-08-01-finding-saved-is
 ### Cleanup becomes advisory — 90d default, warn-only, never per-tool (2026-08-01) ⚠ BEHAVIOUR CHANGE
 
 Cage no longer deletes state automatically. Built from:
-[docs/archive/v0.36-cleanup-safety.handoff.md](docs/archive/v0.36-cleanup-safety.handoff.md)
-+ [docs/archive/v0.36-cleanup-safety.prompt.md](docs/archive/v0.36-cleanup-safety.prompt.md).
+[work/archive/v0.36-cleanup-safety.handoff.md](work/archive/v0.36-cleanup-safety.handoff.md)
++ [work/archive/v0.36-cleanup-safety.prompt.md](work/archive/v0.36-cleanup-safety.prompt.md).
 
 - **The auto sweep (piggybacked on `cage import`) only ever warns.** It computes what
   would go and prints one stderr reminder — count, reclaimable size, and the runnable
@@ -1725,12 +1725,12 @@ F5, F7) — none a capture-loss bug, each small and additive.
   (`human_turns == stamped + Σ skip_*`, proven on a real transcript). No gap is
   ever fabricated to raise the number — the report's own line in the wall
   against exactly that stays intact.
-- `docs/regression/2026-07-22-capture-report.md`: F3/F5/F7 marked ✅ resolved
+- `work/regression/2026-07-22-capture-report.md`: F3/F5/F7 marked ✅ resolved
   in place, with F7's corrected framing (recommended coverage denominator:
   `stamped / (human_turns − skip_first_turn − skip_negative_gap)` ≈ 88% on the
   measured machine, not "~1%").
 - Built from
-  [docs/archive/v0.35-phase3-deferred-findings.handoff.md](docs/archive/v0.35-phase3-deferred-findings.handoff.md).
+  [work/archive/v0.35-phase3-deferred-findings.handoff.md](work/archive/v0.35-phase3-deferred-findings.handoff.md).
 
 ## v0.34.0 (2026-07-24) — `cage doctor --wiring`: the installed-artifact inventory
 
@@ -1772,7 +1772,7 @@ enumeration + liveness (v0.32.0's F1 fix); forks none of it.
   nothing is ever executed or healed (`cage setup` still owns healing); a fresh
   scan over `wiringscan.run()`'s scan, not a fork of it.
 - New `cage query wiring-inventory` concept entry.
-- Built from [docs/archive/v0.34-wiring-inventory.handoff.md](docs/archive/v0.34-wiring-inventory.handoff.md).
+- Built from [work/archive/v0.34-wiring-inventory.handoff.md](work/archive/v0.34-wiring-inventory.handoff.md).
 
 ## v0.33.0 (2026-07-24) — Codex removed: cage is Claude Code · Copilot · Kiro
 
@@ -1823,8 +1823,8 @@ simply stops producing new codex rows.
   `agent="codex"` pricing-scenario stamps move to `agent="copilot"`. `python -m
   tools.dummyrepo` all-green (S1-S18).
 
-Built from: [docs/archive/v0.33-codex-removal.handoff.md](docs/archive/v0.33-codex-removal.handoff.md)
-+ [docs/archive/v0.33-codex-removal.prompt.md](docs/archive/v0.33-codex-removal.prompt.md).
+Built from: [work/archive/v0.33-codex-removal.handoff.md](work/archive/v0.33-codex-removal.handoff.md)
++ [work/archive/v0.33-codex-removal.prompt.md](work/archive/v0.33-codex-removal.prompt.md).
 
 858 tests passing.
 
@@ -1839,7 +1839,7 @@ and both shims fail open to `exit 0`, **a dead verb is indistinguishable from ca
 installed**. On a real machine `bin/graphify` probed the pre-rename verb and silently exec'd
 the unmetered binary for 9 days while `cage doctor` reported ✅, because the interceptor check
 tested existence + PATH, not liveness. Diagnosed in
-[docs/regression/2026-07-24-f1-root-cause.md](docs/regression/2026-07-24-f1-root-cause.md).
+[work/regression/2026-07-24-f1-root-cause.md](work/regression/2026-07-24-f1-root-cause.md).
 
 - **New `cage/wiringscan.py` — detection against the live parser.** Every installed
   artifact's command tail is resolved to its verb and checked against `cli.build_parser()`,
@@ -1890,8 +1890,8 @@ tested existence + PATH, not liveness. Diagnosed in
   symptom, the doctor output and the fix. dummyrepo **S18** covers detect → heal →
   idempotence black-box through the shipped CLI.
 
-Built from: [docs/archive/v0.32-stale-wiring.handoff.md](docs/archive/v0.32-stale-wiring.handoff.md)
-+ [docs/archive/v0.32-stale-wiring.prompt.md](docs/archive/v0.32-stale-wiring.prompt.md).
+Built from: [work/archive/v0.32-stale-wiring.handoff.md](work/archive/v0.32-stale-wiring.handoff.md)
++ [work/archive/v0.32-stale-wiring.prompt.md](work/archive/v0.32-stale-wiring.prompt.md).
 
 881 tests passing.
 
@@ -1919,7 +1919,7 @@ with debug on or off, asserted).
   rendered `cage report` is byte-identical with debug-under-`CAGE_BASE` on vs off.
   `test_debug_coverage` unchanged and green.
 - **Regression correction published:**
-  [docs/regression/2026-07-24-f1-root-cause.md](docs/regression/2026-07-24-f1-root-cause.md) —
+  [work/regression/2026-07-24-f1-root-cause.md](work/regression/2026-07-24-f1-root-cause.md) —
   corrects §F1 of the 2026-07-22 capture report (the 07-22 report itself is unchanged, per the
   never-rewrite convention). Two corrections matter: "no real savings has ever been captured" is
   false machine-wide (5 real receipts live in a *project* ledger while the 36k calls live in the
@@ -1981,7 +1981,7 @@ or without the breadcrumb writing).
   cause — "`captured` tracks this-run delta, not lifetime" — didn't match the code, which has
   read the lifetime `ledger.calls(root)` set since v0.30.0. The real defect and the corrected
   blast radius (this never produced a false "installed but capturing nothing" warning) are
-  documented in [docs/regression/2026-07-23-f2-correction.md](docs/regression/2026-07-23-f2-correction.md)
+  documented in [work/regression/2026-07-23-f2-correction.md](work/regression/2026-07-23-f2-correction.md)
   — a new dated entry per this repo's never-rewrite-history convention; the 07-22 report is
   unchanged.
 - **New Must-Know Rule:** every `docs/*.prompt.md` must declare the model tier that should
@@ -2061,8 +2061,8 @@ source file. Fail-open: a capture error is traced under `CAGE_DEBUG` and never b
 
 ## v0.30.0 (2026-07-16) — capture health: make silent zero-capture loud
 
-Built from: [docs/archive/v0.30-capture-health.handoff.md](docs/archive/v0.30-capture-health.handoff.md) ·
-[docs/archive/v0.30-capture-health.prompt.md](docs/archive/v0.30-capture-health.prompt.md).
+Built from: [work/archive/v0.30-capture-health.handoff.md](work/archive/v0.30-capture-health.handoff.md) ·
+[work/archive/v0.30-capture-health.prompt.md](work/archive/v0.30-capture-health.prompt.md).
 
 When an agent is **installed but its log source matched nothing**, cage now says so —
 instead of quietly capturing zero and printing confident totals from the agents that
@@ -2097,8 +2097,8 @@ carry a footer warning:
 
 ## v0.29.0 (2026-07-16) — visible source paths + per-source globs
 
-Built from: [docs/archive/v0.29-sources-defaults.handoff.md](docs/archive/v0.29-sources-defaults.handoff.md) ·
-[docs/archive/v0.29-sources-defaults.prompt.md](docs/archive/v0.29-sources-defaults.prompt.md) —
+Built from: [work/archive/v0.29-sources-defaults.handoff.md](work/archive/v0.29-sources-defaults.handoff.md) ·
+[work/archive/v0.29-sources-defaults.prompt.md](work/archive/v0.29-sources-defaults.prompt.md) —
 Phase 4 follow-on of [docs/output-and-simplification.plan.md](docs/output-and-simplification.plan.md).
 
 Two independent pieces, one release. Both **capture-side only** — no derived view
@@ -2142,8 +2142,8 @@ gates drift on both.
 
 ## v0.28.0 (2026-07-15) — configurable import paths: `[sources]` in policy.toml
 
-Built from: [docs/archive/v0.28-policy-sources.handoff.md](docs/archive/v0.28-policy-sources.handoff.md) ·
-[docs/archive/v0.28-policy-sources.prompt.md](docs/archive/v0.28-policy-sources.prompt.md) —
+Built from: [work/archive/v0.28-policy-sources.handoff.md](work/archive/v0.28-policy-sources.handoff.md) ·
+[work/archive/v0.28-policy-sources.prompt.md](work/archive/v0.28-policy-sources.prompt.md) —
 Phase 4 of [docs/output-and-simplification.plan.md](docs/output-and-simplification.plan.md).
 
 **This release also ships the previously-unreleased v0.26.0 (output honesty) and
@@ -2196,8 +2196,8 @@ only: no derived view changes, determinism untouched.
 
 ## v0.27.0 (shipped in v0.28.0, 2026-07-15) — CLI tiering: five daily verbs, grouped rooms, a clean pre-1.0 verb break
 
-Built from: [docs/archive/v0.27-cli-tiering.handoff.md](docs/archive/v0.27-cli-tiering.handoff.md) ·
-[docs/archive/v0.27-cli-tiering.prompt.md](docs/archive/v0.27-cli-tiering.prompt.md) —
+Built from: [work/archive/v0.27-cli-tiering.handoff.md](work/archive/v0.27-cli-tiering.handoff.md) ·
+[work/archive/v0.27-cli-tiering.prompt.md](work/archive/v0.27-cli-tiering.prompt.md) —
 Phase 3 of [docs/output-and-simplification.plan.md](docs/output-and-simplification.plan.md).
 
 **⚠ BREAKING — this release removes ~30 top-level verbs and regroups them.** The
@@ -2273,8 +2273,8 @@ generated from `cage/verbmap.py`):
 
 ## v0.26.0 (shipped in v0.28.0, 2026-07-15) — output honesty: tokens by default, `—` for unpriced, signal-gated columns, generated docs
 
-Built from: [docs/archive/v0.26-output-honesty.handoff.md](docs/archive/v0.26-output-honesty.handoff.md) ·
-[docs/archive/v0.26-output-honesty.prompt.md](docs/archive/v0.26-output-honesty.prompt.md) —
+Built from: [work/archive/v0.26-output-honesty.handoff.md](work/archive/v0.26-output-honesty.handoff.md) ·
+[work/archive/v0.26-output-honesty.prompt.md](work/archive/v0.26-output-honesty.prompt.md) —
 plan Phases 1+2+5.6 of
 [docs/output-and-simplification.plan.md](docs/output-and-simplification.plan.md).
 
@@ -2355,8 +2355,8 @@ for.
 
 ## v0.25.0 (2026-07-14) — policy sync: upgrade a project policy.toml to the installed bundle
 
-Built from: [docs/archive/v0.25-policy-sync.handoff.md](docs/archive/v0.25-policy-sync.handoff.md) ·
-[docs/archive/v0.25-policy-sync.prompt.md](docs/archive/v0.25-policy-sync.prompt.md)
+Built from: [work/archive/v0.25-policy-sync.handoff.md](work/archive/v0.25-policy-sync.handoff.md) ·
+[work/archive/v0.25-policy-sync.prompt.md](work/archive/v0.25-policy-sync.prompt.md)
 
 A project inited at v0.16 has a policy.toml missing everything the bundle
 gained since (`[meta]`, `[cleanup]`, `capture.import_before_export`).
@@ -2425,8 +2425,8 @@ New: `cage/policysync.py`, `policy` CLI group, doctor `policy-version`,
 
 ## v0.24.0 (2026-07-14) — pricing freshness: the per-commit staleness note + complete vendor tables
 
-Built from: [docs/archive/v0.24-pricing-freshness.handoff.md](docs/archive/v0.24-pricing-freshness.handoff.md) ·
-[docs/archive/v0.24-pricing-freshness.prompt.md](docs/archive/v0.24-pricing-freshness.prompt.md)
+Built from: [work/archive/v0.24-pricing-freshness.handoff.md](work/archive/v0.24-pricing-freshness.handoff.md) ·
+[work/archive/v0.24-pricing-freshness.prompt.md](work/archive/v0.24-pricing-freshness.prompt.md)
 
 Pricing is derive-time, so a stale price table quietly mis-prices *all* history —
 and nothing checked freshness at the moment work is committed, or watched the
@@ -2488,10 +2488,10 @@ byte-identical; `stale_days = 0` opt-out) · 22 new tests (623 passing).
 
 ## v0.23.0 (2026-07-14) — tool-receipt pricing: dollars for call-less token receipts
 
-Built from: [docs/archive/v0.23-tool-receipt-pricing.handoff.md](docs/archive/v0.23-tool-receipt-pricing.handoff.md) ·
-[docs/archive/v0.23-tool-receipt-pricing.prompt.md](docs/archive/v0.23-tool-receipt-pricing.prompt.md) ·
-[docs/archive/v0.23-prices-route-tool.handoff.md](docs/archive/v0.23-prices-route-tool.handoff.md) ·
-[docs/archive/v0.23-prices-route-tool.prompt.md](docs/archive/v0.23-prices-route-tool.prompt.md)
+Built from: [work/archive/v0.23-tool-receipt-pricing.handoff.md](work/archive/v0.23-tool-receipt-pricing.handoff.md) ·
+[work/archive/v0.23-tool-receipt-pricing.prompt.md](work/archive/v0.23-tool-receipt-pricing.prompt.md) ·
+[work/archive/v0.23-prices-route-tool.handoff.md](work/archive/v0.23-prices-route-tool.handoff.md) ·
+[work/archive/v0.23-prices-route-tool.prompt.md](work/archive/v0.23-prices-route-tool.prompt.md)
 
 Graphify's interceptor and fux-style shims file token-savings receipts with a
 `task` but **no call id** — the saved tokens belong to future calls the shim
@@ -2569,7 +2569,7 @@ run surfaced three capture-correctness bugs, all fixed here with regression test
   (mirroring `cage graphify`); the child's exit code propagates as before.
 
 Also in this release: the v0.22.1 run record is archived at
-[docs/archive/v0.22.1-full-test-run.md](docs/archive/v0.22.1-full-test-run.md)
+[work/archive/v0.22.1-full-test-run.md](work/archive/v0.22.1-full-test-run.md)
 (58 findings rows: capture matrix per agent×surface, PII canary sweep, determinism
 double-runs, offline sweep, portable-wiring clone-sim, launcher-mode round-trip,
 zipapp parity, fleet study); the evergreen test plan gains the run's four drift
@@ -2579,23 +2579,23 @@ equivalent); the reusable driver prompt is indexed under Operations
 (`docs/cage-claude-code-prompt-full-test-run.md`). Suite: **574 tests passing**
 (three new regression tests).
 
-Built from: [test run record](docs/archive/v0.22.1-full-test-run.md) · [driver prompt](docs/cage-claude-code-prompt-full-test-run.md) · plan: [docs/full-test-plan-sibling-repo.md](docs/full-test-plan-sibling-repo.md)
+Built from: [test run record](work/archive/v0.22.1-full-test-run.md) · [driver prompt](docs/cage-claude-code-prompt-full-test-run.md) · plan: [docs/full-test-plan-sibling-repo.md](docs/full-test-plan-sibling-repo.md)
 
 ## v0.22.1 (2026-07-11) — docs lifecycle: the archive, the storybook spine, the rule
 
 Docs-only release: `docs/` (41 loose files, most of them shipped-work exhaust) is restructured so a future reader — human or agent — can tell live spec from historical build instruction, and the discipline is made durable as a CLAUDE.md rule.
 
-- **`docs/archive/`** — every shipped handoff/prompt/build-prompt (all of the old `docs/prompts/`, now removed, plus the root-level pairs) moved and renamed to sort by the release that shipped the work: `vX.Y-<feature>.{handoff,prompt}.md`, text verbatim plus a one-line "Archived — history, not spec" header. Superseded drafts (the ledger-scale plan amendment, the meter research pair, the dummy-repo trio) archived under the same convention; the applied `claude-md-proposal-*.md` trio deleted (verified applied; git history preserves them). Index: `docs/archive/README.md` (version · feature · handoff · prompt · CHANGELOG anchor, with explicit mapping notes where a version was ambiguous).
-- **The storybook spine** — new `docs/README.md` (Start here → Subsystem design docs → Operations → Active work → Archive); CHANGELOG entries v0.16.0–v0.22.0 each gained a trailing "Built from: …" line linking their archived pair; `docs/full-test-plan-sibling-repo.md` reset to an evergreen template (`<version under test>` placeholder, boxes unticked) with the ticked v0.16.0 run record archived as `docs/archive/v0.16-full-test-run.md`.
+- **`work/archive/`** — every shipped handoff/prompt/build-prompt (all of the old `docs/prompts/`, now removed, plus the root-level pairs) moved and renamed to sort by the release that shipped the work: `vX.Y-<feature>.{handoff,prompt}.md`, text verbatim plus a one-line "Archived — history, not spec" header. Superseded drafts (the ledger-scale plan amendment, the meter research pair, the dummy-repo trio) archived under the same convention; the applied `claude-md-proposal-*.md` trio deleted (verified applied; git history preserves them). Index: `work/archive/README.md` (version · feature · handoff · prompt · CHANGELOG anchor, with explicit mapping notes where a version was ambiguous).
+- **The storybook spine** — new `docs/README.md` (Start here → Subsystem design docs → Operations → Active work → Archive); CHANGELOG entries v0.16.0–v0.22.0 each gained a trailing "Built from: …" line linking their archived pair; `docs/full-test-plan-sibling-repo.md` reset to an evergreen template (`<version under test>` placeholder, boxes unticked) with the ticked v0.16.0 run record archived as `work/archive/v0.16-full-test-run.md`.
 - **The rule (CLAUDE.md, Must-Know Rules)** — handoff/prompt docs have a lifecycle: active in `docs/` root (listed under *Active work*) while unshipped; **the release that ships the work must, in the same change, move the pair to the archive, link it from the CHANGELOG entry, update both indexes, and promote any still-true design content into the living docs.** A shipped feature whose handoff/prompt still sits in `docs/` root is a release bug, same as a missing changelog entry. (This release dogfoods it: its own build prompt is archived below.)
 - **README trimmed (307 → 235 lines), nothing lost** — the pricing wall-of-text became the new design doc `docs/pricing.md` (how a call prices · the unpriced workflow · policy versioning/`cage prices sync` · fleet repricing · the Copilot approximation · credits vs prices); the 44-line command listing, the Authorship section, and a third of Honest attribution now live behind links (`cage --help`, plan §3.5, plan §4). The keep-untouched sections (story, See it, Quickstart, agents table, `$0` guarantee) are byte-identical.
 - Zero behavior change: comment/docstring path updates only (`tests/test_bundled_data.py`, `tools/buildpyz.py`, `tools/dummyrepo/run.py`); every relative link in README/CHANGELOG/CLAUDE.md/docs verified resolving; suite unchanged (569 passing), skillgen `--check` clean.
 
-Built from: [prompt](docs/archive/v0.22.1-docs-lifecycle.prompt.md)
+Built from: [prompt](work/archive/v0.22.1-docs-lifecycle.prompt.md)
 
 ## v0.22.0 (2026-07-11) — restricted environments: python-launcher mode + cage.pyz (plan §5)
 
-Cage as a first-class citizen on locked-down (finance/enterprise) endpoints where unknown exes are blocked (AppLocker/WDAC) or pip/PyPI is unreachable. Design of record: `docs/restricted-environments.md` (+ `docs/portable-wiring.md`, extended); handoff: `docs/archive/v0.22-restricted-env.handoff.md`.
+Cage as a first-class citizen on locked-down (finance/enterprise) endpoints where unknown exes are blocked (AppLocker/WDAC) or pip/PyPI is unreachable. Design of record: `docs/restricted-environments.md` (+ `docs/portable-wiring.md`, extended); handoff: `work/archive/v0.22-restricted-env.handoff.md`.
 
 - **Python-launcher wiring mode (opt-in)** — `cage setup --python-launcher` persists `[wiring] python_launcher = true` in project policy and (re)writes the shim pair + every user-level wired file (copilot hook, codex MCP, kiro MCP, git commit hooks) to resolve cage **through the interpreter only** (`python3 -m cage` / `py -3 -m cage`) — nothing exe-shaped is probed or executed, grep-tested. Committed files are unchanged (they reference the shim; the shim *is* the mode). Same fail-open exit-0 contract; plain `cage setup` re-runs preserve the persisted mode byte-identically; flip the key to `false` + re-run to revert. Mode-switch re-wiring collapses stale entries (`paths.cage_command_tail` now recognizes the interpreter forms); `cage doctor`'s portability check names the active mode and warns on policy↔shim drift.
 - **`CAGE_RUN_PYTHON=1`** — runtime-only override on the **standard** shim: skips the exe probe and goes straight to the interpreter without rewiring (the standard shim texts changed once to carry the branch — behavior with the env unset is test-pinned identical, and the next `cage setup` rewrites the file).
@@ -2605,7 +2605,7 @@ Cage as a first-class citizen on locked-down (finance/enterprise) endpoints wher
 - **Docs + query** — `docs/restricted-environments.md` (three tiers: launcher mode · pyz · internal mirror; the WDAC script-host caveat stated honestly; a first-endpoint validation checklist), README platforms link, `docs/portable-wiring.md` launcher-mode section, new `cage query restricted-env` concept + `portable-wiring` extended.
 - Validation: launcher-mode grep contract + shim runtime + `CAGE_RUN_PYTHON` precedence + doctor mode/drift tests; bundled-data wheel byte-identity + full pyz asset/determinism suite; dummyrepo **S12** (launcher wiring end-to-end) and **S13** (pyz wheel↔zip report parity, `$CAGE_PYZ` reuses the exact CI artifact). +26 tests (543→569).
 
-Built from: [handoff](docs/archive/v0.22-restricted-env.handoff.md) · [prompt](docs/archive/v0.22-restricted-env.prompt.md)
+Built from: [handoff](work/archive/v0.22-restricted-env.handoff.md) · [prompt](work/archive/v0.22-restricted-env.prompt.md)
 
 ## v0.21.0 (2026-07-11) — CSV output + agent reporting recipes (plan §3.9)
 
@@ -2619,7 +2619,7 @@ CSV as a one-way **reporting** surface — never blurred with the re-importable 
 - **`cage query csv-output`** — new concept entry: which views, the column law, same-numbers guarantee, bundle-vs-CSV distinction; the export help text documents the distinction too.
 - Validation: golden byte-exact CSVs over the seeded §4.4 demo ledger, determinism double-runs, text-vs-CSV same-numbers assertions, method-tag column on every view, PII grep on raw CSVs, RFC-4180 round-trip (and the label/phase single-token guard that keeps commas out of grouping keys), MCP parity vs the goldens; dummyrepo **S8** adds `report --csv`/`attrib --csv` to the byte-identical + CAGE_DEBUG-no-drift sweep. +34 tests (509→543).
 
-Built from: [prompt](docs/archive/v0.21-csv-and-report-skill.prompt.md)
+Built from: [prompt](work/archive/v0.21-csv-and-report-skill.prompt.md)
 
 ## v0.20.0 (2026-07-11) — portable wiring (no absolute paths in committed files)
 
@@ -2633,7 +2633,7 @@ Fixes a sharing bug: wired hook/MCP entries embedded the wiring machine's **abso
 - **`cage query portable-wiring`** — new concept entry: why the shim exists, the resolution order, fail-open-when-absent, committed vs user-level, the one-exception host.
 - Validation: dummyrepo **S1** now clone-simulates (copies the wired testbed sans `.git`/gitignored dirs to a new path → doctor portability clean there → the committed shim actually resolves and passes args through). New `tests/test_portable_wiring.py` pins the never-rot invariant (grep every committed wired file for absolute paths), the shim resolution order incl. absent-cage → silent exit 0, cleanup-allowlist unreachability of `.cage/bin/`, migration exactly-once, and the doctor flags. +13 tests (496→509).
 
-Built from: [prompt](docs/archive/v0.20-portable-wiring.prompt.md)
+Built from: [prompt](work/archive/v0.20-portable-wiring.prompt.md)
 
 ## v0.19.0 (2026-07-11) — pricing management (the unpriced workflow, `cage prices`, policy versioning)
 
@@ -2651,7 +2651,7 @@ A ledger is only as honest as its price table. This release makes the price tabl
 - **`cage query` coverage** — nine new entries, all live-interpolated: calculations `pricing-match`, `unpriced`, `repricing`; concepts `prices-cli`, `effort-tiers`, `policy-versioning`, `copilot-pricing` (copilot-served Claude at Anthropic list rates ≈ GitHub's own AI-Credits metering basis since 2026-06-01; `[credits]` stays a separate layer), `cleanup`, `import-before-export`. The UNPRICED report line points at `cage query unpriced`. `cage doctor` gains `prices-meta` and `state` checks.
 - **Validation** — dummyrepo scenario **S11** (seeded unpriced calls → exact `prices unpriced` output → `set`+`alias` → report re-prices to exact expected USD with the ledger untouched → stale `[meta]` → sync recommendation → restamp clears it) and an 8th fleet machine in **S9** that never runs `cage import` — its bundle is complete purely via export's sweep and the analyst's totals stay exact. +55 tests (441→496).
 
-Built from: [prompt](docs/archive/v0.19-pricing-management.prompt.md)
+Built from: [prompt](work/archive/v0.19-pricing-management.prompt.md)
 
 ## v0.18.0 (2026-07-11) — derived human attention (passive minutes from turn gaps)
 
@@ -2666,7 +2666,7 @@ Total cost's missing half: what the agent costs in **human time**, derived passi
 - **The watcher guard** — deliberately NOT built: no editor plugins, activity trackers, keystroke or focus monitoring. Transcript timestamps only; PII surface unchanged (timestamp arithmetic, counts-never-content).
 - Validation: dummyrepo scenario **S10** (seeded transcript gap → exact derived minutes across human/compare/verdict; attest → precedence + exact calibration ratio; `--agent-only` clean; byte-identical re-runs). +23 tests (418→441).
 
-Built from: [prompt](docs/archive/v0.18-human-attention.prompt.md)
+Built from: [prompt](work/archive/v0.18-human-attention.prompt.md)
 
 ## v0.17.1 (2026-07-09) — dead-code cleanup
 
@@ -2685,15 +2685,15 @@ A systematic AST sweep (unused imports, unreferenced functions/methods/constants
 - **Console safety** — `cli.main` degrades the ✔/·/⚠ glyphs on non-UTF consoles (`errors="replace"`) instead of dying with UnicodeEncodeError on cp1252; the scheduler hint is OS-aware (cron line on POSIX, a `schtasks /create` example on Windows — printed, never installed).
 - **`cage doctor --paths` + probe events (the exportable path diagnostic)** — `cage/pathprobe.py` renders one read-only screen per agent × candidate location: found/missing, files matched, parseable row count, cursor state, one why-line per miss ("location absent", "no files match <glob>", "cursor: already imported", "parse: 0 rows — see debug.log"), env overrides and UNVERIFIED-LAYOUT candidates labeled, ending with the active sink + precedence chain. It writes nothing. The same facts stream to `debug.log` as metadata-only `probe` events during `CAGE_DEBUG=1 cage import`, and `cage doctor --bundle` now ships the report as `paths.txt` (home-prefix redaction applies). New explain entry: `cage query "why is nothing being captured"`. +16 tests (401→417).
 
-Built from: [prompt](docs/archive/v0.17-windows-and-path-probe.prompt.md)
+Built from: [prompt](work/archive/v0.17-windows-and-path-probe.prompt.md)
 
 ## v0.16.0 (2026-07-08) — cost-impact roadmap: validate · diagnose
 
-Accumulating release for the cost-impact roadmap phases (`docs/archive/v0.16-cost-impact-roadmap.handoff.md`); each phase lands as a subsection below. Suite 318→401 across P0–P5 + the manual validation (roadmap complete).
+Accumulating release for the cost-impact roadmap phases (`work/archive/v0.16-cost-impact-roadmap.handoff.md`); each phase lands as a subsection below. Suite 318→401 across P0–P5 + the manual validation (roadmap complete).
 
 ### Manual validation (full-test-plan, 2026-07) — real-extension capture bugs
 
-Findings from executing `docs/full-test-plan-sibling-repo.md` (run record: `docs/archive/v0.16-full-test-run.md`) against real Claude Code / Codex / Copilot VS Code extensions and the Kiro IDE (`../cage-testbed`):
+Findings from executing `docs/full-test-plan-sibling-repo.md` (run record: `work/archive/v0.16-full-test-run.md`) against real Claude Code / Codex / Copilot VS Code extensions and the Kiro IDE (`../cage-testbed`):
 
 - **Codex call ids no longer collide across sessions** (`transcript.parse_codex_calls`) — the id carried `session[:8]`, but every rollout stem starts with `rollout-`, so all Codex sessions shared one id namespace and `hooks.append_new` silently dropped colliding line indexes: on the validation machine **150 of 368 real calls (41%, ≈$11) were lost as false "dupes"**. The session component is now `sha1(session)[:8]` — deterministic per (session, line), unique across sessions. Existing ledger rows keep their old ids (append-only); unchanged rollouts are cursor-skipped, so historical undercount persists unless the ledger is rebuilt.
 - **Codex rows carry the event's own timestamp** — `parse_codex_calls` stamped rows at import time, filing a May rollout in the import month's shard and breaking `--since`/month partitioning. The row `ts` is now the `token_count` event's `timestamp` (fallback to write-time when absent). Codex fixtures drop `ts` from `volatile`.
@@ -2752,9 +2752,9 @@ Before comparing or estimating anything, prove capture actually works on every a
 
 - **Fixture corpus** — `tests/fixtures/transcripts/<agent>/<surface>/` for all four agents (claude / codex / copilot / kiro) × (cli / vscode): sanitized session-log samples in each agent's real on-disk shape (realistic token counts, all content stripped), each with an `expected.json` freezing the exact call rows `cage import` must produce — deterministic ids included, `ts` excluded only for codex/kiro whose logs carry no per-row timestamp (the parser stamps write time). `tests/test_fixture_corpus.py` parametrizes over the corpus, plants each log into an isolated fake agent home at its real relative location, runs the real default (pathless) import scan, and asserts exact rows + idempotent re-import. A structural test fails if any agent × surface directory ever goes missing (the four-agent invariant, enforced).
 - **`UNVERIFIED-FORMAT` stand-ins, never invented formats** — the codex/copilot/kiro VS Code-extension fixtures are CLI-format stand-ins until real extension logs are captured (handoff §10 open question); they are flagged `format_verified: false` in `expected.json` and marked `UNVERIFIED-FORMAT` in the corpus README, and a test asserts the flagging discipline (only vscode fixtures may be stand-ins; every CLI format is pinned against a real client log).
-- **Dummy sibling-repo scenario runner** — `python -m tools.dummyrepo` (build-time only, stdlib-only, never in the wheel — the `tools/skillgen` rules): scaffolds a disposable repo beside the checkout, sandboxes every agent home + `CAGE_HOME` via env overrides (nothing touches real machine data), and runs the automatable scenario matrix from `docs/archive/v0.16-dummy-repo-test.plan.md` §9: **S1** (all four agents wire, planted CLI logs import to exact rows, doctor exits 0), **S2** (extension-format logs import with hooks unwired, re-import byte-identical via the cursor), **S8** (six derived views byte-identical across runs, and `CAGE_DEBUG=1` changes no derived output), plus a counts-never-content PII grep of everything the ledger wrote. S3–S7 render `PENDING` with the phase that ships them (P1–P4); live-agent steps print as an explicit `MANUAL` checklist, never silently skipped. Exits 1 on any failure and keeps the sandbox for inspection; cleans up on success.
+- **Dummy sibling-repo scenario runner** — `python -m tools.dummyrepo` (build-time only, stdlib-only, never in the wheel — the `tools/skillgen` rules): scaffolds a disposable repo beside the checkout, sandboxes every agent home + `CAGE_HOME` via env overrides (nothing touches real machine data), and runs the automatable scenario matrix from `work/archive/v0.16-dummy-repo-test.plan.md` §9: **S1** (all four agents wire, planted CLI logs import to exact rows, doctor exits 0), **S2** (extension-format logs import with hooks unwired, re-import byte-identical via the cursor), **S8** (six derived views byte-identical across runs, and `CAGE_DEBUG=1` changes no derived output), plus a counts-never-content PII grep of everything the ledger wrote. S3–S7 render `PENDING` with the phase that ships them (P1–P4); live-agent steps print as an explicit `MANUAL` checklist, never silently skipped. Exits 1 on any failure and keeps the sandbox for inspection; cleans up on success.
 
-Built from: [handoff](docs/archive/v0.16-cost-impact-roadmap.handoff.md) · [prompt](docs/archive/v0.16-cost-impact-roadmap.prompt.md) · validation: [dummy-repo](docs/archive/v0.16-dummy-repo-test.handoff.md) · [test run record](docs/archive/v0.16-full-test-run.md)
+Built from: [handoff](work/archive/v0.16-cost-impact-roadmap.handoff.md) · [prompt](work/archive/v0.16-cost-impact-roadmap.prompt.md) · validation: [dummy-repo](work/archive/v0.16-dummy-repo-test.handoff.md) · [test run record](work/archive/v0.16-full-test-run.md)
 
 ## v0.15.2 — Fable 5 / Mythos 5 pricing + two doc/interpolation papercuts
 
@@ -2764,7 +2764,7 @@ A second validation-pass batch, found by re-testing v0.15.1 against a real cross
 
 - **`cage query overview` / `data-flow` show the real on-disk paths.** The concept text interpolated the legacy unpartitioned `calls.jsonl` / `receipts.jsonl`, but the ledger is month-partitioned — that single file doesn't exist on a fresh ledger. It now shows the shard glob `calls-*.jsonl` / `receipts-*.jsonl`, matching what's actually on disk.
 
-- **Test-plan doc drift corrected.** `docs/archive/v0.16-dummy-repo-test.plan.md` §5 listed `cage report --html PATH` (no such flag — the HTML surface is `cage serve`) and `cage export --json` as a stand-in for the summary; both lines now match the real CLI (`cage export --json` is a first-class alias as of v0.15.1).
+- **Test-plan doc drift corrected.** `work/archive/v0.16-dummy-repo-test.plan.md` §5 listed `cage report --html PATH` (no such flag — the HTML surface is `cage serve`) and `cage export --json` as a stand-in for the summary; both lines now match the real CLI (`cage export --json` is a first-class alias as of v0.15.1).
 
 ## v0.15.1 — validation-pass fixes (concurrent-import dedup + three CLI/setup papercuts)
 

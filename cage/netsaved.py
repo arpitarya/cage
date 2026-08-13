@@ -1,5 +1,5 @@
 """Gross vs **net** savings — what a tool avoided, minus what it cost to *use*
-(net-savings handoff, [finding](../docs/regression/2026-08-01-finding-saved-is-gross.md)).
+(net-savings handoff, [finding](../work/regression/2026-08-01-finding-saved-is-gross.md)).
 
 Every `saved` in the ledger is a **per-query counterfactual**: *the files this answer
 cites would have cost N tokens; the answer cost M.* It does not subtract the cost of

@@ -861,7 +861,7 @@ def _detect_graphify_copilot(root: Path, files: list[Path], gfx_ids: set,
 
 
 def _log_kiro_src(root: Path, src: Path, *, pol: dict | None = None) -> None:
-    """F3 visibility (docs/regression/2026-07-22-capture-report.md): one debug event
+    """F3 visibility (work/regression/2026-07-22-capture-report.md): one debug event
     per import run recording the resolved kiro `src`'s raw state — existed?, byte
     size, rows parsed, tokens summed. Read **unconditionally**, independent of the
     incremental cursor, so "found but empty/thin" stays visible on every run even

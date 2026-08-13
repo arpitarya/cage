@@ -12,6 +12,53 @@ by milestone) — the worklog is what *happened this session*.
 
 ---
 
+## 2026-08-13 — WORK-DIR-CONT: doc-registry/research/regression/dogfood/compare/cage-lab/archive moved docs/ → work/
+
+- **Asked (Arpit, Cowork):** move `doc-registry`, `research`, `regression`,
+  `dogfood`, `compare`, `cage-lab`, `archive` from `docs/` to the root `work/` dir
+  (continuing the 2026-08-12 WORK-DIR move that already relocated `IMPLEMENTATION.md`/
+  `INTERVIEW.md`/`MACHINE.md`/`OPEN-WORK.md`/`WORKLOG.md`), and change the standing
+  rule so future handoff/prompt docs are created in `work/` from the start instead of
+  `docs/` root.
+- **Done:** `git mv` all seven (313 renamed files) into `work/`. Swept every LIVE
+  cross-reference project-wide (543 tracked `.md`/`.py` files scanned): the seven
+  `docs/<name>` path strings repointed to `work/<name>` everywhere, plus a second
+  pass that recomputed and fixed the now-broken *relative* links in both directions
+  — `docs/` files linking into the moved dirs (`FORMULAS.md`, `GLOSSARY.md`,
+  `PLAN.md`, `README.md`, `CLI.md`, the capture-*.md trio, `adr/*.md`,
+  `example/README.md`) and moved files linking back out to what stayed in `docs/`
+  (`work/DOC-REGISTRY.md`, `work/compare/*.md`, and every `work/archive/*.md`/
+  `work/regression/*.md` citation of a still-`docs/` doc). Updated the three
+  functional (non-comment) path constants: `tests/test_doc_links.py`'s
+  `HISTORY_DIRS` (→ `work/archive/`, `work/regression/`) and its LIVE-set docstring,
+  `tests/test_dogfood_freshness.py`'s `DOGFOOD_DIR` (→ `work/dogfood`), and
+  `tests/test_cli_reference.py`'s registry-file read (→ `work/DOC-REGISTRY.md`).
+  Rewrote CLAUDE.md's *Handoff/prompt docs have a lifecycle* rule and the two
+  `docs/*.prompt.md` mentions to `work/`, plus the matching lines in
+  `docs/README.md`, `work/OPEN-WORK.md`, and `cage/steering.py`'s release-skill
+  archive bullet. Deliberately **left untouched**: `.cage/ledger/provenance.jsonl`
+  (append-only audit ledger), `graphify-out/` (generated cache — self-heals on the
+  next `graphify update`), and `samples/agent-artifacts/**` (real captured
+  transcript fixtures) — none of these are doc citations, all three would be
+  falsified by hand-editing. Verified green without `pytest` available in this
+  sandbox (no network to install it): ran `test_doc_links.py`'s four test functions
+  and `test_dogfood_freshness.py`'s `_structure_problem` directly by import — all
+  pass, `DOGFOOD_DIR.exists()` True, zero new dangling LIVE links. Added a dated
+  `work/DOC-REGISTRY.md` row entry for this change under the CLAUDE.md maintained-doc
+  history.
+- **Not touched:** the ~155-and-growing historical citations *inside*
+  `work/archive/**` and `work/regression/**` that still name pre-move sibling paths
+  (e.g. a v0.36 handoff citing `cage-lab-plan.md` informally) — both dirs are
+  `test_doc_links.py` HISTORY-exempt by design, and rewriting them would be exactly
+  the "falsify the record" case the exemption exists to prevent. CHANGELOG.md's own
+  historical `docs/...` mentions, same reasoning (`CHANGELOG.md` is a HISTORY_FILE).
+- **Next step:** none — the move is complete and self-verified. First agent to touch
+  `work/` for a *new* feature should confirm the new create-in-`work/`-root
+  convention reads correctly in practice (no pair has been created since this
+  change).
+
+---
+
 ## 2026-08-14 — CLAUDE-METRICS: `.cage/ledger/claude/` built end to end
 
 - **Asked:** build the filed CLAUDE-METRICS prompt (pasted directly) — a new
@@ -51,9 +98,9 @@ by milestone) — the worklog is what *happened this session*.
   `kind`/`filesets` for the new ingest event). Docs: `docs/GLOSSARY.md` (three
   terms), `docs/claude-capture.md` (rewritten — new per-chat ledger section, the
   two calls-path defects rescoped to `calls` only since CLAUDE-METRICS dodges
-  rather than fixes them, retention line now present-tense), `docs/DOC-REGISTRY.md`
-  (six rows bumped), `docs/README.md`/`docs/archive/README.md` updated, pair
-  archived to `docs/archive/v0.49-claude-metrics-ledger.{handoff,prompt}.md` with
+  rather than fixes them, retention line now present-tense), `work/DOC-REGISTRY.md`
+  (six rows bumped), `docs/README.md`/`work/archive/README.md` updated, pair
+  archived to `work/archive/v0.49-claude-metrics-ledger.{handoff,prompt}.md` with
   internal links repointed for the new location.
 - **Decided:** fold key is scoped per chat (`(chat_key, requestId, message.id)`,
   not the handoff's literal global `(requestId, message.id)`) — strictly safer
@@ -127,7 +174,7 @@ by milestone) — the worklog is what *happened this session*.
   tuples, unlike COPILOT-METRICS). One doctor-surface test (`test_doctor.py`'s
   exhaustive check-name set) updated to include `"kiro-metrics"`. Docs: `docs/GLOSSARY.md`
   (two terms), `docs/kiro-capture.md` (three closed gaps moved out of Known gaps,
-  executive summary rewritten), `docs/DOC-REGISTRY.md` (three rows + this row bumped).
+  executive summary rewritten), `work/DOC-REGISTRY.md` (three rows + this row bumped).
 - **Decided:** the `cli-conv` row's `credits` None-sentinel follows the handoff
   literally — "sum when the `usage_info` list is present, else `None`" — which is
   *looser* than `_kiro_cli_credit_row`'s existing "credits≤0 and context≤0 ⇒ no row
@@ -141,7 +188,7 @@ by milestone) — the worklog is what *happened this session*.
   inherited from the two legs already resolving it, never re-decided.
 - **Open:** `work/OPEN-WORK.md`'s KIRO-METRICS line removal + its two scope-out
   lines (a read surface, `--csv kiro`), the archive-on-implement move of the
-  handoff/prompt pair to `docs/archive/`, and a proposed `CLAUDE.md` diff (ledger
+  handoff/prompt pair to `work/archive/`, and a proposed `CLAUDE.md` diff (ledger
   diagram + the kiro adapter bullet) are the immediate next steps — the prompt's
   own instructions require the `CLAUDE.md` diff be proposed for Arpit's review, not
   silently applied.
@@ -179,13 +226,13 @@ by milestone) — the worklog is what *happened this session*.
   never-sum rule.
 - **Open:** the two scope-out items (a read surface, `--csv copilot`) are parked, not
   built. Ran the session mid-way into 7 other concurrent Claude Code sessions on this
-  same machine, with `work/OPEN-WORK.md`/`WORKLOG.md`/`docs/DOC-REGISTRY.md`/
+  same machine, with `work/OPEN-WORK.md`/`WORKLOG.md`/`work/DOC-REGISTRY.md`/
   `docs/README.md` mid-edit by what looks like a sibling KIRO-METRICS/CLAUDE-METRICS
   session — exactly the concurrency CLAUDE-METRICS's own filed item warns against.
   Proceeded carefully (re-read each shared file immediately before editing, small
   targeted edits only, on Arpit's explicit go) rather than blocking; a genuine race
   would have failed the Edit tool's exact-match loudly, not silently clobbered.
-  Archive-on-implement (moving the handoff/prompt pair to `docs/archive/`) and a
+  Archive-on-implement (moving the handoff/prompt pair to `work/archive/`) and a
   proposed `CLAUDE.md` diff (ledger diagram + a substrate bullet) are the next step,
   held for a fresh read of these same files given the concurrent activity.
 - **Cost:** unmeasured — `cage report` is cumulative over the whole `~/.cage` ledger
@@ -293,7 +340,7 @@ by milestone) — the worklog is what *happened this session*.
 
 - **Asked:** research how to fetch claude token in/out, cached in/out, and credits
   per chat — which dir, which file, which row/props.
-- **Done:** `docs/research/2026-08-13-claude-per-chat-usage-fetch-spec.md` — the
+- **Done:** `work/research/2026-08-13-claude-per-chat-usage-fetch-spec.md` — the
   Claude twin of the copilot fetch spec, verified on a LIVE 2.1.229 store (this
   Cowork session's own `~/.claude/projects/`), not desk-only: full usage prop set
   (cache TTL split, `thinking_tokens`, `server_tool_use`, `iterations[]`), the
@@ -315,7 +362,7 @@ by milestone) — the worklog is what *happened this session*.
 - **Asked:** the kiro analog of today's copilot spec — for every chat, how are
   token in/out, cached in/out, and credits *supposed* to be fetched: which dir,
   which file, which row, which prop.
-- **Done:** `docs/research/2026-08-13-kiro-per-chat-usage-fetch-spec.md`. Headline:
+- **Done:** `work/research/2026-08-13-kiro-per-chat-usage-fetch-spec.md`. Headline:
   **the wire has all five, the disk has almost none** — the backend streams
   `metadataEvent.tokenUsage {uncachedInput, output, cacheRead, cacheWrite, total}`
   + `meteringEvent {unit:"credit", usage:<float>}` + `messageMetadataEvent`
@@ -470,7 +517,7 @@ by milestone) — the worklog is what *happened this session*.
   for every chat — exact dir, file, row, and prop for each value.
 - **Done:** verified against microsoft/vscode `main` + vscode-copilot-chat `main`
   (2026-08-13 clones); published
-  [research/2026-08-13-copilot-per-chat-usage-fetch-spec.md](../docs/research/2026-08-13-copilot-per-chat-usage-fetch-spec.md).
+  [research/2026-08-13-copilot-per-chat-usage-fetch-spec.md](../work/research/2026-08-13-copilot-per-chat-usage-fetch-spec.md).
   Five sources mapped: chatSessions (always-on), CLI `~/.copilot/session-state`
   (always-on), `agentHostUsage/` sidecar (debug-gated), extension `debug-logs/`
   (fileLogging-gated — no cached tokens reach the file), and a NEW OTel SQLite
@@ -546,7 +593,7 @@ by milestone) — the worklog is what *happened this session*.
   framing was no longer true), `README.md`'s test count, `CLAUDE.md`'s `just test`
   count, `work/OPEN-WORK.md` (removed the item; the pre-filed REPORT-CREDITS?
   follow-up updated to drop a citation to the now-deleted `_credit_agents`), and
-  archived the handoff/prompt pair to `docs/archive/`.
+  archived the handoff/prompt pair to `work/archive/`.
 - **Decided/open:** the handoff's proposed `CLAUDE.md` chats-bullet edit is **not
   applied** — flagged here for Arpit's review, per the standing rule that steering
   files are never silently rewritten. Proposed replacement for the sentence "kiro-CLI
@@ -578,7 +625,7 @@ by milestone) — the worklog is what *happened this session*.
   `test_doc_links.py`'s `HISTORY_FILES` and `test_queue_honesty.py`'s `QUEUE` constant
   to the new paths. On the second instruction, rewrote `work/OPEN-WORK.md` down to a
   bare empty-queue statement (removed the 11-row closure table and the standing-
-  constraints section — that history still lives in `docs/archive/` and
+  constraints section — that history still lives in `work/archive/` and
   `IMPLEMENTATION.md`). Found and fixed a pre-existing, unrelated bug while running
   the doc-link gate: `docs/restricted-environments.md` had been silently deleted a
   second time (same class of bug it was restored for once already, per the
@@ -625,7 +672,7 @@ by milestone) — the worklog is what *happened this session*.
 - **Clarified before moving anything** (none of the 16 was built, so archiving records a
   *decision*, not an outcome): Arpit chose **all of them**, including `CONSTRAINTS.md` and
   both directory READMEs.
-- **Done:** 16 docs archived to `docs/archive/v0.49-*` with per-file headers naming what
+- **Done:** 16 docs archived to `work/archive/v0.49-*` with per-file headers naming what
   each closure left unresolved; `docs/open/` and `docs/proposals/` emptied; OPEN-WORK
   rewritten as an empty queue carrying the closure table; citations migrated in CLAUDE.md
   (3 rules), docs/README, DOC-REGISTRY (6 rows), FIELD-RUNBOOK, GLOSSARY, shim-contract,
@@ -820,7 +867,7 @@ by milestone) — the worklog is what *happened this session*.
   was right is that **zero goldens were re-blessed** across the whole sweep, because
   `full[:7]` is exactly the `%h` the tables already showed.
 - **Open — needs your verdict:** **COMMITS-WINDOW**
-  ([compare](../docs/compare/commits-view-cost-bound.compare.md)), the sweep's only residual.
+  ([compare](../work/compare/commits-view-cost-bound.compare.md)), the sweep's only residual.
   Recommendation: option B, bound the read by the row cap.
 - **Next step:** your call on COMMITS-WINDOW; then release v0.49.
 
@@ -838,7 +885,7 @@ by milestone) — the worklog is what *happened this session*.
   **6.4s for 20 rows on 123 commits**; a 90d default cut **zero** of them here, so it
   would not have bounded the cost either. Landed the two uncontested halves (O(n²) scan →
   set; a window that hides commits now says how many).
-  → [compare](../docs/compare/commits-view-cost-bound.compare.md), OPEN-WORK **COMMITS-WINDOW**.
+  → [compare](../work/compare/commits-view-cost-bound.compare.md), OPEN-WORK **COMMITS-WINDOW**.
   **Needs Arpit's verdict; recommendation is Option B (cap the read by the row cap).**
 - **Three findings beyond the handoff:**
   1. `core.quotePath` bites a **third** site it did not list — `tasks.git_snapshot`, which
@@ -916,7 +963,7 @@ by milestone) — the worklog is what *happened this session*.
 
 - **Asked:** a Claude Code prompt for the pending work — then, when offered a choice of
   four items, "all of them, and anything more".
-- **Done:** wrote the [handoff](../docs/archive/v0.49-agent-lane-sweep.handoff.md)/[prompt](../docs/archive/v0.49-agent-lane-sweep.prompt.md)
+- **Done:** wrote the [handoff](../work/archive/v0.49-agent-lane-sweep.handoff.md)/[prompt](../work/archive/v0.49-agent-lane-sweep.prompt.md)
   pair covering every *buildable* item left in OPEN-WORK, in seven independently-landable
   phases. Filed **EXPORT-SCOPE** (three report-shaped views v0.48.0's scope line missed).
 - **The valuable part was not the prompt, it was the verification.** Every one of the
@@ -948,7 +995,7 @@ by milestone) — the worklog is what *happened this session*.
   side effect** — a plain `cage report` still just prints; bare `--export` writes **all
   available formats** into a per-run folder. Recorded with the debate, the deliberately-
   not-taken list and a reopen trigger in
-  [compare/view-export-and-run-stamp.compare.md](../docs/compare/view-export-and-run-stamp.compare.md).
+  [compare/view-export-and-run-stamp.compare.md](../work/compare/view-export-and-run-stamp.compare.md).
 - **Done:** shipped as v0.48.0 (unreleased in tree). 1503 → 1541, suite green.
 - **The thing worth inheriting from (3):** the old message was *true and misleading at the
   same time*, which is the hardest kind of wrong output to notice. Kiro's absence had two
@@ -1005,7 +1052,7 @@ by milestone) — the worklog is what *happened this session*.
 - **Done:** located the capture, ran the shipped route against it (146,261 tokens saved,
   72 files, idempotent), rebuilt the fixture from the sanitized real record, added the two
   tests the capture earned, published
-  [the run](../docs/regression/2026-08-08-gfx-cov-vscode-field-run.md). 1498 => 1500.
+  [the run](../work/regression/2026-08-08-gfx-cov-vscode-field-run.md). 1498 => 1500.
 - **The lesson, and it is the same one twice:** my synthetic fixture was wrong in exactly
   the way a synthetic fixture is always wrong — it was *too clean*. A real agent prefixes
   `cd <repo> &&` because `run_in_terminal` reuses a shell, and the real part carries no
@@ -1024,7 +1071,7 @@ by milestone) — the worklog is what *happened this session*.
 - **Done:** measured the kiro half of GFX-COV-FIELD against the real kiro-cli store —
   the P0 probe runs were still in it, so the evidence was already there. 2 graphify
   invocations: 1 filed (3,545 tokens), 1 refused as truncated, re-run idempotent.
-  Published to [regression/](../docs/regression/2026-08-07-gfx-cov-kiro-field-run.md).
+  Published to [regression/](../work/regression/2026-08-07-gfx-cov-kiro-field-run.md).
 - **Decided:** report n=2 as *both branches execute*, **not** as a 50% refusal rate.
   ADR 0009's veto is keyed to a 10% file rate and that needs a real sample; publishing a
   rate off two runs would be the kind of number this project exists to refuse.
@@ -1041,11 +1088,11 @@ by milestone) — the worklog is what *happened this session*.
 ## 2026-08-07 — Claude Code — GFX-COV built, all five phases (v0.47.0, 1462/0 => 1498/0)
 
 - **Asked:** execute the GFX-COV pair (Opus). P0 was a blocking real-store evidence gate.
-- **Done:** P0 probes + [research doc](../docs/research/2026-08-07-graphify-store-evidence.md) ->
+- **Done:** P0 probes + [research doc](../work/research/2026-08-07-graphify-store-evidence.md) ->
   STOP -> Arpit's four verdicts -> P1 copilot-VSCode route - P2 kiro-CLI route +
   [ADR 0009](../docs/adr/0009-kiro-cli-tool-run-bodies-read-transiently-never-persisted.md) -
   P3 `--rescan-graphify` + the coverage gap surfaces - P4 tests + the full docs pass.
-  Pair archived to `docs/archive/v0.47-*`.
+  Pair archived to `work/archive/v0.47-*`.
 - **The premise the pair was built on was false, and the gate is what caught it.** F2 said
   copilot's `chatSessions` carried the command but no tool result. 1,132 real
   `run_in_terminal` parts say it carries `commandLine.original`, a **per-command**
@@ -1075,7 +1122,7 @@ by milestone) — the worklog is what *happened this session*.
 - **Asked:** execute the GFX-COV prompt (Opus). P0 is a blocking evidence gate ending in
   a mandatory STOP.
 - **Done:** all four probes, read-only, on this machine's real stores. Wrote
-  [docs/research/2026-08-07-graphify-store-evidence.md](../docs/research/2026-08-07-graphify-store-evidence.md)
+  [work/research/2026-08-07-graphify-store-evidence.md](../work/research/2026-08-07-graphify-store-evidence.md)
   and six redacted real-shape fixtures under `tests/fixtures/transcripts/graphify/`.
   Suite green 1462/11.
 - **Decided by evidence (not by me):** the F2 no-result assumption that copilot VS Code
@@ -1237,7 +1284,7 @@ by milestone) — the worklog is what *happened this session*.
 - **Routed to a decision rather than patched:** the OTel `gen_ai.system` rename. It *is*
   deprecated (semconv v1.37.0, before our pinned 1.42.0), but verifying it surfaced that
   the GenAI conventions **moved to their own repo**, so the pin's referent is itself
-  unclear. [Research doc](../docs/research/2026-08-03-otel-genai-semconv-pin.md) with three
+  unclear. [Research doc](../work/research/2026-08-03-otel-genai-semconv-pin.md) with three
   options; recommendation is to fix the pin, from which the rename falls out.
 - **Open:** three decisions — COPILOT-PREMIUM-DEAD · REV-CREDITS defect 2 · the semconv
   pin. No code is blocked on them.
@@ -1390,9 +1437,9 @@ by milestone) — the worklog is what *happened this session*.
      hand-kept map goes stale in the very release that renames an event; the fix-hint
      derives from live `hookcmd.EVENTS` instead).
   2. Its evidence link pointed at `_review/…`, which is **gitignored** — a proof no
-     teammate or fork can open. The doc's own text said "move to `docs/regression/` on
+     teammate or fork can open. The doc's own text said "move to `work/regression/` on
      pickup", and pickup had already happened. Moved to
-     `docs/regression/2026-08-02-review-v0.37.0-to-v0.44.0.md` and repointed.
+     `work/regression/2026-08-02-review-v0.37.0-to-v0.44.0.md` and repointed.
 - **Also:** `chats-agent-authorship-column`'s Trigger still said "parked until Arpit
   accepts" — it is picked up and its REV-TS gate now passes. Corrected to say so.
 - **Guard against recurrence:** proposals/README now states the format as a **checkable
@@ -1499,7 +1546,7 @@ by milestone) — the worklog is what *happened this session*.
 
 ## 2026-08-02 — Claude Code — CHATS-AUTHOR Phase 0 gate: **FAILED, work not started**
 
-- **Asked:** execute [chats-author.prompt.md](../docs/archive/v0.46-chats-author.prompt.md) (the `agent%`
+- **Asked:** execute [chats-author.prompt.md](../work/archive/v0.46-chats-author.prompt.md) (the `agent%`
   column on `cage insights chats`), whose Phase 0 gate requires REV-TS landed.
 - **Done:** gate verification only — read `cage/commitjoin.py` at HEAD and swept
   the tree for a normalizer and a non-UTC fixture. **REV-TS has not landed:**
@@ -1512,13 +1559,13 @@ by milestone) — the worklog is what *happened this session*.
   or test work started; REV-TS deliberately **not** fixed here (its own filed
   program, per the packaging decision in the entry below).
 - **Open:** nothing new. The three REV-TS failure shapes stand as proposed.
-- **Next:** pick up REV-TS ([timestamp-utc-normal-form](../docs/archive/v0.45-rev-ts.proposal.md))
+- **Next:** pick up REV-TS ([timestamp-utc-normal-form](../work/archive/v0.45-rev-ts.proposal.md))
   as its own handoff/prompt pair; re-run this prompt once its `+05:30` fixture is green.
 
 ## 2026-08-02 — Claude Code — REV-TS picked up: handoff + prompt pair written
 
 - **Asked:** "go" — write the REV-TS pair the failed gate above called for.
-- **Done:** [rev-ts.handoff.md](../docs/archive/v0.45-rev-ts.handoff.md) + [rev-ts.prompt.md](../docs/archive/v0.45-rev-ts.prompt.md)
+- **Done:** [rev-ts.handoff.md](../work/archive/v0.45-rev-ts.handoff.md) + [rev-ts.prompt.md](../work/archive/v0.45-rev-ts.prompt.md)
   (**Opus** — the diagnosis is the work; wrong normal form freezes wrong authorship).
   Every claim re-verified against HEAD, not carried from the proposals. Lifecycle
   bookkeeping done in the same change: proposal header + `proposals/README.md` gain
@@ -1543,7 +1590,7 @@ by milestone) — the worklog is what *happened this session*.
   becomes UTC — un-goldened, user-visible, changelog-worthy.
 - **Open:** one non-blocking naming question (handoff §10): public `norm_ts` vs a
   private helper — recommended public, since `authorcapture` needs it directly.
-- **Next:** run [rev-ts.prompt.md](../docs/archive/v0.45-rev-ts.prompt.md) in Claude Code (Opus). P0 —
+- **Next:** run [rev-ts.prompt.md](../work/archive/v0.45-rev-ts.prompt.md) in Claude Code (Opus). P0 —
   the `+05:30` and same-second fixtures — must be shown RED before any fix lands.
 
 ## 2026-08-02 — Cowork — CHATS-AUTHOR packaged: handoff + prompt pair
@@ -1551,8 +1598,8 @@ by milestone) — the worklog is what *happened this session*.
 - **Asked:** create the handoff and prompt for CHATS-AUTHOR (the entry below) —
   i.e. accept the proposal and package it for execution.
 - **Done:** debate gate run before packaging (implementation-handoff discipline),
-  then wrote the live pair: [chats-author.handoff.md](../docs/archive/v0.46-chats-author.handoff.md) +
-  [chats-author.prompt.md](../docs/archive/v0.46-chats-author.prompt.md) (**Opus** — substrate deviation
+  then wrote the live pair: [chats-author.handoff.md](../work/archive/v0.46-chats-author.handoff.md) +
+  [chats-author.prompt.md](../work/archive/v0.46-chats-author.prompt.md) (**Opus** — substrate deviation
   + guard reconciliation). Proposal header, proposals/README entry, docs/README
   *Active work*, the OPEN-WORK **CHATS-AUTHOR** row and DOC-REGISTRY all updated
   to the picked-up state; entry stays in proposals/ per the lifecycle rule.
@@ -1575,7 +1622,7 @@ by milestone) — the worklog is what *happened this session*.
   authorship share** — the v2 line-match evidence re-keyed per chat — over
   conversation share or a tokens_in/out ratio (the latter would mislabel the whole
   context window as "human").
-- **Done:** filed [chats-agent-authorship-column.proposal.md](../docs/archive/v0.46-chats-author.proposal.md)
+- **Done:** filed [chats-agent-authorship-column.proposal.md](../work/archive/v0.46-chats-author.proposal.md)
   (status: proposed, owner unclaimed). Verified against HEAD before writing: the
   join key is real (`importcmd` and `authorcapture` both stamp `session=f.stem`;
   `agents.row_surface` normalizes `claude-code`→`claude`), so the column is a pure
@@ -1636,7 +1683,7 @@ by milestone) — the worklog is what *happened this session*.
   of **L1-FIELD**. Filed a finding: the firing happened inside a session that
   self-identifies as a "VSCode native extension environment," which is in tension
   with the documented "hooks don't fire under a VS Code extension" claim — see
-  [finding](../docs/regression/2026-08-02-finding-hooks-fire-in-vscode-extension.md) and the
+  [finding](../work/regression/2026-08-02-finding-hooks-fire-in-vscode-extension.md) and the
   updated **L1-FIELD** row in [OPEN-WORK.md](OPEN-WORK.md). Updated
   [IMPLEMENTATION.md](IMPLEMENTATION.md).
 - **Decided/open:** did **not** commit — the new wiring files (`.cage/cage.toml`,
@@ -1659,7 +1706,7 @@ by milestone) — the worklog is what *happened this session*.
   misc); every finding checked against HEAD, top three re-verified by hand; suite
   confirmed green at HEAD (1400 pass in the review sandbox). Report:
   `_review/cage-review-v0.37.0-to-v0.44.0.md` (durable home on pickup:
-  `docs/regression/`). Filed [timestamp-utc-normal-form](../docs/archive/v0.45-rev-ts.proposal.md)
+  `work/regression/`). Filed [timestamp-utc-normal-form](../work/archive/v0.45-rev-ts.proposal.md)
   (the headline defect: `%cI` local-offset vs UTC lexicographic compares — authorship
   joins skewed on this IST machine), [copilot-credits-integrity](../docs/proposals/copilot-credits-integrity.proposal.md)
   (lost credit deltas + multi-model double-count), and
@@ -1675,7 +1722,7 @@ by milestone) — the worklog is what *happened this session*.
 ## 2026-08-02 (Claude Code) — DOGFOOD executed: cage's own ledger, published (Sonnet)
 
 - **Asked:** run the DOGFOOD prompt. Its own stop condition fired correctly on first
-  read — `docs/dogfood/<date>.md` did not exist, so I stopped and said so rather than
+  read — `work/dogfood/<date>.md` did not exist, so I stopped and said so rather than
   seeding or approximating anything. Arpit then said to run the commands myself and get
   the real numbers, which is P0 — normally his hands, done in-session here instead.
 - **Done:** ran the three allowlisted commands (`cage report --usd`,
@@ -1686,14 +1733,14 @@ by milestone) — the worklog is what *happened this session*.
   the `cage demo` seed (`session: "demo"`, task `fix-handover-bug`, ts 2026-07-23,
   matching `cage/demo.py`'s hardcoded slices exactly) — the *only* task-tagged row in
   the entire global ledger. Surfaced this to Arpit via AskUserQuestion rather than
-  deciding alone; he chose to omit `attrib` with a note. Built `docs/dogfood/
+  deciding alone; he chose to omit `attrib` with a note. Built `work/dogfood/
   {2026-08-02,latest,README}.md`, the README line-16 pointer, `tests/
   test_dogfood_freshness.py` (10 tests: the real guard + 8 tmp_path failure modes +
   the skip-env test), refreshed the test count everywhere (1391 → 1401), and wrote
   `docs/proposals/steering-edits-pending.proposal.md` (held, not applied). Doc sweep: IMPLEMENTATION
   milestone entry written before the OPEN-WORK row was removed, proposal archived to
-  `docs/archive/v0.44-dogfood-report.proposal.md` and moved to Graduated, pair archived
-  to `docs/archive/v0.44-dogfood-report.{handoff,prompt}.md`, DOC-REGISTRY rows bumped.
+  `work/archive/v0.44-dogfood-report.proposal.md` and moved to Graduated, pair archived
+  to `work/archive/v0.44-dogfood-report.{handoff,prompt}.md`, DOC-REGISTRY rows bumped.
   `just test`: **1401 passed / 0 failed / 10 skipped** (1391 baseline + 10 new).
 - **Decided:** the non-negotiable ("ZERO dummy data — the executing agent never runs a
   ledger command and never authors a number") was written against a scenario where P0's
@@ -1717,11 +1764,11 @@ by milestone) — the worklog is what *happened this session*.
   `git mv` (`formulas.md` → `_formulas.tmp` → `FORMULAS.md`), verified via
   `git ls-files`, not `ls` — registered as a clean `R` rename, no silent no-op. Fixed
   `cage/roi.py:85` and `cage/report.py:682`. Left every history-class citation
-  untouched: `CHANGELOG.md` (4×), `docs/archive/**` (4×), `docs/IMPLEMENTATION.md:1051`,
+  untouched: `CHANGELOG.md` (4×), `work/archive/**` (4×), `docs/IMPLEMENTATION.md:1051`,
   `docs/INTERVIEW.md:311`, `docs/WORKLOG.md:39,213,235,1160`. Doc sweep: OPEN-WORK row
   removed (residuals filed as CC-CLAUDEMD-DOCCASE + DOC-LINK-CHECK), IMPLEMENTATION
   milestone entry, DOC-REGISTRY rows bumped, README Active-work swapped, pair archived
-  to `docs/archive/v0.44-doc-case-rename.{handoff,prompt}.md`,
+  to `work/archive/v0.44-doc-case-rename.{handoff,prompt}.md`,
   `docs/proposals/steering-edits-pending.proposal.md` written and held for review (steering files are
   never edited silently). `just test`: **1391 passed / 0 failed / 10 skipped** — no
   change in count.
@@ -1748,7 +1795,7 @@ by milestone) — the worklog is what *happened this session*.
   which build took the snapshot. Refreshed inside the release cut it matches the
   shipping version, refreshed after it ships one behind — but either way the reader is
   **time-behind**, so **date is the real freshness axis and version is provenance**.
-- **Done:** rewrote the proposal. Three changes: (1) dated `docs/dogfood/<date>.md` +
+- **Done:** rewrote the proposal. Three changes: (1) dated `work/dogfood/<date>.md` +
   `latest.md` snapshots (the `regression/latest-*` pattern) instead of a README-inline
   block; (2) a **version-free, date-free** README pointer at `latest.md`, so the README
   is written once and never edited again; (3) a **60-day freshness guard test** reading
@@ -1766,7 +1813,7 @@ by milestone) — the worklog is what *happened this session*.
 - **Found, filed as DOC-CASE:** the tracked file is `docs/formulas.md` but 120 citations
   across 49 files spell `FORMULAS.md` — invisible on macOS, dangling on GitHub and any
   case-sensitive checkout.
-- **Accepted same session (Arpit):** the `docs/dogfood/` home and the **60-day** gate.
+- **Accepted same session (Arpit):** the `work/dogfood/` home and the **60-day** gate.
   DOGFOOD is now **picked up** — pair written, proposal stays put as the rationale.
 - **Pairs created:** `dogfood-report.{handoff,prompt}.md` (Sonnet; four phases, **P0 is
   Arpit's hands** and blocks the rest) and `doc-case-rename.{handoff,prompt}.md`
@@ -1820,7 +1867,7 @@ by milestone) — the worklog is what *happened this session*.
   the handoff's literal signature contradicted its own §8 rule that a recorded zero is
   a real zero, and no other reading satisfies both.
 - **Finding filed:** copilot-CLI `premium` has captured **nothing, ever** — 13 real rows,
-  none carrying it ([research](../docs/research/2026-08-02-copilot-credit-fields-real-stores.md)).
+  none carrying it ([research](../work/research/2026-08-02-copilot-credit-fields-real-stores.md)).
   Now unread by pricing but still written; carried into OPEN-WORK as
   **COPILOT-PREMIUM-DEAD**. Also corrected the old OPEN-WORK row's `elapsedMs`→`gap_ms`
   half: `gap_ms` died with the human axis in v0.36, so that is void, not pending.
@@ -1887,7 +1934,7 @@ by milestone) — the worklog is what *happened this session*.
 - **Gate:** PASSED on cage's own repo — 69 rows over 25 commits from 81 real
   transcripts, **68.7% verbatim match inside proposed files**, re-run writes 0.
   `MIN_MATCH_CHARS` frozen at **4** with a measured sweep.
-  [regression doc](../docs/regression/2026-08-02-p1-authorship-dogfood.md) · [ADR 0008](../docs/adr/0008-line-match-authorship-counts-persisted-content-transient.md).
+  [regression doc](../work/regression/2026-08-02-p1-authorship-dogfood.md) · [ADR 0008](../docs/adr/0008-line-match-authorship-counts-persisted-content-transient.md).
 - **Amended the handoff's §5.4 mock (flagged, not silent):** a single `human` bucket
   printed **76.6%** for this repo, 89% of it one commit of generated JSON. The residual
   now splits `human~` (files the session proposed — a real human tweak) vs
@@ -1904,8 +1951,8 @@ by milestone) — the worklog is what *happened this session*.
 ## 2026-08-02 (Cowork) — COPILOT-CREDITS packaged: handoff + prompt (Opus)
 
 - **Asked:** create the handoff and prompt for COPILOT-CREDITS.
-- **Done:** [copilot-credits.handoff.md](../docs/archive/v0.44-copilot-credits.handoff.md) +
-  [copilot-credits.prompt.md](../docs/archive/v0.44-copilot-credits.prompt.md); Active-work indexed;
+- **Done:** [copilot-credits.handoff.md](../work/archive/v0.44-copilot-credits.handoff.md) +
+  [copilot-credits.prompt.md](../work/archive/v0.44-copilot-credits.prompt.md); Active-work indexed;
   OPEN-WORK row → ready to execute; proposal header carries the picked-up pointer.
 - **Tier call:** **Opus**, not Sonnet — `CALL_FIELDS` gains a field (substrate
   contract, plan §3 in the same change) and a new pricing rung carries method-tag
@@ -1921,7 +1968,7 @@ by milestone) — the worklog is what *happened this session*.
 
 - **Asked:** "we're going with both" — proposal with example CLI outputs.
 - **Done:** compare verdict C recorded as DECIDED;
-  [proposals/copilot-credits.proposal.md](../docs/archive/v0.44-copilot-credits.proposal.md) —
+  [proposals/copilot-credits.proposal.md](../work/archive/v0.44-copilot-credits.proposal.md) —
   capture design (additive `credits` call field; CLI `premium` read as credits;
   sidecar deferred), `[credits.copilot] usd_per_credit` policy key (cage.toml —
   plan economics, not vendor rate card), the 3-rung ladder, worked outputs in house
@@ -1985,7 +2032,7 @@ by milestone) — the worklog is what *happened this session*.
   CLAUDE.md's own architecture-flow bullet edit is proposed for Arpit's review, not
   applied — per the prompt's explicit instruction.
 - **Next step:** Arpit reviews the proposed CLAUDE.md edit; archive the handoff/prompt
-  pair to `docs/archive/v0.42-chats-view.{handoff,prompt}.md` and graduate the proposal
+  pair to `work/archive/v0.42-chats-view.{handoff,prompt}.md` and graduate the proposal
   (already done in this session, ahead of this entry) — nothing else pending.
 
 ## 2026-08-02 (Cowork) — PROMPT-PROGRESS: prompt docs must state how much is done
@@ -2001,9 +2048,9 @@ by milestone) — the worklog is what *happened this session*.
   count, say it in words) · `0% — not started` → `100%` in the archiving change ·
   updated in the same change as the work. Doc-discipline pointer updated to name both
   prompt-doc rules. Applied on contact to the live pair
-  ([agent-vs-human-v2](../docs/archive/v0.43-agent-vs-human-v2.prompt.md) 0%,
+  ([agent-vs-human-v2](../work/archive/v0.43-agent-vs-human-v2.prompt.md) 0%,
   [chats-view](../docs/chats-view.prompt.md) 0%) and to the just-archived
-  [v0.41-agent-surface](../docs/archive/v0.41-agent-surface.prompt.md) (100%, P0–P3).
+  [v0.41-agent-surface](../work/archive/v0.41-agent-surface.prompt.md) (100%, P0–P3).
 - **Found:** `agent-vs-human-v2.prompt.md` had **no `**Model:**` line at all** — a
   standing violation of the older prompt-doc rule. Added **Opus** with the reason
   (P1 is a substrate re-wire behind a STOP-capable gate; the commit-window join is
@@ -2015,7 +2062,7 @@ by milestone) — the worklog is what *happened this session*.
 
 - **Asked:** detailed proposal on how the chats view works, then the handoff and
   Claude Code prompt.
-- **Done:** [proposals/chats-view.proposal.md](../docs/archive/v0.42-chats-view.proposal.md)
+- **Done:** [proposals/chats-view.proposal.md](../work/archive/v0.42-chats-view.proposal.md)
   rewritten as the design of record (the five-step mechanism, the carve-out wording,
   known honesty limits) + the pair: [chats-view.handoff.md](../docs/chats-view.handoff.md) ·
   [chats-view.prompt.md](../docs/chats-view.prompt.md) (**Sonnet** — additive, fully specced).
@@ -2034,7 +2081,7 @@ by milestone) — the worklog is what *happened this session*.
 
 - **Asked:** can cage show a detailed per-chat view (kiro/claude/copilot) by chat
   title — tokens in/out, cached in/out, lines suggested? Proposal if yes.
-- **Done:** [proposals/chats-view.proposal.md](../docs/archive/v0.42-chats-view.proposal.md) —
+- **Done:** [proposals/chats-view.proposal.md](../work/archive/v0.42-chats-view.proposal.md) —
   verdict YES, derive-time only; the substrate already carries every numeric column
   (`cached_in` = cache reads, `cache_write_in` = the honest "cached out"). Per-agent
   honesty matrix: claude full · copilot-vscode titled but uncached (store limit, see
@@ -2070,7 +2117,7 @@ by milestone) — the worklog is what *happened this session*.
   diffs; **human = residual (`human~`)**; unknown is first-class, never redistributed.
   Views: `cage insights commits` (list) + `cage insights commit <sha>` (detail).
 - **Produced:** proposal rewritten in place (accepted-amended) ·
-  [handoff](../docs/archive/v0.43-agent-vs-human-v2.handoff.md) · [prompt](../docs/archive/v0.43-agent-vs-human-v2.prompt.md).
+  [handoff](../work/archive/v0.43-agent-vs-human-v2.handoff.md) · [prompt](../work/archive/v0.43-agent-vs-human-v2.prompt.md).
   Build order P1 capture re-wire → P2 `commitjoin.py` → P3 views → P4 time; P1 ends
   with a dogfood gate on cage's own repo (match/unknown rates) before P2.
 - **Next:** run the prompt (P1 first) — slotted after the current track per OPEN-WORK.
@@ -2080,7 +2127,7 @@ by milestone) — the worklog is what *happened this session*.
 - **Asked:** research how VS Code Copilot displays token in/out/cached per chat, and
   whether title-based lookup could beat id-based capture.
 - **Done:** read VS Code `main` + `vscode-copilot-chat` sources, real-store samples, and
-  public docs. Written up: [research/copilot-vscode-token-sources.md](../docs/research/copilot-vscode-token-sources.md).
+  public docs. Written up: [research/copilot-vscode-token-sources.md](../work/research/copilot-vscode-token-sources.md).
 - **The finding that matters:** the chatSessions store persists **`copilotCredits` /
   `sessionCopilotCredits` per request** — the actual billing unit — and cage drops them.
   Capturing credits retires copilot/auto UNPRICED (24/60 real calls, 975k tok at $0)
@@ -2174,7 +2221,7 @@ by milestone) — the worklog is what *happened this session*.
 
 ## 2026-08-02 (Claude Code) — AGENT-L0 P0: residue cleared, the floor is a test
 
-- **Asked:** execute [agent-surface.prompt.md](../docs/archive/v0.41-agent-surface.prompt.md) — phases in
+- **Asked:** execute [agent-surface.prompt.md](../work/archive/v0.41-agent-surface.prompt.md) — phases in
   order, stop at each gate. This entry covers **P0** only.
 - **Done:**
   - **The floor is now a test, not an intention** — `tests/test_floor.py`, 15 tests,
@@ -2585,9 +2632,9 @@ by milestone) — the worklog is what *happened this session*.
   in the module docstring rather than left implicit. Nothing left open; no residual
   filed on OPEN-WORK.md.
 - **Docs:** proposal + handoff/prompt archived to
-  `docs/archive/v0.39-otel-{export.handoff,export.prompt,genai-export.proposal}.md`;
-  `docs/proposals/README.md`, `docs/archive/README.md`, `docs/README.md` (Active work
-  emptied), `docs/OPEN-WORK.md`, `docs/DOC-REGISTRY.md`, `CHANGELOG.md`, `README.md` +
+  `work/archive/v0.39-otel-{export.handoff,export.prompt,genai-export.proposal}.md`;
+  `docs/proposals/README.md`, `work/archive/README.md`, `docs/README.md` (Active work
+  emptied), `docs/OPEN-WORK.md`, `work/DOC-REGISTRY.md`, `CHANGELOG.md`, `README.md` +
   `CLAUDE.md` test counts, and a new `CLAUDE.md` architecture bullet all updated in
   this change, last (per the handoff's parallel-execution rule).
 - **Next:** none — OTEL is closed. Whatever CODEX-OUT/DEBT/CMD-SYNC leave behind in
@@ -2611,11 +2658,11 @@ by milestone) — the worklog is what *happened this session*.
   cleanup** NEVER list gained `prices.toml`; constants/numbers-layers phrasing updated.
   `grep -c prices.toml CLAUDE.md`: 0 → 10. Governing sentence kept verbatim: **vendor
   facts move, routing decisions stay.**
-  Archived both proposals to `docs/archive/v0.39-claude-md-{prices-file,sources-authority}.proposal.md`
-  and the handoff+prompt pair to `docs/archive/v0.39-claude-md-sync.{handoff,prompt}.md`.
+  Archived both proposals to `work/archive/v0.39-claude-md-{prices-file,sources-authority}.proposal.md`
+  and the handoff+prompt pair to `work/archive/v0.39-claude-md-sync.{handoff,prompt}.md`.
   Updated `docs/proposals/README.md` (both moved Active → Graduated), `docs/README.md`
   (dropped from Active work — docs root carries no loose pair), `docs/OPEN-WORK.md`
-  (CMD-SYNC row removed from Pending, closure paragraph rewritten), `docs/archive/README.md`
+  (CMD-SYNC row removed from Pending, closure paragraph rewritten), `work/archive/README.md`
   index row added, `DOC-REGISTRY.md` rows bumped.
 - **Zero code changes** — `git diff --stat cage/` confirmed empty for this session's own
   edits (the pre-existing uncommitted `cage/` diff in the tree predates this session,
@@ -2645,7 +2692,7 @@ by milestone) — the worklog is what *happened this session*.
   Part 2 alone. **Chose: leave Part 2 alone entirely.**
 - **Did:** Part 1 landed — the `paths.py` splits-on-contact rule in `CLAUDE.md`
   (Must-Know Rules, beside the removed-verb rule). Archived the resolved
-  proposal+handoff+prompt trio to `docs/archive/v0.39-structural-debt.*` (mixed outcome:
+  proposal+handoff+prompt trio to `work/archive/v0.39-structural-debt.*` (mixed outcome:
   Part 1 implemented, Part 2 declined, both stated in the archive headers with a
   claim-vs-truth table). Updated `docs/proposals/README.md` (Active → Graduated),
   `docs/README.md` (dropped from Active work), `docs/OPEN-WORK.md` (DEBT row removed
@@ -2668,7 +2715,7 @@ by milestone) — the worklog is what *happened this session*.
   (stale prose) had the word dropped from six modules. **Category 2 held**:
   `data/prices.toml` is byte-identical (empty `git diff`, unchanged sha) and a new guard
   test prices a Copilot call on all seven `gpt-5.x-codex` ids. Suite 983 ⇒ **982 green**;
-  no golden moved. Pair archived to `docs/archive/v0.39-codex-purge.*`; CHANGELOG,
+  no golden moved. Pair archived to `work/archive/v0.39-codex-purge.*`; CHANGELOG,
   OPEN-WORK, IMPLEMENTATION, archive index, README/CLAUDE.md test counts updated.
 - **Decided:** (a) `paths.py:106/122/126` are all docstring *examples*, not migration
   behaviour — re-pointed at `claude` / generalised to `import-<agent>`; the dead-verb
@@ -2692,7 +2739,7 @@ by milestone) — the worklog is what *happened this session*.
   GF-LAUNCHER subsection). README Platforms line + `cage doctor`'s new `launcher-gap`
   check + the restored doc all state the same gap now. New `cage query graphify-shims`
   concept entry, live-interpolated. `docs/adr/0007-graphify-twin-pair-hand-paired-not-templated.md`
-  filed. `docs/cage-lab/{01-setup,03-verify}.md` updated. The corpus-sizing rule is
+  filed. `work/cage-lab/{01-setup,03-verify}.md` updated. The corpus-sizing rule is
   written into `tools/cigraphify.py`'s docstring **and** enforced — 4 new tests in
   `tests/test_cigraphify.py` prove `check_bare_graphify_is_intercepted` cannot pass on
   a zero-row or zero-saving result, with no real graphify needed. Two incidental test
@@ -2773,7 +2820,7 @@ by milestone) — the worklog is what *happened this session*.
   `test_already_in_sync_message_on_current_file` untouched. Confirmed nothing else in
   the suite borrows a live bundle table this way (other `bundled_raw()[...]` reads
   are all against the permanent `[meta]` table). Suite: **961 → 962 passed, 0
-  failed**. Archived the solo prompt to `docs/archive/v0.36-sync-guard.prompt.md`;
+  failed**. Archived the solo prompt to `work/archive/v0.36-sync-guard.prompt.md`;
   removed `SYNC-GUARD` from `docs/OPEN-WORK.md`.
 - **Decided/open:** nothing left open — the synthetic-bundle fixture remains a
   deliberately-parked proposal, not a task.
@@ -2803,7 +2850,7 @@ by milestone) — the worklog is what *happened this session*.
   offered the 30→90 refresh), `docs/example/toml-config.md`, `GLOSSARY.md`, and
   `CLAUDE.md`'s cleanup paragraph. Goldens P5/P6a/P6b re-blessed (policy_version +
   in-sync count shifted). Suite: **956 → 961 passed, 0 failed**. Pair archived to
-  `docs/archive/v0.36-cleanup-safety.{handoff,prompt}.md`.
+  `work/archive/v0.36-cleanup-safety.{handoff,prompt}.md`.
 - **Decided:** the "safer" `enabled` reading from the handoff — auto-only gate, never
   blocks an explicit command. No stdout leakage anywhere (asserted by a dedicated
   test); the accepted trade-off (unbounded `state/` growth if the reminder is
@@ -2888,7 +2935,7 @@ by milestone) — the worklog is what *happened this session*.
   §2.1a added. Suite **947 pass / 8 fail** — all 8 pre-existing (BUD-V ×7, G-SAV ×1),
   verified against a stripped-out copy. Goldens R1/R2/R6/I2/I3/O2 re-blessed;
   **P5/P6 deliberately not** (they are BUD-V's defect, not this change's).
-  Pair archived to `docs/archive/v0.36-net-savings.*`.
+  Pair archived to `work/archive/v0.36-net-savings.*`.
 - **Decided (the one the prompt left open):** *attributable cost = the ±120s task-window
   union.* The whole task measures task size, not tool cost; "turns with a tool-use block"
   is sharper but no ledger field marks one, so it needs a capture-time change. Symmetric
@@ -2916,7 +2963,7 @@ by milestone) — the worklog is what *happened this session*.
 - **Done:** both halves, the read-side honesty (with K3/K4's wording, done once as the
   prompt asked), and `tests/test_kiro_routing.py` (27 tests). Suite: **937 passed**, 8 red
   — none mine (7 = the concurrent budget-opt-in bundle change, 1 = pre-existing `G-SAV`).
-  Goldens R1/R2/R4 re-blessed. Pair archived to `docs/archive/v0.36-kiro-routing.*`.
+  Goldens R1/R2/R4 re-blessed. Pair archived to `work/archive/v0.36-kiro-routing.*`.
   Detail + the per-root map: [IMPLEMENTATION.md](IMPLEMENTATION.md).
 - **Decided (the two the prompt left open):**
   1. **Capture switches compose as AND** — the project's gates the sweep, the machine
@@ -2945,7 +2992,7 @@ by milestone) — the worklog is what *happened this session*.
   ledgers readable, decide the `minutes`-receipt question. No commits in `cage`.
 - **Done:** the full removal + wiring migration + docs. Suite green
   (915 passed; the 1 failure is pre-existing, see below). Handoff/prompt archived to
-  `docs/archive/v0.36-human-removal.*`.
+  `work/archive/v0.36-human-removal.*`.
 - **Decided:**
   1. **The handoff's scope was wrong on two verbs.** `cage human outcome` and
      `cage human quality` were filed under the `human` group but are not the human
@@ -2969,7 +3016,7 @@ by milestone) — the worklog is what *happened this session*.
 
 - **Asked:** execute `meta-version.prompt.md` (written earlier today in the Cowork
   session below; archived by this same entry to
-  [v0.36-meta-version.prompt.md](../docs/archive/v0.36-meta-version.prompt.md)) — derive
+  [v0.36-meta-version.prompt.md](../work/archive/v0.36-meta-version.prompt.md)) — derive
   `cage_version` from `__version__`,
   leave `policy_version` alone, pin it with a test, close the release-checklist gap.
 - **Done:** removed the literal from `cage/data/cage.toml [meta]`; `policy._bundled()`
@@ -2986,7 +3033,7 @@ by milestone) — the worklog is what *happened this session*.
   fresh-scaffold test; fixed `test_zipapp.py`'s now-invalid "written byte-identical to
   bundle" assumption (real behavior change, documented why, not a weakened assertion);
   re-blessed `P1.txt`. Added the CLAUDE.md release-checklist line. Archived the prompt
-  to `docs/archive/v0.36-meta-version.prompt.md`; updated OPEN-WORK/README/DOC-REGISTRY
+  to `work/archive/v0.36-meta-version.prompt.md`; updated OPEN-WORK/README/DOC-REGISTRY
   to match (remove-on-done).
 - **Decided/left open:** `policy_version` is untouched, confirmed still a content
   counter (no coupling to `__version__`) — matches the standing pushback from the
@@ -3761,7 +3808,7 @@ by milestone) — the worklog is what *happened this session*.
   switch governs a write to the *global* ledger when the project's policy is the one
   loaded; and what the `captured N new` summary reports when a sweep touches two
   ledgers. Both are real precedence questions, not details.
-- **Flagged:** `docs/cage-lab/03-verify.md` check 11 (`~/.cage` untouched) stops being
+- **Flagged:** `work/cage-lab/03-verify.md` check 11 (`~/.cage` untouched) stops being
   true for a *default* run and must be updated to distinguish default vs `--ledger`.
 - **Next step:** unchanged — **HUMAN** first (it deletes code K2's read-side wording
   would otherwise touch twice), then K2.
@@ -3860,7 +3907,7 @@ by milestone) — the worklog is what *happened this session*.
   exactly at budget. Leads with next/blocked/state in 3 lines; one 5-row pending table;
   open decisions; what binds the next lab run; a 5-line maintenance pointer.
 - **Nothing deleted without a home** — verified before cutting: all seven durable rules
-  are already carried in `CLAUDE.md` (`.venv`, usage-rows) or `docs/cage-lab/` (ZERO
+  are already carried in `CLAUDE.md` (`.venv`, usage-rows) or `work/cage-lab/` (ZERO
   dummy data, precision-vs-source, reproducible-workspace, corpus-not-config, three
   artifact types), so the section became a link. The superseded 2026-07-29 list and the
   ✅ tail went with it.
@@ -3967,7 +4014,7 @@ by milestone) — the worklog is what *happened this session*.
   log + evidence) and deleted **here**.
 - **Corrected mid-task:** my first pass listed `B-fix-3` and the copilot `--path` glob
   as pending — both were already built (`hookbypass.py`; `[sources] path_globs`,
-  archived). Checking `docs/regression/` and `docs/archive/` against the file, rather
+  archived). Checking `work/regression/` and `work/archive/` against the file, rather
   than trusting its own ✅ markers, is what caught it. A stale ✅ is exactly the failure
   the remove-on-done rule exists to prevent.
 - **Open:** `meta-version.prompt.md` is the only unstarted prompt (`cage_version` still
@@ -4007,7 +4054,7 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
   loud-absence line and the doctor advisory both render. The AST grep-gate was proven to
   bite by temporarily reintroducing a literal.
 - **Sealed-doc tension, resolved by precedent:** §9.5 asks to flip the finding's Status,
-  §6 says don't touch `docs/regression/**`, and the file is pinned by its `.sha256`. The
+  §6 says don't touch `work/regression/**`, and the file is pinned by its `.sha256`. The
   repo already has the answer — DOC-REGISTRY records the 2026-07-29 benchmark being
   bannered "with digests unchanged above a `HASH-COVERS-BELOW` marker". Applied the same
   convention: a RESOLVED banner above the marker, published body byte-identical, digest
@@ -4086,7 +4133,7 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
 
 - **Asked:** the same-day rebuild wired claude only; bring `cage-lab` to
   three-agent parity (claude+copilot+kiro, both workspaces) per updated
-  `docs/cage-lab/01-setup.md` (now carries law 0: three agents always in scope).
+  `work/cage-lab/01-setup.md` (now carries law 0: three agents always in scope).
   Zero paid calls, don't drive questions, don't re-author the fixture.
 - **Done:** `cage setup --all --no-graphify` (workspace-off) / `cage setup --all`
   (workspace-on), plus `graphify kiro install` in workspace-on (claude/copilot
@@ -4109,7 +4156,7 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
 
 ## 2026-07-30 — Claude Code: rebuild cage-lab from scratch (setup only, zero paid calls)
 
-- **Asked:** `../cage-lab` was deleted; rebuild it from `docs/cage-lab/01-setup.md`,
+- **Asked:** `../cage-lab` was deleted; rebuild it from `work/cage-lab/01-setup.md`,
   recording every command. Stop after the §6 verification gate — Arpit drives the
   question set himself. Zero paid calls beyond one authorized ~$0.02 smoke prompt.
 - **Done:** fresh `_src/tinyshop/` fixture (6 files, ~8.1k-token `models.py` + 4 small
@@ -4120,12 +4167,12 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
   Smoke prompt captured into `labledger/`; `~/.cage` and `~/.zshrc` both confirmed
   byte-for-byte unchanged.
 - **Decided/found:** three real-CLI deviations from the manual's literal commands,
-  each corrected back into `docs/cage-lab/01-setup.md`/`02-run.md` in this same
+  each corrected back into `work/cage-lab/01-setup.md`/`02-run.md` in this same
   change (Python version floor, `workspace-off` needs `--no-graphify`, PATH needs
   the per-workspace `bin/` not a shared one). `graphifyy` turned out to already be
   on PyPI (0.9.30) — no local-source deviation needed there, only for cage (v0.36
   unreleased). Separately found: the 2026-07-29 run's raw report artifacts were
-  never published to `docs/regression/` before that lab was deleted and are now
+  never published to `work/regression/` before that lab was deleted and are now
   gone — recorded as a process finding in `docs/OPEN-WORK.md` §I, not something
   this session could recover.
 - **Open / next:** Arpit reviews the six questions (printed in the handback),
@@ -4143,7 +4190,7 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
   I.4 all PASS. $5.29, 429 turns. Three deliverables written in `cage-lab/reports/`.
 - **Findings:** kiro unscriptable (manual D); copilot ON = passive skill; **the graphify gap
   is adoption, not capture** (measured). F1 validated end-to-end on real data.
-- **Open / next:** publish the 3 lab artifacts into `cage/docs/regression/` — **gated on
+- **Open / next:** publish the 3 lab artifacts into `cage/work/regression/` — **gated on
   Arpit** (guardrail). **Leg D** (manual VS Code + kiro, 4/6 cells UNPROVEN) — Arpit's hands.
   H (release) still blocked by no-commit.
 - **Next step:** await Arpit on (1) publish-to-regression, (2) scheduling leg D.
@@ -4258,7 +4305,7 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
 ## 2026-07-30 — Cowork: shim-integrity landed → docs/ root emptied, five items left
 
 - **Confirmed built:** B-fix-1/2/3 (`pathshim.py`, `hookbypass.py`, doctor checks) and
-  the three lab artifacts **published + hashed** into `docs/regression/` with index rows.
+  the three lab artifacts **published + hashed** into `work/regression/` with index rows.
   Phase **B** and phase **J** now closed; **I** has only its manual leg outstanding.
 - **Archived the three now-implemented prompts** (`three-agent-parity`,
   `cage-lab-rebuild`, `open-work` runner → `archive/v0.36-*`), so `docs/` root is back to
@@ -4357,8 +4404,8 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
   fallback, consistent with the existing "empty [sources] captures NOTHING" law.
 - **The half that matters as much as the glob:** the zero-match message must **name the
   patterns tried**. Hiding the glob is why this bug cost 20 minutes in leg D.
-- **Shipped** [path-globs.handoff.md](../docs/archive/v0.36-path-globs.handoff.md) +
-  [path-globs.prompt.md](../docs/archive/v0.36-path-globs.prompt.md) (**Opus**, unpaid; archived
+- **Shipped** [path-globs.handoff.md](../work/archive/v0.36-path-globs.handoff.md) +
+  [path-globs.prompt.md](../work/archive/v0.36-path-globs.prompt.md) (**Opus**, unpaid; archived
   on implementation 2026-08-01), with 8 tests including
   a **grep-gate** (no glob literal survives in the `--path` branches) and the
   `surface = "vscode"` test that pins the actual fix — untested today, because D3 only
@@ -4453,7 +4500,7 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
 ## 2026-07-29 — Cowork: three-agent scope made LAW 0 across the lab docs + parity prompt
 
 - **Arpit:** claude, copilot and kiro are **always** in scope — document it everywhere.
-- **Added as law 0** in `docs/cage-lab/README.md` (now six laws), and swept the
+- **Added as law 0** in `work/cage-lab/README.md` (now six laws), and swept the
   conditional language out of the manual: `graphify kiro install` is **ALWAYS**, not
   "if in scope"; `cage setup --all` in **both** workspaces with `cage setup --status`
   as the check; 02-run states kiro being non-scriptable is a **route** difference, not
@@ -4476,7 +4523,7 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
 - **Asked:** what are the questions, how do I type them in a VS Code extension, and is
   everything configured for claude + copilot + kiro?
 - **Answer to the third: NO — two gaps, both would have silently spoiled cells.**
-  1. `docs/cage-lab/01-setup.md` said `cage setup --claude` for both workspaces. That
+  1. `work/cage-lab/01-setup.md` said `cage setup --claude` for both workspaces. That
      wires **claude only** — a copilot or kiro session there gets no MCP wiring.
      **Fixed to `cage setup --all`** in both workspaces, with `cage setup --status`
      named as the verification.
@@ -4500,9 +4547,9 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
 ## 2026-07-29 — Cowork: cage-lab rebuild prompt (setup only, stops before the questions)
 
 - **Asked:** a prompt to set cage-lab up so Arpit can then run the questions himself.
-- **Shipped** [cage-lab-rebuild.prompt.md](../docs/cage-lab-rebuild.prompt.md) — **Sonnet**
+- **Shipped** [cage-lab-rebuild.prompt.md](../work/cage-lab-rebuild.prompt.md) — **Sonnet**
   (the manual is written, decisions made; it's a recorded build with a hard gate), a
-  wrapper over `docs/cage-lab/01-setup.md` rather than a duplicate of it.
+  wrapper over `work/cage-lab/01-setup.md` rather than a duplicate of it.
 - **Scoped to STOP at the verification gate.** It builds `drive.sh` but never runs it;
   the only spend is one ~$0.03 smoke prompt proving capture lands in the isolated
   ledger with `~/.cage` untouched.
@@ -4512,15 +4559,15 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
   `anton/bin/graphify`. If it doesn't, the fix is the lab's PATH order; **editing anton
   stays out of scope** per Arpit's direction.
 - **Fix-the-manual-on-contact** guardrail: if a real CLI differs from
-  `docs/cage-lab/01-setup.md`, use the real verb and correct the manual in the same
+  `work/cage-lab/01-setup.md`, use the real verb and correct the manual in the same
   change — plus the `graphify <agent> install --help` footgun (it may install for real).
 - **Next:** run it, approve the questions, then drive.
 
-## 2026-07-29 — Cowork: `docs/cage-lab/` — the rebuild manual (lab is now disposable)
+## 2026-07-29 — Cowork: `work/cage-lab/` — the rebuild manual (lab is now disposable)
 
 - **Asked:** a separate dir in cage documenting how to set cage-lab up — it's being
   deleted and rebuilt from scratch.
-- **Created [cage-lab/](../docs/cage-lab/README.md)** — 6 docs: README (what the lab is, the
+- **Created [cage-lab/](../work/cage-lab/README.md)** — 6 docs: README (what the lab is, the
   five laws, what's safe to delete) · 01-setup (`.venv` + explicit PATH, structure,
   fixture as the control variable, question set, the two workspaces via tool-owned
   installers, a verify-before-you-spend gate) · 02-run (manifest before the first call,
@@ -4529,7 +4576,7 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
   a cell before scoring) · 04-publish (three artifact types, append-only regression,
   what a good headline looks like) · 05-manual-cells (Arpit's leg).
 - **The asymmetry made explicit up front:** the whole `../cage-lab` tree is
-  **disposable**; `cage/docs/regression/**` is **never** deletable. The lab is
+  **disposable**; `cage/work/regression/**` is **never** deletable. The lab is
   scaffolding, the evidence is permanent — so results live in cage, not in the lab.
 - **Written prescriptively, not descriptively** — cage-lab isn't reachable from this
   session, so the docs say how to build it rather than describing files I can't read.
@@ -4589,7 +4636,7 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
 ## 2026-07-29 — Cowork: publish approved · anton dropped · B-fixes specced · leg D checklist
 
 - **Publish APPROVED** — the three lab artifacts (run report · finding · phase
-  benchmark) may be written into `cage/docs/regression/`; recorded in OPEN-WORK so the
+  benchmark) may be written into `cage/work/regression/`; recorded in OPEN-WORK so the
   guardrail no longer blocks. Append-only/never-edit still holds for what's published.
 - **Anton's stale shim REMOVED from the pending list** at Arpit's direction. The two
   *generic* product fixes stand on their own; anton is no longer tracked here.
@@ -4689,7 +4736,7 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
 
 - **Asked:** archive all the plans/handoffs/prompts, then create just one plan with
   what's pending.
-- **Done:** 24 files moved to `docs/archive/v0.36-*` (import-ledger · cage-lab ·
+- **Done:** 24 files moved to `work/archive/v0.36-*` (import-ledger · cage-lab ·
   cage-lab-setup · capture-precision · golden-set ×3 · phase1-closeout ×3 ·
   report-per-run ×4 · graphify-ab-steering · g05-rebuild ×2 · graphify-capture ×3),
   each with an archive header naming what was built and where its remainder went.
@@ -4782,7 +4829,7 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
   workspace's provenance is unknown — but split it four ways: **REBUILD**
   `golden/workspace/` · **DELETE freely** `golden/runs/` · **KEEP**
   `golden/captures/` (arm A's baseline; deleting it destroys what arm B is compared
-  against) · **NEVER DELETE** `docs/regression/**` (published, hashed, append-only).
+  against) · **NEVER DELETE** `work/regression/**` (published, hashed, append-only).
 - **Decided / made standing:** a workspace is valid evidence only if its setup is
   reproducible — `SETUP.md` + `rebuild.sh`, tool-owned installers only, recorded
   step order (graphify and cage both write `CLAUDE.md`; who clobbers whom is an
@@ -4828,7 +4875,7 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
 - **Asked:** execute the Phase 1 benchmark prompt — derive *what cage captures,
   how correct*, no paid calls, no new numbers; publish + close Phase 1.
 - **Done:** authored `PHASE-1-BENCHMARK.md` (cage-lab), hashed `58948469192c`,
-  published into `cage/docs/regression/`. Verdicts: claude/copilot CLI **EXACT**,
+  published into `cage/work/regression/`. Verdicts: claude/copilot CLI **EXACT**,
   kiro CLI **HONEST-LIMIT** (tokens FINAL-null), all VS Code **UNPROVEN**.
   Coverage stated up front (**6/12 scripted CLI only**); FINAL (kiro tokens, by
   vendor design) vs PENDING (VS Code, P3) kept strictly apart. `inputs.toml`
@@ -4885,7 +4932,7 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
   couldn't be edited: a finding's history scattered across three files, **owned
   by none**.
 - **The reason it's worth doing rather than leaving as history (plan §7.4):**
-  `docs/regression/` is what a future agent reads to learn what's broken, and
+  `work/regression/` is what a future agent reads to learn what's broken, and
   today **F1's wrong first diagnosis outranks its real root cause** — the
   original text ("graphify is being run directly") reads as current in the
   report, while the true cause (a dead interceptor verb) is buried in a
@@ -4979,7 +5026,7 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
   project-vs-global ledger question (plan §8) stays out of scope (ADR-level).
   CLAUDE.md edits **proposed, not applied** — parked at
   `docs/proposals/claude-md-prices-file.md`. Handoff/prompt/plan trio archived to
-  `docs/archive/v0.36-prices-toml.*`.
+  `work/archive/v0.36-prices-toml.*`.
 - **Next:** Arpit reviews the parked CLAUDE.md proposal; folds into the pending
   v0.36.0 release. Tree left **uncommitted** (standing constraint).
 
@@ -5243,7 +5290,7 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
     migrate to temp `cage.toml`); anything surviving must be doctor-announced.
   - **§3.7 hashed + published reports** — sha256 sidecar, hash in the header (with
     the hashed byte-range documented), dated copy + `latest-` into
-    `docs/regression/`, index row with the hash prefix, append-only (same-day
+    `work/regression/`, index row with the hash prefix, append-only (same-day
     re-run gets `-2`).
 - **Re-validation specced with exact expectations:** V1/V2 byte-identical (a
   regression check on the untouched path), V3/V4 exactly 227,298 / 233,675, plus a
@@ -5305,7 +5352,7 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
   `auth_kv` + all-directory transcript text with the metadata (redacted
   workspace-scoped projection instead; check 2 = `◻ n/a`; a future SQLite parser
   inherits the same counts-never-content constraint).
-- **Next (recommended order):** cheap Kiro token probe → `docs/regression/` entries
+- **Next (recommended order):** cheap Kiro token probe → `work/regression/` entries
   for the two HIGH findings → Copilot delta-id fix → then Phase 2. Manual VS Code
   cells (V6–V11) still pending. Tree uncommitted.
 
@@ -5325,7 +5372,7 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
      id keeps the first and dedup-drops the second ⇒ **16.5–18% undercount**
      (189,788 vs 227,298 true tokens; Q3's whole increment lost). Hits any
      multi-shutdown Copilot session including VS Code chats across restarts.
-     **This must be fixed (or at minimum dated into `docs/regression/`) before a
+     **This must be fixed (or at minimum dated into `work/regression/`) before a
      full sweep — otherwise every Copilot number in the corpus bakes in the
      error.**
   2. **MED — stacked graphify shims recurse → hang.** Fresh `workspace/bin/
@@ -5398,7 +5445,7 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
   stays byte-identical.
 - **Docs:** folded into the uncommitted v0.36.0 CHANGELOG; README/example/FORMULAS/
   GLOSSARY/`cage query` updated; handoff+prompt archived to
-  `docs/archive/v0.36-config-surfaces-and-rename.*`; DOC-REGISTRY bumped;
+  `work/archive/v0.36-config-surfaces-and-rename.*`; DOC-REGISTRY bumped;
   IMPLEMENTATION Task A/B entries. **CLAUDE.md edits then applied** on Arpit's "go":
   the `policy.toml`→`cage.toml` sweep (11 refs; `NEVER` note keeps the legacy name),
   a new **Config file** substrate bullet, the `[sources] surface` note, and the
@@ -5564,7 +5611,7 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
   can be built and how to test it; list the manual VS Code steps too; capture ids +
   logs as a **golden set**; author the question set; configure graphify (with/
   without pairs). Create a plan.
-- **Done:** `docs/cage-lab-golden-set.plan.md` — layout (`golden/` with driver,
+- **Done:** `work/cage-lab-golden-set.plan.md` — layout (`golden/` with driver,
   questions, captures, manual checklist, findings); the driver protocol
   (pre-snapshot → frozen scratch workspace → ask with real pauses → post-snapshot
   diff → copy new logs **verbatim** → import to a scratch ledger → manifest +
@@ -5613,7 +5660,7 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
   runner UX incl. new `lab inputs --list`), the handoff DoD/non-negotiables/key
   inputs, the prompt (task step 2, guardrails, workflow, plan-pause now posts the
   *input inventory*), and `PLAN.md` §11's laws line.
-- **Next:** unchanged — execute `docs/cage-lab-setup.prompt.md` (Opus).
+- **Next:** unchanged — execute `work/cage-lab-setup.prompt.md` (Opus).
 
 ## 2026-07-25 — Cowork: synthetic data DELETED — cage-lab runs on real captures only
 
@@ -5639,7 +5686,7 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
   match), and there's a new `python -m lab source <scenario> [--open]` that
   prints/opens just the paths. Mental-math fixture rule dropped (real numbers) —
   replaced by "show every addend with its source line and a running sum".
-- **Next:** unchanged — execute `docs/cage-lab-setup.prompt.md` (Opus).
+- **Next:** unchanged — execute `work/cage-lab-setup.prompt.md` (Opus).
 
 ## 2026-07-25 — Cowork: "is cage-lab data fake?" → fixture-provenance rule added
 
@@ -5662,7 +5709,7 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
   (~38% of real ones), graphify fakes (no real graphify log exists). Propagated to
   the handoff DoD and the prompt (incl. a new guardrail: if a matrix cell has no
   real capture to reduce from, STOP and ask — never author a plausible structure).
-- **Next:** unchanged — execute `docs/cage-lab-setup.prompt.md` (Opus).
+- **Next:** unchanged — execute `work/cage-lab-setup.prompt.md` (Opus).
 
 ## 2026-07-25 — Cowork: FORMULAS.md created; INTERVIEW reframed as the exit interview
 
@@ -5689,7 +5736,7 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
   fights the workflow gets broken silently — fix the rule* (the archive-on-ship
   case). Registered FORMULAS.md + the reframed INTERVIEW in DOC-REGISTRY and the
   docs index.
-- **Next:** unchanged — execute `docs/cage-lab-setup.prompt.md` (Opus, both
+- **Next:** unchanged — execute `work/cage-lab-setup.prompt.md` (Opus, both
   siblings). Tree stays uncommitted.
 
 ## 2026-07-25 — Cowork: cage-lab docs reviewed against the 4 requirements, gaps closed
@@ -5715,7 +5762,7 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
 - **Decided/open:** `uv build` from the uncommitted tree is correct — the lab
   verifies what is about to ship. Open questions unchanged (publish eyeball
   reports? pipx?) — defaults stand.
-- **Next:** execute `docs/cage-lab-setup.prompt.md` (Opus, both siblings).
+- **Next:** execute `work/cage-lab-setup.prompt.md` (Opus, both siblings).
 
 ## 2026-07-25 — Cowork: archive implemented pairs; lifecycle rule now archive-on-implement
 
@@ -5730,15 +5777,15 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
   features per release; `docs/` root must read as *work not yet done* so the next
   agent can trust it as the live queue) — and to require the archive header naming
   the version the work rides. Moved
-  `names-and-savings-migration.{handoff,prompt}` → `docs/archive/v0.36-…`; added
+  `names-and-savings-migration.{handoff,prompt}` → `work/archive/v0.36-…`; added
   archive headers to it and to the two v0.36-hookless-rebuild files (moved earlier
   without one), worded for the built-but-unreleased state. Updated
-  `docs/archive/README.md` (row + trigger note), `docs/README.md`, and the
+  `work/archive/README.md` (row + trigger note), `docs/README.md`, and the
   CHANGELOG "Built from:" line (now links both pairs).
 - **Decided/open:** `docs/` root now holds exactly one active pair —
   `cage-lab-setup` — which is accurate: it is the only unbuilt work. Still open:
   the proposed CLAUDE.md union/migrate line from the last exchange.
-- **Next:** run `docs/cage-lab-setup.prompt.md` (Opus, both siblings). Tree stays
+- **Next:** run `work/cage-lab-setup.prompt.md` (Opus, both siblings). Tree stays
   uncommitted.
 
 ## 2026-07-25 — Cowork: review of the A+B execution; spec corrected from real data
@@ -5765,7 +5812,7 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
   views); left unapplied pending Arpit's word, per the propose-don't-rewrite rule.
   Tree stays uncommitted.
 - **Next:** Arpit's call on the CLAUDE.md line, then run
-  `docs/cage-lab-setup.prompt.md` (Opus, both siblings).
+  `work/cage-lab-setup.prompt.md` (Opus, both siblings).
 
 ## 2026-07-25 — Cowork strategy session: the whole v0.36 arc + cage-lab v3 + doc-discipline rules
 
@@ -5799,7 +5846,7 @@ executions. Logged per the new rule: chat decisions are worklog material.)*
   continuously for model-switch pickup.
 - **Next (sequence):** names-and-savings-migration prompt ✔ (done, 817 green) →
   `cage-lab-setup.prompt.md` in Claude Code (Opus, both siblings) → baseline
-  report into `docs/regression/` → Arpit eyeballs `runs/*/eyeball.md`.
+  report into `work/regression/` → Arpit eyeballs `runs/*/eyeball.md`.
 
 - **Asked:** execute `docs/names-and-savings-migration.{handoff,prompt}.md` — (A)
   always capture session names, (B) `cage data migrate-savings` with an id-deduped
@@ -5843,8 +5890,8 @@ executions. Logged per the new rule: chat decisions are worklog material.)*
   verb-sweep list, the policy `[sources]` comment block, the gitcommithook install
   line); removed 8 dead doc pointers from README; fixed 3 in docs/PLAN.md. cage
   still imports; every live-spec file's links resolve.
-- **Deliberately left:** broken links inside `CHANGELOG.md` and `docs/regression/*`
-  — history/evidence, frozen by the same convention as `docs/archive/` (a dated
+- **Deliberately left:** broken links inside `CHANGELOG.md` and `work/regression/*`
+  — history/evidence, frozen by the same convention as `work/archive/` (a dated
   record isn't rewritten to chase moved paths).
 - **Next step:** if docgen/skillgen ever return, the CLAUDE.md rules need
   reinstating — the CHANGELOG v0.36 entry is the record of their removal.
@@ -5882,7 +5929,7 @@ executions. Logged per the new rule: chat decisions are worklog material.)*
   and the doc-style rule.
 - **Done:** created [adr/TEMPLATE.md](../docs/adr/TEMPLATE.md) (bakes in the three
   veto-condition devices), [GLOSSARY.md](../docs/GLOSSARY.md), this file,
-  [DOC-REGISTRY.md](../docs/DOC-REGISTRY.md), [architecture-flow.mermaid](architecture-flow.mermaid)
+  [DOC-REGISTRY.md](../work/DOC-REGISTRY.md), [architecture-flow.mermaid](architecture-flow.mermaid)
   (linked in README), [example/](example/) (cli/debug/setup/toml-config),
   [compare/](compare/) + [proposals/](proposals/) with READMEs; added a
   *Documentation discipline* section to CLAUDE.md.

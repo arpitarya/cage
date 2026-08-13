@@ -6,7 +6,7 @@ whitelist. Reading tool bodies out of that store is the ADR-0009 carve-out — t
 hashes only.
 
 Shapes are pinned against two live `execute_bash` runs (kiro-cli 2.16.0, 2026-08-07;
-`docs/research/2026-08-07-graphify-store-evidence.md`), including the truncation marker
+`work/research/2026-08-07-graphify-store-evidence.md`), including the truncation marker
 this route refuses on. Fixtures are the real `value`-JSON shape.
 """
 from __future__ import annotations

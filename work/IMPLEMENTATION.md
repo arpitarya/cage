@@ -59,9 +59,9 @@ Entry format:
   `docs/PLAN.md` (§3.13), `docs/GLOSSARY.md` (*claude metrics row*, *THE DEDUP
   LAW*, *session fileset*), `docs/claude-capture.md` (refreshed — the new ledger
   section, calls-path defects rescoped to `calls` only, retention nudge now
-  present-tense), `docs/DOC-REGISTRY.md` (six rows bumped), `docs/README.md`,
-  `docs/archive/README.md` (new row), pair archived to
-  `docs/archive/v0.49-claude-metrics-ledger.{handoff,prompt}.md`.
+  present-tense), `work/DOC-REGISTRY.md` (six rows bumped), `docs/README.md`,
+  `work/archive/README.md` (new row), pair archived to
+  `work/archive/v0.49-claude-metrics-ledger.{handoff,prompt}.md`.
 - **Tests:** green — 1768/0 ⇒ 1798/11 skipped (30 new, zero collateral breakage,
   zero goldens re-blessed, `test_floor` untouched).
 - **Incident, disclosed and fixed in the same session:** the manual end-to-end CLI
@@ -118,7 +118,7 @@ Entry format:
   deleted).
 - **Files:** `cage/schema.py`, `cage/paths.py`, `cage/ledger.py`, `cage/transcript.py`,
   `cage/importcmd.py`, `cage/doctorcmd.py`, `cage/explain_data.py`, `docs/PLAN.md`,
-  `docs/GLOSSARY.md`, `docs/kiro-capture.md`, `docs/DOC-REGISTRY.md`,
+  `docs/GLOSSARY.md`, `docs/kiro-capture.md`, `work/DOC-REGISTRY.md`,
   `tests/test_kiro_metrics.py` (new, 31 tests), `tests/test_doctor.py` (the
   exhaustive check-name set gains `"kiro-metrics"`).
 - **Tests:** full suite green, 1768 passed / 11 skipped (1737 + 31 new), **zero
@@ -127,7 +127,7 @@ Entry format:
   `tests/test_debug_coverage.py`, `tests/test_floor.py`, `tests/test_output_spec.py`,
   `tests/test_cli_reference.py` re-run explicitly green.
 - **Next:** `work/OPEN-WORK.md` (remove the KIRO-METRICS line, add its two scope-out
-  lines), archive the handoff/prompt pair to `docs/archive/v0.49-kiro-metrics-ledger.
+  lines), archive the handoff/prompt pair to `work/archive/v0.49-kiro-metrics-ledger.
   {handoff,prompt}.md`, and propose (never silently apply) the `CLAUDE.md` diff for
   the ledger diagram + kiro adapter bullet in the session's final summary.
 
@@ -175,7 +175,7 @@ Entry format:
   2 rows then 0; `cage doctor` renders the per-source advisory line correctly.
 - **Note:** a `CLAUDE.md` diff (ledger diagram line + a substrate bullet) is proposed,
   not applied — flagged for Arpit's review per the standing rule.
-- **Next:** archive the handoff/prompt pair to `docs/archive/`, update the two doc
+- **Next:** archive the handoff/prompt pair to `work/archive/`, update the two doc
   indexes, and get Arpit's call on the proposed `CLAUDE.md` diff. The two scope-out
   items above are the next agent-closable candidates for the read surface.
 
@@ -199,7 +199,7 @@ Entry format:
   `tests/test_graphifychat.py` (new, 23 tests), `tests/fixtures/cli-help.txt`,
   `tests/test_view_export.py` (`EXPECTED_VIEWS`), `docs/FORMULAS.md` (§2.15),
   `docs/CLI.md` (new command + flags rows, 54⇒55 commands, 16⇒17 insights views),
-  `CHANGELOG.md`, `docs/DOC-REGISTRY.md`.
+  `CHANGELOG.md`, `work/DOC-REGISTRY.md`.
 - **Tests:** `tests/test_graphifychat.py` (23, all green) + full suite green,
   1704 passed / 11 skipped. Briefly 1703 passed / 1 failed
   (`test_doc_links.py::test_every_live_doc_link_resolves`) while a concurrent
@@ -280,33 +280,33 @@ Entry format:
   `work/` is now the session-tracking tree. Every live-doc markdown link that resolved
   through the old `docs/<file>` path was mechanically rewritten (a script that mirrors
   `tests/test_doc_links.py`'s own resolve logic, run across every tracked `.md` file
-  except `docs/archive/**`, `docs/regression/**`, and `CHANGELOG.md`, which stay
+  except `work/archive/**`, `work/regression/**`, and `CHANGELOG.md`, which stay
   frozen history) — 11 live files changed, plus the moved docs' own outgoing links.
   `tests/test_doc_links.py`'s `HISTORY_FILES` set (which exempts `WORKLOG.md`/
   `IMPLEMENTATION.md` from the dangling-link gate) was repointed to the new `work/`
   paths; `tests/test_queue_honesty.py`'s `QUEUE` constant likewise. `CLAUDE.md`'s
   ALL-CAPS-tracker-location note, the *Documentation discipline* section's five
-  bullets, and every other prose/link mention across `CLAUDE.md`/`docs/DOC-REGISTRY.md`/
-  `docs/PLAN.md`/`docs/README.md`/`docs/CLI.md`/`docs/cage-lab/README.md`/
-  `docs/compare/README.md`/`docs/doc-size-discipline.md`/`cage/explain_data.py` were
+  bullets, and every other prose/link mention across `CLAUDE.md`/`work/DOC-REGISTRY.md`/
+  `docs/PLAN.md`/`docs/README.md`/`docs/CLI.md`/`work/cage-lab/README.md`/
+  `work/compare/README.md`/`docs/doc-size-discipline.md`/`cage/explain_data.py` were
   hand-fixed where the script's mechanical link rewrite didn't reach (bare prose,
   backtick-only mentions, a stale `§I.2a` section citation). **On a separate explicit
   instruction, `work/OPEN-WORK.md` was additionally stripped** from a header +
   11-row closure table down to a bare "the queue is empty" statement — the closure
-  history remains in `docs/archive/` and this file, just no longer indexed from
+  history remains in `work/archive/` and this file, just no longer indexed from
   OPEN-WORK.md itself.
 - **Found in passing, fixed on contact:** `docs/restricted-environments.md` had been
   deleted a *second* time (first was the v0.36 hookless sweep, restored then because
   eight source files still cited it — see the 2026-08-11 `GF-LAUNCHER` entry below) by
   the prior uncommitted session's queue-closure sweep, with no citation migration and
   no recorded decision to remove it — six live citations across `CLAUDE.md`, `README.md`,
-  `docs/DOC-REGISTRY.md`, `docs/compare/gf-launcher-metering.compare.md` (×2), and
+  `work/DOC-REGISTRY.md`, `work/compare/gf-launcher-metering.compare.md` (×2), and
   `docs/shim-contract.md` went dangling. Restored via `git checkout HEAD --
   docs/restricted-environments.md` rather than migrating the citations, since every
   citing doc still describes its content as current.
 - **Files:** `work/{IMPLEMENTATION,INTERVIEW,MACHINE,OPEN-WORK,WORKLOG}.md` (moved),
-  `CLAUDE.md`, `docs/DOC-REGISTRY.md`, `docs/PLAN.md`, `docs/README.md`, `docs/CLI.md`,
-  `docs/cage-lab/README.md`, `docs/compare/README.md`, `docs/doc-size-discipline.md`,
+  `CLAUDE.md`, `work/DOC-REGISTRY.md`, `docs/PLAN.md`, `docs/README.md`, `docs/CLI.md`,
+  `work/cage-lab/README.md`, `work/compare/README.md`, `docs/doc-size-discipline.md`,
   `cage/explain_data.py`, `tests/test_doc_links.py`, `tests/test_queue_honesty.py`,
   `docs/restricted-environments.md` (restored).
 - **Tests:** green, 1655 passed / 11 skipped (`just test`'s pinned count unchanged —
@@ -323,10 +323,10 @@ Entry format:
   it left unresolved, rather than the usual *implemented, living spec is X*.
 - **Archived (11 items):** NET-1 · SHIM-TOOL-DEPS · L1-FIELD · KIRO-MCP-FIELD · HR-FIELD ·
   GFX-KIRO-RATE · TOOL-SDK · COPILOT-SIDECAR · POLICYSYNC-FIXTURE · KIRO-CLI-SCOPE ·
-  OUTPUT-GROWTH → `docs/archive/v0.49-*.item.md`.
+  OUTPUT-GROWTH → `work/archive/v0.49-*.item.md`.
 - **Archived (5 proposals):** net-positive-evidence-run · tool-integration-contract ·
   larger-lab-corpus · policysync-synthetic-bundle · attest-join-command-normalization →
-  `docs/archive/v0.49-*.proposal.md`.
+  `work/archive/v0.49-*.proposal.md`.
 - **Archived (3 directory docs):** `open/CONSTRAINTS.md` · `open/README.md` ·
   `proposals/README.md`. **`docs/open/` and `docs/proposals/` no longer exist.**
 - **What this leaves unresolved, stated once so it is not lost:** cage has still never
@@ -342,11 +342,11 @@ Entry format:
   requirement, the `--hooks`-off-by-default trap, F2's UNTESTED VS Code receipt limit, and
   the `test_portable_wiring.py`-never-existed correction.
 - **Files:** `docs/OPEN-WORK.md` (rewritten as an empty queue + closure table) ·
-  `docs/archive/` (+16 files, new sweep section in its README) · `CLAUDE.md` (three rules:
+  `work/archive/` (+16 files, new sweep section in its README) · `CLAUDE.md` (three rules:
   compare-on-a-fork, the proposal lifecycle, the OPEN-WORK maintained-doc bullet; plus the
-  OUTPUT-GROWTH citation) · `docs/README.md` · `docs/DOC-REGISTRY.md` (6 rows) ·
+  OUTPUT-GROWTH citation) · `docs/README.md` · `work/DOC-REGISTRY.md` (6 rows) ·
   `docs/FIELD-RUNBOOK.md` · `docs/GLOSSARY.md` · `docs/shim-contract.md` ·
-  `docs/compare/README.md` · `docs/cage-lab/README.md` · `cage/viewexport.py`.
+  `work/compare/README.md` · `work/cage-lab/README.md` · `cage/viewexport.py`.
 - **Tests:** see the verification note in the same-day WORKLOG entry.
 - **Next:** Arpit deletes the two now-empty directories and `_to_delete/`, and decides
   whether SHIM-TOOL-DEPS stays closed — it is the only closure that is a live defect
@@ -387,7 +387,7 @@ Entry format:
 - Files: `cage/data/shims/graphify` · `cage/data/shims/graphify.cmd` · `cage/doctorcmd.py`
   · `tests/test_gf_launcher_arm2.py` (new) · `tests/test_win_graphify_shim.py` ·
   `docs/shim-contract.md` (B5b + D8) · `docs/restricted-environments.md` ·
-  `docs/compare/gf-launcher-metering.compare.md` (verdict accepted) ·
+  `work/compare/gf-launcher-metering.compare.md` (verdict accepted) ·
   `docs/open/SHIM-TOOL-DEPS.md` (new) · `docs/open/GF-LAUNCHER.md` (deleted) ·
   `docs/OPEN-WORK.md` · `CHANGELOG.md`
 - Tests: green — **1650 ⇒ 1655** (+5 arm-2; the cmd-twin exit-code test was rewritten,
@@ -406,7 +406,7 @@ assertion for eleven days.
 - **P0 — the `docs/open/` migration finished in the law.** The 2026-08-11 restructure had
   moved the queue's detail into `docs/open/` and indexed it nowhere. `docs/README.md` now
   lists it under *Current spec* beside the index it details (and re-describes OPEN-WORK as
-  an index, naming its new gate); `docs/DOC-REGISTRY.md` gained its row with the trigger
+  an index, naming its new gate); `work/DOC-REGISTRY.md` gained its row with the trigger
   *an item opens, closes, or changes gate*. *Active work* re-opened for this handoff,
   recorded as **handoff-only** — its prompt was handed over inline and never written to
   `docs/`, so there is no `.prompt.md` to archive with it.
@@ -438,20 +438,20 @@ assertion for eleven days.
 - Nine of eleven queue items were **not touched, simulated, or prepared** — they need a
   real Copilot/Kiro/second repo or a trigger that has not fired.
 
-- Implemented: `docs/README.md` + `docs/DOC-REGISTRY.md` (`open/` row) · new
+- Implemented: `docs/README.md` + `work/DOC-REGISTRY.md` (`open/` row) · new
   `tests/test_queue_honesty.py` · `graphifymeter.run` hashes `cmd[1:]` + its first
-  real-interceptor test · `docs/regression/2026-08-12-l1-attest-args-hash-mismatch.md` ·
+  real-interceptor test · `work/regression/2026-08-12-l1-attest-args-hash-mismatch.md` ·
   `docs/proposals/attest-join-command-normalization.proposal.md` · `docs/open/L1-FIELD.md`
   Q3 · FORMULAS §2.11/§2.12 · CHANGELOG v0.49.0 · the queue header de-staled (47 → 65
   files, suite figure now measured).
 - Files: `cage/graphifymeter.py` · `tests/test_queue_honesty.py` ·
   `tests/test_hooks_layer.py` · `docs/{README,DOC-REGISTRY,OPEN-WORK,FORMULAS}.md` ·
   `docs/open/L1-FIELD.md` · `docs/proposals/{README,attest-join-command-normalization}.md` ·
-  `docs/regression/{README,2026-08-12-l1-attest-args-hash-mismatch}.md` · `CHANGELOG.md`
+  `work/regression/{README,2026-08-12-l1-attest-args-hash-mismatch}.md` · `CHANGELOG.md`
 - Tests: **green — 1650 passed / 0 failed / 11 skipped** (1639 → 1650; +10 queue-honesty,
   +1 real-interceptor join).
 - Archived on implement: the handoff moved to
-  `docs/archive/v0.49-open-queue-agent-lane.handoff.md` with its header naming the three
+  `work/archive/v0.49-open-queue-agent-lane.handoff.md` with its header naming the three
   ways the build corrected it; `docs/README.md` *Active work* emptied, archive index and
   CHANGELOG *Built from* updated, `INTERVIEW.md` state-of-play rewritten. **No prompt
   doc exists to archive** — it was handed over inline, recorded rather than fabricated.
@@ -531,9 +531,9 @@ commit**, so the record of *why* matters more than the diff.
   · `cage/schema.py` · `cage/transcript.py` · `cage/creditprice.py` · `cage/prices.py` ·
   `cage/otelout.py` · `cage/explain.py` · `cage/explain_data.py` · `cage/cli.py` ·
   `CLAUDE.md` · `README.md` · `docs/{OPEN-WORK,FORMULAS,CLI,README,doc-size-discipline}.md`
-  · `docs/compare/copilot-pricing-basis.compare.md` ·
-  `docs/research/2026-08-03-otel-genai-semconv-pin.md` · `docs/{DOC-REGISTRY,INTERVIEW,WORKLOG}.md`
-  · `docs/proposals/README.md` → `docs/archive/v0.49-steering-edits-pending.proposal.md`
+  · `work/compare/copilot-pricing-basis.compare.md` ·
+  `work/research/2026-08-03-otel-genai-semconv-pin.md` · `docs/{DOC-REGISTRY,INTERVIEW,WORKLOG}.md`
+  · `docs/proposals/README.md` → `work/archive/v0.49-steering-edits-pending.proposal.md`
   · `tests/` (7 files + new `test_doc_links.py`) · 3 chats goldens re-blessed ·
   `tests/fixtures/transcripts/copilot/cli/expected.json`
 - Tests: **green — 1639 pass / 0 fail / 11 skipped** (from 1616). Every fix ships a test
@@ -571,7 +571,7 @@ commit**, so the record of *why* matters more than the diff.
   `docs/CLI.md` · `docs/*`.
 - **Tests:** green — **1609 ⇒ 1616**, 11 skipped.
 - **Next:** the sweep is complete. **COMMITS-WINDOW** is the one open decision it raised
-  ([compare](../docs/compare/commits-view-cost-bound.compare.md)).
+  ([compare](../work/compare/commits-view-cost-bound.compare.md)).
 
 ## 2026-08-11 — agent-lane sweep P5: HR-COPILOT-JOIN — copilot VS Code rows carry a project
 
@@ -729,11 +729,11 @@ commit**, so the record of *why* matters more than the diff.
   `constants.COMMITS_DEFAULT_ROWS`' comment claimed the row cap bounded cost — it never
   did (the cap is applied after every row is built), and that false comment is why this
   stayed invisible. Corrected. Fork filed:
-  [compare](../docs/compare/commits-view-cost-bound.compare.md) + OPEN-WORK **COMMITS-WINDOW**.
+  [compare](../work/compare/commits-view-cost-bound.compare.md) + OPEN-WORK **COMMITS-WINDOW**.
 - **Files:** `tools/cigraphify.py` · `cage/authorcapture.py` · `cage/hookcmd.py` ·
   `cage/importcmd.py` · `cage/commitview.py` · `cage/clicmds.py` · `cage/cli.py` ·
   `cage/constants.py` · `cage/linematch.py` · `cage/originrecord.py` · `cage/tasks.py` ·
-  four test files · `docs/compare/commits-view-cost-bound.compare.md` · `docs/*`.
+  four test files · `work/compare/commits-view-cost-bound.compare.md` · `docs/*`.
 - **Tests:** green — **1562 ⇒ 1583**, 11 skipped.
 - **Next:** P4 — REV-HARDEN P4's judgment half (Opus; the sha rewrite lands LAST).
 
@@ -842,7 +842,7 @@ commit**, so the record of *why* matters more than the diff.
   `~/.cage`, `~/bin` and `~/CLAUDE.md`: byte-identical**, and the sandbox landed under
   `/var/folders/…/T/`, not beside the repo.
 - **Files:** `tools/cigraphify.py` · `tests/test_cigraphify.py` · `docs/OPEN-WORK.md` ·
-  `docs/DOC-REGISTRY.md` · `README.md` · `CLAUDE.md`.
+  `work/DOC-REGISTRY.md` · `README.md` · `CLAUDE.md`.
 - **Tests:** green — **1542 ⇒ 1545**, 11 skipped. Three added, and the first is a
   **negative control that reproduces the bug**: without the seed,
   `find_project_root(project)` returns the fake dev home. A regression test could not be
@@ -876,7 +876,7 @@ commit**, so the record of *why* matters more than the diff.
   credits usage they cannot show. `ledger.credits` is the third money-independent
   carve-out — read for a refusal, never a cell.
 - **Files:** new `cage/runstamp.py` · `cage/viewexport.py` · `tests/test_view_export.py`
-  · `docs/compare/view-export-and-run-stamp.compare.md`; changed `cage/cli.py`
+  · `work/compare/view-export-and-run-stamp.compare.md`; changed `cage/cli.py`
   (`_export_flags`) · `cage/cliutil.py` · `cage/clicmds.py` · `cage/paths.py`
   (`Footprint.output`) · `cage/chats.py` · `cage/report.py` · `cage/initcmd.py`
   (gitignore heal) · `cage/explain_data.py` (`view-export`) · `docs/CLI.md` ·
@@ -963,8 +963,8 @@ commit**, so the record of *why* matters more than the diff.
   had no report read, and folding a synthetic part into a real capture would launder
   invention into a fixture labelled real. Sanitization asserted: no user path, no username
   anywhere under `tests/fixtures/transcripts/graphify/`.
-- Files: `docs/regression/2026-08-08-gfx-cov-vscode-field-run.md` (new) ·
-  `docs/regression/README.md` · `tests/fixtures/transcripts/graphify/copilot-vscode/*` ·
+- Files: `work/regression/2026-08-08-gfx-cov-vscode-field-run.md` (new) ·
+  `work/regression/README.md` · `tests/fixtures/transcripts/graphify/copilot-vscode/*` ·
   `tests/fixtures/transcripts/graphify/README.md` · `tests/test_graphify_vscode.py` (+2) ·
   `docs/OPEN-WORK.md` (**GFX-COV-FIELD closed**, narrowed to **GFX-KIRO-RATE**).
 - Tests: **green, 1500 passed / 11 skipped** (1498 → 1500).
@@ -985,8 +985,8 @@ commit**, so the record of *why* matters more than the diff.
   still holds 0 graphify receipts and its 5 pre-existing savings rows from 2026-08-03.
 - **n = 2. Deliberately not published as a refusal rate** — it proves both paths run and
   nothing more. ADR 0009's veto (reopen below a 10% file rate) needs a real usage sample.
-- Files: `docs/regression/2026-08-07-gfx-cov-kiro-field-run.md` (new) ·
-  `docs/regression/README.md` · `docs/OPEN-WORK.md` (GFX-COV-FIELD narrowed to its two
+- Files: `work/regression/2026-08-07-gfx-cov-kiro-field-run.md` (new) ·
+  `work/regression/README.md` · `docs/OPEN-WORK.md` (GFX-COV-FIELD narrowed to its two
   surviving residuals).
 - Tests: unchanged, **1498 passed / 11 skipped** (a field run, no code change).
 - Next: the copilot **VS Code** field half (needs a real Copilot chat), or the v0.47.0
@@ -1094,7 +1094,7 @@ commit**, so the record of *why* matters more than the diff.
   command's own output (rust clippy `cast_possible_truncation`). A substring guard would
   have false-positived. `lineCount` is not a truncation detector either (338/341
   discrepancies are `\r`/ANSI redraws).
-- Files: `docs/research/2026-08-07-graphify-store-evidence.md` (new) ·
+- Files: `work/research/2026-08-07-graphify-store-evidence.md` (new) ·
   `tests/fixtures/transcripts/graphify/{README.md,copilot-vscode/*3,kiro-cli/*5,kiro-ide/*1}`
   (new — no `expected.json`, so `test_fixture_corpus.py` does not pick them up).
 - Tests: **green, 1462 passed / 11 skipped** (unchanged — P0 added no code).
@@ -1221,7 +1221,7 @@ commit**, so the record of *why* matters more than the diff.
   **v1.37.0**, before cage's pinned 1.42.0) — but verifying it surfaced that the GenAI
   conventions moved to their own repository, so the pinned version string may not name
   what cage thinks. Filed as
-  [research](../docs/research/2026-08-03-otel-genai-semconv-pin.md) with three
+  [research](../work/research/2026-08-03-otel-genai-semconv-pin.md) with three
   options and a recommendation; `otelout` and the pin are untouched.
 - **CLI-GAPS(a):** `cage --help` advertised six of `data`'s eight commands. Fixed *and*
   **gated bidirectionally against the live parser** — a command that exists but is
@@ -1231,7 +1231,7 @@ commit**, so the record of *why* matters more than the diff.
 - **Files:** `cage/transcript.py` · `cage/taskgroup.py` · `cage/compare.py` ·
   `cage/adoption.py` · `cage/convert.py` · `cage/otelout.py` · `cage/claudewire.py` ·
   `cage/cli.py` · six test modules (+18) · `tests/fixtures/cli-help.txt` (re-blessed) ·
-  `CHANGELOG.md` · `docs/research/2026-08-03-otel-genai-semconv-pin.md`.
+  `CHANGELOG.md` · `work/research/2026-08-03-otel-genai-semconv-pin.md`.
 - **Tests:** green — **1441 passed, 11 skipped, 0 failed**. Zero goldens re-blessed.
 - **Open / carried forward:** **COPILOT-PREMIUM-DEAD's premise is FALSE** — OPEN-WORK
   says `premium` "now has no reader", but `chats.py` sums it into a rendered column and
@@ -1313,7 +1313,7 @@ commit**, so the record of *why* matters more than the diff.
   (`assert [65536] == [4294967296]`).
 - **Files:** `cage/ids.py` · `cage/mergeutil.py` · `cage/transcript.py` ·
   `tests/test_substrate.py` (+3) · `CHANGELOG.md` ·
-  `docs/regression/2026-08-02-finding-call-id-collisions.md` (flipped to RESOLVED,
+  `work/regression/2026-08-02-finding-call-id-collisions.md` (flipped to RESOLVED,
   original body unedited) + its missing index row.
 - **Tests:** green — **1416 passed, 10 skipped, 0 failed**. Zero goldens re-blessed.
   `tests/test_study.py` (the 37-vs-38 flake's home) green.
@@ -1354,8 +1354,8 @@ commit**, so the record of *why* matters more than the diff.
 - **Files:** `cage/commitjoin.py` · `cage/authorcapture.py` · `cage/commitview.py` ·
   `cage/explain_data.py` · `tests/test_commitjoin.py` (+7) ·
   `tests/test_authorship_capture.py` (+5) · `CHANGELOG.md` · `docs/FORMULAS.md` §2.14 ·
-  `docs/GLOSSARY.md` · `docs/regression/2026-08-02-finding-commit-window-timestamp-skew.md`
-  (+ index) · pair and proposal archived to `docs/archive/v0.45-rev-ts.*`.
+  `docs/GLOSSARY.md` · `work/regression/2026-08-02-finding-commit-window-timestamp-skew.md`
+  (+ index) · pair and proposal archived to `work/archive/v0.45-rev-ts.*`.
 - **Tests:** green — **1413 passed, 10 skipped, 0 failed** (from 1401/0, which this run
   confirmed as accurate). 4 fixtures red before the fix, 1 guard green before and after,
   7 normalizer units. **Zero goldens re-blessed.**
@@ -1429,7 +1429,7 @@ commit**, so the record of *why* matters more than the diff.
   runs "inside a VSCode native extension environment," yet the hook fired anyway,
   in tension with the documented `attest.LIMIT` ("hooks do not fire under a VS Code
   extension") — see
-  [finding](../docs/regression/2026-08-02-finding-hooks-fire-in-vscode-extension.md). Cleaned
+  [finding](../work/regression/2026-08-02-finding-hooks-fire-in-vscode-extension.md). Cleaned
   the one synthetic test row (a manually-piped `cage hook` invocation used to prove the
   command works in isolation) out of `attest.jsonl` before finishing, leaving only the
   two genuinely host-fired rows.
@@ -1444,7 +1444,7 @@ commit**, so the record of *why* matters more than the diff.
   `.claude/settings.json` (modified — L1 hooks added, graphify hook preserved);
   `.claude/skills/cage-context/SKILL.md` (new); `bin/graphify`, `bin/graphify.cmd`
   (new); `docs/OPEN-WORK.md` (L1-FIELD row updated); this entry;
-  `docs/regression/2026-08-02-finding-hooks-fire-in-vscode-extension.md` (new).
+  `work/regression/2026-08-02-finding-hooks-fire-in-vscode-extension.md` (new).
   `.cage/ledger/`, `.cage/state/`, `.cage/out/` are gitignored by design and untouched
   here as a commit concern.
 - **Tests:** not run (no code changed — pure wiring/config + docs). `cage doctor` and
@@ -1458,12 +1458,12 @@ commit**, so the record of *why* matters more than the diff.
 
 - **Implemented:** P0 (Arpit's hands, done in-session by running the allowlisted
   commands directly against the real global `~/.cage` ledger) + P1–P3 (Claude Code).
-  `docs/dogfood/2026-08-02.md` carries the real, verbatim output of `cage report --usd`
+  `work/dogfood/2026-08-02.md` carries the real, verbatim output of `cage report --usd`
   (52,179 calls, $9,921.4588, 71% of cost from cache reads, 33 calls UNPRICED) and
   `cage insights adoption` (100% of savings rows agent-attributable; claude the only
-  agent with attributed savings). `docs/dogfood/latest.md` mirrors it;
-  `docs/dogfood/README.md` states the append-only convention, copied from
-  `docs/regression/`. README line 16's `▶ Demo GIF coming soon.` placeholder is now a
+  agent with attributed savings). `work/dogfood/latest.md` mirrors it;
+  `work/dogfood/README.md` states the append-only convention, copied from
+  `work/regression/`. README line 16's `▶ Demo GIF coming soon.` placeholder is now a
   version/date-free pointer to `latest.md`.
   **`cage insights attrib` is deliberately absent from this and every near-future
   snapshot until real data exists**: every task-tagged row in the *entire* global
@@ -1483,16 +1483,16 @@ commit**, so the record of *why* matters more than the diff.
   the repo's own release rule) — a proposed "Dogfood snapshot" section mirroring
   "Regression & capture reports" is held in `docs/proposals/steering-edits-pending.proposal.md` for
   Arpit's review, never applied silently.
-- **Files:** new `docs/dogfood/{2026-08-02,latest,README}.md` ·
+- **Files:** new `work/dogfood/{2026-08-02,latest,README}.md` ·
   new `docs/proposals/steering-edits-pending.proposal.md` · new `tests/test_dogfood_freshness.py` ·
   `README.md` (line 16 pointer; test count 1391 → 1401) · `CLAUDE.md` (`just test`
   count only) · `docs/README.md` (docs index + Active work) · `docs/OPEN-WORK.md`
-  (DOGFOOD row removed; header suite count + Next line) · `docs/DOC-REGISTRY.md`
+  (DOGFOOD row removed; header suite count + Next line) · `work/DOC-REGISTRY.md`
   (new dogfood/ row; CLAUDE.md/README/IMPLEMENTATION/OPEN-WORK/WORKLOG/proposals/
   docs-README rows bumped) · `docs/WORKLOG.md` · proposal archived to
-  `docs/archive/v0.44-dogfood-report.proposal.md`, moved to Graduated in
+  `work/archive/v0.44-dogfood-report.proposal.md`, moved to Graduated in
   `docs/proposals/README.md` · pair archived to
-  `docs/archive/v0.44-dogfood-report.{handoff,prompt}.md`.
+  `work/archive/v0.44-dogfood-report.{handoff,prompt}.md`.
 - **Tests:** green — **1401 passed / 0 failed / 10 skipped** (1391 baseline + 10 new).
 - **Next:** Arpit reviews `docs/proposals/steering-edits-pending.proposal.md` (apply/amend/decline);
   a real `attrib` snapshot lands once any task on this machine is actually closed/
@@ -1507,7 +1507,7 @@ commit**, so the record of *why* matters more than the diff.
   checkout. Two-step `git mv` (`docs/formulas.md` → `docs/_formulas.tmp` →
   `docs/FORMULAS.md`, verified via `git ls-files`, not `ls`) plus the two live code
   docstrings that still spelled it lowercase. History-class citations left untouched
-  by design: `CHANGELOG.md` (4×), `docs/archive/**` (4×), `docs/IMPLEMENTATION.md:1051`,
+  by design: `CHANGELOG.md` (4×), `work/archive/**` (4×), `docs/IMPLEMENTATION.md:1051`,
   `docs/WORKLOG.md:39,213,235,1160`, `docs/INTERVIEW.md:311` — the `:39`/`:213`/`:235`/
   `:311` set specifically *quote the wrong name as the bug*; rewriting them would erase
   the finding. `docs/WORKLOG.md:235` is a third such citation the handoff's explicit
@@ -1518,9 +1518,9 @@ commit**, so the record of *why* matters more than the diff.
   review.
 - **Files:** `docs/formulas.md` → `docs/FORMULAS.md` (rename only, contents
   untouched) · `cage/roi.py:85` · `cage/report.py:682` · `docs/OPEN-WORK.md` ·
-  `docs/DOC-REGISTRY.md` · `docs/README.md` · `docs/archive/README.md` ·
+  `work/DOC-REGISTRY.md` · `docs/README.md` · `work/archive/README.md` ·
   `docs/WORKLOG.md` · new `docs/proposals/steering-edits-pending.proposal.md` · pair archived to
-  `docs/archive/v0.44-doc-case-rename.{handoff,prompt}.md`.
+  `work/archive/v0.44-doc-case-rename.{handoff,prompt}.md`.
 - **Tests:** green — **1391 passed / 0 failed / 10 skipped**, unchanged count from
   the pre-change baseline.
 - **Next:** Arpit reviews `docs/proposals/steering-edits-pending.proposal.md` (apply/amend/decline);
@@ -1573,7 +1573,7 @@ commit**, so the record of *why* matters more than the diff.
   `credits` column), diff-reviewed line by line; **no report golden moved**, which is
   the legacy byte-identity claim holding.
 - **Finding published:** copilot-CLI `premium` has never captured a single real value
-  (13 rows, none carrying it) — `docs/research/2026-08-02-copilot-credit-fields-real-stores.md`.
+  (13 rows, none carrying it) — `work/research/2026-08-02-copilot-credit-fields-real-stores.md`.
   Carried into OPEN-WORK as **COPILOT-PREMIUM-DEAD**.
 - **Tests:** green — **1391 pass / 0 fail / 10 skipped** (1354 baseline + 35 new).
 - **Next:** Arpit reviews `docs/proposals/steering-edits-pending.proposal.md` (the CLAUDE.md
@@ -1603,7 +1603,7 @@ commit**, so the record of *why* matters more than the diff.
   v0.36) · CLI.md 50 ⇒ **54** commands · GLOSSARY ×6 terms · ADR 0008 · DOC-REGISTRY ×8
   rows · OPEN-WORK (**HR1 deleted**, residuals filed as HR-FIELD + HR-COPILOT-JOIN,
   header de-staled) · the handoff/prompt/**proposal** trio archived as
-  `docs/archive/v0.43-*` with headers naming what the build corrected · every dangling
+  `work/archive/v0.43-*` with headers naming what the build corrected · every dangling
   citation swept. **CLAUDE.md edit PROPOSED, not applied** (steering file).
 - **Files:** `cage/{tasks,clicmds,cli}.py` · `tests/test_task_time.py` (new) ·
   `tests/fixtures/cli-help.txt` · 15 docs.
@@ -1689,7 +1689,7 @@ commit**, so the record of *why* matters more than the diff.
     different permission from metering spend.
   - `importcmd.glob_source` extracted so the pass and `_scan` share ONE glob.
 - **Phase gate — PASSED, with one design defect found and fixed:**
-  [regression/2026-08-02-p1-authorship-dogfood.md](../docs/regression/2026-08-02-p1-authorship-dogfood.md).
+  [regression/2026-08-02-p1-authorship-dogfood.md](../work/regression/2026-08-02-p1-authorship-dogfood.md).
   103 commits × 81 real transcripts (123 MB), 4.2 s → **69 rows / 25 commits**, re-run 0.
   **The join is sound: 68.7% verbatim match inside files a session proposed.**
   `MIN_MATCH_CHARS` **frozen at 4** with a 1→12 sweep (rate flat at 41.1–41.2%; 1→4
@@ -1701,7 +1701,7 @@ commit**, so the record of *why* matters more than the diff.
   `cage/{transcript,schema,originrecord,policy,importcmd,constants}.py` ·
   `cage/data/cage.toml` · `tests/{test_authorship_capture.py (new),conftest.py}` ·
   `docs/adr/0008-line-match-authorship-counts-persisted-content-transient.md` (new) ·
-  `docs/regression/2026-08-02-p1-authorship-dogfood.md` (new)
+  `work/regression/2026-08-02-p1-authorship-dogfood.md` (new)
 - **Tests:** green — **1270 pass / 0 fail / 10 skipped** (+25 new). Includes the
   plant-string PII test: runs the pass under `CAGE_DEBUG=1` and greps every written
   file for the sentinel line bodies **and** their sha1/sha256/md5 digests (full and
@@ -1751,7 +1751,7 @@ commit**, so the record of *why* matters more than the diff.
 - **Files:** `docs/CLI.md` (new) · `tests/test_cli_reference.py` (new) ·
   `README.md` (quickstart link) · `docs/README.md` (living-process-docs index) ·
   `CLAUDE.md` (maintained-doc set + the removed-verb rule now names the doc) ·
-  `docs/DOC-REGISTRY.md` (new row + 3 bumps + the orphaned-row fix) ·
+  `work/DOC-REGISTRY.md` (new row + 3 bumps + the orphaned-row fix) ·
   `docs/OPEN-WORK.md` (CLI-GAPS filed).
 - **Tests:** the new module's 93 cases run green against the live parser via a
   pytest-free harness (the Cowork sandbox has no pytest and no network); **the full
@@ -1762,7 +1762,7 @@ commit**, so the record of *why* matters more than the diff.
 ## 2026-08-02 — CHATS-VIEW: `cage insights chats` built, single phase (1125/0 ⇒ 1148/0)
 
 - **Milestone:** the per-chat detail view, per
-  [docs/archive/v0.42-chats-view.proposal.md](../docs/archive/v0.42-chats-view.proposal.md) —
+  [work/archive/v0.42-chats-view.proposal.md](../work/archive/v0.42-chats-view.proposal.md) —
   a new derived view, no substrate change, single phase.
 - **Implemented:**
   - **`cage/chats.py`** — `summarize()` groups `ledger.calls` by `(agent, surface,
@@ -1912,7 +1912,7 @@ commit**, so the record of *why* matters more than the diff.
 ## 2026-08-02 — AGENT-L0 **P0**: skill residue cleared, the floor proven (1024/0 ⇒ 1039/0)
 
 - **Milestone:** phase P0 of the agent-surface program
-  ([handoff](../docs/archive/v0.41-agent-surface.handoff.md) · [prompt](../docs/archive/v0.41-agent-surface.prompt.md)) — gate met,
+  ([handoff](../work/archive/v0.41-agent-surface.handoff.md) · [prompt](../work/archive/v0.41-agent-surface.prompt.md)) — gate met,
   P1 unblocked.
 - **Implemented:**
   - **`tests/test_floor.py` (new, 15 tests) — the floor proof, built *before* the layers
@@ -2007,7 +2007,7 @@ commit**, so the record of *why* matters more than the diff.
   `cage/mcpserver.py` · `cage/explain.py` · `cage/explain_data.py` ·
   `tests/test_adoption.py` (new) · `tests/test_output_spec.py` · `tests/goldenseed.py` ·
   `tests/fixtures/goldens/I9{a,b,c,d}.txt` (new) · `tests/fixtures/cli-help.txt` ·
-  `docs/FORMULAS.md` §2.12 · proposal + handoff/prompt archived to `docs/archive/`.
+  `docs/FORMULAS.md` §2.12 · proposal + handoff/prompt archived to `work/archive/`.
 - **Coverage on the real dev ledger (the honest number):** 6/6 savings rows are
   agent-attributable — but only **3 via the session join** (all graphify, all
   `claude-code`); the other 3 are legacy receipts carrying a `call` id, one of which
@@ -2070,10 +2070,10 @@ commit**, so the record of *why* matters more than the diff.
   `tests/test_otel_export.py` (new, 13 tests).
 - **Tests:** green — 982 → 995 (13 new), full suite `python -m pytest -q`.
 - **Docs:** proposal `otel-genai-export.md` and the handoff/prompt pair archived to
-  `docs/archive/v0.39-otel-{export.handoff,export.prompt,genai-export.proposal}.md`
+  `work/archive/v0.39-otel-{export.handoff,export.prompt,genai-export.proposal}.md`
   (implemented-for-v0.39, unreleased); `docs/proposals/README.md`,
-  `docs/archive/README.md`, `docs/README.md` (Active work emptied),
-  `docs/OPEN-WORK.md`, `docs/DOC-REGISTRY.md`, `CHANGELOG.md` (new `## Unreleased —
+  `work/archive/README.md`, `docs/README.md` (Active work emptied),
+  `docs/OPEN-WORK.md`, `work/DOC-REGISTRY.md`, `CHANGELOG.md` (new `## Unreleased —
   OTel GenAI export (OTEL)` section), `README.md` + `CLAUDE.md` test counts, and a
   new `CLAUDE.md` **OTel GenAI export** architecture bullet all updated in this
   change.
@@ -2101,10 +2101,10 @@ commit**, so the record of *why* matters more than the diff.
   that never shipped. Applying it would have replaced a true statement with a false
   one, so it was not applied.
 - **Files:** `CLAUDE.md`; both proposals moved to
-  `docs/archive/v0.39-claude-md-{prices-file,sources-authority}.proposal.md`; the
-  handoff+prompt pair moved to `docs/archive/v0.39-claude-md-sync.{handoff,prompt}.md`;
+  `work/archive/v0.39-claude-md-{prices-file,sources-authority}.proposal.md`; the
+  handoff+prompt pair moved to `work/archive/v0.39-claude-md-sync.{handoff,prompt}.md`;
   `docs/proposals/README.md`, `docs/README.md`, `docs/OPEN-WORK.md`,
-  `docs/archive/README.md`, `docs/DOC-REGISTRY.md` updated.
+  `work/archive/README.md`, `work/DOC-REGISTRY.md` updated.
 - **Tests:** green — 995 passed / 0 failed / 10 skipped (unchanged by this docs-only
   change; `git diff --stat cage/` carries no edits from this session).
 - **Next:** none — CMD-SYNC has no residual. Directive A (making `[sources]` the sole
@@ -2129,7 +2129,7 @@ commit**, so the record of *why* matters more than the diff.
   `docs/WORKLOG.md`). Offered the human four rescope options; chose "leave Part 2 alone
   entirely."
 - **Files:** `CLAUDE.md` · `docs/proposals/README.md` · `docs/README.md` ·
-  `docs/OPEN-WORK.md` · `docs/archive/v0.39-structural-debt.{proposal,handoff,prompt}.md`
+  `docs/OPEN-WORK.md` · `work/archive/v0.39-structural-debt.{proposal,handoff,prompt}.md`
   (new) · `docs/proposals/structural-debt.md`, `docs/structural-debt.{handoff,prompt}.md`
   (removed, superseded by the archive copies)
 - **Tests:** not run — no code changed, docs/CLAUDE.md only.
@@ -2170,14 +2170,14 @@ commit**, so the record of *why* matters more than the diff.
     move never share a diff* — was promoted by the concurrent DEBT session into
     `CLAUDE.md`'s `paths.py`-splits-on-contact rule, alongside the `agenthomes` seam;
     the motivating proposal is archived as
-    `docs/archive/v0.39-structural-debt.proposal.md`.
+    `work/archive/v0.39-structural-debt.proposal.md`.
 - **Files:** `cage/{paths,wiringscan,doctorcmd,doctorbundle,explain_data,agents,schema,
   ledger,report,proxy,runshim}.py` · `tests/{test_wiringscan,test_pricing,conftest,
   goldenseed,test_estimate,test_debuglog,test_capture_on_read,test_prices_cli,
   test_universal_capture,test_zipapp,test_substrate,test_debug_coverage,
   test_doctor_bundle}.py` · `CHANGELOG.md` · `README.md` · `CLAUDE.md` ·
   `docs/{OPEN-WORK,README,DOC-REGISTRY}.md` · `docs/proposals/structural-debt.md` ·
-  `docs/archive/v0.39-codex-purge.{handoff,prompt}.md` (+ archive README row).
+  `work/archive/v0.39-codex-purge.{handoff,prompt}.md` (+ archive README row).
 - **Tests:** green — **982 passed, 10 skipped** (was 983/10: two codex cases deleted,
   one guard added). **No golden needed re-blessing** — the removed text appears in no
   golden fixture, and `tests/fixtures/goldens/P1.txt`'s seven codex *price* rows are
@@ -2258,7 +2258,7 @@ commit**, so the record of *why* matters more than the diff.
   `tests/test_cigraphify.py` (new) · `cage/doctorcmd.py` (`_launcher_gap` + wiring) ·
   `cage/explain.py` (+3 `_live()` values) · `cage/explain_data.py` (`graphify-shims`
   entry) · `tools/cigraphify.py` (docstring) · `docs/shim-contract.md` (cross-links) ·
-  `docs/cage-lab/{01-setup,03-verify}.md` · `README.md` · `CLAUDE.md` ·
+  `work/cage-lab/{01-setup,03-verify}.md` · `README.md` · `CLAUDE.md` ·
   `tests/{test_doctor,test_cli_tiering}.py` (fixes) · docs indexes/trackers.
 - **Tests:** green. `just test` **983 pass / 0 fail / 10 skipped** (979 before — the 4
   new `test_cigraphify.py` cases). No goldens affected (nothing here touches a golden
@@ -2425,12 +2425,12 @@ commit**, so the record of *why* matters more than the diff.
     never-removed table: `test_prices_cli.py`, `test_prices_split.py`,
     `test_explain.py`, `tests/goldenseed.py`, `test_freshness.py`).
   - Archived the solo prompt (no handoff pair — too small for one) to
-    `docs/archive/v0.36-sync-guard.prompt.md`; removed `SYNC-GUARD` from
-    `docs/OPEN-WORK.md`; updated `docs/README.md`, `docs/archive/README.md`,
-    `docs/DOC-REGISTRY.md`, root `README.md`, `CLAUDE.md` test count.
+    `work/archive/v0.36-sync-guard.prompt.md`; removed `SYNC-GUARD` from
+    `docs/OPEN-WORK.md`; updated `docs/README.md`, `work/archive/README.md`,
+    `work/DOC-REGISTRY.md`, root `README.md`, `CLAUDE.md` test count.
 - **Files:** `tests/test_policysync.py`; `docs/OPEN-WORK.md`; `docs/README.md`;
-  `docs/archive/README.md`; `docs/archive/v0.36-sync-guard.prompt.md` (new, moved
-  from `docs/sync-fixture-guard.prompt.md`); `docs/DOC-REGISTRY.md`; `docs/WORKLOG.md`;
+  `work/archive/README.md`; `work/archive/v0.36-sync-guard.prompt.md` (new, moved
+  from `docs/sync-fixture-guard.prompt.md`); `work/DOC-REGISTRY.md`; `docs/WORKLOG.md`;
   `README.md`; `CLAUDE.md`.
 - **Tests:** green — 962/0 (`python -m pytest -q`, was 961/0).
 - **Next:** none — the synthetic bundle fixture stays parked as a proposal behind a
@@ -2575,7 +2575,7 @@ commit**, so the record of *why* matters more than the diff.
 ## 2026-08-01 — K2 finished: routed leg, CLI scoping, read-side, and the tests (supersedes the entry below)
 
 - **Milestone:** K2 executed end-to-end from
-  [the archived prompt](../docs/archive/v0.36-kiro-routing.prompt.md). **Supersedes the
+  [the archived prompt](../work/archive/v0.36-kiro-routing.prompt.md). **Supersedes the
   "⚠️ Tests: NOT PINNED / K-TEST" line in the entry below** — `tests/test_kiro_routing.py`
   (27 tests) now pins the routing, the CLI scoping and both caveat texts.
 
@@ -2847,15 +2847,15 @@ land · `cage query kiro-routing`.
     `cage 0.36.0`).
   - Docs: `CLAUDE.md` gained the derive-rule (Must-Know Rules) plus a release-checklist
     line; `docs/meta-version.prompt.md` archived to
-    `docs/archive/v0.36-meta-version.prompt.md`; `docs/OPEN-WORK.md`, `docs/README.md`,
-    `docs/DOC-REGISTRY.md`, `docs/archive/README.md` updated to match
+    `work/archive/v0.36-meta-version.prompt.md`; `docs/OPEN-WORK.md`, `docs/README.md`,
+    `work/DOC-REGISTRY.md`, `work/archive/README.md` updated to match
     (remove-on-done). `docs/example/toml-config.md` already showed `0.36.0` — no
     change needed, it was asserting the invariant the shipped file violated.
 - **Files:** `cage/data/cage.toml` · `cage/policy.py` · `cage/initcmd.py` ·
   `CLAUDE.md` · `tests/test_prices_split.py` · `tests/test_zipapp.py` ·
   `tests/fixtures/goldens/P1.txt` · `docs/OPEN-WORK.md` · `docs/README.md` ·
-  `docs/DOC-REGISTRY.md` · `docs/archive/README.md` ·
-  `docs/archive/v0.36-meta-version.prompt.md` (new)
+  `work/DOC-REGISTRY.md` · `work/archive/README.md` ·
+  `work/archive/v0.36-meta-version.prompt.md` (new)
 - **Tests:** green — 942 passed (three new tests: the drift guard, the fresh-scaffold
   stamp check, and the insertion-point regression test for `pricestoml`). Two
   unrelated pre-existing failures left untouched
@@ -2891,7 +2891,7 @@ land · `cage query kiro-routing`.
   lines that NET and K would otherwise edit twice.
 - **Files:** `docs/human-removal.handoff.md` (new) · `docs/human-removal.prompt.md`
   (new) · `docs/adr/0006-*.md` (new) · `docs/OPEN-WORK.md` · `docs/README.md` ·
-  `docs/DOC-REGISTRY.md` · `docs/WORKLOG.md`
+  `work/DOC-REGISTRY.md` · `docs/WORKLOG.md`
 - **Tests:** none — documentation only. Suite last green at 833.
 - **Next step:** run `human-removal.prompt.md` (Opus).
 
@@ -2904,7 +2904,7 @@ land · `cage query kiro-routing`.
     (next · blocked · state) · 5-row pending table · open decisions · constraints
     binding the next lab run · 5-line maintenance pointer. Detail moved to the finding
     docs it already had; durable rules dropped to a link after verifying all seven are
-    homed in `CLAUDE.md` or `docs/cage-lab/`.
+    homed in `CLAUDE.md` or `work/cage-lab/`.
   - `docs/doc-size-discipline.md` — **rule 4 amended**: the ≤120-char row limit
     measures **rendered** text, not raw. Raw counting penalized markdown link targets
     (~60 chars, zero reading burden), putting rule 4 in direct conflict with rule 3.
@@ -2926,12 +2926,12 @@ land · `cage query kiro-routing`.
   - `docs/doc-size-discipline.md` (**new**) — full spec: per-rule detail, the
     three-audience table, a worked bad/good evidence example, the four-step fix
     procedure for an over-budget doc, and the trial-exit criteria.
-  - `docs/DOC-REGISTRY.md` + `docs/README.md` — row and index entry, both carrying the
+  - `work/DOC-REGISTRY.md` + `docs/README.md` — row and index entry, both carrying the
     2026-09-01 expiry.
 - **Design notes:** the trial **lapses if unreviewed** (a trial that persists by
   default was never a trial). Enforcement (a grep test for over-length rows) is
   deliberately **not built** — it becomes an option only if the trial is retained.
-- **Files:** `CLAUDE.md` · `docs/doc-size-discipline.md` · `docs/DOC-REGISTRY.md` ·
+- **Files:** `CLAUDE.md` · `docs/doc-size-discipline.md` · `work/DOC-REGISTRY.md` ·
   `docs/README.md` · `docs/WORKLOG.md`
 - **Tests:** none run — documentation only. Suite last green at 833.
 - **Next step:** re-cut `docs/OPEN-WORK.md` to the budget — the trial's first test.
@@ -2947,9 +2947,9 @@ land · `cage query kiro-routing`.
     markers** clause: a ✅ in a plan file is an assertion, not evidence — reconcile
     against `regression/`, `archive/`, `IMPLEMENTATION.md` and the code.
   - `docs/OPEN-WORK.md` — header mirrors both rules.
-  - `docs/DOC-REGISTRY.md` — trigger widened from "a phase opens, closes, or its
+  - `work/DOC-REGISTRY.md` — trigger widened from "a phase opens, closes, or its
     verdict/scope changes" to the full continuous list.
-- **Files:** `CLAUDE.md` · `docs/OPEN-WORK.md` · `docs/DOC-REGISTRY.md` ·
+- **Files:** `CLAUDE.md` · `docs/OPEN-WORK.md` · `work/DOC-REGISTRY.md` ·
   `docs/WORKLOG.md`
 - **Tests:** none run — documentation only. Suite last green at 833.
 - **Next step:** **K — relabel `saved` as gross** (proposal B).
@@ -2973,14 +2973,14 @@ land · `cage query kiro-routing`.
   - `docs/README.md` — spent `legd-publish` prompt out of *Active work*; OPEN-WORK
     blurb restated as the law; "Leg D is DONE" → **DONE and PUBLISHED** with the true
     remaining list.
-  - `docs/archive/v0.36-legd-publish.prompt.md` — archived with the standard header.
+  - `work/archive/v0.36-legd-publish.prompt.md` — archived with the standard header.
 - **Why it matters:** the first pass of this very change listed two already-built items
   (`B-fix-3`, the copilot `--path` glob) as pending, because the file's own ✅ markers
   had gone stale. Ground truth came from `regression/` and `archive/`, not the plan —
   which is the failure mode the rule removes.
 - **Files:** `CLAUDE.md` · `docs/OPEN-WORK.md` · `docs/README.md` ·
-  `docs/WORKLOG.md` · `docs/DOC-REGISTRY.md` ·
-  `docs/archive/v0.36-legd-publish.prompt.md` (moved)
+  `docs/WORKLOG.md` · `work/DOC-REGISTRY.md` ·
+  `work/archive/v0.36-legd-publish.prompt.md` (moved)
 - **Tests:** none run — documentation only, no code touched. Suite last green at 833.
 - **Remaining after this:** K (relabel `saved` gross) · meta (`cage_version` drift) ·
   K2 (kiro cross-ledger decision) · K3/K4 (two HONEST-LIMITs to state) · H (release,
@@ -3047,7 +3047,7 @@ land · `cage query kiro-routing`.
 
 ## 2026-08-01 — Phase I closed: leg D written up, published + hashed
 - **Implemented:** the write-up of leg D (the six manual VS Code / IDE cells Arpit drove
-  by hand on 2026-08-01), published into `docs/regression/` as the three artifact types,
+  by hand on 2026-08-01), published into `work/regression/` as the three artifact types,
   never merged: one **run report** (immutable, hashed, standalone-readable), four
   **finding docs** (each owning its own Status line), one **phase benchmark** (derived,
   introduces no new numbers) superseding 2026-07-29's.
@@ -3077,14 +3077,14 @@ land · `cage query kiro-routing`.
   moved from whole-file to `HASH-COVERS-BELOW` marker-range **with their digests
   unchanged** — the header sits above the marker, the bytes below are byte-identical to
   what was published. Nothing existing was edited below a marker.
-- **Files:** `docs/regression/2026-08-01-leg-d-run-report.md` ·
+- **Files:** `work/regression/2026-08-01-leg-d-run-report.md` ·
   `2026-08-01-phase-benchmark.md` · `2026-08-01-finding-{copilot-path-glob,
   kiro-rows-double-count-across-ledgers, kiro-rows-carry-no-time-session-project,
   surface-attribution-is-agent-dependent}.md` (+ `.sha256` sidecars) ·
-  `docs/regression/README.md` (index rows) · bannered `2026-07-29-phase-benchmark.md` +
+  `work/regression/README.md` (index rows) · bannered `2026-07-29-phase-benchmark.md` +
   status-headered `2026-07-29-finding-adoption-not-capture.md` (+ their sidecars) ·
   `docs/OPEN-WORK.md` (D done, I complete, new **K** follow-up) · `docs/WORKLOG.md` ·
-  `docs/DOC-REGISTRY.md`. Cell records committed in `cage-lab`.
+  `work/DOC-REGISTRY.md`. Cell records committed in `cage-lab`.
 - **Tests:** not run — documentation-only change in the cage tree; **no cage code was
   touched** (the copilot glob bug is filed, not fixed).
 - **Next:** K1 — fix the copilot `--path` glob, with a test over a `chatSessions/` tree.
@@ -3112,7 +3112,7 @@ land · `cage query kiro-routing`.
   (whole-file coverage, stated in each sidecar — distinct from the validation reports'
   marker-range convention); `2026-07-28-phase-1-benchmark.md` bannered **superseded**
   *above* its `HASH-COVERS-BELOW` marker, so its body and published hash are byte-identical
-  (verified). Index rows + a hash-convention table added to `docs/regression/README.md`.
+  (verified). Index rows + a hash-convention table added to `work/regression/README.md`.
 - **Refactors, no behaviour change:** `wiringscan.verbs_in_shell` extracted from
   `interceptor_verbs` (one detector, not two); `hook_commands`/`display_path` made public
   for `hookbypass` to reuse rather than fork; `doctor --wiring` gained a `_path_winner`
@@ -3123,8 +3123,8 @@ land · `cage query kiro-routing`.
 - **Files:** `cage/pathshim.py` (new) · `cage/hookbypass.py` (new) · `cage/wiringscan.py`
   · `cage/doctorcmd.py` · `cage/agents.py` · `cage/explain_data.py` ·
   `tests/test_pathshim.py` (new) · `tests/test_hookbypass.py` (new) ·
-  `tests/conftest.py` · `tests/test_doctor.py` · `docs/regression/*` · `docs/GLOSSARY.md`
-  · `docs/OPEN-WORK.md` · `docs/README.md` · `docs/archive/README.md` + the archived pair.
+  `tests/conftest.py` · `tests/test_doctor.py` · `work/regression/*` · `docs/GLOSSARY.md`
+  · `docs/OPEN-WORK.md` · `docs/README.md` · `work/archive/README.md` + the archived pair.
 - **Tests:** 925 passed, **1 pre-existing failure** —
   `test_output_spec.py::test_I2_verdict_saving`, a **clock-driven** golden unrelated to
   this change: `insights verdict` composes `insights regression`, whose 7d window is read
@@ -3152,7 +3152,7 @@ land · `cage query kiro-routing`.
   graphify installer in `workspace-on`. Arpit's standing rule is all three agents,
   always — an unwired agent's ON cell silently becomes a second OFF cell, misread as
   an adoption finding rather than the setup bug it is. Now **law 0** in
-  `docs/cage-lab/01-setup.md`/`README.md`: three agents, always in scope; a
+  `work/cage-lab/01-setup.md`/`README.md`: three agents, always in scope; a
   non-scriptable one (kiro) is driven by hand, never dropped from the matrix.
 - **Fixed:** `cage setup --all --no-graphify` in `workspace-off`, `cage setup --all`
   in `workspace-on` (was `--claude` in both); added `graphify kiro install` alongside
@@ -3167,7 +3167,7 @@ land · `cage query kiro-routing`.
   re-authored, per standing law); `~/.cage` mtime and `~/.zshrc` sha256 both
   unchanged across the whole pass. `rebuild.sh` updated to assert all of this from
   scratch, idempotently, at $0; `drive.sh` header updated to cite law 0.
-- **Found, not fixed (flagged for Arpit):** `docs/cage-lab/01-setup.md` §3/§4 have
+- **Found, not fixed (flagged for Arpit):** `work/cage-lab/01-setup.md` §3/§4 have
   been edited elsewhere to pin a *different* fixture layout (`_src/pkg/...`) and
   question set than what's actually built (`_src/tinyshop/...`, this lab's own
   `questions.txt`). Left both exactly as-is per the "never re-author the fixture,
@@ -3177,14 +3177,14 @@ land · `cage query kiro-routing`.
 - Files: `cage-lab/{workspace-off,workspace-on}/` (agent wiring + graphify
   installs), `cage-lab/rebuild.sh`, `cage-lab/drive.sh`, `cage-lab/SETUP.md`,
   `cage-lab/{workspace-off,workspace-on}/.gitignore` (new — kiro's absolute MCP
-  path, per `cage doctor`'s own advice); `docs/cage-lab/01-setup.md` (§6 gained the
+  path, per `cage doctor`'s own advice); `work/cage-lab/01-setup.md` (§6 gained the
   three-agent + all-graphify-integrations checks).
 - Tests: not run (lab-only, no cage source changed).
 - Next: still Arpit's call on driving; also his call on the fixture/manual mismatch
   above.
 
 ## 2026-07-30 — cage-lab rebuilt from scratch (foundation only, setup + §6 gate)
-- **`../cage-lab` was deleted and rebuilt from `docs/cage-lab/01-setup.md`**, scoped
+- **`../cage-lab` was deleted and rebuilt from `work/cage-lab/01-setup.md`**, scoped
   deliberately to setup + verification per Arpit's instruction — no driving, one
   authorized ~$0.02 smoke prompt, everything else $0.
 - Built: `_src/tinyshop/` fixture (6 files — `models.py` ~8.1k tokens/20+ dataclasses,
@@ -3204,7 +3204,7 @@ land · `cage query kiro-routing`.
   $0.0189) captured 2 calls into `labledger/`, re-import idempotent (0 new rows),
   `~/.cage` mtime and `~/.zshrc` sha256 both confirmed unchanged before/after.
 - **Three real-CLI deviations found and folded back into the manual in this same
-  change** (`docs/cage-lab/01-setup.md` + `02-run.md`): `.venv` needs a `>=3.11`
+  change** (`work/cage-lab/01-setup.md` + `02-run.md`): `.venv` needs a `>=3.11`
   interpreter (machine default `python3` is 3.9.6, too old for cage `>=3.11` and
   graphifyy `>=3.10`); `workspace-off`'s `cage setup` needs `--no-graphify` explicitly
   (else the shared lab `.venv`'s `graphify` on PATH gets OFF its own interceptor
@@ -3214,13 +3214,13 @@ land · `cage query kiro-routing`.
   Also found: `graphifyy` **is** published on PyPI (latest 0.9.30) — the earlier
   belief it wasn't was an artifact of checking under the wrong (too-old) Python.
 - **Finding, not a fix:** the 2026-07-29 run's raw artifacts
-  (`cage-lab/reports/2026-07-29-*.md`) were never published to `cage/docs/regression/`
+  (`cage-lab/reports/2026-07-29-*.md`) were never published to `cage/work/regression/`
   before that lab instance was deleted — they no longer exist. Only the prose
   conclusions already transcribed into this file/WORKLOG.md/OPEN-WORK.md survive.
   Recorded as a process lesson in `docs/OPEN-WORK.md` §I.
 - Files: `cage-lab/` (new sibling repo — `_src/`, `workspace-off/`, `workspace-on/`,
   `SETUP.md`, `rebuild.sh`, `drive.sh`, `questions.txt`, `.gitignore`, `bin/`,
-  `labledger/`); `docs/cage-lab/01-setup.md`, `docs/cage-lab/02-run.md`,
+  `labledger/`); `work/cage-lab/01-setup.md`, `work/cage-lab/02-run.md`,
   `docs/OPEN-WORK.md` (this repo).
 - Tests: not run this leg (lab-only work, no cage source changed); cage's own
   in-tree suite untouched.
@@ -3242,10 +3242,10 @@ land · `cage query kiro-routing`.
   re-import idempotent, three-way reconcile exact).
 - Premise corrections: kiro not scriptable (manual leg D); copilot ON is a passive skill.
 - Deliverables (in cage-lab/reports/, immutable, hashed): run report · adoption finding ·
-  phase benchmark (supersedes Phase-1 benchmark). NOT yet published to `cage/docs/regression/`
+  phase benchmark (supersedes Phase-1 benchmark). NOT yet published to `cage/work/regression/`
   (gated on Arpit).
 - Tests: cage in-tree suite still **889 passed** (no cage source changed this leg — lab work).
-- Next: Arpit's call on publishing artifacts to docs/regression + manual leg D (VS Code/kiro).
+- Next: Arpit's call on publishing artifacts to work/regression + manual leg D (VS Code/kiro).
 
 ## 2026-07-29 — OPEN-WORK Phase G (honesty debts + ceiling surfacing) + Phase F (copilot capture reach)
 - Implemented **G1** — report-read confidence 0.3 labelled **UNVALIDATED** everywhere it
@@ -3295,7 +3295,7 @@ land · `cage query kiro-routing`.
   capture is CONTINGENT; the transcript route is the reliable one there.
 - Files: `cage/repoceiling.py`, `cage/graphifymodel.py`, `tests/test_graphify_forward.py`,
   `cage/explain_data.py`, `docs/FORMULAS.md`, `docs/GLOSSARY.md`, `docs/OPEN-WORK.md`
-  (A/B verdicts + corrected §F table), `docs/DOC-REGISTRY.md`, `docs/WORKLOG.md`.
+  (A/B verdicts + corrected §F table), `work/DOC-REGISTRY.md`, `docs/WORKLOG.md`.
 - Tests: `just test` green (see next commit-adjacent run); `test_graphify_forward.py`
   10 passed, `test_output_spec.py` unaffected (ceiling not in a golden yet — G4 adds it).
 - Next: **STOP GATE 1** — report A + B, wait for Arpit's go before C (paid calls). Then
@@ -3355,7 +3355,7 @@ land · `cage query kiro-routing`.
   cage's own CLAUDE.md block) — via the tools' own installers only, never a
   hand-written block. Fixture (`pkg/`, `README.md`, `.kiro/settings/lsp.json`)
   preserved byte-for-byte (sha256-asserted, 9 files, before == after);
-  `golden/captures/**` (148 files) and `cage/docs/regression/**` (46 files)
+  `golden/captures/**` (148 files) and `cage/work/regression/**` (46 files)
   asserted untouched. `cage doctor` confirms the interceptor **live** (not
   merely present) once `workspace/bin` is on PATH, matching `drive.py`'s own
   `build_env()` convention for `graphify=on` cells. `workspace/SETUP.md` +
@@ -3400,7 +3400,7 @@ land · `cage query kiro-routing`.
   `cage-lab/.gitignore` (nested `workspace/.git/` ignored), `cage-lab/golden/workspace/{CLAUDE.md,.claude/,.mcp.json,graphify-out/,bin/,.cage/,.git/}`
   (re-derived) — all committed in **cage-lab only**.
   `docs/graphify-ab-steering.plan.md` (§1.1 corrections above), this file,
-  `docs/WORKLOG.md`, `docs/DOC-REGISTRY.md` — **cage tree stays
+  `docs/WORKLOG.md`, `work/DOC-REGISTRY.md` — **cage tree stays
   uncommitted**.
 - Tests: N/A (cage-lab is black-box; no cage code changed). `rebuild.sh`'s
   own verification (sha256 identity + `cage doctor` interceptor-live grep)
@@ -3430,25 +3430,25 @@ land · `cage query kiro-routing`.
 ## 2026-07-30 — Docs: three implemented prompts archived; OPEN-WORK reduced to five items
 
 - Implemented (docs only): archived `three-agent-parity.prompt.md`,
-  `cage-lab-rebuild.prompt.md` and `open-work.prompt.md` to `docs/archive/v0.36-*` with
+  `cage-lab-rebuild.prompt.md` and `open-work.prompt.md` to `work/archive/v0.36-*` with
   headers (all implemented and green); `docs/` root back to nine living docs with
   *Active work* empty by design; `OPEN-WORK.md` pending list rewritten to the five real
   remaining items (ledger hygiene · real-world proof of B-fix-1/3 · leg D · final
   benchmark · release + the `-e ../cage` deviation expiry).
-- Files: `docs/archive/v0.36-{three-agent-parity,cage-lab-rebuild,open-work-runner}.prompt.md`
+- Files: `work/archive/v0.36-{three-agent-parity,cage-lab-rebuild,open-work-runner}.prompt.md`
   (new), `docs/README.md`, `docs/OPEN-WORK.md`, `docs/WORKLOG.md`.
 - Tests: not run (documentation only).
 - Next: Arpit's ledger decision, then `cage doctor` confirmation, then leg D.
 
 ## 2026-07-30 — Lab review: graphify 0.9.30 facts recorded, three stale findings corrected
 
-- Implemented (docs only): `docs/cage-lab/01-setup.md` §3/§4 rewritten to the real
+- Implemented (docs only): `work/cage-lab/01-setup.md` §3/§4 rewritten to the real
   `tinyshop` fixture + the six actual questions; new **§4a** (graphify 0.9.30 hook
   reality, the absolute-path bypass, the `--strict` OFF decision, verbatim-hook-block
   rule); OFF-arm `[tools] order` exemption; `02-run.md` §1a ledger hygiene;
   `03-verify.md` ON cells now require three answers; `OPEN-WORK.md` **§J** + phase-index
   row, with §C's superseded "PATH-bypass dead" line marked.
-- Files: `docs/cage-lab/{01-setup,02-run,03-verify}.md`, `docs/OPEN-WORK.md`,
+- Files: `work/cage-lab/{01-setup,02-run,03-verify}.md`, `docs/OPEN-WORK.md`,
   `docs/WORKLOG.md`.
 - Tests: not run (documentation only; no code touched).
 - Next: ledger reset decision, then Arpit drives. Product question filed (doctor warning
@@ -3456,27 +3456,27 @@ land · `cage query kiro-routing`.
 
 ## 2026-07-29 — Lab law 0: all three agents always in scope (docs swept) + parity prompt
 
-- Implemented (docs only): `docs/cage-lab/README.md` gains **law 0** (Claude Code ·
+- Implemented (docs only): `work/cage-lab/README.md` gains **law 0** (Claude Code ·
   Copilot · Kiro always in scope, `cage setup --all`, all three graphify installers,
   undriveable surfaces are `NOT AVAILABLE`/`UNPROVEN` and never dropped); conditional
   language swept from 01-setup/02-run/05-manual-cells; new
   `docs/three-agent-parity.prompt.md` to bring the existing lab to parity.
-- Files: `docs/cage-lab/{README,01-setup,02-run,05-manual-cells}.md`,
+- Files: `work/cage-lab/{README,01-setup,02-run,05-manual-cells}.md`,
   `docs/three-agent-parity.prompt.md` (new), `docs/README.md`, `docs/WORKLOG.md`.
 - Tests: not run (documentation only).
 - Next: run the parity prompt, then Arpit drives the six questions.
 
-## 2026-07-29 — docs/cage-lab/ created: the from-scratch rebuild manual
+## 2026-07-29 — work/cage-lab/ created: the from-scratch rebuild manual
 
-- Implemented (docs only): `docs/cage-lab/` — README + 01-setup · 02-run · 03-verify ·
+- Implemented (docs only): `work/cage-lab/` — README + 01-setup · 02-run · 03-verify ·
   04-publish · 05-manual-cells. Makes `../cage-lab` fully disposable: everything needed
   to recreate it now lives in cage, versioned with the tool it tests. Encodes the five
   laws (zero dummy data · own `.venv` with driver-set PATH · isolated ledger ·
   reproducible workspace · rebuild config not corpus).
-- Files: `docs/cage-lab/*.md` (6 new), `docs/README.md`, `docs/OPEN-WORK.md`,
+- Files: `work/cage-lab/*.md` (6 new), `docs/README.md`, `docs/OPEN-WORK.md`,
   `CLAUDE.md` (pointer), `docs/WORKLOG.md`.
 - Tests: not run (documentation only; no code touched).
-- Next: delete `../cage-lab` and rebuild from `docs/cage-lab/01-setup.md`.
+- Next: delete `../cage-lab` and rebuild from `work/cage-lab/01-setup.md`.
 
 ## 2026-07-29 — `.venv` lab isolation made standing (CLAUDE.md + OPEN-WORK §I.2a)
 
@@ -3519,13 +3519,13 @@ land · `cage query kiro-routing`.
 ## 2026-07-28 — Docs consolidation: 24 cycle docs archived → one OPEN-WORK plan
 
 - Implemented (docs only): archived the entire v0.36 planning cycle to
-  `docs/archive/v0.36-*` with per-file headers; created `docs/OPEN-WORK.md` as the
+  `work/archive/v0.36-*` with per-file headers; created `docs/OPEN-WORK.md` as the
   single plan of pending work (phases A–H) carrying every remainder plus the
   durable rules promoted out of the archived plans; rewrote `docs/README.md`
   (Active work is now empty by design) and added the consolidation note to
-  `docs/archive/README.md`.
-- Files: `docs/archive/v0.36-*` (24 new), `docs/OPEN-WORK.md` (new),
-  `docs/README.md`, `docs/archive/README.md`, `docs/WORKLOG.md`.
+  `work/archive/README.md`.
+- Files: `work/archive/v0.36-*` (24 new), `docs/OPEN-WORK.md` (new),
+  `docs/README.md`, `work/archive/README.md`, `docs/WORKLOG.md`.
 - Tests: not run (documentation change; no code touched).
 - Next: OPEN-WORK **A** (ceiling credibility) and **B** (VS Code shim check) —
   both free — then **C** (G1, ~2 paid calls). Cage tree stays uncommitted.
@@ -3567,7 +3567,7 @@ land · `cage query kiro-routing`.
   new phase **G0.5 clean rebuild** with recorded provenance; and the standing rule
   *a workspace is evidence only if reproducible* promoted into the golden-set plan.
 - Files: `docs/graphify-ab-steering.plan.md` (phase index + §1.1, §1.2, §1.2.1,
-  §1.2.2), `docs/cage-lab-golden-set.plan.md` (§2.4a), `docs/WORKLOG.md`,
+  §1.2.2), `work/cage-lab-golden-set.plan.md` (§2.4a), `docs/WORKLOG.md`,
   `docs/README.md`.
 - Tests: not run (documentation change; no code touched).
 - Next: execute **G0.5** in cage-lab — rebuild `golden/workspace/` via
@@ -3623,19 +3623,19 @@ land · `cage query kiro-routing`.
     matrix with method tag + verdict (EXACT / HONEST-LIMIT / UNPROVEN / WRONG) +
     permanence + citation per cell · open defects. Hashed (sha256
     `58948469192c`), published byte-identical into
-    `docs/regression/2026-07-28-phase-1-benchmark.md` (+ `.sha256`).
+    `work/regression/2026-07-28-phase-1-benchmark.md` (+ `.sha256`).
   - **Verdicts:** claude CLI **EXACT** (381,813 / 565,637, 3-way) · copilot CLI
     **EXACT** post-fix (227,298 / 233,675) · kiro CLI **HONEST-LIMIT** (12/15
     credit rows, `estimated`; tokens null, FINAL) · all VS Code **UNPROVEN**.
   - **`inputs.toml`** (cage-lab root) re-pointed at `golden/captures/**` as
     **primary** inputs (9 cells); `samples/**` demoted to secondary/legacy.
   - **Phase 1 CLOSED** in the closeout plan phase index + §P5.4; benchmark
-    prompt archived (`docs/archive/v0.36-phase1-benchmark.prompt.md`); HISTORY +
+    prompt archived (`work/archive/v0.36-phase1-benchmark.prompt.md`); HISTORY +
     both regression-README indexes + docs/README Active-work updated.
 - Files: cage-lab `golden/findings/PHASE-1-BENCHMARK.md`(+`.sha256`),
-  `golden/findings/HISTORY.md`, `inputs.toml`; cage `docs/regression/2026-07-28-phase-1-benchmark.md`(+`.sha256`),
-  `docs/regression/README.md`, `docs/phase1-closeout.plan.md`, `docs/README.md`,
-  `docs/archive/README.md`, `docs/archive/v0.36-phase1-benchmark.prompt.md` (moved).
+  `golden/findings/HISTORY.md`, `inputs.toml`; cage `work/regression/2026-07-28-phase-1-benchmark.md`(+`.sha256`),
+  `work/regression/README.md`, `docs/phase1-closeout.plan.md`, `docs/README.md`,
+  `work/archive/README.md`, `work/archive/v0.36-phase1-benchmark.prompt.md` (moved).
 - Tests: n/a (docs/derived only; no code touched). Hash round-trip verified.
 - Next: P3 (Arpit's manual VS Code/IDE sweep) answers the 6 PENDING cells; P4
   Phase-2 sweep enriches the benchmark (graphify A/B measured). Cage tree stays
@@ -3663,7 +3663,7 @@ land · `cage query kiro-routing`.
     off-by-one), 07-24 f1-root-cause → receipts-empty; both correction files stay
     on disk, banner-marked SUPERSEDED, and are cited from the finding docs. The
     07-24 capture-log-hook-gap diagnosis is owned as F6's deferred follow-on.
-  - **Indexes**: `docs/regression/README.md` (real-ledger lab-runs section +
+  - **Indexes**: `work/regression/README.md` (real-ledger lab-runs section +
     finding-docs table + absorbed-corrections table) and `cage-lab/golden/findings/
     HISTORY.md` (broadened to index both golden validation runs and real-ledger lab
     sweeps; lab-run-001 + lab-baseline rows added).
@@ -3673,10 +3673,10 @@ land · `cage query kiro-routing`.
   finding docs — capture-log-hook-gap is owned by F6 as a follow-on; field-gate-
   post-heal-check is a self-contained acceptance-analysis that owns its own status.
   Both are indexed in the README corrections table.
-- Files: `docs/regression/2026-07-22-lab-run-001.md`,
-  `docs/regression/2026-07-22-finding-*.md` (×8), banners on
+- Files: `work/regression/2026-07-22-lab-run-001.md`,
+  `work/regression/2026-07-22-finding-*.md` (×8), banners on
   `2026-07-22-capture-report.md` / `2026-07-23-f2-correction.md` /
-  `2026-07-24-f1-root-cause.md`, `docs/regression/README.md`,
+  `2026-07-24-f1-root-cause.md`, `work/regression/README.md`,
   `../cage-lab/golden/findings/HISTORY.md`.
 - Tests: not run (docs-only; no cage source touched). No paid calls; no ledger read.
 - Next: mark report-per-run.plan §7 phase-index row ✅; optionally give the two
@@ -3723,7 +3723,7 @@ land · `cage query kiro-routing`.
   Its two corrections (`2026-07-23-f2-correction`, `2026-07-24-f1-root-cause`)
   live in separate files *because* the report couldn't be edited: a finding's
   history spread across three files and **owned by none**.
-- **Why it matters (plan §7.4), strongest reason first:** `docs/regression/` is
+- **Why it matters (plan §7.4), strongest reason first:** `work/regression/` is
   what a future agent reads to learn what's broken, and today **F1's superseded
   first diagnosis outranks its real root cause** — "graphify is being run
   directly" reads as current in the report while the dead-interceptor-verb cause
@@ -3754,7 +3754,7 @@ land · `cage query kiro-routing`.
   per directive, cage-lab is where the code lives):
   - **P2 generator:** reworked `cage-lab/golden/publish_report.py` — publishes ONE
     run from `findings/runs/<run-id>/REPORT.md`, adds the sha256 header + marker,
-    copies to `docs/regression/<date>-validation-<run-id>.md` + repoints
+    copies to `work/regression/<date>-validation-<run-id>.md` + repoints
     `latest-validation-report.md`. **Structurally can't append:** refuses if the
     source already carries the hash marker or the dated copy exists; no
     read-and-reprepend path exists.
@@ -3767,20 +3767,20 @@ land · `cage query kiro-routing`.
     recomputed). Old layered file + its 3 earlier hash-versions marked SUPERSEDED via
     a banner **above** the hashed range → body/hash intact.
   - **P3 index:** `cage-lab/golden/findings/HISTORY.md` + a `## Per-run validation
-    reports` table in `docs/regression/README.md`, one row per run.
+    reports` table in `work/regression/README.md`, one row per run.
 - Files: `cage-lab/golden/publish_report.py`, `cage-lab/golden/findings/runs/run-00{2,3}/REPORT.md`,
   `cage-lab/golden/findings/HISTORY.md`, `cage-lab/golden/findings/VALIDATION-REPORT.md`
-  (SUPERSEDED banner), `cage-lab/golden/README.md`; `cage/docs/regression/`
+  (SUPERSEDED banner), `cage-lab/golden/README.md`; `cage/work/regression/`
   (2 run reports + 2 sidecars, 5 finding docs, README index, latest pointer, 4 layered
   files banner-marked); `cage/docs/report-per-run.{plan,handoff}.md`,
-  `cage/docs/cage-lab-golden-set.plan.md`.
+  `cage/work/cage-lab-golden-set.plan.md`.
 - Tests: verification pass green — all body hashes match sidecars (banners above the
   marker didn't move them); `latest` → run-003; grep proves neither run report holds
   the other's numbers; number-accounting shows every original figure survives across
   run-002 ∪ run-003 ∪ finding docs (shared before/after anchors — 227,298 / 233,675
   truth-vs-cage, unchanged claude, 37,510 undercount==self-heal — appear in both by
   design). No paid agent calls.
-- Next: archive `report-per-run.{plan,handoff}.md` to `docs/archive/` on the release
+- Next: archive `report-per-run.{plan,handoff}.md` to `work/archive/` on the release
   these ride; give the manual sweep (V6–V11) its own run report when it runs.
 
 ## 2026-07-28 — One report per run specced (plan + handoff + prompt)
@@ -3833,7 +3833,7 @@ land · `cage query kiro-routing`.
 - Answered the open question from the code: the proxy writes call rows **directly**
   (`proxy._meter` → `metering.record_call(route="proxy")`) — **no `[sources]` entry
   needed** (that's the pull/import path). So "0 rows" is conclusive.
-- Files: `cage/docs/regression/2026-07-28-kiro-proxy-probe.md` (new, + README index
+- Files: `cage/work/regression/2026-07-28-kiro-proxy-probe.md` (new, + README index
   row); `cage/docs/FORMULAS.md` §1.7 (new — the final credit-derived-`estimated`
   limit). **No cage source touched** (no paid calls beyond the two probe turns).
 - Tests: n/a (probe + docs); no cage code changed.
@@ -3857,7 +3857,7 @@ land · `cage query kiro-routing`.
   == sidecar on all 3 copies), index row added. Original pre-fix observation retained
   as the *why*, not deleted. **No cage source touched.**
 - Files: `cage-lab/golden/findings/VALIDATION-REPORT.md` (+ .sha256);
-  `cage/docs/regression/2026-07-28-validation-report-4.md` (+ .sha256, latest, README).
+  `cage/work/regression/2026-07-28-validation-report-4.md` (+ .sha256, latest, README).
 - Tests: `test_sources.py` collision + restamp tests green (3 passed).
 - Next: P2 — Kiro proxy probe (last route to exact Kiro tokens).
 
@@ -3871,12 +3871,12 @@ land · `cage query kiro-routing`.
   CLOSED green; open = manual V6–V11 + Phase 2". **Pre-fix numbers left byte-for-byte
   unedited** — they are the evidence the fix was needed (append-only evidence artifact).
 - Re-hashed + re-published append-only via `publish_report.py 2026-07-28` → new sha
-  `adee806506…`, new dated copy `docs/regression/2026-07-28-validation-report-3.md`
+  `adee806506…`, new dated copy `work/regression/2026-07-28-validation-report-3.md`
   (prior `-1`/`-2` untouched), `latest-validation-report.md{,.sha256}` refreshed,
   index row prepended. **Hash independently recomputed and verified** == sidecar on
   all three copies (lab + dated + latest).
 - Files: `cage-lab/golden/findings/VALIDATION-REPORT.md` (+ .sha256);
-  `cage/docs/regression/2026-07-28-validation-report-3.md` (+ .sha256),
+  `cage/work/regression/2026-07-28-validation-report-3.md` (+ .sha256),
   `latest-validation-report.md` (+ .sha256), `README.md` (index row). **No cage
   source touched.**
 - Tests: n/a (docs/evidence only); hash re-verification green on all 3 copies.
@@ -4171,7 +4171,7 @@ land · `cage query kiro-routing`.
 
 - **Directive B (report hashing/publish):** `cage-lab/golden/publish_report.py` — sha256
   over the report body (marker `<!-- HASH-COVERS-BELOW -->` to EOF; header excluded and
-  documented in the sidecar), header prints the hash, copied into `docs/regression/`
+  documented in the sidecar), header prints the hash, copied into `work/regression/`
   dated + `latest-validation-report.md` + `.sha256`, index row, **append-only** (`-2`
   suffix verified). Hash reproducible (recompute == sidecar).
 - **Self-heal proof (deterministic, no paid calls):** ran the fixed Copilot parser
@@ -4180,13 +4180,13 @@ land · `cage query kiro-routing`.
   goes 8/8 → **227,298** without spending on the paid re-run.
 - **Records:** [ADR 0004](../docs/adr/0004-append-only-delta-rows-and-separate-by-schema.md)
   (append-only delta rows + separate-by-schema, with veto condition);
-  `docs/regression/2026-07-28-capture-precision-fixes.md`; proposed CLAUDE.md edits parked
+  `work/regression/2026-07-28-capture-precision-fixes.md`; proposed CLAUDE.md edits parked
   in `docs/proposals/claude-md-sources-authority.md` (**propose, don't apply**).
 - **Paid re-run (Step 6):** deterministic proofs done (846 green + self-heal). The paid
   6-cell re-run needs `cage-lab/golden/drive.py` updated for Directive A + Kiro credit
   checks and real agent calls — gated on Arpit's go-ahead.
-- Files (cage): `docs/adr/0004-*.md`, `docs/regression/2026-07-28-*.md`,
-  `docs/proposals/*.md`, `docs/regression/README.md`. Files (cage-lab):
+- Files (cage): `docs/adr/0004-*.md`, `work/regression/2026-07-28-*.md`,
+  `docs/proposals/*.md`, `work/regression/README.md`. Files (cage-lab):
   `golden/publish_report.py`, `golden/findings/VALIDATION-REPORT.md(.sha256)`.
 - Tests: **846 passing**.
 
@@ -4311,7 +4311,7 @@ land · `cage query kiro-routing`.
   **drift check** vs bundled defaults + `cage setup --sync-sources`. Env overrides
   removed from path resolution by default; survivors must be doctor-announced.
 - **Directive B — reports hashed + published:** sha256 sidecar, hash in header
-  (hashed byte-range documented), dated copy + `latest-` into `docs/regression/`,
+  (hashed byte-range documented), dated copy + `latest-` into `work/regression/`,
   index row with hash prefix, append-only.
 - **Re-validation is part of the task, with exact targets:** V3/V4 exactly
   227,298 / 233,675, V5/V5b rows-or-written-limit, V1/V2 byte-identical, plus a
@@ -4357,10 +4357,10 @@ land · `cage query kiro-routing`.
   **LOW → MED** — silent loss of an explicit config value. (3) "Kiro tokens
   unrecoverable" not yet closed: probe an explicit non-`auto` model + `kiro-cli
   settings list --all` before concluding.
-- Files: `docs/cage-lab-golden-set.plan.md` (§4.1, §2.6a),
+- Files: `work/cage-lab-golden-set.plan.md` (§4.1, §2.6a),
   `docs/{WORKLOG,IMPLEMENTATION}.md`.
 - Tests: n/a (cage source untouched; suite last green 833).
-- Next: Kiro token probe → `docs/regression/` entries for both HIGH findings →
+- Next: Kiro token probe → `work/regression/` entries for both HIGH findings →
   Copilot delta-id fix → Phase 2. Manual cells V6–V11 pending.
 
 ## 2026-07-28 — Kiro CLI installed → resume prompt for the pending V5/V5b cells
@@ -4433,7 +4433,7 @@ land · `cage query kiro-routing`.
   extractor leak-test ✅; `~/.cage` untouched (all imports `--ledger` scratch).
 - Next: **STOP** — all scripted cells done. Manual VS Code/IDE cells (V6–V11) await
   Arpit. Two Phase-2 gates now open: Copilot undercount + Kiro SQLite 4th parser —
-  both merit `docs/regression/` entries.
+  both merit `work/regression/` entries.
 
 ## 2026-07-28 — Golden-set Phase 1 EXECUTED: scripted cells done, 2 cage findings (cage-lab)
 
@@ -4456,7 +4456,7 @@ land · `cage query kiro-routing`.
   the **first** and dedup-drops the second → **resumed sessions undercounted**
   (V3 189,788 vs true 227,298 = **16.5%**; V4 = 18.1%). Affects any multi-shutdown
   Copilot session (scripted resume AND VS Code chats spanning restarts). Warrants a
-  `docs/regression/` entry + a cage fix (update-to-last-cumulative) before a full
+  `work/regression/` entry + a cage fix (update-to-last-cumulative) before a full
   sweep leans on Copilot numbers. **Filed, not patched.**
 - **⚠ FINDING (MED):** stacked graphify shims recurse → hang — the fresh
   `workspace/bin/graphify` (`cage setup` → `cage data graphify`) + a stale
@@ -4476,7 +4476,7 @@ land · `cage query kiro-routing`.
   zero-call ✅; eight checks evaluated per cell (reds are reported truthfully).
 - Next: **STOP** — hand Arpit `manual/vscode-checklist.md` (V6–V11) + the interim
   report. Phase 2 (18-q sweep) and the manual cells await his explicit go. Consider a
-  `docs/regression/` entry for the Copilot undercount.
+  `work/regression/` entry for the Copilot undercount.
 
 ## 2026-07-28 — Golden-set pair rewritten to Phase 1 (off hold, runnable)
 
@@ -4507,7 +4507,7 @@ land · `cage query kiro-routing`.
 
 ## 2026-07-27 — Golden-set plan updated for the shipped config changes (docs only)
 
-- Implemented (docs/spec): `docs/cage-lab-golden-set.plan.md` reconciled with the
+- Implemented (docs/spec): `work/cage-lab-golden-set.plan.md` reconciled with the
   two config tasks that just went green (`surface` key; `cage.toml` rename).
   - **§2.6 Kiro gap re-scored:** suspicion 2 (hardcoded `surface="ide"`) is
     **fixed** — a source can declare `surface = "cli"`; suspicion 1 (unknown
@@ -4529,8 +4529,8 @@ land · `cage query kiro-routing`.
     per run).
   - Swept stale `policy.toml` references in `cage-lab-plan.md` §4 and
     `cage-lab-setup.prompt.md` (the bundled price table the lab reads as data).
-- Files: `docs/cage-lab-golden-set.plan.md`, `docs/cage-lab-plan.md`,
-  `docs/cage-lab-setup.prompt.md`, `docs/{WORKLOG,IMPLEMENTATION}.md`.
+- Files: `work/cage-lab-golden-set.plan.md`, `work/cage-lab-plan.md`,
+  `work/cage-lab-setup.prompt.md`, `docs/{WORKLOG,IMPLEMENTATION}.md`.
 - Tests: not run (docs-only; cage code untouched — suite last green at 833).
 - Next: rewrite the golden-set handoff/prompt pair to the phased plan (still
   ⏸ ON HOLD), then run Phase 1. Tree stays uncommitted.
@@ -4644,7 +4644,7 @@ land · `cage query kiro-routing`.
   12-cell matrix, per-agent non-interactive driving-command table (with a
   "confirm flags from `--help` at run time" rule); `cage-lab-plan.md` M4c
   corrected (it asserted no Kiro CLI surface exists).
-- Files: `docs/cage-lab-golden-set.plan.md`, `docs/cage-lab-plan.md`,
+- Files: `work/cage-lab-golden-set.plan.md`, `work/cage-lab-plan.md`,
   `docs/{WORKLOG,IMPLEMENTATION}.md`.
 - Tests: not run (docs-only; **no cage code changed** — the gap is recorded as a
   finding to verify, not patched).
@@ -4673,7 +4673,7 @@ land · `cage query kiro-routing`.
 - `docs/golden-set.{handoff,prompt}.md` marked ⏸ **ON HOLD** (banner at the top of
   each): they describe the superseded 4-question pilot and must be rewritten to
   the phased plan before execution. Docs index updated.
-- Files: `docs/cage-lab-golden-set.plan.md`, `docs/golden-set.{handoff,prompt}.md`,
+- Files: `work/cage-lab-golden-set.plan.md`, `docs/golden-set.{handoff,prompt}.md`,
   `docs/README.md`, `docs/{WORKLOG,IMPLEMENTATION}.md`.
 - Tests: not run (docs-only milestone).
 - Next: Arpit signs off the phased plan → rewrite the pair to Phase 1 → execute.
@@ -4696,7 +4696,7 @@ land · `cage query kiro-routing`.
   exceeds that), and forbids making a check pass by loosening it.
   Indexed in `docs/README.md` as the **first** pair to run — it produces the
   inputs the M/G matrix consumes.
-- Files: `docs/cage-lab-golden-set.plan.md`, `docs/golden-set.handoff.md` (new),
+- Files: `work/cage-lab-golden-set.plan.md`, `docs/golden-set.handoff.md` (new),
   `docs/golden-set.prompt.md` (new), `docs/README.md`,
   `docs/{WORKLOG,IMPLEMENTATION}.md`.
 - Tests: not run (docs-only milestone).
@@ -4705,7 +4705,7 @@ land · `cage query kiro-routing`.
 
 ## 2026-07-25 — Golden-set plan: drive the real agents, capture, build the field matrix
 
-- Implemented (docs/spec): `docs/cage-lab-golden-set.plan.md` — a driven capture
+- Implemented (docs/spec): `work/cage-lab-golden-set.plan.md` — a driven capture
   corpus for cage-lab. `golden/drive.py` runs the **real** Claude/Copilot/Kiro
   CLIs against a curated question set in a frozen scratch workspace, snapshots the
   agent log dir before/after, copies new log files **verbatim** (no stripping —
@@ -4731,7 +4731,7 @@ land · `cage query kiro-routing`.
   - Feeds the lab: golden captures become the primary `inputs.toml` entries, and
     Q14/Q9/Q15 replace three cases currently reported `NOT COVERED`.
 - Summarized into `docs/PLAN.md` §11; indexed in `docs/README.md`.
-- Files: `docs/cage-lab-golden-set.plan.md` (new), `docs/PLAN.md`,
+- Files: `work/cage-lab-golden-set.plan.md` (new), `docs/PLAN.md`,
   `docs/README.md`, `docs/{WORKLOG,IMPLEMENTATION}.md`.
 - Tests: not run (docs-only milestone).
 - Next: Arpit answers §9's open questions (run cost, refresh cadence, workspace
@@ -4756,7 +4756,7 @@ land · `cage query kiro-routing`.
   - Eyeball header: ORIGINAL (real path · "read in place, never modified" ·
     before/after sha) → IMPORTED (exact command) → LEDGER → MANIFEST →
     REFERENCE; `lab source <id> [--open]` jumps straight there.
-- Files: `docs/cage-lab-plan.md`, `docs/cage-lab-setup.{handoff,prompt}.md`,
+- Files: `work/cage-lab-plan.md`, `work/cage-lab-setup.{handoff,prompt}.md`,
   `docs/PLAN.md` (§11 laws), `docs/{WORKLOG,IMPLEMENTATION}.md`.
 - Tests: not run (docs-only milestone).
 - Next: execute the cage-lab setup prompt (Opus, both siblings).
@@ -4783,7 +4783,7 @@ land · `cage query kiro-routing`.
   FIXTURE (copy + sha match); new `python -m lab source <id> [--open]` prints or
   opens just those paths. The mental-math fixture rule is dropped (real numbers);
   replaced by "show every addend with its source line + a running sum".
-- Files: `docs/cage-lab-plan.md`, `docs/cage-lab-setup.{handoff,prompt}.md`,
+- Files: `work/cage-lab-plan.md`, `work/cage-lab-setup.{handoff,prompt}.md`,
   `docs/{WORKLOG,IMPLEMENTATION}.md`.
 - Tests: not run (docs-only milestone).
 - Next: execute the cage-lab setup prompt (Opus, both siblings).
@@ -4805,7 +4805,7 @@ land · `cage query kiro-routing`.
 - Propagated to `cage-lab-setup.handoff.md` (DoD boxes) and
   `cage-lab-setup.prompt.md` (build step + a STOP guardrail: no real capture to
   reduce from ⇒ ask, never author a plausible structure).
-- Files: `docs/cage-lab-plan.md`, `docs/cage-lab-setup.{handoff,prompt}.md`,
+- Files: `work/cage-lab-plan.md`, `work/cage-lab-setup.{handoff,prompt}.md`,
   `docs/{WORKLOG,IMPLEMENTATION}.md`.
 - Tests: not run (docs-only milestone).
 - Next: execute the cage-lab setup prompt (Opus, both siblings).
@@ -4839,7 +4839,7 @@ land · `cage query kiro-routing`.
 - Tests: not run (docs-only milestone). FORMULAS content cross-read against
   source; next verification pass should diff it against
   `cage query --list --kind calculation`.
-- Next: execute `docs/cage-lab-setup.prompt.md` (Opus, both siblings).
+- Next: execute `work/cage-lab-setup.prompt.md` (Opus, both siblings).
 
 ## 2026-07-25 — cage-lab COMPLETE: 16/16 matrix green, eyeball + playground + track2, baseline published
 
@@ -4867,15 +4867,15 @@ land · `cage query kiro-routing`.
     `lab labs` (L1/L2/L4/L5 read-only on the real ledger — surfaced live findings:
     39,020 real calls across 4 agents, 0 savings receipts, 0% manifest coverage,
     L4 flagged upper-bound since lab pricing is exact-match not cage's family).
-  - **Baseline published** into `docs/regression/2026-07-25-cage-lab-baseline.{md,json}`
+  - **Baseline published** into `work/regression/2026-07-25-cage-lab-baseline.{md,json}`
     + `latest-*` + README index row.
 - **FINDING (spec-correction, NOT a cage bug):** `cage-lab-plan.md` M3/M5b call
   kiro `agent` UNPRICED; the shipped bundle **prices** it via `[prices.kiro.agent]`
   (sonnet 3/15/0.3) by design. cage is correct — the plan line is stale. Lab
   references corrected to $0.0201 for the kiro fixture. **Recommend updating
-  `docs/cage-lab-plan.md` M3/M5b + `docs/PLAN.md` §11 to drop the "kiro UNPRICED"
+  `work/cage-lab-plan.md` M3/M5b + `docs/PLAN.md` §11 to drop the "kiro UNPRICED"
   claim.**
-- Files (cage side): `docs/IMPLEMENTATION.md`, `docs/regression/*` (append-only,
+- Files (cage side): `docs/IMPLEMENTATION.md`, `work/regression/*` (append-only,
   uncommitted).
 - Tests: `lab run --all` 16/16 green twice byte-identical; `lab regression` green.
 - Next: Arpit review; fold the kiro-pricing spec correction into the plan; run
@@ -4936,8 +4936,8 @@ land · `cage query kiro-routing`.
   - Handoff §11 added — prerequisite status: every asserted behavior is built and
     green (818) in the uncommitted tree; `uv build` from it is correct (the lab
     verifies what is about to ship). No blockers.
-- Files: `docs/cage-lab-plan.md`, `docs/cage-lab-setup.handoff.md`,
-  `docs/cage-lab-setup.prompt.md`, `docs/{WORKLOG,IMPLEMENTATION}.md`.
+- Files: `work/cage-lab-plan.md`, `work/cage-lab-setup.handoff.md`,
+  `work/cage-lab-setup.prompt.md`, `docs/{WORKLOG,IMPLEMENTATION}.md`.
 - Tests: not run (docs-only milestone).
 - Next: execute the cage-lab setup prompt (Opus, both siblings).
 
@@ -4945,7 +4945,7 @@ land · `cage query kiro-routing`.
 
 - Implemented (docs/lifecycle — Arpit's directive):
   - Moved the implemented pair to
-    `docs/archive/v0.36-names-and-savings-migration.{handoff,prompt}.md`; added the
+    `work/archive/v0.36-names-and-savings-migration.{handoff,prompt}.md`; added the
     one-line archive header to it **and** to the two v0.36-hookless-rebuild files
     (they were moved earlier without one). Header wording for this state:
     *"implemented for v0.36 (unreleased: built + green, release pending)"*.
@@ -4955,11 +4955,11 @@ land · `cage query kiro-routing`.
     sitting in `docs/` root and made the *Active work* list lie. `docs/` root must
     read as *work not yet done*. Rule now also requires the archive header and
     names the version the work rides.
-  - Indexes updated: `docs/archive/README.md` (new row + the trigger note),
+  - Indexes updated: `work/archive/README.md` (new row + the trigger note),
     `docs/README.md` (Active work = not-yet-built only; built-and-archived noted
     below it), CHANGELOG v0.36.0 "Built from:" now links both pairs.
-- Files: `CLAUDE.md`, `CHANGELOG.md`, `docs/README.md`, `docs/archive/README.md`,
-  `docs/archive/v0.36-*.{handoff,prompt}.md` (moved + headers),
+- Files: `CLAUDE.md`, `CHANGELOG.md`, `docs/README.md`, `work/archive/README.md`,
+  `work/archive/v0.36-*.{handoff,prompt}.md` (moved + headers),
   `docs/{WORKLOG,DOC-REGISTRY,IMPLEMENTATION}.md`.
 - Tests: not run (docs-only milestone).
 - Next: only `cage-lab-setup.{handoff,prompt}` remains active — run it (Opus, both
@@ -5006,7 +5006,7 @@ land · `cage query kiro-routing`.
   - DOC-REGISTRY.md: WORKLOG + INTERVIEW rows re-triggered and bumped.
 - Files: `CLAUDE.md`, `docs/{WORKLOG,INTERVIEW,DOC-REGISTRY,IMPLEMENTATION}.md`.
 - Tests: not run (docs-only milestone).
-- Next: execute `docs/cage-lab-setup.prompt.md` (Opus, both siblings); cage tree
+- Next: execute `work/cage-lab-setup.prompt.md` (Opus, both siblings); cage tree
   stays uncommitted.
 
 ## 2026-07-25 — precise savings migration (B green) — names-and-savings migration
@@ -5059,7 +5059,7 @@ land · `cage query kiro-routing`.
 ## 2026-07-25 — cage-lab v3: fresh-setup plan, PLAN.md §11, execution pair
 
 - Implemented (docs/spec only — build handed to Claude Code):
-  - `docs/cage-lab-plan.md` rewritten as **v3** per Arpit's four requirements:
+  - `work/cage-lab-plan.md` rewritten as **v3** per Arpit's four requirements:
     fresh sibling-repo setup (replaces v2's rebuild-in-place); the correctness
     matrix — M1–M3 solo (claude/copilot/kiro), M4 per-CLI (kiro = honest no-CLI
     cell), M5 per-VS Code/IDE (claude shared-store ⇒ honest `surface=""`),
@@ -5073,16 +5073,16 @@ land · `cage query kiro-routing`.
     the R-scenarios + L-labs + finding taxonomy.
   - `docs/PLAN.md` gained **§11 cage-lab** — the durable long-term summary
     (laws, two verification modes, matrix, playground).
-  - New pair `docs/cage-lab-setup.{handoff,prompt}.md` (**Model: Opus**;
+  - New pair `work/cage-lab-setup.{handoff,prompt}.md` (**Model: Opus**;
     references authored BEFORE cage runs; commits in cage-lab only, cage tree
-    stays uncommitted). Superseded `docs/cage-lab-rebuild.prompt.md` deleted;
+    stays uncommitted). Superseded `work/cage-lab-rebuild.prompt.md` deleted;
     `docs/README.md` indexes updated (sequence: after names-and-savings-migration).
-- Files: `docs/cage-lab-plan.md`, `docs/PLAN.md`, `docs/cage-lab-setup.handoff.md`
-  (new), `docs/cage-lab-setup.prompt.md` (new), `docs/cage-lab-rebuild.prompt.md`
+- Files: `work/cage-lab-plan.md`, `docs/PLAN.md`, `work/cage-lab-setup.handoff.md`
+  (new), `work/cage-lab-setup.prompt.md` (new), `work/cage-lab-rebuild.prompt.md`
   (deleted), `docs/README.md`, `docs/IMPLEMENTATION.md`.
 - Tests: not run (docs-only milestone).
 - Next: run the names-and-savings-migration prompt first, then paste
-  `docs/cage-lab-setup.prompt.md` into Claude Code (Opus) with both siblings.
+  `work/cage-lab-setup.prompt.md` into Claude Code (Opus) with both siblings.
 
 ## 2026-07-25 — Arpit's revisions: names always-on, precise migration, no commits
 
@@ -5099,12 +5099,12 @@ land · `cage query kiro-routing`.
   - New execution pair `docs/names-and-savings-migration.{handoff,prompt}.md`
     (**Model: Opus** — union semantics move money; DO-NOT-COMMIT constraint baked
     into both docs). Indexed under Active work.
-  - `docs/cage-lab-plan.md` corrected to match: R6 asserts names always captured +
+  - `work/cage-lab-plan.md` corrected to match: R6 asserts names always captured +
     manifest-only grep; R7 gains the migration-precision assertions (byte-identical
     receipts.jsonl + attrib, idempotent `--apply`, high-severity finding on any
     shifted dollar).
 - Files: `docs/cage-import-ledger-plan.md`, `docs/names-and-savings-migration.handoff.md`
-  (new), `docs/names-and-savings-migration.prompt.md` (new), `docs/cage-lab-plan.md`,
+  (new), `docs/names-and-savings-migration.prompt.md` (new), `work/cage-lab-plan.md`,
   `docs/README.md`, `docs/IMPLEMENTATION.md`.
 - Tests: not run (docs-only milestone).
 - Next: paste `docs/names-and-savings-migration.prompt.md` into Claude Code (Opus);
@@ -5112,23 +5112,23 @@ land · `cage query kiro-routing`.
 
 ## 2026-07-25 — cage-lab v2 rebuild prompt (execution driver)
 
-- Implemented: `docs/cage-lab-rebuild.prompt.md` — the paste-ready Claude Code
-  prompt executing `docs/cage-lab-plan.md`: **Model: Opus**, run with both sibling
+- Implemented: `work/cage-lab-rebuild.prompt.md` — the paste-ready Claude Code
+  prompt executing `work/cage-lab-plan.md`: **Model: Opus**, run with both sibling
   checkouts; hard laws (black-box, hand-derived references written BEFORE running
-  cage, read-only real ledger, publish into docs/regression/); workflow
+  cage, read-only real ledger, publish into work/regression/); workflow
   (inventory→plan-pause→R1–R4 hermetic first→derive-then-assert→run regression +
   labs→log milestones); guardrail: never fix a red scenario by regenerating its
   reference from cage's own output. Indexed in `docs/README.md`.
-- Files: `docs/cage-lab-rebuild.prompt.md` (new), `docs/README.md`,
+- Files: `work/cage-lab-rebuild.prompt.md` (new), `docs/README.md`,
   `IMPLEMENTATION.md`.
 - Tests: not run (docs-only milestone).
 - Next: paste the prompt into Claude Code (Opus) with `cage/` + `cage-lab/` access;
-  first run publishes the v2 baseline into `docs/regression/`.
+  first run publishes the v2 baseline into `work/regression/`.
 
 ## 2026-07-25 — cage-lab v2 test plan (rebuild spec for the sibling suite)
 
-- Implemented: `docs/cage-lab-plan.md` — reviewed how cage-lab v1 works (black-box
-  install, hand-derived reference, real-ledger labs, publish-into-`docs/regression/`
+- Implemented: `work/cage-lab-plan.md` — reviewed how cage-lab v1 works (black-box
+  install, hand-derived reference, real-ledger labs, publish-into-`work/regression/`
   convention) and wrote the full v2 plan against the v0.36 hookless surface:
   dead-assertion map (hooks/codex/assets/receipts.jsonl), recreation verdict
   (**rebuild in place — keep repo, history, publishing convention**), R1–R13
@@ -5138,10 +5138,10 @@ land · `cage query kiro-routing`.
   CSV, taskcorr-stays-caged), L1–L6 real-ledger labs (incl. the taskcorr field
   gate that decides Phase 4 activation), finding taxonomy v2
   (`receipts-empty`→`savings-empty` etc.). Indexed in `docs/README.md`.
-- Files: `docs/cage-lab-plan.md` (new), `docs/README.md`, `IMPLEMENTATION.md`.
+- Files: `work/cage-lab-plan.md` (new), `docs/README.md`, `IMPLEMENTATION.md`.
 - Tests: not run (docs-only milestone; cage-lab itself is the sibling repo).
 - Next: execute the rebuild inside `../cage-lab` (**Opus**) per the plan; first run
-  publishes the v2 baseline report into `docs/regression/`.
+  publishes the v2 baseline report into `work/regression/`.
 
 ## 2026-07-25 — Phase 4: gated task correlation (built, tested, disabled)
 
@@ -5346,7 +5346,7 @@ number nobody had measured, the exact failure the item was filed to prevent.
 **Stated limit, carried forward:** the count is *project* scope. `~/.cage` was unreachable
 from the environment that ran it, so a copilot-CLI shutdown with the cwd outside any
 project (the KIRO-CLI-SCOPE shape) is excluded. Evidence, reopen trigger and the re-run
-script: [regression/2026-08-11-credits-legacy-split-count.md](../docs/regression/2026-08-11-credits-legacy-split-count.md).
+script: [regression/2026-08-11-credits-legacy-split-count.md](../work/regression/2026-08-11-credits-legacy-split-count.md).
 
 ## 2026-08-11 — ADOPT-COV: closed as filed, by its own pre-committed finding
 
@@ -5370,7 +5370,7 @@ shim) remains a **capture change requiring its own proposal** — unchanged.
 "attested by an L1 hook" table printed **zero rows** while the session-join produced
 seven, so attestation contributes nothing to coverage today despite a non-empty
 `.cage/state/attest.jsonl`. Evidence:
-[regression/2026-08-11-adopt-cov-dev-ledger-read.md](../docs/regression/2026-08-11-adopt-cov-dev-ledger-read.md).
+[regression/2026-08-11-adopt-cov-dev-ledger-read.md](../work/regression/2026-08-11-adopt-cov-dev-ledger-read.md).
 
 ## 2026-08-11 — doc hygiene: two proposals archived, two constraints rescued
 
@@ -5397,7 +5397,7 @@ items, every command checked against `cage 0.48.0`'s real `--help`.
 ## 2026-08-12 — GF-LAUNCHER: verdict B accepted (decision recorded, nothing built)
 
 Arpit accepted **option B — an unconditional interpreter arm in B5** on the
-[gf-launcher-metering compare](../docs/compare/gf-launcher-metering.compare.md). The compare's
+[gf-launcher-metering compare](../work/compare/gf-launcher-metering.compare.md). The compare's
 status moved from *proposed verdict* to **DECIDED**; the item moved out of OPEN-WORK's
 *your decision* section into a new **agent lane — buildable now**, which had been empty
 since the 2026-08-11 sweep.

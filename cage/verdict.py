@@ -21,7 +21,7 @@ is noise, so the line says so instead.
 *gross*: it excludes the cost of **using** the tool. graphify is AST-only and declares
 `tool_cost_usd = 0`, so the rule above collapsed to `net = gross` and printed a bare
 **SAVING** on sessions that measurably cost more
-([finding](../docs/regression/2026-08-01-finding-saved-is-gross.md)). The exclusion is
+([finding](../work/regression/2026-08-01-finding-saved-is-gross.md)). The exclusion is
 **one-directional**, and the refusal rule follows from that asymmetry rather than from
 taste:
 

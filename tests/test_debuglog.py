@@ -83,7 +83,7 @@ def test_event_writes_under_an_explicit_cage_base_override(tmp_path, monkeypatch
     """A ``--ledger``/``CAGE_BASE`` scratch root is an *explicit* sink — the footprint
     re-bases onto it, so the debug log belongs there. Before v0.31.4 the guard tested
     ``cwd/.cage`` (unrelated to the override) and went silent, taking the F6 receipt
-    trace with it — see docs/regression/2026-07-24-f1-root-cause.md."""
+    trace with it — see work/regression/2026-07-24-f1-root-cause.md."""
     base, cwd = tmp_path / "scratch", tmp_path / "elsewhere"
     cwd.mkdir()  # a bare cwd: no .cage/ of its own
     monkeypatch.setenv("CAGE_BASE", str(base))

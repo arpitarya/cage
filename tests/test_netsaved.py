@@ -2,7 +2,7 @@
 
 The finding this pins: `saved` is a per-query counterfactual that excludes the cost of
 *using* the tool, so a $0-self-declared tool read as pure profit
-(docs/regression/2026-08-01-finding-saved-is-gross.md). Three properties are asserted
+(work/regression/2026-08-01-finding-saved-is-gross.md). Three properties are asserted
 here and must never regress:
 
 1. the attributable-cost rule is the ±window union, and it never double-counts;

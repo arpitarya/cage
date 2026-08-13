@@ -496,7 +496,7 @@ Recorded here rather than quietly worked around; tracked in [OPEN-WORK.md](../wo
 
 **Trigger: any change to the CLI surface** — a new command, a renamed or removed verb,
 an added or dropped flag, or a changed choice list. Update this file *in that same
-change*, and bump its row in [DOC-REGISTRY.md](DOC-REGISTRY.md).
+change*, and bump its row in [DOC-REGISTRY.md](../work/DOC-REGISTRY.md).
 
 The gate is [`tests/test_cli_reference.py`](../tests/test_cli_reference.py), which is
 **bidirectional** against `cli.build_parser()`:

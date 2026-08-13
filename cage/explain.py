@@ -106,7 +106,7 @@ def _live(pol: dict) -> dict:
         "graphify_shim_posix": next(n for n in paths.GRAPHIFY_SHIMS if n == "graphify"),
         "graphify_shim_windows": next(n for n in paths.GRAPHIFY_SHIMS if n.endswith(".cmd")),
         "graphify_shim_here": paths.graphify_shim_name(),
-        # the OTel GenAI semconv version `--otel` targets (docs/archive/v0.39-otel-export.handoff.md) —
+        # the OTel GenAI semconv version `--otel` targets (work/archive/v0.39-otel-export.handoff.md) —
         # live from the one pinned constant, never a hard-coded literal in the text
         "semconv": constants.OTEL_SEMCONV_VERSION,
         "semconv_status": constants.OTEL_SEMCONV_STATUS,

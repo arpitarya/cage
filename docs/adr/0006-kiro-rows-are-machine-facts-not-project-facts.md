@@ -32,7 +32,7 @@ But the damage is larger than "don't sum". Kiro's log carries **no project, no s
 no timestamp**. Importing it into a *new* project therefore pulls kiro's entire global
 history. Measured in the lab: `workspace-off` 22 rows, `workspace-on` 28 — of which 22
 were the same turns, from work done in the other workspace
-([finding](../regression/2026-08-01-finding-kiro-rows-double-count-across-ledgers.md)).
+([finding](../../work/regression/2026-08-01-finding-kiro-rows-double-count-across-ledgers.md)).
 
 **A per-project kiro cost has never been correct.** Kiro is a paid tool, so this is a
 money-correctness problem, not a reporting nicety.
@@ -55,7 +55,7 @@ than its source*. Kiro's source has no project dimension, so a kiro cost is a
 cannot support, which is the exact failure cage exists to prevent in other tools.
 
 **Reference:** the lab finding above; the principle is stated in
-[cage-lab/03-verify.md](../cage-lab/03-verify.md) §1 and applied identically to kiro's
+[cage-lab/03-verify.md](../../work/cage-lab/03-verify.md) §1 and applied identically to kiro's
 `estimated` token counts, which are accepted as a limit rather than "fixed".
 
 ## Consequences

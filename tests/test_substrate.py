@@ -23,7 +23,7 @@ def test_ids_are_sortable_by_time():
 # `ledger.receipts` · `study.import_bundles`) treats an id as an identity — so a
 # collision is a **silently dropped row**, not a retry. At 16 bits it was measured at
 # ~1 in 229 over 200k sequential ids and turned main red once (`test_study`, 37 vs 38):
-# docs/regression/2026-08-02-finding-call-id-collisions.md.
+# work/regression/2026-08-02-finding-call-id-collisions.md.
 #
 # Asserted as a contract rather than by generating ids and counting duplicates: a
 # statistical test for a 1-in-4-billion event is either vacuous or flaky, and neither

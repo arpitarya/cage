@@ -2,7 +2,7 @@
 
 Store samples pinning the **shapes a graphify savings receipt would be detected from**,
 per route. Evidence for the GFX-COV P0 gate; the sourced findings behind them are
-[docs/research/2026-08-07-graphify-store-evidence.md](../../../../docs/research/2026-08-07-graphify-store-evidence.md).
+[work/research/2026-08-07-graphify-store-evidence.md](../../../../work/research/2026-08-07-graphify-store-evidence.md).
 
 Deliberately **not** part of the agent × surface corpus above: these carry no
 `expected.json`, so `tests/test_fixture_corpus.py` (which globs `*/*/expected.json`)

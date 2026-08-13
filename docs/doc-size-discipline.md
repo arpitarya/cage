@@ -45,7 +45,7 @@ State the claim, link the proof.
 - **Bad:** `saved` is mislabelled — D2 (ON) cost ~14% more than D1 (OFF): +37% calls,
   +29% tokens in, +78% out, while cage recorded 18,456 saved, because `saved` is a
   per-query counterfactual that never nets the query turn or the hook tax…
-- **Good:** `saved` is mislabelled (gross, not net) — [finding](regression/2026-08-01-finding-saved-is-gross.md)
+- **Good:** `saved` is mislabelled (gross, not net) — [finding](../work/regression/2026-08-01-finding-saved-is-gross.md)
 
 The homes already exist: `regression/` (measurements) · `archive/` (shipped specs) ·
 `IMPLEMENTATION.md` (what was built) · `adr/` (why).

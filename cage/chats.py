@@ -1,6 +1,6 @@
 """`cage insights chats` — one row per chat, titled where the store has a title
-(proposal `docs/archive/v0.42-chats-view.proposal.md`, handoff
-`docs/archive/v0.42-chats-view.handoff.md`).
+(proposal `work/archive/v0.42-chats-view.proposal.md`, handoff
+`work/archive/v0.42-chats-view.handoff.md`).
 
 The differentiating question no cost dashboard answers per-*chat*: which conversation
 spent the tokens, and (where the store carries a title) what was it about? The

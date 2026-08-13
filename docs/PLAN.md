@@ -25,13 +25,13 @@ actually built; [OPEN-WORK.md](../work/OPEN-WORK.md) is what is left.
 > describes hook-driven capture in several places — read those as history. The
 > skill/steering machinery of §5.1 was deleted outright (that section is marked). If an
 > agent-side surface is being rebuilt, the design of record is
-> [archive/v0.41-agent-surface-layers.proposal.md](archive/v0.41-agent-surface-layers.proposal.md), not this file.
+> [archive/v0.41-agent-surface-layers.proposal.md](../work/archive/v0.41-agent-surface-layers.proposal.md), not this file.
 
 > **Agent count.** `agents.SURFACES` has been **three** — claude · copilot · kiro — since
 > v0.33.0. Any "four agents" phrasing below is pre-v0.33 history.
 
 > **v0.33.0 note:** Codex was removed from cage completely (a product/scope
-> decision — see `docs/archive/*-codex-removal.handoff.md`). This plan predates
+> decision — see `work/archive/*-codex-removal.handoff.md`). This plan predates
 > that decision and still describes Codex as a supported agent in several
 > places (§3.7, §3.8, §5.3) — read those as history, not current behavior.
 > §3.8 (`cage data limits`) in particular describes a feature removed with
@@ -128,7 +128,7 @@ expose the cwd populate `project` (Claude transcripts do; Copilot/Kiro leave it
 empty).
 
 **`billed_with` — one basis per billing GROUP** (added 2026-08-11, REV-CREDITS defect 2;
-[compare](compare/copilot-pricing-basis.compare.md)). Some providers compute **one**
+[compare](../work/compare/copilot-pricing-basis.compare.md)). Some providers compute **one**
 billed figure over a *group* of calls: a Copilot-CLI `session.shutdown` reports
 `totalPremiumRequests` across **every** model in it. That figure lands on one carrier row
 and every sibling carries this link to it. A linked row prices at **`$0.00` on the
@@ -396,7 +396,7 @@ callers**, so every commit answered `unknown` while the read surface worked perf
    `unattributed` = added lines in files **no** session proposed (human-written,
    vendored or generated — cage does not guess which). Measured: a single `human`
    bucket printed **76.6%** on cage's own repo, 89% of it one commit of generated JSON
-   ([dogfood](regression/2026-08-02-p1-authorship-dogfood.md)). `unknown` (sub-gate,
+   ([dogfood](../work/regression/2026-08-02-p1-authorship-dogfood.md)). `unknown` (sub-gate,
    binary) stays first-class and is **never redistributed**.
 
 Coverage is **per-agent and stated**: claude only. Copilot's stores record usage and
@@ -809,7 +809,7 @@ and the metrics parser call). The IDE parser SELECTs four explicit columns only,
 no `report`/`insights chats` cell moves whether the `kiro/` tree exists or is deleted.
 Cache tokens and per-chat IDE credits stay absent from every row here because no
 on-disk Kiro store persists them at all (only the wire protocol does — proxy capture,
-out of scope, `docs/research/2026-08-13-kiro-per-chat-usage-fetch-spec.md`). A read
+out of scope, `work/research/2026-08-13-kiro-per-chat-usage-fetch-spec.md`). A read
 surface and `--csv kiro` are future work, parked in `work/OPEN-WORK.md`.
 
 ## 3.13 Claude metrics — `.cage/ledger/claude/`, a seventh append-only kind
@@ -819,7 +819,7 @@ usage figures the transcript store carries that `calls` (§3.1) deliberately doe
 widen to hold: the cache-write TTL split (5m/1h — a real 1.6× price spread), thinking
 tokens, server-tool call counts, and a sidechain (subagent) split. One store, one row
 shape — the `make_copilot_metric`/`make_kiro_metric` precedent, generalized to
-Claude's single transcript store (CLAUDE-METRICS handoff, docs/research/2026-08-13-
+Claude's single transcript store (CLAUDE-METRICS handoff, work/research/2026-08-13-
 claude-per-chat-usage-fetch-spec.md).
 
 **THE DEDUP LAW is this kind's whole reason to exist.** One API response writes 1–5
@@ -1099,12 +1099,12 @@ future attention measurement inherits it.
 
 ### 4.11 graphify capture — usage rows · transcript detection · forward model
 
-Plan of record: [graphify-capture.plan.md](archive/v0.36-graphify-capture.plan.md) (GC0–GC6).
+Plan of record: [graphify-capture.plan.md](../work/archive/v0.36-graphify-capture.plan.md) (GC0–GC6).
 Closes the gap that every existing graphify route is **invocation-gated** while the
 real saving is often invocation-less (the agent reads `GRAPH_REPORT.md` instead of
 scanning files). Five landed phases (GC0–GC5), one follow-up (GC6/G1):
 
-- **GC0** — probe verdict ([plan §3.0](archive/v0.36-graphify-capture.plan.md)): claude ships; copilot
+- **GC0** — probe verdict ([plan §3.0](../work/archive/v0.36-graphify-capture.plan.md)): claude ships; copilot
   cli is detectable but out of scope (finding filed); kiro is HONEST-LIMIT.
 - **GC1** — a diagnostic **usage row** per graphify run (`state/graphify-usage.jsonl`),
   never priced, never in a money view (byte-identical, tested).
@@ -1163,7 +1163,7 @@ Two of the section's premises are also historically wrong now: it says the skill
 
 **The section number is kept, not deleted**, so the ~65 source files that cite `plan §`
 anchors keep a stable numbering. **Where an agent surface is being *rebuilt*, the design
-of record is [archive/v0.41-agent-surface-layers.proposal.md](archive/v0.41-agent-surface-layers.proposal.md)** —
+of record is [archive/v0.41-agent-surface-layers.proposal.md](../work/archive/v0.41-agent-surface-layers.proposal.md)** —
 the L0/L1/L2/L3 ladder — not this section.
 
 ### 5.2 Error surfacing — typed CLI error + exit-code contract (fail-open preserved)
@@ -1367,7 +1367,7 @@ The leverage is in the **spec and the contract**, so lock those first.
 
 Cage's numbers are verified from **outside**: a sibling repo `../cage-lab` that
 installs the shipped artifact and checks it against independently derived
-references. Detailed plan of record: [docs/cage-lab-plan.md](archive/v0.36-cage-lab.plan.md);
+references. Detailed plan of record: [work/cage-lab-plan.md](archive/v0.36-cage-lab.plan.md);
 this section is the durable summary.
 
 **Laws.** Black-box (never `import cage`; drive the binary) · independently
@@ -1378,7 +1378,7 @@ unchanged before/after), real graphify or the cell is uncovered, no manufactured
 edge cases — a cell without real data reports `NO REAL DATA — cell not covered`
 rather than being fabricated · hermetic scenario runs (scratch `$HOME` +
 `CAGE_BASE`; the real ledger only ever read) · findings publish dated into
-`docs/regression/` · a cage defect is a **finding**, never an in-flight patch.
+`work/regression/` · a cage defect is a **finding**, never an in-flight patch.
 
 **Two verification modes, always both.** *Automatic:* three independent
 readbacks per scenario (raw-log recount by the lab's own parser · cage's

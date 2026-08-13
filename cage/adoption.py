@@ -1,5 +1,5 @@
 """`cage insights adoption` — do the agents you wired actually **use** the tools you
-gave them? (proposal `docs/archive/v0.40-insights-adoption.proposal.md`)
+gave them? (proposal `work/archive/v0.40-insights-adoption.proposal.md`)
 
 The differentiating question no cost dashboard answers: same workspace, same install,
 three agents — which of them reached for the tool unprompted? Cage can answer it only
@@ -46,7 +46,7 @@ never read by a derived *money* view — an invariant pinned byte-identically by
 all, so that invariant is intact and stays intact; the next reader should not mistake a
 count for a lapse. Nothing here calls `convert`/`receiptprice`/`prices`.
 
-**Surface is deliberately not a dimension** (K4, [finding](docs/regression/2026-08-01-finding-surface-attribution-is-agent-dependent.md)):
+**Surface is deliberately not a dimension** (K4, [finding](work/regression/2026-08-01-finding-surface-attribution-is-agent-dependent.md)):
 Claude Code's CLI and its VS Code extension share one store with no distinguishing
 marker, so a `--by surface` split here would invent a fact. The view answers *which
 agent*, which is derivable, and declines the surface question by not asking it.

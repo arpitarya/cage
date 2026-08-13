@@ -1,11 +1,11 @@
-"""Guard: docs/dogfood/'s published snapshot must not silently rot (plan
-docs/dogfood-report.handoff.md §5 D3, §8 R1/R2).
+"""Guard: work/dogfood/'s published snapshot must not silently rot (plan
+work/dogfood-report.handoff.md §5 D3, §8 R1/R2).
 
 Reads **frontmatter only, never numbers** — the only reason this can run in CI with
 no ledger. Two required assertions: `latest.md`'s `snapshot_date` is <= 60 days old,
-and it agrees with the newest `docs/dogfood/<date>.md` filename (without the second
+and it agrees with the newest `work/dogfood/<date>.md` filename (without the second
 check, the guard is satisfiable by editing one frontmatter line and never re-running
-the numbers). A missing/empty `docs/dogfood/` FAILS — a green check that asserts
+the numbers). A missing/empty `work/dogfood/` FAILS — a green check that asserts
 nothing is worse than a red one. `CAGE_SKIP_DOGFOOD_FRESHNESS=1` is the bisect/old-tag
 escape hatch (handoff §8 R1): a date-based assertion can go red on a boundary with no
 code change, so the failure message says so in plain words.
@@ -36,7 +36,7 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-DOGFOOD_DIR = REPO_ROOT / "docs" / "dogfood"
+DOGFOOD_DIR = REPO_ROOT / "work" / "dogfood"
 MAX_AGE_DAYS = 60
 _SKIP_ENV = "CAGE_SKIP_DOGFOOD_FRESHNESS"
 # Set by the canonical repo's CI only. Absent ⇒ the *age* assertion does not run;
@@ -79,33 +79,33 @@ def _structure_problem(dogfood_dir: Path) -> str | None:
     skip_hint = f"Set {_SKIP_ENV}=1 if you are bisecting or building an old tag."
 
     if not dogfood_dir.is_dir():
-        return ("docs/dogfood/ is missing — see docs/dogfood-report.handoff.md. "
+        return ("work/dogfood/ is missing — see work/dogfood-report.handoff.md. "
                 f"{skip_hint}")
 
     latest = dogfood_dir / "latest.md"
     if not latest.is_file():
-        return f"docs/dogfood/latest.md is missing. {skip_hint}"
+        return f"work/dogfood/latest.md is missing. {skip_hint}"
 
     fm = _parse_frontmatter(latest.read_text(encoding="utf-8"))
     snapshot_date = fm.get("snapshot_date")
     if not snapshot_date:
-        return (f"docs/dogfood/latest.md has no snapshot_date in its frontmatter. "
+        return (f"work/dogfood/latest.md has no snapshot_date in its frontmatter. "
                 f"{skip_hint}")
 
     try:
         dt.date.fromisoformat(snapshot_date)
     except ValueError:
-        return (f"docs/dogfood/latest.md's snapshot_date {snapshot_date!r} is not a "
+        return (f"work/dogfood/latest.md's snapshot_date {snapshot_date!r} is not a "
                 f"YYYY-MM-DD date. {skip_hint}")
 
     newest_filename_date = _newest_snapshot_date(dogfood_dir)
     if newest_filename_date is None:
-        return (f"docs/dogfood/ has no dated <YYYY-MM-DD>.md snapshot file. "
+        return (f"work/dogfood/ has no dated <YYYY-MM-DD>.md snapshot file. "
                 f"{skip_hint}")
 
     if snapshot_date != newest_filename_date:
-        return (f"docs/dogfood/latest.md's snapshot_date ({snapshot_date}) does not "
-                f"match the newest docs/dogfood/<date>.md filename "
+        return (f"work/dogfood/latest.md's snapshot_date ({snapshot_date}) does not "
+                f"match the newest work/dogfood/<date>.md filename "
                 f"({newest_filename_date}) — latest.md must be refreshed by "
                 f"re-running the snapshot, not by editing one frontmatter line. "
                 f"{skip_hint}")
@@ -122,10 +122,10 @@ def _age_problem(dogfood_dir: Path, today: dt.date) -> str | None:
     parsed_date = dt.date.fromisoformat(fm["snapshot_date"])
     age_days = (today - parsed_date).days
     if age_days > MAX_AGE_DAYS:
-        return (f"docs/dogfood/latest.md's snapshot is {age_days} days old "
+        return (f"work/dogfood/latest.md's snapshot is {age_days} days old "
                 f"(> {MAX_AGE_DAYS}). This is a calendar-triggered freshness "
                 f"reminder, not a code regression — refresh the snapshot per "
-                f"docs/dogfood-report.handoff.md. "
+                f"work/dogfood-report.handoff.md. "
                 f"Set {_SKIP_ENV}=1 if you are bisecting or building an old tag.")
     return None
 
@@ -193,7 +193,7 @@ def test_an_over_age_snapshot_is_only_a_problem_for_the_age_half(tmp_path):
 
 
 # ── failure-mode coverage, all on tmp_path — never mutate the real
-#    docs/dogfood/ (handoff §9) ───────────────────────────────────────────────
+#    work/dogfood/ (handoff §9) ───────────────────────────────────────────────
 
 def _write_snapshot(dir_: Path, date_str: str, frontmatter_date: str | None = None):
     dir_.mkdir(parents=True, exist_ok=True)

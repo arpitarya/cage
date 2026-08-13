@@ -14,7 +14,7 @@ stays in the reader's spreadsheet. Nothing in this module imports `prices` or
 **Four line buckets, never three, and nothing is redistributed.** The handoff mocked
 `agent / human / unknown`; measured on cage's own repo that printed **human~ 76.6%**,
 89% of it a single commit of generated JSON
-([dogfood](../docs/regression/2026-08-02-p1-authorship-dogfood.md) §4). A residual
+([dogfood](../work/regression/2026-08-02-p1-authorship-dogfood.md) §4). A residual
 presented as a finding is exactly the v1 mistake, so the residual splits:
 
 - ``agent``        — matched an agent proposal (direct evidence, from the ledger).
@@ -176,7 +176,7 @@ def summarize(root: Path, pol: dict, *, since: str | None = None,
     over the ledger + `git show`; no clock, no pricing, no mutation.
 
     ``limit`` is the **cost bound** (OPEN-WORK COMMITS-WINDOW, verdict B accepted
-    2026-08-11 — [compare](../docs/compare/commits-view-cost-bound.compare.md)). Every
+    2026-08-11 — [compare](../work/compare/commits-view-cost-bound.compare.md)). Every
     row costs one `linematch.commit_diff` → `git show --numstat` **subprocess**, so an
     uncapped read makes this view O(*history*) while the screen is O(*rows*): measured
     **6.4s to print 20 rows from 123 commits**. It keeps the **newest** ``limit``

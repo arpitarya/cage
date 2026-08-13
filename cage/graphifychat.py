@@ -1,6 +1,6 @@
 """`cage insights graphify` — one row per chat: recorded tokens (the with-graphify
 world), the modeled without-graphify counterfactual, and the GROSS saved share
-(graphify-chats handoff, `docs/archive/v0.49-graphify-chats.handoff.md`).
+(graphify-chats handoff, `work/archive/v0.49-graphify-chats.handoff.md`).
 
 Reuses `chats.summarize` verbatim for the chat universe (title, normalized agent +
 surface, session, token sums, `from_credits` marks) and joins `ledger.savings` rows

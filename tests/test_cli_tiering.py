@@ -1,7 +1,7 @@
 """Phase 3 — CLI tiering contract: the curated front door, the removed-verb
 directions, hidden-but-callable plumbing, no argparse abbreviation, and the
 grep gates (no stale `cage <old-verb>` anywhere; committed wiring names only
-non-moving verbs). See docs/archive/*cli-tiering* + docs/output-and-simplification.plan.md."""
+non-moving verbs). See work/archive/*cli-tiering* + docs/output-and-simplification.plan.md."""
 from __future__ import annotations
 
 import re

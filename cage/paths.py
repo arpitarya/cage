@@ -635,7 +635,7 @@ def materialize_sources(text: str, seed: list[dict] | None = None) -> str:
 # `[sources]` ⇒ the built-in registry byte-for-byte, so capture is unchanged for
 # everyone who doesn't use it. Explained live by `cage query sources`.
 # NB: this 'byte-for-byte fallback' wording predates Directive A — reconcile when
-# CMD-SYNC lands (docs/archive/v0.39-claude-md-sources-authority.proposal.md).
+# CMD-SYNC lands (work/archive/v0.39-claude-md-sources-authority.proposal.md).
 
 class LogSource(NamedTuple):
     """One candidate log location, tagged with where it came from. ``provenance`` is

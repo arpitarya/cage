@@ -2,7 +2,7 @@
 
 Worked, copy-from examples of cage's surfaces. Each file is a **contract**: the
 shape a user or agent can rely on. When a surface changes, update the matching file
-in the same change (docs-in-sync law; row in [../DOC-REGISTRY.md](../DOC-REGISTRY.md)).
+in the same change (docs-in-sync law; row in [../DOC-REGISTRY.md](../../work/DOC-REGISTRY.md)).
 
 Written in short points, not walls of prose (the doc-style rule in CLAUDE.md).
 

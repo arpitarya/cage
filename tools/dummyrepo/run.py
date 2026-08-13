@@ -1,5 +1,5 @@
 """Dummy sibling-repo scenario runner — the automatable half of
-`docs/archive/v0.16-dummy-repo-test.plan.md` (handoff §9), build-time only.
+`work/archive/v0.16-dummy-repo-test.plan.md` (handoff §9), build-time only.
 
 Scaffolds a disposable repo *beside* the cage checkout, sandboxes every agent
 home (env overrides — nothing touches the real machine), plants the sanitized
@@ -1044,7 +1044,7 @@ for ln in p.read_text(encoding="utf-8").splitlines(keepends=True):
     if skip or s.startswith("import_before_export"):
         continue
     out.append(ln)
-# [budgets] is opt-in/commented-out in the bundle now (BUD-V, docs/archive/
+# [budgets] is opt-in/commented-out in the bundle now (BUD-V, work/archive/
 # v0.36-suite-green.handoff.md) and can't demonstrate a customized hand edit — this
 # mirrors tests/test_policysync.py's re-point to `[quality] signal`, a bundle-shipped,
 # active, scalar-keyed table that survives the v0.16 strip.

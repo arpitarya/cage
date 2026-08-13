@@ -130,7 +130,7 @@ def make_call(*, route: str, provider: str, model: str, tokens_in: int = 0,
     - `billed_with` — the id of the row that carries **this row's billing**, when the
       provider computed ONE billed figure over a GROUP of calls (REV-CREDITS defect 2,
       closed 2026-08-11; verdict *one basis per shutdown* in
-      `docs/compare/copilot-pricing-basis.compare.md`). A copilot-CLI `session.shutdown`
+      `work/compare/copilot-pricing-basis.compare.md`). A copilot-CLI `session.shutdown`
       reports `totalPremiumRequests` over **every** model in that shutdown, so stamping
       the delta on one row while its siblings fell through to tokens×table priced the
       same spend twice — once billed, once at list rates.

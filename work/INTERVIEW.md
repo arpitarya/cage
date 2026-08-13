@@ -23,11 +23,26 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
 
 ---
 
-## State of play (2026-08-12 late — pick up here on a model switch)
+## State of play (2026-08-13 — pick up here on a model switch)
+
+- **`docs/` vs `work/` split moved further: doc-registry, research, regression,
+  dogfood, compare, cage-lab, and archive now live under root `work/`, not `docs/`.**
+  Arpit's instruction (Cowork session), continuing the 2026-08-12 WORK-DIR move.
+  `docs/` now holds only: `PLAN.md`, `CLI.md`, `FORMULAS.md`, `GLOSSARY.md`,
+  `README.md`, the three `*-capture.md` one-pagers, `doc-size-discipline.md`,
+  `shim-contract.md`, `restricted-environments.md`, `adr/`, `architecture-flow.mermaid`,
+  `assets/`, `example/`. **New handoff/prompt pairs are now specced directly into
+  `work/` root**, not `docs/` root — CLAUDE.md's *Handoff/prompt docs have a
+  lifecycle* rule was rewritten for this; see the Standing constraints bullet below.
+  Every LIVE cross-reference (in both directions) was swept and `test_doc_links.py`
+  re-verified green by direct import (no `pytest` in this sandbox — no network to
+  install it). Full account: `work/WORKLOG.md`'s 2026-08-13 WORK-DIR-CONT entry.
+
+## State of play (2026-08-12 late — historical)
 
 - **THE QUEUE IS EMPTY BECAUSE ARPIT CLOSED IT, NOT BECAUSE IT WAS WORKED.** On
   2026-08-12 he instructed that all open items and all parked proposals be archived
-  wholesale. Sixteen docs moved to `docs/archive/v0.49-*`, **none of them built**;
+  wholesale. Sixteen docs moved to `work/archive/v0.49-*`, **none of them built**;
   `docs/open/` and `docs/proposals/` no longer exist. `OPEN-WORK.md` now records what was
   closed and what each closure left unresolved. **Do not read the empty queue as
   progress** — read the closure table.
@@ -36,7 +51,7 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
   and re-execs forever — a reproduced 120-second hang, pre-existing in every released
   version, closed **unfixed**. A hang is the worst failure shape a fail-open path can
   have. If you touch the twins, read
-  [archive/v0.49-shim-tool-deps.item.md](../docs/archive/v0.49-shim-tool-deps.item.md) first.
+  [archive/v0.49-shim-tool-deps.item.md](../work/archive/v0.49-shim-tool-deps.item.md) first.
 - **`CONSTRAINTS.md` was archived, and its rules were NOT migrated into CLAUDE.md.** It
   was never open work; it moved because its directory was emptied. Most of it is enforced
   mechanically and survives (`tests/test_floor.py`, `agents.SURFACES`, `wiringscan`,
@@ -127,12 +142,12 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
 ## State of play (2026-08-11 — the agent-lane sweep, historical)
 
 - **The agent-lane sweep is CLOSED — all six phases, 1542/0 ⇒ 1616/0, zero goldens
-  re-blessed.** Pair archived to `docs/archive/v0.49-agent-lane-sweep.{handoff,prompt}.md`.
+  re-blessed.** Pair archived to `work/archive/v0.49-agent-lane-sweep.{handoff,prompt}.md`.
   In tree as **v0.49, unreleased**; `__version__` is still `0.48.0` and the CHANGELOG
   entry is not written — that is the next step, and it needs Arpit's go (the GitHub
   release IS the PyPI trigger).
 - **One thing is waiting on you and nothing else is:** **COMMITS-WINDOW**
-  ([compare](../docs/compare/commits-view-cost-bound.compare.md)). `cage insights commits` runs
+  ([compare](../work/compare/commits-view-cost-bound.compare.md)). `cage insights commits` runs
   one `git show` per commit in the *whole* history to print 20 rows (measured 6.4s /
   123 commits). The obvious fix — a default `--since` — is wrong, and that is the whole
   doc: a **relative** default puts a wall clock in the default path, so the same ledger
@@ -167,8 +182,8 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
   in tree* for a full day after it shipped, and so did `OPEN-WORK.md`'s header and the
   agent-lane-sweep handoff's entire P0 STOP gate. **Never restate a release claim from
   prose here** — `git ls-remote --tags origin`, `gh release view`, PyPI.
-- **The agent-lane sweep is under way** ([handoff](../docs/archive/v0.49-agent-lane-sweep.handoff.md) ·
-  [prompt](../docs/archive/v0.49-agent-lane-sweep.prompt.md), 29%). **P0 needed no work** (above); **P1
+- **The agent-lane sweep is under way** ([handoff](../work/archive/v0.49-agent-lane-sweep.handoff.md) ·
+  [prompt](../work/archive/v0.49-agent-lane-sweep.prompt.md), 29%). **P0 needed no work** (above); **P1
   CIGF-HERMETIC is closed** — `tools/cigraphify` now seeds `project/.cage` so
   `find_project_root` short-circuits inside the sandbox, and the `present` leg ran
   **7/7 on a developer machine for the first time** with the real `~/.cage`/`~/bin`
@@ -216,9 +231,9 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
 - **CHATS-AUTHOR: BUILT 2026-08-03** (v0.46.0, unreleased — see *In flight* below).
   The `agent%` authorship column on `cage insights chats`, joining the v2 provenance
   counts by `(agent, session)`. Pair + proposal archived:
-  [handoff](../docs/archive/v0.46-chats-author.handoff.md) ·
-  [prompt](../docs/archive/v0.46-chats-author.prompt.md) ·
-  [proposal](../docs/archive/v0.46-chats-author.proposal.md); living spec is FORMULAS
+  [handoff](../work/archive/v0.46-chats-author.handoff.md) ·
+  [prompt](../work/archive/v0.46-chats-author.prompt.md) ·
+  [proposal](../work/archive/v0.46-chats-author.proposal.md); living spec is FORMULAS
   §2.13/§2.14. **Its Phase-0 REV-TS gate did its job** — it STOPped an earlier session
   cold with no work done, REV-TS was then built and shipped, and the re-run verified the
   gate independently rather than trusting the prompt's own status line. That sequencing
@@ -230,8 +245,8 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
   savings now file from copilot **VS Code** and kiro **CLI** as well as claude and
   copilot-CLI; `cage import --rescan-graphify` backfills sessions the cursor already ate;
   kiro **IDE** is a named gap in doctor + `cage query graphify-coverage`. Pair archived
-  (`docs/archive/v0.47-*`), evidence in
-  [research/2026-08-07-graphify-store-evidence.md](../docs/research/2026-08-07-graphify-store-evidence.md),
+  (`work/archive/v0.47-*`), evidence in
+  [research/2026-08-07-graphify-store-evidence.md](../work/research/2026-08-07-graphify-store-evidence.md),
   carve-out in [ADR 0009](../docs/adr/0009-kiro-cli-tool-run-bodies-read-transiently-never-persisted.md).
 - **The one thing to internalise about it: the blocking P0 gate paid for itself on the
   first phase.** The pair's central premise - "F2: copilot's chatSessions carries the
@@ -291,8 +306,8 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
   bar NOT WRONG, NOT DUPLICATED). Suite last green at **817 tests**. Do not
   commit, tag, or release until Arpit says so.
 - **In flight / immediate next:** execute
-  [cage-lab-setup.prompt.md](../docs/archive/v0.36-cage-lab-setup.prompt.md) (**Opus**, both sibling
-  checkouts) — create `../cage-lab` fresh per [cage-lab-plan.md](../docs/archive/v0.36-cage-lab.plan.md)
+  [cage-lab-setup.prompt.md](../work/archive/v0.36-cage-lab-setup.prompt.md) (**Opus**, both sibling
+  checkouts) — create `../cage-lab` fresh per [cage-lab-plan.md](../work/archive/v0.36-cage-lab.plan.md)
   v3 + [PLAN.md](../docs/PLAN.md) §11: the M/G correctness matrix, three-way auto-verify,
   the **eyeball surface** (source + ledger + derivation with line refs, side by
   side — Arpit verifies manually), his playground, then publish the baseline into
@@ -484,7 +499,7 @@ you touch any savings number.**
 - Kiro's **IDE** rows now go to the machine ledger; its **CLI** credits are scoped to the
   project tree. Two stores, two *opposite* fixes — getting them backwards destroys real
   attribution. [ADR 0006](../docs/adr/0006-kiro-rows-are-machine-facts-not-project-facts.md) ·
-  [archived pair](../docs/archive/v0.36-kiro-routing.handoff.md).
+  [archived pair](../work/archive/v0.36-kiro-routing.handoff.md).
 - **The invariant that changed:** `importcmd.run`'s "one active sink per run — never a
   double-write" now has exactly ONE exception, and it is contained in `_kiro_leg`. If you
   add a second exception, re-read that function first: every per-root object is rebuilt
@@ -504,7 +519,7 @@ you touch any savings number.**
   scratch after v0.36. There is no stub, no commented-out code, nothing to revert to.
   **If you are about to "restore" any of it: don't.** Write a proposal doc first
   (OPEN-WORK **HR1**). Evidence of what existed:
-  [archived pair](../docs/archive/v0.36-human-removal.handoff.md) + CHANGELOG v0.36 *Removed*.
+  [archived pair](../work/archive/v0.36-human-removal.handoff.md) + CHANGELOG v0.36 *Removed*.
 - **The trap, recorded because it nearly landed:** cage had two unrelated "human"s.
   Provenance `origin="human"` (authorship) survives untouched. And `cage human outcome`
   / `cage human quality` were **not** the human axis at all — they sat in that command
@@ -519,7 +534,7 @@ you touch any savings number.**
 **Update 2026-08-01 — Phase I is COMPLETE; the queue moved.**
 
 - **Phase D (manual VS Code / IDE cells) ran** on 2026-08-01 and is written up, published
-  and hashed in `docs/regression/` (leg-D run report · 4 findings · a final phase
+  and hashed in `work/regression/` (leg-D run report · 4 findings · a final phase
   benchmark superseding 07-29). **Phase I is closed**: scripted legs + manual leg.
 - **The result that matters:** same workspace, same six questions, same graphify install —
   **claude invoked graphify unprompted (18,456 tokens saved, captured via the *transcript*
@@ -552,11 +567,11 @@ you touch any savings number.**
 
 **Pre-2026-08-01 (still true unless superseded above):**
 
-- **Next step:** execute [cage-lab-setup.prompt.md](../docs/archive/v0.36-cage-lab-setup.prompt.md)
+- **Next step:** execute [cage-lab-setup.prompt.md](../work/archive/v0.36-cage-lab-setup.prompt.md)
   (**Opus**, both sibling checkouts) — it is the only unbuilt pair in `docs/`
   root, and its prerequisites are all built and green.
 - Everything else specced today is **implemented** and archived under
-  `docs/archive/v0.36-*` (archive-on-implement is now the rule).
+  `work/archive/v0.36-*` (archive-on-implement is now the rule).
 - **Prices split shipped (2026-07-28):** model prices now live in `.cage/prices.toml`
   (vendor rate card), apart from `cage.toml` (your decisions incl. `[alias]`) — the
   rule is *vendor facts move, routing decisions stay*. Money verified **byte-identical**
@@ -584,6 +599,10 @@ you touch any savings number.**
   (cage-lab L5 is the gate).
 - **Every session updates WORKLOG + IMPLEMENTATION, and this file when direction
   moves** — including Cowork/chat sessions where no code moved.
+- **New handoff/prompt pairs are created in `work/` root, not `docs/` root**
+  (2026-08-13, Arpit) — archived to `work/archive/vX.Y-<feature>.{handoff,prompt}.md`
+  on implement, same as before. `docs/` root now carries no loose pairs by
+  convention, same as `work/` did under the old rule.
 - **Every prompt doc states its `**Progress:**` percentage** (2026-08-02, Arpit) —
   phases of *that* program built over its total, directly under `**Model:**`, counted
   against evidence rather than the doc's own ticks. He wants to see how far along a
@@ -847,7 +866,7 @@ you touch any savings number.**
 - Claude (Opus 5) — 2026-08-01 — built `[sources] path_globs` (K1). Lesson for the next
   model: **before inventing a mechanism, check whether this repo already ruled on the
   case.** Two spec sections here contradicted each other — flip the finding's Status vs.
-  never touch `docs/regression/**` — and the file was sha256-sealed, so both readings
+  never touch `work/regression/**` — and the file was sha256-sealed, so both readings
   looked defensible. The answer was already written down: DOC-REGISTRY records a banner
   above a `HASH-COVERS-BELOW` marker keeping a digest valid. Applying the precedent
   satisfied both rules exactly; my first instinct (record it elsewhere and escalate) would

@@ -245,7 +245,7 @@ def test_the_reference_declares_how_it_is_maintained(doc):
 
 
 def test_the_reference_is_registered_as_maintained():
-    reg = (REPO / "docs" / "DOC-REGISTRY.md").read_text(encoding="utf-8")
+    reg = (REPO / "work" / "DOC-REGISTRY.md").read_text(encoding="utf-8")
     assert "CLI.md" in reg, "docs/CLI.md is a maintained doc and needs a DOC-REGISTRY row"
     readme = (REPO / "README.md").read_text(encoding="utf-8")
     assert "docs/CLI.md" in readme, "the README must link the CLI reference"

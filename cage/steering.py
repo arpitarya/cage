@@ -481,7 +481,7 @@ attaches `cage.pyz` + `SHA256SUMS`.
 - `[meta] policy_version` is deliberately **not** coupled to the release: it is a
   content counter driving the `cage policy sync` recommendation. Bumping it per release
   would tell every project its defaults are stale when nothing changed.
-- Archive any implemented `docs/*.{handoff,prompt}.md` pair into `docs/archive/` and
+- Archive any implemented `work/*.{handoff,prompt}.md` pair into `work/archive/` and
   link it from the changelog entry.
 """,
 )
@@ -524,7 +524,7 @@ recorded as a **declared deviation** from the black-box rule.
 
 ## After every run, publish
 
-Drop the dated report plus a prioritized `*-fixes.md` into `docs/regression/` in the
+Drop the dated report plus a prioritized `*-fixes.md` into `work/regression/` in the
 cage repo and add the row to its README index — that directory is append-only: publish
 new findings, edit nothing existing.
 

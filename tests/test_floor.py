@@ -1,7 +1,7 @@
 """L0 — the floor: cage works with **no hooks, no MCP, no steering**, on all three agents.
 
 The binding rule of the agent-surface ladder
-([docs/archive/v0.41-agent-surface-layers.proposal.md](../docs/archive/v0.41-agent-surface-layers.proposal.md)):
+([work/archive/v0.41-agent-surface-layers.proposal.md](../work/archive/v0.41-agent-surface-layers.proposal.md)):
 *L0 must work perfectly, alone, forever.* Every layer above it (L1 hooks+steering,
 L2 MCP, L3 skills) is opt-in and degrades cleanly to absent — **if adding or removing
 a layer changes a number, the layer is wrong.**

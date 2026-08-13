@@ -128,7 +128,7 @@ def test_verdict_insufficient_data_reaches_the_agent_verbatim(mcp):
 
 def test_verdict_saving_gross_reaches_the_agent_verbatim(mcp):
     """Savings computable, cost-of-use not ⇒ `SAVING (GROSS)`, never a bare SAVING.
-    The qualifier is the whole finding (docs/regression/2026-08-01-finding-saved-is-gross.md);
+    The qualifier is the whole finding (work/regression/2026-08-01-finding-saved-is-gross.md);
     an MCP wrapper that dropped it would re-tell the lie the CLI was fixed to stop."""
     _seed_gross_only(mcp)
     d = verdict.compose(mcp, policy.load(None), "graphify")

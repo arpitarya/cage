@@ -148,7 +148,7 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   ledger is GROSS**: `raw_alternative − actual` is the *avoided read cost* and excludes
   the cost of **using** the tool (the invoking turn, a hook's injected context), so a big
   `saved` and a session that cost more are both true
-  ([finding](docs/regression/2026-08-01-finding-saved-is-gross.md)). Two rules follow.
+  ([finding](work/regression/2026-08-01-finding-saved-is-gross.md)). Two rules follow.
   (a) The word `gross` appears on every surface that prints the number — report/attrib/
   roi/overview/ceiling, text **and** CSV (`gross_saved_*`) — from ONE phrasing,
   `netsaved.GROSS_NOTE`; never re-word it per view. (b) `netsaved.by_tool` nets it at
@@ -318,7 +318,7 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   offset, and the compare is a string compare. **Seconds, not milliseconds:** `%cI`
   has no sub-second, so finer precision would push an edit made inside the commit's
   own second out of it and break the inclusive bound
-  ([finding](docs/regression/2026-08-02-finding-commit-window-timestamp-skew.md)).
+  ([finding](work/regression/2026-08-02-finding-commit-window-timestamp-skew.md)).
   **FOUR line buckets, never three, and none is redistributed:** `agent` (matched a
   proposal — read from the row, *never* re-matched at render time) · `human~` (in a
   file that session *did* propose, matching nothing — a real human tweak, `estimated`
@@ -326,7 +326,7 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   vendored tree, or generated output — cage does not guess) · `unknown` (sub-gate or
   binary). The fourth bucket exists **because it was measured**: a single `human`
   bucket printed 76.6% on cage's own repo, 89% of it one commit of generated JSON
-  ([dogfood](docs/regression/2026-08-02-p1-authorship-dogfood.md)) — a residual
+  ([dogfood](work/regression/2026-08-02-p1-authorship-dogfood.md)) — a residual
   presented as a finding is the v1 mistake in new clothes. **Coverage is per-agent and
   stated** (`authorcapture.COVERAGE_GAPS`): claude only; copilot and kiro persist no
   edit payload and render `—` with the reason, never `0%`. The call→commit join reuses
@@ -391,7 +391,7 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   its `tools/docgen` generator were removed in the hookless rebuild; the goldens
   remain the contract.)
 - **OTel GenAI export** ([otelout.py](cage/otelout.py), plan/handoff
-  `docs/archive/v0.39-otel-export.handoff.md`) — `cage data export --otel`, a third
+  `work/archive/v0.39-otel-export.handoff.md`) — `cage data export --otel`, a third
   one-way REPORTING format beside `--csv`/`--study` (never an import source; the
   fleet bundle stays jsonl). Calls map to `gen_ai.system` / `gen_ai.request.model` /
   `gen_ai.usage.input_tokens` / `output_tokens` / `gen_ai.client.operation.duration`
@@ -487,7 +487,7 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   (policy `[capture] import_stale_hours` wins).
 - **View export + the run stamp** ([viewexport.py](cage/viewexport.py),
   [runstamp.py](cage/runstamp.py), compare doc
-  [view-export-and-run-stamp](docs/compare/view-export-and-run-stamp.compare.md);
+  [view-export-and-run-stamp](work/compare/view-export-and-run-stamp.compare.md);
   `cage query view-export`) — `--export` on `cage report` and **every** `cage insights`
   leaf (17 views) writes the rendered view to disk: bare ⇒
   `<ledger>/.cage/output/<view>-<stamp>/` holding **every format that view has** (text ·
@@ -514,7 +514,7 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   would publish every exported report on the loopback port. **No cleanup class prunes
   it** — cage never deletes an artifact it wrote (OUTPUT-GROWTH carried the
   volume-gated reopen and was closed unactioned 2026-08-12, no size number ever
-  measured: [archive/v0.49-output-growth.item.md](docs/archive/v0.49-output-growth.item.md)). Bare `cage` (the overview) has **no** `--export`: a
+  measured: [archive/v0.49-output-growth.item.md](work/archive/v0.49-output-growth.item.md)). Bare `cage` (the overview) has **no** `--export`: a
   root-level optional-value flag would swallow the following subcommand. Adding a view =
   `_export_flags(<parser>, "<verb path>")`; the fan-out is gated by
   `test_every_report_and_insight_is_exportable` — **wire it in, never relax the set.**
@@ -561,7 +561,7 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   setup`, the skill/steering data) must keep all three first-class, and new
   surface work fans out to all three. This is a product invariant, not a
   default — Codex was removed completely in v0.33.0 (a product/scope decision,
-  not a capture-quality one — see docs/archive/*-codex-removal.handoff.md).
+  not a capture-quality one — see work/archive/*-codex-removal.handoff.md).
 - **A renamed or removed verb is a wiring migration, not just a CLI change.**
   Renaming/removing a top-level verb must add an entry to `verbmap.REMOVED`
   ([verbmap.py](cage/verbmap.py)) so the old spelling prints a direction instead of
@@ -675,7 +675,7 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   today they're unreachable only because they sit under `ledger/`; a per-tool class must
   never be added, since a savings row is unrecoverable (tested at `days=0`).
 - **Compare on a fork; propose an idea — before the plan.** When a decision has
-  multiple viable options, write a *compare doc* in [docs/compare/](docs/compare/)
+  multiple viable options, write a *compare doc* in [work/compare/](work/compare/)
   **first** — debate, matrix, grounded references, a proposed verdict Arpit accepts
   or overrides, and a reopen-trigger — before committing to a plan. This is a
   standing rule. **`docs/proposals/` no longer exists** — on 2026-08-12 Arpit closed
@@ -683,20 +683,20 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   but not being built now gets **one line in [work/OPEN-WORK.md](work/OPEN-WORK.md)**
   with its trigger, not a file of its own (this still keeps a `# v2:` idea out of the
   code). If a parked-idea home is ever re-established, the four-rule format contract to
-  copy is in [archive/v0.49-proposals-readme.md](docs/archive/v0.49-proposals-readme.md).
+  copy is in [archive/v0.49-proposals-readme.md](work/archive/v0.49-proposals-readme.md).
   A settled fork graduates to a plan entry and, on ship, an ADR; the compare doc stays
   as the evidence behind it.
-- **Research gets its own doc, always — in [docs/research/](docs/research/).**
+- **Research gets its own doc, always — in [work/research/](work/research/).**
   Whenever a session does research — an external-source investigation, a store/format
   probe, a competitive or ecosystem survey, anything whose output is *findings rather
   than a decision* — the findings are written up as a separate dated research doc in
-  `docs/research/` in that same session, never left as chat-only knowledge or inlined
+  `work/research/` in that same session, never left as chat-only knowledge or inlined
   into a proposal. Research docs are **evidence, not spec**: proposals, compare docs,
   plan entries, and IMPLEMENTATION.md entries *link* to them as their grounding
   (the same role `regression/` plays for measured evidence — research/ is the
   sourced-findings twin). Cite sources (URLs, code paths, versions probed) so a
   future agent can re-verify. First occupant:
-  [research/copilot-vscode-token-sources.md](docs/research/copilot-vscode-token-sources.md).
+  [research/copilot-vscode-token-sources.md](work/research/copilot-vscode-token-sources.md).
 - **Deleting a doc is a citation migration, not just a file removal** — the prose
   twin of the removed-verb rule. Source comments cite docs by path (`docs/x.md`), and
   a deleted doc leaves those pointers dangling **silently**: nothing fails, and a
@@ -710,35 +710,35 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   `grep -rho "docs/[a-z0-9-]*\.md" cage/*.py | sort -u` and test each target exists.
 - **A proposal has a lifecycle too — and as of 2026-08-12 there is nowhere to park
   one.** `docs/proposals/` was emptied and archived when Arpit closed the whole queue;
-  the five parked ideas are `docs/archive/v0.49-*.proposal.md`, each headed *closed by
+  the five parked ideas are `work/archive/v0.49-*.proposal.md`, each headed *closed by
   decision, never built*. **This rule is retained because the archive lifecycle still
   binds**: where an archived proposal disagrees with the living spec, **the spec wins** —
   implementation routinely corrects the proposal that motivated it, and that correction
   is the valuable part (see
-  [v0.38-windows-graphify-interceptor.proposal.md](docs/archive/v0.38-windows-graphify-interceptor.proposal.md),
+  [v0.38-windows-graphify-interceptor.proposal.md](work/archive/v0.38-windows-graphify-interceptor.proposal.md),
   wrong on both the packaging source and the recursion guard). Should the directory be
   re-established, the full four-state lifecycle (proposed → picked up → implemented →
   archived) and the archive-on-implement checklist are preserved verbatim in
-  [archive/v0.49-proposals-readme.md](docs/archive/v0.49-proposals-readme.md).
-- **Handoff/prompt docs have a lifecycle — active in `docs/`, archived once
-  IMPLEMENTED.** New feature work is specced as a pair: `docs/<feature>.handoff.md`
-  + `docs/<feature>.prompt.md`. While the work is unbuilt they live in `docs/` root
+  [archive/v0.49-proposals-readme.md](work/archive/v0.49-proposals-readme.md).
+- **Handoff/prompt docs have a lifecycle — active in `work/`, archived once
+  IMPLEMENTED.** New feature work is specced as a pair: `work/<feature>.handoff.md`
+  + `work/<feature>.prompt.md`. While the work is unbuilt they live in `work/` root
   and are listed under *Active work* in `docs/README.md`. **The change that
   completes the work (suite green — NOT necessarily a release; cage often builds
   several features before committing/tagging) must, in that same change: (1) move
-  the pair to `docs/archive/vX.Y-<feature>.{handoff,prompt}.md` naming the version
+  the pair to `work/archive/vX.Y-<feature>.{handoff,prompt}.md` naming the version
   the work rides, (2) prepend the one-line archive header — say "implemented for
   vX.Y (unreleased)" when the release is still pending, (3) link them from that
   version's CHANGELOG entry ("Built from: …"), (4) update the `docs/README.md` and
-  `docs/archive/README.md` indexes, and (5) promote any still-true design content
+  `work/archive/README.md` indexes, and (5) promote any still-true design content
   into the living design doc or plan section — the archive is history and must
   never be cited as current spec.** An implemented feature whose handoff/prompt
-  still sits in `docs/` root is a bug, same class as a missing changelog entry:
-  `docs/` root must read as *work not yet done*, so the next agent can trust it as
+  still sits in `work/` root is a bug, same class as a missing changelog entry:
+  `work/` root must read as *work not yet done*, so the next agent can trust it as
   the live queue. Archive-on-implement (not on release) is deliberate — it keeps
   that queue honest across the long uncommitted stretches this repo works in.
 - **Every prompt doc declares the model tier that should execute it.** A
-  `docs/*.prompt.md` starts with a `**Model:**` line naming the tier and the
+  `work/*.prompt.md` starts with a `**Model:**` line naming the tier and the
   one-line reason. Work in this repo spans mechanical git hygiene to
   multi-hypothesis diagnosis across a fail-open capture path, and running the
   wrong tier fails in both directions — an over-powered model on a scripted
@@ -759,7 +759,7 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   *additive, fully-specced* one, choose Sonnet. State the tier when handing a
   prompt to a human, too — not just in the file.
 - **Every prompt doc also declares how much of the work is already done.**
-  Directly under the `**Model:**` line, a `docs/*.prompt.md` carries a
+  Directly under the `**Model:**` line, a `work/*.prompt.md` carries a
   `**Progress:**` line — the phases of that feature or program already built, over
   its total, as a percentage, with the phases named:
   `**Progress:** 75% — P0·P1·P2 built (2026-08-02), P3 remaining.`
@@ -770,7 +770,7 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
     (which has no fixed total, so the ratio drifts every time work is discovered)
     and never an effort guess. It must be *countable*, so a reader can check it.
   - **Count against evidence, not against ticks** — the phase index,
-    [IMPLEMENTATION.md](work/IMPLEMENTATION.md), `docs/archive/` and the code decide
+    [IMPLEMENTATION.md](work/IMPLEMENTATION.md), `work/archive/` and the code decide
     what is built. A ✅ in the prompt itself is an assertion, not proof; this is the
     same trap the OPEN-WORK rule names, and it bites hardest here because a prompt
     is read by an agent that will act on the number.
@@ -789,18 +789,18 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
 the change touched code; a decision, a scope change, or a plan is documentation
 too. A task is not done until the docs are true. When a doc goes stale, fix it on
 contact, not later. The maintained set, each with a standing owner-trigger (the
-freshness tracker is [docs/DOC-REGISTRY.md](docs/DOC-REGISTRY.md) — a change that
+freshness tracker is [work/DOC-REGISTRY.md](work/DOC-REGISTRY.md) — a change that
 fires a trigger updates the doc *and* bumps its row):
 
 - **[work/OPEN-WORK.md](work/OPEN-WORK.md)** — the **single index of pending work**, and
   the only place unfinished work is tracked. **One line per item, one screen.**
   `docs/open/` held that detail one-file-per-item from 2026-08-11 until 2026-08-12,
   when Arpit closed the whole queue and the directory was archived — so **an item is now
-  one line here**, with detail inline or in a handoff/prompt pair in `docs/` root.
+  one line here**, with detail inline or in a handoff/prompt pair in `work/` root.
   The standing constraints that lived beside it did **not** lapse with the directory:
-  [archive/v0.49-open-queue-constraints.md](docs/archive/v0.49-open-queue-constraints.md)
+  [archive/v0.49-open-queue-constraints.md](work/archive/v0.49-open-queue-constraints.md)
   names which are enforced mechanically and which are now carried by prose alone.
-  `docs/` root carries no loose handoff/prompt pairs; a pair is created only when a
+  `work/` root carries no loose handoff/prompt pairs; a pair is created only when a
   phase there is picked up, and archived on implement.
   **The header's checkable claims are test-gated** ([tests/test_queue_honesty.py](tests/test_queue_honesty.py)):
   a version, tag, or clean-and-pushed assertion that contradicts git fails the suite. It
@@ -826,14 +826,14 @@ fires a trigger updates the doc *and* bumps its row):
   as *what is still to do*, so a reader can trust its length. Removal is only legal once
   the work is recorded elsewhere: **before deleting an item, append its outcome to
   [IMPLEMENTATION.md](work/IMPLEMENTATION.md)** (what was built · files · tests · next
-  step) **and, if it produced evidence, publish it to [regression/](docs/regression/)**.
+  step) **and, if it produced evidence, publish it to [regression/](work/regression/)**.
   Carry forward anything still live — a residual limit, an open decision, a follow-up —
   as its own item rather than losing it with the parent. A ticked-but-present item and a
   deleted-but-unrecorded one are the same bug in opposite directions: the first inflates
   the queue, the second loses the history.
   **Never trust its own status markers as ground truth when reconciling** — a ✅ in a
-  plan file is an assertion, not evidence. Verify against `docs/regression/`,
-  `docs/archive/`, `IMPLEMENTATION.md`, and the code before declaring an item
+  plan file is an assertion, not evidence. Verify against `work/regression/`,
+  `work/archive/`, `IMPLEMENTATION.md`, and the code before declaring an item
   pending or done. On 2026-08-01 this file listed two already-built items as
   pending precisely because its markers had gone stale.
 - **[work/IMPLEMENTATION.md](work/IMPLEMENTATION.md)** — the build log. Append at
@@ -892,7 +892,7 @@ fires a trigger updates the doc *and* bumps its row):
   vocabulary can't paper over a misfiled one.
 - **[docs/GLOSSARY.md](docs/GLOSSARY.md)** — every recurring term, defined once
   against the code that owns it.
-- **[docs/DOC-REGISTRY.md](docs/DOC-REGISTRY.md)** — the freshness tracker itself; a
+- **[work/DOC-REGISTRY.md](work/DOC-REGISTRY.md)** — the freshness tracker itself; a
   new maintained doc gets a new row, same change.
 - **[docs/architecture-flow.mermaid](docs/architecture-flow.mermaid)** — the
   one-way data flow as a diagram; update when a stage/sink/read-surface changes.
@@ -901,7 +901,7 @@ fires a trigger updates the doc *and* bumps its row):
   *Decision records* below.
 - **[docs/example/](docs/example/)** — copy-from contracts (cli · debug · setup ·
   toml-config), one per file; update the matching one when that surface changes.
-- **[docs/research/](docs/research/)** — dated research docs, one per investigation
+- **[work/research/](work/research/)** — dated research docs, one per investigation
   (see the *Research gets its own doc* rule in Must-Know Rules): sourced findings
   that proposals/plan/IMPLEMENTATION link to as evidence, never spec.
 
@@ -936,7 +936,7 @@ every authored doc. Full spec, worked examples and the fix procedure:
 **On 2026-09-01 this rule must be explicitly retained, amended, or removed — it
 lapses if unreviewed**, so it cannot become permanent by neglect. Review criteria and
 the retain/remove call live in the spec doc. Tracked in
-[docs/DOC-REGISTRY.md](docs/DOC-REGISTRY.md).
+[work/DOC-REGISTRY.md](work/DOC-REGISTRY.md).
 
 **Every prompt/handoff also names the model tier** that should execute it, and
 **every prompt doc carries a `Progress:` percentage** of that program's phases — see
@@ -1005,7 +1005,7 @@ imports it; the in-tree suite can't see packaging, entry points, or bundled data
 Its numbers are validated against a hand-derived reference, and its labs slice the
 **real** `~/.cage` ledger per agent to surface capture gaps.
 
-**Rebuild manual: [docs/cage-lab/](docs/cage-lab/README.md)** — cage-lab is disposable;
+**Rebuild manual: [work/cage-lab/](work/cage-lab/README.md)** — cage-lab is disposable;
 that directory is what recreates it from nothing (setup · run · verify · publish ·
 manual cells).
 
@@ -1023,30 +1023,30 @@ extension subprocesses, which inherit VS Code's launch environment — those sta
 per-machine-verified.
 
 **Standing rule: after every cage-lab testing/capture run, publish the findings into
-[`docs/regression/`](docs/regression/) here, dated** — so they live with cage, are
+[`work/regression/`](work/regression/) here, dated** — so they live with cage, are
 diffable release-to-release, and any agent working on cage can read them without the
 test repo checked out. The runner does it automatically:
 
 ```bash
-CAGE_REAL_LEDGER=~/.cage python ../cage-lab/labs/run_all.py   # writes docs/regression/<date>-{capture-report.md,.json,fixes.md} + latest-*
+CAGE_REAL_LEDGER=~/.cage python ../cage-lab/labs/run_all.py   # writes work/regression/<date>-{capture-report.md,.json,fixes.md} + latest-*
 ```
 
 When you (an agent) run cage-lab by hand, still drop the dated report + a prioritized
-`*-fixes.md` into `docs/regression/` and add the row to its README index. The latest
+`*-fixes.md` into `work/regression/` and add the row to its README index. The latest
 findings and their fix checklist are the input for the next round of cage fixes; see
-`docs/regression/latest-capture-report.md`.
+`work/regression/latest-capture-report.md`.
 
 ## Dogfood snapshot (refresh periodically)
 
-`docs/dogfood/` publishes cage's own real `~/.cage` ledger numbers so the README
+`work/dogfood/` publishes cage's own real `~/.cage` ledger numbers so the README
 never has to chase them — design of record:
-[dogfood-report.handoff.md](docs/archive/v0.44-dogfood-report.handoff.md) (archived
-on implement; the living pattern is `docs/dogfood/README.md`).
+[dogfood-report.handoff.md](work/archive/v0.44-dogfood-report.handoff.md) (archived
+on implement; the living pattern is `work/dogfood/README.md`).
 
 To refresh: on the dev machine, run the three allowlisted commands — `cage report`,
 `cage insights attrib`, `cage insights adoption` — over the same absolute window
 (all-time, no `--since`), paste the output verbatim (method tags intact) into a new
-`docs/dogfood/<YYYY-MM-DD>.md`, and copy it over `latest.md`. **Never**
+`work/dogfood/<YYYY-MM-DD>.md`, and copy it over `latest.md`. **Never**
 `cage insights chats` or `cage report --project` in a snapshot — chat titles and
 working-dir basenames leak private project names, and this repo is public.
 **Never author a number** — if a command has nothing real to show (an empty task
@@ -1143,7 +1143,7 @@ each agent only needs thin idiomatic wiring (`agents.py` orchestrates):
   (`--scope` / `--team` filters, `ledger-sync` into refs/notes/cage-ledger via the
   shared `mergeutil.union_by_id` core, plan §3.6).
 - **The agent surface is a four-layer ladder, and L0 is the floor**
-  ([archive/v0.41-agent-surface-layers.proposal.md](docs/archive/v0.41-agent-surface-layers.proposal.md);
+  ([archive/v0.41-agent-surface-layers.proposal.md](work/archive/v0.41-agent-surface-layers.proposal.md);
   `cage query agent-layers`). **L0 hookless** (pull capture + interceptor + every CLI
   view — *this is cage*, never optional) → **L1 hooks+steering** (`cage setup --hooks`) →
   **L2 MCP** → **L3 skills** (`--skills`). Everything above L0 is **opt-in and two-way**:
