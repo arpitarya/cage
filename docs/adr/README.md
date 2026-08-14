@@ -1,10 +1,10 @@
 ---
-doc: the ADR set — four maintained per-agent records
+doc: the ADR set — seven maintained records, and the rule that keeps them true
 status: current as of 2026-08-14 · replaces the numeric ADRs 0001–0011
-update-rule: ANY capture, routing, or unit change for an agent updates that agent's ADR in the same change, and bumps its DOC-REGISTRY row
+update-rule: NO behaviour change lands without its owning ADR updated in the same change (see "The standing rule"). A change touching no recorded decision says "no ADR affected" out loud
 ---
 
-# ADRs — one record per metered agent
+# ADRs — the durable *why*, and the rule that keeps it true
 
 **One record per thing cage meters, plus one for what binds them all and one for the surface it is all read through.**
 
@@ -21,6 +21,50 @@ update-rule: ANY capture, routing, or unit change for an agent updates that agen
 Each has **two sections**: **§1 for humans** (one screen, diagrams, no jargon) and
 **§2 for agents** (the binding detail — context, decision, consequences, alternatives,
 reference, veto). Author from [TEMPLATE.md](TEMPLATE.md).
+
+## The standing rule — no behaviour change without its record
+
+**Arpit, 2026-08-14: the ADRs are kept up to date, and a change to the code does not land
+without its ADR updated in the same change.**
+
+**The trigger, stated precisely so the rule stays meaningful.** Update the owning record
+when a change:
+
+- alters behaviour a record describes — a parser, a store, a routing decision, a schema
+  field, a unit, a rendered refusal, an interceptor behaviour, a CLI command or flag; or
+- makes, reverses or narrows a decision — including one taken *by deletion*; or
+- invalidates a **veto condition**, a stated gap, or a *deliberately not taken* item.
+
+**And say so when it does not.** A change that touches no recorded decision — a typo, a
+refactor with identical behaviour, a test-only edit — states *"no ADR affected"* in its
+commit message. That sentence is the rule working, not an exemption from it: a rule that
+demands an edit for every keystroke decays into ritual edits, and a doc nobody trusts is
+worse than no doc. This project has already watched that happen to a header seven times.
+
+**A stale record is a defect of the same class as a missing changelog entry.** It is not
+tidied up later; it is fixed on contact.
+
+## Which record owns what
+
+So *"update the ADR"* has an answer rather than a judgement call. A module may be claimed
+by exactly one record; `tests/test_adr_ownership.py` fails when a module in `cage/` is
+claimed by none, which is precisely the moment a new decision is being made without a
+record to hold it.
+
+| record | owns |
+|---|---|
+| [ADR-LAWS](0001_laws.md) | `ledger` · `schema` · `savings` · `units` · `paths` · `constants` · `errors` · `mergeutil` · `ids` |
+| [ADR-CLI](0002_cli.md) | `cli` · `clicmds` · `cliutil` · `verbmap` · `render` · `display` · `csvout` · `viewexport` · `runstamp` · `explain*` |
+| [ADR-CLAUDE](0003_claude.md) | the claude half of `transcript` · `authorcapture` · `linematch` · `commitjoin` · `commitview` · `provenance` · `origin*` · `notessync` · `verifycmd` · `claudewire` |
+| [ADR-COPILOT](0004_copilot.md) | the copilot half of `transcript` · `copilotwire` |
+| [ADR-KIRO](0005_kiro.md) | the kiro half of `transcript` · `kirowire` |
+| [ADR-CONSUMERS](0006_consumer.md) | `metering` · `usageparse` · `usagelog` · `manifest` · `machine` · `study` |
+| [ADR-GRAPHIFY](0007_graphify.md) | `graphify*` · `pathshim` · `runshim` · `adoptcmd` · `compress` · `responsecache` |
+
+**Shared and infrastructure modules are claimed explicitly, never by silence** — the
+ownership test carries the list and the reason for each. `transcript.py` is deliberately
+claimed by **three** records: it is one file holding three vendors' parsers, and pretending
+otherwise would send a copilot change to the wrong reviewer.
 
 ## Cite them by name, never by number
 

@@ -61,6 +61,14 @@ Full release notes. The README keeps a one-line summary per version; the detail 
     numeric ADRs left those laws' reasoning **only** in a tree headed *never cite as
     current spec*: for a few hours the sole current-spec statement of *counts, never
     content* was a table row with no veto attached. A law with no veto is a habit.
+  - **The standing rule, and a gate under it (Arpit, 2026-08-14):** *no behaviour change
+    lands without its ADR updated in the same change*, and a change touching no recorded
+    decision says **`no ADR affected`** out loud rather than editing something to look
+    compliant. `docs/adr/README.md` gains a **module→record ownership table** so *"which
+    ADR?"* is a lookup rather than a judgement call, and **`tests/test_adr_ownership.py`**
+    fails when a module in `cage/` is claimed by no record — the moment a new decision is
+    being made with nothing to hold it. What a test *cannot* see (was the record edited in
+    the same commit?) is stated as uncovered rather than implied.
   - **Cite by name, never by number.** `ADR 0001` meant *team ledger via `refs/notes`* for
     six weeks; the numbers now belong only to the archive.
   - **`docs/CLI.md` became [ADR-CLI](docs/adr/0002_cli.md)** — the complete command

@@ -411,6 +411,22 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
 
 ## Must-Know Rules
 
+- **No behaviour change lands without its ADR updated in the same change (Arpit,
+  2026-08-14).** The ADRs are the durable *why*, and they are kept **up to date**, not
+  reconciled later. Update the owning record when a change alters behaviour a record
+  describes (a parser, a store, a routing decision, a schema field, a unit, a rendered
+  refusal, an interceptor behaviour, a CLI command or flag), makes/reverses/narrows a
+  decision **including one taken by deletion**, or invalidates a veto condition, a stated
+  gap, or a *deliberately not taken* item. **A change that touches no recorded decision
+  says `no ADR affected` out loud** — that sentence is the rule working, not an exemption
+  from it, because a rule demanding an edit per keystroke decays into ritual edits and a
+  doc nobody trusts is worse than none. **Which record owns which module is a table, not
+  a judgement call** ([docs/adr/README.md](docs/adr/README.md) *Which record owns what*),
+  and `tests/test_adr_ownership.py` fails when a module in `cage/` is claimed by no
+  record — precisely the moment a new decision is being made with nothing to hold it.
+  **A stale ADR is a defect of the same class as a missing changelog entry.** The half no
+  test can see — *was the record edited in the same commit?* — is carried by review, and
+  the test says so rather than implying coverage it does not have.
 - **Triage before work: a human-blocked queue STOPS the session (Arpit, 2026-08-12).**
   Before doing anything, read `work/OPEN-WORK.md` and ask: *is any item agent-closable
   right now?* If everything remaining needs Arpit — his hands, a ratification, a
