@@ -21,6 +21,7 @@ cross-agent question of who wrote which lines.**
 | 0007 | [**ADR-GRAPHIFY**](0007_graphify.md) | graphify — the interceptor twins and the savings receipt |
 | 0008 | [**ADR-COVERAGE**](0008_coverage.md) | what cage can and cannot say, per agent × surface — and why an absence is never a zero |
 | 0009 | [**ADR-AUTHORSHIP**](0009_authorship.md) | who wrote which lines of a commit — the agent is measured, the human is the residual |
+| 0010 | [**ADR-INTEGRITY**](0010_integrity.md) | proving nothing that was already written has changed — a hash chain, report-only |
 
 Each has **two sections**: **§1 for humans** (one screen, diagrams, no jargon) and
 **§2 for agents** (the binding detail — context, decision, consequences, alternatives,
@@ -58,6 +59,7 @@ record to hold it.
 | record | owns |
 |---|---|
 | [ADR-LAWS](0001_laws.md) | `ledger` · `schema` · `savings` · `units` · `paths` · `constants` · `errors` · `mergeutil` · `ids` |
+| [ADR-INTEGRITY](0010_integrity.md) | `integrity` |
 | [ADR-CLI](0002_cli.md) | `cli` · `clicmds` · `cliutil` · `verbmap` · `render` · `display` · `csvout` · `viewexport` · `runstamp` · `explain*` · `chats` · `commitview` |
 | [ADR-CLAUDE](0003_claude.md) | the claude half of `transcript` · `claudewire` |
 | [ADR-COPILOT](0004_copilot.md) | the copilot half of `transcript` · `copilotwire` |

@@ -8,6 +8,51 @@ Entry format:
 
 ```
 
+## 2026-08-15 — P6 (ledger-restructure): the integrity chain
+
+- **Built:** `cage/integrity.py` (new) · `state/integrity.json` in `cleanup.NEVER` ·
+  a `cage doctor` check · a checkpoint call at the end of the import sweep ·
+  **[ADR-INTEGRITY](../docs/adr/0010_integrity.md)** (0010) with its veto condition ·
+  `tests/test_integrity.py` (18 cases).
+- **The design constraint decided the shape.** A full-file digest per append is O(n) per
+  row on a hot fail-open path, so the digest is a **chain over appended segments**
+  (`current = sha256(prev ‖ appended)`), O(delta) to advance.
+- **And the chain advances at SWEEP boundaries, not per row** — `ledger.append_row` is
+  **untouched**. The hot path keeps its exact speed and fail-open shape, and the recorded
+  segment list stays short, which matters because **verification replays it**. Verification
+  is O(n) and that is the trade the constraint actually asked for: *appends* must not be
+  O(n); a doctor run already reads the ledger. Replaying rather than comparing one stored
+  digest is what makes a change **anywhere** in the file detectable, not just at the tail.
+  **Measured on the real ledger: 14 files, ~5 ms** — ~400× under the veto's 2s threshold,
+  so that trigger is recorded as measured rather than aspirational.
+- **The lock is never load-bearing.** A miss marks the segment `unverified` and **never
+  breaks the chain** — `lockutil` proceeds unlocked by contract, and depending on it here
+  would quietly promote it to a correctness guarantee it is not built to be. Pinned by a
+  test that also proves the chain still catches a real rewrite afterwards.
+- **Two verdicts, never blended:** `altered-history` (a recorded prefix changed — never
+  legitimate under append-only) and `damaged` (truncated/unreadable, which `ledger.read`
+  tolerates **by design**; calling it tampering would turn a documented fail-open behaviour
+  into an alarm). Plus two non-findings that matter as much: `unverified`, and `expected`
+  for designed churn (`cursors.json`, the logs) — **a report its reader learns to ignore is
+  worse than no report.**
+- **A design error I made and the suite caught:** my first `cage doctor` check called
+  `checkpoint()` before reporting. That **wrote state**, breaking doctor's stated contract
+  that running it records nothing (`test_doctor_bundle::test_bundle_bytes_deterministic`) —
+  and it was wrong on the merits too: a check that advances the baseline it is about to
+  compare against can never report the same finding twice. The checkpoint moved to the
+  import path; a test now pins that doctor never writes.
+- **Report-only, always.** A finding is a WARN, never a FAIL — the `cage authorship verify`
+  precedent. Cage cannot know whether a changed prefix was a corrupt disk or a maintainer
+  who meant it, and a check that fails a build over an ambiguity is one people disable.
+- **Threat model stated, not implied:** this detects accident and drift, **not an
+  adversary** — anyone who can write the ledger can rewrite the manifest. That is veto
+  trigger 1, and it is explicitly reopened by a stated need rather than by data.
+- **ADR (ADR-DISCIPLINE):** new record **ADR-INTEGRITY (0010)**, claimed in **both**
+  `docs/adr/README.md`'s ownership table and `tests/test_adr_ownership.py`'s `OWNERS` — the
+  test failed until both were done, which is the gate working.
+- **Tests:** `just test` green — **1521 passed**, 11 skipped (+18).
+- **Next:** P7 — docs, CHANGELOG, README, version bump, archive the handoff/prompt pair.
+
 ## 2026-08-15 — P5 (ledger-restructure): the transcript→`calls` writer is retired
 
 - **Built:** the claude and copilot `_ingest` legs removed; `_PARSERS` and all four

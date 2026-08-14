@@ -324,8 +324,11 @@ def run_cli(root: Path, pol: dict, apply: bool = False,
 # a `state/` cleanup class added years from now would eat it with no test going red.
 # **Named explicitly, and it must stay named.** Both homes are covered — the legacy file
 # is still read forever.
-NEVER = ("ledger/", "imports.jsonl", "cage.toml", "prices.toml", "policy.toml",
-         "machine.json", "study.jsonl", "limits.json", "outcomes")
+# `integrity.json` (P6) is protected for the same reason `imports.jsonl` is: it lives in
+# `state/`, nothing reconstructs it, and losing it silently resets the tamper baseline —
+# which is worse than never having had one, because the next report reads clean.
+NEVER = ("ledger/", "imports.jsonl", "integrity.json", "cage.toml", "prices.toml",
+         "policy.toml", "machine.json", "study.jsonl", "limits.json", "outcomes")
                                      # both config names — the legacy
                                      # `policy.toml` survives on machines that never
                                      # re-ran setup; `prices.toml` is the split-out

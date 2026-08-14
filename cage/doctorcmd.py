@@ -788,6 +788,39 @@ def _out_of_root_fix(ps) -> str:
             + (ps.fix_tail or "interceptor graphify") + "`")
 
 
+def _integrity(root: Path) -> tuple[str, str]:
+    """The tamper-evidence chain (`cage/integrity.py`, P6).
+
+    **Report-only and never a gate** — the `cage authorship verify` precedent, which is
+    report-only and always exits 0. A finding here is a WARN, never a FAIL: cage does not
+    know whether a changed prefix was a corrupted disk or a maintainer who meant it, and
+    failing doctor over it would make the check something people disable.
+
+    Two verdicts, never blended: `altered-history` (bytes that were already recorded no
+    longer hash the same — under append-only, never legitimate) and `damaged` (truncated
+    or unreadable — which `ledger.read` already tolerates by design). Files rewritten by
+    design (`cursors.json`, the logs) are classified `expected` and never reported."""
+    from cage import integrity
+    try:
+        # **Doctor NEVER checkpoints.** This module's contract is that running it records
+        # nothing (its ledger round-trip writes to a temp dir for exactly that reason), and
+        # an earlier draft of this check called `checkpoint()` here — which wrote state and
+        # broke `test_doctor_bundle::test_bundle_bytes_deterministic`. It also would have
+        # been wrong on the merits: a check that advances the baseline it is about to
+        # compare against can never report a finding twice. The chain is advanced on the
+        # IMPORT path; doctor only reads what is recorded.
+        bad = integrity.findings(root)
+    except Exception as exc:  # noqa: BLE001 — a diagnostic never breaks doctor
+        return _OK, f"integrity check unavailable ({exc})"
+    if not bad:
+        n = len(integrity.read_manifest(root))
+        return _OK, (f"integrity: {n} file(s) chained, nothing altered" if n else
+                     "integrity: nothing chained yet — the chain advances on `cage import`")
+    lines = [f"\n      · {r['path']}: {r['verdict']} — {r['detail']}" for r in bad]
+    return _WARN, ("integrity: the append-only files disagree with their recorded "
+                   "chain:" + "".join(lines))
+
+
 def _hook_bypass(root: Path) -> tuple[str, str]:
     """An agent hook invoking graphify by absolute path (`cage/hookbypass.py`, B-fix-3).
 
@@ -1104,6 +1137,7 @@ def run(root: Path) -> dict:
         ("timeline", *_capture_timeline(active)),
         ("capture-quality", *_capture_quality(active)),
         ("trace", *_capture_trace(active)),
+        ("integrity", *_integrity(root)),
         ("interceptor", *_interceptor(root, scan)),
         # The PATH-winning pair must render directly below `interceptor`: they answer
         # the same question at a wider scope (what actually runs, vs what this root

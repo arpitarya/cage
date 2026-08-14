@@ -82,6 +82,8 @@ def test_every_check_has_a_known_level(proj):
                      "kiro-mcp",
                      "wiring", "metering", "timeline",
                      "capture-quality", "trace", "interceptor",
+                     # ADR-INTEGRITY: report-only, never a gate — a finding is a WARN
+                     "integrity",
                      # the PATH-scoped pair: what actually RUNS, and what reaches
                      # graphify without passing the interceptor at all (B-fix-1/3)
                      "path-interceptor",

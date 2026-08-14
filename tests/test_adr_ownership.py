@@ -31,6 +31,8 @@ OWNERS: dict[str, str] = {
     "ledger": "0001_laws", "schema": "0001_laws", "savings": "0001_laws",
     "units": "0001_laws", "paths": "0001_laws", "constants": "0001_laws",
     "errors": "0001_laws", "mergeutil": "0001_laws", "ids": "0001_laws",
+    # ADR-INTEGRITY — tamper-evidence over the append-only files
+    "integrity": "0010_integrity",
     # ADR-CLI — the surface and how a view reaches a terminal
     "cli": "0002_cli", "clicmds": "0002_cli", "cliutil": "0002_cli",
     "verbmap": "0002_cli", "render": "0002_cli", "display": "0002_cli",

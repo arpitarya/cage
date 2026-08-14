@@ -1508,6 +1508,14 @@ def run(root: Path, agent: str, args) -> list[str]:
         _write_manifest(root, import_id, collected, health, pol, _now_iso(), names)
         _record_health(root, cursors, health, captured, targets, pol)
         _record_capture_log(root, health, prior_rows, targets)
+        # P6: advance the tamper-evidence chain once per sweep — never per row (that
+        # would make every append O(n) on a hot fail-open path). Fail-open and last, so
+        # nothing about capture depends on it.
+        try:
+            from cage import integrity
+            integrity.checkpoint(root)
+        except Exception as e:  # noqa: BLE001 — a diagnostic never breaks an import
+            debuglog.exception(root, "integrity.checkpoint", e, pol=pol)
         cursors["_last_import"] = _now_iso()  # pull-based staleness signal for doctor/report
         _save_cursors(foot, cursors)
     # Piggybacked state maintenance (plan §3.6.4): every hook/watch/export sweep
