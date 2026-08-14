@@ -56,7 +56,10 @@ project's history — was built and green on 2026-08-14 and archived:
 half of ADR 0010**: the spend cutover is retired and `ledger.spend()` partitions by
 agent rather than by time.
 
-**`work/` root now carries no handoff/prompt pair** — nothing is in flight.
+**In flight: SURFACE-CUT** — [handoff](../work/surface-cut.handoff.md) ·
+[prompt](../work/surface-cut.prompt.md), raised 2026-08-14 after ADR 0011: delete
+`cage data *`, `cage report`, and `insights compare|estimate|calibration`. **PROPOSED,
+unbuilt** — archive the pair to `work/archive/` on implement, per the handoff lifecycle.
 
 **One thing each of the three left open is not a pair and does not live here:** a
 `CLAUDE.md` diff (ledger diagram line + a substrate bullet) is **proposed, awaiting

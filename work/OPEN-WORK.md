@@ -1,5 +1,12 @@
 # OPEN-WORK — the index of pending work
 
+## In flight
+
+- **SURFACE-CUT** — delete `cage data *`, `cage report`, and
+  `insights compare|estimate|calibration`. Specced as
+  [handoff](surface-cut.handoff.md) + [prompt](surface-cut.prompt.md) (raised
+  2026-08-14 after ADR 0011); **PROPOSED, unbuilt**. Archive the pair on implement.
+
 ## Agent-closable
 
 - **COPILOT-METRICS-CSV** — `cage data export --csv copilot` (raw-row export for the
@@ -14,7 +21,8 @@
   `taskgroup` window fallback cannot help: it builds windows from task-carrying calls,
   and there are none. Same root cause makes `report --by route` collapse to `chat`.
   Candidate fix: derive the window from `tasks.jsonl` (which carries session + ts)
-  instead of from task-carrying calls. Pinned in `tests/test_compare.py`'s `_MODEL`
+  instead of from task-carrying calls. **Check SURFACE-CUT first** — it deletes all
+  three affected views, which would close this without any fix. Pinned in `tests/test_compare.py`'s `_MODEL`
   comment so the seam is visible where it bites.
 
 - **METRICS-DUAL-WRITE-END** — decide whether `calls` capture for the three agents ever

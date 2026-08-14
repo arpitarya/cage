@@ -376,10 +376,14 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
 
 ## In flight + the single next step
 
-**Update 2026-08-14 (latest) — nothing is in flight. USAGE-ONLY is built and green;
-`work/` root carries no handoff/prompt pair. The single next step is Arpit's: read the
-repositioned README, decide the version question, then TASK-GRAIN-SPINE — the one live
-measured defect in the queue.**
+**Update 2026-08-14 (latest) — USAGE-ONLY is built, green and committed. In flight:
+SURFACE-CUT** ([handoff](surface-cut.handoff.md) · [prompt](surface-cut.prompt.md)),
+raised by Arpit straight after ADR 0011 — delete `cage data *`, `cage report`, and
+`insights compare|estimate|calibration`. **Read that pair before starting anything
+else.** Note it partly overlaps TASK-GRAIN-SPINE: two of the three views it deletes
+(`compare`, `estimate`, `calibration`) are exactly the ones that gap affects, so if
+SURFACE-CUT ships, TASK-GRAIN-SPINE may close itself — check before spending on it.
+Also outstanding for Arpit: read the repositioned README, decide the version question.**
 
 **Update 2026-08-12 — historical. Nothing was in flight and there was no queue left. The
 single next step is Arpit's: unjam git (`rm -f .git/index.lock`), delete the emptied
