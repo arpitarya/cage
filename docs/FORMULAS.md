@@ -328,7 +328,7 @@ spec'd elsewhere.
   "nothing landed" ≠ "the agent wrote nothing") · **pre-upgrade** (rows predating
   `residual_lines`; excluded from **both** sums and counted in one footnote). A
   *measured* `0%` renders `0%`, which is why the dash can never be spent on absence.
-- **The second money-independent carve-out.** `agent%` reads `provenance.jsonl` —
+- **The second money-independent carve-out.** `agent%` reads `ledger/provenance/` (monthly since v0.51; the legacy `provenance.jsonl` is read forever) —
   counts only, and deleting it moves **zero** pre-existing cell; only the authorship
   cells fall to `—`. Same terms as the `chat`-label carve-out, pinned by the same test
   file. **No USD, no rate, no minutes ever touches it** (the v0.36 law): `agent%` never

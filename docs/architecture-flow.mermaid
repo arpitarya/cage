@@ -21,15 +21,16 @@ flowchart TD
             mcopilot["copilot/chats-YYYY-MM.jsonl"]
             mkiro["kiro/chats-YYYY-MM.jsonl<br/>(+ credits since P2)"]
             mconsumer["consumer/calls-YYYY-MM.jsonl<br/>(NEW v0.51 — P1)"]
+            mprov["provenance/provenance-YYYY-MM.jsonl<br/>(authorship; monthly since P3c)"]
             msavings["savings/&lt;tool&gt;/savings-YYYY-MM.jsonl"]
         end
         subgraph hist["written by nothing current, read forever"]
             calls["calls-YYYY-MM.jsonl<br/>(retired agents: codex)"]
             credits["credits-YYYY-MM.jsonl<br/>(kiro CLI — re-homed to kiro/ in P2)"]
+            provold["provenance.jsonl<br/>(re-homed in P3c)"]
         end
         receipts["receipts-YYYY-MM.jsonl"]
         tasks["tasks-YYYY-MM.jsonl"]
-        prov["provenance.jsonl<br/>(local buffer)"]
     end
 
     machine["Machine ledger — ~/.cage<br/>kiro IDE rows only (ADR-KIRO)<br/>one copy per machine"]
@@ -39,12 +40,15 @@ flowchart TD
     imp --> mkiro
     imp --> calls
     imp --> tasks
-    imp --> prov
+    imp --> mprov
     yours --> mconsumer
     yours -. "dual write — the calls row is the rollback<br/>and join_table's lookup key" .-> calls
     yours --> receipts
     gfx --> msavings
     imp -. "kiro IDE: no project in the source<br/>(unless --ledger names a sink)" .-> machine
+
+    manifest["state/imports.jsonl<br/>(capture manifest — moved out of ledger/ in P3a;<br/>labels only, never a number)"]
+    imp --> manifest
 
     policy["cage.toml<br/>[tools] order · [capture] · [sources] · [authorship]"]
 
@@ -60,7 +64,7 @@ flowchart TD
     hist --> spend
     receipts --> derive
     tasks --> derive
-    prov --> derive
+    mprov --> derive
     policy --> derive
 
     subgraph read["Read / export surfaces"]
@@ -76,4 +80,4 @@ flowchart TD
         nprov["refs/notes/cage-provenance — authorship"]
     end
 
-    prov -. "notes-sync (CAGE_NOTES_WRITE=1, CI only;<br/>a dev machine dry-runs)" .-> nprov
+    mprov -. "notes-sync (CAGE_NOTES_WRITE=1, CI only;<br/>a dev machine dry-runs)" .-> nprov

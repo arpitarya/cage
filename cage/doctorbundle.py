@@ -67,9 +67,17 @@ def _footprint_text(root: Path, active: Path, source: str) -> str:
                 lines.append(f"  {sh.name}  {sh.stat().st_size} B  {len(ledger.read(sh))} row(s)")
             except OSError as e:
                 lines.append(f"  {sh.name}  unreadable ({type(e).__name__})")
-    if foot.provenance.exists():
-        lines.append(f"  {foot.provenance.name}  {foot.provenance.stat().st_size} B  "
-                     f"{len(ledger.read(foot.provenance))} row(s)")
+    # P3c: provenance is month-partitioned, so this must span shards. It reads the file
+    # DIRECTLY rather than through `ledger.provenance`, which is why it is an easy miss —
+    # left on the single legacy path it would silently under-report row counts in a
+    # DIAGNOSTIC bundle, the one artifact whose whole job is being trustworthy.
+    prov_shards = foot.provenance_shards()
+    if prov_shards:
+        size = sum(sh.stat().st_size for sh in prov_shards)
+        rows = sum(len(ledger.read(sh)) for sh in prov_shards)
+        label = ("provenance.jsonl" if len(prov_shards) == 1
+                 else f"provenance ×{len(prov_shards)}")
+        lines.append(f"  {label}  {size} B  {rows} row(s)")
     return "\n".join(lines) + "\n"
 
 

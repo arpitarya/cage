@@ -175,7 +175,10 @@ def record(root: Path, *, sha: str, files: list[str], agent: str = "",
                                          lines_added=lines_added, lines_removed=lines_removed,
                                          method=method, origin=origin, confidence=conf,
                                          session_id=session_id, **extra)
-            return ledger.append(paths.Footprint(root).provenance, row)
+            # P3c: partition-aware. `append_row` picks the shard from the ROW'S OWN
+            # `ts` (never a write-time clock), so a backdated capture lands in its own
+            # month and the same input always produces the same file.
+            return ledger.append_row(root, "provenance", row)
     except Exception:  # noqa: BLE001 — write-path discipline: never raise
         return False
 

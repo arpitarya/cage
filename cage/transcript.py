@@ -15,6 +15,7 @@ import datetime as _dt
 import hashlib
 import json
 import os
+import re
 import sqlite3
 from pathlib import Path, PurePosixPath
 
@@ -360,6 +361,13 @@ def _claude_request_rows(fileset: list[Path], session_hint: str = "") -> list[di
     return rows
 
 
+# `workspace.yaml`'s `name:` key, anchored at column 0 so a nested `name:` under some
+# future block can never be mistaken for the conversation's own. `[^\S\n]` rather than
+# `\s` for the same reason: `\s` matches a newline, which would let the pattern slide
+# onto the following line and lift an unrelated value.
+_COPILOT_CLI_NAME = re.compile(r"^name:[^\S\n]*(.*)$", re.MULTILINE)
+
+
 def session_name_claude(transcript_path: Path) -> str:
     """The human-readable session name for a Claude transcript — the `summary` record's
     text (`{"type":"summary","summary":"…"}`, previously unused by the parser). Parse-only
@@ -387,6 +395,54 @@ def session_name_claude(transcript_path: Path) -> str:
     except OSError:
         return ""
     return name
+
+
+def session_name_copilot_cli(events_path: Path) -> str:
+    """The session name for a Copilot **CLI** conversation — read from `workspace.yaml`,
+    the sibling of the `events.jsonl` cage already parses.
+
+    **`events.jsonl` carries no title.** Probed 2026-08-14 across 24 real session files:
+    457 events, 269 distinct nested key paths, 12 event types, and every title-shaped key
+    belongs to a *tool call* (`data.toolRequests[].name`, `data.toolName`,
+    `data.predictedLabel`), never to the conversation. `session.start` carries the
+    sessionId, version and a cwd/git context; `session.shutdown` carries token and model
+    metrics. Neither has a name
+    ([probe](../work/research/2026-08-14-chat-title-store-probes.md)).
+
+    `workspace.yaml`, beside it, does: `name:` on **24 of 32** files, every present slot
+    non-empty, and `user_named: false` on all 32 (the name is auto-derived from the
+    opening turn, never user-set). The 8 files with no `name:` key at all are the honest-
+    empty case and stay ``""``.
+
+    **Parsed by hand, and deliberately not with a YAML subset parser.** `dependencies = []`
+    is law, the stdlib ships no YAML, and every file probed is **flat** — no nesting, no
+    lists, one `key: value` per line. So this reads exactly one key with a regex and
+    **fails closed**: anything it does not understand yields ``""``. Writing a general
+    parser to serve one string would be strictly more code and strictly more ways to be
+    wrong about someone else's file.
+
+    Note the two stores are **not in bijection** (32 `workspace.yaml` to 24
+    `events.jsonl`), so neither side may be assumed present.
+
+    Parse-only/additive and counts-never-content: only the title string is read, and it
+    lands only in `imports.jsonl`, never on a call row. Fail-open ⇒ ``""``."""
+    if not events_path.exists():
+        return ""
+    ws = events_path.parent / "workspace.yaml"
+    try:
+        text = ws.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ""
+    m = _COPILOT_CLI_NAME.search(text)
+    if not m:
+        return ""
+    raw = m.group(1).strip()
+    # A YAML scalar may be single- or double-quoted; strip ONE matching pair and nothing
+    # else. No escape processing: a name that needs it is a name this reader does not
+    # understand, and "" beats a mangled guess.
+    if len(raw) >= 2 and raw[0] == raw[-1] and raw[0] in "'\"":
+        raw = raw[1:-1]
+    return raw.strip()
 
 
 def session_name_copilot_vscode(chat_session_path: Path) -> str:

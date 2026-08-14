@@ -310,8 +310,17 @@ def run_cli(root: Path, pol: dict, apply: bool = False,
 # savings tree out from under `ledger/` without adding it back here would silently
 # make it cleanable, with no test failing until `test_cleanup.py`'s
 # `ledger/savings/<tool>/` survival case is the one that catches it.
-NEVER = ("ledger/", "cage.toml", "prices.toml", "policy.toml", "machine.json",
-         "study.jsonl", "limits.json", "outcomes")  # both config names — the legacy
+# `imports.jsonl` is the worked example of the hazard above, and it is why the entry
+# below exists. P3a (v0.51) moved the capture manifest from `ledger/imports.jsonl` to
+# `state/imports.jsonl` — correct on its behaviour (it supplies labels, never a number),
+# and it walked straight out from under the `"ledger/"` umbrella that was its only
+# protection. It is an APPEND-ONLY AUDIT TRAIL: nothing reconstructs a deleted row, and
+# a `state/` cleanup class added years from now would eat it with no test going red.
+# **Named explicitly, and it must stay named.** Both homes are covered — the legacy file
+# is still read forever.
+NEVER = ("ledger/", "imports.jsonl", "cage.toml", "prices.toml", "policy.toml",
+         "machine.json", "study.jsonl", "limits.json", "outcomes")
+                                     # both config names — the legacy
                                      # `policy.toml` survives on machines that never
                                      # re-ran setup; `prices.toml` is the split-out
                                      # vendor rate card, protected alongside cage.toml

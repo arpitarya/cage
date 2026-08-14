@@ -795,8 +795,26 @@ def receipts_for(root: Path, call_id: str) -> list[dict]:
     return [r for r in receipts(root) if r.get("call") == call_id]
 
 
-def provenance(root: Path) -> list[dict]:
-    return read(paths.Footprint(root).provenance)
+def provenance(root: Path, since: str | None = None) -> list[dict]:
+    """Every authorship row, across **both homes** — `ledger/provenance/provenance-*.jsonl`
+    (P3c, v0.51) and the legacy unpartitioned `ledger/provenance.jsonl`, oldest first.
+
+    The legacy file is read forever and never rewritten: frozen rows are never backfilled,
+    and `residual_lines`' absent-vs-recorded-`0` distinction — the version gate for the
+    per-chat `agent%` column — depends on that. Order is deterministic (legacy, then dated
+    shards ascending) and a truncated tail in any shard is tolerated.
+
+    ``since`` drops dated shards whose whole month predates the cutoff — the bounded
+    re-scan that partitioning bought. **The legacy file is never skipped by it**: it has no
+    month in its name, so `_month_entirely_below` returns False, which is the safe
+    direction (read too much, never too little)."""
+    cut = since_cutoff(since)
+    rows: list[dict] = []
+    for sh in paths.Footprint(root).provenance_shards():
+        if cut is not None and _month_entirely_below(sh.name, cut):
+            continue
+        rows.extend(read(sh))
+    return rows
 
 
 def provenance_for_sha(root: Path, sha: str) -> list[dict]:

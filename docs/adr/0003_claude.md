@@ -54,7 +54,7 @@ flowchart TD
     C -. "✗ never reaches spend()" .-x S
     S --> V["cage insights chats · commits · study"]
     T --> A["line-match authorship<br/>counts only, bodies dropped"]
-    A --> PR["provenance.jsonl"]
+    A --> PR["ledger/provenance/<br/>(monthly since v0.51)"]
 ```
 
 <details><summary>Same diagram, ASCII</summary>
@@ -78,7 +78,7 @@ flowchart TD
         |                                                            |
         |                                      cage insights chats | commits | study
         |
-        +-- line-match authorship ....... counts only ------> provenance.jsonl
+        +-- line-match authorship ....... counts only ------> ledger/provenance/
                                           (bodies dropped)
 ```
 </details>
@@ -133,6 +133,30 @@ flowchart TD
   the only agent with an authorship route at all.
 
 ### Decision
+
+> **⟲ Storage note (P3c, v0.51) — the authorship buffer is month-partitioned.**
+> `ledger/provenance.jsonl` became `ledger/provenance/provenance-<month>.jsonl`, chosen
+> from each **row's own `ts`** (never a write-time clock — authorship capture is routinely
+> backdated, since it attributes commits rather than the present). This **reverses**
+> `paths.shard()`'s explicit *"`provenance` is intentionally never partitioned (buffer)"*
+> and PLAN §3.6.1's matching exemption; both record the reversal rather than dropping the
+> sentence. The premise was right and the conclusion did not follow: **nothing flushes the
+> buffer**, so it grew without bound and every read scanned it end to end.
+>
+> **Nothing about the record itself changed** — same schema, same enums, same
+> counts-never-content guarantee, same CI-sole-writer distribution to
+> `refs/notes/cage-provenance`, and `cage authorship verify` still always exits 0. The
+> legacy file is **read forever and never rewritten**: frozen rows are never backfilled,
+> which `residual_lines`' absent-vs-recorded-`0` version gate for `agent%` depends on.
+>
+> **All five readers span shards**, and they were enumerated rather than assumed:
+> `ledger.provenance` · `originrecord.read_all`/`for_sha` · `chats.py`'s `agent%` ·
+> `doctorbundle` (which reads the path **directly** and would have under-reported in a
+> diagnostic bundle) · `notessync` (which merges by row id, so a partial read re-pushes or
+> silently drops rows in the canonical note). A missed shard here does not raise or warn —
+> **`agent%` reads counts rather than re-deriving them, so it surfaces as a different
+> percentage**, which is why each reader has its own test.
+
 
 **Claude's spend resolves from `ledger/claude/` for all of history. `calls` is retained,
 never mutated, and is not a spend source. Authorship is measured on the agent only, in

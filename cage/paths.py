@@ -1099,15 +1099,103 @@ class Footprint:
         return self.ledger / "tasks.jsonl"
 
     @property
-    def provenance(self) -> Path:
+    def provenance_legacy(self) -> Path:
+        """The pre-P3c authorship buffer, `ledger/provenance.jsonl` — **read forever,
+        never written, never rewritten, never deleted.**
+
+        Renamed from `provenance` in P3c (v0.51) rather than left pointing at the old
+        file: every call site had to be visited, and a property that silently returns a
+        *subset* of the rows is the failure this rename exists to make impossible. Frozen
+        rows are never backfilled — `residual_lines`' absent-vs-recorded-`0` version gate
+        for `agent%` depends on exactly that."""
         return self.ledger / "provenance.jsonl"
+
+    @property
+    def provenance_dir(self) -> Path:
+        """The month-partitioned authorship tree (P3c, v0.51):
+        ``ledger/provenance/provenance-<month>.jsonl``.
+
+        **⟲ THIS REVERSES AN EXPLICIT IN-CODE DECISION.** `shard()`'s docstring said, in
+        as many words, *"`provenance` is intentionally never partitioned (buffer)"* — the
+        reasoning being that the local file is a buffer whose canonical home is
+        `refs/notes/cage-provenance` (CI-sole-writer, merged by row id), so bounding it
+        did not matter.
+
+        **What overturned it: nothing prunes the buffer.** `cleanup.NEVER` covers
+        `ledger/`, and no cleanup class touches this file, so the "buffer" is an unbounded
+        append-only log that every read scans end to end. Partitioning gives it the same
+        bounded `--since` re-scan every other long-lived log already has. The original
+        sentence is recorded above rather than deleted, per the house rule that a reversal
+        is written down.
+
+        Uses the **directory** mechanism (`savings_dir`/`copilot_dir` style), which
+        `paths.py` already calls *"smallest diff, precedent already tested"* — not a
+        generalization of `shard()`'s flat naming."""
+        return self.ledger / "provenance"
+
+    def provenance_shard(self, ts: str) -> Path:
+        """Month-partition path for a provenance row, from the **row's own `ts`** — never
+        a write-time clock (the determinism law). A missing or unparseable `ts` falls back
+        to the legacy unpartitioned name, exactly as `shard()` already does, so a
+        malformed row still lands somewhere readable rather than being dropped."""
+        month = ts[:7] if (ts and len(ts) >= 7 and ts[4] == "-") else ""
+        name = f"provenance-{month}.jsonl" if month else "provenance.jsonl"
+        return self.provenance_dir / name
+
+    def provenance_shards(self) -> list[Path]:
+        """Every readable provenance shard — **the legacy unpartitioned file first**
+        (it is strictly older), then the dated month shards in ascending order, so a
+        concatenated read stays oldest→newest. Names match `ledger._SHARD_MONTH`, so
+        ``--since`` month-skipping is free. Only existing files are returned."""
+        out: list[Path] = []
+        if self.provenance_legacy.exists():
+            out.append(self.provenance_legacy)
+        base = self.provenance_dir
+        if base.is_dir():
+            out.extend(sorted(base.glob("provenance*.jsonl")))
+        return out
 
     @property
     def imports(self) -> Path:
         """The capture manifest (import-ledger plan §4): one append-only row per import
         sweep (per agent×surface) and per graphify run — an audit trail of what cage
-        captured, when, from where, and how much. Unpartitioned like `provenance.jsonl`
-        (an audit buffer, not a long-lived derived source); never read by a derived view."""
+        captured, when, from where, and how much.
+
+        **Moved to `state/` in P3a (v0.51).** It was `ledger/imports.jsonl`, and its
+        behaviour had already been a state file's for two releases: never read by a
+        derived view, supplying **labels only** to `cage insights chats` and moving zero
+        numeric cells when deleted (pinned by
+        `test_chats.py::test_deleting_manifest_changes_zero_numeric_cells`). It is an
+        audit trail, not ledger data. This is consistent with the state law rather than in
+        tension with it — that law says a state file cannot change a reported *number*.
+
+        **⚠ The move loses `cleanup.NEVER`'s `"ledger/"` umbrella**, which protected this
+        file purely by location. `imports.jsonl` is therefore named in `NEVER` explicitly,
+        and must stay named there: cleanup is a closed allowlist, so nothing would fail
+        until someone added a `state/` class years from now — and an audit trail that
+        quietly becomes cleanup-eligible is a silent data-loss path.
+
+        `CAGE_IMPORTS_LOG` overrides the path, matching `capture_log`/`attest_log`.
+        The legacy location is still READ (`imports_legacy`) and never rewritten."""
+        return Path(os.environ.get("CAGE_IMPORTS_LOG", self.state / "imports.jsonl"))
+
+    @property
+    def imports_legacy(self) -> Path:
+        """The pre-P3a manifest home, `ledger/imports.jsonl` — **read forever, never
+        written, never deleted**.
+
+        Every real install has rows here (208 in the maintainer's own ledger). A one-way
+        move would make every existing chat title fall back to a session id on the next
+        read: not a crash, not an error — just names quietly disappearing.
+
+        **Deliberately NOT the `cage.toml`/`policy.toml` shape, and the difference is why
+        no doctor warning exists here.** Those two *shadow* each other — one wins, the
+        other is ignored, and a user who edits the ignored one is confused, so doctor says
+        so. These two homes are **both read, and their rows are disjoint** (the old file
+        stopped being appended the moment the new one started). There is no wrong file to
+        edit and nothing to disambiguate, so a warning would be noise — and worse, it would
+        read as *delete this*, which is the one thing that loses data here. It is protected
+        by `cleanup.NEVER` under both names."""
         return self.ledger / "imports.jsonl"
 
     @property
@@ -1248,16 +1336,27 @@ class Footprint:
         from a row's own ``ts`` — ``calls-2026-06.jsonl`` (plan §3.6.1). Determinism:
         the name comes from the row, never a write-time clock. A missing/unparseable
         ``ts`` falls back to the legacy unpartitioned file so a malformed row still lands
-        somewhere readable. ``provenance`` is intentionally never partitioned (buffer).
+        somewhere readable.
+
+        **⟲ REVERSED in P3c (v0.51).** This line used to end: *"`provenance` is
+        intentionally never partitioned (buffer)."* It is now partitioned, through the
+        directory branch below. The reason the original held — the local file is only a
+        buffer, canonical storage being `refs/notes/cage-provenance` — was true and
+        insufficient: **nothing prunes the buffer**, so it grew without bound and every
+        read scanned all of it. The sentence is recorded here rather than deleted; see
+        `provenance_dir` for the full reversal.
 
         ``kind`` may be a ``("savings", tool)`` tuple, which routes into the per-source
         savings tree via `savings_shard` (import-ledger plan §3). The plain strings
-        ``"copilot"``/``"kiro"``/``"claude"``/``"consumer"`` route into their own
-        per-producer trees via `copilot_shard`/`kiro_metric_shard`/`claude_shard`/
-        `consumer_shard` (COPILOT-METRICS handoff §4.2, KIRO-METRICS handoff §4.2,
-        CLAUDE-METRICS handoff §4.2, P1 of the ledger restructure), the same mechanism."""
+        ``"copilot"``/``"kiro"``/``"claude"``/``"consumer"``/``"provenance"`` route into
+        their own per-producer trees via `copilot_shard`/`kiro_metric_shard`/
+        `claude_shard`/`consumer_shard`/`provenance_shard` (COPILOT-METRICS handoff §4.2,
+        KIRO-METRICS handoff §4.2, CLAUDE-METRICS handoff §4.2, P1 and P3c of the ledger
+        restructure), the same mechanism."""
         if isinstance(kind, tuple) and kind and kind[0] == "savings":
             return self.savings_shard(kind[1], ts)
+        if kind == "provenance":
+            return self.provenance_shard(ts)
         if kind == "consumer":
             return self.consumer_shard(ts)
         if kind == "copilot":

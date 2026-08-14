@@ -818,12 +818,19 @@ def import_custom_tools(root: Path, args, *, pol: dict | None = None,
 
 
 def _copilot_name(f: Path) -> str:
-    """A copilot file's session name: the VS Code chat title for a chatSessions-shaped
-    file (any of `_CHAT_SESSION_DIRS`), ``""`` for a CLI `events.jsonl` (which carries no
-    title — honest empty, plan §4)."""
+    """A copilot file's session name — VS Code and CLI now both resolve one (P3b, v0.51).
+
+    - chatSessions-shaped file (any of `_CHAT_SESSION_DIRS`) → the VS Code chat title.
+    - CLI `events.jsonl` → the name in the sibling `workspace.yaml`.
+
+    **The CLI half used to return `""` unconditionally, and that was right about the wrong
+    file.** `events.jsonl` genuinely carries no title; the name sits one file over, in
+    `workspace.yaml` — present on 24 of 32 real session dirs, every present slot non-empty
+    ([probe](../work/research/2026-08-14-chat-title-store-probes.md)). A dir with no
+    `name:` key stays the honest ``""``, and nothing is ever fabricated from a session id."""
     if _is_chat_session_file(f):
         return transcript.session_name_copilot_vscode(f)
-    return ""
+    return transcript.session_name_copilot_cli(f)
 
 
 def import_copilot(root: Path, args, *, pol: dict | None = None, seen: set | None = None,

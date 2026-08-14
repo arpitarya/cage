@@ -8,6 +8,75 @@ Entry format:
 
 ```
 
+## 2026-08-14 — P3 (ledger-restructure): the two unpartitioned files move, and copilot CLI gets a name
+
+Three asks in one phase because they share one migration shape — *stop writing here, start
+writing there, read both forever* — and one hazard: a reader left behind.
+
+**P3a · `imports.jsonl` → `state/`.**
+- New `paths.imports` (with `CAGE_IMPORTS_LOG`, matching `capture_log`/`attest_log`) +
+  `imports_legacy`; `manifest.read` unions both homes, legacy first (it is strictly older).
+  Rows are not deduped across them — they are **disjoint by construction**, and a dedupe
+  would guard an event that cannot occur.
+- **The hazard, and the reason for an explicit `cleanup.NEVER` entry:** the file's only
+  protection was location, and the move walked straight out from under the `"ledger/"`
+  umbrella. It is an append-only audit trail — nothing reconstructs a deleted row — and
+  cleanup is a **closed allowlist**, so a `state/` class added years from now would eat it
+  with *no test going red*. `test_cleanup.py` gained a `days=0` survival case for **both**
+  homes.
+- **No doctor warning, deliberately.** My own first draft of the docstring promised one on
+  the `cage.toml`/`policy.toml` precedent; that precedent does not apply and the docstring
+  was corrected rather than the code. Those two *shadow* each other, so doctor names the
+  ignored one. These two homes are both read and disjoint — there is no wrong file to edit,
+  and a warning would read as *delete this*, the one action that loses data here.
+
+**P3b · names — P0.2 changed what was possible.** Copilot **CLI** was `""` because cage
+looked in `events.jsonl`, which genuinely has no title. The name is in the sibling
+`workspace.yaml`: 24 of 32 real session dirs, every present slot non-empty, `user_named`
+false throughout. `transcript.session_name_copilot_cli` reads **one anchored key with a
+regex and fails closed** — `dependencies = []`, and every file probed is flat
+`key: value`, so a YAML subset parser would be strictly more code and more ways to be
+wrong about someone else's file. Verified on the real store: **24/24 named, quotes
+stripped.** **Kiro keeps `""` permanently** — no title at any depth, `latest_summary` NULL
+on all 20 rows — asserted structurally, because the failure mode there is someone
+synthesizing one.
+
+**P3c · `provenance.jsonl` → `ledger/provenance/provenance-<month>.jsonl`.**
+- **⟲ Reverses an explicit in-code decision** — `paths.shard()`'s *"`provenance` is
+  intentionally never partitioned (buffer)"* and PLAN §3.6.1's matching exemption. Both
+  are **recorded, not deleted**. The premise was right and the conclusion did not follow:
+  **nothing flushes the buffer** (`cleanup.NEVER` covers `ledger/`, no class touches it),
+  so it was a long-lived store by behaviour whatever it was by intent.
+- **`Footprint.provenance` was RENAMED to `provenance_legacy`**, not left pointing at the
+  old file. That broke 191 tests in one run — which was the point: a property that silently
+  returns a *subset* of the rows is the exact failure the rename makes impossible. Every
+  call site was then visited deliberately.
+- **All five readers span shards**, enumerated rather than assumed: `ledger.provenance`
+  (gains `since=`) · `originrecord.read_all`/`for_sha` · `chats.py`'s `agent%` ·
+  **`doctorbundle`**, which reads the path *directly* and would have under-reported in a
+  diagnostic bundle · **`notessync`**, which merges by row id, so a partial read re-pushes
+  or silently drops rows in the canonical note. Each has its own test, because
+  **a missed shard here does not raise or warn** — `agent%` reads counts rather than
+  re-deriving them, so it surfaces as *a different percentage*.
+- **The plant-string PII test was strengthened, not just left working.** It already
+  `rglob`s the whole tree, so it covered the new directory for free — but its guard was
+  only *"something was written"*, which would have kept passing while the authorship path
+  wrote where it no longer looked. It now names the shard and reads a row back.
+- **Verified on the real 105-row ledger:** the legacy file reads intact, and `agent%`
+  renders real measured percentages across 18 chats.
+
+- **Files:** `cage/{paths,manifest,cleanup,ledger,originrecord,doctorbundle,transcript,
+  importcmd}.py` · `docs/adr/{0003_claude,0006_consumer}.md` · `docs/PLAN.md` §3.5/§3.6.1 ·
+  `docs/FORMULAS.md` · `docs/architecture-flow.mermaid` ·
+  `tests/test_manifest_move.py` (new, 19) · `tests/test_provenance_partition.py` (new, 14)
+  · `tests/{test_cleanup,test_chats,test_authorship_capture}.py`.
+- **ADRs (ADR-DISCIPLINE):** **ADR-CLAUDE** (owns provenance/notessync — the storage move,
+  the reversal, the five readers) · **ADR-CONSUMERS** (owns `manifest` — the move, the
+  cleanup hazard, why no doctor warning, and the two name findings). No new module.
+- **Tests:** `just test` green — **1464 passed**, 11 skipped (+33).
+- **Next:** P4 — savings to `ledger/<tool>/`, with the reserved-name list (10.5) and all
+  four sources moving together (10.6).
+
 ## 2026-08-14 — P2 (ledger-restructure): kiro's credits re-home into `ledger/kiro/`
 
 - **Built:** `ledger._credit_from_cli_conv` (projection) + `_credit_score` ·

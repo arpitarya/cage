@@ -184,6 +184,39 @@ partially reversed — see the block above. The rest stands.)*
 - **A retired agent's rows are never deleted, rewritten, or re-attributed.** They are
   history that still counts.
 
+> **⟲ Storage note (P3a, v0.51) — the capture manifest moved to `state/`.**
+> `ledger/imports.jsonl` became `state/imports.jsonl` (`CAGE_IMPORTS_LOG` overrides), and
+> the legacy path is **read forever**. This module (`manifest`) is claimed by this record,
+> so the move is recorded here.
+>
+> **It is consistent with the state law rather than an exception to it.** That law says a
+> `state/` file cannot change a reported *number*; the manifest supplies **labels only**
+> and has moved zero numeric cells for two releases (pinned by
+> `test_chats.py::test_deleting_manifest_changes_zero_numeric_cells`). The move puts it
+> where its behaviour already said it belonged.
+>
+> **⚠ The one real hazard, and why an explicit `cleanup.NEVER` entry exists.** The file's
+> only protection was location — `NEVER`'s `"ledger/"` umbrella — and the move walked
+> straight out from under it. It is an append-only audit trail: nothing reconstructs a
+> deleted row, and cleanup is a **closed allowlist**, so a `state/` class added years from
+> now would consume it with no test going red. `imports.jsonl` is named in `NEVER`
+> explicitly and must stay named there; `tests/test_cleanup.py` runs the survival case at
+> `days=0` for **both** homes.
+>
+> **No doctor warning, deliberately** — and the contrast is the point. `cage.toml`/
+> `policy.toml` *shadow* each other, so doctor names the ignored one. These two homes are
+> both read and their rows are disjoint; there is no wrong file to edit, and a warning
+> would read as *delete this*, which is the one action that loses data here.
+>
+> **Names (P3b).** Copilot **CLI** now yields a session name, from `workspace.yaml` beside
+> the `events.jsonl` cage parses — 24 of 32 real session dirs, every present slot
+> non-empty, `user_named: false` throughout
+> ([probe](../../work/research/2026-08-14-chat-title-store-probes.md)). It is read by hand
+> (one anchored key, fail-closed) rather than by a YAML parser: `dependencies = []`, and
+> every file probed is flat `key: value`. **Kiro yields none, permanently** — no title
+> field at any depth, `latest_summary` NULL on all 20 rows — and its transcript text must
+> never be mined for one. An absent name stays `""`; a session id is never dressed as one.
+
 ### Consequences
 
 - **Consumers are the only population whose entire history still reads.** The three agents

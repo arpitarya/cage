@@ -74,13 +74,24 @@ def test_never_list_survives_days_zero(root):
     (st / "machine.json").write_text('{"id": "m_x"}', encoding="utf-8")
     (st / "limits.json").write_text("{}", encoding="utf-8")
     (Footprint(root).ledger / "study.jsonl").write_text("{}\n", encoding="utf-8")
+    # P3a (v0.51): the capture manifest moved OUT of `ledger/` into `state/`, losing the
+    # `"ledger/"` umbrella that was its only protection. It is an append-only audit trail
+    # — nothing reconstructs a deleted row — so it is named in `NEVER` explicitly, and
+    # **both homes** are asserted here. Without this case a future `state/` cleanup class
+    # would eat it with nothing going red, which is exactly the hazard the savings-tree
+    # comment beside `NEVER` warns about, realized one directory over.
+    (st / "imports.jsonl").write_text('{"kind":"import","session_name":"n"}\n',
+                                      encoding="utf-8")
+    (Footprint(root).ledger / "imports.jsonl").write_text(
+        '{"kind":"import","session_name":"legacy"}\n', encoding="utf-8")
     pol_path = Footprint(root).policy
     pol_path.write_text("[cleanup]\ndays = 0\n", encoding="utf-8")
-    for p in (st / "machine.json", st / "limits.json", pol_path):
+    for p in (st / "machine.json", st / "limits.json", pol_path, st / "imports.jsonl"):
         _age(p)
     keep = {p: p.read_bytes() for p in
             (st / "machine.json", st / "limits.json", pol_path,
-             Footprint(root).ledger / "study.jsonl")}
+             Footprint(root).ledger / "study.jsonl",
+             st / "imports.jsonl", Footprint(root).ledger / "imports.jsonl")}
     shards = b"".join(p.read_bytes() for p in Footprint(root).shards("calls"))
     cleanup.prune(root, policy.load(pol_path), days=0)
     for p, content in keep.items():

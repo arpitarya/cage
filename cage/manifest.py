@@ -112,6 +112,18 @@ def record_graphify(root: Path, *, import_id: str, op: str, session: str,
 
 
 def read(root: Path) -> list[dict]:
-    """Every manifest row (import + graphify), oldest first. Tolerates a truncated tail."""
-    from cage import ledger
-    return ledger.read(_imports_path(root))
+    """Every manifest row (import + graphify) from **both homes**, oldest first.
+
+    P3a (v0.51) moved the manifest from `ledger/imports.jsonl` to `state/imports.jsonl`.
+    The legacy file is read first (it is strictly older) and is **never written, migrated
+    or deleted** — every real install has rows there, and dropping them would make each
+    existing chat title silently fall back to a session id.
+
+    Rows are not deduped across the two: they are disjoint by construction (the old file
+    stopped being appended to the moment the new one started), and an id-dedupe here would
+    be machinery guarding an event that cannot occur. Tolerates a truncated tail in either."""
+    from cage import ledger, paths
+    foot = paths.Footprint(root)
+    rows = ledger.read(foot.imports_legacy)
+    rows.extend(ledger.read(foot.imports))
+    return rows

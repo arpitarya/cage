@@ -329,7 +329,8 @@ def test_deleting_provenance_changes_zero_pre_existing_cells(root, pol):
     before = chats.summarize(root, pol)
     assert {r["session"]: r["agent_pct"] for r in before["rows"]}["s1"] == 80.0
 
-    paths.Footprint(root).provenance.unlink()
+    for _sh in paths.Footprint(root).provenance_shards():   # P3c: span every shard
+        _sh.unlink()
     after = chats.summarize(root, pol)
 
     pre_existing = ("calls", "tokens_in", "cached_in", "cache_write_in", "tokens_out",

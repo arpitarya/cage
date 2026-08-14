@@ -286,7 +286,7 @@ phase markers live in a fifth small append-only file, `ledger/study.jsonl`
 (unpartitioned, like provenance — a study is weeks, not years), which travels
 inside `cage data export --study` bundles.
 
-### 3.5 The provenance record — `provenance.jsonl` (fourth append-only file, v1)
+### 3.5 The provenance record — `ledger/provenance/` (fourth append-only file, v1)
 
 A fourth, separate substrate answering a different question than §3.1–3.4: not
 "what did this cost" but **"which agent wrote which files, in which commit, and how
@@ -295,7 +295,9 @@ type and read surface (`cage authorship origin`), never a new tool; it reuses th
 append-only-buffer + git-shell-out + fail-open idioms as `tasks.jsonl`.
 
 ```jsonc
-// .cage/ledger/provenance.jsonl   (append-only, local buffer only — see below)
+// .cage/ledger/provenance/provenance-YYYY-MM.jsonl  (append-only; month-partitioned
+//   since v0.51 — the legacy .cage/ledger/provenance.jsonl is READ FOREVER, never
+//   written or rewritten. Local buffer only — see below.)
 {
   "schema_ver": 1, "id": "p_01J...", "ts": "2026-06-14T10:22:03Z",
   "sha": "a1b2c3d", "agent": "claude-code",
@@ -445,9 +447,21 @@ point of the partition. **Determinism:** the shard name derives from the row's `
 never a write-time clock; same rows ⇒ same shards ⇒ byte-identical reads.
 **Backward-compatible:** a legacy `calls.jsonl` is still globbed (read first, oldest);
 migration is "new writes go to the dated file," never a rewrite of the past (the ledger
-is never rewritten). `provenance.jsonl` is exempt — it is a buffer flushed to notes
-(§3.5), not a long-lived store. Granularity (`constants.PARTITION_GRANULARITY="month"`)
-lives in the third audit layer — reviewable, not user-config.
+is never rewritten).
+
+**⟲ `provenance.jsonl`'s exemption was REVERSED in v0.51 (P3c).** This paragraph read:
+*"`provenance.jsonl` is exempt — it is a buffer flushed to notes (§3.5), not a long-lived
+store."* The premise was right and the conclusion did not follow: **nothing flushes the
+buffer.** `cleanup.NEVER` covers `ledger/` and no cleanup class touches the file, so it
+grew without bound and every read scanned it end to end — a long-lived store by behaviour
+whatever it was by intent. It is now `ledger/provenance/provenance-<month>.jsonl`, through
+the same directory mechanism `savings/` and the per-agent metric dirs use, and gains the
+same bounded `--since` re-scan. The legacy file is read forever and never rewritten:
+frozen rows are never backfilled, which `residual_lines`' absent-vs-recorded-`0` version
+gate for `agent%` depends on.
+
+Granularity (`constants.PARTITION_GRANULARITY="month"`) lives in the third audit layer —
+reviewable, not user-config.
 
 ### 3.6.2 The `scope` dimension (additive contract change)
 

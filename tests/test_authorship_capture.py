@@ -331,6 +331,15 @@ def test_no_line_body_and_no_line_hash_ever_reaches_disk(repo, tmp_path):
 
     written = [p for p in paths.Footprint(root).base.rglob("*") if p.is_file()]
     assert written, "the pass wrote nothing at all — the test would pass vacuously"
+    # **The vacuity guard that P3c needed.** `rglob` walks the whole base, so the move to
+    # `ledger/provenance/` is covered for free — but "something was written" is far too
+    # weak to prove THE FILE UNDER TEST was. This is the strongest PII guard in the repo;
+    # left asserting only a non-empty tree it would go on passing while the authorship
+    # path wrote somewhere it no longer looked. So: name the shard, and read the row back.
+    prov = paths.Footprint(root).provenance_shards()
+    assert prov, "no provenance shard was written — the grep below covers nothing"
+    assert set(prov) <= set(written)
+    assert ledger.provenance(root), "a shard exists but holds no row"
     import hashlib
     digests = {h(p.encode()).hexdigest()
                for p in (PLANT, PLANT_DROPPED)
