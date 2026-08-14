@@ -20,10 +20,11 @@ cage_version = "0.51.0"
 # Auto-capture switch. Each agent's hook runs `cage import --agent <itself>` to meter
 # its own on-disk usage log; set enabled=false to pause that without unwiring any hooks
 # (the hooks still fire, the import is a no-op). Env CAGE_CAPTURE (0/1) overrides.
-# import_before_export: `cage data export` (plain and --study) runs the all-agent import
-# sweep first, so a capture-only machine (hooks don't fire under a VS Code extension)
-# still ships a complete bundle. Set false for as-is snapshots; the `--no-import`
-# flag wins per invocation (precedence: flag > env CAGE_CAPTURE > policy).
+# import_before_export: RECORDED BUT READ BY NOTHING since v0.51. It made an export run
+# the all-agent import sweep first, so a capture-only machine still shipped a complete
+# artifact; its last surface was the fleet study's bundle export, and the whole study
+# was removed (STUDY-CUT). The key stays rather than becoming an orphan in every
+# scaffolded project — a reader may be deleted, the setting it read is its own decision.
 [capture]
 enabled = true
 import_before_export = true
@@ -36,8 +37,9 @@ import_before_export = true
 # State-dir maintenance (.cage/state/ only — a CLOSED allowlist: aged debug.log and
 # hooks-seen.jsonl rows, stale pending-* provenance buffers, cursors whose source log
 # is gone, *.tmp). Never touches ledger/ (tool savings included — a per-tool cleanup
-# class must never be added), cage.toml, machine.json, study.jsonl, or
-# limits.json — fleet pairing and the audit trail are not cleanup's to lose.
+# class must never be added), cage.toml, limits.json, or the fleet study's two
+# leftovers (machine.json, study.jsonl) — unwritten since v0.51, and still never
+# cleanup's to delete: the audit trail is not cleanup's to lose.
 # Deletion only ever happens via an explicit `cage data cleanup --apply`: the auto
 # path (piggybacked on `cage import`, throttled, fail-open; cage installs no
 # scheduler) only ever WARNS on stderr, silent when nothing is eligible — never
