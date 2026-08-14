@@ -70,7 +70,7 @@ def _tool() -> tuple[str, str]:
 
 
 def _footprint(active: Path, source: str) -> tuple[str, str]:
-    """The active ledger sink, per the capture precedence (plan §3.7). Names *which* sink
+    """The active ledger sink, per the capture precedence (ADR-LAWS Law 2). Names *which* sink
     is live (project vs global vs --ledger override) so a user with both a project `.cage/`
     and a global `~/.cage` knows where capture lands — one sink per run, never both."""
     base = paths.Footprint(active).base
@@ -102,7 +102,7 @@ def _policy(root: Path) -> tuple[str, str]:
 
 
 def _metering(active: Path) -> tuple[str, str]:
-    """Honest three-agent capture matrix (plan §3.7). Capture is **pull-based and the
+    """Honest three-agent capture matrix (ADR-LAWS Law 1). Capture is **pull-based and the
     only path**: explicit `cage import` / `cage data export` (and the optional foreground
     `cage data watch`) capture every surface in ``agents.SURFACES``, client-independent —
     no hooks, so nothing depends on which client wrote the log. MCP is the wired *read*
@@ -417,7 +417,7 @@ def _claude_metrics(active: Path) -> tuple[str, str]:
 
 
 def _policy_version(root: Path) -> tuple[str, str]:
-    """Policy-defaults drift (plan §3.10): a newer bundled
+    """Policy-defaults drift (CLAUDE.md): a newer bundled
     ``policy_version`` means tunables/defaults this project hasn't discovered.
     Recommendation only, never auto-applied (`cage policy sync` is the user's
     move)."""
@@ -487,7 +487,7 @@ def _committed_commands(root: Path) -> list[tuple[str, str]]:
 
 def _is_machine_absolute_cage(command: str) -> bool:
     """A cage command whose executable is a machine-absolute path — the sharing bug
-    (plan §5): committed, it ships one dev's filesystem layout to the whole team."""
+    (ADR-GRAPHIFY): committed, it ships one dev's filesystem layout to the whole team."""
     bin0, _ = paths._split_bin(command)
     if not bin0:
         return False

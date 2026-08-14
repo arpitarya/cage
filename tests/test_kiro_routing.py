@@ -2,7 +2,11 @@
 
 - **IDE** (`tokens_generated.jsonl`): one global file with no project/session/timestamp,
   so its rows are a *machine* fact and route to the machine ledger. One copy per machine
-  ⇒ double-counting is impossible by construction.
+  ⇒ double-counting is impossible by construction. Since KIRO-CALLS-LEG (ratified
+  2026-08-15) those rows land as kiro-METRICS rows (`ledger/kiro/`, `source="ide-log"`)
+  rather than `calls` rows — **the routing decision this file pins is unchanged**, which
+  is the point: the sink resolution never depended on the row kind, and asserting it
+  through the new kind is what proves that.
 - **CLI** (`conversations_v2` SQLite): keyed by the cwd it ran in, with a real
   conversation id — genuinely project-attributable, so it gets the opposite treatment:
   scoped to the project tree and stamped with `project`.
@@ -59,8 +63,18 @@ def _claude_log(uuid="u1", tin=100, tout=20):
         encoding="utf-8")
 
 
+def _kiro_rows(root):
+    """The IDE store's rows in whichever ledger they landed in. `ledger/kiro/`'s
+    `ide-log` grain since KIRO-CALLS-LEG — the CLI grains are excluded so a test about
+    the IDE leg cannot pass on a CLI row."""
+    return [r for r in ledger.kiro_metrics(root) if r.get("source") == "ide-log"]
+
+
 def _shards(root):
-    return b"".join(p.read_bytes() for p in paths.Footprint(root).shards("calls"))
+    """Bytes of the shards the IDE rows live in — `kiro/chats-*.jsonl`. Deliberately NOT
+    the `calls` shards: those are empty for every agent now, so a byte-comparison on them
+    is two empty strings agreeing."""
+    return b"".join(p.read_bytes() for p in paths.Footprint(root).kiro_metric_shards())
 
 
 # ── the resolver: one place the rule lives ────────────────────────────────────
@@ -100,8 +114,8 @@ def test_ide_rows_land_in_the_machine_ledger_not_the_project(tmp_path, monkeypat
     root = _isolate(tmp_path, monkeypatch)
     _kiro_log(2)
     importcmd.run(root, "all", _args())
-    assert ledger.calls(root) == []
-    assert len(ledger.calls(paths.global_home())) == 2
+    assert _kiro_rows(root) == [] and ledger.calls(root) == []
+    assert len(_kiro_rows(paths.global_home())) == 2
 
 
 def test_two_projects_one_machine_records_the_turn_exactly_once(tmp_path, monkeypatch):
@@ -112,9 +126,9 @@ def test_two_projects_one_machine_records_the_turn_exactly_once(tmp_path, monkey
     importcmd.run(a, "all", _args())
     b = _isolate(tmp_path, monkeypatch, "b")
     importcmd.run(b, "all", _args())
-    machine = ledger.calls(paths.global_home())
+    machine = _kiro_rows(paths.global_home())
     assert len(machine) == 3 and len({c["id"] for c in machine}) == 3
-    assert ledger.calls(a) == [] and ledger.calls(b) == []
+    assert _kiro_rows(a) == [] and _kiro_rows(b) == []
 
 
 def test_reimport_is_idempotent_against_the_machine_ledger(tmp_path, monkeypatch):
@@ -122,6 +136,7 @@ def test_reimport_is_idempotent_against_the_machine_ledger(tmp_path, monkeypatch
     _kiro_log(2)
     importcmd.run(root, "all", _args())
     before = _shards(paths.global_home())
+    assert before, "byte-identical must be asserted about rows that exist"
     lines = importcmd.run(root, "all", _args())
     assert _shards(paths.global_home()) == before          # 0 new, byte-identical
     assert any("imported 0 call(s)" in l for l in lines if "kiro" in l)
@@ -137,7 +152,7 @@ def test_ledger_override_keeps_kiro_in_the_named_ledger(tmp_path, monkeypatch):
     monkeypatch.setenv("CAGE_BASE", str(base))
     _kiro_log(2)
     importcmd.run(root, "all", _args())
-    assert len(ledger.calls(root)) == 2                    # Footprint is re-based to `base`
+    assert len(_kiro_rows(root)) == 2                      # Footprint is re-based to `base`
     # The default machine ledger is never even created: under an override every Footprint
     # is re-based, so `ledger.calls(global_home())` would read `base` too — the honest
     # assertion is against the directory on disk.
@@ -172,8 +187,10 @@ def test_the_project_ledger_never_gains_a_kiro_row(tmp_path, monkeypatch):
     importcmd.run(root, "all", _args())
     # P5: claude resolves from `ledger/claude/`, so the project ledger's usage is read
     # through `spend`. The half this test is named for — no KIRO row here — is asserted
-    # on `calls`, which is exactly where a mis-routed kiro row would land.
+    # on both kinds: `ledger/kiro/` is where a mis-routed row would land today, and
+    # `calls` is where one would land if the retired writer ever came back.
     assert {c["agent"] for c in ledger.spend(root)} == {"claude-code"}
+    assert _kiro_rows(root) == []
     assert [c for c in ledger.calls(root) if c.get("agent") == "kiro"] == []
 
 
@@ -205,7 +222,7 @@ def test_capture_on_read_summary_counts_only_local_rows(tmp_path, monkeypatch):
     _kiro_log(3)
     summary = importcmd.ensure_captured(root, _args(no_import=False))
     assert summary is None                                  # nothing landed HERE
-    assert len(ledger.calls(paths.global_home())) == 3       # but kiro was captured
+    assert len(_kiro_rows(paths.global_home())) == 3         # but kiro was captured
 
 
 # ── the capture switches compose as AND ───────────────────────────────────────
@@ -217,7 +234,7 @@ def test_machine_ledger_capture_switch_can_veto_the_routed_leg(tmp_path, monkeyp
     g.policy.write_text("[capture]\nenabled = false\n", encoding="utf-8")
     _kiro_log(2)
     lines = importcmd.run(root, "all", _args())
-    assert ledger.calls(paths.global_home()) == []
+    assert _kiro_rows(paths.global_home()) == []
     assert any("disabled at the machine ledger" in l for l in lines)  # never silent
 
 
@@ -226,7 +243,7 @@ def test_project_capture_switch_still_pauses_everything(tmp_path, monkeypatch):
     monkeypatch.setenv("CAGE_CAPTURE", "0")
     _kiro_log(2)
     importcmd.run(root, "all", _args())
-    assert ledger.calls(paths.global_home()) == []
+    assert _kiro_rows(paths.global_home()) == []
 
 
 # ── the read side explains the absence ────────────────────────────────────────

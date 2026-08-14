@@ -120,7 +120,7 @@ The "so what" chain: deterministic → so the numbers never hallucinate → so e
 
 ## Honest attribution — the part that survives the room
 
-Anyone can sum a bill. Cage's job is to divide credit **without lying about it**, and it does that with three rules (full design: [docs/PLAN.md](docs/PLAN.md) §4):
+Anyone can sum a bill. Cage's job is to divide credit **without lying about it**, and it does that with three rules (full design: [ADR-LAWS](docs/adr/0001_laws.md)):
 
 - **Marginal-by-fixed-order.** Each tool's receipt reports the saving it produced *given the tools upstream of it*; the marginals sum exactly to the total — no overlap, no double-counting, `$0` to compute, the order fixed and visible (not a black-box Shapley pass).
 - **Gross, and it says so.** `saved` is the read cost you avoided; it excludes the tokens spent *using* the tool. Cage prints that caveat on every view that shows the number, and reports **no net at all** — netting needs a per-query link that shim receipts structurally don't carry, so cage declines rather than picking one.
@@ -143,7 +143,7 @@ The savings are anchored to the commit they produced — Cage snapshots a git-aw
 
 ## Authorship — who wrote which commit, and how sure are we
 
-A different question than *what did this cost*: **who is accountable for this diff.** `cage authorship origin <sha>` answers it from the same append-only substrate — which agent wrote which files in which commit, with the same honesty discipline (`hooked` > `transcript` > `heuristic` method ranks; `unknown` derived from absence, never stored; `origin=human` only by explicit attestation; CI the sole git-notes writer; counts-never-content — paths and line counts, never a diff body or commit message). Full design: [docs/PLAN.md](docs/PLAN.md) §3.5.
+A different question than *what did this cost*: **who is accountable for this diff.** `cage authorship origin <sha>` answers it from the same append-only substrate — which agent wrote which files in which commit, with the same honesty discipline (`hooked` > `transcript` > `heuristic` method ranks; `unknown` derived from absence, never stored; `origin=human` only by explicit attestation; CI the sole git-notes writer; counts-never-content — paths and line counts, never a diff body or commit message). Full design: [ADR-AUTHORSHIP](docs/adr/0009_authorship.md).
 
 ## Every number is reviewable — and you can ask it
 

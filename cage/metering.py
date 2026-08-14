@@ -1,7 +1,7 @@
 """The library adapter — `cage.meter()` / `record_call()` at the provider boundary.
 
 Tool-agnostic and fail-open: you call it, it doesn't wrap you, and a metering
-error never propagates into the request path (plan §5, §10). Records token *counts*
+error never propagates into the request path (ADR-CONSUMERS; ADR-LAWS Law 4). Records token *counts*
 — never prompt bodies, and since USAGE-ONLY (ADR 0011) never a derived cost either.
 A caller that already knows its own billed figure (Orff passes `est_cost_usd`) still
 has it stored verbatim; cage computes none and reads none.
@@ -34,7 +34,7 @@ def _policy_for(root_str: str) -> dict:
 @lru_cache(maxsize=8)
 def _scope_for(root_str: str) -> str:
     """Best-effort `scope` (top-level changed dir) for a root, cached per process so the
-    git shell-out runs once per root — never on every metered call (plan §3.6.2; the
+    git shell-out runs once per root — never on every metered call (ADR-LAWS; the
     write-path-perf design note). Fail-open ⇒ ""; reuses `tasks.scope_for`, no new git."""
     try:
         from cage import tasks
@@ -48,7 +48,7 @@ def record_call(*, route: str, provider: str, model: str, tokens_in: int = 0,
                 scope: str = "", root: Path | None = None, **fields) -> str:
     """Append one call row; return its id (empty string if the write failed).
 
-    `scope` (top-level changed dir, plan §3.6.2) is passed through when known; callers
+    `scope` (top-level changed dir, ADR-LAWS) is passed through when known; callers
     that don't supply it leave it "" (the legacy, non-monorepo case). `meter()` resolves
     it best-effort via `_scope_for`."""
     r = _resolve_root(root)

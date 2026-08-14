@@ -1,4 +1,4 @@
-"""Multi-agent integration orchestrator (plan §5, §6, §9.5-6).
+"""Multi-agent integration orchestrator (CLAUDE.md *Architecture*).
 
 One ledger contract, three surfaces. Cage targets the wire protocol, so the *meter*
 is universal (transcript import — pull-based, no hooks) and the *read* surface is
@@ -142,7 +142,7 @@ def install(root: Path, surfaces: tuple[str, ...] | None = None,
     # preserves the persisted mode with no flag repeated.
     launcher = policy.python_launcher(policy.load(paths.Footprint(root).policy))
     # Every surface's committed wiring references the committed shim instead of an
-    # absolute cage path (plan §5) — write it first so the references always resolve.
+    # absolute cage path (CLAUDE.md *Architecture*) — write it first so the references always resolve.
     runshim.write(root, python_launcher=launcher)
     out: dict[str, dict] = {}
     for name in (s for s in SURFACES if s in picked):

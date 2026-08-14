@@ -1,4 +1,4 @@
-"""State-dir maintenance — a CLOSED allowlist over `.cage/state/` (plan §3.6.4).
+"""State-dir maintenance — a CLOSED allowlist over `.cage/state/` (ADR-LAWS).
 
 `.cage/state/` accumulates files nothing prunes: `debug.log` and
 `hooks-seen.jsonl` grow unbounded, per-session provenance buffers go stale when a

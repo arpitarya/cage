@@ -1,4 +1,4 @@
-"""Tier-0 exact-match response cache → eliminated-call receipts (plan §4.5, §6).
+"""Tier-0 exact-match response cache → eliminated-call receipts (ADR-GRAPHIFY).
 
 A cache hit eliminates a call entirely: `actual: 0`, the full alternative cost
 saved, `method: measured` — Cage's "4′33″" case, the highest-value receipt there

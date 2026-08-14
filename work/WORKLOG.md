@@ -12,6 +12,41 @@ by milestone) — the worklog is what *happened this session*.
 
 ---
 
+## 2026-08-15 — Claude (Cowork) — PLAN-REMOVED: the design of record is deleted, its addressing scheme repointed to the ADRs
+
+- **Asked (Arpit):** *"remove plan.md file and its references."*
+- **Scoped before touching anything, because the file was load-bearing:** `docs/PLAN.md`
+  was 1541 lines and ~60 source files carried **165 `plan §X` citations** into its live
+  addressing scheme. Offered him disposal / citation-treatment / reach; he chose
+  **delete outright · repoint to ADRs+CLAUDE.md · live docs and code only** (history
+  left verbatim).
+- **Repointed 149 code citations + 39 live-doc references**, section by section, against
+  the ADR ownership table rather than by pattern: §3/§3.1/§3.2/§3.6.x → **ADR-LAWS** ·
+  §3.5 → **ADR-AUTHORSHIP** · §3.7 → **ADR-LAWS Law 1** (pull-only) or **Law 2** (one
+  sink), chosen per line, not per file · §4 manifest/`import_id` → **ADR-CONSUMERS**,
+  graphify's own → **ADR-GRAPHIFY** · §4.9 → **ADR-CONSUMERS** · §7/§3.9 → **ADR-CLI** ·
+  §5 wiring → the owning vendor record or ADR-GRAPHIFY · §8.x → **ADR-LAWS Law 5** ·
+  §10 privacy → **ADR-LAWS Law 4**.
+- **Three anchors had no live successor and were stripped, not faked:** §4.4's worked
+  example (`demo.py`), §4.7–§4.8 (the deleted usage-impact roadmap), §9.5 (build order).
+  A citation pointing at a plausible-but-wrong record is worse than none.
+- **Left alone deliberately:** the four `plan §2.1`/`§2.2` citations in `importcmd.py`,
+  `test_import_unified.py` and `test_transcript.py`. `PLAN.md` never had a §2.1 or §2.2 —
+  these belong to the **archived import-ledger plan** and were never PLAN references.
+  `transcript.py`'s comment that said so by name was reworded (named, not cited).
+- **No ADR affected.** No behaviour changed — comments, prose and one mermaid header.
+- **⚠ NOT DONE — blocked on Arpit's machine.** `docs/PLAN.md` **still exists**: the Cowork
+  device bridge cannot delete or move files, and the attempted `git rm` left a stale
+  **`.git/index.lock`** it also cannot clear, so every git write in this repo is blocked
+  until he removes it. Two commands: `rm -f .git/index.lock && git rm docs/PLAN.md`.
+- **Verified what could be verified from here:** `compileall` clean over `cage`/`tests`/
+  `tools`; an exhaustive re-grep shows no live `PLAN.md` reference or bare `plan §`
+  citation outside history; and a standalone re-run of `test_doc_links.py`'s gate **with
+  PLAN.md treated as already deleted** reports **0 dangling LIVE links** (history dangle
+  225, bound 400). **The suite was NOT run** — the repo's venv is a macOS build and the
+  bridge VM has no pytest.
+- **Next step:** Arpit clears the lock, `git rm docs/PLAN.md`, runs `just test`.
+
 ## 2026-08-15 — Claude (Cowork) — KIRO-CALLS-LEG: retired, and the store relocated to `ledger/kiro/`
 
 - **Asked (Arpit):** "KIRO-CALLS-LEG, what is blocked??" — then, offered ratify-or-reverse,

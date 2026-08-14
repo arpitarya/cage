@@ -7,7 +7,7 @@ cage hook entries a previous version wrote into `.claude/settings.json` are
 stripped (foreign hooks are never touched), so old wiring can't fire dead
 `cage hook-*` verbs.
 
-**Portability (plan §5):** `.mcp.json` is committed to git, so it never carries
+**Portability (ADR-CLAUDE):** `.mcp.json` is committed to git, so it never carries
 the wiring machine's absolute cage path — the command references the committed
 shim `.cage/bin/cage-run` (`cage/runshim.py`) via the documented
 `${CLAUDE_PROJECT_DIR:-.}` env expansion (the `:-.` default is required: the

@@ -10,7 +10,7 @@ leaving it would double-fire every event), and cage's repo-level entries are str
 whenever hooks are off — which makes `--hooks` a two-way switch, not a one-way door.
 Foreign entries inside `.github/hooks/cage.json` are never touched.
 
-**Portability (plan §5):** `.vscode/mcp.json` is project-committed, so it
+**Portability (ADR-COPILOT):** `.vscode/mcp.json` is project-committed, so it
 references the committed shim via `${workspaceFolder}/.cage/bin/cage-run` —
 VS Code documents predefined-variable substitution in MCP server config.
 """

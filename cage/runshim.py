@@ -1,4 +1,4 @@
-"""The committed runtime-resolving shim: `.cage/bin/cage-run` (plan §5).
+"""The committed runtime-resolving shim: `.cage/bin/cage-run` (ADR-GRAPHIFY).
 
 Wired hook/MCP entries used to embed the wiring machine's *absolute* cage path
 (`paths.cage_bin()` at setup time). Several wired files are committed to git

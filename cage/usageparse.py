@@ -1,4 +1,4 @@
-"""Extract token usage from an Anthropic/OpenAI response body (plan §5, ≤60 lines).
+"""Extract token usage from an Anthropic/OpenAI response body (ADR-CONSUMERS, ≤60 lines).
 
 Handles both a buffered JSON response and a Server-Sent-Events stream, for either
 protocol — so the proxy meters whatever speaks the wire format, naming nothing.

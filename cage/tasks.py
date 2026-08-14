@@ -61,7 +61,7 @@ def git_snapshot(root: Path) -> dict:
 
 
 def scope_for(root: Path) -> str:
-    """The single top-level changed dir of the working tree, for `scope` (plan §3.6.2).
+    """The single top-level changed dir of the working tree, for `scope` (ADR-LAWS).
 
     Reuses `git_snapshot`'s `dirs` (the same top-level-dirs-only PII guard, decision F)
     — no new git code path. A monorepo commit touching exactly one component resolves to

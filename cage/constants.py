@@ -55,13 +55,13 @@ SHORT_SHA_DISPLAY = 7
 
 SINCE_WINDOW_DAYS = {"h": 1 / 24, "d": 1, "w": 7}  # `24h` / `7d` / `2w` → days
 
-# Ledger partition granularity (plan §3.6.1). Writers append to `calls-YYYY-MM.jsonl`
+# Ledger partition granularity (ADR-LAWS). Writers append to `calls-YYYY-MM.jsonl`
 # (same for receipts/tasks); readers glob + concatenate. Reviewable here (third audit
 # layer), not user-config — month is the only supported granularity. Determinism: the
 # shard a row lands in derives from the row's own `ts`, never a write-time clock.
 PARTITION_GRANULARITY = "month"
 
-# Ledger-size warning threshold (plan §3.6.4 (d)). NOT a vibes number: a stamped
+# Ledger-size warning threshold (ADR-LAWS). NOT a vibes number: a stamped
 # call/receipt row serializes to ~290 B (measured: call 314 / receipt 264 B), and the
 # plan's heavy-agent figure is 1–2k call rows/day. So a heavy *monthly* shard ≈
 # 2000×30×290 B ≈ 17 MB and a heavy solo *year* ≈ 210 MB. The threshold is a multiple
@@ -73,7 +73,7 @@ PARTITION_GRANULARITY = "month"
 # refuses. A write-path block (cf. budgets `on_exceed = warn|block`, the CI disk-quota
 # case) is a separate decision, deliberately not taken here; see the ADR.
 LEDGER_ROW_BYTES = 290              # measured avg serialized JSONL row (call 314 / receipt 264 B)
-LEDGER_HEAVY_ROWS_PER_DAY = 2000   # plan §3.6: a heavy agent user emits 1–2k call rows/day
+LEDGER_HEAVY_ROWS_PER_DAY = 2000   # ADR-LAWS: a heavy agent user emits 1–2k call rows/day
 LEDGER_WARN_MONTHS = 24            # warn only past ~2 years of un-pruned monthly shards
 LEDGER_WARN_BYTES = LEDGER_WARN_MONTHS * 30 * LEDGER_HEAVY_ROWS_PER_DAY * LEDGER_ROW_BYTES
 
@@ -96,13 +96,13 @@ LEDGER_WARN_BYTES = LEDGER_WARN_MONTHS * 30 * LEDGER_HEAVY_ROWS_PER_DAY * LEDGER
 MODEL_FAMILY_MIN_SEGMENTS = 2
 MODEL_EFFORT_SUFFIXES = frozenset({"low", "medium", "high", "max"})
 # Router prefixes stripped before family matching — a CLOSED list, never "any
-# `<x>/` prefix" (an unknown router must stay loudly UNPRICED, plan §3.3). Copilot's
+# `<x>/` prefix" (an unknown router must stay loudly UNPRICED, CLAUDE.md). Copilot's
 # VS Code store stamps modelId `copilot/claude-opus-4.6`; the bare router id
 # `copilot/auto` strips to `auto` which matches nothing — route it with an explicit
 # never a silent default.
 MODEL_ROUTE_PREFIXES = ("copilot/",)
 
-# State-dir cleanup (plan §3.6.4 remedy, `cage/cleanup.py`). Policy-preferred
+# State-dir cleanup (ADR-LAWS, `cage/cleanup.py`). Policy-preferred
 # fallbacks (the DEFAULT_CONFIDENCE pattern): `cage.toml [cleanup] days` wins.
 # 90 days: 30 proved tighter than a real usage gap (a project untouched for a
 # month is common, not exceptional), and the auto path only ever warns now — it
@@ -111,7 +111,7 @@ MODEL_ROUTE_PREFIXES = ("copilot/",)
 CLEANUP_DEFAULT_DAYS = 90
 CLEANUP_THROTTLE_HOURS = 24
 
-# Bundled-prices staleness threshold (plan §3.3, `cage/freshness.py`). Vendor
+# Bundled-prices staleness threshold (CLAUDE.md, `cage/freshness.py`). Vendor
 # list prices historically shift a few times a year, and cage never fetches a
 # rate — the bundle is only as fresh as its last build-time research pass
 # (`[meta] prices_date`). 45 days is deliberately wider than a normal release

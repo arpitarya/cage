@@ -93,13 +93,15 @@ def correlate(root: Path, pol: dict | None = None) -> Result:
         return Result(enabled=False, blocked=False,
                       reason=("task correlation is disabled — enable with "
                               "[capture] task_correlation = true / CAGE_TASK_CORRELATION=1 "
-                              "(off until validated on real data, plan §4)"),
+                              "(off until validated on real data)"),
                       correlations=[])
     closed = taskgroup.closed_tasks(root)
     # **P5 narrowed what this can see, and it says so rather than silently reading less.**
     # `calls` is the only kind that carries a `task`, and claude/copilot stopped writing it
-    # — their metric rows have no task grain at all (TASK-GRAIN-SPINE). So the correlation
-    # population is now consumer rows, retired-agent history, custom sources and kiro.
+    # — their metric rows have no task grain at all (TASK-GRAIN-SPINE). **KIRO-CALLS-LEG
+    # then narrowed it once more** (2026-08-15): kiro's IDE rows moved to `ledger/kiro/`
+    # too, so the correlation population is consumer rows, retired-agent history and
+    # custom sources — no built-in agent is in it at all.
     # Deliberately NOT widened with a timestamp-proximity fallback: guessing which task a
     # call belonged to from how close its clock was is forbidden by house law, and this
     # module's whole reason for being gated is that a few heuristic joins are noise.
@@ -109,8 +111,8 @@ def correlate(root: Path, pol: dict | None = None) -> Result:
                       reason=(f"INSUFFICIENT DATA — {len(found)} correlated call(s), need "
                               f"{constants.MIN_TASK_CORRELATION_N} before tagging (a few "
                               "heuristic joins are noise, not attribution). Since v0.51 "
-                              "only `calls` rows carry a task, and claude/copilot no "
-                              "longer write them — see TASK-GRAIN-SPINE"),
+                              "only `calls` rows carry a task, and no built-in agent "
+                              "writes them — see TASK-GRAIN-SPINE"),
                       correlations=[])
     return Result(enabled=True, blocked=False, reason="", correlations=found)
 

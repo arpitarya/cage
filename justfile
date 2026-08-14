@@ -1,4 +1,4 @@
-# Cage — task runner. Same $0/stdlib constitution as fux (plan §1).
+# Cage — task runner. Same $0/stdlib constitution as fux (README.md).
 python := env_var_or_default("CAGE_PYTHON", "python3.14")
 
 # List recipes

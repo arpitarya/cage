@@ -1,4 +1,4 @@
-"""Parse a Claude Code transcript JSONL into call rows (plan §5, §9.5).
+"""Parse a Claude Code transcript JSONL into call rows (ADR-CLAUDE).
 
 Claude Code can't be metered with the library adapter — you can't edit its request
 code. But it *writes* a transcript whose every assistant turn already records
@@ -87,7 +87,7 @@ def parse_calls(transcript_path: Path, session: str = "",
         if rec.get("type") != "assistant":
             continue
         # `project` is the working-dir basename Claude stamps on each record (`cwd`) —
-        # a derived attribution axis (plan §3.7). Basename only (counts-never-content
+        # a derived attribution axis (ADR-LAWS Law 2). Basename only (counts-never-content
         # PII guard); absent on records without a cwd ⇒ "" (legacy contract).
         cwd = rec.get("cwd") or ""
         row = _usage_to_row(rec.get("message") or {}, session,
@@ -372,7 +372,7 @@ def session_name_claude(transcript_path: Path) -> str:
     """The human-readable session name for a Claude transcript — the `summary` record's
     text (`{"type":"summary","summary":"…"}`, previously unused by the parser). Parse-only
     and additive: it reads the same file `parse_calls` does, extracts NOTHING but the
-    title, and never touches a call row (the name lives only in `imports.jsonl`, plan §4).
+    title, and never touches a call row (the name lives only in `imports.jsonl`, ADR-CONSUMERS).
     Returns the LAST summary seen (a session can be re-summarized), or ``""`` when the
     store carries none — the caller falls back to the cwd basename (`project`). Fail-open:
     a bad/unreadable transcript yields ``""``, never an exception into capture."""
@@ -808,7 +808,7 @@ def parse_copilot_calls(events_path: Path, session: str = "") -> list[dict]:
         if not isinstance(metrics, dict):
             continue
         # `totalPremiumRequests` is a cumulative session-level billing signal
-        # (import-ledger plan §2.1 — archived; PLAN.md has no §2.1);
+        # (the archived import-ledger plan's §2.1 — named, not cited);
         # stamp only its per-shutdown delta, on the first model row, so it never multi-counts.
         cum_prem = _first_int(data, _COPILOT_CLI_CREDIT_KEYS)
         prem_delta = cum_prem if cum_prem < prev_prem else cum_prem - prev_prem
@@ -1493,6 +1493,61 @@ def parse_kiro_calls(token_log: Path, session: str = "") -> list[dict]:
             route="chat", provider=rec.get("provider", "kiro") or "kiro",
             model=rec.get("model", "") or "", tokens_in=inp, tokens_out=out,
             session=session, agent="kiro", surface="ide", call_id=f"c_kiro{i:05d}{h}"))
+    return rows
+
+
+def parse_kiro_ide_log_metrics(token_log: Path, session: str = "") -> list[dict]:
+    """Kiro-metrics rows from the IDE's append-only usage log
+    `dev_data/tokens_generated.jsonl` — the `source="ide-log"` leg, and **the only IDE
+    leg that fires on a real install**.
+
+    This is the same file `parse_kiro_calls` reads, and the same facts. It exists
+    because kiro's transcript→`calls` leg was retired (KIRO-CALLS-LEG, ratified by
+    Arpit) on the condition that the facts move rather than disappear: for claude and
+    copilot the retired leg was a duplicate of a metric twin, and kiro IDE had no twin —
+    `parse_kiro_ide_metrics` reads `devdata.sqlite`, absent on every install ever
+    probed. So the leg was not deleted, it was **relocated** into the kiro-metrics
+    ledger, where the rows read as usage facts rather than as spend the ledger then has
+    to exclude from every total.
+
+    **What is lost relative to the retired leg: nothing.** The store carries the same
+    four fields either way, and the retired `calls` rows never had a real `ts` either —
+    `make_call` stamped import time exactly as `make_kiro_metric` does here. The
+    coarseness is Kiro's: prompt tokens are reliable, output tokens are frequently 0,
+    and `model` is frequently the generic `"agent"`. Recorded verbatim; never repaired.
+
+    **What is gained: the rows stop being spend.** As `calls` rows they were real spend
+    the ledger had to keep out of every total by name (`ABSENT_SPINES["kiro"]`). As
+    metrics rows they are capture-only by kind, so the exclusion is structural rather
+    than a maintained exception.
+
+    The lines carry no id, so the row key is the line index and the row id folds in a
+    content hash — the `parse_kiro_calls` idiom, preserved so a re-import of the same
+    append-only file never double-records and an appended line gets a fresh id. Rows
+    where both counts are 0 are skipped, the same rule both sibling parsers apply.
+    Fail-open per line."""
+    if not token_log.exists():
+        return []
+    session = session or "kiro"
+    rows: list[dict] = []
+    for i, line in enumerate(token_log.read_text(encoding="utf-8").splitlines()):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            rec = json.loads(line)
+        except ValueError:
+            continue
+        inp = int(rec.get("promptTokens", 0) or 0)
+        out = int(rec.get("generatedTokens", 0) or 0)
+        if not (inp or out):
+            continue
+        h = hashlib.sha1(line.encode("utf-8")).hexdigest()[:8]
+        rows.append(schema.make_kiro_metric(
+            source="ide-log", session=session, surface="ide",
+            provider=rec.get("provider", "kiro") or "kiro",
+            model=rec.get("model", "") or "", tokens_in=inp, tokens_out=out,
+            row_ref=str(i), metric_id=f"km_idelog{i:05d}{h}"))
     return rows
 
 

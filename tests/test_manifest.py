@@ -1,4 +1,4 @@
-"""The capture manifest (`imports.jsonl`, plan §4): one audit row per import sweep
+"""The capture manifest (`imports.jsonl`, ADR-CONSUMERS): one audit row per import sweep
 (per agent×surface) and per graphify run, the `import_id` FK threaded onto call/savings
 rows, and the counts-never-content / never-a-derived-view invariants.
 """
@@ -38,7 +38,7 @@ def test_import_writes_a_manifest_row_and_threads_the_fk(tmp_path, monkeypatch):
     m = rows[0]
     assert m["kind"] == "import" and m["agent"] == "claude" and m["surface"] == ""
     assert m["rows_appended"] == 1 and m["tokens_in"] == 1000
-    # per-session row (plan §4): the log's session id + a cage-minted unique id
+    # per-session row (ADR-CONSUMERS): the log's session id + a cage-minted unique id
     assert m["session"] == "s" and m["session_uid"].startswith("n_")
     # no summary record + no cwd ⇒ no name (honest empty ⇒ field omitted)
     assert "session_name" not in m
@@ -81,7 +81,7 @@ def test_claude_session_name_falls_back_to_cwd_basename(tmp_path, monkeypatch):
 
 def test_kiro_manifest_name_is_honest_empty(tmp_path, monkeypatch):
     # copilot CLI / kiro carry no session title — the manifest name stays "" (omitted),
-    # never a fabricated name or a session-id-as-name (plan §4).
+    # never a fabricated name or a session-id-as-name (ADR-CONSUMERS).
     root = _root(tmp_path, monkeypatch)
     klog = tmp_path / "tokens_generated.jsonl"
     klog.write_text(json.dumps({"model": "agent", "provider": "kiro",
@@ -192,7 +192,7 @@ def test_graphify_run_writes_a_linked_graphify_manifest(tmp_path, monkeypatch):
     m = gm[0]
     assert m["tool"] == "graphify" and m["op"] == "query" and m["import_id"].startswith("g_")
     assert m["source_files"] == 1 and m["saved"] > 0
-    assert m["session_name"] == "cage"  # graphify's name = the task (plan §4)
+    assert m["session_name"] == "cage"  # graphify's name = the task (ADR-GRAPHIFY)
     # the manifest's saving_id points at a real savings-tree row
     saving_ids = {s["id"] for s in ledger.savings(root)}
     assert m["saving_id"] in saving_ids

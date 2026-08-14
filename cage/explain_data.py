@@ -228,7 +228,7 @@ REGISTRY: tuple[Explanation, ...] = (
         "  i.e. calls-YYYY-MM.jsonl etc., named from each row's ts. Every read\n"
         "  (report/attrib/matrix/budget/roi) globs the shards (+ any legacy\n"
         "  single file) and derives at read time — nothing is ever rewritten in place;\n"
-        "  new writes target dated files (plan §3.6.1).",
+        "  new writes target dated files (ADR-LAWS).",
         ("cage/ledger.py", "cage/paths.py"),
         "n/a — describes the pipeline shape, not a number.",
         kind="concept", plan_ref="§3"),

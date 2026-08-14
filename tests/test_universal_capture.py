@@ -1,4 +1,4 @@
-"""Universal capture (plan §3.6.5) — explicit `import`/`export` over a global ledger.
+"""Universal capture (ADR-LAWS Law 2) — explicit `import`/`export` over a global ledger.
 
 Covers: ledger-resolution precedence (`--ledger`/`CAGE_BASE` → project `.cage/` → global
 `~/.cage`); capture into the global ledger with no project; the additive `project` field

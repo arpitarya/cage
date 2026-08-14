@@ -1,5 +1,5 @@
 """Load `.cage/cage.toml` (legacy `policy.toml` read as a fallback) — pipeline order,
-capture switches, cleanup and authorship settings (plan §3.3). The resolved filename
+capture switches, cleanup and authorship settings (CLAUDE.md). The resolved filename
 lives in one place, `paths.Footprint.policy`; this module never hard-codes it for the
 project.
 
@@ -198,7 +198,7 @@ def debug_enabled(pol: dict) -> bool:
 
 
 def task_correlation_enabled(pol: dict) -> bool:
-    """Whether the best-effort `task` backfill (plan §4 / Phase 4) runs — correlating an
+    """Whether the best-effort `task` backfill runs — correlating an
     import against `tasks.jsonl` by session/time window. Default **off**: it ships
     disabled until validated against real correlated data (handoff §3), and its output is
     always its own `method`/confidence-tagged, never ground truth. Env
@@ -255,7 +255,7 @@ def authorship_capture(pol: dict) -> bool:
     against the added lines of the commits those edits fall inside (v2 P1).
 
     This is the one capture path that reads a repository's *diffs*, which is the widest
-    PII surface cage has (plan §3.5 justifies repo-relative file paths; the line bodies
+    PII surface cage has (ADR-AUTHORSHIP justifies repo-relative file paths; the line bodies
     themselves never persist). So it gets its own switch, separate from
     `capture_enabled`: someone can meter their spend and still decline to have cage
     look at their code. Off ⇒ no provenance row is ever written, every commit reads

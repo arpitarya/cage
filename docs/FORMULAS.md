@@ -588,7 +588,7 @@ saved%   = 100 × Σsaved / without              (None when tokens is None or wi
 Every formula that lived here (human cost `usd = minutes / 60 × rate`, derived
 attention `minutes = Σ min(gap_ms, cap)`, and time saved
 `human_minutes − agent_active_minutes`) is **gone with the Tier-1 axis**, substrate
-included — see [PLAN.md](PLAN.md) §4.6 and the CHANGELOG's v0.36 *Removed* section.
+included — see the CHANGELOG's v0.36 *Removed* section.
 
 The one rule that outlives them, because pre-0.36 ledgers still hold the rows:
 

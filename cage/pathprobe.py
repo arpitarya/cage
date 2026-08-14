@@ -1,6 +1,6 @@
 """`cage doctor --paths` — which log locations cage looked at, which missed, and why.
 
-A read-only diagnostic (plan §3.7 troubleshooting): for every agent × candidate log
+A read-only diagnostic (ADR-LAWS Law 1 — troubleshooting): for every agent × candidate log
 location on *this* machine it reports found/missing, files matched, parseable row
 count, cursor state, and one `why` line per miss — then the active ledger sink and
 the precedence chain that chose it. Filesystem-dependent output by design (it is a

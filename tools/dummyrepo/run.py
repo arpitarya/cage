@@ -203,7 +203,7 @@ def assert_exact_rows(repo: Path, specs: list[dict], env: dict) -> None:
 
 def assert_pii_clean(repo: Path) -> None:
     # imports.jsonl (cage/manifest.py) is a DELIBERATE, documented exception (import-ledger
-    # plan §7, Arpit 2026-07-25): it always captures a best-available human-authored
+    # ADR-CLI, Arpit 2026-07-25): it always captures a best-available human-authored
     # session_name/title, a conscious PII widening scoped to this one local audit file —
     # never a call/receipt/savings row, never read by a derived view. The generic
     # counts-never-content scan below is for those rows; it must not flag a title.
@@ -245,7 +245,7 @@ def s1_cli(base: Path) -> str:
 
 
 def _clone_simulation(base: Path, repo: Path, env: dict) -> str:
-    """Portable-wiring acceptance (plan §5): copy the wired testbed to a new path the
+    """Portable-wiring acceptance (ADR-GRAPHIFY): copy the wired testbed to a new path the
     way a `git clone` would land it — no `.git`, none of the `.cage/.gitignore`d dirs
     (ledger/out/state) — then assert the clone's wiring is portable end-to-end:
     doctor's portability check is clean and the committed shim actually resolves."""
@@ -673,7 +673,7 @@ pricestoml.update_meta(root, {"prices_version": "2020-01-01"},
 
 
 def s11_prices(base: Path) -> str:
-    """S11 — pricing management (plan §3.3): seeded unpriced calls surface with
+    """S11 — pricing management (CLAUDE.md): seeded unpriced calls surface with
     exact counts + fix lines; `prices set`/`alias` reprice the report to exact
     expected USD (idempotent, ledger untouched); a backdated [meta] triggers the
     sync recommendation in list/doctor; `sync --update` restamps; byte-identical."""
@@ -862,7 +862,7 @@ def s13_pyz(base: Path) -> str:
     return f"zipapp labelled · demo+import ok · report deterministic · wheel↔pyz parity ({built})"
 
 
-# Seeder for S14 — call-less token receipts against every ladder rung (plan §4.5).
+# Seeder for S14 — call-less token receipts against every ladder rung (ADR-GRAPHIFY).
 # Fixed timestamps; the receipts deliberately carry no call id (the graphify-shim
 # shape) so pricing must resolve via the ladder, never the linked-call path.
 _S14_SEED = """
@@ -894,7 +894,7 @@ receipt("fux", "t-orphan", "2026-06-13T10:00:00Z")
 
 
 def s14_receipt_ladder(base: Path) -> str:
-    """S14 — the tool-receipt pricing ladder (plan §4.5): call-less token receipts
+    """S14 — the tool-receipt pricing ladder (ADR-GRAPHIFY): call-less token receipts
     price via [tools.<tool>] price_at (rung 1), the task's dominant model with
     deterministic tie-breaks (rung 2), or refuse loudly (rung 3); the rung is
     footnoted in text and a `priced_via` CSV column; byte-identical runs."""
@@ -958,7 +958,7 @@ p.write_text(p.read_text(encoding="utf-8") + '\\n[prices]\\nstale_days = 0\\n',
 
 
 def s15_freshness(base: Path) -> str:
-    """S15 — pricing freshness (plan §3.3): a backdated project [meta] puts the
+    """S15 — pricing freshness (CLAUDE.md): a backdated project [meta] puts the
     staleness note on the `cage report` footer (the surviving surface — the
     post-commit hook was removed with the hook machinery); `sync --update` silences
     it; the footer ages the bundle data-relatively (newest ledger ts, exact N,
@@ -1054,7 +1054,7 @@ p.write_text("".join(out).replace('signal = "task_ok"', 'signal = "task_custom"'
 
 
 def s16_policy_sync(base: Path) -> str:
-    """S16 — project-policy upgrade (plan §3.10): a v0.16-shaped policy shows
+    """S16 — project-policy upgrade (CLAUDE.md): a v0.16-shaped policy shows
     exact add/keep categories; `--apply` writes the adds, keeps the hand edit,
     stamps [meta] policy_version, and changes no derived view by one byte;
     the second apply is a byte-identical no-op; doctor/hook hints flip clean."""

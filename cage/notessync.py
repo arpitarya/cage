@@ -1,4 +1,4 @@
-"""Distribute per-SHA provenance fragments into `refs/notes/cage-provenance` (plan §3.5).
+"""Distribute per-SHA provenance fragments into `refs/notes/cage-provenance` (ADR-AUTHORSHIP).
 
 The local `provenance.jsonl` is a **buffer only** — gitignored, machine-local, never
 the canonical record. `refs/notes/cage-provenance` is canonical, and **CI is the sole

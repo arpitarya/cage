@@ -73,7 +73,7 @@ def _comparable(rows: list[dict], volatile: list[str]) -> list[dict]:
         r = dict(r)
         for v in volatile:
             assert r.pop(v), f"volatile field {v!r} missing/empty on {r.get('id')}"
-        # `import_id` is the per-sweep capture-manifest FK (plan §4) — a fresh random id
+        # `import_id` is the per-sweep capture-manifest FK (ADR-CONSUMERS) — a fresh random id
         # each import run, so it is non-deterministic by nature (like `ts`) and stripped
         # before the exact-row comparison. Its presence is asserted separately.
         r.pop("import_id", None)
@@ -153,10 +153,13 @@ def test_import_captures_the_same_facts(fixture, tmp_path, monkeypatch):
     want_out = sum(r.get("tokens_out", 0) for r in spec["rows"])
     if agent == "kiro":
         assert ledger.spend(sink) == [], "kiro has no token spine — never a fabricated 0"
-        # …and its rows are in `calls`, because **kiro keeps its writer** (the one P5
-        # deviation, see `importcmd.import_kiro`): it has no metric twin, so retiring the
-        # leg would have ended kiro IDE capture rather than de-duplicating it.
-        got = ledger.calls(sink)
+        # …and its rows are in the kiro-METRICS ledger, not `calls`. KIRO-CALLS-LEG
+        # (ratified 2026-08-15) retired kiro's `calls` writer like claude's and
+        # copilot's, but — because kiro IDE had no metric twin to fall back on — it
+        # RELOCATED the same store into `ledger/kiro/` as `source="ide-log"` rather than
+        # dropping it. This assertion is the corpus-level proof that the move lost
+        # nothing: the same fixture, the same token totals, a different kind.
+        got = ledger.kiro_metrics(sink)
         assert sum(r.get("tokens_in", 0) for r in got) == want_in
         assert sum(r.get("tokens_out", 0) for r in got) == want_out
     else:
@@ -165,11 +168,11 @@ def test_import_captures_the_same_facts(fixture, tmp_path, monkeypatch):
         assert sum(r.get("tokens_in", 0) for r in got) == want_in
         assert sum(r.get("tokens_out", 0) for r in got) == want_out
 
-    # No `calls` row is written for claude or copilot any more (P5). Kiro is the stated
-    # exception above — asserting `== []` for all three would have quietly encoded the
-    # spec-as-written rather than the code as it is.
-    if agent != "kiro":
-        assert ledger.calls(sink) == []
+    # No built-in leg writes a `calls` row any more — claude and copilot from P5, kiro
+    # from KIRO-CALLS-LEG. Asserted for all three now that the exception is gone, and it
+    # is a real assertion for kiro rather than a vacuous one: the corpus above proved the
+    # same facts DID land, so an empty `calls` here can only mean relocated, not lost.
+    assert ledger.calls(sink) == []
 
     # Idempotency: a re-import (cursor + id-dedupe) leaves every shard byte-identical.
     def snapshot():

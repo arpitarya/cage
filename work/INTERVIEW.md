@@ -15,7 +15,7 @@ Four standing sections: **state of play** · **in-flight + next step** · **stan
 constraints** · **lessons / scar tissue**.
 
 It is **context, never spec.** Where it disagrees with CLAUDE.md or
-[PLAN.md](../docs/PLAN.md), those win. Distinct from [WORKLOG.md](WORKLOG.md) (the
+the [ADR set](../docs/adr/README.md), those win. Distinct from [WORKLOG.md](WORKLOG.md) (the
 granular per-exchange trail) and [IMPLEMENTATION.md](IMPLEMENTATION.md) (what is
 built, milestone by milestone) — this is the strategic, cross-session record.
 
@@ -24,6 +24,14 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
 ---
 
 ## State of play (2026-08-15 — pick up here on a model switch)
+
+- **`docs/PLAN.md` is gone (2026-08-14/15, Arpit's instruction) — the ADR set is the
+  design of record now.** Its `plan §X` addressing scheme, which ~60 source files cited,
+  was repointed record by record; three anchors with no live successor were stripped
+  rather than pointed somewhere plausible. **If you find a `plan §` citation, it belongs
+  to an archived plan (import-ledger, prices-toml), not to a live doc — name it, never
+  cite it.** The deletion itself was pending on Arpit's machine at hand-off: the Cowork
+  bridge cannot delete files and left a stale `.git/index.lock`.
 
 - **v0.51 is BUILT and unreleased: LEDGER-RESTRUCTURE, nine phases, 1521 green.** Every
   producer owns exactly one directory under `ledger/` — `claude/` `copilot/` `kiro/` ·
@@ -412,7 +420,7 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
 - **In flight / immediate next:** execute
   [cage-lab-setup.prompt.md](../work/archive/v0.36-cage-lab-setup.prompt.md) (**Opus**, both sibling
   checkouts) — create `../cage-lab` fresh per [cage-lab-plan.md](../work/archive/v0.36-cage-lab.plan.md)
-  v3 + [PLAN.md](../docs/PLAN.md) §11: the M/G correctness matrix, three-way auto-verify,
+  v3 + the plan's §11 (deleted 2026-08-14 — named, not cited): the M/G correctness matrix, three-way auto-verify,
   the **eyeball surface** (source + ledger + derivation with line refs, side by
   side — Arpit verifies manually), his playground, then publish the baseline into
   [regression/](regression/). Commits allowed in cage-lab only.

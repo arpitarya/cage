@@ -75,7 +75,7 @@ EOF
   fit produces dense unreadable text, which is the original problem wearing a
   smaller coat.
 
-**Exemption:** reference docs — `CLAUDE.md`, `PLAN.md`, the design docs — are exempt
+**Exemption:** reference docs — `CLAUDE.md`, the design docs — are exempt
 from **rule 4 only**. They are dense on purpose and CLAUDE.md is loaded into every
 agent's context, where density is load-bearing. Rules 1–3 bind them fully.
 

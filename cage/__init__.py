@@ -2,9 +2,9 @@
 
 Meters every call at the provider boundary, collects a savings receipt from each
 tool in the stack, and derives the ledger / attribution / counterfactuals — $0,
-stdlib-only, independent of any single AI tool. See docs/PLAN.md.
+stdlib-only, independent of any single AI tool. See docs/adr/README.md.
 
-Public library API (the protocol-targeted adapter, plan §5):
+Public library API (the protocol-targeted adapter, ADR-CONSUMERS):
 
     from cage import meter, record_call, record_receipt
 

@@ -1,6 +1,6 @@
 """Provenance (authorship attribution): union-by-sha, corroboration, the
 read-time-unknown default, attestation, the repo-relative path guard, and
-fail-open capture (plan §3.5)."""
+fail-open capture (ADR-AUTHORSHIP)."""
 from __future__ import annotations
 
 import subprocess
@@ -27,7 +27,7 @@ def _git_init(root):
 
 # ── substrate: closed enums + the human/heuristic pairing + path guard
 def test_provenance_row_shape_matches_the_contract():
-    # PROVENANCE_FIELDS is the documented substrate contract (plan §3.5), the same
+    # PROVENANCE_FIELDS is the documented substrate contract (ADR-AUTHORSHIP), the same
     # family as CALL_FIELDS/RECEIPT_FIELDS — a row must carry exactly those keys,
     # in that order (additive-only schema: new fields append, never reorder).
     row = schema.make_provenance(sha="abc1234", files=["a.py"], agent="claude-code",

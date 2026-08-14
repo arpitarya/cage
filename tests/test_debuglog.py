@@ -315,7 +315,7 @@ def test_ledger_byte_identical_with_debug_on_vs_off(tmp_path, monkeypatch):
     capture(b)
 
     # Normalize out the per-sweep `import_id` (a fresh random capture-manifest FK each
-    # run, plan §4) — it varies by run, not by the debug switch under test.
+    # run, ADR-CONSUMERS) — it varies by run, not by the debug switch under test.
     def _rows(root):
         return [{k: v for k, v in c.items() if k != "import_id"}
                 for c in ledger.spend(root)]

@@ -1,4 +1,4 @@
-"""Per-project setup engine — the project-scaffold half of `cage setup` (plan §6).
+"""Per-project setup engine — the project-scaffold half of `cage setup` (ADR-GRAPHIFY).
 
 Drives `cage setup --project-only` (and the project steps of the guided wizard).
 Everything a consumer app needs to start metering, with no repo to clone — it all

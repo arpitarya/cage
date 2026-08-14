@@ -98,7 +98,7 @@ counterfactual; `estimated` = a heuristic (e.g. a compression ratio). Never let 
 projection read as `measured`. Owned by the `METHOD_TRUST` ladder in
 [constants.py](../cage/constants.py).
 
-**marginal-by-fixed-order** — cage's attribution rule (plan §4). Each tool's saving
+**marginal-by-fixed-order** — cage's attribution rule (ADR-LAWS). Each tool's saving
 is its marginal contribution given a fixed pipeline order; a reconstructed
 counterfactual cell is `modeled`/`estimated`, never `measured`.
 

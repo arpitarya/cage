@@ -1,4 +1,4 @@
-"""Path resolution for the per-project `.cage/` footprint + agent homes (plan §3, §5)."""
+"""Path resolution for the per-project `.cage/` footprint + agent homes (ADR-LAWS)."""
 from __future__ import annotations
 
 import os
@@ -54,7 +54,7 @@ _PY_CAGE_TAIL = re.compile(r"^(?:-3(?:\.\d+)?\s+)?-m\s+cage(?:\s+(.*))?$")
 def cage_command_tail(command: str) -> str | None:
     """The subcommand tail if ``command`` invokes cage — by binary name (`cage …`,
     `/abs/path/cage …`, the Windows `…\\cage.exe` forms, quoted), **via the
-    committed shim** (`cage-run` in any host's reference form, plan §5), or **via
+    committed shim** (`cage-run` in any host's reference form, ADR-GRAPHIFY), or **via
     the interpreter** (`python3 -m cage …` / `py -3 -m cage …` — python-launcher
     wiring mode, work/restricted-environments.md); else None (a foreign hook —
     never touch it). The superset detector wiring/migration use;
@@ -148,7 +148,7 @@ def find_project_root(start: Path | None = None) -> Path | None:
     """Walk up from ``start`` to the dir containing a *project* ``.cage/`` footprint.
 
     The machine-wide **global** base (``$CAGE_HOME/.cage``, default ``~/.cage``,
-    plan §3.7) is deliberately *not* a project: it is the fallback capture sink,
+    ADR-LAWS Law 2) is deliberately *not* a project: it is the fallback capture sink,
     a separate tier of the resolution precedence (override → project → global).
     Without this exclusion, any dir under ``$HOME`` on a machine with a global
     ledger resolves to ``~`` as its "project" — `cage setup` then re-inits the
@@ -184,7 +184,7 @@ def global_base() -> Path:
 
 def resolve_root(start: Path | None = None) -> Path:
     """The root whose :class:`Footprint` is the **active** ledger, per the capture
-    precedence (plan §3.7): ``--ledger``/``CAGE_BASE`` → nearest project ``.cage/`` from
+    precedence (ADR-LAWS Law 2): ``--ledger``/``CAGE_BASE`` → nearest project ``.cage/`` from
     cwd → global ``~/.cage``. One active sink per run — never a double-write.
 
     A ``CAGE_BASE`` override (what ``--ledger`` sets) re-bases every ``Footprint``, so the
@@ -1084,7 +1084,7 @@ def builtin_source_docs() -> list[dict]:
 
 
 # THE prices-file name — the single project-prices filename literal (prices-toml
-# plan §3, mirror of the ``cage.toml`` rename). `Footprint.prices` /
+# ADR-LAWS, mirror of the ``cage.toml`` rename). `Footprint.prices` /
 # `Footprint.shadowed_prices` and `resolve_prices_file` are the only places it lives;
 # the bundled-seed name (`data/prices.toml`) is a separate literal in `policy.py`,
 # exactly as the bundled `data/cage.toml` name sits beside `Footprint.policy`.
@@ -1117,17 +1117,17 @@ def _file_declares_prices(path: Path) -> bool:
 
 
 class Footprint:
-    """The per-project ``.cage/`` layout (plan §3).
+    """The per-project ``.cage/`` layout (ADR-LAWS).
 
     The ledger carries token *counts*, never prompt bodies — PII-safe by
-    construction (plan §10). For Orff, point ``CAGE_LEDGER`` at elgar so even the
+    construction (ADR-LAWS Law 4). For Orff, point ``CAGE_LEDGER`` at elgar so even the
     counts live in the private store.
     """
 
     def __init__(self, root: Path, base: Path | None = None):
         self.root = root
         # ``CAGE_BASE`` (set by the ``--ledger`` flag) re-bases the whole footprint —
-        # ledger, state and policy all move together to one active sink (plan §3.7).
+        # ledger, state and policy all move together to one active sink (ADR-LAWS Law 2).
         # An explicit ``base`` arg wins (callers that target a specific store); else the
         # env override; else the legacy per-project ``<root>/.cage``.
         override = os.environ.get("CAGE_BASE")
@@ -1418,7 +1418,7 @@ class Footprint:
 
     def shard(self, kind: str, ts: str) -> Path:
         """Month-partition path for ``kind`` (``calls``/``receipts``/``tasks``) derived
-        from a row's own ``ts`` — ``calls-2026-06.jsonl`` (plan §3.6.1). Determinism:
+        from a row's own ``ts`` — ``calls-2026-06.jsonl`` (ADR-LAWS). Determinism:
         the name comes from the row, never a write-time clock. A missing/unparseable
         ``ts`` falls back to the legacy unpartitioned file so a malformed row still lands
         somewhere readable.
@@ -1468,7 +1468,7 @@ class Footprint:
 
     @property
     def study(self) -> Path:
-        """Fleet-study phase markers (`cage study start/stop`, plan §4.9) — a small
+        """Fleet-study phase markers (`cage study start/stop`, ADR-CONSUMERS) — a small
         append-only jsonl beside the ledger files (it travels inside `cage data export
         --study` bundles). Unpartitioned by design, like `provenance.jsonl`: a study
         is weeks, not years."""
@@ -1547,7 +1547,7 @@ class Footprint:
 
     @property
     def cursors(self) -> Path:
-        """Per-agent incremental-import high-water cursors (plan §3.7). Maps each
+        """Per-agent incremental-import high-water cursors (ADR-LAWS Law 1). Maps each
         scanned source file to its last-seen ``(size, mtime)`` so a re-import skips
         unchanged files instead of re-parsing the whole world (the ledger is 22k+ rows);
         `hooks.append_new`'s id-dedupe stays the correctness backstop. Machine-local
@@ -1596,7 +1596,7 @@ class Footprint:
         return self.state / "hooks-seen.jsonl"
 
     def pending_edits(self, session_id: str) -> Path:
-        """Per-session buffer of uncommitted `PostToolUse` edits (plan §3.5) — a
+        """Per-session buffer of uncommitted `PostToolUse` edits (ADR-AUTHORSHIP) — a
         `post-commit` hook resolves these to a real sha and clears the file."""
         safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in (session_id or "nosession"))
         return self.state / f"pending-{safe}.jsonl"

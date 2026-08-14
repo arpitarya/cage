@@ -16,7 +16,7 @@ def _bare_cage_in_hooks(monkeypatch, tmp_path):
 
     Also redirect the global ledger (`paths.global_home`) off the real ``~/.cage`` to a
     throwaway per-test dir via ``CAGE_HOME``, so a no-project read/capture (which now falls
-    back to the global ledger, plan §3.6.5) can never see or pollute the developer's real
+    back to the global ledger, ADR-LAWS Law 2) can never see or pollute the developer's real
     global ledger — tests stay hermetic and deterministic."""
     monkeypatch.setattr("cage.paths.cage_bin", lambda: "cage")
     monkeypatch.setenv("CAGE_HOME", str(tmp_path / "global-home"))

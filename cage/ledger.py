@@ -1,4 +1,4 @@
-"""The append-only event log — read/write `calls.jsonl` + `receipts.jsonl` (plan §3).
+"""The append-only event log — read/write `calls.jsonl` + `receipts.jsonl` (ADR-LAWS).
 
 The only mutation is append; everything else derives. Writes are best-effort
 (metering must never break the request path); reads tolerate a half-written tail.
@@ -29,10 +29,10 @@ def append(path: Path, row: dict) -> bool:
 
 
 def append_row(root: Path, kind, row: dict) -> bool:
-    """Append a ``calls``/``receipts``/``tasks`` row to its month shard (plan §3.6.1).
+    """Append a ``calls``/``receipts``/``tasks`` row to its month shard (ADR-LAWS).
 
     ``kind`` is normally a string; a ``("savings", tool)`` tuple routes the row into the
-    per-source savings tree (`savings/<tool>/savings-<month>.jsonl`, plan §3).
+    per-source savings tree (`savings/<tool>/savings-<month>.jsonl`, ADR-LAWS).
 
     The shard is chosen from the row's own ``ts`` (`paths.Footprint.shard`), so writes
     are deterministic and the append-only past is never rewritten — new writes simply
@@ -41,7 +41,7 @@ def append_row(root: Path, kind, row: dict) -> bool:
     attributable line in the debug log under ``CAGE_DEBUG=1``. Local import + row
     metadata only (kind, shard path, row id) — the trace is itself fail-open.
 
-    Fleet studies (plan §4.9): when this ledger is *enrolled* (an opaque machine id
+    Fleet studies (ADR-CONSUMERS): when this ledger is *enrolled* (an opaque machine id
     exists in state), the row gains an additive ``machine`` field here — the one write
     chokepoint every calls/receipts/tasks writer already goes through. Unenrolled
     ledgers stamp nothing: byte-identical to the legacy contract."""
@@ -154,7 +154,7 @@ def _shard_bytes(shards: list[Path]) -> int:
 
 
 def _warn_if_large(foot, shards: list[Path]) -> None:
-    """One stderr line when the globbed shard bytes cross the threshold (plan §3.6.4 (d)).
+    """One stderr line when the globbed shard bytes cross the threshold (ADR-LAWS).
 
     Warn-only and fail-open: never touches stdout (the deterministic table surface),
     never blocks or raises, swallows a `stat` error, and fires at most once per ledger
@@ -298,7 +298,7 @@ def credits(root: Path, since: str | None = None) -> list[dict]:
 
 
 def savings(root: Path, since: str | None = None) -> list[dict]:
-    """The dedicated per-source savings tree (`savings/*/savings-*.jsonl`, plan §3).
+    """The dedicated per-source savings tree (`savings/*/savings-*.jsonl`, ADR-LAWS).
     Globbed + concatenated across every tool sub-dir, deterministic order. ``since``
     drops dated shards whose whole month predates the cutoff (same partition win as
     `read_kind`). Empty when no tool has ever recorded a saving."""
@@ -815,7 +815,7 @@ def join_table(root: Path, since: str | None = None) -> list[dict]:
 
 def receipts(root: Path, since: str | None = None) -> list[dict]:
     """Every savings receipt: an **id-deduped union** of the legacy `receipts.jsonl`
-    shards with the dedicated `savings/<tool>/` tree (plan §3), the tree winning on a
+    shards with the dedicated `savings/<tool>/` tree (ADR-LAWS), the tree winning on a
     duplicate id. Savings rows are receipt-compatible, so every attribution/roi/report
     surface reads them unchanged.
 
@@ -875,13 +875,13 @@ def by_task(rows: list[dict], task: str | None) -> list[dict]:
 
 
 def by_scope(rows: list[dict], scope: str | None) -> list[dict]:
-    """Filter to one `scope` (top-level dir, plan §3.6.2). `None`/"" ⇒ unfiltered, so a
+    """Filter to one `scope` (top-level dir, ADR-LAWS). `None`/"" ⇒ unfiltered, so a
     missing `--scope` flag yields the exact pre-§3.6 row set (no-flag byte-identity)."""
     return [r for r in rows if r.get("scope") == scope] if scope else rows
 
 
 def by_project(rows: list[dict], project: str | None) -> list[dict]:
-    """Filter to one `project` (working-dir basename, plan §3.7) — a *derived*
+    """Filter to one `project` (working-dir basename, ADR-LAWS Law 2) — a *derived*
     attribution axis distinct from `scope`. `None`/"" ⇒ unfiltered. Only logs that carry
     the cwd stamp it (Claude today; Copilot/Kiro leave it empty), so a project view
     is exact for Claude and silently drops the projectless rows of the other agents."""
@@ -920,7 +920,7 @@ def _ts(row: dict) -> _dt.datetime | None:
 
 def newest_ts(rows: list[dict]) -> _dt.datetime | None:
     """The newest parseable row ``ts`` — the data-relative "now" derived views use
-    instead of the wall clock (freshness age math, plan §3.3). ``None`` when no row
+    instead of the wall clock (freshness age math, CLAUDE.md). ``None`` when no row
     carries a timestamp (empty ledger ⇒ the age signal has no anchor)."""
     return max((t for r in rows if (t := _ts(r)) is not None), default=None)
 

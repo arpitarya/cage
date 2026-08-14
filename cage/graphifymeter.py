@@ -81,7 +81,7 @@ def content_signature(argv: list[str], answer: str) -> tuple[str, str, str]:
 
 def receipt_id(session: str, op: str, args_hash: str, answer_hash: str) -> str:
     """The deterministic savings-row id: ``s_`` + sha1 of
-    ``session | op | args_hash | answer_hash`` (plan §4 / GC3). Session-inclusive for
+    ``session | op | args_hash | answer_hash`` (ADR-GRAPHIFY, GC3). Session-inclusive for
     per-session attribution; re-import of the same transcript reproduces it exactly, so
     `ledger.receipts`' `union_by_id` collapses re-imports with no growth in derived rows."""
     key = f"{session}|{op}|{args_hash}|{answer_hash}"
@@ -148,7 +148,7 @@ def _meter(root: Path, answer: str, argv: list[str], task: str) -> tuple[int, st
                            skip_reason="no-saving-to-claim", op=op)
             return 0, "unmeasurable"
         # Route into the dedicated per-source savings tree (`savings/graphify/`,
-        # plan §3), not the shared receipts.jsonl. `source_files` is a COUNT only
+        # ADR-LAWS), not the shared receipts.jsonl. `source_files` is a COUNT only
         # (never the cited paths — PII guard). It stays receipt-compatible, so
         # attribution/roi/report read it through `ledger.receipts`'s union unchanged.
         from cage import manifest, savings
@@ -166,14 +166,14 @@ def _meter(root: Path, answer: str, argv: list[str], task: str) -> tuple[int, st
                              savings_id=sid)
         debuglog.event(root, event="receipt", tool="graphify", produced=bool(rid),
                        skip_reason="" if rid else "ledger-write-failed", op=op)
-        if rid:  # capture-manifest row for this graphify run (plan §4), fail-open
+        if rid:  # capture-manifest row for this graphify run (ADR-GRAPHIFY), fail-open
             import datetime as _dt
             now = _dt.datetime.now(_dt.timezone.utc).isoformat()
             manifest.record_graphify(root, import_id=gid, op=op, session=task,
                                      source_path=Path.cwd().name,  # basename only (PII guard)
                                      saving_id=rid, saved=int(raw - actual),
                                      source_files=len(files), ts=now,
-                                     session_name=task)  # graphify's name = the task (plan §4)
+                                     session_name=task)  # graphify's name = the task (ADR-GRAPHIFY)
         return (int(raw - actual), "receipt") if rid else (0, "unmeasurable")
     except Exception as e:                # any metering error → graphify result intact
         debuglog.exception(root, "graphify.meter", e)

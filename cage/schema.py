@@ -1,8 +1,8 @@
-"""The substrate contract — call-record and receipt row factories (plan §3.1–3.2).
+"""The substrate contract — call-record and receipt row factories (ADR-LAWS).
 
 Rows are plain JSON dicts (append-only, diffable, stdlib-parseable). These
 factories stamp ids/timestamps and validate the closed enums so a malformed row
-never reaches the log. Prompt *bodies* are never a field — counts only (plan §10).
+never reaches the log. Prompt *bodies* are never a field — counts only (ADR-LAWS Law 4).
 """
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ METHODS = ("measured", "modeled", "estimated")
 # enums — `measured/modeled/estimated` answers "how do we know a saving"; this answers
 # "how do we know who wrote it". Keeping the two method vocabularies distinct (rather
 # than overloading METHODS) means a provenance row can never misread as a cost claim
-# or vice versa. See docs/PLAN.md §3.5.
+# or vice versa. See ADR-AUTHORSHIP.
 PROV_METHODS = ("hooked", "transcript", "heuristic")
 ORIGINS = ("human", "agent", "agent-autonomous", "unknown")
 
@@ -46,7 +46,7 @@ PROVENANCE_FIELDS = ("schema_ver", "id", "ts", "sha", "agent", "files",
 # `PROVENANCE_FIELDS` and `schema_ver` stays 1 (additive, not a new contract). They
 # are the ONLY thing the matcher persists: the proposed line bodies it compares
 # exist in process memory for the length of one import and are never written, never
-# hashed, and never shipped (counts-never-content, plan §3.5).
+# hashed, and never shipped (counts-never-content, ADR-LAWS Law 4).
 #
 # `residual_lines` is the ONE deliberate exception to omitted-at-zero: it is written
 # whenever the caller supplies it, **including 0**, because presence of the key is the
@@ -78,13 +78,13 @@ def make_call(*, route: str, provider: str, model: str, tokens_in: int = 0,
     `call_id` may be supplied for idempotent sources (a transcript turn's uuid) so
     re-parsing the same transcript never double-records the call.
 
-    `scope` is the optional top-level changed dir of the work (plan §3.6.2) — the same
+    `scope` is the optional top-level changed dir of the work (ADR-LAWS) — the same
     coarse, counts-safe key `tasks.jsonl` carries (top-level dir only, never sub-paths
     or filenames). Empty string is the default and the non-monorepo case; an empty
     `scope` makes a row byte-identical to the pre-§3.6 contract.
 
     `project` is the optional working-dir **basename** the call ran under — a *derived
-    attribution axis* (plan §3.7 — its `--project` rollup view was deleted in
+    attribution axis* (ADR-LAWS Law 2 — its `--project` rollup view was deleted in
     SURFACE-CUT; the field is still stamped, and no view reads it), deliberately separate from
     `scope` (the monorepo top-level dir). Basename only, never a full path (the same PII
     guard as `scope`/tasks). Only logs that carry the cwd can set it, so an empty
@@ -108,9 +108,9 @@ def make_call(*, route: str, provider: str, model: str, tokens_in: int = 0,
     - `premium` — copilot CLI `totalPremiumRequests`, the one billing-relevant signal
       copilot exposes that was previously dropped.
     - `import_id` — a foreign key to the capture-manifest row that produced this row
-      (plan §4, threaded in Phase 3). Empty until a manifest is written.
+      (ADR-CONSUMERS, threaded in Phase 3). Empty until a manifest is written.
     - `credits` — the **billed** AI-credit figure the provider itself computed for this
-      request (COPILOT-CREDITS, plan §3.1). Copilot persists it per request in VS Code's
+      request (COPILOT-CREDITS, ADR-COPILOT). Copilot persists it per request in VS Code's
       chatSessions store (`copilotCredits`) and per shutdown in the CLI's
       `totalPremiumRequests`; since 2026-06-01 it *is* GitHub's own tokens×rates
       computation, done with information cage cannot see (what `copilot/auto` actually
@@ -174,9 +174,9 @@ def make_receipt(*, tool: str, raw_alternative: float, actual: float,
                  method: str = "modeled", confidence: float = 1.0,
                  meta: dict | None = None, scope: str = "", route_key: str = "",
                  ts: str | None = None) -> dict:
-    """One savings receipt. `saved` is derived so it can never disagree (plan §3.2).
+    """One savings receipt. `saved` is derived so it can never disagree (ADR-LAWS).
 
-    `scope` is the optional top-level changed dir (plan §3.6.2) — same counts-safe key
+    `scope` is the optional top-level changed dir (ADR-LAWS) — same counts-safe key
     as `make_call`; empty by default (non-monorepo), so an unset `scope` is the legacy
     contract.
 
@@ -629,7 +629,14 @@ def make_copilot_metric(*, source: str, session: str, surface: str = "",
 # populated `request_metadata` fields, plus token slots that are NULL today but
 # schema-present). A closed enum, like `COPILOT_METRIC_SOURCES` — `make_kiro_metric`
 # validates it.
-KIRO_METRIC_SOURCES = ("ide", "cli-conv", "cli-turn")
+# `ide` and `ide-log` are the SAME counter read from Kiro's two IDE stores — the
+# timestamped `devdata.sqlite` table and the append-only `tokens_generated.jsonl`.
+# They are separate grains rather than one merged grain because they carry different
+# row keys and different fidelity, and merging them would mean choosing at write time
+# which store is authoritative — a derive-time question. Only one of the pair is
+# manifest-eligible at a time (`importcmd._MANIFEST_SOURCES`); today that is
+# `ide-log`, the store that actually exists on every install ever probed.
+KIRO_METRIC_SOURCES = ("ide", "ide-log", "cli-conv", "cli-turn")
 
 
 def make_kiro_metric(*, source: str, session: str = "", surface: str = "",
@@ -745,7 +752,7 @@ def make_provenance(*, sha: str, files: list[str], agent: str = "",
                     agent_lines: int = 0, residual_lines: int | None = None) -> dict:
     """One authorship-attribution row — which agent touched which files in `sha`.
 
-    `origin="human"` is reachable only by explicit attestation (plan §3.5), which is
+    `origin="human"` is reachable only by explicit attestation (ADR-AUTHORSHIP), which is
     always `method="heuristic"` (no automated signal fired; a person asserted it) — so
     this combination is the one case where the row's own fields enforce that rule.
     Counts-never-content: `files` are validated repo-relative, never absolute, and the

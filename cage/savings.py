@@ -11,7 +11,7 @@ into the tool's own result. The push sink is resolved through the ONE canonical 
 saving by exact key — the same discipline `metering.record_receipt` holds.
 
 Savings rows are receipt-compatible, so they surface through `ledger.receipts`'s union
-in every attribution/roi/report view with no per-view change (plan §3).
+in every attribution/roi/report view with no per-view change (ADR-LAWS).
 """
 from __future__ import annotations
 

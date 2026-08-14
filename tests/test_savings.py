@@ -1,4 +1,4 @@
-"""The dedicated savings tree (`savings/<tool>/savings-<month>.jsonl`, plan §3):
+"""The dedicated savings tree (`savings/<tool>/savings-<month>.jsonl`, ADR-LAWS):
 writer, per-source partition, the read union with legacy receipts, tool-token PII
 safety, and the cleanup-never-touches-it invariant.
 """

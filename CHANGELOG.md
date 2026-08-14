@@ -59,9 +59,18 @@ Every producer now owns exactly one directory under `ledger/`:
   `[sources.<name>] format` custom-source contract, and deleting them would break user config
   silently. A custom source declaring `format = "claude"` **inherits CLAUDE-DEDUP and
   CLAUDE-SUBAGENT-KEY**, which ADR-CONSUMERS now states outright.
-- **Kiro keeps its leg** — a deliberate deviation. Kiro IDE has **no metric twin**, so that
-  leg is the only reader of `tokens_generated.jsonl`; retiring it would end kiro IDE capture
-  rather than de-duplicate it.
+- **Kiro's leg is retired too — and its store RELOCATED, not dropped** (KIRO-CALLS-LEG,
+  ratified 2026-08-15). Kiro IDE has **no metric twin**, so that leg was the only reader of
+  `tokens_generated.jsonl` and retiring it unchanged would have ended kiro IDE capture
+  rather than de-duplicating it. So the same store is now read into `ledger/kiro/` as
+  **`source="ide-log"`** (`transcript.parse_kiro_ide_log_metrics`) — same file, same four
+  fields, same line-index+content-hash dedupe, same machine sink, a different kind. These
+  rows never carried a real `ts` in either home: the store has none, so `make_call` stamped
+  import time and `make_kiro_metric` stamps it the same way. **The move is a gain, not a
+  lateral:** as `calls` rows they were spend every total had to exclude by name
+  (`ABSENT_SPINES["kiro"]`); as metrics rows they are capture-only **by kind**.
+  `ide` and `ide-log` are one counter from two stores, so exactly one is manifest-eligible
+  at a time — pinned by test. **No built-in leg writes a `calls` row any more.**
 - `calls` and `ledger.calls` are **permanent**: 373 retired-agent (`codex`) rows have no
   other home.
 

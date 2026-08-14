@@ -1,4 +1,4 @@
-"""Observability for the capture path — $0/stdlib, off by default (plan §5, §9.5).
+"""Observability for the capture path — $0/stdlib, off by default.
 
 The capture path is fail-open everywhere: every hook entrypoint and every import
 swallows exceptions, and the skip-reason strings `importcmd.run` returns are dropped

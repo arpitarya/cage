@@ -64,7 +64,7 @@ def _mtime_utc(f: Path):
         return None
 
 
-# ── incremental high-water cursors (plan §3.7) ──────────────────────────────
+# ── incremental high-water cursors (ADR-LAWS Law 1) ──────────────────────────────
 # The ledger is 22k+ rows and the no-daemon model means manual `cage import`,
 # `export`'s import-first refresh, and the `cage data watch` loop all re-run the scan
 # repeatedly. Re-parsing every transcript + reloading the whole ledger per file each
@@ -104,7 +104,7 @@ def _now_iso() -> str:
 def last_import(root: Path) -> str | None:
     """ISO timestamp of the last `cage import` run over this ledger, or ``None`` if it has
     never run. Capture is pull-based (no daemon), so `cage doctor` and the read views surface
-    this as "last import: N ago" and nudge when stale (plan §3.7)."""
+    this as "last import: N ago" and nudge when stale (ADR-LAWS Law 1)."""
     return _load_cursors(paths.Footprint(root)).get("_last_import")
 
 
@@ -303,7 +303,11 @@ def _scan(root: Path, agent: str, src: Path, pattern, since,
 _MANIFEST_SOURCES: dict[str, tuple[str, ...]] = {
     "claude": ("request",),            # per-request; `transcript` is their fold
     "copilot": ("chat", "cli-delta"),  # `cli` is cumulative — its delta twin instead
-    "kiro": ("ide", "cli-conv"),       # `cli-turn` is per-turn within `cli-conv`
+    # `cli-turn` is per-turn within `cli-conv`; `ide`/`ide-log` are the SAME IDE
+    # counter from two stores, so exactly ONE of that pair is ever listed here — today
+    # `ide-log` (`tokens_generated.jsonl`), the store that exists on every install ever
+    # probed. The day `devdata.sqlite` ships, flip the pair rather than adding to it.
+    "kiro": ("ide-log", "cli-conv"),
 }
 
 
@@ -334,7 +338,7 @@ def _ingest(root: Path, agent: str, src: Path, files: list[Path], parse,
     for f in files:
         try:
             rows = parse(f)
-            if import_id:  # stamp the sweep's manifest FK on each row (plan §4)
+            if import_id:  # stamp the sweep's manifest FK on each row (ADR-CONSUMERS)
                 for r in rows:
                     r["import_id"] = import_id
             if not rows and f.is_file() and f.stat().st_size > 0:
@@ -360,7 +364,7 @@ def _lift_names(files: list[Path], names: dict | None, lift) -> None:
     """Populate the run-shared ``{session: name}`` map from the files this sweep ingests,
     keyed by the log's session id (the file stem — the same value the parser stamps as a
     row's ``session``). Parse-only and additive: the name lands only in `imports.jsonl`,
-    never on a call row (plan §4). A file with no title contributes no entry — the manifest
+    never on a call row (ADR-CONSUMERS). A file with no title contributes no entry — the manifest
     then falls back (claude → the cwd basename, others → honest ``""``)."""
     if names is None:
         return
@@ -964,7 +968,7 @@ def import_copilot(root: Path, args, *, pol: dict | None = None, seen: set | Non
       the session dir name is the session id);
     - VS Code extension: `<vscode-user>/workspaceStorage/*/chatSessions/*.jsonl` —
       the extension's own transcripts dir carries no usage event, so the per-request
-      counts come from VS Code's chat-session store (plan §3.7; `CAGE_VSCODE_USER`
+      counts come from VS Code's chat-session store (ADR-LAWS Law 1; `CAGE_VSCODE_USER`
       overrides the user dir for tests)."""
     sources = (_override_sources("copilot", Path(args.path), pol)
                if getattr(args, "path", None)
@@ -1062,7 +1066,7 @@ def import_kiro(root: Path, args, *, pol: dict | None = None, seen: set | None =
     tokens_generated.jsonl) — a single file, not a glob. Best-effort and idempotent.
 
     ``names`` is accepted for a uniform adapter signature and ignored: Kiro's log carries
-    no session title, so its manifest name stays ``""`` (honest empty, plan §4)."""
+    no session title, so its manifest name stays ``""`` (honest empty, ADR-CONSUMERS)."""
     sources = (_override_sources("kiro", Path(args.path), pol)
                if getattr(args, "path", None)
                else [(s.path, s.glob, s.surface) for s in paths.agent_log_sources("kiro", pol)])
@@ -1071,50 +1075,55 @@ def import_kiro(root: Path, args, *, pol: dict | None = None, seen: set | None =
         _log_kiro_src(root, src, pol=pol)
         files = _scan(root, "kiro", src, pattern, getattr(args, "since", None), pol=pol,
                       agent_cursor=agent_cursor, health=health)
-        # ⚠ **KIRO KEEPS ITS `calls` LEG — the one deviation from P5's spec, and it is a
-        # deviation on evidence rather than caution.**
+        # **KIRO'S `calls` LEG IS RETIRED, AND ITS FACTS RELOCATED — not deleted.**
+        # KIRO-CALLS-LEG, ratified by Arpit 2026-08-15. P5 retired this leg for claude
+        # and copilot because it was a *duplicate*: `ledger/claude/` and `ledger/copilot/`
+        # carry the same traffic. Kiro IDE had no such twin — `parse_kiro_ide_metrics`
+        # reads `devdata.sqlite`, absent on every install ever probed — so retiring it
+        # unchanged would have ENDED kiro IDE capture rather than de-duplicating it.
         #
-        # For claude and copilot the retired leg was a *duplicate*: `ledger/claude/` and
-        # `ledger/copilot/` carry the same traffic, so stopping the calls writer loses
-        # nothing. **Kiro IDE has no metric twin.** `parse_kiro_ide_metrics` reads
-        # `devdata.sqlite`, which is absent on every install ever probed, so this leg is
-        # the ONLY reader of `tokens_generated.jsonl` — the only file kiro IDE actually
-        # writes. Removing it does not de-duplicate kiro; it ends kiro IDE capture.
+        # So the same store is now read into the kiro-metrics ledger instead, as
+        # `source="ide-log"`. The three things that made keeping the `calls` leg
+        # defensible all survive the move:
+        #   1. `tokens_generated.jsonl` still has a reader — the same four fields, the
+        #      same line-index+hash dedupe, the same import-time `ts` the `calls` rows
+        #      had (`make_call` stamped `_now()` too). Nothing is lost in the move.
+        #   2. **ADR-KIRO's routing decision still has rows to route.** These land
+        #      machine-side unchanged: `import_kiro` already runs against the ROUTED SINK
+        #      as `root` when kiro routes away (`_kiro_leg` calls `run_agent(sink, ...)`,
+        #      ADR 0006), so the sink resolution below is the same one the leg used.
+        #   3. **The upgrade-watch keeps its baseline** — arriving `ide-log` rows are
+        #      exactly what the day-devdata-ships `ide` rows get compared against, and
+        #      doctor now counts the pair side by side.
         #
-        # Two things go with it, neither named in the handoff's justification:
-        #   1. **ADR-KIRO's routing decision loses the rows it routes.** IDE rows are a
-        #      machine fact and land in `~/.cage`; with nothing captured there is nothing
-        #      to route, and the mechanism goes unexercised.
-        #   2. **The upgrade-watch loses its baseline.** The whole point of keeping
-        #      `parse_kiro_ide_metrics` is to notice the day Kiro ships a real store —
-        #      which is easiest to see against rows that are still arriving.
+        # And the reason the move is an improvement rather than a lateral: as `calls`
+        # rows these were spend that every total had to exclude BY NAME
+        # (`ABSENT_SPINES["kiro"]`, a maintained exception). As metrics rows they are
+        # capture-only by kind, so they cannot reach a total in the first place.
         #
-        # The handoff's reason for removing it — 28 rows, 1,576 in / **0 out**, model
-        # `"agent"`, a byte-identical 6-row block repeated — is about the rows being
-        # **unsummable**, and that is already handled: `ABSENT_SPINES["kiro"]` keeps them
-        # out of every total, so they cost nothing and read as `—` with a stated reason.
-        # Unsummable is not the same as worthless.
-        #
-        # Kept as the smaller, reversible choice, and flagged for Arpit — the handoff
-        # itself says this one is overridable in two lines. Deleting these five lines
-        # implements the spec as written.
-        total_rows += _ingest(root, "kiro", src, files,
-                              _surface_restamp(lambda f: transcript.parse_kiro_calls(f), surface),
-                              pol=pol, seen=seen, agent_cursor=agent_cursor,
-                              collect=collect, import_id=import_id)
+        # `parse_kiro_calls` itself is NOT deleted: it is the `[sources.<name>]
+        # format = "kiro"` custom-source contract (P5 decision 10.1).
+        total_rows += _ingest_kiro_metrics(root, files,
+                             _surface_restamp(
+                                 lambda f: transcript.parse_kiro_ide_log_metrics(f),
+                                 surface),
+                             src=src, pol=pol, agent_cursor=agent_cursor,
+                             collect=collect, import_id=import_id)
         total_files += len(files)
     # KIRO-METRICS IDE leg (handoff §4.5): a single fixed file, not a glob — resolved
     # directly rather than through `_scan`/`agent_log_sources` (`paths.kiro_devdata_db`
     # is deliberately not a registered source; see its docstring). `import_kiro` already
     # runs against the ROUTED SINK as `root` when kiro routes away (`_kiro_leg` calls
     # `run_agent(sink, "kiro", ...)`, ADR 0006), so these rows land machine-side with
-    # zero new routing code — never folded into `total_rows`/`total_files` above:
-    # metrics rows are not calls.
+    # zero new routing code. Its return folds into `total_rows` like the `ide-log` leg
+    # above, and is 0 while `ide` is the unlisted half of the manifest pair — so the two
+    # IDE stores can never both be counted into one reported number.
     devdata = paths.kiro_devdata_db()
     if devdata.exists():
-        _ingest_kiro_metrics(root, [devdata], transcript.parse_kiro_ide_metrics,
-                            src=devdata, pol=pol, agent_cursor=agent_cursor,
-                            collect=collect, import_id=import_id)
+        total_rows += _ingest_kiro_metrics(
+            root, [devdata], transcript.parse_kiro_ide_metrics,
+            src=devdata, pol=pol, agent_cursor=agent_cursor,
+            collect=collect, import_id=import_id)
     return total_rows, total_files
 
 
@@ -1210,12 +1219,12 @@ def _import_rollup(collected: list[dict], pol: dict, deduped: int) -> list[str]:
 def _write_manifest(root: Path, import_id: str, collected: list[dict], health: dict,
                     pol: dict, ts: str, names: dict | None = None) -> None:
     """Emit one `imports.jsonl` manifest row per (agent, surface, session) this sweep
-    captured rows from (plan §4), built from the run's appended rows (`collected`), the
+    captured rows from (ADR-CONSUMERS), built from the run's appended rows (`collected`), the
     per-agent probed source (`health`), and the lifted `{session: name}` map (`names`).
     Each row gets a cage-minted `session_uid` and the best-available `session_name` —
     the lifted title (claude `summary` / copilot `customTitle`), else the claude cwd
     basename (`project`), else `""` (honest empty for copilot CLI / kiro). Counts only —
-    the name is the sole prose, deliberate for this local audit file (plan §7) and never
+    the name is the sole prose, deliberate for this local audit file (ADR-CLI) and never
     on a call row. Fail-open: a manifest error never breaks the import."""
     if not collected:
         return
@@ -1343,7 +1352,7 @@ def _drop_routed_kiro_state(cursors: dict) -> None:
 def _load_policy(root: Path) -> dict:
     """Load policy fail-open: a malformed `policy.toml` (e.g. a duplicate `[debug]` table
     that makes `tomllib` raise) must degrade to the bundled default + a recorded debug
-    event, never traceback out of the capture path (plan §3.7)."""
+    event, never traceback out of the capture path (ADR-LAWS Law 1)."""
     try:
         return policy.load(paths.Footprint(root).policy)
     except Exception as e:  # fail-open: a broken project policy never aborts capture
@@ -1390,7 +1399,7 @@ def _rescan_metrics_line(before: dict[str, int], after: dict[str, int]) -> list[
 def run(root: Path, agent: str, args) -> list[str]:
     """Dispatch to one agent or, for ``all`` (the default), every surface in order.
 
-    Capture is global by default (plan §3.7): ``root`` is the resolved active sink
+    Capture is global by default (ADR-LAWS Law 2): ``root`` is the resolved active sink
     (``--ledger``/``CAGE_BASE`` → project ``.cage/`` → global ``~/.cage``), so an import
     fired anywhere — including a user-level Copilot hook in a repo with no ``.cage/`` —
     lands in the one resolved ledger and never scatters a stray local footprint.
@@ -1470,7 +1479,7 @@ def run(root: Path, agent: str, args) -> list[str]:
         health: dict = {}  # per-agent {files, src} accumulated by _scan across this sweep
         collected: list[dict] = []  # rows this run appended — feeds the §2.2 rollup, no re-read
         names: dict[str, str] = {}  # {session: lifted name}, parse-only — feeds the manifest only
-        # One import_id per sweep (plan §4): stamped on every call row this sweep appends
+        # One import_id per sweep (ADR-CONSUMERS): stamped on every call row this sweep appends
         # (the FK back to the manifest) and shared by the per-session manifest rows.
         from cage import manifest
         import_id = manifest.new_import_id()
@@ -1503,7 +1512,7 @@ def run(root: Path, agent: str, args) -> list[str]:
         # The loud per-agent×surface token/cost rollup (plan §2.2), from this run's
         # appended rows (the per-agent `✔ …` lines above already report file counts).
         lines += _import_rollup(collected, pol, deduped=0)
-        # The capture manifest (plan §4): one audit row per (agent, surface, session)
+        # The capture manifest (ADR-CONSUMERS): one audit row per (agent, surface, session)
         # captured, each carrying its lifted session name (parse-only, manifest-only).
         _write_manifest(root, import_id, collected, health, pol, _now_iso(), names)
         _record_health(root, cursors, health, captured, targets, pol)
@@ -1518,7 +1527,7 @@ def run(root: Path, agent: str, args) -> list[str]:
             debuglog.exception(root, "integrity.checkpoint", e, pol=pol)
         cursors["_last_import"] = _now_iso()  # pull-based staleness signal for doctor/report
         _save_cursors(foot, cursors)
-    # Piggybacked state maintenance (plan §3.6.4): every hook/watch/export sweep
+    # Piggybacked state maintenance (ADR-LAWS): every hook/watch/export sweep
     # converges here — the one chokepoint. Throttled + fail-open inside; cage
     # installs no scheduler, so this is the only auto path cleanup ever gets.
     from cage import cleanup

@@ -16,7 +16,7 @@ def root() -> Path:
 
 def ledger_root() -> Path:
     """The root whose `.cage/` is the **active ledger**, per the capture precedence
-    (`--ledger`/`CAGE_BASE` → nearest project `.cage/` → global `~/.cage`, plan §3.7) —
+    (`--ledger`/`CAGE_BASE` → nearest project `.cage/` → global `~/.cage`, ADR-LAWS Law 2) —
     for every read/emit/capture command (`report`, `import`, `export`, `watch`, …). Capture
     is global by default: a no-project user reads/writes the global ledger rather than
     scattering a footprint into the cwd."""

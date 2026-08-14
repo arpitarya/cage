@@ -9,8 +9,8 @@ spec.
 
 ## Current spec
 
-- [PLAN.md](PLAN.md) — the design of record: substrate contract, attribution
-  engine, every plan-§ referenced from code and CLAUDE.md.
+- [adr/](adr/README.md) — **the design of record**: ten records, the durable *why*
+  behind every metered thing, cited **by name** from code and CLAUDE.md.
 - **[OPEN-WORK.md](../work/OPEN-WORK.md) — the ONE plan of pending work, and ONLY that.**
   It lives in root `work/`, not `docs/` (moved 2026-08-12). It is an **index**: one
   line per item, one screen, nothing else. **The queue is empty** — Arpit closed

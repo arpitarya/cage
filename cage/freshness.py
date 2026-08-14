@@ -6,7 +6,7 @@ This module carried **four** signals through v0.50, three of which were pricing:
 2. *bundle age* — the bundle's own `prices_date` older than `stale_days`;
 3. *UNPRICED presence* — calls and call-less token receipts billing $0;
 4. **policy-defaults drift** — the project's `[meta] policy_version` older than the
-   bundle's (plan §3.10).
+   bundle's (CLAUDE.md).
 
 The money subsystem's deletion took 1–3 with it: there is no price table, no rate card,
 no `prices.toml` staleness to report, and no priced/unpriced distinction left to make.
@@ -30,7 +30,7 @@ from cage import paths, policy
 
 
 def policy_line(root: Path) -> str | None:
-    """Verbatim :func:`policysync.sync_recommendation` (plan §3.10) — one wording, one
+    """Verbatim :func:`policysync.sync_recommendation` (CLAUDE.md) — one wording, one
     home. No project policy file ⇒ the bundle applies directly and nothing can be
     stale."""
     from cage import policysync  # deferred: CLI-layer module, keep import light

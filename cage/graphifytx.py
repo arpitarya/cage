@@ -124,7 +124,7 @@ def _roots_for(cwd: str) -> list[Path]:
 def _report_read_signature(fp: str, graph_json: Path) -> tuple[str, str]:
     """``(args_hash, answer_hash)`` for a report read — per (file, mtime-bucket), so a
     re-read of the same report at the same graph revision dedupes to one receipt, not one
-    per line (plan §4). Uses the graph's mtime bucket as the revision key."""
+    per line (ADR-GRAPHIFY). Uses the graph's mtime bucket as the revision key."""
     args_hash = hashlib.sha1(fp.replace("\\", "/").lower().encode("utf-8")).hexdigest()[:16]
     try:
         bucket = str(int(graph_json.stat().st_mtime))

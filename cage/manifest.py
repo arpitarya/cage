@@ -8,14 +8,14 @@ files); overloading it would blur two record types.
 
 PII: `source_path` is tilde-relative (`importcmd._tilde`, strips $HOME/username) and
 counts-only — never absolute, never file contents. An import sweep emits **one row per
-(agent, surface, session)** it captured (plan §4): each row carries the log's `session`
+(agent, surface, session)** it captured (ADR-CONSUMERS): each row carries the log's `session`
 id, a cage-minted `session_uid` (a `n_…` id unique to this manifest row, distinct from
 the sweep-wide `import_id` FK), and the best-available `session_name` — **always**
 captured now (the earlier `[capture] session_names` opt-in is gone). Name lifting:
 claude ← the transcript `summary` record (fallback the cwd basename / `project`);
 copilot VS Code ← the chat `customTitle`/`generatedTitle`; copilot CLI / kiro ← `""`
 (honest empty, never a session id as a name). A name is user-authored prose — a
-deliberate, recorded PII widening for THIS local audit file only (plan §7); it never
+deliberate, recorded PII widening for THIS local audit file only (ADR-CLI); it never
 touches a call/receipt/savings row and is never read by a derived view. The graphify
 row's `session` is the task (already a validated cwd basename), and its name = that task.
 
@@ -82,7 +82,7 @@ def record_import(root: Path, *, import_id: str, agent: str, surface: str,
                   rows_appended: int, tokens_in: int, tokens_out: int, cached_in: int,
                   ts: str, session_name: str = "", machine: str = "") -> bool:
     """One manifest row per (agent, surface, session) an import sweep captured rows from
-    (plan §4). `session` is the log's own session id; `session_uid` is the cage-minted
+    (ADR-CONSUMERS). `session` is the log's own session id; `session_uid` is the cage-minted
     `n_…` id unique to this row; `session_name` is the best-available human name (``""``
     when the log carries none — honest, never fabricated). Fail-open."""
     row = {"kind": "import", "import_id": import_id, "session_uid": session_uid,

@@ -39,7 +39,7 @@ also fails if an agent × surface directory is ever missing.
 | Fixture | Status | Pinned against |
 |---|---|---|
 | claude/cli | verified | Claude Code CLI transcript (`~/.claude/projects/**/*.jsonl`), assistant turns with `uuid`/`timestamp`/`cwd`/`message.usage` — see `transcript.parse_calls` |
-| claude/vscode | verified | Same store, same format: the Claude Code VS Code extension writes the identical `~/.claude/projects` transcript (plan §3.7 — only Claude's extension shares the CLI's on-disk log) |
+| claude/vscode | verified | Same store, same format: the Claude Code VS Code extension writes the identical `~/.claude/projects` transcript (ADR-CLAUDE — only Claude's extension shares the CLI's on-disk log) |
 | copilot/cli | verified | Copilot CLI 1.0.65 `session-state/<id>/events.jsonl` — `session.shutdown.modelMetrics`, tokens under `usage`, `inputTokens` already total — see `transcript.parse_copilot_calls` |
 | copilot/vscode | verified | Real Copilot Chat extension session (v0.54.0 / VS Code 1.126, 2026-07-08), pinned against **VS Code's chat-session store**: `<vscode-user>/workspaceStorage/<hash>/chatSessions/<session>.jsonl` (`kind:2, k:["requests"]` lines; per-request `requestId`/`timestamp`/`modelId`/`promptTokens`/`completionTokens`) — see `transcript.parse_copilot_vscode_calls`. The extension's own `GitHub.copilot-chat/transcripts/` event stream carries **no** usage event (no `session.shutdown`, even after quitting VS Code) — that's why the store differs from the CLI's `events.jsonl`. `CAGE_VSCODE_USER` overrides the user dir. |
 | kiro/cli | verified | Kiro `dev_data/tokens_generated.jsonl` (`{model, provider, promptTokens, generatedTokens}`, coarse by design) — see `transcript.parse_kiro_calls` |

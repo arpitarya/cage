@@ -96,9 +96,9 @@ GFX-COV-FIELD · COPILOT-JETBRAINS-UNPROBED).
 
 ## No ADR — doc discipline (CLAUDE.md)
 
-- **DOC-BACKTICK-GATE** *(was PLAN-BACKTICK-IMBALANCE)* — the imbalance is gone: PLAN.md is
-  **even** at 1832 backticks outside fences, at HEAD and in tree. Nothing is recorded as
-  fixing it, so the count moved untracked — which argues for the gate. An unbalanced
+- **DOC-BACKTICK-GATE** *(was PLAN-BACKTICK-IMBALANCE)* — the file the imbalance was
+  measured in is deleted (`docs/PLAN.md`, 2026-08-14), so the original evidence is gone
+  and nothing was ever recorded as fixing it — which is the argument for the gate. An unbalanced
   backtick makes every downstream code-span scan misread the file (how `_doc_flags` was
   silently emptied and an assertion passed vacuously), and nothing fails today. One-line
   detector: strip fences, count backticks, fail on odd.

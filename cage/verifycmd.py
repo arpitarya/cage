@@ -1,5 +1,5 @@
 """`cage authorship verify` — a deterministic consistency pass over the provenance buffer
-(plan §3.5). **Report-only by design**: this command always exits 0. It is meant
+(ADR-AUTHORSHIP). **Report-only by design**: this command always exits 0. It is meant
 to be wired into CI for visibility, never as a gate — see the hard constraint
 "cage authorship verify is report-only, never fails the build".
 """

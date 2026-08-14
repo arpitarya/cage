@@ -24,7 +24,7 @@ def scheduler_hint() -> str:
 
 def ago(ts: str) -> str:
     """Human "3m ago" for an ISO timestamp; fail-open to "". Used by `cage doctor`/`cage
-    report` to surface "last import: N ago" (capture is pull-based, plan §3.7). A clock
+    report` to surface "last import: N ago" (capture is pull-based, ADR-LAWS Law 1). A clock
     is read, but never inside a derived-from-ledger table — determinism holds. The floor
     is "just now", never per-second ("0s ago" → "2s ago" made back-to-back runs of the
     same view byte-different, which is exactly what the determinism sweeps compare)."""

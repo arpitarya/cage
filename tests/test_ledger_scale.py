@@ -1,4 +1,4 @@
-"""Ledger scale (plan §3.6): month partitioning, `scope`, team aggregation, size warning.
+"""Ledger scale (ADR-LAWS): month partitioning, `scope`, team aggregation, size warning.
 
 Covers the handoff Definition of Done and Non-negotiables — partition target by `ts`,
 reader globs legacy + dated, `--since` shard skipping, `scope` round-trip + filter +

@@ -1,4 +1,4 @@
-"""Tier-0 structural compression of tool output → a `compressor` receipt (plan §6).
+"""Tier-0 structural compression of tool output → a `compressor` receipt (ADR-GRAPHIFY).
 
 Deterministic, no model: minify JSON and cap long arrays/strings (reversibly
 annotated), or collapse whitespace for free text. The point is not the bytes — it

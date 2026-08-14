@@ -103,7 +103,7 @@ def _gitignore(fp: paths.Footprint) -> None:
     fresh = not gi.exists()
     lines = (gi.read_text(encoding="utf-8").splitlines() if not fresh else
              ["# Append-only event log — machine-local, may carry holdings counts.",
-              "# Point CAGE_LEDGER at elgar to keep even the counts private (plan §10).",
+              "# Point CAGE_LEDGER at elgar to keep even the counts private (ADR-LAWS Law 4).",
               "ledger/",
               "# Generated dashboards.",
               "out/"])

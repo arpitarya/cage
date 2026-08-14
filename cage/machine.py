@@ -1,4 +1,4 @@
-"""Opaque machine id for the fleet study (roadmap P5, plan §4.9).
+"""Opaque machine id for the fleet study (roadmap P5, ADR-CONSUMERS).
 
 A **random** id generated once into ``.cage/state/machine.json`` — never the
 hostname, username, or anything derivable from the machine (the analyst keeps

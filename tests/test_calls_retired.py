@@ -15,17 +15,23 @@ What must stay true, and each has a test below:
   3. **The parsers survive** — `transcript.parse_calls` and friends are the
      `[sources.<name>] format = …` custom-source contract (10.1). Deleting them would
      break user config silently.
-  4. **Kiro is the stated exception** — it keeps its writer. See the module note below.
+  4. **Kiro is retired too — and its facts RELOCATED, not dropped.** See below.
 
-**Kiro, and why it deviates from the spec.** For claude and copilot the retired leg was a
-*duplicate*: `ledger/claude/` and `ledger/copilot/` hold the same traffic. Kiro IDE has no
-metric twin — `parse_kiro_ide_metrics` reads `devdata.sqlite`, absent on every install ever
-probed — so its `calls` leg is the ONLY reader of `tokens_generated.jsonl`. Removing it
-would not de-duplicate kiro; it would end kiro IDE capture, take ADR-KIRO's routing
-decision's subject matter with it, and leave the upgrade-watch without a baseline. The
-handoff's reason (the rows are unsummable) is already handled by `ABSENT_SPINES`, which
-keeps them out of every total. Kept as the smaller reversible choice and flagged for
-Arpit — deleting `import_kiro`'s five-line leg implements the spec as written.
+**Kiro: retired, on a condition.** For claude and copilot the retired leg was a
+*duplicate*: `ledger/claude/` and `ledger/copilot/` hold the same traffic, so stopping the
+writer lost nothing. Kiro IDE had no such twin — `parse_kiro_ide_metrics` reads
+`devdata.sqlite`, absent on every install ever probed — so retiring its leg unchanged
+would have ENDED kiro IDE capture rather than de-duplicating it. That is why P5 kept it
+and flagged it as KIRO-CALLS-LEG.
+
+**Arpit ratified the retirement on 2026-08-15 with the condition attached: "retire it and
+capture the data in ledger/kiro."** So `tokens_generated.jsonl` is now read into the
+kiro-metrics ledger as `source="ide-log"`, and the tests below assert the retirement and
+the relocation TOGETHER. That pairing is the whole gate: "no kiro calls rows" alone is
+satisfied just as well by deleting the leg outright, which is precisely what the condition
+forbade — and nothing else in the suite would have noticed, because kiro rows were already
+excluded from every total by `ABSENT_SPINES` and so their disappearance changes no number
+a user ever sees.
 """
 from __future__ import annotations
 
@@ -34,7 +40,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from cage import importcmd, ledger, metering, paths, transcript
+from cage import importcmd, ledger, metering, paths, schema, transcript
 from srcseed import mkcage
 
 
@@ -137,34 +143,81 @@ def test_a_custom_claude_source_inherits_the_quarantined_defects():
     assert 'format = "claude"' in text or "format = `claude`" in text
 
 
-# ── 4 · kiro, the stated exception ──────────────────────────────────────────────
+# ── 4 · kiro: retired AND relocated ─────────────────────────────────────────────
 
-def test_kiro_keeps_its_calls_writer(proj, tmp_path):
-    """The deviation, pinned so it is a decision rather than an oversight — and so that
-    implementing the spec as written is a deliberate act that turns this test red."""
+def _kiro_log(tmp_path, tin=1200, tout=0):
     log = tmp_path / "tokens_generated.jsonl"
     log.write_text(json.dumps({"model": "agent", "provider": "kiro",
-                               "promptTokens": 1200, "generatedTokens": 0}) + "\n",
+                               "promptTokens": tin, "generatedTokens": tout}) + "\n",
                    encoding="utf-8")
+    return log
+
+
+def test_kiros_calls_writer_is_retired_and_its_store_still_captured(proj, tmp_path):
+    """**Both halves in one test, and that is the point.**
+
+    The retirement half alone would pass on a kiro leg deleted outright — and deleting it
+    outright was the one outcome Arpit's ratification ruled out, because kiro IDE has no
+    metric twin. So the relocation is asserted in the same breath: the same store, the
+    same number, in `ledger/kiro/` under `source="ide-log"`.
+
+    A failure here is a real regression in either direction — a returning `calls` writer
+    (silent double-recording) or a vanished IDE capture (silent data loss, invisible in
+    every total because kiro was never in one)."""
+    log = _kiro_log(tmp_path)
     importcmd.run(proj, "kiro", SimpleNamespace(path=str(log), project=None, since=None))
     sink = paths.kiro_routed(proj) or proj
-    rows = [c for c in ledger.calls(sink) if c.get("agent") == "kiro"]
-    assert rows, "kiro IDE has no metric twin — retiring this leg ends its capture"
+
+    assert [c for c in ledger.calls(sink) if c.get("agent") == "kiro"] == []
+
+    rows = [r for r in ledger.kiro_metrics(sink) if r.get("source") == "ide-log"]
+    assert rows, "the store lost its only reader — retirement without relocation"
     assert rows[0]["tokens_in"] == 1200
+    assert rows[0]["surface"] == "ide" and rows[0]["agent"] == "kiro"
 
 
-def test_kiro_rows_still_never_reach_a_token_total(proj, tmp_path):
-    """And the reason keeping them is cheap: `ABSENT_SPINES` already excludes them from
-    every total, so they cost nothing and render `—` with a stated reason — never a 0."""
-    log = tmp_path / "tokens_generated.jsonl"
-    log.write_text(json.dumps({"model": "agent", "provider": "kiro",
-                               "promptTokens": 1200, "generatedTokens": 0}) + "\n",
-                   encoding="utf-8")
+def test_the_relocated_rows_are_capture_only_by_kind_not_by_exception(proj, tmp_path):
+    """Why the move is an improvement rather than a lateral. As `calls` rows these were
+    spend that every total had to exclude BY NAME (`ABSENT_SPINES["kiro"]`, a maintained
+    exception that fails open — forget it once and kiro's `0`-output rows start deflating
+    a real average). As kiro-metrics rows they cannot reach a spend basis at all: the kind
+    is capture-only, so the exclusion is structural.
+
+    `absent_reason` is asserted alongside, because "excluded from the total" must keep
+    rendering as `—` with a stated reason and never as a fabricated `0`."""
+    log = _kiro_log(tmp_path)
     importcmd.run(proj, "kiro", SimpleNamespace(path=str(log), project=None, since=None))
     sink = paths.kiro_routed(proj) or proj
     assert [r for r in ledger.spend(sink) if r.get("agent") == "kiro"] == []
     from cage import units
     assert units.absent_reason("kiro", units.TOKENS)
+
+
+def test_reimport_never_double_records_the_relocated_store(proj, tmp_path):
+    """The `calls` leg's line-index+content-hash id survived the move, so the append-only
+    log stays safe to re-read. Asserted because the dedupe anchor changed kinds: metrics
+    rows dedupe against `ledger.kiro_metrics_raw`, a different seen-set from the call-id
+    one this leg used to ride."""
+    log = _kiro_log(tmp_path)
+    args = SimpleNamespace(path=str(log), project=None, since=None)
+    importcmd.run(proj, "kiro", args)
+    sink = paths.kiro_routed(proj) or proj
+    once = [r for r in ledger.kiro_metrics(sink) if r.get("source") == "ide-log"]
+    importcmd.run(proj, "kiro", args)
+    twice = [r for r in ledger.kiro_metrics(sink) if r.get("source") == "ide-log"]
+    assert [r["id"] for r in once] == [r["id"] for r in twice]
+
+
+def test_exactly_one_of_the_two_ide_grains_is_manifest_eligible(proj):
+    """`ide` (devdata.sqlite) and `ide-log` (tokens_generated.jsonl) are the SAME counter
+    from Kiro's two IDE stores. Listing both in `_MANIFEST_SOURCES` would count one
+    install's IDE traffic twice the day `devdata.sqlite` finally ships — the `copilot`
+    `cli`/`cli-delta` hazard, one store later. Pinned as a rule rather than as today's
+    value so flipping the pair stays legal and adding to it does not."""
+    both = {"ide", "ide-log"}
+    listed = both & set(importcmd._MANIFEST_SOURCES["kiro"])
+    assert len(listed) == 1, f"exactly one of {both} may be manifest-eligible, got {listed}"
+    assert both <= set(schema.KIRO_METRIC_SOURCES), "both grains must remain writable"
 
 
 # ── the knock-ons P5 had to carry with it ───────────────────────────────────────

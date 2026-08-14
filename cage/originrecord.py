@@ -1,11 +1,11 @@
-"""The provenance write side — authorship-attribution rows (plan §3.5).
+"""The provenance write side — authorship-attribution rows (ADR-AUTHORSHIP).
 
 Mirrors `tasks.py`'s git idiom exactly: shell out, read-only, 5s timeout,
 fail-open (`(OSError, subprocess.SubprocessError)` → None, never raise). A
 provenance row only ever exists if *some* signal fired (a live `PostToolUse`
 hook, a parsed transcript, or an explicit human attestation in `origin.py`) —
 there is no "unknown" row; absence of a row *is* unknown (read-time default,
-plan §3.5). `method` is sacred here too: never let a recorded row claim a
+ADR-AUTHORSHIP). `method` is sacred here too: never let a recorded row claim a
 stronger method than the signal that actually produced it.
 """
 from __future__ import annotations
@@ -149,7 +149,7 @@ def record(root: Path, *, sha: str, files: list[str], agent: str = "",
           **counts) -> bool:
     """Append one provenance row. Fail-open; idempotent on (sha, agent, session_id, method).
     Confidence is bumped when a *different* method already recorded an overlapping
-    file for the same (sha, session) — independent-path corroboration, plan §3.5.
+    file for the same (sha, session) — independent-path corroboration, ADR-AUTHORSHIP.
 
     ``**counts`` carries the additive-optional line-match integers
     (`schema.PROVENANCE_COUNT_FIELDS`, agent-vs-human v2 P1). Unknown keys are dropped
@@ -187,7 +187,7 @@ def record_hooked(root: Path, *, sha: str, files: list[str], agent: str,
                   lines_added: int = 0, lines_removed: int = 0,
                   session_id: str = "", origin: str = "agent") -> bool:
     """Live `PostToolUse` capture — the highest-trust method (sees `tool_input` as
-    the agent acts, plan §3.5)."""
+    the agent acts, ADR-AUTHORSHIP)."""
     return record(root, sha=sha, files=files, agent=agent, lines_added=lines_added,
                  lines_removed=lines_removed, method="hooked", origin=origin,
                  session_id=session_id)

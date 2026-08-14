@@ -1,4 +1,4 @@
-"""`cage authorship origin <sha>` — read surface for authorship attribution (plan §3.5).
+"""`cage authorship origin <sha>` — read surface for authorship attribution (ADR-AUTHORSHIP).
 
 `origin="unknown"` is a **read-time default**, never a written row: a sha with no
 provenance fragment anywhere (local buffer or `refs/notes/cage-provenance`) simply

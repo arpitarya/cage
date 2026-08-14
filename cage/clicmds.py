@@ -1,4 +1,4 @@
-"""Command handlers — load policy, derive a view, print it (plan §7, §8)."""
+"""Command handlers — load policy, derive a view, print it (ADR-CLI)."""
 from __future__ import annotations
 
 import re
@@ -15,7 +15,7 @@ from cage.errors import CageError
 
 def _project_filter(args):
     """The `--project` value, resolving the `.` (or bare-flag) shorthand to the current
-    directory's basename — a project view of the global ledger (plan §3.7)."""
+    directory's basename — a project view of the global ledger (ADR-LAWS Law 2)."""
     p = getattr(args, "project", None)
     return Path.cwd().name if p == "." else p
 
@@ -260,7 +260,7 @@ def _newest_task(known: dict) -> str:
 
 
 def cmd_policy(args) -> int:
-    """`cage policy <diff|sync>` (plan §3.10) — upgrade the resolved root's
+    """`cage policy <diff|sync>` (CLAUDE.md) — upgrade the resolved root's
     project policy.toml to the installed bundle; dry-run by default, never
     auto-applied by anything."""
     from cage import policysync
@@ -304,7 +304,7 @@ def _study_sweep(root: Path, since: str | None) -> tuple[bool, int]:
 
 
 def _study_export(r, args) -> int:
-    """`cage study export` — the one-file fleet bundle (plan §4.9), rows + phase markers
+    """`cage study export` — the one-file fleet bundle (ADR-CONSUMERS), rows + phase markers
     + a counts-only manifest. The bundle stays **jsonl**: it is the one export that is
     also an *import* source (`cage import bundle*.zip`), which is why it never grew the
     csv/otel flags that the deleted `cage data export` carried."""
@@ -323,7 +323,7 @@ def _study_export(r, args) -> int:
 
 
 def cmd_study(args) -> int:
-    """Fleet-study verbs (plan §4.9). Markers/report act on the *active* ledger
+    """Fleet-study verbs (ADR-CONSUMERS). Markers/report act on the *active* ledger
     (capture lands there); `join` additionally wires this project's agents."""
     # No runtime refusal for `--csv`/`--export`/`--stamp` on a marker verb any more:
     # CLI-GAPS(b) gave each study action its own parser, and only `report` — the one
@@ -429,7 +429,7 @@ def cmd_setup(args) -> int:
     here = root()
 
     # Handle --global: initialize the machine-wide global ledger (~/.cage) and exit. This
-    # is the project-less capture sink (plan §3.7) — `cage import`/`cage data export` from any
+    # is the project-less capture sink (ADR-LAWS Law 2) — `cage import`/`cage data export` from any
     # dir without a project `.cage/` land here.
     if getattr(args, "global_ledger", False):
         info = initcmd.run(paths.global_home(), pointer=False)
@@ -696,7 +696,7 @@ def cmd_import(args) -> int:
     and no project. Each agent prints its own count line; the proxy fallback for those
     with no on-disk usage log. Always exits 0 (fail-open).
 
-    With positional BUNDLE args (fleet path, plan §4.9), merges study bundles by row
+    With positional BUNDLE args (fleet path, ADR-CONSUMERS), merges study bundles by row
     identity instead — the analyst's verb; idempotent, a bad bundle is a typed error."""
     if getattr(args, "bundles", None):
         from cage import study

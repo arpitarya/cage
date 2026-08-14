@@ -1,5 +1,5 @@
 """`cage policy sync` / `cage policy diff` — upgrade the project policy.toml
-to the installed bundle (plan §3.10).
+to the installed bundle (CLAUDE.md).
 
 Syncs the whole project config against the bundle: adds
 new sections/keys the bundle gained since the project was inited, refreshes

@@ -6,7 +6,7 @@ The differentiating question no usage dashboard answers per-*chat*: which conver
 used the tokens, and (where the store carries a title) what was it about? The
 substrate already carries everything numeric — `session`, `agent`, `surface`,
 `tokens_in`, `tokens_out`, `cached_in`, `cache_write_in`, `credits` are all call-row
-fields (plan §3.1) — so this is pure derive, no substrate change.
+fields (ADR-LAWS) — so this is pure derive, no substrate change.
 
 **Mechanism (the proposal's five steps, binding):**
 

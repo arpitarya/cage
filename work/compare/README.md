@@ -51,7 +51,7 @@ Naming: `<topic>.compare.md`. Written in short points, not walls of prose.
   (credits = what was billed; tokens = the cross-agent denominator), joined by a
   ladder, never blended. **DECIDED — C accepted 2026-08-02 · IMPLEMENTED v0.44 · RELEASED**
   (v0.44.0; corrected 2026-08-11 — this line said "unreleased" for nine days). Living spec: [FORMULAS.md §1.1a](../../docs/FORMULAS.md) ·
-  [PLAN.md §3.1](../../docs/PLAN.md) · `cage query copilot-credits`; the proposal it graduated
+  [ADR-LAWS](../../docs/adr/0001_laws.md) · `cage query copilot-credits`; the proposal it graduated
   through is [archived](../archive/v0.44-copilot-credits.proposal.md).
 - [view-export-and-run-stamp.compare.md](view-export-and-run-stamp.compare.md) — the
   artifact surface: where a generated-at stamp may live, whether a read command writes a

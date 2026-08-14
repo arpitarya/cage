@@ -1,6 +1,6 @@
 ---
 doc: compare — pricing basis for Copilot usage
-status: DECIDED — verdict C accepted by Arpit 2026-08-02, IMPLEMENTED v0.44; **reopened and re-decided 2026-08-11 for the multi-model shutdown (REV-CREDITS defect 2), IMPLEMENTED same day** — living spec: ../FORMULAS.md §1.1a · ../PLAN.md §3.1 · `cage query copilot-credits`; the proposal it graduated through is archived at ../archive/v0.44-copilot-credits.proposal.md
+status: DECIDED — verdict C accepted by Arpit 2026-08-02, IMPLEMENTED v0.44; **reopened and re-decided 2026-08-11 for the multi-model shutdown (REV-CREDITS defect 2), IMPLEMENTED same day** — living spec: ../FORMULAS.md §1.1a · ADR-LAWS · `cage query copilot-credits`; the proposal it graduated through is archived at ../archive/v0.44-copilot-credits.proposal.md
 raised: 2026-08-02 (fork surfaced by COPILOT-CREDITS — the store persists the billed credits cage drops)
 evidence: ../research/copilot-vscode-token-sources.md
 ---

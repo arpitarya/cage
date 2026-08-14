@@ -82,7 +82,7 @@ NO_RECORD: dict[str, str] = {
     "cfgio": "TOML/JSON read helpers",
     "cleanup": "state pruning; an allowlist, and never a ledger path",
     "debuglog": "the CAGE_DEBUG sink",
-    "demo": "seeds the plan's worked example",
+    "demo": "seeds the worked example",
     "doctorbundle": "redacted diagnostics archive",
     "doctorcmd": "diagnoses the capture paths; owns no decision of its own",
     "freshness": "import-staleness advice line",

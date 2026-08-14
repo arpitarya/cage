@@ -236,20 +236,30 @@ def test_kiro_import_counts_and_idempotent(tmp_path, monkeypatch, capsys):
     clicmds.cmd_import(_args(agent="kiro", path=str(log)))
     assert ledger.calls(root) == []                     # not in the project ledger
     machine = paths.global_home()
-    # `ledger.calls`, not `spend()`: kiro has NO token spine (`ABSENT_SPINES`), so its
-    # rows are correctly absent from the spend basis and present in `calls` — which is
-    # exactly why P5 kept kiro's writer (it has no metric twin to move to).
-    calls = ledger.calls(machine)
-    assert len(calls) == 2 and {c["agent"] for c in calls} == {"kiro"}
-    assert {c["tokens_in"] for c in calls} == {1200, 13}  # the 0-output line still counts
+    # `ledger.kiro_metrics`, not `calls` and not `spend()`. KIRO-CALLS-LEG retired the
+    # `calls` writer and relocated this store to `ledger/kiro/` as `source="ide-log"`.
+    # Both halves are asserted together on purpose: "no calls rows" alone would pass just
+    # as happily on a kiro leg that had been deleted outright, which is the failure the
+    # ratification was conditional on NOT happening.
+    assert ledger.calls(machine) == [], "the retired writer must stay retired"
+    rows = ledger.kiro_metrics(machine)
+    assert len(rows) == 2 and {r["agent"] for r in rows} == {"kiro"}
+    assert {r["source"] for r in rows} == {"ide-log"}
+    assert {r["tokens_in"] for r in rows} == {1200, 13}  # the 0-output line still counts
     out = capsys.readouterr().out
     assert "✔ kiro: imported 2 call(s) from 1 file(s) →" in out
     # the line names the sink — tilde-relative when under the real home (importcmd._tilde,
     # "machine-portable in tests"), which the sandboxed tmp_path IS on a Windows runner
     assert importcmd._tilde(paths.Footprint(machine).base) in out
-    before = b"".join(p.read_bytes() for p in paths.Footprint(machine).shards("calls"))
+    # Idempotency asserted on the shards the rows actually live in now — asserting the
+    # `calls` shards would compare two empty byte strings and prove nothing.
+    def _kiro_shards():
+        return b"".join(p.read_bytes()
+                        for p in paths.Footprint(machine).kiro_metric_shards())
+    before = _kiro_shards()
+    assert before, "the idempotency check must have rows to be idempotent about"
     clicmds.cmd_import(_args(agent="kiro", path=str(log)))  # re-import → idempotent
-    assert b"".join(p.read_bytes() for p in paths.Footprint(machine).shards("calls")) == before
+    assert _kiro_shards() == before
 
 
 def test_all_four_agents_are_log_bearing():

@@ -106,7 +106,7 @@ def test_metering_matrix_lists_all_three_agents(proj):
 
 
 def test_metering_matrix_is_honest_about_pull_capture(proj):
-    # Honest doctor (plan §3.6.5): capture is pull-based and the ONLY path — no hooks.
+    # Honest doctor (ADR-LAWS Law 2): capture is pull-based and the ONLY path — no hooks.
     # MCP is the wired *read* surface, and whether it's installed says nothing about
     # whether capture ran; the matrix points at `cage import` + the last-import signal.
     from cage import agents

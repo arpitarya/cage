@@ -36,7 +36,7 @@ def test_install_all_surfaces(homes):
     proj.mkdir()
     agents.install(proj)
     assert agents.status(proj) == {"claude": True, "copilot": True, "kiro": True}
-    # The committed shim is written alongside the wiring (both twins, plan §5).
+    # The committed shim is written alongside the wiring (both twins, ADR-GRAPHIFY).
     assert (proj / ".cage" / "bin" / "cage-run").exists()
     assert (proj / ".cage" / "bin" / "cage-run.cmd").exists()
     # Claude MCP — committed file references the shim, never a binary path.

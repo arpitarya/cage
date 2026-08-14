@@ -70,7 +70,7 @@ def _live(pol: dict) -> dict:
         "cleanup_on": "on" if policy.cleanup_enabled(pol) else "off",
         "cleanup_warn_on": "on" if policy.cleanup_warn(pol) else "off",
         "import_before_export": "on" if policy.import_before_export(pol) else "off",
-        # policy sync (plan §3.10) — live version stamps, both sides
+        # policy sync (CLAUDE.md) — live version stamps, both sides
         "policy_version_bundled": str(policy.bundled_raw().get("meta", {})
                                       .get("policy_version") or "?"),
         "policy_version_project": str((policy.load_project_raw(foot.policy)

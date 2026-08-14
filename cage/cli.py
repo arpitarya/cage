@@ -1,4 +1,4 @@
-"""`cage` CLI — argparse dispatch over the deterministic command surface (plan §7).
+"""`cage` CLI — argparse dispatch over the deterministic command surface (ADR-CLI).
 
 Phase 3 (CLI tiering): the front door is five daily verbs + six groups. Moved verbs
 keep their exact flags and run functions — they dispatch from a group subparser
@@ -156,7 +156,7 @@ def build_parser() -> argparse.ArgumentParser:
                         formatter_class=argparse.RawDescriptionHelpFormatter)
     im.add_argument("bundles", nargs="*", metavar="BUNDLE",
                     help="study bundle zip(s) from `cage data export --study` — merged by row "
-                         "identity, idempotent (fleet path, plan §4.9)")
+                         "identity, idempotent (fleet path, ADR-CONSUMERS)")
     im.add_argument("--agent", choices=[*SURFACES, "all"], default="all",
                     help="which agent to meter (default: all)")
     im.add_argument("--path", help="a transcript file or dir to scan (log-bearing agents only)")
@@ -391,7 +391,7 @@ def build_parser() -> argparse.ArgumentParser:
     # ── group: study ───────────────────────────────────────────────────────────
     st_g = sub.add_parser("study",
                          help="fleet study: recorded phases + paired-by-machine deltas "
-                              "across laptops (plan §4.9)",
+                              "across laptops (ADR-CONSUMERS)",
                          epilog="examples:\n"
                                 "  cage study join baseline      # enroll this machine: wire + start + doctor\n"
                                 "  cage study start plugin       # switch phase (opaque machine id, no hostname)\n"

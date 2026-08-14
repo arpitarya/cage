@@ -4,7 +4,7 @@
 tool savings. In the family alongside **fux** (decisions→rules). `$0`, stdlib-only,
 deterministic, independent of any AI tool.
 
-Design of record: [docs/PLAN.md](docs/PLAN.md). Read it before changing
+Design of record: [the ADR set](docs/adr/README.md). Read it before changing
 the substrate contract or the attribution engine.
 
 Maintainer handoff: [work/INTERVIEW.md](work/INTERVIEW.md)
@@ -26,7 +26,7 @@ changelog entry.
 
 ```
 record_call / record_receipt  →  .cage/ledger/  — ONE DIRECTORY PER PRODUCER (v0.51)
-        (meter, plan §5)          │   claude/ copilot/ kiro/   (agent usage, per chat)
+        (meter, ADR-CONSUMERS)    │   claude/ copilot/ kiro/   (agent usage, per chat)
                                   │   consumer/                (cage.meter — dual-written)
                                   │   graphify/ fux/ compress/ responsecache/  (savings)
                                   │   provenance/              (authorship, monthly)
@@ -54,11 +54,14 @@ condition is numbered and reopenable only by a *measurement*, never an argument.
 directory under `ledger/`. **Nothing on disk was ever moved:** each migration is *stop
 writing here, start writing there, read both forever*, so every legacy path still resolves.
 `calls` in particular can never be fully retired — retired-agent rows (codex, 373 in one
-real ledger) have no other home, and `ledger.calls` is permanent. **The claude and copilot
-transcript→`calls` writers are RETIRED** (for claude the row was a second copy of the same
-traffic, inflated 1.979×, that no view resolved from); **kiro's leg is deliberately KEPT**
-because kiro IDE has no metric twin, so retiring it would end that surface's capture rather
-than de-duplicate it (ADR-KIRO; queue item KIRO-CALLS-LEG). `transcript.parse_calls` and its
+real ledger) have no other home, and `ledger.calls` is permanent. **No built-in leg writes a
+`calls` row any more.** Claude's and copilot's went in P5 (for claude the row was a second
+copy of the same traffic, inflated 1.979×, that no view resolved from). **Kiro's went with
+KIRO-CALLS-LEG (ratified 2026-08-15) — but its store was RELOCATED, not dropped**: kiro IDE
+has no metric twin, so `tokens_generated.jsonl` is now read into `ledger/kiro/` as
+`source="ide-log"` rather than losing its only reader. The rows gained by moving: as `calls`
+they were spend every total had to exclude by name; as metrics they are capture-only by kind
+(ADR-KIRO). `transcript.parse_calls` and its
 three siblings survive as the `[sources.<name>] format` custom-source contract — a source
 declaring `format = "claude"` inherits CLAUDE-DEDUP/SUBAGENT-KEY, which ADR-CONSUMERS states.
 `ledger/` is a flat namespace shared by agents, consumers and tools, so a colliding tool name
@@ -87,24 +90,24 @@ items).
 Long-lived logs are month-partitioned (writers append to a dated shard chosen from
 the row's own `ts`; readers glob + concatenate, legacy single files still read; `--since`
 skips below-cutoff months). provenance.jsonl is a local buffer only — canonical storage
-is refs/notes/cage-provenance, written by CI alone (plan §3.5). The calls/receipts/tasks
+is refs/notes/cage-provenance, written by CI alone (ADR-AUTHORSHIP). The calls/receipts/tasks
 rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team view
-(`--team`, plan §3.6.3; [ADR 0001](work/archive/adr/0001-ledger-team-aggregation-notes-not-external-sink.md)
+(`--team`, ADR-LAWS; [ADR 0001](work/archive/adr/0001-ledger-team-aggregation-notes-not-external-sink.md)
 — why a git ref, not an external sink).
 
 - **Substrate** ([schema.py](cage/schema.py)) — `make_call` / `make_receipt` stamp
   ids + validate the closed enums. Rows are plain JSON. Prompt bodies are never a
   field (counts only). Change here = change the contract; update the plan §3. Calls/
   receipts also carry an additive optional `scope` (top-level changed dir, same PII
-  guard as tasks; empty = the legacy contract, plan §3.6.2); calls additionally carry an
+  guard as tasks; empty = the legacy contract, ADR-LAWS); calls additionally carry an
   additive optional `project` (working-dir basename, same PII guard; empty = legacy) — a
   **recorded fact with no reader** — its `cage report --project` view was deleted in
   v0.50; the field is still stamped, deliberately distinct from `scope`'s monorepo
-  axis (plan §3.7). The long-lived logs are month-partitioned behind
-  `ledger.append_row`/`read_kind` (plan §3.6.1). Calls also carry an additive optional
+  axis (ADR-LAWS Law 2). The long-lived logs are month-partitioned behind
+  `ledger.append_row`/`read_kind` (ADR-LAWS). Calls also carry an additive optional
   `credits` (the provider's own billed figure, verbatim) — the one additive field whose
   default is a `None` sentinel rather than zero, because absence and a recorded `0.0` are
-  different billing facts (plan §3.1) — and `billed_with`, the id of the row carrying
+  different billing facts (ADR-LAWS) — and `billed_with`, the id of the row carrying
   **this** row's billing when the provider computed one figure over a *group* of calls
   (REV-CREDITS defect 2). `billed_with` is a recorded structural fact, never a derived
   number, and is empty for every row that bills for itself.
@@ -160,7 +163,7 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   produce/skip log at every receipt push site (graphifymeter/record_receipt/
   responsecache/compress) makes a silently-skipped savings receipt diagnosable.
 - **Attribution** ([attribution.py](cage/attribution.py))
-  — the differentiator (plan §4). Marginal-by-fixed-order; a reconstructed
+  — the differentiator (ADR-LAWS). Marginal-by-fixed-order; a reconstructed
   counterfactual cell is `modeled`/`estimated`, never `measured` (only the recorded
   run is an invoice). `cage demo` must keep reproducing the plan's §4.4 tables.
 - **The Tier-1 human axis is GONE (v0.36)** — `human.py`/`humanview.py`/`trend.py`/
@@ -198,7 +201,7 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
 - **Provenance (authorship attribution)** ([schema.py](cage/schema.py) `make_provenance`,
   [originrecord.py](cage/originrecord.py) write side, [origin.py](cage/origin.py) read
   surface, [notessync.py](cage/notessync.py) distribution, [verifycmd.py](cage/verifycmd.py))
-  — *who wrote which files in which commit* (plan §3.5), a fourth append-only file
+  — *who wrote which files in which commit* (ADR-AUTHORSHIP), a fourth append-only file
   (`provenance.jsonl`) answering a different question than calls/receipts/tasks. Its
   own closed enums, deliberately separate from `METHODS`/`UNITS`: `method ∈
   {hooked, transcript, heuristic}` (ranked by `constants.PROVENANCE_METHOD_TRUST`,
@@ -273,7 +276,7 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   agent-authorship` explains it.
 - **Usage-impact surface** ([taskgroup.py](cage/taskgroup.py), [compare.py](cage/compare.py),
   [estimate.py](cage/estimate.py), [calibration.py](cage/calibration.py)
-  — plan §4.7–§4.8) — the closed-task join
+  — the usage-impact roadmap) — the closed-task join
   (task-id first, session-window fallback; overlaps → smallest task id) yields
   *observed* stack signatures (`human` excluded; empty ⇒ `agent-only`).
   **⚠ THE WHOLE USAGE-IMPACT SURFACE WAS DELETED IN v0.50 (SURFACE-CUT)** — `compare`,
@@ -300,7 +303,7 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   identity — calls/receipts by id, tasks/markers by whole-row so task updates
   survive), the **machine-day** as sample unit, paired delta `estimated` with the
   work-mix caveat, gate = `MIN_COMPARE_N` machines-with-both-phases (blocking).
-- **CSV output (plan §3.9)** ([csvout.py](cage/csvout.py)) — `--csv` on
+- **CSV output (ADR-CLI)** ([csvout.py](cage/csvout.py)) — `--csv` on
   `cage insights chats`/`graphify`/`commits`/`commit`, `authorship summary` and
   `study report`, plus the bundle via
   `cage study export` for the fleet bundle (the raw-row CSV export and
@@ -611,13 +614,13 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   file**: a duplicate table header would make the whole config unparseable and capture
   would silently fall back to the bundle. Callers: `policysync` · `initcmd` ·
   `cage setup --python-launcher`. `cage policy sync` is unambiguously `cage.toml`-only.
-- **Export imports everything first** (plan §3.7) — `cage study export` runs the full
+- **Export imports everything first** (ADR-LAWS Law 1) — `cage study export` runs the full
   all-agent sweep before emitting; `--no-import` flag > `CAGE_CAPTURE` env >
   `[capture] import_before_export` policy; fail-open; the study manifest records
   `refresh: {ran, new_calls}`. (`cage data export` carried this first and was deleted in
   v0.50; `study export` is the surviving bundle path.)
 - **State cleanup is a closed allowlist, and deletion is manual-only (v0.37)**
-  ([cleanup.py](cage/cleanup.py), plan §3.6.4) — aged debug.log/hooks-seen rows, stale
+  ([cleanup.py](cage/cleanup.py), ADR-LAWS) — aged debug.log/hooks-seen rows, stale
   `pending-*` buffers, orphan cursors, `*.tmp`; never ledger/ (tool savings included —
   see below), cage.toml (and legacy policy.toml), machine.json,
   study.jsonl, limits.json (by construction). **⚠ NOTHING PRUNES `state/` ANY MORE.** The one deletion path was
@@ -857,10 +860,8 @@ fires a trigger updates the doc *and* bumps its row):
   change as any formula, constant, or method-tag change; it must agree with the
   live explainer registry ([explain_data.py](cage/explain_data.py)), which is the
   copy that ships in the binary.
-- **[docs/PLAN.md](docs/PLAN.md)** — the design of record (the PLAN).
-  Update before building; keep its status truthful when scope or a contract changes.
 - **Every plan doc opens with a phase index.** The first section after the title
-  block of any plan (`docs/*plan*.md`, and PLAN.md's own major sections) is a
+  block of any plan (`docs/*plan*.md`) is a
   numbered list of every phase/step with **one line each** — what it does and its
   gate/status — so a reader (or an executing agent) sees the whole shape before
   any detail, and a stale plan is spottable at a glance. Existing plans gain the
@@ -896,7 +897,7 @@ fires a trigger updates the doc *and* bumps its row):
   that proposals/plan/IMPLEMENTATION link to as evidence, never spec.
 
 Note: ALL-CAPS entry-point/tracker files (CLAUDE.md, CHANGELOG.md, README.md and
-AGENTS.md at root; PLAN.md, GLOSSARY.md, DOC-REGISTRY.md, FORMULAS.md under `docs/`;
+AGENTS.md at root; GLOSSARY.md, DOC-REGISTRY.md, FORMULAS.md under `docs/`;
 IMPLEMENTATION.md, INTERVIEW.md, MACHINE.md, OPEN-WORK.md, WORKLOG.md under `work/`)
 carry no frontmatter; lowercase docs may.
 
@@ -904,7 +905,7 @@ carry no frontmatter; lowercase docs may.
 prompts, examples, ADRs, compare/proposal docs) are written in **short points**,
 one idea each, roomy, takeaway first; keep paragraphs to 3–4 lines and use tables
 for option/field comparisons. Fix a wall of text on contact — the docs law applies
-to *form*, not just facts. (CLAUDE.md, the plan, and the design docs are the
+to *form*, not just facts. (CLAUDE.md and the design docs are the
 deliberate exception: dense reference prose, packed on purpose.)
 
 **Document size discipline — ⏳ TRIAL, expires 2026-09-01.** Four composing rules on
@@ -920,7 +921,7 @@ every authored doc. Full spec, worked examples and the fix procedure:
    and the ADRs already hold them.
 4. **A hard budget** — a plan fits one screen (~40 lines); a table row is *genuinely*
    one line (≤120 chars). Over budget ⇒ move content out, never compress in place.
-   **Reference docs (this file, PLAN.md, the design docs) are exempt from rule 4
+   **Reference docs (this file, the design docs) are exempt from rule 4
    only** — dense on purpose; 1–3 still bind them.
 
 **On 2026-09-01 this rule must be explicitly retained, amended, or removed — it
@@ -1074,7 +1075,7 @@ each agent only needs thin idiomatic wiring (`agents.py` orchestrates):
   defects (CLAUDE-DEDUP inflates `calls` ~2-3×; CLAUDE-SUBAGENT-KEY mis-keys
   subagent spend there). No credits field — none exists for Claude Code on disk.
   Capture is **pull-based and
-  global** (plan §3.7): `cage import` over a **resolved** ledger
+  global** (ADR-LAWS Law 2): `cage import` over a **resolved** ledger
   (`--ledger`/`CAGE_BASE` → project `.cage/` → global `~/.cage`, via `paths.resolve_root`)
   is the universal path that works with no hooks and no project.
   **Kiro is the ONE exception to one-sink-per-sweep** ([ADR 0006](work/archive/adr/0006-kiro-rows-are-machine-facts-not-project-facts.md)):
@@ -1139,9 +1140,9 @@ each agent only needs thin idiomatic wiring (`agents.py` orchestrates):
   debug-logged) — never hand-roll another `fcntl` block.
 - **Read:** `mcpserver.py` (MCP, every agent), `report/attrib/matrix/budget/roi`,
   plus `task outcome`, authorship
-  (`origin`/`notes-sync`/`verify`, plan §3.5), and the ledger-scale surface
+  (`origin`/`notes-sync`/`verify`, ADR-AUTHORSHIP), and the ledger-scale surface
   (`--scope`; **`--team` and `ledger-sync` were deleted in v0.50** — `mergeutil.union_by_id`
-  survives and is still `notes-sync`'s merge core, plan §3.6).
+  survives and is still `notes-sync`'s merge core, ADR-LAWS).
 - **The agent surface is a four-layer ladder, and L0 is the floor**
   ([archive/v0.41-agent-surface-layers.proposal.md](work/archive/v0.41-agent-surface-layers.proposal.md);
   `cage query agent-layers`). **L0 hookless** (pull capture + interceptor + every CLI
@@ -1254,7 +1255,7 @@ each agent only needs thin idiomatic wiring (`agents.py` orchestrates):
   and Kiro has **no session-start trigger**. Copilot and Kiro get the
   `runshim.selflocating_command` git-root one-liner (neither documents a repo variable
   or a guaranteed hook cwd); Claude gets `${CLAUDE_PROJECT_DIR:-.}`.
-  **Committed wiring is portable (plan §5.3):** every project-committed wired
+  **Committed wiring is portable (ADR-GRAPHIFY):** every project-committed wired
   file (`.mcp.json`, `.vscode/mcp.json`) references the committed
   runtime-resolving shim `.cage/bin/cage-run` ([runshim.py](cage/runshim.py) —
   written by `agents.install`, identical bytes on every machine, resolution:

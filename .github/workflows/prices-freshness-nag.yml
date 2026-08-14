@@ -1,4 +1,4 @@
-# Maintainer-side pricing-freshness nag (plan §3.3, handoff C). Weekly cron:
+# Maintainer-side pricing-freshness nag (CLAUDE.md, handoff C). Weekly cron:
 # read the bundled [meta] prices_date, and past constants.PRICES_STALE_DAYS
 # upsert ONE pinned issue asking a human to re-verify the cited sources. It
 # NEVER fetches or parses a vendor pricing page (brittle, and a wrong

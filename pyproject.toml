@@ -24,7 +24,7 @@ classifiers = [
     "Topic :: Software Development :: Libraries",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
-dependencies = []  # stdlib only — $0, deterministic, dependency-free (see docs/PLAN.md §1)
+dependencies = []  # stdlib only — $0, deterministic, dependency-free (see README.md)
 
 [project.urls]
 Homepage = "https://github.com/arpitarya/cage"
@@ -35,9 +35,9 @@ Repository = "https://github.com/arpitarya/cage"
 cage = "cage.cli:main"
 
 [project.optional-dependencies]
-# Tier 1 — local semantic response cache (plan §6). Local model only, never required.
+# Tier 1 — local semantic response cache (ADR-GRAPHIFY). Local model only, never required.
 embeddings = ["sentence-transformers>=2.2"]
-# Tier 2 — learned text compressor (plan §6). Off by default; a pluggable adapter.
+# Tier 2 — learned text compressor (ADR-GRAPHIFY). Off by default; a pluggable adapter.
 ml = ["sentence-transformers>=2.2"]
 dev = ["pytest>=8", "build>=1.0", "twine>=5.0"]
 
