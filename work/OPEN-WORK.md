@@ -55,12 +55,12 @@
 
 ## Arpit decides
 
-- **Does cage keep a release-shaped version for USAGE-ONLY?** The work is committed
-  under the unreleased v0.49.1 changelog heading (as METRICS-PRIMARY was). `__version__`
-  is untouched at `0.49.1`. A deletion this large arguably wants its own version;
-  releasing is Arpit's call and never happens from a laptop.
-- **README positioning is DONE but worth a read** — cage is now described as a usage
-  meter that deliberately refuses to price. If that framing is wrong, it is one file.
+- **TEST-COUNT** — README's `$0` section and CLAUDE.md's `just test` comment still say
+  **1571**, stale after SURFACE-CUT deleted 12 test files and stripped ~30. Needs one
+  `just test` on the dev machine; no agent can measure it from Cowork (macOS venv).
+- **PLAN-4-REWRITE** — PLAN §4 still calls `insights attrib` "the attribution engine (the
+  part that's actually novel)" for a deleted command. SURFACE-CUT's handoff says that
+  section needs **rewriting, not annotating**.
 
 ## How this file is maintained
 
