@@ -105,6 +105,53 @@
   Carries one open decision — **OPEN QUESTION 10.1**, whether `_PARSERS` survives as the
   `[sources.<name>] format` custom-source contract; blocks only its own deletion.
 
+- **AUTHORSHIP-CODE-CATCHUP** — [ADR-AUTHORSHIP](../docs/adr/0009_authorship.md) is
+  ratified (Arpit, 2026-08-14) and **three of its decisions are not built**. The record
+  says so in its own status line and §1, so it is honest, not stale — but it stays that way
+  only until this closes. Exactly three changes, each small and independent:
+  **(a)** `authorcapture.COVERAGE_GAPS` still carries the corrected-away structural claim
+  for copilot and kiro — replace with *"no parser yet"* naming the store, and keep
+  **copilot · cloud** as the one genuinely structural entry.
+  **(b)** `coverage_note()` names only the per-agent gaps and is silent on the ~30-day
+  retention wall that bounds the one agent it does cover — add the clause.
+  **(c)** the `declared` column in `commitview`: read the trailer out of the commit message
+  **at render time**, print agent + model string, footer states the failure in cluster
+  terms (never a coverage rate). **Write no provenance row and add no `method` rung** —
+  the quarantine is structural on purpose, and persisting it is the signal it failed.
+  ADR-AUTHORSHIP is updated in the same change as any of the three (its own update-rule).
+  Doc half is DONE: the record exists, ADR-CLAUDE's false sentence is recorded as
+  corrected, ADR-COVERAGE's matrix row is fixed and its veto marked FIRED, ownership moved
+  in `docs/adr/README.md` and `tests/test_adr_ownership.py`.
+
+- **AUTHORSHIP-PARSERS** — the optional half, and the reason the gap strings matter. Four
+  parsers would move an entry out of `COVERAGE_GAPS` each, in this order by reach per unit
+  of work: **copilot · CLI** (`events.jsonl` → `tool.execution_start.arguments`; the file is
+  already open every sweep) → **kiro · IDE** (the largest *historical* prize — nothing
+  deletes it; scan for JSON containing `"executionId"`, do not hardcode the hex dir names)
+  → **kiro · CLI** (`data.sqlite3`, open read-only) → **copilot · VS Code** (`chatSessions`
+  first — `chatEditingSessions` is richer but self-deletes on session stop, so it needs a
+  capture cadence cage does not have; pairs with **CONTINUOUS-CAPTURE**). Each lands in one
+  parser and the gap table, nothing else. **Not started, and not required by the ADR** —
+  the record ratifies the order, not the work.
+
+- **COPILOT-JETBRAINS-UNPROBED** — hands-only, Arpit's machine, one command. Since
+  2026-05 the JetBrains Copilot plugin drives the local CLI, but the CLI's `events.jsonl`
+  writer is gated on `getReverseCallHandler() === undefined` — an IDE driving it over RPC
+  would send events to the host and write **no local file**. Run one Copilot agent edit
+  from JetBrains, then check `~/.copilot/session-state/*/events.jsonl` exists;
+  `workspace.yaml`'s `client_name` distinguishes the surfaces. Same shape as
+  **GFX-IDE-PATH-UNPROBED** — pair them in one sitting.
+
+- **PLAN-BACKTICK-IMBALANCE** — `docs/PLAN.md` carries an **odd** number of backticks
+  outside fenced blocks (1859, unchanged at HEAD — pre-existing, not introduced by the
+  archive sweep). This is the exact failure recorded in CLAUDE.md's doc-gate trap: an
+  unbalanced backtick makes every code-span scan downstream read the file wrong, which is
+  how `_doc_flags` was silently emptied and an assertion passed vacuously. Nothing fails
+  today, which is the problem — it is a gate that has quietly stopped seeing. One-line
+  detector, worth adding to the doc gates: strip fenced blocks, count backticks per file,
+  fail on odd. **Found 2026-08-14 while verifying the archive sweep**; the sweep itself
+  left every touched file even.
+
 ## Arpit decides
 
 - **`CLAUDE.md` diff for SURFACE-CUT — proposed, not applied**:
@@ -123,6 +170,19 @@
 - **PLAN-4-REWRITE** — PLAN §4 still calls `insights attrib` "the attribution engine (the
   part that's actually novel)" for a deleted command. SURFACE-CUT's handoff says that
   section needs **rewriting, not annotating**.
+
+- **COVERAGE-STRIKE-2** — [ADR-COVERAGE](../docs/adr/0008_coverage.md)'s *deliberately not
+  taken* generated matrix set its own threshold at *"this record is found stale twice"*.
+  It has now been found stale twice (2026-08-14, both by reading sessions), so the
+  threshold is met — **but the remedy it points at would have caught neither strike.** Both
+  failures were in the prose a generator flattens, and one was a wrong *mark* (⚠️ where
+  nothing worked), which a generator derived from the same wrong belief reproduces
+  faithfully. Two ways out, and it is a call, not a task: **(a)** extend
+  `tests/test_formulas_coverage.py` to this record's two ✅/N/A tables — the mechanical half
+  that *would* have caught STRIKE 1 — and leave the prose to review; or **(b)** accept that
+  this record's failure mode is prose, stop counting strikes toward a generator that cannot
+  address it, and say so in the record so the counter stops reading as a debt. Filed
+  2026-08-14 (COVERAGE-LEGEND).
 
 ## How this file is maintained
 

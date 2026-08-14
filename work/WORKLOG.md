@@ -12,6 +12,231 @@ by milestone) — the worklog is what *happened this session*.
 
 ---
 
+## 2026-08-14 — Cowork — COVERAGE-LEGEND: N/A is not the same mark as ❌
+
+- **Asked (Arpit):** review the coverage table — mark whatever is *not applicable* as
+  **N/A**, and keep a **cross** for whatever *isn't built but could be*.
+- **The split, and why it is not cosmetic.** ADR-COVERAGE's legend had one ❌ meaning
+  *"structurally cannot"*, and it was carrying two different claims: *"Claude Code records
+  no credit unit anywhere on disk"* (the vendor's, permanent, closed only by a probe) and
+  *"nobody has written the copilot edit parser yet"* (cage's, a week of work, closed by
+  writing it). Collapsing them lets a backlog item read as a law — the softer twin of the
+  failure the record exists to prevent, and exactly what the authorship row did for weeks.
+  Now: **N/A = nothing to build** (vendor · platform · cage's own refusal to fabricate) and
+  **❌ = cage's, buildable, and must be findable as work**.
+- **All four matrices re-derived from the five code tables** (`units.ABSENT`,
+  `ledger.ABSENT_SPINES`, `authorcapture.COVERAGE_GAPS`, `graphifytx.GRAPHIFY_COVERAGE`,
+  `agents.HOOK_EVENTS`/`HOOK_GAPS`), per the record's own never-edit-from-memory rule.
+  Result: **the only ❌ left in the whole record are the four authorship parser cells** —
+  `AUTHORSHIP-PARSERS`. Usage capture, graphify and operational state contain **no** ❌ at
+  all, which is a claim worth being able to make in one glance.
+- **Two corrections found while doing it.** (a) The four authorship cells were **⚠️**
+  (*works with a stated limit*) when **nothing works on any of them** — an overclaim in the
+  flattering direction, now ❌. (b) The legend still introduced **⛔** as a live mark and
+  called it *"the only mark cage itself is expected to clear"*, after v0.51 had flipped
+  every ⛔ cell back to ✅ — so the record referred to a mark no cell carried, and the
+  sentence was false anyway once ❌ became cage's too.
+- **STRIKE 2 recorded — and it argues against its own remedy.** Two reading sessions have
+  now found this record contradicting its own tables, which meets the two-strikes threshold
+  for the parked *generated coverage matrix*. But **a generator would have caught neither
+  strike**: both live in the prose half a generator flattens, and one was a wrong *mark*,
+  which a generator derived from the same wrong belief reproduces faithfully. Filed as a
+  decision rather than silently absorbed.
+- **`docs/FORMULAS.md` §2.7 kept on the same legend** (kiro-IDE ❌ ⇒ N/A) rather than
+  forking marks between two docs describing one fact; `tests/test_formulas_coverage.py`
+  widened to accept `✅|❌|N/A` because the gate binds the **verdict**, not the spelling.
+- **Verified:** the §2.7 gate re-run by hand — 5/5 surfaces parsed, all four assertions
+  pass. Backtick parity even in both edited docs, every relative link resolves, the Mermaid
+  block and its ASCII twin changed together (the diagram's `❌ no signal` label became
+  `no signal`, which is what the twin always said).
+- **Decided/open:** the STRIKE 2 call is **Arpit's** — extend `test_formulas_coverage.py`
+  to this record's two tables (the mechanical half), or stop counting strikes toward a
+  generator that cannot address a prose failure. Filed in OPEN-WORK under *Arpit decides*.
+- **Not verified here:** `pytest` cannot run over the device bridge — `.venv/bin/pytest`'s
+  shebang is an absolute host path that does not resolve under the mount. The §2.7 gate was
+  replicated by hand instead; **the full suite has not been run** and should be.
+- **Cost:** Cowork session, docs + one test file; no product code, no release.
+
+## 2026-08-14 — Cowork — ARCHIVE-NOT-EVIDENCE: archived docs are named, never cited
+
+- **Asked (Arpit, standing directive):** archived documents must not be used as valid
+  references — they could have been overwritten. They may be called out, never used to
+  back anything. Update it in the necessary places.
+- **The rule, stated once** in [CLAUDE.md](../CLAUDE.md) *Documentation discipline* →
+  **Archived documents are NAMED, never CITED**, with three parts that matter: naming is
+  fine (the trail stays followable), linking as evidence is not, and **if no live source
+  grounds a claim, say it is ungrounded** — an archive link that looks like evidence is
+  worse than an admitted gap, because it reads as checked. Narration is the one carve-out:
+  WORKLOG/IMPLEMENTATION/INTERVIEW record what happened, and what happened includes
+  archived pairs. Named-not-restated in `work/archive/README.md`,
+  `work/archive/adr/README.md`, `docs/adr/README.md` and `work/compare/README.md`.
+- **The sweep — all eight live ADRs now hold ZERO archive references.** Worst case first:
+  **ADR-LAWS backed all five laws' ratification entirely on archived ADRs**, and
+  ADR-CLAUDE grounded the 2.00× measurement on two of them. Every *Reference* section is
+  where the TEMPLATE demands grounding, so an archive-backed Reference was a hole in the
+  record, not a style nit.
+- **Repointed, not delinked — 22 archived-ADR citations moved to their live successors**
+  (0011 → ADR-LAWS Law 5 · 0004 → Law 3 · 0006/0009 → ADR-KIRO · 0005/0007 → ADR-GRAPHIFY ·
+  0008 → **ADR-AUTHORSHIP** · 0010 → the per-agent §2s; 0001 is retired with no live home
+  and says so). Also fixed: the 2.00× figure now cites the **live**
+  `work/regression/2026-08-14-calls-vs-metric-crosscheck.md`, and five *"design/plan of
+  record"* claims in PLAN.md and docs/README.md that rested on archived handoffs and
+  proposals now name a live record instead.
+- **CLAUDE.md contradicted the new rule and was corrected**: its OPEN-WORK reconciliation
+  step told agents to *"verify against `work/regression/`, `work/archive/`,
+  `IMPLEMENTATION.md`, and the code"*. The archive is out — a pair archived as *"built and
+  green"* is a claim from the past, not a check on the present.
+- **Found while verifying, pre-existing, filed as PLAN-BACKTICK-IMBALANCE:**
+  `docs/PLAN.md` has an **odd** backtick count outside fenced blocks (1859, identical at
+  HEAD — not mine). That is the exact trap CLAUDE.md records: it silently breaks every
+  code-span scan downstream, which is how `_doc_flags` was emptied and an assertion passed
+  vacuously. Nothing fails today, which is the problem. A one-line detector belongs in the
+  doc gates.
+- **Verified before finishing:** no link broken by this session (diffed against HEAD, not
+  just scanned — the repo carries 95 pre-existing broken links and I needed the delta, not
+  the total); every touched file's backticks balance.
+- **ADR affected: ADR-LAWS, ADR-CLI, ADR-CLAUDE, ADR-COPILOT, ADR-KIRO, ADR-CONSUMERS,
+  ADR-GRAPHIFY** (references repointed) and the ADR README. DOC-REGISTRY bumped for all.
+- **Also answered this session:** *is everything in ADR-AUTHORSHIP implemented?* **No —
+  verified against the code, none of the three.** `COVERAGE_GAPS` still carries the old
+  strings, `coverage_note()`'s docstring still says *"structurally cannot cover"*, and
+  `declared` appears nowhere in `commitview`. AUTHORSHIP-CODE-CATCHUP is unstarted.
+- **Next:** Arpit's call on AUTHORSHIP-CODE-CATCHUP (a)+(b), which are small and paired.
+- **Cost:** Cowork session, docs only; no product code, no release.
+
+---
+
+## 2026-08-14 — Cowork — AGENT-SHARE-BACKFILL accepted, and ADR-AUTHORSHIP becomes the ninth record
+
+- **Asked:** accept the verdict and create an ADR.
+- **Decided by Arpit (two calls, asked because both moved the ownership table):**
+  **(1)** a **new ADR-AUTHORSHIP (0009)** rather than folding into ADR-COVERAGE +
+  ADR-CLAUDE — because the accepted decision's whole content is that authorship is *not*
+  claude's, so leaving the record inside ADR-CLAUDE re-encodes the error it corrects, and
+  ADR-CLAUDE's update-rule would have forced a *copilot* parser to edit the *claude*
+  record. **(2)** fix the `commitview` ownership drift in this change rather than filing it.
+- **Done — docs only, no product code.** Created
+  [docs/adr/0009_authorship.md](../docs/adr/0009_authorship.md) (§1 with the paired
+  Mermaid/ASCII twin, §2 with context · decision · consequences · alternatives · reference ·
+  a six-trigger veto). Moved `authorcapture` · `linematch` · `commitjoin` · `provenance` ·
+  `origin*` · `notessync` · `verifycmd` out of ADR-CLAUDE in **both** the README table and
+  `tests/test_adr_ownership.py`; `transcript` and `importcmd` now list 0009 as a fourth/fifth
+  claimant. Moved the P3c month-partition storage note to 0009 with a pointer left behind.
+- **The find that made the ADR sharper:** **ADR-COVERAGE's own numbered veto had already
+  fired and nobody noticed.** It read *"a vendor exposes edit text for copilot or kiro ⇒
+  `COVERAGE_GAPS` loses that entry"* — and the trigger was **satisfiable on the day it was
+  written**, because both stores already carried edit text. Recorded as FIRED with the
+  lesson stated: **write a veto as a condition to check, never as an event to await.**
+- **Corrections landed:** ADR-COVERAGE's authorship matrix row was false on four cells
+  (now ⚠️ *no parser yet*, with the store named per cell) and gained a separate row for
+  copilot's **cloud** agent, the one structural ❌. ADR-CLAUDE's *"Claude is the only agent
+  whose store carries the text of a proposed edit"* is recorded as **CORRECTED, not
+  deleted** — a reader met that claim for six weeks. The `commitview` drift was real: the
+  README table said ADR-CLAUDE, the executable copy said `0002_cli`; reconciled to ADR-CLI,
+  which is what actually runs.
+- **Honest status, deliberately loud:** **three decisions are ratified and NOT built** —
+  the `COVERAGE_GAPS` strings, `coverage_note()`'s missing retention clause, and the
+  `declared` column. 0009's status line and §1 both say so, and **AUTHORSHIP-CODE-CATCHUP**
+  holds the scope; **AUTHORSHIP-PARSERS** holds the optional four-parser half in reach
+  order. AUTHORSHIP-GAPS-MISSTATED is deleted, not ticked — its doc half is done.
+- **ADR affected: ADR-AUTHORSHIP (created), ADR-CLAUDE and ADR-COVERAGE (corrected),
+  the ADR README and the ownership test.** DOC-REGISTRY bumped for all three.
+- **Next:** AUTHORSHIP-CODE-CATCHUP (a), (b), (c) — small, independent, agent-closable;
+  each updates ADR-AUTHORSHIP in the same change.
+- **Cost:** Cowork session, docs + one test file; no product code, no release.
+
+---
+
+## 2026-08-14 — Cowork — does agent-vs-human work for all three agents? No, and the recorded reason is wrong
+
+- **Asked:** will the per-commit agent share work for claude, copilot and kiro, CLI and
+  IDE — and if not, research it.
+- **Done:** research only, no product code. Two source-level sweeps (copilot, kiro),
+  amended [compare/agent-share-historical-backfill.compare.md](compare/agent-share-historical-backfill.compare.md)
+  with a **breadth arm** (agent x surface matrix, per-row confidence, build order,
+  its own reopen-trigger), re-indexed it in compare/README, and filed two OPEN-WORK items.
+- **The finding:** `authorcapture.AGENT = "claude-code"` is the whole of today's coverage
+  — expected. **What was not expected is that the recorded reason is false.**
+  `COVERAGE_GAPS` states copilot and kiro as *structural* exclusions, and both stores
+  carry edit text: copilot CLI `events.jsonl` has `tool.execution_start.arguments` plus a
+  **required** `PermissionRequestWrite.diff`; VS Code `chatSessions/*.jsonl` has
+  `IChatTextEditGroup.edits` — **cage already opens both files every sweep** for tokens
+  and credits. Kiro IDE execution logs carry `input.originalContent` *and*
+  `input.modifiedContent` verbatim. ADR-CLAUDE §2's *"Claude is the only agent whose store
+  carries the text of a proposed edit"* is false as written.
+- **Two facts that reorder the work:** kiro IDE has **no retention policy** (8.2GB / 38GB
+  accumulations reported upstream), so a kiro parser would reach **further back than the
+  claude one ever can** — claude's ~30-day wall is the worst of the three, which inverts
+  the priority the gap list implies. And **kiro writes no commit trailer and sets no git
+  identity** (exhaustive Q-CLI source grep, zero hits), so for kiro there is no metadata
+  route and no declaration route — content matching is the only one that can ever work.
+- **Confidence is stated per row, not averaged:** VS Code `chatEditingSessions`
+  independently confirmed at source (before *and* after text, and `clearState()` deletes
+  the folder on stop — so it is capture-on-read, never an archive); copilot CLI confirmed
+  from the schema shipped in `@github/copilot`, not from a live file; kiro from two
+  independent third-party parsers, not from AWS. **Copilot's cloud coding agent is the one
+  honestly structural gap** — web-only logs, no read API.
+- **Decided (proposed, Arpit's call):** verdict B/A stands untouched — that was the
+  historical arm. It gains a **fourth clause: correct `COVERAGE_GAPS` before building any
+  parser.** Claiming a source cannot answer is the same class of defect as inventing an
+  answer it did not give; the honest text is *"no parser yet"* with the store named.
+- **Filed:** **AUTHORSHIP-GAPS-MISSTATED** (agent-closable, text first, parsers optional
+  and ordered copilot-CLI → kiro-IDE → kiro-CLI → copilot-VS Code) and
+  **COPILOT-JETBRAINS-UNPROBED** (hands-only, one command — the CLI's `events.jsonl`
+  writer is gated on `getReverseCallHandler() === undefined`, so an IDE driving it over
+  RPC may write nothing locally; pair with GFX-IDE-PATH-UNPROBED).
+- **No ADR affected by this session** — but AUTHORSHIP-GAPS-MISSTATED, when taken, updates
+  ADR-CLAUDE §2 in the same change.
+- **Next:** Arpit accepts or overrides; the text correction can go before any parser does.
+- **Cost:** Cowork session, 2 research subagents + 2 independent source verifications; no
+  code, no release.
+
+---
+
+## 2026-08-14 — Cowork — the per-commit agent share for history line-match cannot reach
+
+- **Asked:** how can every commit report what percentage of its code was written by an
+  agent vs a human — *including historically*? Research the field; write a compare doc if
+  the options fork.
+- **Done:** research only, no product code. Ran an external sweep (git-native
+  attribution, agent telemetry, vendor analytics, retroactive inference), measured this
+  repo against it, and filed
+  [compare/agent-share-historical-backfill.compare.md](compare/agent-share-historical-backfill.compare.md)
+  — five options, matrix, proposed verdict, reopen-trigger — indexed in compare/README.
+- **The measurement that frames the fork:** `authorcapture`'s first real sweep (all 104
+  provenance rows stamped `2026-08-14T16:40:25Z`) covers **66 of 166 commits** and stops
+  dead at **2026-07-16** — the vendor's ~30-day transcript wall, not a bug. Agent share
+  on those 66: **40,470 / 47,819 added lines = 84.6%**; verbatim rate `kept ÷ suggested`
+  = **85.2%**, *above* ADR-CLAUDE §2 reopen-trigger 2's 68.7%, so that trigger moved
+  further from firing. The other 100 commits can never be line-matched by any future
+  code — that is the permanent shape of every repo cage is pointed at after the fact.
+- **Two facts not previously written down:** `Co-Authored-By` reaches **141 of 166**
+  commits back to the first one and carries a **model string** (7 distinct: Sonnet 5,
+  Opus 5, Opus 5 1M, Opus 4.8, Opus 4.8 1M, Fable 5, Sonnet 4.6) — a provenance row
+  records `agent="claude-code"` and **no model at all**, so the weaker signal is strictly
+  richer on that axis. And the **18 commits with neither signal cluster** (9 on
+  2026-08-12 alone, 3 merge commits, 2 GitHub web edits) — the trailer fails in clumps,
+  which is exactly what a coverage percentage would smooth over.
+- **Decided (proposed, Arpit's call):** **B for presence + A for the percentage.** The
+  share stays `unknown` for all 100; a `declared` column is read out of the commit
+  message at render time and **never stored**, so no `method="trailer"` rung exists and
+  no arithmetic can promote a declaration into a share. **D (infer from the diff)
+  rejected on measured evidence** — best detector out-of-domain scores **34.13 macro-F1
+  against a 45.73 random baseline**, and **39.36 F1 on hybrid human-edited AI code**,
+  which is exactly what a commit contains; metadata-only inference has a published
+  **3.3% recall / 30× undercount**. **E (archive raw transcripts) rejected** on
+  counts-never-content — and it solves nothing cage has, since provenance rows are
+  permanent once written and `doctor`'s 25-day nudge is the existing defence.
+- **Open:** whether `coverage_note()` should name the 30-day wall alongside its
+  copilot/kiro clauses — proposed in the doc, not filed as an OPEN-WORK item.
+- **No ADR affected.** Nothing shipped; ADR-CLAUDE changes only if verdict B is accepted
+  and built.
+- **Next:** Arpit accepts or overrides verdict B; if accepted, it becomes an OPEN-WORK
+  item (~1 read-time helper in `commitview`, plus the footer clause).
+- **Cost:** Cowork session, 3 research subagents + repo measurement; no code, no release.
+
+---
+
 ## 2026-08-14 — Cowork — graphify review after SURFACE-CUT: the interceptor route is dead, and the fork that leaves
 
 - **Asked:** re-review the graphify subsystem against the current tree (SURFACE-CUT,

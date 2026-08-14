@@ -6,7 +6,7 @@
 > not, fux vs. not, cache vs. not…), and turns the raw stream into an
 > **attribution ledger** — what each agent used, what each tool saved you, and who
 > wrote which commit. `$0`, stdlib-only, deterministic, and independent of any single
-> AI tool. **Usage, never cost** (v0.51, [ADR 0011](../work/archive/adr/0011-cage-measures-usage-not-cost.md)).
+> AI tool. **Usage, never cost** (v0.51, [ADR-LAWS](adr/0001_laws.md) Law 5).
 
 Status: **the design of record — and substantially BUILT.** This document defines the
 category, the substrate, the attribution engine, and the build order. It was written at
@@ -27,7 +27,7 @@ actually built; [OPEN-WORK.md](../work/OPEN-WORK.md) is what is left.
 > describes a subsystem that **no longer exists** — read it as history. The `spend
 > cutover` of §3.14 is retired with it (`ledger.spend` partitions by *agent*, not time).
 > The durable decision, with its alternatives and veto condition, is
-> [ADR 0011](../work/archive/adr/0011-cage-measures-usage-not-cost.md); the sections most affected are
+> [ADR-LAWS](adr/0001_laws.md) Law 5; the sections most affected are
 > **§3.1, §3.3, §3.14, §4.4, §4.5, §6, §7 and all of §8**.
 
 > **v0.36 note — the hookless rebuild.** Cage's capture is now **pull-based**
@@ -35,13 +35,15 @@ actually built; [OPEN-WORK.md](../work/OPEN-WORK.md) is what is left.
 > describes hook-driven capture in several places — read those as history. The
 > skill/steering machinery of §5.1 was deleted outright (that section is marked). If an
 > agent-side surface is being rebuilt, the design of record is
-> [archive/v0.41-agent-surface-layers.proposal.md](../work/archive/v0.41-agent-surface-layers.proposal.md), not this file.
+> the **archived** v0.41 agent-surface-layers proposal — **named, not cited**; the binding
+> statement is CLAUDE.md's agent-surface ladder, not that file and not this one.
 
 > **Agent count.** `agents.SURFACES` has been **three** — claude · copilot · kiro — since
 > v0.33.0. Any "four agents" phrasing below is pre-v0.33 history.
 
 > **v0.33.0 note:** Codex was removed from cage completely (a product/scope
-> decision — see `work/archive/*-codex-removal.handoff.md`). This plan predates
+> decision; its handoff is archived and therefore **named, not cited** — the live treatment
+is [ADR-CONSUMERS](adr/0006_consumer.md)'s retired-agent section). This plan predates
 > that decision and still describes Codex as a supported agent in several
 > places (§3.7, §3.8, §5.3) — read those as history, not current behavior.
 > §3.8 (`cage data limits`) in particular describes a feature removed with
@@ -373,7 +375,7 @@ all attestations, methods are in the closed enum) that **always exits 0** — a
 hard constraint, never wired as a CI gate.
 
 **Capture (v2 — the line-match pass).** Provenance is written by the **import
-sweep**, not by a hook ([ADR 0008](../work/archive/adr/0008-line-match-authorship-counts-persisted-content-transient.md)).
+sweep**, not by a hook ([ADR-AUTHORSHIP](adr/0009_authorship.md)).
 The `hooked` method is legacy-only: the hookless rebuild removed the `PostToolUse` /
 `post-commit` / `prepare-commit-msg` machinery, and for a while nothing replaced it —
 `transcript.parse_provenance` and `originrecord.record_transcript` sat with **zero
@@ -797,7 +799,7 @@ strict field whitelist and never touch the body fields at all, transiently or ot
 
 **Capture-only in its FIRST build only — superseded by §3.14.** Since v0.50 this
 kind is the source of derived spend from `constants.SPEND_CUTOVER` onwards
-([ADR 0010](../work/archive/adr/0010-metric-ledgers-are-the-spend-source-forward-only-cutover.md)).
+([ADR-CLAUDE](adr/0003_claude.md) §2).
 The paragraph below is the original shipping stance, kept because it explains why the
 kind was built separately from `calls` — but it no longer describes today's reads.
 
@@ -857,7 +859,7 @@ and the metrics parser call). The IDE parser SELECTs four explicit columns only,
 
 **Capture-only in its FIRST build only — superseded by §3.14.** Since v0.50 this
 kind is the source of derived spend from `constants.SPEND_CUTOVER` onwards
-([ADR 0010](../work/archive/adr/0010-metric-ledgers-are-the-spend-source-forward-only-cutover.md)).
+([ADR-CLAUDE](adr/0003_claude.md) §2).
 The paragraph below is the original shipping stance, kept because it explains why the
 kind was built separately from `calls` — but it no longer describes today's reads.
 
@@ -919,7 +921,7 @@ read — never `message.content`, `summary` titles, user rows' text, or
 
 **Capture-only in its FIRST build only — superseded by §3.14.** Since v0.50 this
 kind is the source of derived spend from `constants.SPEND_CUTOVER` onwards
-([ADR 0010](../work/archive/adr/0010-metric-ledgers-are-the-spend-source-forward-only-cutover.md)).
+([ADR-CLAUDE](adr/0003_claude.md) §2).
 The paragraph below is the original shipping stance, kept because it explains why the
 kind was built separately from `calls` — but it no longer describes today's reads.
 
@@ -936,7 +938,7 @@ fix for CLAUDE-DEDUP/CLAUDE-SUBAGENT-KEY, which this kind deliberately does not 
 
 **Status: built, v0.50 (unreleased), 2026-08-14.** §3.11–3.13's three kinds are no longer
 capture-only: they are the **source of derived spend** from a pinned instant onwards.
-Design of record: [ADR 0010](../work/archive/adr/0010-metric-ledgers-are-the-spend-source-forward-only-cutover.md).
+Design of record: [ADR-CLAUDE](adr/0003_claude.md) §2 · [ADR-COPILOT](adr/0004_copilot.md) §2 · [ADR-KIRO](adr/0005_kiro.md) §2.
 
 - **`constants.SPEND_CUTOVER = "2026-08-14T00:00:00Z"`** — a **literal**, never `now()`.
   A computed cutover would make yesterday's report irreproducible tomorrow.
@@ -1209,19 +1211,21 @@ future attention measurement inherits it.
 
 ### 4.11 graphify capture — usage rows · transcript detection · forward model
 
-Plan of record: [graphify-capture.plan.md](../work/archive/v0.36-graphify-capture.plan.md) (GC0–GC6).
+Plan of record: **[ADR-GRAPHIFY](adr/0007_graphify.md) §2.** The v0.36 graphify-capture plan
+(GC0–GC6) is archived and therefore **named, not cited** — its contract was absorbed whole.
 Closes the gap that every existing graphify route is **invocation-gated** while the
 real saving is often invocation-less (the agent reads `GRAPH_REPORT.md` instead of
 scanning files). Five landed phases (GC0–GC5), one follow-up (GC6/G1):
 
-- **GC0** — probe verdict ([plan §3.0](../work/archive/v0.36-graphify-capture.plan.md)): claude ships; copilot
+- **GC0** — probe verdict ([ADR-GRAPHIFY](adr/0007_graphify.md) §2, absorbed from the archived
+  plan's §3.0): claude ships; copilot
   cli is detectable but out of scope (finding filed); kiro is HONEST-LIMIT.
 - **GC1** — a diagnostic **usage row** per graphify run (`state/graphify-usage.jsonl`),
   never priced, never in a money view (byte-identical, tested).
 - **GC2** — at `cage import`, detect graphify in **claude** transcripts: Bash
   `graphify query|explain` (reuses the shim counterfactual → `modeled`) and Reads of the
   report/wiki (a distinct, weaker `report-read` receipt, footnoted apart). §2.7–2.8 (FORMULAS).
-- **GC3** ([ADR 0005](../work/archive/adr/0005-graphify-receipt-ids-session-inclusive-cross-route-deferral.md))
+- **GC3** ([ADR-GRAPHIFY](adr/0007_graphify.md))
   — deterministic session-inclusive ids + a content-key **deferral** so shim+transcript
   converge to one receipt while per-session attribution is preserved.
 - **GC4** — `cage doctor` graph-staleness (`graph.json` mtime vs HEAD).
@@ -1273,7 +1277,8 @@ Two of the section's premises are also historically wrong now: it says the skill
 
 **The section number is kept, not deleted**, so the ~65 source files that cite `plan §`
 anchors keep a stable numbering. **Where an agent surface is being *rebuilt*, the design
-of record is [archive/v0.41-agent-surface-layers.proposal.md](../work/archive/v0.41-agent-surface-layers.proposal.md)** —
+of record is CLAUDE.md's agent-surface ladder** — the v0.41 proposal it came from is archived,
+so it is named, not cited —
 the L0/L1/L2/L3 ladder — not this section.
 
 ### 5.2 Error surfacing — typed CLI error + exit-code contract (fail-open preserved)
@@ -1477,7 +1482,8 @@ The leverage is in the **spec and the contract**, so lock those first.
 
 Cage's numbers are verified from **outside**: a sibling repo `../cage-lab` that
 installs the shipped artifact and checks it against independently derived
-references. Detailed plan of record: [work/cage-lab-plan.md](archive/v0.36-cage-lab.plan.md);
+references. The detailed v0.36 cage-lab plan is archived — **named, not cited**; what binds is
+[work/cage-lab/](../work/cage-lab/);
 this section is the durable summary.
 
 **Laws.** Black-box (never `import cage`; drive the binary) · independently
@@ -1514,7 +1520,8 @@ for the human maintainer (own venv + ledger + real logs via read-only symlinks +
 cheat-sheet). The automated runner never touches it; it refreshes only on
 explicit command.
 
-**The golden set** ([cage-lab-golden-set.plan.md](archive/v0.36-golden-set.plan.md)).
+**The golden set** (its v0.36 plan is archived — **named, not cited**; the live artefact is
+`tests/goldenseed.py` and the fixtures it seeds).
 Rather than wait for the right situations to appear in ad-hoc logs, cage-lab
 **drives the real agents** (`golden/drive.py` → Claude / Copilot / Kiro CLIs)
 through a curated question set covering every capture dimension — cache

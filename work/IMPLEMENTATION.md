@@ -8,6 +8,76 @@ Entry format:
 
 ```
 
+## 2026-08-15 — P5 (ledger-restructure): the transcript→`calls` writer is retired
+
+- **Built:** the claude and copilot `_ingest` legs removed; `_PARSERS` and all four
+  parsers **kept** (10.1). `ledger.captured_surfaces` + `ledger.usage_rows` added.
+  New gate: `tests/test_calls_retired.py`.
+- **Verified on the real stores, after the change:** `calls` holds **kiro only** (28 rows),
+  `spend` resolves **22,885** from the metric ledgers, `captured_surfaces` reports all
+  three, and the capture manifest has **242 rows, 218 carrying a name**. Against P0's
+  baseline the ~1.98× duplicate is gone exactly as predicted (44,659 → 22,802 for claude).
+- **⚠ ONE DEVIATION, stated not silent: kiro keeps its leg.** For claude and copilot the
+  retired leg was a *duplicate*. Kiro IDE has **no metric twin** — `parse_kiro_ide_metrics`
+  reads `devdata.sqlite`, absent on every install probed — so that leg is the ONLY reader
+  of `tokens_generated.jsonl`. Removing it does not de-duplicate kiro, it **ends kiro IDE
+  capture**, and takes two things the handoff's justification did not name: ADR-KIRO's
+  routing decision loses the rows it routes, and the upgrade-watch loses its baseline. The
+  stated reason (unsummable) is already handled by `ABSENT_SPINES`. Kept as the smaller
+  reversible choice, pinned by a test, flagged for Arpit — deleting five lines in
+  `import_kiro` implements the spec as written.
+- **Five knock-ons the phase had to carry, every one of them a SILENT failure if missed:**
+  1. **The capture manifest.** `_write_manifest` returns early on an empty `collected`, and
+     `collected` was filled only by the retired leg — P5 as specced would have stopped
+     writing the manifest, and its one consumer is the chat-title map, so **every new chat
+     would silently lose its name**. New `_MANIFEST_SOURCES` table feeds it metric rows,
+     picked to **partition** a session without overlap (deliberately *not* `SPEND_SOURCES`,
+     whose empty kiro tuple would erase kiro from the audit trail).
+  2. **The cursor.** `_ingest_claude_metrics` had none — it rode the retired leg's. Missing
+     it fails nothing; every sweep just re-reads every transcript forever.
+  3. **Gate 3 and doctor health.** Both derived from `ledger.calls`; left alone a healthy
+     install reports all three agents as *never captured*.
+  4. **The `[sources] surface` restamp**, which only wrapped the calls parser.
+  5. **The `import_id` manifest FK** and the fail-open diagnostics (`parsed-zero-rows`,
+     `import.ingest`), all of which lived in `_ingest`.
+- **`usage_rows` vs `spend`, kept distinct on purpose.** `spend` is the single resolver —
+  one basis per producer, safe to sum. `usage_rows` is the DIAGNOSTIC union and **overlaps
+  by construction**: it must see kiro (no spine) and cumulative grains, so it answers *did
+  anything arrive* and is never summed. `_capture_quality` reads it rather than `spend`
+  precisely because the agent it was written for is the one `spend` cannot see.
+- **The reported count is the non-overlapping grain**, not every row written: a kind
+  holding two grains would report a 2-request chat as "3 calls" — a number matching no
+  view. `appended` (all rows) still goes to the debug log; `spine_rows` is what the user
+  is told, and it equals `len(ledger.spend(...))`.
+- **Fixture migration, ~30 tests**, done as a migration rather than a re-bless:
+  - **The exact-row corpus was SPLIT, not regenerated.** `expected.json` is untouched and
+    now asserts the **parsers** through `_PARSERS` — which also makes it the only end-to-end
+    test of the custom-source contract. A second test asserts the import captures the same
+    **facts** (token totals identical; the row *grain* legitimately changed).
+    Regenerating would have blessed whatever the new code produced and thrown the evidence
+    away.
+  - `ledger.calls(` → `ledger.spend(` where a test asserts *captured usage* — the
+    basis-agnostic reader, which is the stronger assertion. **Reverted per-file where the
+    subject is kiro**, whose rows are `calls` rows with no spine, so `spend` never returns
+    them (my first blanket rewrite got this wrong and the suite caught it).
+  - The debuglog contract widened from *calls-ingest* to *capture*: the old filter excluded
+    every `kind`-bearing event, so post-P5 it selected nothing and the test could only have
+    been deleted. What it guards — every agent emits a counts-only import event — is intact.
+  - `test_metrics_rescan` now asserts the **cursor** directly, which is what "never advances
+    the calls cursor" literally means and is basis-independent.
+- **Degraded, stated not silent:** `taskcorr` and `hookcmd` can only see a `task` on a
+  `calls` row, and claude/copilot no longer write one (TASK-GRAIN-SPINE). Both say so in
+  place; **no timestamp-proximity fallback** was added — forbidden by house law.
+- **Files:** `cage/{importcmd,ledger,doctorcmd,doctorbundle,taskcorr,hookcmd,explain_data}.py`
+  · `docs/adr/{0003_claude,0004_copilot,0005_kiro,0006_consumer}.md` ·
+  `tests/test_calls_retired.py` (new, 10) + ~14 migrated test files.
+- **ADRs (ADR-DISCIPLINE):** ADR-CLAUDE (retirement + the four things that moved with it) ·
+  ADR-COPILOT (retirement; the two writers already agreed row-for-row) · ADR-KIRO (**the
+  deviation, with its two unnamed consequences**) · ADR-CONSUMERS (a custom source
+  declaring `format = "claude"` inherits CLAUDE-DEDUP/SUBAGENT-KEY — pinned by a test).
+- **Tests:** `just test` green — **1503 passed**, 11 skipped (+16 net).
+- **Next:** P6 — the integrity chain.
+
 ## 2026-08-15 — P4 (ledger-restructure): savings lift to `ledger/<tool>/`
 
 - **Built:** `paths.tool_dir` · `savings_shard` retargeted · `savings_shards` unions both

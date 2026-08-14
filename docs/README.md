@@ -45,14 +45,15 @@ archived: [copilot](../work/archive/v0.49-copilot-metrics-ledger.handoff.md) ·
 **METRICS-PRIMARY** — the flip that made those three ledgers the SOURCE of derived
 spend from a pinned cutover — was built and green on 2026-08-14 and archived:
 [handoff](../work/archive/v0.50-metrics-primary.handoff.md) ·
-[prompt](../work/archive/v0.50-metrics-primary.prompt.md). Its design of record is
-[ADR 0010](../work/archive/adr/0010-metric-ledgers-are-the-spend-source-forward-only-cutover.md).
+[prompt](../work/archive/v0.50-metrics-primary.prompt.md) — the pair is **named, not cited**.
+Its design of record is [ADR-CLAUDE](adr/0003_claude.md) §2, [ADR-COPILOT](adr/0004_copilot.md) §2
+and [ADR-KIRO](adr/0005_kiro.md) §2.
 
 **USAGE-ONLY** — the deletion of the money subsystem, and the largest removal in the
 project's history — was built and green on 2026-08-14 and archived:
 [handoff](../work/archive/v0.50-usage-only.handoff.md) ·
-[prompt](../work/archive/v0.50-usage-only.prompt.md). Its design of record is
-[ADR 0011](../work/archive/adr/0011-cage-measures-usage-not-cost.md), which also **supersedes the money
+[prompt](../work/archive/v0.50-usage-only.prompt.md) — the pair is **named, not cited**.
+Its design of record is [ADR-LAWS](adr/0001_laws.md) Law 5, which also **supersedes the money
 half of ADR 0010**: the spend cutover is retired and `ledger.spend()` partitions by
 agent rather than by time.
 

@@ -96,12 +96,21 @@ def correlate(root: Path, pol: dict | None = None) -> Result:
                               "(off until validated on real data, plan §4)"),
                       correlations=[])
     closed = taskgroup.closed_tasks(root)
+    # **P5 narrowed what this can see, and it says so rather than silently reading less.**
+    # `calls` is the only kind that carries a `task`, and claude/copilot stopped writing it
+    # — their metric rows have no task grain at all (TASK-GRAIN-SPINE). So the correlation
+    # population is now consumer rows, retired-agent history, custom sources and kiro.
+    # Deliberately NOT widened with a timestamp-proximity fallback: guessing which task a
+    # call belonged to from how close its clock was is forbidden by house law, and this
+    # module's whole reason for being gated is that a few heuristic joins are noise.
     found = _correlate_rows(ledger.calls(root), closed)
     if len(found) < constants.MIN_TASK_CORRELATION_N:
         return Result(enabled=True, blocked=True,
                       reason=(f"INSUFFICIENT DATA — {len(found)} correlated call(s), need "
                               f"{constants.MIN_TASK_CORRELATION_N} before tagging (a few "
-                              "heuristic joins are noise, not attribution)"),
+                              "heuristic joins are noise, not attribution). Since v0.51 "
+                              "only `calls` rows carry a task, and claude/copilot no "
+                              "longer write them — see TASK-GRAIN-SPINE"),
                       correlations=[])
     return Result(enabled=True, blocked=False, reason="", correlations=found)
 

@@ -50,7 +50,10 @@ def test_bundle_members_and_manifest(tmp_path, monkeypatch):
         assert set(manifest["included"]) == names - {"manifest.json"}
         assert manifest["skipped"] == {}
         foot = zf.read("footprint.txt").decode("utf-8")
-        assert "1 row(s)" in foot and "calls-2026-06.jsonl" in foot  # counts, never bodies
+        # P5: a claude fixture lands in `ledger/claude/chats-<month>.jsonl`, not
+        # `calls-*.jsonl`. The invariant is unchanged — shard NAMES and row COUNTS,
+        # never a row body — so it is asserted against the shard the ledger now has.
+        assert "row(s)" in foot and "chats-2026-06.jsonl" in foot  # counts, never bodies
         prov = zf.read("policy-provenance.txt").decode("utf-8")
         assert "bundled default" in prov and "CLAUDE_CONFIG_DIR" in prov
 

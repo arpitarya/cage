@@ -77,6 +77,11 @@ def _open_tasks(root: Path, session: str) -> list[str]:
     """
     if not session:
         return []
+    # P5: `calls` is the only kind carrying a `task`, and claude/copilot stopped writing
+    # it. An open task is therefore only findable for a consumer/custom/kiro row — stated
+    # in TASK-GRAIN-SPINE, and NOT patched with a timestamp-proximity guess. The caller
+    # already declines rather than guessing when this returns nothing, so the degradation
+    # is a narrower true answer, never a wrong one.
     from cage import ledger, tasks
     closed = {tid for tid, row in tasks.read(root).items() if row.get("outcome")}
     seen: list[str] = []

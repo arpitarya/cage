@@ -480,10 +480,9 @@ Tested in both pairings (`bash + cmd`, `cmd + cmd`) — `tests/test_win_graphify
   [copilot VS Code](../../work/regression/2026-08-08-gfx-cov-vscode-field-run.md).
 - **Why `saved` is gross:**
   [work/regression/2026-08-01-finding-saved-is-gross.md](../../work/regression/2026-08-01-finding-saved-is-gross.md).
-- Ratified in full: [0005](../../work/archive/adr/0005-graphify-receipt-ids-session-inclusive-cross-route-deferral.md)
-  (ids and deferral) · [0007](../../work/archive/adr/0007-graphify-twin-pair-hand-paired-not-templated.md)
-  (the twin pair) · [0009](../../work/archive/adr/0009-kiro-cli-tool-run-bodies-read-transiently-never-persisted.md)
-  (the kiro route's transient read).
+- Ratified as archived ADRs 0005 (ids and deferral), 0007 (the twin pair) and 0009 (the
+  kiro route's transient read) — **named, not cited**. All three are live in this record's
+  §2, which is now their only spec.
 
 ### Veto condition (when to revisit)
 

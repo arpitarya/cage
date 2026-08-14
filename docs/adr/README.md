@@ -1,13 +1,14 @@
 ---
-doc: the ADR set — seven maintained records, and the rule that keeps them true
-status: current as of 2026-08-14 · replaces the numeric ADRs 0001–0011
+doc: the ADR set — nine maintained records, and the rule that keeps them true
+status: current as of 2026-08-14 · replaces the numeric ADRs 0001–0011 · ADR-AUTHORSHIP carved out of ADR-CLAUDE 2026-08-14
 update-rule: NO behaviour change lands without its owning ADR updated in the same change (see "The standing rule"). A change touching no recorded decision says "no ADR affected" out loud
 ---
 
 # ADRs — the durable *why*, and the rule that keeps it true
 
 **One record per thing cage meters, plus one for what binds them all, one for the surface it is
-all read through, and one for the map of what each surface can and cannot yield.**
+all read through, one for the map of what each surface can and cannot yield, and one for the
+cross-agent question of who wrote which lines.**
 
 | # | record | covers |
 |---|---|---|
@@ -19,6 +20,7 @@ all read through, and one for the map of what each surface can and cannot yield.
 | 0006 | [**ADR-CONSUMERS**](0006_consumer.md) | the things cage meters that are not agents — library, custom sources, retired agents |
 | 0007 | [**ADR-GRAPHIFY**](0007_graphify.md) | graphify — the interceptor twins and the savings receipt |
 | 0008 | [**ADR-COVERAGE**](0008_coverage.md) | what cage can and cannot say, per agent × surface — and why an absence is never a zero |
+| 0009 | [**ADR-AUTHORSHIP**](0009_authorship.md) | who wrote which lines of a commit — the agent is measured, the human is the residual |
 
 Each has **two sections**: **§1 for humans** (one screen, diagrams, no jargon) and
 **§2 for agents** (the binding detail — context, decision, consequences, alternatives,
@@ -56,27 +58,38 @@ record to hold it.
 | record | owns |
 |---|---|
 | [ADR-LAWS](0001_laws.md) | `ledger` · `schema` · `savings` · `units` · `paths` · `constants` · `errors` · `mergeutil` · `ids` |
-| [ADR-CLI](0002_cli.md) | `cli` · `clicmds` · `cliutil` · `verbmap` · `render` · `display` · `csvout` · `viewexport` · `runstamp` · `explain*` |
-| [ADR-CLAUDE](0003_claude.md) | the claude half of `transcript` · `authorcapture` · `linematch` · `commitjoin` · `commitview` · `provenance` · `origin*` · `notessync` · `verifycmd` · `claudewire` |
+| [ADR-CLI](0002_cli.md) | `cli` · `clicmds` · `cliutil` · `verbmap` · `render` · `display` · `csvout` · `viewexport` · `runstamp` · `explain*` · `chats` · `commitview` |
+| [ADR-CLAUDE](0003_claude.md) | the claude half of `transcript` · `claudewire` |
 | [ADR-COPILOT](0004_copilot.md) | the copilot half of `transcript` · `copilotwire` |
 | [ADR-KIRO](0005_kiro.md) | the kiro half of `transcript` · `kirowire` |
 | [ADR-CONSUMERS](0006_consumer.md) | `metering` · `usageparse` · `usagelog` · `manifest` · `machine` · `study` |
 | [ADR-GRAPHIFY](0007_graphify.md) | `graphify*` · `pathshim` · `runshim` · `adoptcmd` · `compress` · `responsecache` |
 | [ADR-COVERAGE](0008_coverage.md) | no module — it owns the cross-cutting *rule* the five gap tables obey (`ABSENT_SPINES` · `units.ABSENT` · `COVERAGE_GAPS` · `GRAPHIFY_COVERAGE` · `HOOK_EVENTS`/`HOOK_GAPS`), each of which stays owned by its own record |
+| [ADR-AUTHORSHIP](0009_authorship.md) | the authorship half of `transcript` and `importcmd` · `authorcapture` · `linematch` · `commitjoin` · `provenance` · `origin*` · `notessync` · `verifycmd` — and the **contents** of `COVERAGE_GAPS`, whose cross-cutting rule stays ADR-COVERAGE's |
 
 **Shared and infrastructure modules are claimed explicitly, never by silence** — the
 ownership test carries the list and the reason for each. `transcript.py` is deliberately
-claimed by **three** records: it is one file holding three vendors' parsers, and pretending
-otherwise would send a copilot change to the wrong reviewer.
+claimed by **four** records: three vendors' parsers plus `parse_edits`, the authorship reader,
+and pretending otherwise would send a copilot change to the wrong reviewer.
 
 ## Cite them by name, never by number
 
-In prose write **ADR-CLAUDE · ADR-COPILOT · ADR-KIRO · ADR-GRAPHIFY · ADR-COVERAGE**.
+In prose write **ADR-CLAUDE · ADR-COPILOT · ADR-KIRO · ADR-GRAPHIFY · ADR-COVERAGE ·
+ADR-AUTHORSHIP**.
 
 A bare "ADR 0001" is now ambiguous — it meant *team ledger aggregation via `refs/notes`*
 for six weeks and there are ~90 live references to the numeric names. The numbers survive
 only as filename ordering. **"ADR 0001–0011" always means an
 [archived](../../work/archive/adr/README.md) record; a named ADR always means a live one.**
+
+**And an archived record is NAMED, never CITED.** Every record here was swept clean of
+archive-backed references on 2026-08-14: an archived file may have been edited or
+overwritten since freezing, so it cannot ground anything — least of all a **Reference**
+section, whose whole job is grounding. Write *"ratified as archived ADR 0008"* without a
+link, and point the actual grounding at the live successor, the code, or a
+[regression](../../work/regression/) measurement. The full rule is in
+[CLAUDE.md](../../CLAUDE.md) *Documentation discipline*; the archived-to-live map is in
+[work/archive/adr/README.md](../../work/archive/adr/README.md).
 
 ## The five laws
 

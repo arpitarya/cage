@@ -2,7 +2,7 @@
 adr: claude-code
 status: current as of 2026-08-14 · metric ledger is the spend basis · two calls-path defects remain, quarantined
 audience: §1 humans (skim) · §2 agents (build)
-update-rule: ANY change to claude capture (parser · store · schema field · unit · authorship) updates this doc in the same change, and bumps its DOC-REGISTRY row
+update-rule: ANY change to claude capture (parser · store · schema field · unit) updates this doc in the same change, and bumps its DOC-REGISTRY row. **Authorship left this record 2026-08-14** — a change to the matcher, a provenance field, a rendered bucket or a `COVERAGE_GAPS` entry updates [ADR-AUTHORSHIP](0009_authorship.md) instead, even when only the claude leg is touched
 ---
 
 # ADR-CLAUDE — Claude Code is metered from its own transcripts, folded once per request
@@ -94,7 +94,7 @@ flowchart TD
 | subagent share of a chat | subagent rows, joined back to the parent chat | vendor-recorded |
 | project name | the working directory on the row, **basename only** | derived by cage |
 | how much the reader was inflating | duplicate rows seen vs. real requests | derived by cage |
-| agent-vs-human authorship | exact line match against the commit's added lines | derived by cage |
+| agent-vs-human authorship (see [ADR-AUTHORSHIP](0009_authorship.md)) | exact line match against the commit's added lines | derived by cage |
 | **credits** | — | **absent: Claude Code records no credit unit on disk** |
 | **dollars** | — | **absent by decision: cage measures usage, never cost** |
 
@@ -129,38 +129,26 @@ flowchart TD
 - `calls` could not be repaired into metric rows retroactively: the vendor fields were
   never captured then, and fabricating them violates counts-never-content. Past ~30 days
   the source transcripts are gone regardless.
-- Claude is the **only** agent whose store carries the text of a proposed edit, so it is
-  the only agent with an authorship route at all.
+- **CORRECTED 2026-08-14 — this record used to say Claude is the *only* agent whose store
+  carries the text of a proposed edit. That was false.** Copilot's CLI `events.jsonl` and
+  VS Code `chatSessions` both carry it, and cage already opens both files every sweep;
+  kiro's IDE execution logs carry the before *and* after text. Claude is the only agent
+  with a **parser**, which is a gap and not a law. The evidence, the per-store confidence
+  and the build order now live in [ADR-AUTHORSHIP](0009_authorship.md); the claim is
+  recorded here because this is where a reader met it for six weeks.
 
 ### Decision
 
-> **⟲ Storage note (P3c, v0.51) — the authorship buffer is month-partitioned.**
-> `ledger/provenance.jsonl` became `ledger/provenance/provenance-<month>.jsonl`, chosen
-> from each **row's own `ts`** (never a write-time clock — authorship capture is routinely
-> backdated, since it attributes commits rather than the present). This **reverses**
-> `paths.shard()`'s explicit *"`provenance` is intentionally never partitioned (buffer)"*
-> and PLAN §3.6.1's matching exemption; both record the reversal rather than dropping the
-> sentence. The premise was right and the conclusion did not follow: **nothing flushes the
-> buffer**, so it grew without bound and every read scanned it end to end.
->
-> **Nothing about the record itself changed** — same schema, same enums, same
-> counts-never-content guarantee, same CI-sole-writer distribution to
-> `refs/notes/cage-provenance`, and `cage authorship verify` still always exits 0. The
-> legacy file is **read forever and never rewritten**: frozen rows are never backfilled,
-> which `residual_lines`' absent-vs-recorded-`0` version gate for `agent%` depends on.
->
-> **All five readers span shards**, and they were enumerated rather than assumed:
-> `ledger.provenance` · `originrecord.read_all`/`for_sha` · `chats.py`'s `agent%` ·
-> `doctorbundle` (which reads the path **directly** and would have under-reported in a
-> diagnostic bundle) · `notessync` (which merges by row id, so a partial read re-pushes or
-> silently drops rows in the canonical note). A missed shard here does not raise or warn —
-> **`agent%` reads counts rather than re-deriving them, so it surfaces as a different
-> percentage**, which is why each reader has its own test.
+> **⟲ The authorship buffer is month-partitioned (P3c, v0.51).** The note that
+> recorded the reversal — and enumerated all five readers that must span shards —
+> moved to [ADR-AUTHORSHIP](0009_authorship.md) *Consequences* on 2026-08-14 with
+> `provenance`'s ownership. It is not restated here.
 
 
 **Claude's spend resolves from `ledger/claude/` for all of history. `calls` is retained,
-never mutated, and is not a spend source. Authorship is measured on the agent only, in
-counts, with human as a labelled residual.**
+never mutated, and is not a spend source.** Authorship — *measured on the agent only, in
+counts, with human as a labelled residual* — is [ADR-AUTHORSHIP](0009_authorship.md)'s
+decision as of 2026-08-14, and is stated there rather than restated here.
 
 - **THE DEDUP LAW.** A request is `(requestId, message.id)`; the last occurrence wins.
   `tokens_in = input_tokens + cache_read_input_tokens + cache_creation_input_tokens`.
@@ -181,18 +169,36 @@ counts, with human as a labelled residual.**
   a sum source.
 - **Chat titles are labels, never facts.** The `summary` record lands as a name in
   `imports.jsonl` and is joined at render time. It never becomes a row field.
-- **Authorship persists five integers and nothing else** (`schema.PROVENANCE_COUNT_FIELDS`).
-  No line body, **and no line hash** — a line hash is a membership oracle over the source.
-  Commit *i* owns `(ts_{i-1}, ts_i]`, upper bound inclusive; resolution is never against
-  `HEAD`. Work after the newest commit is left unrecorded this sweep and picked up
-  exactly once by the next import after its commit exists. Reading diffs is a separate
-  permission: `[authorship] capture` / `CAGE_AUTHORSHIP`, distinct from `[capture] enabled`.
-- **`human` is never written without an attestation.** The automated path may only ever
-  produce `human~` (files the session proposed in) or `unattributed` (files no session
-  proposed in). Unknown is first-class and is never redistributed to make a split total
-  100%.
+- **The claude leg of authorship is `transcript.parse_edits` and nothing else.** What the
+  matcher does with those edits, what is persisted, how the buckets render and which
+  agents are covered are all [ADR-AUTHORSHIP](0009_authorship.md)'s — including the five
+  persisted integers, the `(ts_{i-1}, ts_i]` window, the `human~`/`unattributed`/`unknown`
+  ladder, and the separate `[authorship] capture` permission. **Do not restate them
+  here**: two copies of a rule drift, and this pair already drifted once.
 - **No credit unit exists**: `units.ABSENT["claude"][CREDITS]` renders `—` with *"Claude
   Code records no credit unit on disk"*. Never a `0`.
+
+> **⟲ The transcript→`calls` leg is RETIRED (P5, v0.51).**
+> `ledger/claude/` has been the spend basis for all of history since METRICS-PRIMARY, so
+> the `calls` row was a **second, inflated copy of the same traffic that no view resolved
+> from** — measured at **1.979× on rows and 1.881× on tokens** over one sweep of the real
+> store ([cross-check](../../work/regression/2026-08-14-calls-vs-metric-crosscheck.md)).
+> Verified after the change on the same store: 22,802 claude rows in `spend`, and **zero**
+> claude rows in `calls`.
+>
+> **`transcript.parse_calls` and `_usage_to_row` are KEPT and UNTOUCHED**, reachable only
+> through `importcmd._PARSERS` as the `[sources.<name>] format` custom-source contract
+> (deleting them breaks user config silently). **CLAUDE-DEDUP and CLAUDE-SUBAGENT-KEY are
+> therefore not fixed and never will be here** — this record forbids repairing them on the
+> way out, because the measurement has to outlive the code. A custom source declaring
+> `format = "claude"` inherits both, which [ADR-CONSUMERS](0006_consumer.md) states
+> outright so its author does not have to discover it.
+>
+> **Four things had to move with the leg, and each was a silent failure if missed:** the
+> capture manifest (built from the retired leg's rows — every new chat would have lost its
+> title), the cursor (`_ingest_claude_metrics` had none; it rode this leg's, and without it
+> every sweep re-reads every transcript forever), gate 3 / doctor health (`calls`-based —
+> a healthy install would report *never captured*), and the `[sources] surface` restamp.
 
 ### Consequences
 
@@ -296,18 +302,20 @@ nudges when the newest transcript is >25 days old.
 ### Reference
 
 - **The 2.00× measurement**, full matched window, 43,973 `calls` rows vs 21,955 requests:
-  [archived ADR 0010](../../work/archive/adr/0010-metric-ledgers-are-the-spend-source-forward-only-cutover.md)
-  and [0011](../../work/archive/adr/0011-cage-measures-usage-not-cost.md).
+  [work/regression/2026-08-14-calls-vs-metric-crosscheck.md](../../work/regression/2026-08-14-calls-vs-metric-crosscheck.md).
+  *(Re-pointed 2026-08-14: this cited archived ADRs 0010 and 0011, which under
+  **named-never-cited** back nothing. The live measurement doc is the grounding.)*
 - **Authorship, measured on cage's own 103-commit repo against 81 real transcripts** —
   68.7% verbatim match inside proposed files, the gate sweep, and the rejected
   single-bucket split:
   [work/regression/2026-08-02-p1-authorship-dogfood.md](../../work/regression/2026-08-02-p1-authorship-dogfood.md).
-- **The autopsy this record answers to** — the v0.36 human-axis removal:
-  `work/archive/v0.36-human-removal.handoff.md`.
+- **The autopsy this record answers to** — the v0.36 human-axis removal, whose handoff is
+  archived and therefore **named, not cited**. What survives of it is the `human~` residual
+  rule, which lives in [ADR-AUTHORSHIP](0009_authorship.md) and is grounded there.
 - The per-chat fetch spec:
   [work/research/2026-08-13-claude-per-chat-usage-fetch-spec.md](../../work/research/2026-08-13-claude-per-chat-usage-fetch-spec.md).
-- Ratified in full: [0008](../../work/archive/adr/0008-line-match-authorship-counts-persisted-content-transient.md) (authorship) ·
-  [0010](../../work/archive/adr/0010-metric-ledgers-are-the-spend-source-forward-only-cutover.md) (the spine).
+- Ratified as archived ADRs 0008 (authorship) and 0010 (the spine) — **named, not cited**.
+  Their live homes are [ADR-AUTHORSHIP](0009_authorship.md) and this record's own §2.
 
 ### Veto condition (when to revisit)
 

@@ -185,7 +185,11 @@ def _record_capture_log(root: Path, health: dict, all_rows: list, targets) -> No
     always-on proof-of-capture (`cage/capturelog.py`; diagnose via `cage doctor --bundle`).
     ``rows_total`` is derived from the shared ``all_rows`` read (taken *before* this
     run's appends) plus this run's own ``imported`` delta — no second ledger read.
-    Fail-open: best-effort, never aborts an import."""
+    Fail-open: best-effort, never aborts an import.
+
+    P5: ``all_rows`` is the spend basis ∪ `calls`, for the same reason gate 3 is — a
+    `calls`-only prior count would read 0 on a healthy install and make every breadcrumb
+    claim the ledger had been empty before this run."""
     try:
         before_counts: dict[str, int] = {}
         for c in all_rows:
@@ -278,6 +282,40 @@ def _scan(root: Path, agent: str, src: Path, pattern, since,
                            src=str(src), candidates=len(files))
         files = fresh
     return files
+
+
+#: Per-agent metric sources that together **partition** a session's usage without
+#: overlap — the rows a capture-manifest entry is built from since P5 (v0.51).
+#:
+#: Before P5 the manifest was built from the `calls` rows the sweep appended. That leg is
+#: gone, and `_write_manifest` returns early on an empty `collected`, so leaving it alone
+#: would have stopped writing the manifest entirely for all three agents — and its one
+#: consumer is `chats._title_map`, so **every new chat would silently lose its title**,
+#: including the copilot-CLI names P3b had just added. Nothing would have failed.
+#:
+#: **Deliberately NOT `ledger.SPEND_SOURCES`**, though it looks like the same table. That
+#: one answers *"what may be summed as spend"* and gives kiro an EMPTY tuple, which would
+#: erase kiro from the audit trail. This one answers *"which rows describe a captured
+#: session, once each"* — an audit question, so kiro's own sources are listed. The
+#: overlap-free part is what matters: a grain listed twice (claude `transcript` *and*
+#: `request`, or kiro `cli-conv` *and* `cli-turn`) would double-count that session's
+#: tokens in the manifest row.
+_MANIFEST_SOURCES: dict[str, tuple[str, ...]] = {
+    "claude": ("request",),            # per-request; `transcript` is their fold
+    "copilot": ("chat", "cli-delta"),  # `cli` is cumulative — its delta twin instead
+    "kiro": ("ide", "cli-conv"),       # `cli-turn` is per-turn within `cli-conv`
+}
+
+
+def _collect_manifest_rows(agent: str, rows: list[dict], collect: list | None) -> None:
+    """Add the manifest-eligible subset of freshly appended metric ``rows`` to ``collect``.
+
+    Filtered by `_MANIFEST_SOURCES` so one session's tokens are counted once. A row whose
+    source is not listed is still WRITTEN — it simply does not describe a manifest bucket."""
+    if collect is None:
+        return
+    allowed = _MANIFEST_SOURCES.get(agent, ())
+    collect.extend(r for r in rows if r.get("source", "") in allowed)
 
 
 def _ingest(root: Path, agent: str, src: Path, files: list[Path], parse,
@@ -444,7 +482,11 @@ def _claude_session_filesets(files: list[Path]) -> list[list[Path]]:
 
 
 def _ingest_claude_metrics(root: Path, files: list[Path], *,
-                           pol: dict | None = None) -> int:
+                           pol: dict | None = None,
+                           agent_cursor: dict | None = None,
+                           collect: list | None = None,
+                         import_id: str = "",
+                           surface: str = "") -> int:
     """Regroup `files` into whole session filesets (`_claude_session_filesets`) and
     parse each into claude-metrics rows via `transcript.parse_claude_chat_metrics`,
     appending the ones not already recorded (CLAUDE-METRICS handoff §4.5). Mirrors
@@ -453,28 +495,64 @@ def _ingest_claude_metrics(root: Path, files: list[Path], *,
     each call — metrics rows never touch the call-id `seen` set or the call stderr
     rollup (they are not calls). Fail-open per fileset, like `_ingest`.
 
-    **No own cursor** — this rides the calls sweep's already-cursor-filtered `files`
-    list (a changed file re-triggers regrouping of its whole fileset); a second,
-    independent cursor here would let a subagent-only change slip through both."""
+    **It now OWNS the cursor** (P5, v0.51). It used to ride the calls sweep's advance —
+    correct while that leg existed, and a silent performance regression the moment it was
+    deleted: nothing would fail, every sweep would simply re-read every transcript forever
+    and rely on id-dedupe. The advance moved here with the leg it depended on.
+
+    Still ONE cursor per file path, shared with whatever else scans the same files — never
+    a second independent cursor, which is what would let a subagent-only change slip
+    through both. It advances **per fileset**, after the fileset ingests cleanly, so a
+    broken file never advances past itself."""
     seen_ids = {r.get("id") for r in ledger.claude_metrics_raw(root)}
     filesets = _claude_session_filesets(files)
-    total = 0
+    total = written = 0
     for fileset in filesets:
         f0 = fileset[0]
         session_hint = (f0.parent.parent.name if f0.parent.name == "subagents"
                         else f0.stem)
+        if all(f.is_file() and f.stat().st_size == 0 for f in fileset):
+            pass   # genuinely empty files are not drift
         try:
-            rows = transcript.parse_claude_chat_metrics(fileset, session_hint=session_hint)
+            # P5: the declared `[sources.<x>] surface` restamp used to ride the calls
+            # parser. With that leg gone it has to be applied here, or a source that
+            # declares a surface silently loses it on every row cage now writes.
+            rows = _surface_restamp(
+                lambda fs, _h=session_hint: transcript.parse_claude_chat_metrics(
+                    fs, session_hint=_h), surface)(fileset)
         except Exception as e:  # fail-open: a broken/unreadable fileset never aborts the sweep
-            debuglog.exception(root, "import.claude-metrics", e, pol=pol, file=str(f0))
+            debuglog.exception(root, "import.ingest", e, pol=pol, agent="claude",
+                               file=str(f0))
             continue
+        if not rows and any(f.is_file() and f.stat().st_size > 0 for f in fileset):
+            debuglog.event(root, pol=pol, event="import", agent="claude",
+                           skip="parsed-zero-rows", file=str(f0),
+                           bytes=f0.stat().st_size if f0.is_file() else 0)
+        fresh = []
         for r in rows:
+            if import_id:   # the manifest FK — `_ingest` stamped this before P5
+                r["import_id"] = import_id
             if r.get("id") not in seen_ids:
                 if ledger.append_row(root, "claude", r):
                     seen_ids.add(r.get("id"))
-                    total += 1
+                    fresh.append(r)
+                    written += 1
+        _collect_manifest_rows("claude", fresh, collect)
+        # The RETURNED count is the spine grain only (`request`), not every row written.
+        # This kind holds two grains and `transcript` is the FOLD of `request`, so
+        # counting both would report a chat of 2 requests as "3 calls" — a number that
+        # matches no view. `written` is what the debug log records; `total` is what the
+        # user is told, and it equals the row count `ledger.spend` returns.
+        total += sum(1 for r in fresh if r.get("source") in _MANIFEST_SOURCES["claude"])
+        if agent_cursor is not None:
+            for f in fileset:
+                sig = _file_sig(f)
+                if sig is not None:
+                    agent_cursor[str(f)] = sig
     debuglog.event(root, pol=pol, event="import", agent="claude", result="ok",
-                   kind="claude-metrics", filesets=len(filesets), appended=total)
+                   src=str(files[0].parent) if files else "",
+                   kind="claude-metrics", files=len(files), filesets=len(filesets),
+                   appended=written, spine_rows=total)
     return total
 
 
@@ -512,17 +590,17 @@ def import_claude(root: Path, args, *, pol: dict | None = None, seen: set | None
         files = _scan(root, "claude", src, pattern, getattr(args, "since", None), pol=pol,
                       agent_cursor=agent_cursor, health=health)
         _lift_names(files, names, transcript.session_name_claude)
-        total_rows += _ingest(root, "claude", src, files,
-                              _surface_restamp(lambda f: transcript.parse_calls(
-                                  f, session=f.stem, root=root, pol=pol), surface),
-                              pol=pol, seen=seen, agent_cursor=agent_cursor, collect=collect, import_id=import_id)
-        # CLAUDE-METRICS: the SAME `files` this sweep just scanned, into the metrics
-        # kind — or the source's full match set under `--rescan-metrics`
-        # (METRICS-CURSOR-BLIND; `metrics_scan_set`). Never folded into
-        # `total_rows`/`total_files` below: metrics rows are not calls, and the printed
-        # "imported N call(s)" summary must not count them (handoff §4.5).
-        mfiles, _ = metrics_scan_set(args, src, pattern, files, agent_cursor)
-        _ingest_claude_metrics(root, mfiles, pol=pol)
+        # **The transcript→`calls` leg was REMOVED in P5 (v0.51).** `ledger/claude/` has
+        # been the spend basis for all of history since METRICS-PRIMARY, so the calls row
+        # was a second, ~1.98×-inflated copy of the same traffic (CLAUDE-DEDUP, measured
+        # in the P0 cross-check) that no view resolved from. `transcript.parse_calls` is
+        # KEPT and is still reachable through `_PARSERS` for a custom
+        # `[sources.<name>] format = "claude"` source — deleting it would break user
+        # config silently (10.1). It is simply no longer on the built-in path.
+        mfiles, mcur = metrics_scan_set(args, src, pattern, files, agent_cursor)
+        total_rows += _ingest_claude_metrics(root, mfiles, pol=pol, agent_cursor=mcur,
+                                             collect=collect, import_id=import_id,
+                                             surface=surface)
         _detect_graphify(root, graphify_scan_set(args, src, pattern, files),
                          gfx_ids, pol)
         # The authorship pass reads the source's FULL match set, not `files`: the call
@@ -619,7 +697,8 @@ def _surface_restamp(parse, surface: str):
 def _ingest_credits(root: Path, name: str, src: Path, files: list[Path], *,
                     pol: dict | None = None, agent_cursor: dict | None = None,
                     graphify_files: list[Path] | None = None,
-                    metrics_files: list[Path] | None = None) -> int:
+                    metrics_files: list[Path] | None = None,
+                    collect: list | None = None, import_id: str = "") -> int:
     """Drive the Kiro-CLI store's two legs — metrics and graphify — and advance the cursor.
 
     **The top-level `credits-<month>.jsonl` shard is NO LONGER WRITTEN (P2, v0.51).** It
@@ -664,7 +743,8 @@ def _ingest_credits(root: Path, name: str, src: Path, files: list[Path], *,
     _ingest_kiro_metrics(root, files if metrics_files is None else metrics_files,
                         lambda f: transcript.parse_kiro_cli_metrics(f, workspace=workspace),
                         src=src, pol=pol,
-                        agent_cursor=agent_cursor if metrics_files is None else None)
+                        agent_cursor=agent_cursor if metrics_files is None else None,
+                        collect=collect, import_id=import_id)
     _detect_graphify_kiro_cli(root, files if graphify_files is None else graphify_files,
                               workspace, pol)
     debuglog.event(root, pol=pol, event="import", agent=name, result="ok", src=str(src),
@@ -674,7 +754,9 @@ def _ingest_credits(root: Path, name: str, src: Path, files: list[Path], *,
 
 def _ingest_copilot_metrics(root: Path, files: list[Path], parse, *, src: Path,
                             pol: dict | None = None,
-                            agent_cursor: dict | None = None) -> int:
+                            agent_cursor: dict | None = None,
+                         collect: list | None = None,
+                         import_id: str = "") -> int:
     """Parse `files` into copilot-metrics rows via `parse` (dispatched per file by the
     caller — chat vs cli metrics in the always-on leg, one of the three gated-store
     parsers in the gated leg) and append the ones not already recorded
@@ -687,16 +769,34 @@ def _ingest_copilot_metrics(root: Path, files: list[Path], parse, *, src: Path,
     sharing one dict with the calls leg or across the three gated stores never
     collides)."""
     seen_ids = {r.get("id") for r in ledger.copilot_metrics_raw(root)}
-    total = parsed = 0
+    total = parsed = written = 0
     for f in files:
         try:
             rows = parse(f)
             parsed += len(rows)
+            if not rows and f.is_file() and f.stat().st_size > 0:
+                # The format-drift signature (`_ingest` logged this before P5): a
+                # non-empty store parsing to zero rows is how a vendor schema change
+                # shows up, and it is silent unless it is recorded here.
+                debuglog.event(root, pol=pol, event="import", agent="copilot",
+                               skip="parsed-zero-rows", file=str(f),
+                               bytes=f.stat().st_size)
+            fresh = []
             for r in rows:
+                if import_id:   # the manifest FK — `_ingest` stamped this before P5
+                    r["import_id"] = import_id
                 if r.get("id") not in seen_ids:
                     if ledger.append_row(root, "copilot", r):
                         seen_ids.add(r.get("id"))
-                        total += 1
+                        fresh.append(r)
+                        written += 1
+            _collect_manifest_rows("copilot", fresh, collect)
+            # RETURNED count is the non-overlapping grain only — the same rule the claude
+            # leg follows. This kind holds several grains describing the same traffic
+            # (copilot: `cli` is cumulative and `cli-delta` is its delta twin), so counting
+            # every written row would tell the user a number no view can reproduce.
+            total += sum(1 for r in fresh
+                         if r.get("source") in _MANIFEST_SOURCES["copilot"])
             if agent_cursor is not None:
                 sig = _file_sig(f)
                 if sig is not None:
@@ -705,13 +805,15 @@ def _ingest_copilot_metrics(root: Path, files: list[Path], parse, *, src: Path,
             debuglog.exception(root, "import.copilot-metrics", e, pol=pol, file=str(f))
     debuglog.event(root, pol=pol, event="import", agent="copilot", result="ok",
                    src=str(src), kind="copilot-metrics", files=len(files),
-                   parsed=parsed, appended=total)
+                   parsed=parsed, appended=written, spine_rows=total)
     return total
 
 
 def _ingest_kiro_metrics(root: Path, files: list[Path], parse, *, src: Path,
                          pol: dict | None = None,
-                         agent_cursor: dict | None = None) -> int:
+                         agent_cursor: dict | None = None,
+                         collect: list | None = None,
+                         import_id: str = "") -> int:
     """Parse `files` into kiro-metrics rows via `parse` (the CLI conv/turn parser in the
     always-on CLI leg, the IDE devdata parser in the IDE leg) and append the ones not
     already recorded (KIRO-METRICS handoff §4.5). Mirrors `_ingest_copilot_metrics`
@@ -721,16 +823,34 @@ def _ingest_kiro_metrics(root: Path, files: list[Path], parse, *, src: Path,
     credits). Fail-open per file, like `_ingest`/`_ingest_credits`. Reuses the SAME
     `files` list the caller already scanned — no second scan."""
     seen_ids = {r.get("id") for r in ledger.kiro_metrics_raw(root)}
-    total = parsed = 0
+    total = parsed = written = 0
     for f in files:
         try:
             rows = parse(f)
             parsed += len(rows)
+            if not rows and f.is_file() and f.stat().st_size > 0:
+                # The format-drift signature (`_ingest` logged this before P5): a
+                # non-empty store parsing to zero rows is how a vendor schema change
+                # shows up, and it is silent unless it is recorded here.
+                debuglog.event(root, pol=pol, event="import", agent="kiro",
+                               skip="parsed-zero-rows", file=str(f),
+                               bytes=f.stat().st_size)
+            fresh = []
             for r in rows:
+                if import_id:   # the manifest FK — `_ingest` stamped this before P5
+                    r["import_id"] = import_id
                 if r.get("id") not in seen_ids:
                     if ledger.append_row(root, "kiro", r):
                         seen_ids.add(r.get("id"))
-                        total += 1
+                        fresh.append(r)
+                        written += 1
+            _collect_manifest_rows("kiro", fresh, collect)
+            # RETURNED count is the non-overlapping grain only — the same rule the claude
+            # leg follows. This kind holds several grains describing the same traffic
+            # (copilot: `cli` is cumulative and `cli-delta` is its delta twin), so counting
+            # every written row would tell the user a number no view can reproduce.
+            total += sum(1 for r in fresh
+                         if r.get("source") in _MANIFEST_SOURCES["kiro"])
             if agent_cursor is not None:
                 sig = _file_sig(f)
                 if sig is not None:
@@ -739,7 +859,7 @@ def _ingest_kiro_metrics(root: Path, files: list[Path], parse, *, src: Path,
             debuglog.exception(root, "import.kiro-metrics", e, pol=pol, file=str(f))
     debuglog.event(root, pol=pol, event="import", agent="kiro", result="ok",
                    src=str(src), kind="kiro-metrics", files=len(files),
-                   parsed=parsed, appended=total)
+                   parsed=parsed, appended=written, spine_rows=total)
     return total
 
 
@@ -795,7 +915,8 @@ def import_custom_tools(root: Path, args, *, pol: dict | None = None,
                 credit_rows += _ingest_credits(
                     root, name, s.path, files, pol=pol, agent_cursor=agent_cursor,
                     graphify_files=graphify_scan_set(args, s.path, s.glob, files),
-                    metrics_files=None if mfiles is files else mfiles)
+                    metrics_files=None if mfiles is files else mfiles,
+                    collect=collect, import_id=import_id)
                 m += len(files)
                 continue
             base_parse = _PARSERS[s.fmt]
@@ -861,17 +982,12 @@ def import_copilot(root: Path, args, *, pol: dict | None = None, seen: set | Non
         files = _scan(root, "copilot", src, pattern, getattr(args, "since", None), pol=pol,
                       agent_cursor=agent_cursor, health=health)
         _lift_names(files, names, _copilot_name)
-        total_rows += _ingest(root, "copilot", src, files,
-                              _surface_restamp(_parse_copilot_any, surface),
-                              pol=pol, seen=seen, agent_cursor=agent_cursor, collect=collect, import_id=import_id)
-        # COPILOT-METRICS: the SAME `files` this sweep just scanned, into the metrics
-        # kind — or the source's full match set under `--rescan-metrics`
-        # (METRICS-CURSOR-BLIND; `metrics_scan_set`). Never folded into
-        # `total_rows`/`total_files` below: metrics rows are not calls, and the printed
-        # "imported N call(s)" summary must not count them (handoff §4.5).
+        # P5: the transcript→`calls` leg is gone (see the claude leg above).
+        # `_parse_copilot_any` and the two parsers behind it are KEPT for `_PARSERS`.
         mfiles, mcur = metrics_scan_set(args, src, pattern, files, agent_cursor)
-        _ingest_copilot_metrics(root, mfiles, _parse_copilot_metrics_any, src=src,
-                                pol=pol, agent_cursor=mcur)
+        total_rows += _ingest_copilot_metrics(
+            root, mfiles, _surface_restamp(_parse_copilot_metrics_any, surface),
+            src=src, pol=pol, agent_cursor=mcur, collect=collect, import_id=import_id)
         _detect_graphify_copilot(root, graphify_scan_set(args, src, pattern, files),
                                  gfx_ids, pol)
         total_files += len(files)
@@ -955,9 +1071,37 @@ def import_kiro(root: Path, args, *, pol: dict | None = None, seen: set | None =
         _log_kiro_src(root, src, pol=pol)
         files = _scan(root, "kiro", src, pattern, getattr(args, "since", None), pol=pol,
                       agent_cursor=agent_cursor, health=health)
+        # ⚠ **KIRO KEEPS ITS `calls` LEG — the one deviation from P5's spec, and it is a
+        # deviation on evidence rather than caution.**
+        #
+        # For claude and copilot the retired leg was a *duplicate*: `ledger/claude/` and
+        # `ledger/copilot/` carry the same traffic, so stopping the calls writer loses
+        # nothing. **Kiro IDE has no metric twin.** `parse_kiro_ide_metrics` reads
+        # `devdata.sqlite`, which is absent on every install ever probed, so this leg is
+        # the ONLY reader of `tokens_generated.jsonl` — the only file kiro IDE actually
+        # writes. Removing it does not de-duplicate kiro; it ends kiro IDE capture.
+        #
+        # Two things go with it, neither named in the handoff's justification:
+        #   1. **ADR-KIRO's routing decision loses the rows it routes.** IDE rows are a
+        #      machine fact and land in `~/.cage`; with nothing captured there is nothing
+        #      to route, and the mechanism goes unexercised.
+        #   2. **The upgrade-watch loses its baseline.** The whole point of keeping
+        #      `parse_kiro_ide_metrics` is to notice the day Kiro ships a real store —
+        #      which is easiest to see against rows that are still arriving.
+        #
+        # The handoff's reason for removing it — 28 rows, 1,576 in / **0 out**, model
+        # `"agent"`, a byte-identical 6-row block repeated — is about the rows being
+        # **unsummable**, and that is already handled: `ABSENT_SPINES["kiro"]` keeps them
+        # out of every total, so they cost nothing and read as `—` with a stated reason.
+        # Unsummable is not the same as worthless.
+        #
+        # Kept as the smaller, reversible choice, and flagged for Arpit — the handoff
+        # itself says this one is overridable in two lines. Deleting these five lines
+        # implements the spec as written.
         total_rows += _ingest(root, "kiro", src, files,
                               _surface_restamp(lambda f: transcript.parse_kiro_calls(f), surface),
-                              pol=pol, seen=seen, agent_cursor=agent_cursor, collect=collect, import_id=import_id)
+                              pol=pol, seen=seen, agent_cursor=agent_cursor,
+                              collect=collect, import_id=import_id)
         total_files += len(files)
     # KIRO-METRICS IDE leg (handoff §4.5): a single fixed file, not a glob — resolved
     # directly rather than through `_scan`/`agent_log_sources` (`paths.kiro_devdata_db`
@@ -969,7 +1113,8 @@ def import_kiro(root: Path, args, *, pol: dict | None = None, seen: set | None =
     devdata = paths.kiro_devdata_db()
     if devdata.exists():
         _ingest_kiro_metrics(root, [devdata], transcript.parse_kiro_ide_metrics,
-                            src=devdata, pol=pol, agent_cursor=agent_cursor)
+                            src=devdata, pol=pol, agent_cursor=agent_cursor,
+                            collect=collect, import_id=import_id)
     return total_rows, total_files
 
 
@@ -1161,7 +1306,7 @@ def _kiro_leg(root: Path, sink: Path, args, pol: dict) -> list[str]:
         cursors = _load_cursors(foot)
         all_rows = ledger.calls(sink)
         seen = {c.get("id") for c in all_rows}
-        captured = {agents.row_surface(c.get("agent")) for c in all_rows}
+        captured = ledger.captured_surfaces(sink)   # the twin of gate 3 above (P5)
         health: dict = {}
         collected: list[dict] = []
         from cage import manifest
@@ -1177,7 +1322,7 @@ def _kiro_leg(root: Path, sink: Path, args, pol: dict) -> list[str]:
         # `pol`, not `gpol`: "is kiro a configured source?" is a question about the sweep's
         # own registry — the one this leg actually read from.
         _record_health(sink, cursors, health, captured, ("kiro",), pol)
-        _record_capture_log(sink, health, all_rows, ("kiro",))
+        _record_capture_log(sink, health, ledger.spend(sink) + all_rows, ("kiro",))
         _save_cursors(foot, cursors)  # NB: `_last_import` deliberately untouched
     return [line]
 
@@ -1313,9 +1458,15 @@ def run(root: Path, agent: str, args) -> list[str]:
         cursors = _load_cursors(foot)
         if kiro_sink is not None:  # kiro captures elsewhere now — its state here would lie
             _drop_routed_kiro_state(cursors)
-        all_rows = ledger.calls(root)  # one ledger read shared across agents + capture health
+        # One shared read: `calls` for the id-dedupe `seen` set (call ids only ever
+        # existed there), and the spend basis for the counts the breadcrumb reports.
+        all_rows = ledger.calls(root)
+        prior_rows = ledger.spend(root) + all_rows
         seen = {c.get("id") for c in all_rows}
-        captured = {agents.row_surface(c.get("agent")) for c in all_rows}  # gate 3 (no 2nd read)
+        # Gate 3 — "has this agent EVER captured?". Read from the metric ledgers ∪ `calls`
+        # since P5: the three agents no longer write `calls`, so a `calls`-only set is
+        # empty on a healthy install and every one of them reports *never captured*.
+        captured = ledger.captured_surfaces(root)
         health: dict = {}  # per-agent {files, src} accumulated by _scan across this sweep
         collected: list[dict] = []  # rows this run appended — feeds the §2.2 rollup, no re-read
         names: dict[str, str] = {}  # {session: lifted name}, parse-only — feeds the manifest only
@@ -1356,7 +1507,7 @@ def run(root: Path, agent: str, args) -> list[str]:
         # captured, each carrying its lifted session name (parse-only, manifest-only).
         _write_manifest(root, import_id, collected, health, pol, _now_iso(), names)
         _record_health(root, cursors, health, captured, targets, pol)
-        _record_capture_log(root, health, all_rows, targets)
+        _record_capture_log(root, health, prior_rows, targets)
         cursors["_last_import"] = _now_iso()  # pull-based staleness signal for doctor/report
         _save_cursors(foot, cursors)
     # Piggybacked state maintenance (plan §3.6.4): every hook/watch/export sweep
@@ -1442,11 +1593,19 @@ def ensure_captured(root: Path, args=None, *, pol: dict | None = None,
                 debuglog.event(root, pol=pol, event="capture-on-read", skip="throttled",
                                age_secs=secs, window=window)
                 return None
-        before_calls = {c.get("id") for c in ledger.calls(root)}
+        # P5: the before/after id sets come from `ledger.spend` ∪ `calls`, not `calls`
+        # alone. The three agents stopped writing `calls`, so a calls-only diff would find
+        # zero new rows after a sweep that captured plenty — and `ensure_captured` returns
+        # None on zero, so the "· captured N new …" confirmation would have gone silent on
+        # every healthy install. Silence is this function's "nothing happened" signal, and
+        # that is exactly what makes the regression invisible.
+        def _visible():
+            return ledger.spend(root) + ledger.calls(root)
+        before_calls = {c.get("id") for c in _visible()}
         debuglog.event(root, pol=pol, event="capture-on-read", action="sweep",
                        resolved_root=str(root))
         run(root, "all", args if isinstance(args, _SweepArgs) else _SweepArgs())
-        after_calls = ledger.calls(root)
+        after_calls = _visible()
         new_calls = [c for c in after_calls if c.get("id") not in before_calls]
         # Savings surfaced "since last read": receipts pushed (graphify/fux) between the
         # previous sweep and now — the pull sweep never appends receipts itself, so this

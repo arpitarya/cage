@@ -94,7 +94,7 @@ def test_import_agent_scoped_pulls_only_that_agent(tmp_path, monkeypatch):
     tp = tmp_path / "live.jsonl"
     tp.write_text(_claude_line("u1", 100, 40) + "\n", encoding="utf-8")
     clicmds.cmd_import(_args(agent="claude", path=str(tp)))
-    assert {c["agent"] for c in ledger.calls(root)} == {"claude-code"}   # copilot NOT pulled in
+    assert {c["agent"] for c in ledger.spend(root)} == {"claude-code"}   # copilot NOT pulled in
 
 
 def test_import_skipped_when_capture_disabled(tmp_path, monkeypatch, capsys):
@@ -104,10 +104,10 @@ def test_import_skipped_when_capture_disabled(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("CAGE_CAPTURE", "0")                              # consumer pauses capture
     assert clicmds.cmd_import(_args(agent="claude", path=str(tp))) == 0
     assert "capture disabled" in capsys.readouterr().out
-    assert ledger.calls(root) == []                                     # nothing imported
+    assert ledger.spend(root) == []                                     # nothing imported
     monkeypatch.setenv("CAGE_CAPTURE", "1")                              # re-enable
     clicmds.cmd_import(_args(agent="claude", path=str(tp)))
-    assert len(ledger.calls(root)) == 1
+    assert len(ledger.spend(root)) == 1
 
 
 def test_import_skipped_when_policy_disables_capture(tmp_path, monkeypatch, capsys):
@@ -120,7 +120,7 @@ def test_import_skipped_when_policy_disables_capture(tmp_path, monkeypatch, caps
     tp.write_text(_claude_line("u1", 100, 50) + "\n", encoding="utf-8")
     assert clicmds.cmd_import(_args(agent="claude", path=str(tp))) == 0
     assert "capture disabled" in capsys.readouterr().out
-    assert ledger.calls(root) == []
+    assert ledger.spend(root) == []
 
 
 # --- every agent is reachable -------------------------------------------------
@@ -148,7 +148,7 @@ def test_claude_import_counts_and_idempotent(tmp_path, monkeypatch, capsys):
     tp.write_text(_claude_line("u1", 100, 50) + "\n" + _claude_line("u2", 200, 60) + "\n",
                   encoding="utf-8")
     clicmds.cmd_import(_args(agent="claude", path=str(tp)))
-    calls = ledger.calls(root)
+    calls = ledger.spend(root)
     assert len(calls) == 2
     assert calls[0]["tokens_in"] == 100 and calls[0]["tokens_out"] == 50
     assert "✔ claude: imported 2 call(s) from 1 file(s)." in capsys.readouterr().out
@@ -158,15 +158,22 @@ def test_claude_import_counts_and_idempotent(tmp_path, monkeypatch, capsys):
 
 
 def test_import_is_noop_when_already_recorded_same_turns(tmp_path, monkeypatch, capsys):
-    """A call seen by two capture paths dedupes by id (no double-count)."""
+    """The same turn captured twice dedupes by row id (no double-count).
+
+    **Rewritten by P5.** It used to seed `calls` via `transcript.parse_calls` to stand in
+    for "a prior capture path", then import and assert the import added nothing. Claude no
+    longer writes `calls` at all, so that seeding produces a row of a *different kind* and
+    the test would have been asserting dedupe between two things that never collide.
+    The property is unchanged and is now exercised where it actually lives: a second
+    import of the same transcript. Ids fold the row's own values, so it appends zero."""
     root = _init_root(tmp_path, monkeypatch)
     tp = tmp_path / "s.jsonl"
     tp.write_text(_claude_line("dup", 100, 50) + "\n", encoding="utf-8")
-    from cage import transcript
-    ledger.append_new(root, transcript.parse_calls(tp, session=tp.stem))  # a prior capture path got it
+    clicmds.cmd_import(_args(agent="claude", path=str(tp)))
+    assert len(ledger.spend(root)) == 1
     capsys.readouterr()
-    clicmds.cmd_import(_args(agent="claude", path=str(tp)))  # import the same turn
-    assert len(ledger.calls(root)) == 1  # still one — id dedupe across hook + import
+    clicmds.cmd_import(_args(agent="claude", path=str(tp)))  # the same turn again
+    assert len(ledger.spend(root)) == 1  # still one — id dedupe
     assert "imported 0 call(s)" in capsys.readouterr().out
 
 
@@ -177,7 +184,7 @@ def test_malformed_file_does_not_abort(tmp_path, monkeypatch):
     (scan / "good.jsonl").write_text(_claude_line("u1", 10, 5) + "\n", encoding="utf-8")
     (scan / "bad.jsonl").write_text("{not json\n", encoding="utf-8")
     assert clicmds.cmd_import(_args(agent="claude", path=str(scan))) == 0
-    assert len(ledger.calls(root)) == 1  # the good file still imported
+    assert len(ledger.spend(root)) == 1  # the good file still imported
 
 
 def _copilot_shutdown(model, tin, tout, cached=0):
@@ -197,16 +204,21 @@ def test_copilot_import_counts_and_idempotent(tmp_path, monkeypatch, capsys):
     ev.parent.mkdir(parents=True)
     ev.write_text(_copilot_shutdown("gpt-5-mini", 1200, 80, cached=300) + "\n", encoding="utf-8")
     clicmds.cmd_import(_args(agent="copilot"))
-    calls = ledger.calls(root)
+    calls = ledger.spend(root)
     assert len(calls) == 1
     assert calls[0]["agent"] == "copilot" and calls[0]["provider"] == "openai"
     # inputTokens is the total (already includes cache) — not summed again
     assert calls[0]["tokens_in"] == 1200 and calls[0]["tokens_out"] == 80
     assert calls[0]["cached_in"] == 300
     assert "✔ copilot: imported 1 call(s) from 1 file(s)." in capsys.readouterr().out
-    before = b"".join(p.read_bytes() for p in paths.Footprint(root).shards("calls"))
+    def snap():   # every shard, not just `calls` — the rows moved kind in P5
+        base = paths.Footprint(root).ledger
+        return {p.relative_to(base).as_posix(): p.read_bytes()
+                for p in sorted(base.rglob("*.jsonl"))}
+    before = snap()
+    assert before, "nothing was written — the idempotency check would be vacuous"
     clicmds.cmd_import(_args(agent="copilot"))  # re-import → idempotent by session id
-    assert b"".join(p.read_bytes() for p in paths.Footprint(root).shards("calls")) == before
+    assert snap() == before
 
 
 def test_kiro_import_counts_and_idempotent(tmp_path, monkeypatch, capsys):
@@ -224,6 +236,9 @@ def test_kiro_import_counts_and_idempotent(tmp_path, monkeypatch, capsys):
     clicmds.cmd_import(_args(agent="kiro", path=str(log)))
     assert ledger.calls(root) == []                     # not in the project ledger
     machine = paths.global_home()
+    # `ledger.calls`, not `spend()`: kiro has NO token spine (`ABSENT_SPINES`), so its
+    # rows are correctly absent from the spend basis and present in `calls` — which is
+    # exactly why P5 kept kiro's writer (it has no metric twin to move to).
     calls = ledger.calls(machine)
     assert len(calls) == 2 and {c["agent"] for c in calls} == {"kiro"}
     assert {c["tokens_in"] for c in calls} == {1200, 13}  # the 0-output line still counts

@@ -158,7 +158,7 @@ def test_claude_and_copilot_capture_is_byte_identical(tmp_path, monkeypatch):
         if with_kiro:
             _kiro_log(2)
         importcmd.run(root, "all", _args())
-        rows = ledger.calls(root)
+        rows = ledger.spend(root)   # P5: claude resolves from `ledger/claude/`
         assert rows, "the claude leg must actually capture, or this proves nothing"
         return [{k: v for k, v in r.items() if k != "import_id"} for r in rows]
 
@@ -170,7 +170,11 @@ def test_the_project_ledger_never_gains_a_kiro_row(tmp_path, monkeypatch):
     _claude_log()
     _kiro_log(4)
     importcmd.run(root, "all", _args())
-    assert {c["agent"] for c in ledger.calls(root)} == {"claude-code"}
+    # P5: claude resolves from `ledger/claude/`, so the project ledger's usage is read
+    # through `spend`. The half this test is named for — no KIRO row here — is asserted
+    # on `calls`, which is exactly where a mis-routed kiro row would land.
+    assert {c["agent"] for c in ledger.spend(root)} == {"claude-code"}
+    assert [c for c in ledger.calls(root) if c.get("agent") == "kiro"] == []
 
 
 # ── the summary line never counts cross-ledger rows ───────────────────────────

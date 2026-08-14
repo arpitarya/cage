@@ -15,7 +15,7 @@ which stand unamended by the accept.
 **The fork:** `cage setup --python-launcher` removes the `cage` command by design, but
 [B5](../../docs/adr/0007_graphify.md)'s capability probe needs exactly that, so **neither twin**
 meters — both degrade to correct, silently unmetered passthrough. Fixing one twin alone
-is precisely the drift [ADR 0007](../archive/adr/0007-graphify-twin-pair-hand-paired-not-templated.md)
+is precisely the drift [ADR-GRAPHIFY](../../docs/adr/0007_graphify.md)
 exists to prevent, which is why this is a decision and not a patch.
 
 ## What is actually lost today (the finding that moves the call)
@@ -124,7 +124,8 @@ non-shim rows in the table above.
 ## References
 
 - [../../docs/adr/0007_graphify.md](../../docs/adr/0007_graphify.md) — B5, and the B1–B8/D1–D7 contract B would amend
-- [ADR 0007](../archive/adr/0007-graphify-twin-pair-hand-paired-not-templated.md) — hand-paired,
+- [ADR-GRAPHIFY](../../docs/adr/0007_graphify.md) §2 (absorbed from the archived twin-pair ADR,
+  which is named, not cited) — hand-paired,
   not templated; every twin change costs two files plus the contract
 - [restricted-environments.md](../restricted-environments.md) — the launcher-mode tier and
   the current GF-LAUNCHER statement

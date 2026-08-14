@@ -65,7 +65,11 @@ def test_ingest_parse_failure_logs(root, monkeypatch):
     home = root / "home-claude_config_dir" / "projects" / "p"
     home.mkdir(parents=True)
     (home / "s.jsonl").write_text("{}\n", encoding="utf-8")
-    monkeypatch.setattr(transcript, "parse_calls", _boom)
+    # P5: the built-in claude path parses through `parse_claude_chat_metrics`, not
+    # `parse_calls` — patching the retired parser would have made this pass while
+    # exercising nothing. The property is unchanged: a parser that raises is RECORDED,
+    # and the sweep still returns (fail-open but never silent).
+    monkeypatch.setattr(transcript, "parse_claude_chat_metrics", _boom)
     importcmd.run(root, "claude", _args())  # fail-open: never raises
     assert "import.ingest" in _contexts(root)
 

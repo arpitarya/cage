@@ -165,7 +165,8 @@ def test_parser_exception_is_recorded_and_import_still_returns(proj, monkeypatch
     def boom(*a, **k):
         raise RuntimeError("parser blew up")
 
-    monkeypatch.setattr("cage.transcript.parse_calls", boom)
+    # P5: patch the parser the built-in claude path actually calls now.
+    monkeypatch.setattr("cage.transcript.parse_claude_chat_metrics", boom)
     tp = _claude_transcript(proj / "t.jsonl")
     importcmd.run(proj, "claude", _import_args(path=tp))  # fail-open: never raises
     exc = [e for e in _events(proj) if e.get("event") == "exception"]
@@ -190,7 +191,12 @@ def test_debug_log_carries_no_prompt_or_response_bodies(proj, monkeypatch):
                "exists", "pattern", "files_matched",
                # CLAUDE-METRICS's own ingest event (_ingest_claude_metrics) —
                # counts only, same discipline as every other debuglog event here.
-               "kind", "filesets"}
+               "kind", "filesets",
+               # P5: the metric legs report BOTH counts — `appended` (every row written)
+               # and `spine_rows` (the non-overlapping grain the user is told about).
+               # A kind holding several grains would otherwise log a number no view can
+               # reproduce, or hide the difference between the two.
+               "spine_rows", "writer", "scoped"}
     for e in _events(proj):
         assert set(e).issubset(allowed), f"unexpected keys logged: {set(e) - allowed}"
 
@@ -224,17 +230,20 @@ def test_every_agent_import_logs_a_structured_event(proj, monkeypatch, tmp_path,
 
     importcmd.run(proj, agent, A())
     logged_in = paths.global_home() if paths.kiro_routed(proj) and agent == "kiro" else proj
-    # "kind" marks a non-calls sibling event (credits/copilot-metrics — COPILOT-METRICS
-    # gives copilot a second, differently-shaped "src"-bearing event on the SAME agent
-    # name) — excluded here because this test targets the *calls*-ingest contract
-    # specifically, the one `_ingest` (not `_ingest_credits`/`_ingest_copilot_metrics`)
-    # emits.
+    # **P5 widened this from the calls-ingest contract to the capture contract.** It used
+    # to exclude every `"kind"`-bearing event so it targeted `_ingest` specifically — the
+    # calls leg. Claude and copilot no longer have one, so that filter selected nothing
+    # and the test would have had to be deleted to go green. What it actually guards is
+    # unchanged and worth keeping: **every agent emits a metadata-only import event with
+    # counts**, whichever leg does the capturing. A new agent that logs nothing still fails.
     detail = [e for e in _events(logged_in)
-              if e.get("agent") == agent and e.get("result") == "ok" and "src" in e
-              and "kind" not in e]
+              if e.get("agent") == agent and e.get("result") == "ok" and "src" in e]
     assert detail, f"no structured import event recorded for {agent}"
-    d = detail[-1]
-    assert {"files", "parsed", "appended", "deduped"} <= set(d)
+    # The COMMON contract is `files` + `appended`: how much was looked at, how much was
+    # recorded. `parsed`/`deduped` are `_ingest`'s shape (kiro still has a calls leg);
+    # `filesets`/`spine_rows` are the metric legs'. Asserting a union of both shapes would
+    # pass only by accident of which leg happened to run last.
+    assert any({"files", "appended"} <= set(d) for d in detail), detail
 
 
 def test_since_filtered_skip_is_logged(proj, monkeypatch, tmp_path):
@@ -309,7 +318,7 @@ def test_ledger_byte_identical_with_debug_on_vs_off(tmp_path, monkeypatch):
     # run, plan §4) — it varies by run, not by the debug switch under test.
     def _rows(root):
         return [{k: v for k, v in c.items() if k != "import_id"}
-                for c in ledger.calls(root)]
+                for c in ledger.spend(root)]
     assert _rows(a) and _rows(a) == _rows(b)             # capture unchanged by debug
     assert not paths.Footprint(a).debug_log.exists()     # off ⇒ no debug file
     assert paths.Footprint(b).debug_log.exists()         # on  ⇒ events recorded

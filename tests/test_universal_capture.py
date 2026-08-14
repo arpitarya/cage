@@ -85,7 +85,7 @@ def test_import_with_no_project_lands_in_global_ledger(tmp_path, monkeypatch, ca
     assert clicmds.cmd_import(_imp_args(agent="claude", path=str(tp))) == 0
     assert "imported 1 call" in capsys.readouterr().out
     # Landed in the global ledger, NOT a stray .cage scattered into the random cwd.
-    assert len(ledger.calls(paths.global_home())) == 1
+    assert len(ledger.spend(paths.global_home())) == 1
     assert not (fresh / ".cage").exists()
 
 
@@ -138,14 +138,14 @@ def test_cursor_skips_unchanged_files(tmp_path, monkeypatch):
     tp.write_text(_claude_line("u1", 100, 50) + "\n", encoding="utf-8")
 
     importcmd.run(root, "claude", _imp_args(agent="claude", path=str(tp)))
-    assert len(ledger.calls(root)) == 1
+    assert len(ledger.spend(root)) == 1
     cur = json.loads(paths.Footprint(root).cursors.read_text())
     assert str(tp) in cur["claude"] and "_last_import" in cur  # high-water recorded
 
     # Second run: file unchanged → cursor skip (recorded), still idempotent.
     log = paths.Footprint(root).debug_log
     importcmd.run(root, "claude", _imp_args(agent="claude", path=str(tp)))
-    assert len(ledger.calls(root)) == 1
+    assert len(ledger.spend(root)) == 1
     events = [json.loads(l) for l in log.read_text().splitlines()]
     assert any(e.get("skip") == "cursor-unchanged" for e in events)
 
@@ -153,7 +153,7 @@ def test_cursor_skips_unchanged_files(tmp_path, monkeypatch):
     with tp.open("a", encoding="utf-8") as fh:
         fh.write(_claude_line("u2", 70, 30) + "\n")
     importcmd.run(root, "claude", _imp_args(agent="claude", path=str(tp)))
-    assert len(ledger.calls(root)) == 2
+    assert len(ledger.spend(root)) == 2
 
 
 # ── cage data export ───────────────────────────────────────────────────────────────
@@ -192,7 +192,7 @@ def test_capture_failopen_on_malformed_policy(tmp_path, monkeypatch, capsys):
     # unreadable config declares none — so cage scans nothing rather than guessing at a
     # glob. That is the deliberate no-code-fallback rule, and it is announced, not silent.
     out = capsys.readouterr().out
-    assert len(ledger.calls(root)) == 0
+    assert len(ledger.spend(root)) == 0
     assert "no `path_globs` declared for claude" in out
     assert "cage setup --sync-sources" in out
 

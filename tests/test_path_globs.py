@@ -88,7 +88,7 @@ def test_path_reaches_the_copilot_cli_shape(proj, tmp_path):
     """`--path <dir>` over `<sid>/events.jsonl` — the shape that always worked."""
     stage = _staged(tmp_path, cli=True)
     importcmd.run(proj, "copilot", _args(path=str(stage)))
-    calls = ledger.calls(proj)
+    calls = ledger.spend(proj)
     assert len(calls) == 1
     assert calls[0]["tokens_in"] == 1200 and calls[0]["model"] == "gpt-5-mini"
 
@@ -103,7 +103,7 @@ def test_path_reaches_the_vscode_chatsessions_shape_with_the_parsers_surface(pro
     """
     stage = _staged(tmp_path, vscode=True)
     importcmd.run(proj, "copilot", _args(path=str(stage)))
-    calls = ledger.calls(proj)
+    calls = ledger.spend(proj)
     assert calls, "the chatSessions store must be reachable under --path"
     assert {c["surface"] for c in calls} == {"vscode"}
     assert {c["agent"] for c in calls} == {"copilot"}
@@ -113,7 +113,7 @@ def test_both_shapes_under_one_path_import_without_double_counting(proj, tmp_pat
     """Overlapping patterns must dedupe the *file set*, not merely the rows."""
     stage = _staged(tmp_path, cli=True, vscode=True)
     importcmd.run(proj, "copilot", _args(path=str(stage)))
-    calls = ledger.calls(proj)
+    calls = ledger.spend(proj)
     surfaces = sorted(c["surface"] for c in calls)
     assert "vscode" in surfaces and len(calls) == len(set(c["id"] for c in calls))
     cli_rows = [c for c in calls if c["model"] == "gpt-5-mini"]
@@ -152,7 +152,7 @@ def test_path_globs_never_affect_a_normal_import(proj, tmp_path, monkeypatch):
     (home / "events.jsonl").write_text(_cli_events(), encoding="utf-8")
     monkeypatch.setenv("COPILOT_HOME", str(tmp_path / "home-copilot_home"))
     importcmd.run(proj, "copilot", _args(path=None))
-    with_key = [dict(c) for c in ledger.calls(proj)]
+    with_key = [dict(c) for c in ledger.spend(proj)]
     assert with_key, "sanity: the pathless registry sweep captured the staged session"
 
     # Same fixture, same table, `path_globs` stripped from every entry.
@@ -162,7 +162,7 @@ def test_path_globs_never_affect_a_normal_import(proj, tmp_path, monkeypatch):
                          if not ln.startswith("path_globs = "))
     paths.Footprint(other).policy.write_text(stripped + "\n", encoding="utf-8")
     importcmd.run(other, "copilot", _args(path=None))
-    without_key = [dict(c) for c in ledger.calls(other)]
+    without_key = [dict(c) for c in ledger.spend(other)]
 
     def _shape(rows):
         return sorted((r["model"], r["tokens_in"], r["tokens_out"], r["surface"])
@@ -184,7 +184,7 @@ def test_absent_path_globs_scans_nothing_and_says_so(tmp_path, monkeypatch):
 
     lines = importcmd.run(root, "copilot", _args(path=str(stage)))
 
-    assert ledger.calls(root) == []
+    assert ledger.spend(root) == []
     loud = [ln for ln in lines if "path_globs" in ln]
     assert len(loud) == 1
     assert loud[0].startswith("⚠ copilot:")
@@ -321,4 +321,4 @@ def test_project_override_uses_the_same_declared_patterns(proj, tmp_path, monkey
                     "usage": {"input_tokens": 100, "output_tokens": 50}}}) + "\n",
         encoding="utf-8")
     importcmd.run(proj, "claude", _args(agent="claude", project=str(target)))
-    assert len(ledger.calls(proj)) == 1
+    assert len(ledger.spend(proj)) == 1

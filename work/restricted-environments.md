@@ -1,6 +1,7 @@
 # Restricted environments — running cage where exes are blocked or pip is unavailable
 
-**Status:** design of record (handoff: `work/archive/v0.22-restricted-env.handoff.md`).
+**Status:** design of record. The v0.22 restricted-env handoff is archived and therefore
+**named, not cited** — this file is the design, not a summary of that one.
 Companion to the committed-shim design of record — `cage query portable-wiring` and
 [PLAN.md §5.3](../docs/PLAN.md) (the standalone `portable-wiring.md` doc was folded into those
 two during the v0.36 hookless doc sweep; this file was dropped in the same sweep and is

@@ -160,15 +160,30 @@ def test_floor_captures_with_zero_wiring(agent, tmp_path, monkeypatch, capsys):
 
     assert clicmds.cmd_import(SimpleNamespace(
         agent=agent, path=None, project=None, since=None)) == 0
-    assert f"✔ {agent}: imported {len(spec['rows'])} call(s)" in capsys.readouterr().out
+    capsys.readouterr()
 
-    rows = ledger.calls(_sink(root, agent))
-    volatile = set(spec["volatile"]) | {"import_id"}
-    actual = sorted(({k: v for k, v in r.items() if k not in volatile} for r in rows),
-                    key=lambda r: r["id"])
-    expected = sorted(({k: v for k, v in r.items() if k not in volatile}
-                       for r in spec["rows"]), key=lambda r: r["id"])
-    assert actual == expected
+    # **Asserted on the FACTS, not the row shape** (P5, v0.51). The built-in path no
+    # longer writes `calls` rows for the three agents, so the exact-row comparison this
+    # used to make could only have been kept green by blessing whatever the new code
+    # produced — throwing away the evidence rather than migrating it. The corpus keeps
+    # the byte-for-byte assertion, pointed at the parsers
+    # (`test_fixture_corpus.test_the_parsers_still_produce_exact_rows`); L0's promise is
+    # that capture *happens with zero wiring* and lands the right numbers, which is what
+    # this asserts. Token totals were verified identical before and after P5.
+    sink = _sink(root, agent)
+    want_in = sum(r.get("tokens_in", 0) for r in spec["rows"])
+    want_out = sum(r.get("tokens_out", 0) for r in spec["rows"])
+    assert want_in > 0, "the fixture must carry real numbers, or this proves nothing"
+    got = ledger.usage_rows(sink)
+    assert got, "capture produced nothing with zero wiring — the floor is broken"
+    assert {r.get("session") for r in got} >= {r["session"] for r in spec["rows"]
+                                               if r.get("session")}
+    if agent != "kiro":
+        # Kiro has no token spine (`ABSENT_SPINES`) so `spend()` is empty by design —
+        # never a fabricated zero. Its rows are asserted through the union above.
+        spent = ledger.spend(sink)
+        assert sum(r.get("tokens_in", 0) for r in spent) == want_in
+        assert sum(r.get("tokens_out", 0) for r in spent) == want_out
 
     # Capture wired nothing on its way through — the floor stays the floor.
     _assert_unwired(root)

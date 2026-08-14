@@ -184,6 +184,31 @@ partially reversed — see the block above. The rest stands.)*
 - **A retired agent's rows are never deleted, rewritten, or re-attributed.** They are
   history that still counts.
 
+> **⚠ A custom source declaring `format = "claude"` inherits two quarantined defects
+> (P5, v0.51).** This is the one caveat a `[sources.<name>]` author cannot discover from
+> their own config, so it is recorded here rather than left to be found.
+>
+> P5 retired the three agents' built-in transcript→`calls` legs. It **kept**
+> `transcript.parse_calls` and its three siblings, reachable only through
+> `importcmd._PARSERS`, because they are this record's `[sources.<name>] format = …`
+> contract and deleting them would break user config **silently** — the row kind would
+> simply stop appearing, with no error.
+>
+> What that means for the author: a source declaring `format = "claude"` gets the parser
+> **as it is**, including
+> [ADR-CLAUDE](0003_claude.md)'s two named calls-path defects — **CLAUDE-DEDUP** (rows
+> inflated, measured at **1.979× on rows / 1.881× on tokens** against the same traffic
+> folded correctly) and **CLAUDE-SUBAGENT-KEY** (subagent spend mis-keyed). Those rows
+> resolve through the `calls` fallback this record's Decision describes, so they are
+> counted — inflated.
+>
+> **They are deliberately NOT fixed.** ADR-CLAUDE forbids repairing these parsers on the
+> way out: the measurement has to outlive the code, and a "fix" applied while retiring the
+> path would have destroyed the evidence and left a differently-wrong parser behind.
+> The honest options for such a source are to accept the inflation knowingly, or to point
+> the source at a store cage parses natively. `tests/test_calls_retired.py` pins that this
+> paragraph exists.
+
 > **⟲ Storage note (P3a, v0.51) — the capture manifest moved to `state/`.**
 > `ledger/imports.jsonl` became `state/imports.jsonl` (`CAGE_IMPORTS_LOG` overrides), and
 > the legacy path is **read forever**. This module (`manifest`) is claimed by this record,
@@ -261,15 +286,16 @@ partially reversed — see the block above. The rest stands.)*
 - **The measurement that killed the metric-ledgers-only reading** — 373 `codex` rows in
   one real ledger, plus the Anton integration's `agent="lib"` traffic: `ledger.spend()`'s
   own docstring, and
-  [ADR 0011](../../work/archive/adr/0011-cage-measures-usage-not-cost.md) *Alternatives
-  rejected*.
+  archived ADR 0011 *Alternatives rejected* — **named, not cited**; the docstring is the
+  grounding, and the live home of that decision is [ADR-LAWS](0001_laws.md) Law 5.
 - **The first consumer, in production:** AlphaForge Anton's `LLMGateway` records each
   `ProviderResponse` through a fail-open `cage_meter` adapter, wired as an optional
   `[cage]` extra. It is the worked example this record generalizes.
-- **Codex's removal as a product decision, not a capture-quality one:**
-  `work/archive/*-codex-removal.handoff.md`.
-- The scoping rule and the `SPEND_SOURCES`-as-membership-test detail are
-  [ADR 0010](../../work/archive/adr/0010-metric-ledgers-are-the-spend-source-forward-only-cutover.md)'s,
+- **Codex's removal as a product decision, not a capture-quality one** — its handoff is
+  archived and therefore **named, not cited**. What binds is this record's own retired-agent
+  treatment; the reason is restated here rather than fetched from history.
+- The scoping rule and the `SPEND_SOURCES`-as-membership-test detail came from archived
+  ADR 0010 — **named, not cited**. They are live in the three per-agent records' §2 and are
   inherited here rather than re-decided.
 
 ### Veto condition (when to revisit)

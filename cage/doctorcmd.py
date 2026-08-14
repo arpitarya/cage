@@ -166,7 +166,12 @@ def _capture_timeline(active: Path) -> tuple[str, str]:
     `record_receipt`). Uses `render.ago` (wall clock) — doctor is a diagnostic, never a
     derived-from-ledger view, so determinism holds. Informational (never fails)."""
     try:
-        calls = ledger.calls(active)
+        # P5: the diagnostic union, not `calls` alone. The three agents stopped writing
+        # `calls`, so a calls-only read would show a healthy install as having pulled
+        # nothing — doctor reporting capture as broken *because* it works. `usage_rows`
+        # overlaps by construction and is used here for presence and freshness only,
+        # never summed.
+        calls = ledger.usage_rows(active)
         receipts = ledger.receipts(active)
     except Exception as exc:  # noqa: BLE001 — a broken ledger is reported elsewhere
         return _OK, f"capture timeline unavailable ({exc})"
@@ -231,7 +236,11 @@ def _capture_quality(root: Path) -> tuple[str, str]:
     Read-only from the ledger, like ``_capture_timeline`` (doctor never sweeps —
     §8/§10); informational, never fails doctor outright."""
     try:
-        calls = ledger.calls(root)
+        # P5: the diagnostic union, NOT `spend`. This check exists to spot an agent whose
+        # capture is input-only — and kiro, the agent it was written for, has no token
+        # spine at all, so it never appears in `spend()`. Reading the spend basis here
+        # would have silently retired the check's own reason to exist.
+        calls = ledger.usage_rows(root)
     except Exception:  # noqa: BLE001 — a broken ledger is reported by other checks
         return _OK, "capture quality unavailable (ledger read failed)"
     per_agent: dict[str, dict] = {}

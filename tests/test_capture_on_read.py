@@ -60,7 +60,7 @@ def test_sweep_runs_before_a_read(tmp_path, monkeypatch):
     _claude_log(tmp_path, "u1", 100, 50)
     summary = importcmd.ensure_captured(root, _read_args())
     assert summary and summary["calls"] == 1 and "claude" in summary["agents"]
-    assert len(ledger.calls(root)) == 1  # the planted turn is now captured
+    assert len(ledger.spend(root)) == 1  # the planted turn is now captured
 
 
 # ── throttle suppresses a back-to-back second sweep ───────────────────────────
@@ -75,7 +75,7 @@ def test_throttle_suppresses_second_sweep(tmp_path, monkeypatch):
     # suppresses the immediate second read — no re-sweep.
     _claude_log(tmp_path, "u2", 70, 30)
     assert importcmd.ensure_captured(root, _read_args()) is None
-    assert len(ledger.calls(root)) == 1  # u2 not yet captured (throttled)
+    assert len(ledger.spend(root)) == 1  # u2 not yet captured (throttled)
 
     # Backdate the cursor past the window → the next read sweeps and picks up u2.
     foot = paths.Footprint(root)
@@ -84,7 +84,7 @@ def test_throttle_suppresses_second_sweep(tmp_path, monkeypatch):
                            - _dt.timedelta(hours=1)).isoformat()
     foot.cursors.write_text(json.dumps(cur))
     assert importcmd.ensure_captured(root, _read_args()) is not None
-    assert len(ledger.calls(root)) == 2
+    assert len(ledger.spend(root)) == 2
 
 
 # ── suppression: CAGE_CAPTURE=0 and --no-import both disable it ────────────────
@@ -95,7 +95,7 @@ def test_cage_capture_env_disables(tmp_path, monkeypatch):
     _claude_log(tmp_path, "u1", 100, 50)
     monkeypatch.setenv("CAGE_CAPTURE", "0")
     assert importcmd.ensure_captured(root, _read_args()) is None
-    assert len(ledger.calls(root)) == 0  # capture paused — nothing swept
+    assert len(ledger.spend(root)) == 0  # capture paused — nothing swept
 
 
 def test_no_import_flag_disables(tmp_path, monkeypatch):
@@ -103,7 +103,7 @@ def test_no_import_flag_disables(tmp_path, monkeypatch):
     monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "claude"))
     _claude_log(tmp_path, "u1", 100, 50)
     assert importcmd.ensure_captured(root, _read_args(no_import=True)) is None
-    assert len(ledger.calls(root)) == 0
+    assert len(ledger.spend(root)) == 0
 
 
 def test_on_read_env_disables(tmp_path, monkeypatch):
@@ -112,7 +112,7 @@ def test_on_read_env_disables(tmp_path, monkeypatch):
     _claude_log(tmp_path, "u1", 100, 50)
     monkeypatch.setenv("CAGE_CAPTURE_ON_READ", "0")  # the determinism-suite switch
     assert importcmd.ensure_captured(root, _read_args()) is None
-    assert len(ledger.calls(root)) == 0
+    assert len(ledger.spend(root)) == 0
 
 
 # ── fail-open: a capture error never blocks the read ──────────────────────────
@@ -148,7 +148,7 @@ def test_concurrent_reads_no_double_append(tmp_path, monkeypatch):
     cur["_last_import"] = "2020-01-01T00:00:00+00:00"
     foot.cursors.write_text(json.dumps(cur))
     importcmd.ensure_captured(root, _read_args())
-    assert len(ledger.calls(root)) == 1  # deduped, not doubled
+    assert len(ledger.spend(root)) == 1  # deduped, not doubled
 
 
 # ── warm cache ⇒ byte-identical derived output (the determinism guard) ─────────

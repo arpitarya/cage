@@ -61,8 +61,13 @@ def _footprint_text(root: Path, active: Path, source: str) -> str:
     foot = paths.Footprint(active)
     lines = [f"cwd root: {root}", f"active sink: {source}", f"base: {foot.base}",
              f"ledger dir: {foot.ledger}", f"state dir: {foot.state}", "", "shards:"]
-    for kind in ("calls", "receipts", "tasks"):
-        for sh in foot.shards(kind):
+    # P5/P1-P4: the per-producer directories hold what `calls` used to. A bundle that
+    # listed only the flat kinds would show a healthy modern ledger as three empty lines —
+    # in the one artifact whose job is telling a maintainer what is actually on disk.
+    dir_shards = (foot.claude_shards() + foot.copilot_shards() + foot.kiro_metric_shards()
+                  + foot.consumer_shards())
+    for kind in ("calls", "credits", "receipts", "tasks"):
+        for sh in list(foot.shards(kind)) + ([] if kind != "calls" else dir_shards):
             try:
                 lines.append(f"  {sh.name}  {sh.stat().st_size} B  {len(ledger.read(sh))} row(s)")
             except OSError as e:

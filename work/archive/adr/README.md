@@ -5,7 +5,12 @@ status: frozen 2026-08-14 · superseded by the four per-agent ADRs in docs/adr/
 
 # Archived ADRs — history, not spec
 
-**Never cite anything in this directory as current spec.** These eleven records were the
+**Never cite anything in this directory — not as current spec, and not as evidence for
+anything else.** Under *Archived documents are named, never cited* (Arpit, 2026-08-14;
+[CLAUDE.md](../../../CLAUDE.md) *Documentation discipline*) these files may be **named** so
+a trail is followable, and may **never back a claim**: they could have been edited or
+overwritten since freezing, and nothing verifies otherwise. The *Where each one went* table
+below exists to make repointing easy — that is its job. These eleven records were the
 ADR set until 2026-08-14, when the standing set became **four per-agent records**
 ([docs/adr/](../../../docs/adr/README.md)). Each is preserved **verbatim** — only relative
 link paths were adjusted for the move, never a claim, a number, or a verdict.

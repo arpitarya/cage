@@ -116,11 +116,20 @@ def test_plain_resweep_is_cursor_blind_and_rescan_recovers(copilot_proj):
 
 # ── 2 · the safety half: a rescan advances no cursor ─────────────────────────
 
-def test_rescan_never_advances_the_calls_cursor(copilot_proj):
-    """The load-bearing half of `metrics_scan_set`. A `--since` window hides a store from
-    the calls leg; the rescan still parses it for metrics, and must NOT stamp the cursor
-    — otherwise the later unfiltered sweep would skip it and those calls would be lost
-    for good. A backfill of one kind must never blind another."""
+def test_rescan_never_advances_the_cursor(copilot_proj):
+    """The load-bearing half of `metrics_scan_set`: **a backfill of one kind must never
+    blind another.** A `--since` window hides a store from the sweep; a `--rescan-metrics`
+    run still parses it, and must NOT stamp the per-agent cursor — or the next unfiltered
+    sweep skips the file and whatever the rescan did not capture is lost for good.
+
+    **Asserted on the CURSOR itself since P5**, which is what the invariant literally says.
+    It used to be asserted through its consequence — "calls reappear on the next sweep" —
+    and copilot no longer has a calls leg for that consequence to land in, so the old
+    shape could only have been deleted. The cursor is basis-independent: it is the thing
+    `metrics_scan_set` is careful about, and it still guards kiro's calls leg today and
+    any future one."""
+    import json
+
     root = copilot_proj
     # Age both stores far outside any --since window the rescan run will use.
     old = 1_600_000_000  # 2020
@@ -129,14 +138,18 @@ def test_rescan_never_advances_the_calls_cursor(copilot_proj):
             import os
             os.utime(f, (old, old))
 
+    def cursor():
+        cur = paths.Footprint(root).state / "cursors.json"
+        return json.loads(cur.read_text(encoding="utf-8")) if cur.exists() else {}
+
     importcmd.run(root, "all", _args(since="1d", rescan_metrics=True))
     assert len(ledger.copilot_metrics_raw(root)) == 3, "rescan ignores --since by design"
-    assert ledger.calls(root) == [], "--since should have hidden the stores from the calls leg"
+    assert not cursor().get("copilot"), (
+        "the rescan stamped the cursor — the next unfiltered sweep would skip this store")
 
-    # The cursor must be untouched, so an unfiltered sweep still sees the calls.
+    # …and the proof it stayed usable: an unfiltered sweep still scans and stamps it.
     importcmd.run(root, "all", _args())
-    assert ledger.calls(root), (
-        "the rescan stamped the calls cursor — those calls are now permanently invisible")
+    assert cursor().get("copilot"), "a normal sweep must still advance the cursor"
 
 
 # ── 3 · idempotency comes from row ids, not the cursor ───────────────────────

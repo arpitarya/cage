@@ -6,7 +6,11 @@
 - the **debate** — the real case for each option, not a strawman;
 - a **matrix** — the options scored against what actually matters;
 - **grounded references** — a plan section, a measurement, a paper, or a worked
-  example per claim (an assertion without a reference is incomplete);
+  example per claim (an assertion without a reference is incomplete). **Never an
+  archived document**: under *Archived documents are named, never cited*
+  ([CLAUDE.md](../../CLAUDE.md)) a file under `work/archive/` may be named but backs
+  nothing, because it could have been rewritten since. An archive link in a matrix cell
+  is an ungrounded claim wearing a citation;
 - a **proposed verdict** — which Arpit accepts or overrides;
 - a **reopen-trigger** — what evidence would revisit the call (the same discipline
   as an ADR's veto condition).
@@ -55,3 +59,22 @@ Naming: `<topic>.compare.md`. Written in short points, not walls of prose.
   2026-08-10; corrected 2026-08-11 — this line said "unreleased" the day after it shipped): an artifact-only metadata block, `--export` as a capability not a side
   effect, all available formats per run. Living spec: [CLI.md](../../docs/adr/0002_cli.md) §Export flags ·
   `cage query view-export`.
+- [agent-share-historical-backfill.compare.md](agent-share-historical-backfill.compare.md) —
+  **AGENT-SHARE-BACKFILL**: line-match reaches 66 of this repo's 166 commits and stops at
+  2026-07-16, the vendor's ~30-day transcript wall; the other 100 can never be matched by
+  any future code. Five options (leave `unknown` · a read-time `declared` column from the
+  commit trailer · bulk human attestation · infer from the diff · archive raw transcripts);
+  **proposed verdict B for presence + A for the percentage** — the share stays `unknown`,
+  a `declared` column carries the trailer's model string and is never stored, so no
+  arithmetic can turn a declaration into a share. D rejected on measured evidence
+  (34 F1 vs a 45.7 random baseline out-of-domain; 39 F1 on hybrid human-edited AI code),
+  E rejected on counts-never-content. **Amended 2026-08-14 with the breadth arm** —
+  agent x surface: `COVERAGE_GAPS` calls copilot/kiro structural exclusions and the stores
+  contradict it (copilot CLI `events.jsonl` and VS Code `chatSessions`, both already swept,
+  carry edit text; kiro IDE logs carry before *and* after). Retention inverts the ranking —
+  kiro IDE keeps everything, claude is capped at ~30 days — and kiro writes no trailer at all,
+  so content matching is its only possible route. **DECIDED — B+A accepted by Arpit 2026-08-14,
+  ratified as [ADR-AUTHORSHIP](../../docs/adr/0009_authorship.md)** (a ninth record, carved out of
+  ADR-CLAUDE; ADR-COVERAGE's authorship veto is recorded as FIRED — its trigger was satisfiable
+  on the day it was written). The three code changes are **not built** — OPEN-WORK
+  AUTHORSHIP-CODE-CATCHUP.

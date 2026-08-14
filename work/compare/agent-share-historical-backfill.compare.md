@@ -1,14 +1,19 @@
 ---
 doc: compare — what cage says about the per-commit agent share of commits line-match cannot reach
-status: PROPOSED — awaiting Arpit's accept or override
+status: DECIDED — B+A accepted by Arpit 2026-08-14, ratified as ADR-AUTHORSHIP (docs/adr/0009_authorship.md); the three code changes are NOT built (OPEN-WORK AUTHORSHIP-CODE-CATCHUP)
 raised: 2026-08-14
 decides: the historical arm of agent-vs-human v2 (P1); no OPEN-WORK item exists yet
 ---
 
 # AGENT-SHARE-BACKFILL — the 100 commits line-match will never see
 
-**VERDICT PROPOSED: B, derived at read time and quarantined — plus A for the
-percentage.** A `declared` presence column read straight from the commit message, in
+> **Two arms.** The body below is the **historical** arm (what cage says about commits
+> older than the transcript window). The **breadth** arm — whether any of this works for
+> copilot and kiro, CLI and IDE — is the amendment at the end, added 2026-08-14.
+
+**VERDICT: B, derived at read time and quarantined — plus A for the percentage.
+ACCEPTED by Arpit 2026-08-14** and ratified as **[ADR-AUTHORSHIP](../../docs/adr/0009_authorship.md)**,
+a ninth record carved out of ADR-CLAUDE. This doc stays as the evidence behind it. A `declared` presence column read straight from the commit message, in
 its own column, that can never become a share. **D is rejected on measured evidence**
 and carries the only interesting reopen-trigger in this doc.
 
@@ -195,3 +200,128 @@ Repo measurements are from `git log` over 166 commits and the 104 rows of
 covered commits, deduped per sha (rows are per `(sha, agent, session)`, up to 27 on one
 commit). The 85.2% verbatim rate is `kept ÷ suggested` — above the 68.7% recorded in
 ADR-CLAUDE §2's reopen-trigger 2, so that trigger is further from firing, not closer.
+
+---
+
+# Amendment 2026-08-14 — does this work for all three agents, CLI and IDE?
+
+**Short answer: no today, and the recorded reason is wrong.** `authorcapture.AGENT =
+"claude-code"` is the whole of it. But `COVERAGE_GAPS` states copilot and kiro as
+**structural** exclusions, and the research below says both are **unbuilt parsers**.
+That distinction is the point of this amendment: cage is telling readers a store cannot
+answer a question it can.
+
+## What cage says today, and what the stores actually carry
+
+`authorcapture.COVERAGE_GAPS`, verbatim:
+
+- `copilot` — *"its stores record usage and prompts, not the text of an edit"*
+- `kiro` — *"its usage log records token counts only, with no tool-input payload"*
+
+And [ADR-CLAUDE](../../docs/adr/0003_claude.md) §2 Context: *"Claude is the **only**
+agent whose store carries the text of a proposed edit, so it is the only agent with an
+authorship route at all."*
+
+**All three sentences appear to be false.** Worse, two of the stores that carry edit text
+are files `importcmd` **already opens every sweep** for tokens and credits.
+
+| agent · surface | store cage already sweeps | carries edit TEXT? | field |
+|---|---|---|---|
+| claude · CLI + VS Code | `~/.claude/projects/**/*.jsonl` | **yes — built** | `old_string`/`new_string`/`content` |
+| copilot · CLI | `~/.copilot/session-state/*/events.jsonl` **(already read)** | **yes** | `tool.execution_start` → `arguments`; `permission.requested` → `PermissionRequestWrite.diff` (required), `newFileContents` |
+| copilot · VS Code | `workspaceStorage/*/chatSessions/*.jsonl` **(already read, 4 roots)** | **yes** | `IChatTextEditGroup.edits: TextEdit[][]`; `toolInvocationSerialized.toolSpecificData.rawInput` |
+| copilot · VS Code (richer, ephemeral) | `workspaceStorage/*/chatEditingSessions/` — **not swept** | **yes, before AND after** | `state.json` → `originalHash`/`currentHash` → `contents/<7-char-hash>`; `timeline.fileBaselines[].content` + `operations[].edits` keyed by `requestId` |
+| copilot · JetBrains | routes through the CLI since 2026-05 | **probably** | same `events.jsonl` — **but see the RPC caveat** |
+| kiro · IDE | `globalStorage/kiro.kiroagent/<hex>/<hex>/*` — **not swept** | **yes, before AND after** | `actions[]` where `actionType == "replace"` → `input.file`, `input.originalContent`, `input.modifiedContent` |
+| kiro · CLI | `data.sqlite3` → `conversations`/`conversations_v2`; `~/.kiro/sessions/cli/*.jsonl` | **yes** | `AssistantToolUse.args` (`fs_write`: `path`, `file_text`, `old_str`, `new_str`); `toolUse.input` |
+| **copilot · cloud coding agent** | — | **no** | logs are web-only behind `Agent-Logs-Url:`; [no public API](https://github.com/orgs/community/discussions/185347) |
+
+**Confidence, stated per row rather than averaged:**
+
+- **Independently confirmed at source** — VS Code `chatEditingSessions`: the storage
+  module writes `contents/<hash>` blobs keyed by `originalHash`/`currentHash`, and
+  `clearState()` recursively deletes the folder
+  ([chatEditingSessionStorage.ts](https://raw.githubusercontent.com/microsoft/vscode/main/src/vs/workbench/contrib/chat/browser/chatEditing/chatEditingSessionStorage.ts)).
+- **Confirmed from a shipped schema, not a live file** — Copilot CLI: the
+  `session-events.schema.json` bundled in `@github/copilot` defines
+  `ToolExecutionStartData.arguments` and a **required** `PermissionRequestWrite.diff`.
+  GitHub's own docs say session files hold *"your prompts, Copilot's responses, the tools
+  that were used, and details of files that were modified"*
+  ([chronicle](https://docs.github.com/en/copilot/concepts/agents/copilot-cli/chronicle)) —
+  consistent, not conclusive.
+- **Confirmed from two independent third-party parsers, not from AWS** — Kiro IDE
+  execution logs ([kiro-history](https://github.com/pajaydev/kiro-history)) and Kiro CLI
+  stores ([kiro-cli-history](https://github.com/prabhugr/kiro-cli-history),
+  [amazon-q-developer-cli](https://github.com/aws/amazon-q-developer-cli) source).
+- **Unverified** — whether the JetBrains plugin writes `events.jsonl` locally at all. The
+  CLI's writer is gated on `getReverseCallHandler() === undefined`; an IDE driving it over
+  RPC would send events to the host instead. This is exactly the shape of
+  **GFX-IDE-PATH-UNPROBED** and wants the same one-sitting probe.
+
+## The three findings that change the shape
+
+1. **Retention inverts the agent ranking.** Claude — the only agent cage covers — has the
+   **worst** historical reach of the three: ~30 days, vendor-enforced. Kiro IDE has **no
+   retention policy at all** (users report 8.2GB / 38GB accumulations —
+   [#4165](https://github.com/kirodotdev/Kiro/issues/4165),
+   [#5727](https://github.com/kirodotdev/Kiro/issues/5727)), so its edit history is
+   effectively permanent. **A kiro parser would reach further back than the claude one
+   ever can.** That reverses the priority the current gap list implies.
+2. **Copilot VS Code's richest store is the most perishable.** `chatEditingSessions`
+   carries before *and* after text, but `clearState()` deletes the whole folder on session
+   stop. It is a capture-on-read opportunity, never an archive — and cage's manual-only
+   import (**CONTINUOUS-CAPTURE**) is exactly the wrong cadence for it. The durable
+   fallback is `chatSessions/*.jsonl`, which cage already sweeps.
+3. **The trailer fallback does not rescue the two uncovered agents.** Option B's coverage
+   is per-agent and uneven: Claude Code stamps `Co-Authored-By` by default; Copilot's VS
+   Code default was **on in 1.117, reverted to off in 1.119**, and stamped commits with AI
+   features *disabled* for two months before that
+   ([The Register](https://www.theregister.com/2026/05/04/microsoft_reverses_ai_credit_grab/));
+   **Kiro writes no trailer and sets no identity** — an exhaustive source grep of the Q CLI
+   for `co-authored` / `Assisted-by` / `--author` returns zero, and the only git identity
+   AWS sets (`user.name = "Q"`) lives in a shadow repo that never touches yours. So for
+   kiro there is **no metadata route and no declaration route** — content matching is the
+   only one that can ever work.
+
+## What this does to the verdict
+
+**The verdict stands, and gains a fourth clause.** B/A were about the *historical* arm;
+this is the *breadth* arm, and it does not disturb them.
+
+4. **`COVERAGE_GAPS` is corrected before anything else is built.** Both entries currently
+   assert a structural impossibility that the stores contradict. Under
+   *"cage can never be more precise than its source"* the failure is symmetrical:
+   **claiming a source cannot answer is as wrong as inventing an answer it did not give.**
+   The honest text is *"no parser yet"*, with the store named — and `coverage_note()`
+   should say which surface, since copilot-cloud is the one entry that really is
+   structural.
+
+**Build order, if the parsers are ever taken** — by reach per unit of work, not by agent
+importance:
+
+1. **copilot · CLI** — `events.jsonl` is already open every sweep; this is a new reader
+   over a parsed file, not a new store.
+2. **kiro · IDE** — the largest *historical* prize, because nothing deletes it. Scan for
+   JSON containing `"executionId"` rather than hardcoding the hex directory names.
+3. **kiro · CLI** — read the SQLite `file:...?mode=ro` so a live session is never corrupted.
+4. **copilot · VS Code** — `chatSessions` first (durable, already swept);
+   `chatEditingSessions` only if capture cadence changes, since it self-deletes.
+
+Each lands as one entry moved out of `COVERAGE_GAPS` and nothing else — the same
+one-module rule ADR-CLAUDE §2 sets for `linematch.match_file`.
+
+## Reopen-trigger (this amendment)
+
+- **The correction itself is not contingent** — if a probe shows a store genuinely lacks
+  edit text, the gap text changes back to structural *with the probe cited*. It does not
+  revert to an unsourced claim.
+- **The JetBrains cell reopens on one probe:** run a Copilot agent edit from JetBrains and
+  check whether `~/.copilot/session-state/*/events.jsonl` exists. `workspace.yaml` records
+  `client_name`, which distinguishes the surfaces. Hands-only, Arpit's machine — pair it
+  with GFX-IDE-PATH-UNPROBED.
+- **copilot · cloud reopens** if GitHub ships a read API for coding-agent session logs
+  ([the open request](https://github.com/orgs/community/discussions/185347)), or if
+  enterprise session streaming is confirmed to carry diffs. Until then it is the **one**
+  surface in this table that is honestly structural.
+- **The build order reopens** if Claude Code's `cleanupPeriodDays` default rises above 90
+  — the retention inversion is the whole argument for putting kiro second.

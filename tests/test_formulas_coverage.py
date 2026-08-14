@@ -37,7 +37,12 @@ def _doc_matrix() -> dict[str, bool]:
     # matches nothing and every assertion below passes over an EMPTY dict. That is the
     # vacuous-gate failure this repo has already paid for once with the fenced diagrams;
     # `test_the_parse_is_not_vacuous` below is the backstop.
-    for row in re.finditer(r"^\s*\|\s*([a-z]+)\s+([a-z+]+)\s*\|\s*([✅❌])\s*\|", body, re.M):
+    # `N/A` is accepted beside `✅`/`❌` because ADR-COVERAGE's legend split the old
+    # single cross into N/A (*nothing to build*) and ❌ (*buildable, unbuilt*), and every
+    # False row in `GRAPHIFY_COVERAGE` is the first kind. The gate binds the VERDICT
+    # (can this surface file a receipt?), never which of the two absence marks the doc
+    # spells it with — a doc that switched marks should not fail a coverage test.
+    for row in re.finditer(r"^\s*\|\s*([a-z]+)\s+([a-z+]+)\s*\|\s*(✅|❌|N/A)\s*\|", body, re.M):
         agent, surface, tick = row.groups()
         out[f"{agent}/{surface}"] = tick == "✅"
     return out
@@ -63,9 +68,10 @@ def test_formulas_names_every_surface_the_code_knows():
 
 
 def test_every_verdict_matches_the_code():
-    """✅/❌ per surface. This is the falsifiable half — a ❌ printed for a route that has
-    worked for three releases understates cage's own coverage, and a ✅ for one that
-    cannot file would be the worse direction: a promised receipt that never lands."""
+    """Can-file / cannot-file per surface. This is the falsifiable half — a cannot-file
+    printed for a route that has worked for three releases understates cage's own
+    coverage, and a ✅ for one that cannot file would be the worse direction: a promised
+    receipt that never lands."""
     assert _doc_matrix() == _code_matrix()
 
 

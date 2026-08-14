@@ -2,6 +2,22 @@
 
 **History, not spec. The living design of record is in `docs/` root and [`docs/cage-plan.md`](../cage-plan.md).**
 
+> ## Nothing in here may back a claim
+>
+> **Archived documents are NAMED, never CITED** (Arpit, 2026-08-14 — the rule is stated in
+> full in [CLAUDE.md](../../CLAUDE.md) *Documentation discipline*). A file here may have
+> been edited, rewritten, corrected or overwritten since it was archived, and **nothing
+> checks that it still says what it said.** So it can support nothing.
+>
+> Name it — *"ratified as archived ADR 0008"* — so the trail stays followable. Do not link
+> it as evidence. Ground a claim in the code, a live ADR, [regression/](../regression/)
+> (measured) or [research/](../research/) (sourced); if nothing live grounds it, **say so**
+> rather than pointing here. Every live ADR was swept clean of archive-backed references on
+> 2026-08-14 for exactly this reason.
+>
+> **This applies to the files' own headers too.** A pair archived as *"built and green"* is
+> a claim made in the past, not a check on the present — verify against the code.
+
 Every file here drove work that has since been **implemented** (or was superseded).
 Files keep their original text verbatim plus a one-line archive header; names sort
 by the release that carries the work: `vX.Y-<feature>.{handoff,prompt}.md`.

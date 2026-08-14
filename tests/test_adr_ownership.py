@@ -37,11 +37,7 @@ OWNERS: dict[str, str] = {
     "csvout": "0002_cli", "viewexport": "0002_cli", "runstamp": "0002_cli",
     "explain": "0002_cli", "explain_data": "0002_cli", "explain_types": "0002_cli",
     "chats": "0002_cli", "commitview": "0002_cli",
-    # ADR-CLAUDE — authorship is claude-only by coverage
-    "authorcapture": "0003_claude", "linematch": "0003_claude",
-    "commitjoin": "0003_claude", "provenance": "0003_claude",
-    "origin": "0003_claude", "originrecord": "0003_claude",
-    "notessync": "0003_claude", "verifycmd": "0003_claude",
+    # ADR-CLAUDE — the claude parser and its wiring, and nothing about authorship
     "claudewire": "0003_claude",
     # ADR-COPILOT / ADR-KIRO — thin wiring; their parsers live in the shared `transcript`
     "copilotwire": "0004_copilot",
@@ -50,6 +46,11 @@ OWNERS: dict[str, str] = {
     "metering": "0006_consumer", "usageparse": "0006_consumer",
     "usagelog": "0006_consumer", "manifest": "0006_consumer",
     "machine": "0006_consumer", "study": "0006_consumer",
+    # ADR-AUTHORSHIP — who wrote which lines; cross-agent by decision, not claude's
+    "authorcapture": "0009_authorship", "linematch": "0009_authorship",
+    "commitjoin": "0009_authorship", "provenance": "0009_authorship",
+    "origin": "0009_authorship", "originrecord": "0009_authorship",
+    "notessync": "0009_authorship", "verifycmd": "0009_authorship",
     # ADR-GRAPHIFY — the interceptor and the tier-0 savings emitters
     "graphifychat": "0007_graphify", "graphifymeter": "0007_graphify",
     "graphifymodel": "0007_graphify", "graphifytx": "0007_graphify",
@@ -62,8 +63,9 @@ OWNERS: dict[str, str] = {
 #: vendors' parsers; routing a copilot change to the claude record would send it to the
 #: wrong reviewer, and splitting the file is a different decision than this test.
 SHARED: dict[str, tuple[str, ...]] = {
-    "transcript": ("0003_claude", "0004_copilot", "0005_kiro"),
-    "importcmd": ("0003_claude", "0004_copilot", "0005_kiro", "0006_consumer"),
+    "transcript": ("0003_claude", "0004_copilot", "0005_kiro", "0009_authorship"),
+    "importcmd": ("0003_claude", "0004_copilot", "0005_kiro", "0006_consumer",
+                  "0009_authorship"),
     "agents": ("0003_claude", "0004_copilot", "0005_kiro"),
 }
 

@@ -312,6 +312,55 @@ def savings(root: Path, since: str | None = None) -> list[dict]:
     return rows
 
 
+def captured_surfaces(root: Path) -> set[str]:
+    """Every agent surface this ledger holds ANY recorded usage for — the capture-health
+    "has this agent ever captured?" gate (gate 3), and doctor's timeline basis.
+
+    **It reads the metric ledgers ∪ `calls`, and that union is the whole point.** Before P5
+    it was a set comprehension over `ledger.calls` alone. P5 retired the three agents'
+    transcript→`calls` writer, so on a perfectly healthy install that set is now EMPTY for
+    all three — and every surface built on it would report *never captured*: a silent false
+    negative, the F1 class this repo has already paid for twice.
+
+    `calls` stays in the union because it is not empty and never will be: retired-agent
+    rows (codex) and pre-P5 history live there, and an agent that captured for six months
+    and then stopped should still read as *has captured*.
+
+    Fail-open per source — a broken metric shard must not make an agent look uncaptured,
+    which is the same false negative one layer down."""
+    from cage import agents
+    return {s for r in usage_rows(root) if (s := agents.row_surface(r.get("agent")))}
+
+
+def usage_rows(root: Path) -> list[dict]:
+    """Every recorded usage row this ledger holds, across every producer — **the
+    DIAGNOSTIC union, and deliberately not a sum source.**
+
+    `spend()` is the single resolver for *what was used*: one basis per producer, each row
+    exactly once, safe to add up. This is the other question — *what did cage capture at
+    all* — and it must see rows `spend()` correctly excludes:
+
+    * **kiro has no token spine** (`ABSENT_SPINES`), so it never appears in `spend()`. A
+      capture diagnostic that could not see kiro would report the one agent whose capture
+      is most fragile as absent.
+    * cumulative sources (`CUMULATIVE_SOURCES`), and claude's `transcript` grain, are
+      excluded from spend precisely because they would double-count — which is harmless
+      for "did anything arrive?" and fatal for a total.
+
+    **So this OVERLAPS by construction and must never be summed.** Every caller uses it
+    for presence, counts-per-agent, and freshness only. Fail-open per reader — one broken
+    shard must not make an agent look uncaptured, which is the same false negative one
+    layer down."""
+    out: list[dict] = []
+    for reader in (calls, claude_metrics_raw, copilot_metrics_raw, kiro_metrics_raw,
+                   consumer_metrics_raw):
+        try:
+            out.extend(reader(root))
+        except Exception:  # noqa: BLE001 — a diagnostic never breaks on one bad shard
+            continue
+    return out
+
+
 def consumer_metrics_raw(root: Path) -> list[dict]:
     """Every consumer-metrics row, unfiltered (`consumer/calls-*.jsonl`) — mirrors
     `copilot_metrics_raw()`. Feeds any seen-set that must see every id ever written

@@ -176,6 +176,17 @@ spend spine.**
   `(source, session, surface, request, call)`.
 - **Cache-write is honest-empty**: no Copilot store persists it. Not modelled, not zeroed.
 
+> **⟲ The transcript→`calls` leg is RETIRED (P5, v0.51).**
+> `ledger/copilot/` carries the same traffic, and the two writers already agreed
+> **row-for-row** before the change (`chat` 57 + `cli-delta` 26 = 83 calls, measured on the
+> real store) — so unlike claude there was not even an inflation to remove, just a
+> duplicate to stop. Verified after: 83 copilot rows in `spend`, zero in `calls`.
+>
+> `parse_copilot_calls` / `parse_copilot_vscode_calls` are **kept** for the
+> `[sources.<name>] format` contract. The reported count is now the **non-overlapping
+> grain** (`chat` + `cli-delta`): `cli` is cumulative and its delta twin covers the same
+> session, so counting every written row would report a number no view can reproduce.
+
 ### Consequences
 
 - History self-heals rather than double-counting — the one property that made shipping the
@@ -279,10 +290,9 @@ enabling setting for each gated store**. `cage query copilot-metrics` explains i
   [work/regression/2026-07-28-capture-precision-fixes.md](../../work/regression/2026-07-28-capture-precision-fixes.md)
 - **Cache-write measured absent** — 0 of 57 vscode rows carried `cached_in` on
   2026-08-14: `cage/units.py` module docstring.
-- Ratified in full: [0004](../../work/archive/adr/0004-append-only-delta-rows-and-separate-by-schema.md)
-  (delta rows, separate by schema) ·
-  [0010](../../work/archive/adr/0010-metric-ledgers-are-the-spend-source-forward-only-cutover.md)
-  (`SPEND_SOURCES`, point-in-time-never-cumulative).
+- Ratified as archived ADRs 0004 (delta rows, separate by schema) and 0010
+  (`SPEND_SOURCES`, point-in-time-never-cumulative) — **named, not cited**. Both are live
+  as [ADR-LAWS](0001_laws.md) Law 3 and this record's own §2 respectively.
 
 ### Veto condition (when to revisit)
 

@@ -296,9 +296,12 @@ def test_ingest_kiro_metrics_idempotent(proj):
     parse = lambda f: transcript.parse_kiro_cli_metrics(f)
     first = importcmd._ingest_kiro_metrics(root, [db], parse, src=db.parent)
     second = importcmd._ingest_kiro_metrics(root, [db], parse, src=db.parent)
-    assert first == 2  # conv + turn
+    # P5: the RETURN is the non-overlapping grain (`cli-conv`), not every row written —
+    # a `cli-turn` row is one turn *inside* the conversation the `cli-conv` row totals, so
+    # returning 2 would report a number no view can reproduce. Both rows are still WRITTEN.
+    assert first == 1
     assert second == 0
-    assert len(ledger.kiro_metrics_raw(root)) == 2
+    assert len(ledger.kiro_metrics_raw(root)) == 2  # conv + turn, both on disk
 
 
 def test_ingest_kiro_metrics_never_touches_call_or_credits_kind(proj):

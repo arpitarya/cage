@@ -359,7 +359,9 @@ def test_surface_dict_shape_restamps_imported_rows(monkeypatch, tmp_path):
     _write_policy(root, f'[sources.claude]\npaths = ["{logs.as_posix()}"]\nsurface = "cli"\n')
     monkeypatch.chdir(root)
     importcmd.run(root, "all", _imp_args())
-    rows = ledger.calls(root)
+    # A BUILT-IN agent name dispatches through `import_claude`, which since P5 writes
+    # metric rows, not `calls`. `spend()` is the reader that survives that basis change.
+    rows = ledger.spend(root)
     assert rows and all(r.get("surface") == "cli" for r in rows)
 
 
@@ -372,7 +374,7 @@ def test_surface_array_shape_restamps_per_entry(monkeypatch, tmp_path):
     _write_policy(root, f'[[sources.claude]]\npath = "{logs.as_posix()}"\nsurface = "vscode"\n')
     monkeypatch.chdir(root)
     importcmd.run(root, "all", _imp_args())
-    rows = ledger.calls(root)
+    rows = ledger.spend(root)      # built-in agent name → metric rows (see above)
     assert rows and all(r.get("surface") == "vscode" for r in rows)
 
 

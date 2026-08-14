@@ -32,7 +32,7 @@ def test_import_writes_a_manifest_row_and_threads_the_fk(tmp_path, monkeypatch):
     root = _root(tmp_path, monkeypatch)
     tp = _claude_log(tmp_path / "s.jsonl", "u1", 1000, 200)
     importcmd.run(root, "claude", SimpleNamespace(agent="claude", path=tp, project=None, since=None))
-    calls = ledger.calls(root)
+    calls = ledger.spend(root)
     rows = manifest.read(root)
     assert len(calls) == 1 and len(rows) == 1
     m = rows[0]
@@ -100,7 +100,7 @@ def test_names_never_leak_onto_call_rows(tmp_path, monkeypatch):
     root = _root(tmp_path, monkeypatch)
     tp = _claude_log_named(tmp_path / "s3.jsonl", "u1", 100, 20, summary="secret prose title")
     importcmd.run(root, "claude", SimpleNamespace(agent="claude", path=tp, project=None, since=None))
-    for c in ledger.calls(root):
+    for c in ledger.spend(root):
         assert "session_name" not in c
         assert "secret prose title" not in json.dumps(c)
     for r in ledger.receipts(root):
@@ -210,4 +210,4 @@ def test_manifest_write_is_fail_open(tmp_path, monkeypatch):
     (foot.ledger / "imports.jsonl").mkdir()
     out = importcmd.run(root, "claude", SimpleNamespace(agent="claude", path=tp, project=None, since=None))
     assert any("imported" in line for line in out)  # capture still succeeded
-    assert len(ledger.calls(root)) == 1             # the call row landed
+    assert len(ledger.spend(root)) == 1             # the call row landed

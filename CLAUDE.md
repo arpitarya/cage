@@ -711,6 +711,31 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
 
 ## Documentation discipline (required)
 
+### Archived documents are NAMED, never CITED (Arpit, 2026-08-14)
+
+**Nothing under `work/archive/` or `docs/archive/` may back a claim.** An archived file
+is history: it may have been edited, rewritten, corrected or overwritten since it was
+archived, and nothing checks that it still says what it said. A live doc that rests on one
+is resting on a source whose integrity is not guaranteed.
+
+**Naming it is fine and often right** — *"ratified as archived ADR 0008"*, *"the v0.36
+human-removal handoff"* — so the trail stays followable. **Linking it as evidence is not.**
+If a claim needs grounding, ground it in a live source: the code, a live ADR,
+[work/regression/](work/regression/) (measured), [work/research/](work/research/) (sourced),
+or a reproducible command. If no live source exists, **say the claim is ungrounded** and
+file it — an archive link that looks like evidence is worse than an admitted gap, because
+it reads as checked.
+
+**The one carve-out is narration.** WORKLOG, IMPLEMENTATION and INTERVIEW record what
+happened, and what happened includes archived pairs; linking them there is a history
+entry, not a citation. The rule binds anywhere a doc **asserts something is true now**:
+every ADR (especially its *Reference* section), FORMULAS, PLAN, GLOSSARY, compare docs,
+and regression findings.
+
+**On contact, repoint — don't just delink.** Every archived record has a live successor
+(`work/archive/adr/README.md` maps all eleven). Moving the citation to the live home is
+strictly better than deleting it, and it is usually the same edit.
+
 **Every change updates the docs in the same change** — this holds whether or not
 the change touched code; a decision, a scope change, or a plan is documentation
 too. A task is not done until the docs are true. When a doc goes stale, fix it on
@@ -759,8 +784,10 @@ fires a trigger updates the doc *and* bumps its row):
   the queue, the second loses the history.
   **Never trust its own status markers as ground truth when reconciling** — a ✅ in a
   plan file is an assertion, not evidence. Verify against `work/regression/`,
-  `work/archive/`, `IMPLEMENTATION.md`, and the code before declaring an item
-  pending or done. On 2026-08-01 this file listed two already-built items as
+  `IMPLEMENTATION.md`, and **the code** before declaring an item pending or done.
+  `work/archive/` may *point* at what once happened, but under
+  *Archived documents are named, never cited* it settles nothing — a pair archived as
+  "built" is a claim from the past, not a check on the present. On 2026-08-01 this file listed two already-built items as
   pending precisely because its markers had gone stale.
 - **[work/IMPLEMENTATION.md](work/IMPLEMENTATION.md)** — the build log. Append at
   **every small milestone** (green checkpoint, commit, phase step): date ·

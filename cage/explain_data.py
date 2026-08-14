@@ -492,9 +492,14 @@ REGISTRY: tuple[Explanation, ...] = (
         "  max (requests, tokens_in+tokens_out, id) — a grown chat appends a FRESH row\n"
         "  (id folds the row's own values), the reader resolves the latest state. A\n"
         "  chat's own growth rows are NEVER summed.\n"
-        "  Dodges, does NOT fix, two calls-path defects (CLAUDE-DEDUP,\n"
-        "  CLAUDE-SUBAGENT-KEY — `parse_calls`/`_usage_to_row` untouched, both stay\n"
-        "  open OPEN-WORK items). No credits field at all — no credit unit exists for\n"
+        "  Dodged, then OUTLIVED, two calls-path defects (CLAUDE-DEDUP,\n"
+        "  CLAUDE-SUBAGENT-KEY). v0.51 retired the transcript->calls leg entirely, so\n"
+        "  neither defect can reach a built-in claude number any more. `parse_calls` is\n"
+        "  KEPT and untouched — it is the `[sources.<name>] format` custom-source\n"
+        "  contract, and a source declaring `format = \"claude\"` still inherits both\n"
+        "  (ADR-CONSUMERS says so). Fixing them on the way out was forbidden: the\n"
+        "  measurement has to outlive the code.\n"
+        "  No credits field at all — no credit unit exists for\n"
         "  Claude Code anywhere on disk. Counts-never-content: only the assistant-row\n"
         "  envelope + `message.usage` are ever read.",
         ("cage/schema.py", "cage/ledger.py", "cage/transcript.py", "cage/importcmd.py"),
