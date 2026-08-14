@@ -23,9 +23,10 @@ def test_ids_are_sortable_by_time():
 #
 # The random field is the only thing separating two rows minted in the same
 # millisecond, and every merge path (`ledger.append_new` · `mergeutil.union_by_id` ·
-# `ledger.receipts` · `study.import_bundles`) treats an id as an identity — so a
+# `ledger.receipts`) treats an id as an identity — so a
 # collision is a **silently dropped row**, not a retry. At 16 bits it was measured at
-# ~1 in 229 over 200k sequential ids and turned main red once (`test_study`, 37 vs 38):
+# ~1 in 229 over 200k sequential ids and turned main red once (in the since-removed
+# fleet-study suite, 37 rows where 38 were seeded):
 # work/regression/2026-08-02-finding-call-id-collisions.md.
 #
 # Asserted as a contract rather than by generating ids and counting duplicates: a

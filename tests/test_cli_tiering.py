@@ -34,7 +34,7 @@ def test_help_matches_the_plan_mock_verbatim():
     assert "usage:" not in got and "positional arguments" not in got
     for line in ("  import ", "  setup ", "  doctor ", "  query "):
         assert line in got
-    for grp in ("insights", "task", "authorship", "study", "policy"):
+    for grp in ("insights", "task", "authorship", "policy"):
         assert f"  {grp} " in got or f"  {grp}  " in got
 
 
@@ -76,7 +76,7 @@ def test_removed_map_never_shadows_a_live_top_level_verb():
     assert not (set(verbmap.REMOVED) & live)
     for old in verbmap.REMOVED:
         assert old not in {"mcp", "debug", "demo"}
-    for group in ("insights", "task", "authorship", "study", "policy"):
+    for group in ("insights", "task", "authorship", "policy"):
         assert group in live
 
 
@@ -105,7 +105,9 @@ _STALE = re.compile(rf"cage ({_MOVED})(?![\w-])")
 # `data` is NOT in this list any more — SURFACE-CUT deleted the whole group, so
 # `cage data <x>` is a dead spelling, not a grouped one. Leaving it whitelisted
 # would be the F1 class inside the detector itself.
-_GROUPED = re.compile(r"cage (insights|task|authorship|study|policy) ")
+# `study` left this list in v0.51 (STUDY-CUT): the group is gone, so `cage study …` is
+# now a DEAD spelling the `_STALE` gate above must catch, not a grouped one to whitelist.
+_GROUPED = re.compile(r"cage (insights|task|authorship|policy) ")
 
 
 def _scan(paths, exts):
@@ -216,7 +218,7 @@ def test_the_front_door_never_advertises_a_command_that_does_not_exist():
     known = set(top.choices)                              # every top-level verb
     for parser in top.choices.values():
         for a in parser._actions:                         # subparsers AND the positional
-            known |= set(a.choices or ())                 # -choice groups (prices/study/policy)
+            known |= set(a.choices or ())                 # -choice groups (policy)
     body = cli._ROOT_HELP.split("groups (run any group name for its commands):")[1]
     body = body.split("\n$ ")[0]
     for token in body.replace("·", " ").split():

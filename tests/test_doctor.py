@@ -8,6 +8,32 @@ def _level(res, name):
     return next(c["level"] for c in res["checks"] if c["name"] == name)
 
 
+def _detail(res, name):
+    return next(c["detail"] for c in res["checks"] if c["name"] == name)
+
+
+def test_integrity_check_inspects_the_active_not_the_unresolved_root(proj):
+    """DOCTOR-INTEGRITY-UNRESOLVED-ROOT: a project-less user's active sink is the global
+    ledger (`paths.resolve_root`), same as every other ledger check `run()` makes. The
+    integrity check must inspect that same sink — not the raw, unresolved `root` — or an
+    altered-history finding in the real global ledger never reaches `cage doctor`."""
+    from cage import integrity, ledger, paths, schema
+
+    TS = "2026-08-10T12:00:00Z"
+    glob = paths.global_home()  # CAGE_HOME, redirected off the real ~/.cage by conftest
+    ledger.append_row(glob, "calls", schema.make_call(
+        route="chat", provider="anthropic", model="m", agent="lib",
+        tokens_in=10, ts=TS, call_id="c_1"))
+    integrity.checkpoint(glob)
+    shard = paths.Footprint(glob).shard("calls", TS)
+    shard.write_bytes(shard.read_bytes().replace(b'"tokens_in": 10', b'"tokens_in": 99'))
+
+    # `proj` has no project `.cage/`, so the active sink resolves to the global ledger.
+    res = doctorcmd.run(proj)
+    assert _level(res, "integrity") == "warn"
+    assert "altered-history" in _detail(res, "integrity")
+
+
 def test_fresh_project_fails_on_footprint(proj):
     res = doctorcmd.run(proj)
     assert _level(res, "footprint") == "fail"

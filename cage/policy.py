@@ -210,7 +210,7 @@ def cleanup_enabled(pol: dict) -> bool:
     """Whether the **automatic** state-dir sweep (`cleanup.maybe_run`, piggybacked on
     import) may run at all. Env `CAGE_CLEANUP` overrides policy `[cleanup] enabled`;
     default on. `enabled=false` means the auto path does nothing — no reminder — but
-    is deliberately NOT consulted by a manually-typed `cage data cleanup` /
+    is deliberately NOT consulted by a manually-typed `cage clean` /
     `--apply`: an explicit command is always honored (the safer of the two readings —
     see `cleanup.py`'s module docstring). Cleanup only ever touches the closed
     state/ allowlist — never the ledger or policy — and since v0.37 the auto path
@@ -220,7 +220,7 @@ def cleanup_enabled(pol: dict) -> bool:
 
 def cleanup_warn(pol: dict) -> bool:
     """Whether the auto sweep prints its stderr reminder when `cleanup_enabled` is
-    true (it never deletes — `cage data cleanup --apply` is the only path that does).
+    true (it never deletes — `cage clean --apply` is the only path that does).
     Env `CAGE_CLEANUP_WARN` overrides policy `[cleanup] warn`; default on."""
     return _flag("CAGE_CLEANUP_WARN", pol, "cleanup", "warn", True)
 
@@ -297,11 +297,17 @@ def authorship_max_est_gap(pol: dict) -> str:
 
 
 def import_before_export(pol: dict) -> bool:
-    """Whether `cage data export` runs the all-agent import sweep before bundling, so a
-    capture-only machine (hooks never fire under a VS Code extension) still ships a
-    complete bundle. Policy `[capture] import_before_export`; the `--no-import`
-    flag wins per invocation, and `CAGE_CAPTURE=0` / `[capture] enabled=false`
-    already skip the sweep inside `importcmd.run` (precedence: flag > env > policy)."""
+    """**Read by nothing since v0.51 — a recorded setting with no reader.**
+
+    It gated *export imports everything first*: whether an export ran the all-agent
+    import sweep before emitting, so a capture-only machine still shipped a complete
+    artifact. Its last surface was the fleet study's bundle export, and the
+    whole study was removed in STUDY-CUT; cage now has no export that bundles a ledger.
+
+    The reader went, the key stays — SURFACE-CUT's rule, and it is cheap here: the key is
+    inert on disk, and removing it from the bundled `cage.toml` would report it as an
+    orphan in every project that ever ran `cage policy sync`. Filed as UNREAD-FACTS in
+    `work/OPEN-WORK.md`. Policy `[capture] import_before_export`, default on."""
     return bool(pol.get("capture", {}).get("import_before_export", True))
 
 

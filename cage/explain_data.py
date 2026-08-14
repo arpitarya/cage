@@ -36,20 +36,6 @@ REGISTRY: tuple[Explanation, ...] = (
         "gross inherits the receipt's own method — modeled for a counterfactual, and\n"
         "  never upgraded to measured by being printed next to recorded tokens."),
     Explanation(
-        "study-pairing", ("study", "fleet", "machines", "laptops", "paired", "pairing",
-                          "phase", "enrollment", "bundle", "week-over-week"),
-        "how the fleet study pairs machines and computes its delta",
-        "phases are recorded markers (`cage study start/stop`), resolved per machine\n"
-        "  against that machine's own clock; the sample unit is the machine-day.\n"
-        "  paired delta = median over machines of (phase-B median daily − phase-A\n"
-        "  median daily), controlling between-machine variance; below\n"
-        "  {min_compare_n} machines with both phases the delta refuses. Coverage\n"
-        "  (days + gaps) always prints first. Machine ids are opaque random tokens —\n"
-        "  never a hostname.",
-        ("cage/study.py", "cage/machine.py", "cage/constants.py"),
-        "per-machine-day totals are measured; the paired delta is estimated —\n"
-        "  recorded phase intent across different weeks, never a randomized experiment."),
-    Explanation(
         "token-heuristic", ("token", "tokens", "chars", "divisor", "heuristic",
                             "tokenize", "tokenizer", "approx"),
         "how text is turned into a token count",
@@ -515,8 +501,10 @@ REGISTRY: tuple[Explanation, ...] = (
         "  it), *.tmp. (hooks-seen.jsonl is a legacy file cleaned on real machines —\n"
         "  cage no longer writes hooks.) Never — by construction, not convention:\n"
         "  ledger/ (tool savings included — a per-tool cleanup class must never be\n"
-        "  added, savings are unrecoverable), cage.toml, the machine id (fleet\n"
-        "  pairing breaks without it), study.jsonl, limits.json. Window: [cleanup]\n"
+        "  added, savings are unrecoverable), cage.toml, limits.json, and the two\n"
+        "  files the removed fleet study left behind (machine.json, study.jsonl —\n"
+        "  nothing writes them since v0.51, and nothing may delete them either).\n"
+        "  Window: [cleanup]\n"
         "  days = {cleanup_days}. Deletion only ever happens via an\n"
         "  explicit prune. NOTE: the manual verb was deleted in v0.50, so nothing\n"
         "  enabled — an explicitly-typed command is always honored. The auto path\n"
@@ -530,22 +518,6 @@ REGISTRY: tuple[Explanation, ...] = (
         ("cage/cleanup.py", "cage/policy.py", "cage.toml [cleanup]"),
         "n/a — describes state maintenance, not a number.",
         kind="concept", plan_ref="§3.6.4"),
-    Explanation(
-        "import-before-export", ("import-before-export", "export-sweep", "no-import",
-                                 "self-refreshing", "snapshot", "bundle-freshness"),
-        "why the fleet bundle imports first (and how to get a frozen snapshot)",
-        "export runs the all-agent import sweep before emitting/bundling, so a\n"
-        "  machine that never ran an explicit `cage import` still ships a complete\n"
-        "  bundle (capture is pull-only) — one `cage study export` is enough. Currently\n"
-        "  {import_before_export}. Precedence: the --no-import flag wins per\n"
-        "  invocation > env CAGE_CAPTURE=0 (pauses all capture, sweep included) >\n"
-        "  policy [capture] import_before_export. The sweep is fail-open — a broken\n"
-        "  parser warns and export proceeds with the pre-sweep ledger — and the\n"
-        "  study bundle's manifest records whether it ran and how many rows it added\n"
-        "  (counts only), so the analyst can tell self-refreshed from snapshot.",
-        ("cage/clicmds.py", "cage/study.py", "cage.toml [capture]"),
-        "n/a — describes capture freshness, not a number.",
-        kind="concept", plan_ref="§3.7"),
     Explanation(
         "display", ("display", "usd", "--usd", "dollars", "tokens-default",
                     "token-view", "dollar-view", "signal-gating", "gating",
@@ -573,8 +545,8 @@ REGISTRY: tuple[Explanation, ...] = (
                        "pivot-table", "flat-table", "reporting-format",
                        "report-csv", "one-way"),
         "the CSV reporting surface: which views, the column law, csv-vs-bundle",
-        "`--csv` on report · attrib · roi · compare · study report · calibration\n"
-        "  — stdout by default (pipe-friendly),\n"
+        "`--csv` on insights chats · graphify · commits · commit, and on\n"
+        "  authorship summary — stdout by default (pipe-friendly),\n"
         "  `--csv <path>` writes a file. Raw-row export was removed in v0.50; the\n"
         "  calls|receipts|tasks` (flat ledger rows for pivot tables; the ledger's\n"
         "  own PII surface — counts and ids, never content). MCP mirrors it: a\n"
@@ -585,10 +557,10 @@ REGISTRY: tuple[Explanation, ...] = (
         "  refusals/caveats/UNPRICED counts survive into the rows; stdlib `csv`,\n"
         "  RFC-4180 quoting, LF line endings pinned on every OS (deterministic:\n"
         "  same ledger + policy ⇒ byte-identical CSV). The column contracts live in\n"
-        "  `csvout.py` itself (one render_csv beside each render_*). Two export kinds,\n"
-        "  never blurred: CSV is one-way\n"
-        "  REPORTING and never an import source; the fleet bundle (`cage study export\n"
-        "  --study`) stays jsonl — lossless, merge-by-id, re-importable.",
+        "  `csvout.py` itself (one render_csv beside each render_*). CSV is one-way\n"
+        "  REPORTING and never an import source. It was once the contrast to the\n"
+        "  re-importable fleet bundle; that bundle went with the whole fleet study in\n"
+        "  v0.51, so CSV is now simply the only export shape cage has.",
         ("cage/csvout.py", "cage/chats.py", "cage/commitview.py", "cage/viewexport.py"),
         "n/a — describes an output format; every row still carries its own method tag.",
         kind="concept", plan_ref="§3.9"),

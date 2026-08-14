@@ -535,115 +535,6 @@ def s7_verdict(base: Path) -> str:
     return "SAVING + COSTING + INSUFFICIENT DATA · tags rendered · byte-identical"
 
 
-# Seeder for S9 — one simulated machine ledger per argv name. Markers carry
-# historical timestamps (the CLI stamps "now", which would leave June rows
-# unphased), so seeding goes through the library; export/import/report run
-# through the real CLI. 7 machines per the min-n gate: the handoff's "3
-# simulated machines" sketch predates MIN_COMPARE_N=5 (the S5 precedent).
-_S9_SEED = """
-import sys
-from pathlib import Path
-from cage import ledger, machine, schema, study
-root, kind = Path(sys.argv[1]), sys.argv[2]
-(root / ".cage").mkdir(parents=True, exist_ok=True)
-machine.ensure(root)
-M = dict(route="chat", provider="anthropic", model="claude-opus-4-8", agent="claude-code")
-def call(tin, ts):
-    ledger.append_row(root, "calls", schema.make_call(
-        tokens_in=tin, tokens_out=500, session="s", ts=ts, **M))
-study.start(root, "baseline", ts="2026-06-01T00:00:00Z")
-for d in ("01", "02", "03"):
-    call(12000, f"2026-06-{d}T10:00:00Z")
-study.stop(root, ts="2026-06-03T23:59:59Z")
-if kind != "missing":
-    study.start(root, "plugin", ts="2026-06-08T00:00:00Z")
-    days = ("08", "10") if kind == "gap" else ("08", "09", "10")
-    for d in days:
-        call(5000, f"2026-06-{d}T10:00:00Z")
-    study.stop(root, ts="2026-06-10T23:59:59Z")
-"""
-
-
-# Machine 8's markers only — its *calls* are never pre-imported: they exist solely
-# as an on-disk Claude transcript, so the bundle's completeness rests entirely on
-# export's own sweep (the capture-only / VS-Code-extension fleet participant).
-_S9_SWEEP_SEED = """
-import sys
-from pathlib import Path
-from cage import machine, study
-root = Path(sys.argv[1])
-(root / ".cage").mkdir(parents=True, exist_ok=True)
-machine.ensure(root)
-study.start(root, "baseline", ts="2026-06-01T00:00:00Z")
-study.stop(root, ts="2026-06-20T23:59:59Z")
-"""
-
-
-def s9_fleet(base: Path) -> str:
-    """S9 — 8 simulated machines (5 complete, 1 mid-week gap, 1 missing phase 2,
-    1 import-never machine that relies solely on export's all-agent sweep):
-    bundles → import-merge → exact coverage + gap flag + paired delta;
-    double-import idempotent."""
-    repo, env = make_sandbox(base, "s9-fleet")
-    expect_ok(repo, env, "setup", "--project-only", "--no-graphify")
-    bundles = []
-    for i in range(1, 8):
-        kind = "gap" if i == 6 else ("missing" if i == 7 else "full")
-        mroot = base / f"s9-machine-{i}"
-        r = _sh([sys.executable, "-c", _S9_SEED, str(mroot), kind], cwd=base, env=env)
-        if r.returncode != 0:
-            raise Fail(f"S9 machine seed failed: {r.stderr.strip()[:300]}")
-        out = str(base / f"s9-bundle-{i}.zip")
-        menv = {**env, "CAGE_BASE": str(mroot / ".cage")}
-        expect_ok(mroot, menv, "data", "export", "--study", out, "--no-import")
-        bundles.append(out)
-    # machine 8: no prior `cage import` ever ran — its two calls live only in a
-    # planted Claude transcript, and `export --study` (no --no-import) must sweep
-    # them into the bundle itself, recording the sweep in the manifest.
-    mroot8 = base / "s9-machine-8"
-    r = _sh([sys.executable, "-c", _S9_SWEEP_SEED, str(mroot8)], cwd=base, env=env)
-    if r.returncode != 0:
-        raise Fail(f"S9 machine-8 seed failed: {r.stderr.strip()[:300]}")
-    claude8 = base / "s9-machine-8-claude-home"
-    spec = next(s for s in fixture_specs("cli") if s["agent"] == "claude")
-    dst = claude8 / spec["plant"]
-    dst.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(spec["dir"] / spec["log"], dst)
-    out8 = str(base / "s9-bundle-8.zip")
-    menv8 = {**env, "CAGE_BASE": str(mroot8 / ".cage"),
-             "CLAUDE_CONFIG_DIR": str(claude8)}
-    # Directive A (capture-precision plan §3.6): no materialized `[sources]` in cage.toml
-    # means import captures nothing, loudly — a real machine gets this from `cage setup`
-    # at some point in its life, so make that true here too before exercising the sweep.
-    expect_ok(mroot8, menv8, "setup", "--project-only", "--no-graphify")
-    swept = expect_ok(mroot8, menv8, "data", "export", "--study", out8)
-    if "self-refreshed: +2 call(s)" not in swept:
-        raise Fail(f"machine-8 export did not self-refresh: {swept.strip()[:200]}")
-    bundles.append(out8)
-    merged = expect_ok(repo, env, "import", *bundles)
-    if merged.count("✔") != 8:
-        raise Fail(f"expected 8 bundle merge lines, got: {merged.strip()[:200]}")
-    if "merged 2 calls" not in merged or "swept +2 at export" not in merged:
-        raise Fail("machine-8 bundle did not carry its sweep record into the "
-                   f"analyst's import: {merged.strip()[:300]}")
-    report = expect_ok(repo, env, "study", "report")
-    for needle in ("⚠ gap days: 2026-06-09", "MISSING — no rows in this phase",
-                   "n=6 machines",
-                   "-7,000 tok/day · -$0.0350/day per machine (estimated)",
-                   "not a randomized experiment"):
-        if needle not in report:
-            raise Fail(f"study report missing {needle!r}")
-    before = shard_bytes(repo)
-    again = expect_ok(repo, env, "import", *bundles)
-    if "merged 0 calls" not in again or shard_bytes(repo) != before:
-        raise Fail("double bundle import was not idempotent")
-    if expect_ok(repo, env, "study", "report") != report:
-        raise Fail("study report not byte-identical across two runs")
-    assert_pii_clean(repo)
-    return ("8 machines · gap flagged · pairs 6 · exact −7,000 tok/day delta · "
-            "import-never machine self-refreshed via export sweep · re-import idempotent")
-
-
 # Seeder for S11 — the field-report shape: an empty-provider router key
 # (`copilot/auto`, what the VS Code Copilot store stamps) and an unknown-vendor
 # model, both genuinely UNPRICED (no est_cost_usd — transcript calls carry none).
@@ -1252,7 +1143,6 @@ SCENARIOS: dict[str, tuple[str, object]] = {
     "S7": ("P4", s7_verdict),
     "S8": ("P0", s8_determinism),
     "S11": ("pricing", s11_prices),
-    "S9": ("P5", s9_fleet),
     "S12": ("restricted", s12_launcher),
     "S13": ("restricted", s13_pyz),
     "S14": ("pricing", s14_receipt_ladder),

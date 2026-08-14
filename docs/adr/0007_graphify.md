@@ -289,8 +289,8 @@ spaces, embedded quotes and `!`.
 forwarded.** sh: `set -euo pipefail`. cmd: `@echo off` + `setlocal`. Delayed expansion
 (`!var!`) is enabled **only** around the PATH-walk — it needs to read a variable set
 earlier in the same parenthesized `for` block, which plain `%var%` cannot do — and is
-turned back off, via a second `setlocal DisableDelayedExpansion`, **before** either line
-that forwards `%*` to the real binary. Delayed expansion active at a forwarding line would
+turned back off, via a second `setlocal DisableDelayedExpansion`, **before** any of the
+four lines that forward `%*` to the real binary. Delayed expansion active at a forwarding line would
 eat a literal `!` out of the caller's arguments: a real, documented cmd.exe hazard, not a
 hypothetical one. Environment mutations (the B1 stamp, scratch variables) never reach the
 caller.
@@ -342,9 +342,9 @@ the "cage absent" assumption), and never nothing.
 | **D1** | `call "%REAL%" %*` then `exit /b %ERRORLEVEL%`, instead of `exec` | cmd has no `exec` | the real binary is a **child process**, not a replacement. Ctrl-C prompts `Terminate batch job (Y/N)?`; one extra process in the tree; a caller signalling by pid signals the batch. Streams and exit code are still identical (B6 holds). |
 | **D2** | candidates come from `PATHEXT`; the bare extensionless name is never tried | cmd.exe cannot execute an extensionless file | the POSIX twin is **invisible** to the cmd twin's scan — half the anti-recursion proof |
 | **D3** | the current directory is not searched | cmd.exe resolves cwd *before* PATH; the sh twin deliberately declines the POSIX cwd (an empty PATH entry) | a `graphify.cmd` in cwd but not on PATH ⇒ 127 rather than running. Deliberate: twin parity, no cwd hijack. **Scoped exception:** the pathological-PATH fallback delegates to `where`, which searches cwd first — a fail-open last resort, still content-filtered. |
-| **D4** | three `findstr /C:` literals instead of one `grep -E` alternation | findstr has no alternation | identical marker set, OR-ed, case-sensitive in both |
+| **D4** | four `findstr /C:` literals instead of one `grep -E` alternation | findstr has no alternation | identical marker set, OR-ed, case-sensitive in both |
 | **D5** | `if exist` only — no execute-bit test | Windows has no execute bit | existence is the whole test |
-| **D6** | `%*` instead of `"$@"` | cmd has no argument array | quoting is preserved as *typed*, the closest available; this is why delayed expansion must be off (B7) at both lines that forward `%*` |
+| **D6** | `%*` instead of `"$@"` | cmd has no argument array | quoting is preserved as *typed*, the closest available; this is why delayed expansion must be off (B7) at all four lines that forward `%*` |
 | **D7** | the B4 message uses an ASCII hyphen where sh uses an em dash | a `.cmd` is read in the console's OEM codepage; an em dash renders as mojibake | one character of the shim's own diagnostic differs. graphify's own output is untouched. |
 | **D8** | arm 2 (B5b) says `py -3` then `python`, where sh says `python3` (both spelling `-m cage interceptor graphify`) | `python3` is frequently absent on Windows; the launcher is `py -3`, with bare `python` as the fallback for a PATH install with no launcher | two probes instead of one, in that order. Neither resolving means the call was always going to be unmetered. **Permanent** — it cannot be collapsed without breaking one OS or the other |
 

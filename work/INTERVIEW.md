@@ -33,6 +33,21 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
   cite it.** The deletion itself was pending on Arpit's machine at hand-off: the Cowork
   bridge cannot delete files and left a stale `.git/index.lock`.
 
+- **STUDY-CUT (2026-08-15): the P5 fleet study is deleted whole, and it rides the same
+  unreleased v0.51.** Six verbs, `study.py`, `machine.py`, phase markers, the opaque
+  per-machine id, the zip bundle and its `cage import BUNDLE` merge — *and* the additive
+  **`machine` row field** four writers stamped. Cage no longer aggregates across machines
+  by any route. **Inherit two things from how it was scoped.** First: the ask was "remove
+  cage study from cli", and the honest default under SURFACE-CUT was the CLI group alone —
+  I asked Arpit rather than assuming, and he chose the subsystem. Second, and the part
+  worth keeping: SURFACE-CUT was *not* overridden. A "writer" reachable only through the
+  verbs you are deleting is dead code, not a recorded fact; the rule bites on writers that
+  survive the cut. The one real writer here (`machine.stamp`) went too, and that is named
+  as a substrate change in CLAUDE.md rather than buried in a docs diff. **What was
+  deliberately NOT tidied:** `machine.json`/`study.jsonl` stay undeletable in
+  `cleanup.NEVER`, `[capture] import_before_export` stays as an unread key (UNREAD-FACTS
+  is now five facts), and `MIN_COMPARE_N` stays because ADR-GRAPHIFY's veto cites the
+  number. Each has its reason at the definition site — do not "clean these up".
 - **v0.51 is BUILT and unreleased: LEDGER-RESTRUCTURE, nine phases, 1521 green.** Every
   producer owns exactly one directory under `ledger/` — `claude/` `copilot/` `kiro/` ·
   `consumer/` · `graphify/` `fux/` `compress/` `responsecache/` · `provenance/`. The

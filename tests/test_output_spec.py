@@ -1,18 +1,22 @@
-"""Golden tests for docs/cli-output-spec.md (plan Phases 1+2+5.6).
+"""Golden tests for the GATED output blocks in docs/adr/0002_cli.md (ADR-CLI).
 
-Every fixture under `tests/fixtures/goldens/` is one spec code block: the first
-line is the invocation (`$ cage …`), the rest is the byte-exact stdout. These
-files are the single artifact behind BOTH surfaces — this test asserts the live
-output equals them, and `python -m tools.docgen --target spec` regenerates the
-spec's code blocks from them (so documented and tested output cannot disagree).
+`docs/cli-output-spec.md` and `tools/docgen` were absorbed into ADR-CLI and no
+longer exist — ADR-CLI's "What the output looks like" section is the one place
+documented and tested output live, and `tests/test_adr_output_blocks.py` is what
+keeps that section honest against these same goldens (every GATED block byte-
+identical to the fixture it cites; every CAPTURED block's invocation still live).
+
+Every fixture under `tests/fixtures/goldens/` backs exactly one GATED block: the
+first line is the invocation (`$ cage …`), the rest is the byte-exact stdout.
+This test asserts the live output equals them.
 
 Regenerate after an intentional rendering change:
     CAGE_BLESS_GOLDENS=1 python -m pytest tests/test_output_spec.py
-    python -m tools.docgen --target spec
+then paste the new body into the matching GATED block in docs/adr/0002_cli.md.
 
-The S1/S2 study mockups (`join`/`start`/`stop`) are deliberately NOT byte-pinned:
-join runs wiring + doctor, whose output is machine-dependent by design — they
-get shape assertions here and stay illustrative in the spec.
+The S1–S4 study fixtures went with the fleet study in v0.51 (STUDY-CUT); §4 is
+deliberately left as a gap in the numbering rather than renumbered, so a golden
+id in an old commit or changelog entry still means what it meant.
 """
 from __future__ import annotations
 
@@ -33,7 +37,11 @@ def _bless() -> bool:
 
 
 def _check(name: str, argv: list[str], out: str) -> None:
-    text = "$ cage " + " ".join(argv) + "\n" + out if argv else out
+    # Always prefixed, even for the bare `cage` invocation (argv=[]) — ADR-CLI shows
+    # every GATED block with its `$ cage …` invocation line so the block is checkable
+    # by test_adr_output_blocks.py; a bare invocation just renders `$ cage ` (trailing
+    # space, no args).
+    text = "$ cage " + " ".join(argv) + "\n" + out
     f = GOLD / f"{name}.txt"
     if _bless():
         f.parent.mkdir(parents=True, exist_ok=True)
@@ -71,6 +79,37 @@ def run(proj, monkeypatch, capsys):
     return _factory
 
 
+# ── the daily four (ADR-OUTPUT-GOLDENS) ────────────────────────────────────────
+
+def test_H1_bare_cage(run):
+    """The front door: `_ROOT_HELP` in cage/cli.py is a hardcoded constant (no ledger
+    dependency), so an empty project is enough — this pins the constant itself."""
+    go = run()
+    out = go("H1", [])
+    assert "daily:" in out and "groups (run any group name for its commands):" in out
+
+
+def test_H2_import_nothing_wired(run):
+    """The empty case is the one worth printing: three agents, zero calls, and a
+    warning that names the cause rather than a silent success."""
+    go = run()
+    out = go("H2", ["import"])
+    assert "no [sources] in cage.toml" in out
+    assert out.count("imported 0 call(s)") == 3
+
+
+def test_W1_setup_status(run):
+    go = run()
+    out = go("W1", ["setup", "--status"])
+    assert "not wired" in out
+
+
+def test_H4_query_saved(run):
+    go = run()
+    out = go("H4", ["query", "saved"])
+    assert "GROSS" in out and "cage/savings.py" in out
+
+
 # ── §1 · cage report ──────────────────────────────────────────────────────────
 
 def test_I10_chats_titled(run):
@@ -103,6 +142,19 @@ def test_I10_chats_truncated(run):
     assert "3 more chat(s) — --all to show" in out
 
 
+def test_I11_insights_graphify(run):
+    go = run(seed.graphify_chats)
+    out = go("I11", ["insights", "graphify"])
+    assert "saved%" in out and "67%" in out
+
+
+def test_I12_insights_why(run):
+    go = run(seed.why_call)
+    out = go("I12", ["insights", "why", "c_why1"])
+    assert "graphify" in out and "fux" in out and "compressor" in out
+    assert "measured" in out and "modeled" in out
+
+
 # ── §3 · cage prices ──────────────────────────────────────────────────────────
 
 def _prices_project(root: Path) -> None:
@@ -125,35 +177,6 @@ def _prices_project(root: Path) -> None:
 
 
 
-
-
-# ── §4 · cage study ───────────────────────────────────────────────────────────
-
-def test_S1_S2_study_join_start_shapes(run, capsys):
-    """S1/S2 stay shape-asserted (join wires agents + runs doctor — output is
-    machine-dependent by design; a byte golden here would be dishonest)."""
-    go = run()
-    assert cli.main(["study", "join", "baseline"]) == 0
-    out = capsys.readouterr().out
-    assert "enrolled: machine m_" in out and "phase 'baseline' started" in out
-    assert cli.main(["study", "start", "plugin"]) == 0
-    out = capsys.readouterr().out
-    assert "phase 'plugin' started" in out
-    assert cli.main(["study", "stop"]) == 0
-    assert "phase stopped" in capsys.readouterr().out
-
-
-def test_S3_study_report_healthy(run):
-    go = run(seed.fleet)
-    out = go("S3", ["study", "report"])
-    assert "estimated" in out
-    assert "not a controlled experiment" in out or "work mix" in out
-
-
-def test_S4_study_report_refusal(run):
-    go = run(lambda r: seed.fleet(r, complete=3))
-    out = go("S4", ["study", "report"])
-    assert "insufficient machines with both phases (n=3 < 5)" in out
 
 
 # ── §5 · cage policy ──────────────────────────────────────────────────────────
@@ -240,3 +263,16 @@ def test_A4_authorship_summary(run, monkeypatch):
     out = go("A4", ["authorship", "summary"])
     assert out.index("UNKNOWN") < out.index("recorded")
     assert "unknown by ABSENCE" in out
+
+
+def test_A5_authorship_origin_detail(run, monkeypatch):
+    """Per-commit provenance rows: agent, files, method, origin, confidence."""
+    monkeypatch.setenv("CAGE_AUTHORSHIP", "1")
+    go = run(seed.commits_mixed)
+    import subprocess
+    sha = subprocess.run(("git", "-C", str(go.root), "log", "--format=%h",
+                          "--skip=1", "-n", "1"), capture_output=True,
+                         text=True, check=True).stdout.strip()
+    out = go("A5", ["authorship", "origin", sha])
+    assert "origin=agent" in out and "confidence=" in out
+    assert "transcript" in out

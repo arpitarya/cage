@@ -46,10 +46,12 @@ flowchart TD
         R["a retired agent<br/>e.g. codex, removed v0.33.0"]
     end
     L --> CA["calls-YYYY-MM.jsonl"]
+    L --> LC["ledger/consumer/<br/>dual-written twin (P1, v0.51)"]
     C --> CA
     R --> CA
     M -->|"spine"| SP["ledger.spend()"]
     CA -->|"fallback — scoped, permanent"| SP
+    LC -.->|"suppresses its own<br/>calls twin by id"| SP
     A -.->|"its calls rows are SUPERSEDED<br/>by its metric rows"| CA
     SP --> V["what you see"]
 ```
@@ -66,6 +68,10 @@ flowchart TD
      your app          cage.meter(...)      --.                             |
      a custom tool     [sources.name]        +--> calls-YYYY-MM.jsonl       |
      a retired agent   e.g. codex (v0.33.0) --'          |                  |
+                          |                              |                  |
+                          +--> ledger/consumer/           |                  |
+                               dual-written twin           |                  |
+                               (P1, v0.51) --------------->|--(suppresses)---.
                                                          |                  |
                                      (fallback: scoped, permanent)          |
                                                          |                  |
@@ -257,6 +263,16 @@ partially reversed — see the block above. The rest stands.)*
   than a policy.
 - Adding a store to a metric kind does **not** add it to the spine, and adding a consumer
   does **not** add a kind. Capture stays wide; spend stays single-basis per agent.
+- **The fleet study left this record's scope in v0.51 (STUDY-CUT).** `study.py` and
+  `machine.py` were claimed here by the ownership table — the N-laptop, two-phase,
+  one-analyst workflow that shipped alongside consumer capture. It is removed whole:
+  the six `cage study` verbs, the phase markers, the opaque per-machine id and the
+  additive `machine` field every `calls`/`receipts`/`tasks`/consumer-metric row could
+  carry, the one-file zip bundle, and the `cage import BUNDLE` merge path that read it.
+  **Nothing about consumer capture changed** — the study only ever *partitioned* rows
+  this record's paths already wrote. Rows already stamped with a `machine` id still
+  read; append-only means the recorded past is never rewritten, and an unread key on an
+  old row costs nothing. Cage no longer aggregates across machines by any route.
 
 ### Alternatives rejected
 

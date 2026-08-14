@@ -171,7 +171,7 @@ Reorder `[tools] order` in `cage.toml` and that printed pipeline changes — pro
 
 ### Pricing is managed, and $0 is never silent
 
-A call whose model has no price row bills **$0 and says so** — `report`, `compare`, and `study report` all print `⚠ N calls (X tokens) UNPRICED — totals understated` rather than letting an analyst publish an understated number; the fix is one pasted `cage prices set`/`alias` line. Family matching absorbs route prefixes, dotted ids, and effort tiers; prices are derive-time, so fixing the table re-prices every historical row (including imported fleet bundles) retroactively — the ledger stores counts, never conclusions, and cage never fetches a price. The full design — how a call prices · the unpriced workflow · policy versioning and `cage prices sync` · fleet repricing · the Copilot approximation · credits vs prices — is walked live by `cage query prices-cli`.
+A call whose model has no price row bills **$0 and says so** — the money views all printed `⚠ N calls (X tokens) UNPRICED — totals understated` rather than letting an analyst publish an understated number; the fix is one pasted `cage prices set`/`alias` line. Family matching absorbs route prefixes, dotted ids, and effort tiers; prices are derive-time, so fixing the table re-prices every historical row retroactively — the ledger stores counts, never conclusions, and cage never fetches a price. The full design — how a call prices · the unpriced workflow · policy versioning and `cage prices sync` · fleet repricing · the Copilot approximation · credits vs prices — is walked live by `cage query prices-cli`.
 
 ## How it works
 
@@ -196,7 +196,7 @@ A tool earns rows in `attrib` by filing a **savings receipt**, and there are two
 - **In-tool (you own it) — e.g. fux** carries a fail-open `cage_receipt.py` and emits its own `tool="fux"` receipt. Cage stays optional; fux runs unchanged with cage absent.
 - **External adapter (third-party) — e.g. graphify:** cage reads graphify's use out of each agent's own session store at `cage import` and files a `tool="graphify"` receipt by parsing the cited `source_file`s. graphify is never edited, and a metering error never alters its result.
 
-The command surface (27 subcommands: per-chat and per-commit views · task outcomes · authorship · fleet study · agents) is grouped in `cage --help`, which points at `cage query` for any "how is this computed". Every read command takes `--json` for the agent-as-user. **Cage deliberately ships no ledger rollup** — the views are per *conversation* and per *commit*, the two units you can act on. `cage insights chats` groups the ledger by `(agent, surface, session)` and titles each row where the store carries one — labels only, never a number the manifest could move. Its `agent%` column answers the question a spend rollup can't: *did this chat's tokens become code?* — per chat, the share of evidenced lines in files it touched that matched the agent's own proposals, read from the authorship rows rather than re-derived. Where cage has no evidence it prints `—` with the reason, never a `0%`. The doc map — design of record, subsystem docs, operations, archive — starts at [docs/README.md](docs/README.md).
+The command surface (23 subcommands: per-chat and per-commit views · task outcomes · authorship · agents) is grouped in `cage --help`, which points at `cage query` for any "how is this computed". Every read command takes `--json` for the agent-as-user. **Cage deliberately ships no ledger rollup** — the views are per *conversation* and per *commit*, the two units you can act on. `cage insights chats` groups the ledger by `(agent, surface, session)` and titles each row where the store carries one — labels only, never a number the manifest could move. Its `agent%` column answers the question a spend rollup can't: *did this chat's tokens become code?* — per chat, the share of evidenced lines in files it touched that matched the agent's own proposals, read from the authorship rows rather than re-derived. Where cage has no evidence it prints `—` with the reason, never a `0%`. The doc map — design of record, subsystem docs, operations, archive — starts at [docs/README.md](docs/README.md).
 
 ## Works with any agent — explicit capture over one global ledger
 
@@ -206,7 +206,7 @@ Cage meters whatever speaks the wire format, so all three agents share **one** l
 cage import                 # capture every agent's spend into the active ledger
 cage import                      # pull every agent's usage into the ledger
 cage insights chats              # which conversation used the tokens?
-cage study export                # the one-file fleet bundle, for the P5 study
+cage insights commits            # agent vs human, per commit
 ```
 
 The ledger resolves **`--ledger`/`CAGE_BASE` → project `.cage/` → global `~/.cage`** — so a user with no project captures into the global ledger (`cage setup --global` to seed it). cage installs **no background job** (no launchd/systemd/cron); automate it, if you like, with your own cron line calling `cage import`.
@@ -234,11 +234,11 @@ cage insights graphify --csv                             # per-chat savings, met
 cage insights commits --csv --since 30d                  # per-commit rows for a pivot table
 ```
 
-`--csv` works on `chats` · `graphify` · `commits` · `commit` · `authorship summary` · `study report`. CSV is one-way reporting — never an import source; the re-importable fleet bundle stays jsonl (`cage study export`). Every view also takes `--export` to write a stamped artifact to disk.
+`--csv` works on `chats` · `graphify` · `commits` · `commit` · `authorship summary`. CSV is one-way reporting and never an import source — since the fleet study was removed it is the only export shape cage has. Every view also takes `--export` to write a stamped artifact to disk.
 
 ## The `$0` guarantee
 
-Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 1521 tests; `cage demo` seeds a real ledger you can read with `cage insights chats`.
+Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 1561 tests; `cage demo` seeds a real ledger you can read with `cage insights chats`.
 
 **Honest limits.** Marginal-by-fixed-order is defensible and `$0`, but it is an *ordering convention*, not a Shapley value (that's a deferred audit mode). And a counterfactual cell is an honest reconstruction, never an invoice — the `method` column says so on every row, on purpose.
 
@@ -246,7 +246,7 @@ Every derived view is parse / arithmetic over the log — **no LLM call, ever, o
 
 Latest release below — full history and detail in [CHANGELOG.md](CHANGELOG.md).
 
-- **v0.51.0 — one shape per producer, and the ledger can prove it hasn't been edited.** Every producer now owns exactly one directory under `ledger/`: `claude/` `copilot/` `kiro/` (agents) · `consumer/` (your own code via `cage.meter`) · `graphify/` `fux/` `compress/` `responsecache/` (tool savings) · `provenance/` (authorship). The three agents' transcript→`calls` writer is **retired** — for claude it was a second copy of the same traffic, inflated **1.98×**, that no view read. Nothing on disk moved: every legacy file is still read, forever. New: a **tamper-evidence chain** ([ADR-INTEGRITY](docs/adr/0010_integrity.md)) that reports when something already written has changed — report-only, never a gate; the graphify interceptor works again after two days dead (`cage interceptor graphify`); and Copilot CLI chats finally get their names. ([the cross-check](work/regression/2026-08-14-calls-vs-metric-crosscheck.md) · [the ADR set](docs/adr/README.md))
+- **v0.51.0 — one shape per producer, the ledger can prove it hasn't been edited, and the fleet study is gone.** Every producer now owns exactly one directory under `ledger/`: `claude/` `copilot/` `kiro/` (agents) · `consumer/` (your own code via `cage.meter`) · `graphify/` `fux/` `compress/` `responsecache/` (tool savings) · `provenance/` (authorship). The three agents' transcript→`calls` writer is **retired** — for claude it was a second copy of the same traffic, inflated **1.98×**, that no view read. Nothing on disk moved: every legacy file is still read, forever. New: a **tamper-evidence chain** ([ADR-INTEGRITY](docs/adr/0010_integrity.md)) that reports when something already written has changed — report-only, never a gate; the graphify interceptor works again after two days dead (`cage interceptor graphify`); Copilot CLI chats finally get their names; and `cage clean` returns as its own top-level verb, restoring the manual `.cage/state/` prune path SURFACE-CUT had left with no door ([ADR-CLEANUP](docs/adr/0011_cleanup.md)). Removed whole: the **`cage study` fleet study** — six verbs, the phase markers, the opaque per-machine id and the `machine` row field it stamped, the zip bundle and its `cage import BUNDLE` merge. Cage no longer aggregates across machines; already-recorded rows still read. ([the cross-check](work/regression/2026-08-14-calls-vs-metric-crosscheck.md) · [the ADR set](docs/adr/README.md))
 
 ## The name
 

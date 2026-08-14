@@ -14,10 +14,11 @@ def new_id(prefix: str) -> str:
     **The random field is 32 bits, and the width is a correctness property.** The
     millisecond prefix is shared by every row minted in that millisecond, so the random
     field is the only thing separating them — and every merge path (`ledger.append_new`,
-    `mergeutil.union_by_id`, `ledger.receipts`, `study.import_bundles`) treats an id as
+    `mergeutil.union_by_id`, `ledger.receipts`) treats an id as
     an *identity*, which turns a collision into a **silently dropped row** rather than a
     retry. At the original 16 bits that was measured at ~1 in 229 over 200k sequential
-    ids and turned main red once (`test_study`, 37 calls where 38 were seeded):
+    ids and turned main red once (in the since-removed fleet-study suite, 37 calls
+    where 38 were seeded):
     `work/regression/2026-08-02-finding-call-id-collisions.md`.
 
     A per-process counter is strictly stronger *within* a process and useless across

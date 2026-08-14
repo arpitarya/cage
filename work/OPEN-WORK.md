@@ -2,16 +2,26 @@
 
 Every item sits under its owning ADR ([ownership map](../docs/adr/README.md)) — an item
 with no record is a decision with nothing to hold it. **Needs Arpit:**
-CONTINUOUS-CAPTURE · COVERAGE-STRIKE-2 · three hands-only probes (GFX-IDE-PATH-UNPROBED ·
-GFX-COV-FIELD · COPILOT-JETBRAINS-UNPROBED).
+CONTINUOUS-CAPTURE · COVERAGE-STRIKE-2 · two hands-only probes (GFX-IDE-PATH-UNPROBED ·
+COPILOT-JETBRAINS-UNPROBED).
 
 ## [ADR-LAWS](../docs/adr/0001_laws.md) — substrate
 
 - **UNREAD-FACTS** — five facts are written and read by nothing: `route_key` reclaim
-  (`savings.record`) · `state/attest.jsonl` (every L1 hook — L1 benefit *(a)*, no consumer) ·
-  `scope` (§3.6.2) · `project` (§3.7) · task `label`/`outcome`. Per fact: earn a read surface
-  (ADR-CLI) or stop writing it. *(`[tools] order` was listed here wrongly — `explain.payload`
-  reads it.)*
+  (`savings.record` — confirmed dead, not just unlinked: `tests/test_canonical_ledger.py`'s
+  own comment says the reclaim backstop is GONE, SURFACE-CUT) · `state/attest.jsonl` (every
+  L1 hook — L1 benefit *(a)*, `attest.read`/`read_by_tool` have zero callers outside
+  `attest.py`) · `scope` (§3.6.2 — `ledger.by_scope` has zero callers and no `--scope` flag
+  exists anywhere in `cli.py`) · task `label`/`outcome` (`commitjoin`/`commitview` only test
+  the field's *presence* as a task-closed gate, never surface the recorded value) ·
+  `[capture] import_before_export` / `policy.import_before_export` (added 2026-08-15 by
+  STUDY-CUT — its last surface was the fleet bundle export; kept because removing the key
+  would orphan it in every project that has run `cage policy sync`). Per fact:
+  earn a read surface (ADR-CLI) or stop writing it. **`project` (§3.7) dropped off this list,
+  2026-08-15** — `importcmd.py`'s manifest-naming fallback (`b["project"]` when a session has
+  no vendor title) now feeds `manifest.record_import`'s `session_name`, which
+  `chats._title_map` reads, so the cwd basename can render as a chat title in `cage insights
+  chats`. *(`[tools] order` was listed here wrongly — `explain.payload` reads it.)*
 - **TASK-GRAIN-SPINE** — a metric row carries no `task`. Since P5 retired the claude/copilot
   `calls` writer — and KIRO-CALLS-LEG the kiro one — `taskcorr` and `hookcmd` correlate
   only consumer/custom rows, and any
@@ -21,40 +31,27 @@ GFX-COV-FIELD · COPILOT-JETBRAINS-UNPROBED).
 
 ## [ADR-CLI](../docs/adr/0002_cli.md) — the surface
 
-- **ADR-OUTPUT-GOLDENS** — ADR-CLI now carries rendered output for all 15 printing views,
-  but only **7 are GATED** (byte-exact against `tests/fixtures/goldens/`). The other 8 —
-  bare `cage`, `import`, `setup --status`, `doctor`, `query`, `insights graphify`,
-  `insights why`, `authorship origin` — are CAPTURED: real stdout with an **ungated body**,
-  so a renderer change rots them silently. Fix is a seed + golden per view in
-  `tests/goldenseed.py`, then flip the block's class marker.
-  **`cage doctor` is the one permanent exception** — it probes the local filesystem, so a
-  byte golden over it would assert a fact about the reader's machine (the same call
-  `test_output_spec.py` already makes for `cage study join`).
-- **DOCTOR-DEAD-VERBS** — `cage doctor`'s `metering` and `timeline` checks print two verbs
-  deleted in v0.50 (the `data` group's export and watch) as live guidance. `verbmap` catches
-  a dead verb when it is *typed*; nothing catches one that cage itself *prints*. The F1 class
-  in a new costume — the reference gate scans docs, not stdout. Found while pasting real
-  doctor output into ADR-CLI (2026-08-14); that block is abridged past the lines rather than
-  documenting a bug as a contract.
-- **GOLDENS-ORPHANED** — 16 of the 27 files in `tests/fixtures/goldens/` are read by nothing
-  and render removed surfaces (`I2.txt` shows `insights verdict graphify` with USD).
-  `tests/test_output_spec.py`'s docstring still points at `docs/cli-output-spec.md` and
-  `python -m tools.docgen --target spec`; **both are gone** — the spec doc was absorbed and
-  `tools/docgen` no longer exists, so half the documented re-bless path is dead
-  (`CAGE_BLESS_GOLDENS=1` still works). Delete the dead goldens and repoint that docstring at
-  ADR-CLI + `tests/test_adr_output_blocks.py`, or restore a docgen that writes the ADR's
-  output blocks from the goldens.
+- **DOCGEN-DEAD-REF** — `cage/paths.py`'s `builtin_source_docs()` (and the comment above
+  `_SOURCE_DOC_PATHS`) still call out `python -m tools.docgen --target policy` as the
+  regeneration command for the bundled `[sources]` comment block — but `tools/docgen` no
+  longer exists (absorbed into ADR-CLI in the hookless rebuild, GOLDENS-ORPHANED). Worse:
+  `builtin_source_docs()` itself has no caller anywhere in `cage/` or `tests/` — it may be
+  fully dead code, or the bundled-policy regeneration step it served may need a live
+  replacement. Found sweeping `tools/docgen` citations while closing GOLDENS-ORPHANED
+  (2026-08-15). Fix is either: confirm it's dead and delete it + the stale comment, or find/
+  restore whatever now regenerates `data/cage.toml`'s `[sources]` block and repoint the
+  comment at it.
 
-- **STATE-RETENTION** — `.cage/state/` has no prune path: SURFACE-CUT deleted the only
-  trigger (`cage data cleanup`). `cleanup.py` is kept and tested (`importcmd` + `doctor`
-  import it) and `maybe_run` now warns that no command prunes. Needs a verb, or a
-  recorded no.
 - **CONTINUOUS-CAPTURE** — **Arpit's call.** `cage import` is manual-only (`watch`/`proxy`
   gone) and Claude Code sweeps transcripts at ~30 days, so a missed import is permanent
   loss. This record forbids a scheduler, so the only option on the table is printed
   guidance cage never installs.
-- **PLAN-4-REWRITE** — PLAN §4 still calls the deleted `insights attrib` *"the attribution
-  engine (the part that's actually novel)"*. Rewrite the section, do not annotate it.
+- **ADR-CLI-PARSE-CHECK** — the Examples section's guarantee is *existence only*
+  (`test_cli_reference.py`'s walker never calls `parse_args`), narrowed from a false
+  "every line is checked to parse" claim during the ADR-correctness sweep (2026-08-15) —
+  two examples were shipped missing a required positional and would have failed (they
+  were `study start`/`study join`, both since removed with the fleet study — the *gap*
+  is unchanged). A real parse-check is a separate gate to build, not a docs edit.
 
 ## [ADR-COPILOT](../docs/adr/0004_copilot.md)
 
@@ -63,6 +60,22 @@ GFX-COV-FIELD · COPILOT-JETBRAINS-UNPROBED).
   — over RPC it may write **no local file**. Run one Copilot agent edit from JetBrains, check
   `~/.copilot/session-state/*/events.jsonl`; `workspace.yaml`'s `client_name` names the
   surface. Pair with GFX-IDE-PATH-UNPROBED.
+
+## [ADR-COVERAGE](../docs/adr/0008_coverage.md)
+
+- **COVERAGE-STRIKE-2** — **Arpit's call.** The "two strikes → a gate" rule (CLAUDE.md) named
+  a remedy after the second stale-cell incident: a generator derived from ADR-COVERAGE's own
+  tables. A third incident (**COVERAGE-STRIKE-3**, `docs/adr/0008_coverage.md`'s copilot-CLI
+  Chat title cell, fixed in the 2026-08-15 ADR correctness sweep) showed that remedy would
+  **not** have caught it — the cell was wrong because a belief about the code went stale, not
+  because arithmetic drifted, and a generator built on the same belief reproduces it.
+  **Compare doc filed 2026-08-15:**
+  [work/compare/coverage-strike-gate.compare.md](../work/compare/coverage-strike-gate.compare.md)
+  — found that four of the five candidate registries are agent-level, not the agent×surface
+  grain the tables render at, and STRIKE 3's own cell has no backing registry at all; proposed
+  verdict **D, close the two-strikes counter**, with the cheap narrow generator (option B)
+  shippable separately since it would have caught STRIKE 1. Awaiting Arpit's accept or
+  override.
 
 ## [ADR-KIRO](../docs/adr/0005_kiro.md)
 
@@ -85,23 +98,21 @@ GFX-COV-FIELD · COPILOT-JETBRAINS-UNPROBED).
 
 ## [ADR-GRAPHIFY](../docs/adr/0007_graphify.md)
 
-- **DOGFOOD-SHIM-STALE** — **healed in the working tree, uncommitted.** `bin/graphify` and
+- **GFX-IDE-PATH-UNPROBED** — hands-only, one probe. Whether an IDE-spawned terminal inherits
+  the project's `bin/` (so the graphify shim actually resolves there) has never been measured
+  (Arpit skipped it 2026-08-14); `docs/adr/0008_coverage.md` marks every IDE interceptor cell
+  `‡ UNPROBED` on this account alone. Run one graphify query from a real IDE terminal (VS Code
+  / Kiro / JetBrains) and check whether a receipt files. Pair with COPILOT-JETBRAINS-UNPROBED
+  (ADR-COPILOT) — same class of probe, same machine visit could do both.
+- **GFX-RECEIPTS-REAUDIT** — residual of the now-closed DOGFOOD-SHIM-STALE. `bin/graphify` /
   `bin/graphify.cmd` had drifted to the SURFACE-CUT-deleted data-group verb (last touched
-  `b30e20e`), so every graphify run inside the cage repo fell through UNMETERED; both files
-  now match `cage/data/shims/graphify{,.cmd}` byte-for-byte and `cage doctor` reports
-  `✔ wiring`. **The shipped template was never wrong** — this was stale committed dogfood
-  wiring. Two residuals keep this item open: the fix is **staged, not committed**, and the
-  metering gap it caused is a live candidate explanation for the 0-real-receipts finding,
-  which was measured *in this repo* — re-run that audit before trusting the old number.
-
-## No ADR — doc discipline (CLAUDE.md)
-
-- **DOC-BACKTICK-GATE** *(was PLAN-BACKTICK-IMBALANCE)* — the file the imbalance was
-  measured in is deleted (`docs/PLAN.md`, 2026-08-14), so the original evidence is gone
-  and nothing was ever recorded as fixing it — which is the argument for the gate. An unbalanced
-  backtick makes every downstream code-span scan misread the file (how `_doc_flags` was
-  silently emptied and an assertion passed vacuously), and nothing fails today. One-line
-  detector: strip fences, count backticks, fail on odd.
+  `b30e20e`), so every graphify run inside this repo fell through **unmetered** — a live
+  candidate explanation for the zero-real-receipts finding in
+  [regression/2026-07-22-finding-receipts-empty.md](regression/2026-07-22-finding-receipts-empty.md).
+  Verified 2026-08-15: both shims now match `cage/data/shims/graphify{,.cmd}` byte-for-byte
+  and are committed (`15cfbb4`), `cage doctor` reports `✔ wiring`. Re-run that audit to confirm
+  real receipts file now that the metering gap is closed — the old zero is no longer trustworthy
+  either way.
 
 ## How this file is maintained
 

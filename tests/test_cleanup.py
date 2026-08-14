@@ -112,12 +112,12 @@ def test_never_list_survives_days_zero(root):
 
 def test_maybe_run_warns_but_never_deletes(root, monkeypatch, capsys):
     """The auto path (v0.37): a reminder on stderr, never a deletion. The reminder
-    names the count and the reclaimable size.
+    names the count, the reclaimable size, and the runnable fix.
 
-    It used to name a runnable fix too (`cage data cleanup --apply`). SURFACE-CUT
-    deleted that verb, so the reminder now says plainly that no command prunes these —
-    naming a fix cage cannot honour would be worse than naming none, and is exactly the
-    dead-verb failure the wiring-liveness gate exists to catch."""
+    SURFACE-CUT deleted `cage data cleanup --apply` in v0.50; STATE-RETENTION
+    restored a manual prune verb as `cage clean` (not re-grouped under a revived
+    `data`), so the reminder names *that* fix — never a dead verb, which is exactly
+    the failure the wiring-liveness gate exists to catch."""
     _seed_state(root)
     pol = policy.load(None)
     cleanup.maybe_run(root, pol)
@@ -127,7 +127,7 @@ def test_maybe_run_warns_but_never_deletes(root, monkeypatch, capsys):
     out, err = capsys.readouterr()
     assert out == ""                                        # never stdout
     assert "state/ item(s)" in err and "KB reclaimable" in err
-    assert "no command prunes them" in err
+    assert "cage clean --apply" in err
     assert "cage data cleanup" not in err   # never advertise a verb that is gone
     # within the throttle window: a second call must not re-scan or re-print
     calls = []
@@ -206,15 +206,55 @@ def test_derived_views_identical_before_and_after_cleanup(root, capsys):
     cleanup.prune(root, policy.load(None))
     assert views() == before
 
-# ── `cage data cleanup` (the VERB) is gone; the module is not (SURFACE-CUT) ───
-# Three tests here drove the CLI: the dry-run default, `--apply` executing regardless of
-# `[cleanup] enabled`, and the dry-run honouring the same rule. The verb went with the
-# whole `data` group. **`cleanup.py` itself was deliberately KEPT** (decision: Arpit,
-# 2026-08-14) because `importcmd.run` and `cage doctor` both import it — every library
-# test above still runs, including the allowlist ageing, the NEVER list at `days=0`, and
-# the auto path's warn-but-never-delete contract.
-#
-# **The consequence is a real gap, and it is filed in work/OPEN-WORK.md:** deletion was
-# manual-only by design, and the only manual trigger has been removed. `maybe_run` still
-# WARNS with a runnable fix, and that fix now names a command that does not exist. Nothing
-# prunes `.cage/state/` any more.
+# ── `cage clean` — the manual verb, restored (ADR-CLEANUP, STATE-RETENTION) ───
+# `cage data cleanup --apply` went with the whole `data` group in SURFACE-CUT (v0.50).
+# `cleanup.py` was deliberately KEPT regardless (decision: Arpit, 2026-08-14) because
+# `importcmd.run` and `cage doctor` both import it — the library tests above never
+# stopped running. This restores the CLI door onto that same library code, as its own
+# top-level verb rather than a revived `data` group.
+
+def test_clean_dry_run_default(root, capsys):
+    _seed_state(root)
+    assert cli.main(["clean"]) == 0
+    out = capsys.readouterr().out
+    assert "candidate(s)" in out and "dry-run" in out
+    assert (Footprint(root).state / "junk.tmp").exists()   # nothing deleted
+
+
+def test_clean_apply_prunes(root, capsys):
+    st = _seed_state(root)
+    assert cli.main(["clean", "--apply"]) == 0
+    out = capsys.readouterr().out
+    assert "applied" in out
+    assert not (st / "junk.tmp").exists()
+    assert cleanup.scan(root, policy.load(None)) == []
+
+
+def test_clean_apply_ignores_cleanup_enabled_env(root, monkeypatch, capsys):
+    """An explicitly-typed `cage clean --apply` always runs, even with the automatic
+    reminder switched off — `[cleanup] enabled` gates only `maybe_run`."""
+    st = _seed_state(root)
+    monkeypatch.setenv("CAGE_CLEANUP", "0")
+    assert cli.main(["clean", "--apply"]) == 0
+    capsys.readouterr()
+    assert not (st / "junk.tmp").exists()
+
+
+def test_clean_json(root, capsys):
+    _seed_state(root)
+    assert cli.main(["clean", "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["applied"] is None
+    assert payload["items"]
+
+
+def test_clean_days_override(root, capsys):
+    """`--days` overrides the retention window for this run only, same as `scan`/`prune`
+    (`test_never_list_survives_days_zero` pins that the never-list still holds at 0)."""
+    st = _seed_state(root)
+    (st / "pending-fresh.jsonl").write_text("{}\n", encoding="utf-8")
+    assert cli.main(["clean", "--days", "0", "--apply"]) == 0
+    capsys.readouterr()
+    # days=0 is maximally aggressive: even the "fresh" buffer (untouched since creation,
+    # so its age is > 0) is now stale and gets pruned too.
+    assert not (st / "pending-fresh.jsonl").exists()

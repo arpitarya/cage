@@ -19,8 +19,9 @@ What may be cleaned is closed **by construction** — `scan` only ever looks at:
 
 Never cleanable — enforced by the allowlist, not convention: anything in
 ``ledger/``, ``cage.toml`` (and ``prices.toml`` + the legacy ``policy.toml``),
-``outcomes``, the machine id (fleet pairing breaks without it), ``study.jsonl``,
-``limits.json``.
+``outcomes``, ``limits.json``, and the two files the removed fleet study left behind
+(``machine.json``, ``study.jsonl`` — STUDY-CUT, v0.51: nothing writes them now, and
+nothing may delete what is already on disk either).
 State files are never read by
 derived views, so cleanup cannot change a single reported number.
 
@@ -34,11 +35,11 @@ Two paths, and since v0.37 they are no longer symmetric:
   enabled, further by `policy.cleanup_warn` (env `CAGE_CLEANUP_WARN`). Entirely
   fail-open: an error is debug-logged under ``cleanup.prune`` and never blocks
   capture.
-- **manual** — REMOVED in SURFACE-CUT (v0.50) with the whole `cage data` group.
-  There is no manual pruning verb any more; `run_cli` below is kept as the
-  library entry a future verb would call, and nothing invokes it today.
-  is the only path that ever deletes, and runs regardless of `cleanup_enabled` —
-  an explicitly-typed command is always honored, never silently ignored because a
+- **manual** (`cage clean` / `run_cli` below, STATE-RETENTION) — REMOVED in
+  SURFACE-CUT (v0.50) with the whole `cage data` group, restored as its own
+  top-level verb rather than re-grouped under a revived `data`. It is the
+  only path that ever deletes, and runs regardless of `cleanup_enabled` — an
+  explicitly-typed command is always honored, never silently ignored because a
   switch happens to be off.
 
 Retention: policy ``[cleanup] days`` (`constants.CLEANUP_DEFAULT_DAYS` fallback,
@@ -235,15 +236,14 @@ def _reminder_line(items: list[dict], window: int) -> str:
     total_bytes = sum(i.get("bytes", 0) for i in items)
     return (f"cage: {len(items)} state/ item(s) older than {window}d "
             f"(~{total_bytes / 1024:.0f} KB reclaimable) — "
-            f"no command prunes them since v0.50 — delete by hand if you "
-            f"want the space back.")
+            f"run `cage clean --apply` to prune them.")
 
 
 def maybe_run(root: Path, pol: dict) -> None:
     """The auto path, piggybacked on `cage import`/read sweeps (cage installs no
     scheduler): a cheap staleness check (one stat on the throttle stamp), then —
     since v0.37 — a **warning, never a deletion**. Deletion is unrecoverable; only
-    an explicit prune performs it (no CLI verb ships one since v0.50). Silent when nothing is
+    an explicit `cage clean --apply` performs it. Silent when nothing is
     eligible; keeps reminding every throttle interval while something is. Gated by
     `policy.cleanup_enabled` (auto path off entirely) and, when enabled, by
     `policy.cleanup_warn` (the reminder specifically). Never raises — capture must
@@ -270,9 +270,10 @@ def maybe_run(root: Path, pol: dict) -> None:
 
 def run_cli(root: Path, pol: dict, apply: bool = False,
             days: int | None = None) -> tuple[dict, str]:
-    """The manual-prune renderer. **No CLI verb reaches this since SURFACE-CUT
-    (v0.50)** — it is kept intact, and tested, as the entry point a restored verb would
-    call. Dry-run table by default (house pattern), ``--apply``
+    """The manual-prune renderer, called by `cage clean` (STATE-RETENTION; the verb
+    was deleted with `cage data cleanup` in SURFACE-CUT v0.50 and restored as its own
+    top-level command rather than re-grouped under a revived `data`). Dry-run table
+    by default (house pattern), ``--apply``
     executes. ``(payload, text)`` for the emit helper. Runs regardless of
     `policy.cleanup_enabled` — that switch gates only the *automatic* reminder
     (`maybe_run`); a command the user typed is always honored, never silently
@@ -284,8 +285,8 @@ def run_cli(root: Path, pol: dict, apply: bool = False,
                "applied": None}
     if not items:
         return payload, (f"✔ nothing stale in state/ (window: {window}d) — the "
-                         "ledger, policy, machine id, study markers and limits are "
-                         "never cleanup's to touch.")
+                         "ledger, policy, limits, outcomes and the legacy study "
+                         "state are never cleanup's to touch.")
     lines = [f"cleanup — {len(items)} candidate(s), window {window}d "
              f"(auto-reminder {'on' if auto_reminder else 'off'}):", ""]
     lines += [f"  {i['cls']:<15} {i['action']:<8} age {i['age_days']:>6.1f}d  "
@@ -327,6 +328,11 @@ def run_cli(root: Path, pol: dict, apply: bool = False,
 # `integrity.json` (P6) is protected for the same reason `imports.jsonl` is: it lives in
 # `state/`, nothing reconstructs it, and losing it silently resets the tamper baseline —
 # which is worse than never having had one, because the next report reads clean.
+# `machine.json` and `study.jsonl` are the fleet study's two files. The study was removed
+# whole in v0.51 (STUDY-CUT) and nothing writes either any more — but they stay named
+# here, because deleting a reader never licensed deleting recorded rows. A real ledger
+# that ran the study still holds both, and a `state/` cleanup class added later would eat
+# `machine.json` with no test going red. The same hazard `imports.jsonl` documents above.
 NEVER = ("ledger/", "imports.jsonl", "integrity.json", "cage.toml", "prices.toml",
          "policy.toml", "machine.json", "study.jsonl", "limits.json", "outcomes")
                                      # both config names — the legacy

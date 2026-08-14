@@ -1,8 +1,9 @@
 """Shared CSV renderer for the read views — one table shape, two renderers.
 
 CSV is a **reporting** format: flat, one-way, for spreadsheets/BI. It is never an
-import source, and it is deliberately distinct from the fleet bundle
-(`cage data export --study`, jsonl — lossless, merge-by-id, re-importable). Every view
+import source. It was once contrasted here with the fleet bundle (jsonl — lossless,
+merge-by-id, re-importable); that bundle and the whole fleet study were removed in
+v0.51 (STUDY-CUT), so CSV is now simply the only export shape cage has. Every view
 that grows `--csv` passes the *same* data structure its text renderer consumes, so
 the two outputs cannot disagree — no view computes twice (the same-numbers-by-
 construction rule).

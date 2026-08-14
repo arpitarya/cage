@@ -27,20 +27,21 @@ daily:
   setup       make this project (or --global) metered — scaffold + wire
   doctor      is capture healthy? (--paths shows every probed location)
   query       ask cage how any number or mechanism works
+  clean       prune stale .cage/state/ debris (dry-run by default)
 
 groups (run any group name for its commands):
   insights    chats · graphify · commits · commit · why
   task        outcome · time
   authorship  origin · summary · verify · notes-sync
-  study       join · start · stop · report · export · id
   policy      diff · sync
   interceptor graphify
 
 $ cage import                     # pull every agent's usage into the ledger
 $ cage insights chats            # which conversation used the tokens?
 $ cage task outcome t_9f31        # close a task so the authorship views can see it
-$ cage study join baseline        # enroll this laptop in the fleet study
+$ cage insights commits          # agent vs human, per commit
 $ cage insights graphify         # per-chat graphify saving
+$ cage clean --apply              # prune stale state/ debris
 """
 
 
@@ -154,9 +155,6 @@ def build_parser() -> argparse.ArgumentParser:
                                "Captures into the resolved ledger (--ledger/CAGE_BASE → project .cage/ → global ~/.cage);\n"
                                "works with no hooks and no project. Idempotent + incremental (per-agent cursor).",
                         formatter_class=argparse.RawDescriptionHelpFormatter)
-    im.add_argument("bundles", nargs="*", metavar="BUNDLE",
-                    help="study bundle zip(s) from `cage data export --study` — merged by row "
-                         "identity, idempotent (fleet path, ADR-CONSUMERS)")
     im.add_argument("--agent", choices=[*SURFACES, "all"], default="all",
                     help="which agent to meter (default: all)")
     im.add_argument("--path", help="a transcript file or dir to scan (log-bearing agents only)")
@@ -247,6 +245,27 @@ def build_parser() -> argparse.ArgumentParser:
     qy.add_argument("--all", action="store_true", help="show the top matches, not just the best")
     _json_flag(qy)
     qy.set_defaults(fn=clicmds.cmd_query)
+
+    cn = sub.add_parser("clean", help="prune stale .cage/state/ debris (dry-run by "
+                        "default, --apply executes; STATE-RETENTION)",
+                        epilog="examples:\n"
+                               "  cage clean                    # dry-run: what would be pruned\n"
+                               "  cage clean --apply            # actually prune it\n"
+                               "  cage clean --days 30 --apply  # override the retention window\n"
+                               "Closed allowlist over state/ (debug/capture/usage/attest logs, "
+                               "hooks-seen, stale pending-buffers, orphan cursors, *.tmp) — never "
+                               "ledger/, cage.toml, limits.json, outcomes, or the legacy "
+                               "machine.json/study.jsonl left by the removed fleet study "
+                               "(`cage query state-cleanup`). Deletion is unrecoverable; "
+                               "runs regardless of `[cleanup] enabled` — that switch gates only "
+                               "the automatic reminder, never a command you typed.",
+                        formatter_class=argparse.RawDescriptionHelpFormatter)
+    cn.add_argument("--apply", action="store_true",
+                    help="actually prune (default: dry-run table, house pattern)")
+    cn.add_argument("--days", type=int, metavar="N",
+                    help="override [cleanup] days for this run")
+    _json_flag(cn)
+    cn.set_defaults(fn=clicmds.cmd_clean)
 
     # ── group: insights (per-chat & per-commit usage views, the differentiator) ─
     insights = _group(sub, "insights",
@@ -387,50 +406,6 @@ def build_parser() -> argparse.ArgumentParser:
     ns.set_defaults(fn=clicmds.cmd_notes_sync)
 
 
-
-    # ── group: study ───────────────────────────────────────────────────────────
-    st_g = sub.add_parser("study",
-                         help="fleet study: recorded phases + paired-by-machine deltas "
-                              "across laptops (ADR-CONSUMERS)",
-                         epilog="examples:\n"
-                                "  cage study join baseline      # enroll this machine: wire + start + doctor\n"
-                                "  cage study start plugin       # switch phase (opaque machine id, no hostname)\n"
-                                "  cage study stop               # end the current phase\n"
-                                "  cage study export             # one bundle for the analyst\n"
-                                "  cage import bundle*.zip       # analyst: merge bundles (idempotent)\n"
-                                "  cage study report             # coverage first, then the paired delta",
-                         formatter_class=argparse.RawDescriptionHelpFormatter)
-    st_g.set_defaults(fn=lambda _a, _g=st_g: (_g.print_help(), 0)[1])
-    st2 = st_g.add_subparsers(dest="study_cmd", metavar="<command>", required=False)
-
-    def _study(name: str, help_text: str):
-        q = st2.add_parser(name, help=help_text)
-        _json_flag(q)
-        q.set_defaults(fn=clicmds.cmd_study, action=name, phase=None)
-        return q
-
-    st_join = _study("join", "enroll this machine: wire + start + doctor")
-    st_join.add_argument("phase", help="phase label (one short token)")
-    st_start = _study("start", "switch phase (opaque machine id, no hostname)")
-    st_start.add_argument("phase", help="phase label (one short token)")
-    _study("stop", "end the current phase")
-    _study("id", "print the opaque machine id")
-    # The fleet bundle's only route. It lived on `cage data export --study` until
-    # SURFACE-CUT deleted that group; the bundle is a study artifact, not a ledger
-    # export, so it belongs on this group and never carried the csv/otel flags anyway
-    # (they were a runtime refusal there — two export kinds, never blurred).
-    st_exp = _study("export", "write the one-file fleet bundle for the analyst")
-    st_exp.add_argument("out", nargs="?", default="",
-                        metavar="PATH", help="bundle path (default: a stamped name in the ledger)")
-    st_exp.add_argument("--since", metavar="WINDOW", help="window like 30d / 2w for the refresh sweep")
-    _capture_flags(st_exp)
-    st_rep = _study("report", "coverage first, then the paired-by-machine delta")
-    # `report` is the ONLY study verb that is a rendered VIEW, so it is the only one
-    # that carries the artifact/CSV surface. Before CLI-GAPS(b) these sat on the group
-    # (the action was a positional) and `cmd_study` refused them at runtime; now a
-    # marker verb simply has no such flag, and argparse says so as a usage error.
-    _csv_flag(st_rep)
-    _export_flags(st_rep, "study report")
 
     # ── group: policy ──────────────────────────────────────────────────────────
     po_g = sub.add_parser("policy",

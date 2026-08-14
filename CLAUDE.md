@@ -283,8 +283,10 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   `estimate` and `calibration` are gone, along with the `INSUFFICIENT DATA` refusal and
   the `MIN_COMPARE_N`/`MIN_ESTIMATE_N` blocking gates as *user-facing* behaviour. What
   survives is the **writer**: `tasks.jsonl` still records outcomes and the additive
-  `est_*` fields, `taskgroup.join_rows` is still the one closed-task join, and
-  `MIN_COMPARE_N` still gates the fleet study. **Nothing reads the task-grain fields**
+  `est_*` fields, and `taskgroup.join_rows` is still the one closed-task join.
+  `MIN_COMPARE_N` gated the fleet study until STUDY-CUT and is now read by nothing —
+  it stays only because ADR-GRAPHIFY's veto condition cites the number.
+  **Nothing reads the task-grain fields**
   (UNREAD-FACTS). A deleted reader never licensed deleting its writer — see the rule
   below. Task `label` (via `cage task outcome
   --label`) is one validated token, never a path or free text. Diagnostics: `cage
@@ -294,25 +296,30 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   silent" is tested, not aspirational). Validation harness: the fixture corpus
   `tests/fixtures/transcripts/` (4 agents × cli/vscode, exact expected rows,
   VS Code stand-ins flagged `UNVERIFIED-FORMAT`) + `python -m tools.dummyrepo`
-  (S1–S18 scenario runner, S10 retired with the human axis; build-time only, never in the wheel).
-  P5 fleet study ([machine.py](cage/machine.py), [study.py](cage/study.py), plan
-  §4.9): opaque random machine id (**opt-in by enrollment** — unenrolled ledgers
-  stamp nothing, byte-identical legacy), recorded phase markers in
-  `ledger/study.jsonl` (resolved per machine against its own clock), one-file
-  bundles (`cage study export` → `cage import bundle*.zip`; merge by row
-  identity — calls/receipts by id, tasks/markers by whole-row so task updates
-  survive), the **machine-day** as sample unit, paired delta `estimated` with the
-  work-mix caveat, gate = `MIN_COMPARE_N` machines-with-both-phases (blocking).
+  (S1–S18 scenario runner; S10 retired with the human axis, S9 with the fleet study;
+  build-time only, never in the wheel).
+- **⚠ THE P5 FLEET STUDY WAS DELETED WHOLE IN v0.51 (STUDY-CUT)** — the six `cage study`
+  verbs, `study.py`, `machine.py`, the phase markers in `ledger/study.jsonl`, the opaque
+  per-machine id in `state/machine.json`, the additive **`machine` row field** every
+  `calls`/`receipts`/`tasks`/consumer-metric writer stamped, the one-file zip bundle, and
+  the `cage import BUNDLE` merge that read it. **Cage no longer aggregates across
+  machines by any route.** Two things survive on purpose and must not be mistaken for
+  debt: rows already carrying `machine` still parse and are simply unread (append-only —
+  the recorded past is never rewritten), and **`machine.json`/`study.jsonl` stay in
+  `cleanup.NEVER`** so a future `state/` class cannot eat what is already on disk.
+  `policy.import_before_export` and its `[capture]` key also survive **unread** — their
+  last surface was the bundle export (UNREAD-FACTS). Do not reintroduce a cross-machine
+  axis without a proposal doc; the `machine` field in particular is a substrate change.
 - **CSV output (ADR-CLI)** ([csvout.py](cage/csvout.py)) — `--csv` on
-  `cage insights chats`/`graphify`/`commits`/`commit`, `authorship summary` and
-  `study report`, plus the bundle via
-  `cage study export` for the fleet bundle (the raw-row CSV export and
-  `exportcmd.RAW_CSV_FIELDS` went with `cage data` in v0.50). One shared
+  `cage insights chats`/`graphify`/`commits`/`commit` and `authorship summary`
+  (the raw-row CSV export and
+  `exportcmd.RAW_CSV_FIELDS` went with `cage data` in v0.50; `study report` and the
+  fleet bundle went with STUDY-CUT). One shared
   data structure per view feeds text AND csv (`render_csv` beside each
   `render_*`) — never compute twice. LF pinned (`lineterminator="\n"` +
   `newline=""` writes), RFC-4180, method/match tags are columns, refusals/
   caveats/UNPRICED survive into rows. CSV is one-way REPORTING — never an import
-  source; the fleet bundle stays jsonl. MCP mirrors it (`format: csv` on
+  source, and since STUDY-CUT it is the only export shape cage has. MCP mirrors it (`format: csv` on
   report/attrib/roi).
   **Text-output contracts: the golden fixtures** (`tests/fixtures/goldens/`,
   asserted by `tests/test_output_spec.py`) are the per-command, per-state output
@@ -325,7 +332,7 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   group (`otelout.py` is gone).** Kept below as the record of a mapping that was
   carefully chosen and may be wanted again; it describes no live surface.
   It was `cage data export --otel`, a one-way REPORTING format (never an import source;
-  the fleet bundle stays jsonl). Calls map to `gen_ai.system` / `gen_ai.request.model` /
+  the re-importable fleet bundle it was contrasted with is gone too — STUDY-CUT). Calls map to `gen_ai.system` / `gen_ai.request.model` /
   `gen_ai.usage.input_tokens` / `output_tokens` / `gen_ai.client.operation.duration`
   (omitted, never a fabricated zero, when `latency_ms` is unknown). **The GenAI
   semantic conventions are pre-stable** (own repo, no 1.0, names can still change) —
@@ -614,16 +621,21 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   file**: a duplicate table header would make the whole config unparseable and capture
   would silently fall back to the bundle. Callers: `policysync` · `initcmd` ·
   `cage setup --python-launcher`. `cage policy sync` is unambiguously `cage.toml`-only.
-- **Export imports everything first** (ADR-LAWS Law 1) — `cage study export` runs the full
-  all-agent sweep before emitting; `--no-import` flag > `CAGE_CAPTURE` env >
-  `[capture] import_before_export` policy; fail-open; the study manifest records
-  `refresh: {ran, new_calls}`. (`cage data export` carried this first and was deleted in
-  v0.50; `study export` is the surviving bundle path.)
+- **⚠ "Export imports everything first" NOW HAS NO SURFACE.** The rule — an export runs
+  the full all-agent sweep before emitting, so a capture-only machine still ships a
+  complete artifact — was carried by `cage data export` (deleted v0.50) and then by the
+  fleet bundle export (deleted v0.51, STUDY-CUT). Cage has no export that bundles a
+  ledger. `policy.import_before_export` and the `[capture] import_before_export` key are
+  **still there and read by nothing** (UNREAD-FACTS) — kept because a reader's deletion
+  never licensed deleting the setting, and removing the key would orphan it in every
+  scaffolded project. A future bundling export re-inherits the rule; it is not repealed.
 - **State cleanup is a closed allowlist, and deletion is manual-only (v0.37)**
   ([cleanup.py](cage/cleanup.py), ADR-LAWS) — aged debug.log/hooks-seen rows, stale
   `pending-*` buffers, orphan cursors, `*.tmp`; never ledger/ (tool savings included —
-  see below), cage.toml (and legacy policy.toml), machine.json,
-  study.jsonl, limits.json (by construction). **⚠ NOTHING PRUNES `state/` ANY MORE.** The one deletion path was
+  see below), cage.toml (and legacy policy.toml), limits.json, and the fleet study's two
+  leftovers — machine.json and study.jsonl, unwritten since STUDY-CUT and *still*
+  undeletable, because a deleted reader never licensed deleting recorded state
+  (by construction). **⚠ NOTHING PRUNES `state/` ANY MORE.** The one deletion path was
   `cage data cleanup --apply`, deleted in v0.50; `cleanup.py` is kept and its auto path
   still *warns*, but the explicitly-typed command that was the only thing allowed to
   delete is gone. This is **STATE-RETENTION** in `work/OPEN-WORK.md`, stated here rather
@@ -936,13 +948,18 @@ don't restate them, apply them.
 
 ## Decision records (ADRs)
 
-**The set is SEVEN records, one per thing cage meters plus two that bind them** —
+**The set is ELEVEN records — one per thing cage meters, plus one for what binds them all,
+one for the surface it is all read through, one for the map of what each surface can and
+cannot yield, one for the cross-agent question of who wrote which lines, one for
+proving nothing already recorded has changed, and one for what may ever be deleted** —
 [ADR-LAWS](docs/adr/0001_laws.md) · [ADR-CLI](docs/adr/0002_cli.md) ·
 [ADR-CLAUDE](docs/adr/0003_claude.md) · [ADR-COPILOT](docs/adr/0004_copilot.md) ·
 [ADR-KIRO](docs/adr/0005_kiro.md) · [ADR-CONSUMERS](docs/adr/0006_consumer.md) ·
-[ADR-GRAPHIFY](docs/adr/0007_graphify.md). Index, the ownership table and the standing
-rule: [docs/adr/README.md](docs/adr/README.md). Author new ones from
-[docs/adr/TEMPLATE.md](docs/adr/TEMPLATE.md).
+[ADR-GRAPHIFY](docs/adr/0007_graphify.md) · [ADR-COVERAGE](docs/adr/0008_coverage.md) ·
+[ADR-AUTHORSHIP](docs/adr/0009_authorship.md) · [ADR-INTEGRITY](docs/adr/0010_integrity.md) ·
+[ADR-CLEANUP](docs/adr/0011_cleanup.md).
+Index, the ownership table and the standing rule: [docs/adr/README.md](docs/adr/README.md).
+Author new ones from [docs/adr/TEMPLATE.md](docs/adr/TEMPLATE.md).
 
 **Cite them BY NAME — `ADR-KIRO`, never "ADR 0005".** The numbers belong to the eleven
 **superseded** records now frozen in [work/archive/adr/](work/archive/adr/README.md),
@@ -989,10 +1006,39 @@ device. Three parts, each load-bearing:
 ## Dev
 
 ```bash
-just test          # python -m pytest -q   (1521 tests; +10 Windows-only skips, +1 opt-in dogfood-age skip)
+just test          # python -m pytest -q   (1561 tests; +10 Windows-only skips, +1 opt-in dogfood-age skip)
 just demo          # seed §4.4 + print attrib/matrix
 cage --version
 ```
+
+## Claude Code subagents (.claude/agents/)
+
+**Three agents (Arpit, 2026-08-15): `queue-auditor` · `adr-verifier` · `doc-reconciler`.**
+They are context compressors, not a speed-up on writing code — cage's bottleneck is
+judgment against this file, not typing, and fanning out code-writers here produces merge
+conflicts and confident law violations. The win is isolating the read-heavy reconciliation
+tax (WORKLOG/IMPLEMENTATION/OPEN-WORK/ADRs vs. git-and-code ground truth) out of the main
+context, so a session doesn't burn its window reading 13k lines of history to write 20.
+
+- **`queue-auditor`** (read-only) — re-derives every `work/OPEN-WORK.md` item against
+  `git log origin/main..HEAD` → `regression/` → `IMPLEMENTATION.md` → code.
+- **`adr-verifier`** (read-only, one instance per ADR, fanned out) — verifies §2 claims
+  against code, flags illegal archive citations and law restatements.
+- **`doc-reconciler`** (writes `WORKLOG.md`/`IMPLEMENTATION.md`/`DOC-REGISTRY.md`; drafts
+  only, unapplied, for `OPEN-WORK.md`/`INTERVIEW.md`; never touches `CLAUDE.md` or
+  `docs/adr/`) — the session-close doc tax from *Documentation discipline* above.
+
+**Auto-invoke — do not wait to be asked.** Each agent's `description` frontmatter states
+its trigger conditions in Claude-Code-routable form; a session ending without the
+`doc-reconciler` pass has left the docs stale, the same defect as a missing changelog
+entry (see *Documentation discipline*).
+
+**Known gap, not yet closed:** read-only on `queue-auditor`/`adr-verifier` is
+prompt-enforced, not tool-enforced — `Bash` is unscoped in their frontmatter. A
+`.claude/settings.json` deny rule would make it hard; not added.
+
+**No ADR affected** — this is Claude Code tooling for working the repo, not a cage
+product behaviour.
 
 ## Regression & capture reports (do this after every testing run)
 
@@ -1222,11 +1268,14 @@ each agent only needs thin idiomatic wiring (`agents.py` orchestrates):
   honesty-reviewer · release · lab-runner · windows-shim. Adding a document = adding one
   `Doc` to `steering.DOCS`; there is no second copy to keep in step, nothing to re-bless,
   and **a document on one agent and not the others is not done**.
-- **MCP surface = 5 read tools + exactly ONE write tool** ([mcpserver.py](cage/mcpserver.py),
-  L2 of the agent-surface ladder). Reads: `report`/`attrib`/`adoption`/`why`/**`compare`**
-  (nine until ADR 0011 took `matrix`/`budget`/`roi`/`verdict`). **The refusals are the
-  point** — `compare` routinely declines (the `MIN_COMPARE_N` block) and every view that
-  prints a saving carries the GROSS caveat, and each renders through the CLI's *own* renderer so the text
+- **MCP surface = 1 read tool + exactly ONE write tool** ([mcpserver.py](cage/mcpserver.py),
+  L2 of the agent-surface ladder). It was nine, then five (USAGE-ONLY took
+  `matrix`/`budget`/`roi`/`verdict` with the money subsystem, ADR 0011), and SURFACE-CUT
+  took `report`/`attrib`/`adoption`/`compare` with the ledger rollup and the
+  task-comparison family — what survives is the one read no other surface answers,
+  **`cage_why`** (full provenance for one call id), and the one write the whole ladder
+  depends on. **The refusals are the point** — every view that prints a saving carries
+  the GROSS caveat, and each renders through the CLI's *own* renderer so the text
   crosses **byte-identically** (`tests/test_mcp_layer.py` asserts equality with the CLI,
   not substring presence): an agent reads an empty result as **zero**, the one thing a
   refusal never means. **Never add a summarizing layer between a composer and a tool.**

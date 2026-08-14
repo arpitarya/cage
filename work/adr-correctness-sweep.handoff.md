@@ -158,12 +158,14 @@ contradicts itself** rather than merely lagging the code. Verified against `cli.
 | 243 | `--hooks` … "auto task-close, **budget blocking**" | `hookcmd.BLOCK` is gone; every event exits 0 | its own lines 446-448 say so |
 | 467 | "every line below is **checked to parse**" | it is not — `_resolvable()` never calls `parse_args` | see below |
 
-**Line 467 is a claimed guarantee that does not hold, and two shipped examples prove it.**
+**Line 467 is a claimed guarantee that does not hold.**
 `tests/test_cli_reference.py:177-195` walks subparser dispatch only, so a missing required
-positional passes. `cage study start` and `cage study join` (lines 510, 513) both fail with *"the
-following arguments are required: phase"* — while the doc's own lines 372-373 spell them
-correctly as `start PHASE` / `join PHASE`. **Fix the two examples, and narrow the sentence to what
-the gate actually checks** (every command and flag *exists*). Do not promise the parse check
+positional passes. The two shipped examples that proved it — `cage study start` and `cage study
+join`, which failed with *"the following arguments are required: phase"* while the doc's own
+table spelled them `start PHASE` / `join PHASE` — were removed with the fleet study in v0.51
+(STUDY-CUT). **The defect is untouched by that**: the gate still checks existence only, so the
+next example missing a positional ships just as silently. **Narrow the sentence to what the gate
+actually checks** (every command and flag *exists*). Do not promise the parse check
 unless you also add it — and if you add it, that is its own phase, not a docs edit.
 
 **Also sweep the same two bugs out of `cage/verbmap.py`** — `:127` dates the cull v0.51, and

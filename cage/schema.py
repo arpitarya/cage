@@ -308,7 +308,7 @@ CONSUMER_METRIC_SOURCES = ("call",)
 CONSUMER_METRIC_FIELDS = ("id", "ts", "agent", "source", "call", "route", "provider",
                           "model", "session", "task", "project", "scope",
                           "tokens_in", "tokens_out", "cached_in", "cache_write_in",
-                          "latency_ms", "ok", "retries", "import_id", "machine")
+                          "latency_ms", "ok", "retries", "import_id")
 
 
 def make_consumer_metric(*, route: str, provider: str = "", model: str = "",
@@ -317,7 +317,7 @@ def make_consumer_metric(*, route: str, provider: str = "", model: str = "",
                          source: str = "call",
                          tokens_in: int = 0, tokens_out: int = 0, cached_in: int = 0,
                          cache_write_in: int = 0, latency_ms: int = 0, ok: bool = True,
-                         retries: int = 0, import_id: str = "", machine: str = "",
+                         retries: int = 0, import_id: str = "",
                          ts: str | None = None, metric_id: str | None = None) -> dict:
     """One **consumer metrics** row — a library/proxy call, in the same per-producer
     directory shape every other producer now owns (`ledger/consumer/`).
@@ -347,6 +347,11 @@ def make_consumer_metric(*, route: str, provider: str = "", model: str = "",
     not get one. **No `credits` field either**, and unlike `make_call` that is not a
     sentinel decision: a credit is a vendor's own billing computation and there is no
     vendor here, so there is nothing an absent-vs-zero distinction could ever mean.
+
+    **No `machine` field either, since v0.51.** It existed only so the fleet study could
+    partition rows by an opaque per-machine id; the study was removed whole (STUDY-CUT)
+    and the field went with it. Rows written before that keep theirs and still read —
+    append-only, so the recorded past is never rewritten.
 
     `metric_id` may be supplied for an idempotent caller; ``None`` mints a fresh `csm_`
     id. Unlike the three agent kinds there is no growth-fold: a consumer row is a
@@ -390,8 +395,6 @@ def make_consumer_metric(*, route: str, provider: str = "", model: str = "",
         row["retries"] = int(retries)
     if import_id:
         row["import_id"] = str(import_id)
-    if machine:
-        row["machine"] = str(machine)
     return row
 
 

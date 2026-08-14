@@ -2,7 +2,7 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
-## v0.51.0 (2026-08-15, unreleased) — one shape per producer, the `calls` writer retires, and the ledger can prove it hasn't been edited
+## v0.51.0 (2026-08-15, unreleased) — one shape per producer, the `calls` writer retires, the ledger can prove it hasn't been edited, and the fleet study is gone
 
 **Built from:** [ledger-restructure.handoff.md](work/archive/v0.51-ledger-restructure.handoff.md) ·
 [ledger-restructure.prompt.md](work/archive/v0.51-ledger-restructure.prompt.md)
@@ -86,6 +86,58 @@ Every producer now owns exactly one directory under `ledger/`:
   `unverified` and never breaks the chain — `lockutil` proceeds unlocked by contract.
 - It detects **accident and drift, not an adversary**: anyone who can write the ledger can
   rewrite the manifest. Stated in the record, not implied.
+
+### New: `cage clean`, the manual `state/` prune verb (STATE-RETENTION, ADR-CLEANUP)
+
+- **[ADR-CLEANUP](docs/adr/0011_cleanup.md)** — the 11th live ADR. SURFACE-CUT (v0.50)
+  deleted `cage data cleanup --apply` with the whole `data` group, leaving `.cage/state/`
+  with no prune path at all; `cleanup.py`'s manual renderer (`run_cli`) was kept and tested
+  the whole time, just unreachable from the CLI.
+- **`cage clean`** restores it as its own top-level command — `cage clean` (dry-run table,
+  the house pattern), `cage clean --apply` (executes), `--days N` (override the retention
+  window for one run), `--json`. Runs regardless of `[cleanup] enabled` — that switch gates
+  only the automatic stderr reminder, never a command you typed.
+- The reminder and `cage doctor`'s `state` check both now name the real fix
+  (`cage clean --apply`) instead of apologizing that nothing prunes.
+- `cage cleanup` (the old bare top-level spelling) now redirects: `'cleanup' is now 'cage
+  clean'`, rather than the misleading "removed with the whole `data` group" message.
+
+### Removed — the fleet study, whole (STUDY-CUT)
+
+The P5 fleet study is deleted, subsystem and all. Not a surface cut: the reader **and**
+the writer went together, which is the exception to the SURFACE-CUT rule, taken
+deliberately because the study's "writers" were reachable only through the verbs being
+removed — a writer nothing can invoke is dead code, not a recorded fact.
+
+| Gone | Was |
+|---|---|
+| `cage study join · start · stop · report · export · id` | the six-verb group |
+| `cage/study.py` · `cage/machine.py` | markers, pairing math, the bundle, the opaque id |
+| `ledger/study.jsonl` · `state/machine.json` | phase markers · the per-machine id (**still never deletable** — both stay in `cleanup.NEVER`) |
+| the additive **`machine` row field** | stamped by `ledger.append_row` onto every `calls`/`receipts`/`tasks` row, and carried by `schema.make_consumer_metric`, `manifest.record_import` and `metering.record_call` |
+| the one-file zip bundle · `cage import BUNDLE …` | the analyst's collect-and-merge path |
+| `study-pairing` and `import-before-export` (`cage query`) | the two explainer entries whose subject no longer exists |
+| goldens `S3`/`S4`, `tests/test_study.py`, dummyrepo `S9` | the study's own gates |
+
+**Cage no longer aggregates across machines by any route.** What survives, on purpose:
+
+- **Rows already carrying `machine` still parse and still read.** Append-only means the
+  recorded past is never rewritten; the key is simply unread, and no derived number
+  consults it. `ledger._spend_row` no longer carries it across from a metric row.
+- **`machine.json` and `study.jsonl` stay named in `cleanup.NEVER`.** Nothing writes
+  them, and nothing may delete them either — a `state/` cleanup class added later would
+  otherwise eat `machine.json` with no test going red.
+- **`policy.import_before_export` and its `[capture]` key stay, read by nothing.** Their
+  last surface was the bundle export. The key is inert rather than removed, because
+  dropping it from the bundled `cage.toml` would report it as an orphan in every project
+  that has ever run `cage policy sync`. Filed under UNREAD-FACTS.
+- **`MIN_COMPARE_N` stays in `constants.py`, now read by no code** — ADR-GRAPHIFY's veto
+  condition cites the number as its sample floor, so deleting it would leave that veto
+  pointing at a constant that does not exist.
+
+`cage study` prints a removal sentence naming all of it (`verbmap.REMOVED`), not a bare
+exit 1. ADR-CONSUMERS records the scope change; ADR-CLI's removed-verb table carries the
+row; FORMULAS §4.4 is now a tombstone.
 
 ### Also
 

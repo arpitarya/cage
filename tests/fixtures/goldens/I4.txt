@@ -1,4 +1,0 @@
-$ cage insights verdict fux
-VERDICT: INSUFFICIENT DATA — no receipts recorded for 'fux'.
-
-A verdict composes recorded receipts; teach the tool to emit them (`cage query receipts`), then re-run.

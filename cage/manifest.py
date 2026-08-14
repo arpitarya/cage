@@ -80,7 +80,7 @@ def _imports_path(root: Path) -> Path:
 def record_import(root: Path, *, import_id: str, agent: str, surface: str,
                   session: str, session_uid: str, source_path: str, files_scanned: int,
                   rows_appended: int, tokens_in: int, tokens_out: int, cached_in: int,
-                  ts: str, session_name: str = "", machine: str = "") -> bool:
+                  ts: str, session_name: str = "") -> bool:
     """One manifest row per (agent, surface, session) an import sweep captured rows from
     (ADR-CONSUMERS). `session` is the log's own session id; `session_uid` is the cage-minted
     `n_…` id unique to this row; `session_name` is the best-available human name (``""``
@@ -92,8 +92,6 @@ def record_import(root: Path, *, import_id: str, agent: str, surface: str,
            "tokens_out": int(tokens_out), "cached_in": int(cached_in)}
     if session_name:
         row["session_name"] = session_name
-    if machine:
-        row["machine"] = machine
     return _append(root, row)
 
 

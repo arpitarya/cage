@@ -17,7 +17,8 @@ So this gate reads what that one skips. Three assertions, in order of what they 
 What it deliberately does NOT check: the *body* of a CAPTURED block. Nothing can —
 `cage doctor` prints a probe of the local filesystem, and pinning that would assert a
 fact about the reader's machine that cage never measured (`test_output_spec.py` makes
-the same call for `cage study join`). The honest handling is a declared class, not a
+the same call the removed `cage study join` block once had). The honest handling is a
+declared class, not a
 fake golden, which is why assertion 1 exists at all.
 """
 from __future__ import annotations

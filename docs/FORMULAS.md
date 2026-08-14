@@ -614,20 +614,18 @@ guarded, `~`-marked estimate whose method is printed beside it.
 `cage insights estimate` / `calibration` / `compare` and their three modules are deleted,
 so cage predicts nothing and scores nothing. `tasks.jsonl` still records outcomes, labels
 and any previously-stamped `est_*` fields — a closed task is still a closed task, and
-`MIN_COMPARE_N` / `MIN_ESTIMATE_N` remain in `constants.py` unread. **§4.4 below is
-unaffected**: the fleet study has its own pairing math in `study.py` and survives whole.
+`MIN_COMPARE_N` / `MIN_ESTIMATE_N` remain in `constants.py`. `MIN_ESTIMATE_N` still
+gates `graphifymodel`'s history band; `MIN_COMPARE_N` is read by nothing and stays only
+because [ADR-GRAPHIFY](adr/0007_graphify.md)'s veto condition cites the number.
 
-### 4.4 Fleet study pairing — `measured` per machine-day, `estimated` delta
+### 4.4 Fleet study pairing — **removed in v0.51 (STUDY-CUT)**
 
-```
-sample unit = the machine-day
-paired delta = median over machines of (phase-B median daily − phase-A median daily)
-refuses below MIN_COMPARE_N machines having both phases
-```
-
-Code: [study.py](../cage/study.py). Phases are recorded markers resolved against
-each machine's own clock; machine ids are opaque random tokens, never hostnames.
-Coverage (days + gaps) always prints first.
+The whole fleet study is gone, and this was its only formula: the machine-day sample
+unit, the paired-by-machine delta, and the `MIN_COMPARE_N` refusal below it. Removed
+with it: `study.py`, `machine.py`, the phase markers, the opaque per-machine id, the
+additive `machine` row field it partitioned by, the one-file zip bundle and the
+`cage import BUNDLE` merge. Cage computes nothing across machines. Rows already
+stamped with a `machine` id still read — no derived number consults the field.
 
 ### 4.5 Task correlation — `estimated` at confidence 0.5, **disabled by default**
 
@@ -696,7 +694,7 @@ Never mixed, by design ([CLAUDE.md](../CLAUDE.md) *Constants*):
 |---|---|---|
 | **Contract** | `schema.py` closed enums | `METHODS`, `UNITS` |
 | **Policy** | `cage.toml` (your decisions) | tool order, capture switches, cleanup, authorship. **No `prices.toml`** — the rate card went with ADR 0011 |
-| **Constants** | `constants.py` (code heuristics, reviewable) | `CHARS_PER_TOKEN`, `MIN_COMPARE_N`, `IDLE_CAP_MINUTES` |
+| **Constants** | `constants.py` (code heuristics, reviewable) | `CHARS_PER_TOKEN`, `MIN_ESTIMATE_N`, `SINCE_WINDOW_DAYS` |
 
 Several constants are **policy-preferred fallbacks** — the policy value wins when
 present: `DEFAULT_CONFIDENCE`, `IDLE_CAP_MINUTES`, `LEDGER_WARN_BYTES`,

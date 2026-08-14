@@ -173,15 +173,16 @@ draw: every row reports the same kind of fact, a recorded count
 number is never staler than the instant it's shown — with no hook. Writes the ledger
 only, so determinism holds.
 
-**state-dir cleanup** — the closed `.cage/state/` allowlist (`cage/cleanup.py`),
-never the ledger. Since v0.37 deletion only ever happens via an explicit
-an explicit prune; the auto path (piggybacked on `cage import`) only
-ever **warns** on stderr, silent when nothing is eligible, and never deletes.
-`[cleanup] enabled` gates the auto path outright (no reminder at all when off);
-`[cleanup] warn` silences just the reminder text. Neither switch is consulted by
-a manually-typed command. **Since v0.50 there is no such command** — the verb went with
-the `cage data` group and `cleanup.py` is kept only for the auto warn path and doctor
-(`work/OPEN-WORK.md`, STATE-RETENTION).
+**state-dir cleanup** — the closed `.cage/state/` allowlist (`cage/cleanup.py`,
+[ADR-CLEANUP](adr/0011_cleanup.md)), never the ledger. Since v0.37 deletion only ever
+happens via an explicit prune, never automatically; the auto path (piggybacked on
+`cage import`) only ever **warns** on stderr, silent when nothing is eligible, and
+never deletes. `[cleanup] enabled` gates the auto path outright (no reminder at all
+when off); `[cleanup] warn` silences just the reminder text. Neither switch is
+consulted by a manually-typed command — `cage clean` (dry-run by default, `--apply`
+executes) is always honored. SURFACE-CUT (v0.50) removed the verb with the whole
+`cage data` group; ADR-CLEANUP restored it as its own top-level command rather than a
+revived `data` group.
 Tool savings (`ledger/savings/<tool>/`) can never be cleaned: they sit under
 `ledger/`, which is on the never-list, and a per-tool cleanup class must never be
 added (savings are unrecoverable, unlike a cursor or a debug-log row).

@@ -44,8 +44,8 @@ TOOLS = [
      "description": "Close a task as ok or redo (optionally with a one-token label). "
                     "THE ONLY WRITE TOOL CAGE EXPOSES. Append-only: it never rewrites "
                     "history, and re-closing a task supersedes rather than edits. Call "
-                    "it when a unit of work finishes — compare/estimate/calibration can "
-                    "say nothing at all about tasks nobody closed.",
+                    "it when a unit of work finishes — a task nobody closes is invisible "
+                    "to every task-grain view cage could ever build.",
      "inputSchema": {"type": "object", "required": ["task"], "properties": {
          "task": {"type": "string", "description": "the task id used when metering"},
          "redo": {"type": "boolean", "default": False,

@@ -48,9 +48,9 @@ def _choice_positional(par):
 
 
 def _group_actions(par):
-    """`prices`/`study`/`policy` take their action as a positional choice rather than a
-    subparser (docs/adr/0002_cli.md § Known gaps), yet `cage --help` presents them as groups
-    beside `insights`/`task`/`authorship`/`data`. So their actions are addressable
+    """`policy` takes its action as a positional choice rather than a
+    subparser (docs/adr/0002_cli.md § Known gaps), yet `cage --help` presents it as a group
+    beside `insights`/`task`/`authorship`. So its actions are addressable
     commands and the reference must cover each one.
 
     `cage hook` is deliberately NOT expanded this way: it is one hidden verb that takes
@@ -202,11 +202,13 @@ def test_no_command_named_in_the_reference_is_dead(doc):
 
 def test_the_dead_command_detector_actually_detects():
     """A gate is only worth having if it fires. Pin both regimes."""
-    assert _resolvable("insights chats") and _resolvable("study report")
+    assert _resolvable("insights chats") and _resolvable("policy diff")
     assert _resolvable("hook tool") and _resolvable("query gross-vs-net")
     assert not _resolvable("rep")            # no argparse abbreviation
     assert not _resolvable("insights attribute")
-    assert not _resolvable("study delete")   # closed choice list
+    assert not _resolvable("policy delete")  # closed choice list
+    # the fleet study, gone whole in v0.51 (STUDY-CUT) — group and leaves alike
+    assert not _resolvable("study") and not _resolvable("study report")
     assert not _resolvable("attrib")         # the pre-v0.32 spelling, now grouped
     # the money surface, gone in v0.51 (USAGE-ONLY, ADR 0011)
     assert not _resolvable("prices list") and not _resolvable("insights roi")

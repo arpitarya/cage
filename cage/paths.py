@@ -348,7 +348,12 @@ _RESERVED_LEDGER_DIRS = frozenset({
     "claude", "copilot", "kiro",
     # non-agent producers
     "consumer", "provenance", "savings",
-    # non-directory ledger kinds, so a tool can never shadow a shard-name prefix
+    # non-directory ledger kinds, so a tool can never shadow a shard-name prefix.
+    # `study` is legacy: the fleet study was removed whole in v0.51 (STUDY-CUT) and
+    # nothing writes `study.jsonl` any more, but real ledgers still hold one and the
+    # append-only past is never rewritten — a tool claiming the name would sit beside a
+    # file cage can no longer explain. `imports` is legacy in the same way (P3a moved
+    # the manifest to `state/`).
     "calls", "credits", "receipts", "tasks", "study", "imports",
 })
 
@@ -1018,70 +1023,18 @@ def copilot_metric_sources() -> list[tuple[Path, str, str]]:
             (user / "globalStorage" / "github.copilot-chat", "agent-traces.db", "otel")]
 
 
-# ── build-time descriptor for the generated `[sources]` comment block (docgen) ──
-# `tools/docgen --target policy` renders an inert, ~-relative `[sources]` block into
-# the bundled policy.toml from :func:`builtin_source_docs`. It is deliberately ENV-
-# and MACHINE-INDEPENDENT: it reads no environment and never calls ``Path.home()`` /
-# ``_first_existing`` — the values `_builtin_log_sources` returns bake the current
-# machine's home, env overrides and on-disk probing into an *absolute* path that
-# differs per developer/OS, so ``str(path)``-ing them would make docgen output
-# machine-specific and CI ``--check`` fail (handoff §8, the single most likely break).
-# These path strings are the canonical ~-relative defaults; the *glob* and the
-# per-agent source count come from `_builtin_log_sources` so a new/renamed built-in
-# source can't ship without the block drifting (docgen `--check` gates it).
-_SOURCE_DOC_PATHS = {
-    "claude": [("~/.claude/projects",
-                "every session transcript under the tree, recursively")],
-    "copilot": [
-        ("~/.copilot/session-state",
-         "Copilot CLI usage events (one dir per session)"),
-        ("~/Library/Application Support/Code/User/workspaceStorage",
-         "VS Code Copilot chat sessions (macOS location shown; other OS below)"),
-    ],
-    "kiro": [
-        ("~/Library/Application Support/Kiro/User/globalStorage/kiro.kiroagent"
-         "/dev_data/tokens_generated.jsonl",
-         "per-call token log — a FILE source, so the glob is ignored (macOS shown)"),
-    ],
-}
-_SOURCE_DOC_OTHER_OS = {
-    "copilot": ("Linux VS Code:   ~/.config/Code/User/workspaceStorage",
-                "Windows VS Code: %APPDATA%\\Code\\User\\workspaceStorage"),
-    "kiro": ("Linux:   ~/.config/Kiro/User/globalStorage/kiro.kiroagent"
-             "/dev_data/tokens_generated.jsonl",
-             "Windows: %APPDATA%\\Kiro\\User\\globalStorage\\kiro.kiroagent"
-             "\\...\\tokens_generated.jsonl  (UNVERIFIED-LAYOUT — inferred from VS "
-             "Code-family, not pinned on a real Windows Kiro)"),
-}
-
-
-def builtin_source_docs() -> list[dict]:
-    """Env-independent, ~-relative description of the built-in log sources for the
-    generated `[sources]` comment block (docgen — see the note above; never imported
-    at runtime). One dict per agent in ``SURFACES`` order: ``env`` (the home-redirect
-    vars from ``_AGENT_ENV``), ``sources`` (a list of ``(path, glob, meaning)`` — the
-    ``glob`` pulled live from :func:`_builtin_log_sources` so the block drifts when a
-    source is added/changed) and ``other_os`` (non-primary OS locations). Deterministic:
-    reads no environment, never resolves ``Path.home()``. Raises loudly if the doc
-    descriptor and the code registry disagree on a source count, so a new built-in
-    source forces a descriptor update + regeneration."""
-    from cage import agents  # lazy: agents imports paths (avoid the cycle)
-    out: list[dict] = []
-    for agent in agents.SURFACES:
-        docs = _SOURCE_DOC_PATHS[agent]
-        builtin = _builtin_log_sources(agent)  # only the globs are read (env-independent)
-        if len(docs) != len(builtin):
-            raise SystemExit(
-                f"paths.builtin_source_docs: {agent} has {len(builtin)} built-in "
-                f"source(s) but _SOURCE_DOC_PATHS lists {len(docs)} — update the "
-                "descriptor in cage/paths.py, then regenerate the [sources] block "
-                "(`python -m tools.docgen --target policy`)")
-        srcs = [(path, glob, meaning)
-                for (path, meaning), (_bp, glob, _pg) in zip(docs, builtin)]
-        out.append({"agent": agent, "env": _AGENT_ENV.get(agent, ()),
-                    "sources": srcs, "other_os": _SOURCE_DOC_OTHER_OS.get(agent, ())})
-    return out
-
+# NB: the built-in registry has **no doc-generator any more.** `tools/docgen --target
+# policy` used to freeze a ~-relative rendering of `_builtin_log_sources` into the
+# bundled `data/cage.toml` as an inert `[sources]` comment block, from a hand-kept
+# `_SOURCE_DOC_PATHS`/`_SOURCE_DOC_OTHER_OS` descriptor here plus a `builtin_source_docs()`
+# reader. docgen went in the hookless rebuild and the descriptor outlived it by three
+# releases — uncalled, ungated, and by then wrong (it listed 2 copilot sources against
+# the registry's 4), which is precisely the confidently-lying documentation the generated
+# block was meant to prevent. All three were deleted (DOCGEN-DEAD-REF, 2026-08-15) and
+# the frozen enumeration went with them: the machine-correct listing is a *live* read
+# (`cage query sources` interpolates it, `cage doctor --paths` probes it), and the block
+# a project actually uses is materialized from this registry at `cage setup` time by
+# `sources_toml`/`materialize_sources` above. Do not reintroduce a frozen copy.
 
 # THE prices-file name — the single project-prices filename literal (prices-toml
 # ADR-LAWS, mirror of the ``cage.toml`` rename). `Footprint.prices` /
@@ -1465,14 +1418,6 @@ class Footprint:
             out.append(legacy)
         out.extend(sorted(base.glob(f"{kind}-*.jsonl")))
         return out
-
-    @property
-    def study(self) -> Path:
-        """Fleet-study phase markers (`cage study start/stop`, ADR-CONSUMERS) — a small
-        append-only jsonl beside the ledger files (it travels inside `cage data export
-        --study` bundles). Unpartitioned by design, like `provenance.jsonl`: a study
-        is weeks, not years."""
-        return self.ledger / "study.jsonl"
 
     @property
     def policy(self) -> Path:

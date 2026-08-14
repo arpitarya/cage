@@ -113,8 +113,9 @@ def test_calculation_entries_unchanged_kind():
     # (USAGE-ONLY, ADR 0011).
     # SURFACE-CUT (v0.50) took `marginal-attribution`, `compare-delta`, `estimate-band`
     # and `calibration-hit-rate` — each explained a command that no longer exists.
+    # STUDY-CUT (v0.51) took `study-pairing` the same way.
     calc_ids = {"saved", "gross-vs-net", "token-heuristic",
-                "confidence", "method-tags", "study-pairing", "policy-versioning"}
+                "confidence", "method-tags", "policy-versioning"}
     for e in explain.REGISTRY:
         if e.id in calc_ids:
             assert e.kind == "calculation"
@@ -208,7 +209,9 @@ def test_cleanup_and_capture_entries_render_live(proj, monkeypatch):
     deletion: no `{placeholder}` may reach a rendered formula."""
     monkeypatch.chdir(proj)
     pol = policy.load(None)
-    live_ids = {"policy-versioning", "cleanup", "import-before-export"}
+    # `import-before-export` left this set in v0.51: its entry described a sweep whose
+    # last surface was the fleet study's bundle export (STUDY-CUT).
+    live_ids = {"policy-versioning", "cleanup"}
     by_id = {e.id: e for e in explain.REGISTRY}
     assert live_ids <= set(by_id)
     for i in live_ids:

@@ -614,4 +614,6 @@ def report_read_footnote(receipts: list[dict]) -> str:
     return (f"† {n} graphify saving(s) are report-reads (read GRAPH_REPORT.md/wiki instead "
             f"of scanning source) — a weaker, lower-confidence counterfactual than a query "
             f"citing exact files; still modeled, counted apart. Its confidence (0.3) is "
-            f"UNVALIDATED — a placeholder not yet scored by `insights calibration`.")
+            f"UNVALIDATED — a placeholder never scored against real outcomes (the "
+            f"`insights calibration` surface that would have done so was deleted in "
+            f"v0.50, SURFACE-CUT).")

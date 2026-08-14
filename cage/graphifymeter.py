@@ -53,7 +53,7 @@ def _op_of(argv: list[str]) -> str:
     return ""
 
 
-# ── deterministic receipt ids + cross-route dedupe (graphify-capture plan GC3, ADR 0005)
+# ── deterministic receipt ids + cross-route dedupe (graphify-capture plan GC3, ADR-GRAPHIFY)
 # The id folds in `session` so the SAME query in two sessions is two receipts (per-session
 # attribution is a requirement, not a nicety). Cross-route convergence (shim + transcript
 # capturing one run) is NOT solved by id-collision — it can't be, the shim honestly can't
@@ -71,7 +71,7 @@ def content_signature(argv: list[str], answer: str) -> tuple[str, str, str]:
     shim and the transcript-parsed command reach the same signature. ``answer_hash`` is
     over the stripped answer text (counts-never-content: a hash, never the words). A
     transcript that truncates a very long tool result would sign differently → the
-    deferral can miss and double-count; that residual is the ADR 0005 veto metric."""
+    deferral can miss and double-count; that residual is the ADR-GRAPHIFY veto metric."""
     tail = [str(a) for a in (argv[1:] if argv else [])]
     op = _op_of(tail)
     args_hash = hashlib.sha1("\x00".join(tail).encode("utf-8")).hexdigest()[:16]
@@ -156,7 +156,7 @@ def _meter(root: Path, answer: str, argv: list[str], task: str) -> tuple[int, st
         # Deterministic id with an HONEST-EMPTY session (GC3 root-cause fix): the shim
         # genuinely cannot know the agent's session id, so it stamps "" rather than a cwd
         # basename masquerading as one. That empty-session id is exactly what the
-        # transcript route recomputes to defer to this receipt (ADR 0005).
+        # transcript route recomputes to defer to this receipt (ADR-GRAPHIFY).
         op_s, ah, anh = content_signature(argv, answer)
         sid = receipt_id("", op_s or op, ah, anh)
         rid = savings.record(root, tool="graphify", unit="tokens", raw_alternative=raw,

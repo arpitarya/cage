@@ -112,10 +112,10 @@ def metric_twin(root, row: dict) -> None:
     if twin is None:
         return
     # Carry the grouping axes the metric constructors do not all model but derived views
-    # bucket by — `project` (the `cage report --project` filter), `machine` (the fleet
-    # study), `task`/`scope`. A twin missing one lands in the wrong bucket, not in none,
-    # which is the harder failure to spot.
-    for axis in ("project", "machine", "task", "scope"):
+    # bucket by — `project`, `task`, `scope`. (`machine` was here for the fleet study
+    # until v0.51; the study and the field went together in STUDY-CUT.) A twin missing an
+    # axis lands in the wrong bucket, not in none, which is the harder failure to spot.
+    for axis in ("project", "task", "scope"):
         if row.get(axis):
             twin[axis] = row[axis]
     ledger.append_row(root, surface, twin)

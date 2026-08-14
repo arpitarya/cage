@@ -106,7 +106,7 @@ def _record_consumer_twin(root: Path, call_row: dict, *, route: str, provider: s
             cache_write_in=fields.get("cache_write_in", 0),
             latency_ms=fields.get("latency_ms", 0), ok=fields.get("ok", True),
             retries=fields.get("retries", 0), import_id=fields.get("import_id", ""),
-            machine=fields.get("machine", ""), ts=call_row.get("ts"))
+            ts=call_row.get("ts"))
         if not ledger.append_row(root, "consumer", twin):
             debuglog.event(root, event="consumer-metric", produced=False,
                            skip_reason="append-failed", call=call_row.get("id", ""))

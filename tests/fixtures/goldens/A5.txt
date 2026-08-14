@@ -1,0 +1,7 @@
+$ cage authorship origin 9e41bcc
+9e41bcc  ·  origin=agent  ·  confidence=0.6667
+
+Provenance rows
+agent        files   method      origin  confidence
+-----------  ------  ----------  ------  ----------
+claude-code  mod.py  transcript  agent   0.67

@@ -28,7 +28,8 @@ parser yet"*. The first is the vendor's and permanent; the second is cage's and 
 Collapsing them let a backlog item read as a law — the softer twin of the failure this record
 exists to prevent, and it is what the authorship row got wrong for weeks. So the split is load
 bearing in both directions: **every ❌ is cage's to clear and must be findable as work** — the four
-below are `AUTHORSHIP-PARSERS` in OPEN-WORK, in that order — and **every N/A still names whose**
+below are `AUTHORSHIP-PARSERS` in OPEN-WORK, in build order copilot-CLI → kiro-IDE → kiro-CLI →
+copilot-VSCode, not the table's left-to-right order — and **every N/A still names whose**
 limitation it is, vendor · platform · or cage's own refusal to fabricate. *Not applicable* is a
 verdict with an owner, never a shrug.
 
@@ -93,8 +94,8 @@ what the numbered vetoes in §2 watch for.
 | Authorship (agent vs human) | ✅ | ✅ | ❌ no parser yet — `events.jsonl` **does** carry edit text | ❌ no parser yet — `chatSessions` carries it | ❌ no parser yet — `fs_write` args are in the store | ❌ no parser yet — exec logs carry before *and* after |
 | Authorship · copilot's **cloud** coding agent | N/A | N/A | N/A web-only session logs, no read API — the one genuinely structural authorship gap | N/A | N/A | N/A |
 | Tool savings, from the store | ✅ | ✅ | ✅ | ✅ | ⚠️ output capped — a long answer files **nothing** | N/A persists no assistant output |
-| Tool savings, via the interceptor | ✅ † | ✅ †‡ | ✅ † | ✅ †‡ | ✅ † | ✅ †‡ *the only route here* |
-| Chat title | ✅ | ✅ | N/A honest empty | ✅ | N/A honest empty | N/A |
+| Tool savings, via the interceptor | ✅ † | ⚠️ †‡ | ✅ † | ⚠️ †‡ | ✅ † | ⚠️ †‡ *the only route here* |
+| Chat title | ✅ | ✅ | ✅ *— corrected, see below* | ✅ | N/A honest empty | N/A |
 
 **These four ❌ are the entire buildable backlog this record knows about.** They were ⚠️ until
 2026-08-14, which read as *works with a limit* when in fact nothing works at all — a stronger claim
@@ -102,6 +103,16 @@ than cage could support, in the direction that flatters it. They are not vendor 
 were: each names the store that already carries the text, and the order to write them in is
 `AUTHORSHIP-PARSERS`. Their contents are [ADR-AUTHORSHIP](0009_authorship.md)'s; the marks are this
 record's.
+
+**COVERAGE-STRIKE-3: the copilot-CLI Chat title cell was stale, and this is the third time a
+belief here outlived the code.** It read `N/A honest empty` after `session_name_copilot_cli` had
+already landed (P3, `24cdd40`) and started reading titles from the sibling `workspace.yaml` —
+present on 24 of 32 real session dirs (`importcmd.py:945-958`). The cell was wrong two commits
+later at P5 (`b21df95`), which touched this file and left it untouched. COVERAGE-STRIKE-2's named
+remedy — a generator derived from the same table — would **not** have caught this: the cell was
+wrong because a *belief* was stale, not because arithmetic drifted, and a generator built on the
+same belief reproduces it. Whether that makes the remedy the wrong fix for this record's actual
+failure mode is Arpit's call, not this sweep's — see `work/OPEN-WORK.md`.
 
 **Graphify capture, route by route** — the *Tool savings* rows above, opened up. graphify is the one
 thing cage meters that is not an agent, it can be seen from four directions, and those directions do
@@ -112,7 +123,7 @@ surface can be *said* to yield.
 |---|---|---|---|---|---|---|
 | Query receipt, from the store | ✅ | ✅ *same store* | ✅ | ✅ | ⚠️ stdout capped ~2000 tok — a long answer files **nothing** | N/A no assistant output persisted |
 | Report-read receipt, from the store | ✅ | ✅ | ✅ | ✅ | ✅ `fs_read` — the cap cannot reach it | N/A |
-| Either, via the PATH interceptor | ✅ † | ✅ †‡ | ✅ † | ✅ †‡ | ✅ † | ✅ †‡ |
+| Either, via the PATH interceptor | ✅ † | ⚠️ †‡ | ✅ † | ⚠️ †‡ | ✅ † | ⚠️ †‡ |
 | Per-chat attribution of a store row | ✅ | ✅ | ✅ | ✅ | ✅ | N/A no store route here to attribute |
 | Per-chat attribution of an interceptor row | N/A | N/A | N/A | N/A | N/A | N/A |
 
@@ -272,10 +283,11 @@ carries whose limitation it is.**
   record the lying copy.
 - Kiro contributes no tokens to any total, and that is the decision, stated — not a bug
   awaiting a fix. Its report section is a named absence, not a silent omission.
-- **Four ✅ cells depend on the interceptor, not on a store.** If the PATH interceptor is
-  not live, kiro-IDE's savings row is not degraded — it is *gone*, with no store-side
-  fallback. `cage doctor` treats an OS whose interceptor twin is missing as a failure, not
-  a green tick.
+- **kiro-IDE has two cells with no store-side fallback at all — the interceptor is the
+  only route.** *Tool savings, from the store* and *Query receipt, from the store* both
+  read N/A/no-assistant-output for kiro-IDE, so if the PATH interceptor is not live there,
+  kiro-IDE's savings row is not degraded — it is *gone*. `cage doctor` treats an OS whose
+  interceptor twin is missing as a failure, not a green tick.
 - The matrix will be **wrong on a vendor's schedule, not cage's**. That is what the veto
   condition is for.
 
@@ -309,12 +321,12 @@ Every cell traces to a dated probe or a measurement, not an assumption:
 | kiro `devdata.sqlite` is absent | the file does not exist on any Kiro install probed (2026-08-14) |
 | copilot persists no cache-write tokens | 0 of 57 vscode rows carried it (2026-08-14) |
 | kiro-CLI truncation is real, not theoretical | 23 `truncat` hits across 1,132 real parts were all the command's own output — the guard keys on a missing output carrier or a non-zero exit instead |
-| authorship match rate is bounded by how people edit | 44.3% repo-wide; repeated edits to one file commit only the final state |
+| authorship match rate is bounded by how people edit | 85.2% repo-wide (kept ÷ suggested, [ADR-AUTHORSHIP](0009_authorship.md) §2 Reference); repeated edits to one file commit only the final state |
 | a single human bucket misleads | 76.6% `human~` on cage's own repo, 89% of it one commit of generated JSON |
 | the interceptor route was dead on every surface, 2026-08-12 → 2026-08-14 | its shims probed `cage data graphify`, deleted in `cb4a4a6`; verified against the live parser (2026-08-14), fixed the same day |
 | the new verb did not match the marker regex until the set was grown | `pathshim._INTERCEPTOR` evaluated directly before the change — the B3 marker set **grew**, and no retired spelling was removed (2026-08-14) |
 | both twins still self-identify mid-migration | both carry `graphify metering interceptor` in their headers, so old↔new shims still skip each other (2026-08-14) |
-| claude's two readers disagree by exactly 2× | 43,973 rows vs 21,955 folded requests over the full matched window |
+| claude's two readers disagree by 1.979× | 44,659 rows vs 22,566 folded requests over the full matched window |
 
 ### Veto condition (when to revisit)
 
@@ -335,7 +347,7 @@ Every cell traces to a dated probe or a measurement, not an assumption:
   `events.jsonl` and VS Code `chatSessions` are swept every import and both carry it, and
   kiro's IDE logs carry before *and* after. Phrasing a veto as *"when a vendor ships it"*
   made it unable to fire on *"they already did"* — **write the trigger as a condition to
-  check, never as an event to await.** The four ⚠️ cells above are now build order, not
+  check, never as an event to await.** The four ❌ cells above are now build order, not
   vendor limits; they and the surviving structural row are
   [ADR-AUTHORSHIP](0009_authorship.md)'s.
 - **A host ships a documented hook event** for copilot's unverified names, or a

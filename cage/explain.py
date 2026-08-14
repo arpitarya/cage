@@ -43,7 +43,8 @@ def _live(pol: dict) -> dict:
         # widened the cap sees ITS values in the explanation, not the shipped default.
         "max_est_gap": policy.authorship_max_est_gap(pol),
         "estimate_hours": str(policy.authorship_estimate_hours(pol)).lower(),
-        "min_compare_n": constants.MIN_COMPARE_N,
+        # `min_compare_n` was dropped from this table in v0.51 with the fleet study —
+        # the `study-pairing` entry was its only consumer.
         "min_estimate_n": constants.MIN_ESTIMATE_N,
         "net_window_s": constants.NET_ATTRIB_WINDOW_S,
         "net_confidence": constants.NET_SAVED_CONFIDENCE,
@@ -69,7 +70,6 @@ def _live(pol: dict) -> dict:
         "cleanup_days": policy.cleanup_days(pol),
         "cleanup_on": "on" if policy.cleanup_enabled(pol) else "off",
         "cleanup_warn_on": "on" if policy.cleanup_warn(pol) else "off",
-        "import_before_export": "on" if policy.import_before_export(pol) else "off",
         # policy sync (CLAUDE.md) — live version stamps, both sides
         "policy_version_bundled": str(policy.bundled_raw().get("meta", {})
                                       .get("policy_version") or "?"),

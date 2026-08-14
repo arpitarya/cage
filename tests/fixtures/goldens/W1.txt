@@ -1,0 +1,4 @@
+$ cage setup --status
+  · claude   not wired
+  · copilot  not wired
+  · kiro     not wired

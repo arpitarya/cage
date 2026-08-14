@@ -12,6 +12,244 @@ by milestone) — the worklog is what *happened this session*.
 
 ---
 
+## 2026-08-15 — Claude Code — STUDY-CUT: the fleet study removed whole
+
+- **Asked:** "remove cage study from cli."
+- **Decided first, before touching anything:** the ask reads two ways — the CLI group
+  alone (SURFACE-CUT's default: delete the reader, keep the writer) or the whole
+  subsystem. Put both to Arpit with their blast radii; **he chose the whole subsystem.**
+  Recorded here because the default was the *other* one, and a future reader should not
+  read this as SURFACE-CUT being quietly overridden: the study's "writers"
+  (`study.start`/`stop`/`export_bundle`) were reachable only through the verbs being
+  deleted, and a writer nothing can invoke is dead code, not a recorded fact. The one
+  genuine writer, `machine.stamp`, went too — that part *is* a substrate change and is
+  called out as such in CLAUDE.md and the changelog.
+- **Done:** the six verbs, `study.py`, `machine.py`, the phase markers, the opaque
+  machine id, the `machine` row field on four writers, the zip bundle and its
+  `cage import BUNDLE` merge, two explainer entries, four goldens/tests, dummyrepo S9 —
+  plus every doc that named any of it (ADR-CLI, ADR-CONSUMERS, ADR-CLEANUP,
+  ADR-CLAUDE/COPILOT diagrams, adr/README ownership, FORMULAS §4.4, architecture-flow,
+  example/cli, both `cage.toml` comment blocks, CLAUDE.md, README, CHANGELOG).
+  Suite green: **1561 passed, 11 skipped**.
+- **Rides v0.51.0 (still unreleased), not a new version** — P8 set that precedent by
+  landing KIRO-CALLS-LEG into the same unreleased entry. Nothing ever shipped with the
+  study present under 0.51, so "removed in v0.51" is the true sentence.
+- **Left open:** `[capture] import_before_export` and `MIN_COMPARE_N` are now read by
+  nothing and are kept deliberately — the first is filed under **UNREAD-FACTS** (now five
+  facts, not four), the second is pinned by ADR-GRAPHIFY's veto condition. Neither is a
+  loose end to tidy; both have their reason written at the definition site.
+- **Two gates earned their keep and are worth naming:** `test_cli_tiering`'s stale-verb
+  grep caught my *own* new comments writing `cage study` in source prose, and
+  `test_adr_counts` caught ADR-CLI's headline counts before the doc shipped stale.
+- **Cost:** unmeasured — `cage report` was deleted in v0.50 and the surviving reader
+  (`cage insights chats`) is per-chat, so no command can isolate this session. Same gap
+  the `Cost:` rule already names.
+- **Next step:** Arpit reviews; nothing is blocked on an agent.
+
+---
+
+## 2026-08-14 — Cowork — Claude Code subagent fleet built + wired to auto-invoke
+
+- **Asked:** set up subagents in cage for faster implementation, then make them
+  auto-invoke rather than requiring an explicit ask each time.
+- **Done:** `.claude/agents/` created — three agents, `queue-auditor` · `adr-verifier` ·
+  `doc-reconciler`. Framed explicitly as context compressors, not a parallelism win:
+  cage's bottleneck is judgment against this file, not typing, so no `implementer` agent
+  was built — whole-task delegation stays a single agent with a handoff/prompt pair, per
+  the existing `adr-correctness-sweep.{handoff,prompt}.md` pattern. Each agent's write
+  boundary mirrors *Archived documents are named, never cited*: narration files
+  (`WORKLOG.md`/`IMPLEMENTATION.md`/`DOC-REGISTRY.md`) get written, assertion files
+  (`OPEN-WORK.md`/`INTERVIEW.md`) get drafted-only, `CLAUDE.md`/`docs/adr/` never touched.
+  This session added the **Claude Code subagents** section to `CLAUDE.md` (no ADR
+  affected — this is repo tooling, not cage product behaviour), strengthened all three
+  `description` frontmatters with explicit `Use PROACTIVELY` trigger language, and bumped
+  `DOC-REGISTRY.md`'s CLAUDE.md row. This entry also backfills the WORKLOG/IMPLEMENTATION
+  gap the fleet's own build session left — it built the three agent files but never
+  recorded them here, the exact defect *Documentation discipline* names.
+- **Decided/open:** read-only on `queue-auditor`/`adr-verifier` is prompt-enforced, not
+  tool-enforced (`Bash` is unscoped in their frontmatter) — named as a known gap in
+  `CLAUDE.md`, not closed. `OPEN-WORK.md`/`INTERVIEW.md` deltas were **not** drafted this
+  session (disproportionate to the ask) — the natural next real use of `doc-reconciler`
+  is a full session-close pass, not this bootstrap one.
+- **Next step:** exercise `queue-auditor` or `adr-verifier` for real against a live
+  release or ADR-touching change — the fleet has not been run yet.
+- **Cost:** unmeasured — `cage report` was deleted in v0.50 (SURFACE-CUT) and the
+  surviving reader, `cage insights chats`, cannot isolate a session (UNREAD-FACTS).
+
+## 2026-08-15 — Claude Code — COVERAGE-STRIKE-2 compare doc filed
+
+- **Asked:** what can be done to fix COVERAGE-STRIKE-2 — ADR-COVERAGE's own prose defers
+  the "generator vs. different gate" call to Arpit, and OPEN-WORK already lists it under
+  *Needs Arpit*.
+- **Done:** per the standing rule (a decision with multiple viable options gets a compare
+  doc before a plan), wrote
+  [work/compare/coverage-strike-gate.compare.md](compare/coverage-strike-gate.compare.md).
+  Read the code before proposing anything: of the five registries ADR-COVERAGE §2 names as
+  generator sources, four (`units.ABSENT`, `authorcapture.COVERAGE_GAPS`,
+  `ledger.ABSENT_SPINES`, `agents.HOOK_GAPS`) are agent-level, not the agent×surface grain
+  the record's tables actually render at — and STRIKE 3's own cell (Chat title) has no
+  backing registry at all. That means the "small… obvious next step" framing in the ADR's
+  own §3 undersells the cost, and even a full generator would not have caught STRIKE 3
+  without new registry work. Proposed verdict **D — close the two-strikes counter**, with
+  the cheap narrow generator (option B, mirroring `test_formulas_coverage.py`) shippable
+  separately since it would have caught STRIKE 1 outright. Updated `work/compare/README.md`
+  and `OPEN-WORK.md`'s COVERAGE-STRIKE-2 row to point at the new doc.
+- **Decided/open:** nothing decided — this is Arpit's call, same as before, now with a
+  grounded fork to accept or override instead of an open question.
+- **Next step:** Arpit accepts or overrides the verdict in the compare doc.
+
+## 2026-08-15 — Claude Code — DOC-BACKTICK-GATE built
+
+- **Asked:** what can be done to fix DOC-BACKTICK-GATE — the residual left when
+  PLAN-BACKTICK-IMBALANCE's evidence file (`docs/PLAN.md`) was deleted before anything was
+  recorded as fixing it. Proposed shape: strip fences, count backticks, fail on odd.
+- **Done:** added `tests/test_doc_backticks.py`. Before writing it, ran the naive
+  strip-fences-count-backticks check over all 363 tracked `.md` files by hand to see what
+  it would actually flag: two files, `graphify-out/GRAPH_REPORT.md` (generated, excluded
+  outright) and `work/WORKLOG.md` (this file — its own prose narrating a backtick escape,
+  `` `-- ``, while describing this exact defect). That confirmed a whole-repo hard gate
+  would break on a legitimate HISTORY entry, so the test reuses `test_doc_links.py`'s
+  LIVE/HISTORY split: LIVE docs fail the build on an unbalanced count, HISTORY docs are
+  exempt but bounded-and-reported (same reasoning as that file's dangle-count test) so the
+  exemption can't silently swallow a real regression. Zero LIVE docs are currently
+  unbalanced, so the gate starts green. Removed the closed item (and its now-empty "No ADR
+  — doc discipline" section) from `OPEN-WORK.md`, recorded the outcome in
+  `IMPLEMENTATION.md`.
+- **Decided/open:** nothing left open — closed. Full suite: 1595 passed, 11 skipped (was
+  1592/11).
+- **Next step:** none required for this item.
+
+## 2026-08-15 — Claude Code — DOCTOR-INTEGRITY-UNRESOLVED-ROOT fixed
+
+- **Asked:** fix DOCTOR-INTEGRITY-UNRESOLVED-ROOT — `doctorcmd.run`'s `integrity` check was
+  calling `_integrity(root)` with the raw unresolved root instead of `active =
+  paths.resolve_root(root)`, the resolution every sibling ledger check in that function
+  already uses.
+- **Done:** one-line call-site fix (`cage/doctorcmd.py`, `_integrity(root)` →
+  `_integrity(active)`); `_integrity`'s docstring updated to state the contract explicitly.
+  Added a regression test
+  (`tests/test_doctor.py::test_integrity_check_inspects_the_active_not_the_unresolved_root`)
+  that tampers the (redirected) global ledger and asserts `cage doctor` surfaces the
+  `altered-history` WARN for a project-less root — confirmed it fails on the old call site
+  (reverted locally, reproduced the miss, restored the fix) before confirming green.
+  Updated [ADR-INTEGRITY](../docs/adr/0010_integrity.md) (new Decision bullet), removed the
+  now-closed item + its now-empty section from `OPEN-WORK.md`, recorded the outcome in
+  `IMPLEMENTATION.md`, bumped the ADR's `DOC-REGISTRY.md` row.
+- **Decided/open:** nothing left open on this item — closed. Full suite: 1592 passed, 11
+  skipped.
+- **Next step:** none required for this item.
+
+## 2026-08-15 — Claude Code — OPEN-WORK review, done items removed
+
+- **Asked:** review `work/OPEN-WORK.md` and remove the done items.
+- **Verified each of the 12 body items plus the 3 header-only names against code, tests and
+  git** (never the file's own markers, per its stated rule): closed **PLAN-4-REWRITE**
+  (`docs/PLAN.md` is deleted outright, `15cfbb4`, citations already repointed by the earlier
+  PLAN-REMOVED session) and **DOGFOOD-SHIM-STALE**'s staleness half (`bin/graphify{,.cmd}`
+  now byte-identical to `cage/data/shims/` and committed, not staged as the item claimed).
+  Carried its residual forward as new item **GFX-RECEIPTS-REAUDIT**.
+- **Found the header had drifted from the body:** `GFX-COV-FIELD` was still named as
+  needing Arpit though it closed 2026-08-08; `COVERAGE-STRIKE-2` and `GFX-IDE-PATH-UNPROBED`
+  were named with no matching body line at all. Fixed the header count and gave both
+  orphaned items real bullets (new ADR-COVERAGE section for the first, ADR-GRAPHIFY for the
+  second) instead of leaving them referenced-but-untracked.
+- **Narrowed UNREAD-FACTS from five facts to four** — `project` now has a reader
+  (`importcmd.py` → `manifest.record_import(session_name=...)` → `chats._title_map`, the
+  chat-title fallback), confirmed by tracing the call chain. The other four
+  (`route_key`/`attest.jsonl`/`scope`/task `label`+`outcome`) remain confirmed unread by
+  grep — zero callers, no CLI flag, or presence-only checks.
+- **Everything else in the queue stayed** — verified still genuinely open (not just marked
+  open): TASK-GRAIN-SPINE, DOCGEN-DEAD-REF, CONTINUOUS-CAPTURE, ADR-CLI-PARSE-CHECK,
+  COPILOT-JETBRAINS-UNPROBED, AUTHORSHIP-CODE-CATCHUP (a/b/c), AUTHORSHIP-PARSERS,
+  DOCTOR-INTEGRITY-UNRESOLVED-ROOT, DOC-BACKTICK-GATE. Full evidence trail in today's other
+  IMPLEMENTATION.md entry.
+- **Decided, not mine to decide:** nothing — this was verification and bookkeeping, no new
+  calls made.
+- **Open / next step:** GFX-RECEIPTS-REAUDIT and GFX-IDE-PATH-UNPROBED both need a real
+  machine/IDE session to close, same blocker as before.
+- **Cost: unmeasured** — `cage report` is deleted and `cage insights chats` cannot isolate
+  one Claude Code session; no other command in this ledger answers "what did this session
+  cost."
+
+---
+
+## 2026-08-15 — Claude Code — `cage clean` restored + ADR-CLEANUP (0011)
+
+- **Asked:** close STATE-RETENTION (`work/OPEN-WORK.md`) — `.cage/state/` has had no prune
+  path since SURFACE-CUT (v0.50) deleted `cage data cleanup --apply`; needed a verb, or a
+  recorded no. Then, mid-turn: author a standalone ADR for it rather than folding it into
+  ADR-CLI (asked via `AskUserQuestion`, since the repo's own convention text disagreed with
+  itself on whether the ADR set was still closed at seven — it wasn't; already ten on disk).
+- **Built:** `cage clean` (`--apply`/`--days N`/`--json`) as its own top-level verb —
+  dispatches to the already-built, already-tested `cleanup.run_cli`, unreachable since
+  SURFACE-CUT. Restored as a new top-level command rather than reviving the deleted `data`
+  group. Fixed the auto-warn reminder and `cage doctor`'s state check to name the real fix
+  instead of apologizing; fixed `verbmap.REMOVED["cleanup"]` (was misrouting into the
+  `data`-group removal sentence). New record: `docs/adr/0011_cleanup.md` (ADR-CLEANUP),
+  wired into `docs/adr/README.md`, `CLAUDE.md`, `tests/test_adr_ownership.py`,
+  `work/DOC-REGISTRY.md`. ADR-CLI's counts/diagrams/examples/flag table updated in the same
+  change (14/28→15/29). Five new CLI tests in `tests/test_cleanup.py`. Full detail in
+  today's other IMPLEMENTATION.md entry.
+- **A concurrent session (the ADR correctness sweep) was live on the same tree at the same
+  time** — its own worklog entry above names this session by description ("a brand-new
+  record not yet on disk") and its IMPLEMENTATION.md entry confirms my `cage clean`/
+  ADR-CLEANUP work "landed fully... nothing left for this sweep to reconcile there." No
+  file collisions in the end; edits landed on non-overlapping regions of the shared docs
+  (`docs/adr/README.md`, `CLAUDE.md`).
+- **Decided, not mine to decide:** whether ADR-CLEANUP should be a standalone record vs.
+  folded into ADR-CLI — asked, Arpit chose standalone.
+- **Open / next step:** none for this item. STATE-RETENTION removed from OPEN-WORK.
+- **Cost: unmeasured** — `cage report` is deleted and `cage insights chats` cannot isolate
+  one Claude Code session; no other command in this ledger answers "what did this session
+  cost."
+
+---
+
+## 2026-08-15 — Claude Code — the ADR correctness sweep (P0–P4), ADR-AUTHORSHIP skipped
+
+- **Asked:** execute `work/adr-correctness-sweep.{handoff,prompt}.md` — make the ten (now
+  eleven, see below) live ADRs true against code, gated by a new counts test.
+- **Tree was dirty on start, twice over:** ~72 files were staged-but-uncommitted (a
+  finished, tested unit — KIRO-CALLS-LEG retirement + the `docs/PLAN.md` deletion) plus a
+  newer commit (`7ef4309`) the handoff didn't know about. Per the handoff's own
+  instruction, committed the staged work first (`15cfbb4`) rather than editing on top of
+  it — full suite green (1563/11) before and after.
+- **A second, live concurrent session then interfered mid-sweep**, in real time: it
+  reverted my `docs/adr/0009_authorship.md` (ADR-AUTHORSHIP) edit back to pre-edit
+  content, and was independently deleting orphaned golden fixtures, editing
+  `doctorcmd.py`/`policy.py`, and building a brand-new record (**ADR-CLEANUP**, `cage
+  clean`) not yet on disk. Arpit's call: **skip ADR-AUTHORSHIP entirely, keep going** —
+  P3's AUTHORSHIP fixes (44.3%→85.2%, "five integers"→six + `files`, the model-trailer
+  not-built mark, the `provenance.jsonl`→`ledger/provenance/` path fix) are **NOT
+  applied**; someone else may be doing this work right now.
+- **Built P0** (`tests/test_adr_counts.py`, 3 assertions re-derived from `cli.build_parser()`
+  and `mcpserver.TOOLS`/`WRITE_TOOLS` — set size, ADR-CLI per-group + total command
+  counts, MCP read-tool count) — confirmed RED, then fixed P1 (three agent diagrams: the
+  `join_table` box removed from ADR-CLAUDE, the `calls row` box removed from ADR-COPILOT,
+  credits re-parented as a projection in ADR-KIRO — mermaid + ASCII twins each), P2
+  (ADR-CLI's 7 errors + the stale positional-choice Conventions bullet I found while
+  fixing them + `verbmap.py`'s two dead-verb bugs), and P3 minus AUTHORSHIP (COVERAGE,
+  CONSUMERS, GRAPHIFY, LAWS, INTEGRITY — see IMPLEMENTATION.md for the full list).
+- **P4:** `docs/adr/README.md`'s cite-by-name list, `CLAUDE.md`'s set-size sentence and
+  MCP-surface line, 10 `work/DOC-REGISTRY.md` rows, and 4 code docstrings +
+  `graphifymeter.py`'s numbered-ADR citation (×3).
+- **Full suite green by the end: 1586 passed, 11 skipped, 0 failed** (`test_adr_counts.py`
+  7/7). Two transient failures mid-sweep (`cage clean`'s undocumented `--days` flag, a
+  stale `--help` golden) were the concurrent ADR-CLEANUP session's own in-flight state —
+  both resolved on their side without any action needed here.
+- **Decided, not mine to decide (per the handoff):** COVERAGE-STRIKE-2 vs STRIKE-3, and
+  whether the counts gate wants a fourth assertion over ADR-COVERAGE's tables — both
+  reported to Arpit, neither resolved.
+- **Open / next step:** once the concurrent session's ADR-CLEANUP + AUTHORSHIP work
+  lands, re-run `tests/test_adr_counts.py` and `test_cli_reference.py`, apply the
+  AUTHORSHIP fixes above if still needed, and finish the archive step (this pair →
+  `work/archive/v0.51-adr-correctness-sweep.{handoff,prompt}.md`) once the tree is quiet.
+- **Cost: unmeasured** — `cage report` is deleted and `cage insights chats` cannot isolate
+  one Claude Code session; no other command in this ledger answers "what did this session
+  cost."
+
+---
+
 ## 2026-08-15 — Claude (Cowork) — PLAN-REMOVED: the design of record is deleted, its addressing scheme repointed to the ADRs
 
 - **Asked (Arpit):** *"remove plan.md file and its references."*

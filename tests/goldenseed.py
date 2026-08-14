@@ -1,10 +1,10 @@
-"""Deterministic seed ledgers behind the output-spec goldens (plan Phases 1+2+5.6).
+"""Deterministic seed ledgers behind ADR-CLI's GATED output blocks.
 
-One builder per spec scenario family (`docs/cli-output-spec.md`); every id and
-timestamp is pinned so the rendered output is byte-stable — the golden tests
-assert against `tests/fixtures/goldens/*.txt`, and `tools/docgen` regenerates
-the spec's code blocks from those same fixture files (one artifact, docs and
-tests cannot disagree).
+One builder per scenario family; every id and timestamp is pinned so the
+rendered output is byte-stable — `tests/test_output_spec.py` asserts against
+`tests/fixtures/goldens/*.txt`, and `tests/test_adr_output_blocks.py` asserts
+`docs/adr/0002_cli.md`'s GATED blocks are byte-identical to those same fixture
+files (one artifact, docs and tests cannot disagree).
 
 Numbers are chosen to exercise every rule, not to be pretty: exact-priced
 (anthropic), family-priced (copilot's dotted ids), UNPRICED (`copilot/auto`),
@@ -16,7 +16,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from cage import ledger, originrecord, paths, schema, tasks
+from cage import ledger, originrecord, paths, savings, schema, tasks
 
 
 def _ts(day: int, hh: int = 9, month: int = 7) -> str:
@@ -25,12 +25,11 @@ def _ts(day: int, hh: int = 9, month: int = 7) -> str:
 
 def _call(root: Path, cid: str, *, provider: str, model: str, agent: str,
           tin: int, tout: int, ts: str, task: str = "", session: str = "",
-          machine: str = "") -> str:
+          surface: str = "") -> str:
     row = schema.make_call(route="chat", provider=provider, model=model,
                            tokens_in=tin, tokens_out=tout, agent=agent,
-                           task=task, session=session, ts=ts, call_id=cid)
-    if machine:
-        row["machine"] = machine
+                           task=task, session=session, surface=surface,
+                           ts=ts, call_id=cid)
     ledger.append(paths.Footprint(root).calls, row)
     _metric_twin(root, row)
     return row["id"]
@@ -65,8 +64,10 @@ def _metric_twin(root: Path, row: dict) -> None:
     if twin is None:
         return
     # Carry the axes the metric constructors do not model but the derived views group
-    # by — the fleet study buckets per MACHINE, and a twin without one lands unphased.
-    for axis in ("machine", "project", "task", "scope"):
+    # by. `machine` was one of them until v0.51 (the fleet study bucketed per machine and
+    # a twin without one landed unphased); the study is gone and so is the axis, but the
+    # rule it taught still binds the rest of this list.
+    for axis in ("project", "task", "scope"):
         if row.get(axis):
             twin[axis] = row[axis]
     ledger.append_row(root, surface, twin)
@@ -374,33 +375,35 @@ def chats_truncated(root: Path) -> None:
               ts=_ts(2, 9 + (i % 10)), session=f"s_tr{i:02d}")
 
 
-def fleet(root: Path, complete: int = 5) -> None:
-    """Spec S3/S4: `complete` machines with both phases (5 days each), one
-    missing the plugin phase, one enrolled with no rows. Markers are written
-    directly (each machine resolves against its own clock)."""
-    study_file = paths.Footprint(root).study
-    mids = [f"m_{i:02d}aa{'0' * 12}"[:18] for i in range(1, complete + 3)]
-    for n, mid in enumerate(mids):
-        ledger.append(study_file, {"id": f"s_b{n:02d}", "ts": _ts(1, 6),
-                                   "event": "start", "phase": "baseline",
-                                   "machine": mid})
-    for n, mid in enumerate(mids[:complete]):
-        ledger.append(study_file, {"id": f"s_p{n:02d}", "ts": _ts(6, 6),
-                                   "event": "start", "phase": "plugin",
-                                   "machine": mid})
-    for n, mid in enumerate(mids[:complete + 1]):  # the last machine: no rows at all
-        for d in range(5):  # baseline days 1–5
-            _call(root, f"c_b{n}{d}", provider="anthropic",
-                  model="claude-sonnet-4-6", agent="claude",
-                  tin=200_000 + n * 10_000, tout=20_000, ts=_ts(1 + d, 12),
-                  machine=mid)
-        if n >= complete:
-            continue
-        for d in range(5):  # plugin days 6–10 — lighter
-            _call(root, f"c_p{n}{d}", provider="anthropic",
-                  model="claude-sonnet-4-6", agent="claude",
-                  tin=120_000 + n * 6_000, tout=14_000, ts=_ts(6 + d, 12),
-                  machine=mid)
+def graphify_chats(root: Path) -> None:
+    """Spec I11: two claude chats (cli and vscode surfaces), each with a graphify
+    saving joined by session — the populated case for `cage insights graphify`."""
+    _call(root, "c_gc1", provider="anthropic", model="claude-sonnet-4-6",
+          agent="claude", tin=18_000, tout=3_400, ts=_ts(2), session="s_gc1",
+          surface="cli")
+    savings.record(root, tool="graphify", raw_alternative=44_600, actual=2_000,
+                   op="query", session="s_gc1", unit="tokens", method="modeled",
+                   confidence=0.60, ts=_ts(2, 10))
+    _call(root, "c_gc2", provider="anthropic", model="claude-sonnet-4-6",
+          agent="claude", tin=5_000, tout=400, ts=_ts(3), session="s_gc2",
+          surface="vscode")
+    savings.record(root, tool="graphify", raw_alternative=8_700, actual=900,
+                   op="query", session="s_gc2", unit="tokens", method="modeled",
+                   confidence=0.60, ts=_ts(3, 10))
+
+
+def why_call(root: Path) -> None:
+    """Spec I12: one call with three linked receipts across tools and methods — the
+    full-provenance case for `cage insights why`."""
+    _call(root, "c_why1", provider="anthropic", model="claude-sonnet-4-6",
+          agent="claude", tin=8_600, tout=1_500, ts=_ts(1, 12), task="fix-handover-bug",
+          session="s_why1")
+    _receipt(root, "r_why1", tool="graphify", raw=30_000, actual=3_000,
+             ts=_ts(1, 13), call="c_why1", method="modeled")
+    _receipt(root, "r_why2", tool="fux", raw=8_000, actual=1_600,
+             ts=_ts(1, 14), call="c_why1", method="modeled")
+    _receipt(root, "r_why3", tool="compressor", raw=10_000, actual=2_000,
+             ts=_ts(1, 15), call="c_why1", method="measured")
 
 
 # ── agent-vs-human v2: the commit surfaces (HR1 P3) ──────────────────────────

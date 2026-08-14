@@ -69,11 +69,11 @@ import_before_export = true
 
 # State-dir maintenance — .cage/state/ only, a closed allowlist (never ledger/,
 # so tool savings can't be touched). Deletion only ever happens via an explicit
-# `cage data cleanup --apply`. The auto sweep (piggybacked on `cage import`) only
-# ever warns on stderr, silent when nothing is eligible, never deletes:
+# `cage clean --apply` (ADR-CLEANUP). The auto sweep (piggybacked on `cage import`)
+# only ever warns on stderr, silent when nothing is eligible, never deletes:
 # `enabled` gates that reminder outright (env CAGE_CLEANUP), `warn` silences the
 # reminder text without disabling the gate (env CAGE_CLEANUP_WARN). Either way,
-# a manually-typed `cage data cleanup` / `--apply` always runs. days: 30 → 90 in
+# a manually-typed `cage clean` / `--apply` always runs. days: 30 → 90 in
 # v0.37 (30 proved tighter than a real usage gap).
 [cleanup]
 enabled = true

@@ -53,6 +53,12 @@ REMOVED: dict[str, str] = {
     "human": "",
     "human-record": "",
     "trend": "",
+    # The fleet study, removed whole in v0.51 (STUDY-CUT) — the six-verb group AND the
+    # subsystem behind it (`study.py`, `machine.py`, the `machine` row field, the zip
+    # bundle and its `cage import BUNDLE` merge path). One group verb, since the group
+    # was always the only spelling; `join`/`start`/`stop`/`report`/`export`/`id` were
+    # never top-level, so they are not keys here.
+    "study": "",
     # → authorship
     "origin": "authorship origin",
     "verify": "authorship verify",
@@ -65,7 +71,6 @@ REMOVED: dict[str, str] = {
     # --team`, so the team ref could be written and never displayed.
     "ledger-sync": "",
     "export": "",
-    "cleanup": "",
     "watch": "",
     "serve": "",
     "proxy": "",
@@ -75,6 +80,11 @@ REMOVED: dict[str, str] = {
     # removal sentence — and `wiringscan.heal_tail` uses it to rewrite an artifact whose
     # probe still names the dead spelling.
     "graphify": "interceptor graphify",
+    # NOT removed either: `cage data cleanup`/`cage cleanup` went with the `data` group,
+    # but the manual prune verb it fronted came back as its own top-level `cage clean`
+    # (ADR-CLEANUP, STATE-RETENTION). A tail, not a removal sentence, for the same
+    # `wiringscan.heal_tail` reason as `graphify` above.
+    "cleanup": "clean",
     # hook machinery removed (capture is pull-based): no replacement command —
     # an empty tail means "removed outright"; direction() explains, heal never
     # rewrites to it (wiringscan.heal_tail skips empty fixes).
@@ -109,7 +119,8 @@ _ROLLUP_REMOVED = (
 _DATA_REMOVED = (
     "was removed in v0.50 (SURFACE-CUT) with the whole `cage data` group — there is no "
     "export, no local server, no proxy and no watcher. Capture still works and is "
-    "pull-based: run `cage import`. The fleet bundle moved to `cage study export`")
+    "pull-based: run `cage import`. There is no bundle format at all any more — the "
+    "fleet study that owned the only one cage ever had was removed in v0.51")
 
 _BODIES: dict[str, str] = {
     **{v: f"'{v}' {_MONEY_REMOVED}" for v in
@@ -118,20 +129,28 @@ _BODIES: dict[str, str] = {
     **{v: f"'{v}' {_ROLLUP_REMOVED}" for v in
        ("report", "attrib", "adoption", "compare", "estimate", "calibration")},
     **{v: f"'{v}' {_DATA_REMOVED}" for v in
-       ("export", "cleanup", "watch", "serve", "proxy", "meter")},
+       ("export", "watch", "serve", "proxy", "meter")},
+    "study": ("'study' was removed in v0.51 (STUDY-CUT) — the whole fleet study went, "
+              "not just its six verbs: the phase markers, the opaque machine id and the "
+              "`machine` field it stamped on rows, the one-file zip bundle, and the "
+              "`cage import BUNDLE` merge that read it. Nothing replaces it; cage no "
+              "longer aggregates across machines at all. Rows already stamped with a "
+              "`machine` id still read — the recorded past is never rewritten. The "
+              "surviving read surfaces are local and per unit of work: `cage insights "
+              "chats`, `cage insights graphify`, `cage insights commits`"),
     "ledger-sync": ("'ledger-sync' was removed in v0.50 (SURFACE-CUT). It pushed local "
                     "rows into refs/notes/cage-ledger for a team view, and `--team` — "
                     "its only reader — went with `cage report`/`cage insights attrib`, "
                     "so the ref could be written and never displayed. Provenance notes "
                     "are unaffected: `cage authorship notes-sync` still works"),
-    "quality": ("'quality' was removed in v0.51 — it reported cost per successful "
+    "quality": ("'quality' was removed in v0.50 — it reported cost per successful "
                 "task, and cage no longer measures cost. The OUTCOME half survives: "
                 "`cage task outcome <task>` still records ok/redo (its readers, "
                 "`compare`/`calibration`, went in v0.50 — the outcome is recorded, and "
                 "no view reads it yet)"),
     "human": ("'human' was removed in v0.36 — the agent-vs-human cost axis is gone. "
-              "Its two non-human subcommands moved: `cage task outcome`, "
-              "`cage task quality` (`cage query savings-axis`)"),
+              "Its two non-human subcommands moved: `cage task outcome` (still live) "
+              "and `quality` (itself removed later as money, `cage query savings-axis`)"),
     "human-record": ("'human-record' was removed in v0.36 with the agent-vs-human "
                      "cost axis (`cage query savings-axis`)"),
     "trend": ("'trend' was removed in v0.36 — it charted the agent-vs-human axis, "

@@ -45,14 +45,13 @@ folded one is believed.
 ```mermaid
 flowchart TD
     T["~/.claude/projects/&lt;slug&gt;/*.jsonl<br/>one file = one chat<br/>CLI and VS Code share it"]
-    T --> P1["parse_calls<br/>keyed by row uuid"]
+    T -.->|"HISTORY — P5 retired this leg"| P1["parse_calls<br/>keyed by row uuid"]
     T --> P2["parse_claude_chat_metrics<br/>THE DEDUP LAW"]
-    P1 --> C["calls-YYYY-MM.jsonl<br/>⚠ inflated ~2×"]
+    P1 --> C["calls-YYYY-MM.jsonl<br/>⚠ inflated ~2× · frozen, pre-P5 rows only"]
     P2 --> M["ledger/claude/chats-YYYY-MM.jsonl<br/>✓ one row per real request"]
     M --> S["ledger.spend()<br/>the believed basis"]
-    C --> J["ledger.join_table<br/>receipt → call lookup<br/>+ rollback path"]
-    C -. "✗ never reaches spend()" .-x S
-    S --> V["cage insights chats · commits · study"]
+    C -. "✗ never reached spend()" .-x S
+    S --> V["cage insights chats · commits · commit"]
     T --> A["line-match authorship<br/>counts only, bodies dropped"]
     A --> PR["ledger/provenance/<br/>(monthly since v0.51)"]
 ```
@@ -62,21 +61,17 @@ flowchart TD
 ```text
   ~/.claude/projects/<slug>/*.jsonl        (one file = one chat; CLI + VS Code share it)
         |
-        |-- parse_calls ................ keyed by row uuid ---> calls-YYYY-MM.jsonl
-        |                                                        (!) inflated ~2x
+        |-- parse_calls .... HISTORY — P5 retired this leg ---> calls-YYYY-MM.jsonl
+        |                                                        (!) inflated ~2x, frozen
         |                                                            |
-        |                                                            +--> ledger.join_table
-        |                                                            |    (receipt -> call
-        |                                                            |     lookup, rollback)
-        |                                                            |
-        |                                                            X  never reaches spend()
+        |                                                            X  never reached spend()
         |
         |-- parse_claude_chat_metrics ... THE DEDUP LAW ---> ledger/claude/chats-*.jsonl
         |                                                        (v) one row per request
         |                                                            |
         |                                                        ledger.spend()
         |                                                            |
-        |                                      cage insights chats | commits | study
+        |                                      cage insights chats | commits | commit
         |
         +-- line-match authorship ....... counts only ------> ledger/provenance/
                                           (bodies dropped)

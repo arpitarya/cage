@@ -1,0 +1,12 @@
+$ cage insights graphify
+Graphify per-chat usage & GROSS saving
+
+chat   agent   surface  gfx uses  tokens  without gfx   saved  saved%
+-----  ------  -------  --------  ------  -----------  ------  ------
+s_gc1  claude  cli             1  21,400       64,000  42,600     67%
+s_gc2  claude  vscode          1   5,400       13,200   7,800     59%
+
+· saved is GROSS — avoided read cost; it excludes the cost of USING the tool
+  (the invoking turn, the injected context). `cage query gross-vs-net`
+· tokens is the chat's recorded tokens_in + tokens_out — the WITH-graphify world (cached/cache-write excluded); without gfx = tokens + Σsaved is the MODELED without-graphify counterfactual — it mixes a graphifymeter.toks estimate against metered tokens, so saved% is modeled throughout (`cage query graphify-chats`)
+· method: modeled (confidence 0.60, worst case across the receipts shown)

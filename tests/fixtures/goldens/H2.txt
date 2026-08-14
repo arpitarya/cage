@@ -1,0 +1,5 @@
+$ cage import
+⚠ no [sources] in cage.toml — cage is capturing nothing. Run `cage setup` (or `cage setup --sync-sources`) to materialize the defaults.
+✔ claude: imported 0 call(s) from 0 file(s).
+✔ copilot: imported 0 call(s) from 0 file(s).
+✔ kiro: imported 0 call(s) from 0 file(s).

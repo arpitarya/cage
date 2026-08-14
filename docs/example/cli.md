@@ -23,9 +23,8 @@ cage report --csv           # same view as RFC-4180 CSV (one-way reporting)
 
 ```bash
 cage import                 # sweep all agent logs into the resolved ledger
-cage data export            # import-then-emit a portable bundle
-cage data export --study    # fleet-study bundle
-cage import bundle*.zip      # merge a bundle by row identity
+cage import --agent claude  # one agent only
+cage import --since 7d      # only logs touched in the window
 ```
 
 ## Explain — no LLM, no network

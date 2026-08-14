@@ -47,7 +47,6 @@ OWNERS: dict[str, str] = {
     # ADR-CONSUMERS — the non-agent capture paths
     "metering": "0006_consumer", "usageparse": "0006_consumer",
     "usagelog": "0006_consumer", "manifest": "0006_consumer",
-    "machine": "0006_consumer", "study": "0006_consumer",
     # ADR-AUTHORSHIP — who wrote which lines; cross-agent by decision, not claude's
     "authorcapture": "0009_authorship", "linematch": "0009_authorship",
     "commitjoin": "0009_authorship", "provenance": "0009_authorship",
@@ -59,6 +58,8 @@ OWNERS: dict[str, str] = {
     "pathshim": "0007_graphify", "runshim": "0007_graphify",
     "adoptcmd": "0007_graphify", "compress": "0007_graphify",
     "responsecache": "0007_graphify",
+    # ADR-CLEANUP — what .cage/state/ debris may ever be deleted
+    "cleanup": "0011_cleanup",
 }
 
 #: Claimed by MORE than one record, on purpose. `transcript.py` is one file holding three
@@ -80,7 +81,6 @@ NO_RECORD: dict[str, str] = {
     "attest": "L1 attestation store — behaviour is stated in CLAUDE.md's agent-surface ladder",
     "capturelog": "always-on capture breadcrumb; counts only, read by no view",
     "cfgio": "TOML/JSON read helpers",
-    "cleanup": "state pruning; an allowlist, and never a ledger path",
     "debuglog": "the CAGE_DEBUG sink",
     "demo": "seeds the worked example",
     "doctorbundle": "redacted diagnostics archive",

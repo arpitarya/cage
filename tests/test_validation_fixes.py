@@ -106,7 +106,7 @@ def test_global_cage_is_not_a_project_root(tmp_path, monkeypatch):
 def test_real_home_cage_is_not_a_project_root_under_cage_home(tmp_path, monkeypatch):
     """With CAGE_HOME redirected (tests, the dummyrepo runner), the *real* `~/.cage`
     is still a global sink — never a project. Without this, any sandbox under $HOME
-    resolved its "project" to the home dir and wrote fixture/study rows into the
+    resolved its "project" to the home dir and wrote fixture rows into the
     user's real global ledger (2026-07 manual validation, S1/S2/S3/S9 fallout)."""
     real_home = tmp_path / "realhome"
     (real_home / ".cage").mkdir(parents=True)                  # the user's real global

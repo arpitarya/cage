@@ -1,6 +1,6 @@
 ---
 adr: integrity
-status: current as of 2026-08-15 · hash chain over appended segments · checkpointed per sweep · report-only, never a gate
+status: current as of 2026-08-14 · hash chain over appended segments · checkpointed per sweep · report-only, never a gate
 audience: §1 humans (skim) · §2 agents (build)
 update-rule: ANY change to what is chained, when the chain advances, how a verdict is classified, or whether it can affect an exit code updates this record in the same change, and bumps its DOC-REGISTRY row
 ---
@@ -31,7 +31,7 @@ flowchart TD
     Q -->|"grew at the end"| G["growth — expected, chained"]
     Q -->|"a recorded prefix differs"| A["<b>altered-history</b><br/>never legitimate"]
     Q -->|"shorter / unreadable tail"| D["<b>damaged</b><br/>a crash mid-write does this"]
-    Q -->|"cursors.json, the logs"| E["expected — rewritten by design"]
+    Q -->|"BY_DESIGN: 5 files —<br/>cursors.json · 3 logs · a dedupe store"| E["expected — rewritten by design"]
     A --> R["cage doctor: WARN"]
     D --> R
     G --> OK["silent"]
@@ -46,7 +46,8 @@ flowchart TD
         +-- grew at the end ................ growth — expected, chained  -> silent
         +-- a recorded PREFIX differs ...... ALTERED-HISTORY             -> doctor WARN
         +-- shorter / unreadable tail ...... DAMAGED                     -> doctor WARN
-        +-- cursors.json, the logs ......... expected (rewritten by design) -> silent
+        +-- BY_DESIGN: 5 files ............. expected (rewritten by design) -> silent
+             cursors.json + 3 logs + a dedupe store (hooks-seen.jsonl)
 ```
 </details>
 
@@ -98,16 +99,28 @@ reported by `cage doctor`, and never able to affect an exit code.**
   replays the recorded segmentation. Appends must not be O(n); a `cage doctor` run already
   reads the ledger. Replaying rather than comparing one stored digest is what makes a
   change **anywhere** in the file detectable, not just at the tail.
-- **A lock miss marks the segment `unverified`; it never breaks the chain.** A stated
-  unknown, never a fabricated verdict — the house `—`-with-a-reason pattern. Fail-open
-  survives and the chain never lies.
+- **A lock miss marks the file entry `unverified`, stickily, for every tracked file — not
+  one segment.** The lock is taken once around the whole checkpoint loop (`integrity.py:147`),
+  and the flag is written per file entry (`:177`), so a single miss taints every tracked
+  file that sweep and never clears on its own. A stated unknown, never a fabricated
+  verdict — the house `—`-with-a-reason pattern. Fail-open survives and the chain never
+  lies, but this is also why veto trigger 3's *"1 in 100 checkpointed segments"* is not
+  computable at that granularity — the flag lives at file scope.
 - **Two verdicts, reported separately:** `altered-history` and `damaged`. Plus two
-  non-findings that matter as much: `unverified` (above) and `expected` (`BY_DESIGN`:
-  `cursors.json`, the logs). **A report its reader learns to ignore is worse than no
-  report**, and classifying designed churn as a finding is exactly how that happens.
+  non-findings that matter as much: `unverified` (above) and `expected` (`BY_DESIGN`, five
+  files: `cursors.json`, three logs, and `hooks-seen.jsonl`, a dedupe store, not a log).
+  **A report its reader learns to ignore is worse than no report**, and classifying
+  designed churn as a finding is exactly how that happens.
 - **Scope is ledger data *and* `state/`.** The question is *did something change what was
   already written*, and a rewritten cursor is as interesting to someone debugging a
   capture gap as a rewritten shard.
+- **`cage doctor` checks the active sink, same as every other ledger check it runs** —
+  `active = paths.resolve_root(root)` (`--ledger`/`CAGE_BASE` → project `.cage/` → global
+  `~/.cage`), never the raw unresolved `root`. A project-less user's live ledger *is*
+  their global `~/.cage`; checking an unresolved cwd would silently inspect a directory
+  with no manifest at all and report a clean chain that was never examined
+  (DOCTOR-INTEGRITY-UNRESOLVED-ROOT, fixed 2026-08-15 — `doctorcmd.run` was passing the
+  unresolved root to this one check while every sibling check already used `active`).
 - **The manifest is `state/integrity.json`**, protected by `cleanup.NEVER`, and
   **excluded from its own hashing** — a manifest cannot hash itself; recording would change
   the bytes it just hashed.
@@ -133,7 +146,8 @@ reported by `cage doctor`, and never able to affect an exit code.**
 
 ### Alternatives rejected
 
-- **A full-file digest per append.** O(n) per row on a hot path over a 22k+ row ledger.
+- **A full-file digest per append.** O(n) per row on a hot path over a ~89k row ledger
+  (66,320 `calls` rows + 22,802 claude metric rows, §2 Reference).
 - **A digest per row.** Sound, and it makes the manifest as large as the ledger.
 - **Making the lock load-bearing** so the chain is always exact. Rejected: `lockutil`
   proceeds unlocked by contract, and quietly depending on it would break fail-open in a way
@@ -143,13 +157,13 @@ reported by `cage doctor`, and never able to affect an exit code.**
   who meant it, and a check that fails a build over an ambiguity is a check people disable.
 - **Signing the manifest.** Rejected as out of threat model and not `$0`/stdlib-shaped;
   see the veto's trigger 1.
-- **Reporting designed churn** (`cursors.json`, the logs). Rejected — it would fire on
+- **Reporting designed churn** (the five `BY_DESIGN` files). Rejected — it would fire on
   every run and train its reader to ignore the one report that matters.
 
 ### Reference
 
 - **The constraint that decided the shape**, measured: the real ledger is 66,320 `calls`
-  rows across six monthly shards plus 22,751 claude metric rows, multi-MB per file
+  rows across six monthly shards plus 22,802 claude metric rows, multi-MB per file
   ([cross-check](../../work/regression/2026-08-14-calls-vs-metric-crosscheck.md)). A
   per-append full-file digest would rehash all of it per row.
 - **The law being protected:** [ADR-LAWS](0001_laws.md), Law 3 — append-only, no row is
@@ -172,7 +186,7 @@ reported by `cage doctor`, and never able to affect an exit code.**
 2. **Verification stops being cheap enough to run in `cage doctor`.** It is O(n) over the
    ledger by construction. **The number: if a `verify()` pass exceeds ~2s on a real
    ledger**, it moves behind an explicit flag rather than running on every doctor.
-   **Measured 2026-08-15: 14 files, ~5 ms** on a ledger holding 22,802 claude metric rows —
+   **Measured 2026-08-14: 14 files, ~5 ms** on a ledger holding 22,802 claude metric rows —
    roughly 400× under the threshold. Not measured on a ledger 10× this one, and the growth
    is linear, so the trigger is real rather than theoretical.
 3. **`unverified` becomes common rather than rare.** It exists for a lock miss, which

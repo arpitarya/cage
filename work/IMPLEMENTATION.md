@@ -8,6 +8,290 @@ Entry format:
 
 ```
 
+## 2026-08-15 — STUDY-CUT: the P5 fleet study removed whole (subsystem, not just the verbs)
+
+- **Asked:** "remove cage study from cli". Scope confirmed with Arpit as the **whole
+  subsystem**, not the CLI group alone.
+- **Built (removed):** `cage/study.py` · `cage/machine.py` · the six-verb `study` parser
+  group in `cli.py` · `cmd_study`/`_study_export`/`_study_sweep`/`_StudyImportArgs` in
+  `clicmds.py` · the `BUNDLE …` positional on `cage import` and its merge branch ·
+  `Footprint.study` · the `machine` field everywhere it was written
+  (`ledger.append_row`'s stamp, `ledger._spend_row`'s carry list,
+  `schema.CONSUMER_METRIC_FIELDS`/`make_consumer_metric`, `manifest.record_import`,
+  `metering.record_call`, `importcmd`'s manifest id resolution) · the `study-pairing` and
+  `import-before-export` explainer entries · `explain.py`'s `min_compare_n` interpolation
+  · goldens `S3`/`S4` · `tests/test_study.py` · dummyrepo `S9`.
+- **Kept on purpose, each with the reason written in place:** `machine.json` /
+  `study.jsonl` stay in `cleanup.NEVER` (nothing writes them; nothing may delete them) ·
+  `"study"` stays in `paths._RESERVED_LEDGER_DIRS` (legacy files still on disk) ·
+  `policy.import_before_export` + its `[capture]` key stay **unread** (filed as
+  UNREAD-FACTS; removing the key would orphan it in every synced project) ·
+  `MIN_COMPARE_N` stays in `constants.py` **unread** (ADR-GRAPHIFY's veto cites the
+  number). `cage study` prints a removal sentence via `verbmap.REMOVED`, not a bare exit 1.
+- **Files touched:** 40 — `cage/` ×14, `tests/` ×12, `docs/` ×8, root/trackers ×6.
+- **Test status:** green — **1561 passed, 11 skipped** (was 1591; −30 is `test_study.py`
+  ×13, output-spec S1–S4 ×4, view-export ×2, and study leaves inside shared parametrized
+  gates). `cage --help`, `H1` and `tests/fixtures/cli-help.txt` re-blessed; ADR-CLI's
+  headline counts re-derived from the parser (15→14 top-level, 29→23 addressable).
+- **ADRs updated in the same change:** ADR-CLI (section deleted, removed-verb row added,
+  counts, `--no-import` and export-flag prose, the S3 output block) · ADR-CONSUMERS (a
+  Consequences entry recording that the study left its scope) · ADR-CLEANUP (the
+  never-list cell) · ADR-CLAUDE / ADR-COPILOT (both diagram twins named `study` as a read
+  surface) · `adr/README.md` ownership table (`machine`/`study` rows dropped).
+- **Next step:** none pending for this item. The one thing a reviewer should check by
+  hand is the half no test sees — that each ADR edit above landed in *this* commit.
+
+## 2026-08-14 — SUBAGENT-FLEET: `.claude/agents/` built — queue-auditor, adr-verifier, doc-reconciler
+
+- **Built:** three agent definitions under `.claude/agents/`:
+  - `queue-auditor.md` (read-only: Read/Grep/Glob/Bash) — re-derives every
+    `work/OPEN-WORK.md` item against `git log origin/main..HEAD` → `work/regression/` →
+    `work/IMPLEMENTATION.md` → code; one verdict per item, CLOSED/OPEN/HALF-TRUE.
+  - `adr-verifier.md` (read-only: Read/Grep/Glob/Bash, one instance per ADR, fanned out)
+    — verifies §2 claims against code, flags citations into `work/archive/`/
+    `docs/archive/` (ARCHIVE-NOT-EVIDENCE) and any restatement of an ADR-LAWS law.
+  - `doc-reconciler.md` (Read/Grep/Glob/Bash/Edit/Write) — writes
+    `WORKLOG.md`/`IMPLEMENTATION.md`/`DOC-REGISTRY.md`; drafts only, unapplied, for
+    `OPEN-WORK.md`/`INTERVIEW.md`; never touches `CLAUDE.md` or `docs/adr/`.
+  Same session, follow-up: `CLAUDE.md` gained a **Claude Code subagents** section (no
+  ADR affected — Claude Code tooling, not product behaviour), all three `description`
+  fields gained explicit `Use PROACTIVELY` trigger language, `DOC-REGISTRY.md`'s
+  CLAUDE.md row bumped.
+- **Why now:** the read-heavy reconciliation tax after every change — WORKLOG (~7k
+  lines) + IMPLEMENTATION (~6.5k lines) + `OPEN-WORK.md` re-derivation + ADR-vs-code
+  checks — was poisoning main-session context. The fleet compresses that read into a
+  bounded report instead of adding parallelism to code-writing, which is not cage's
+  bottleneck; judgment against this file is.
+- **Test status:** not applicable — `.claude/agents/*.md` are Claude Code configuration,
+  not Python; no suite change. Suite count not re-verified this session (`.venv` is a
+  macOS venv, unusable from this bridge — see *The suite number is unverifiable off
+  Arpit's machine*).
+- **Next step:** exercise `queue-auditor` against the live `OPEN-WORK.md` for real —
+  it has not run yet.
+
+## 2026-08-15 — DOC-BACKTICK-GATE: mechanical detector for unbalanced backticks in LIVE docs
+
+- **Built:** `tests/test_doc_backticks.py` — strips fenced blocks (`` ``` ``/`~~~`) from
+  every git-tracked `*.md` file, counts the remaining backticks, and fails on an odd
+  count. Same LIVE/HISTORY split as `test_doc_links.py` (`work/archive/`,
+  `work/regression/`, `work/WORKLOG.md`, `work/IMPLEMENTATION.md`, `CHANGELOG.md` are
+  HISTORY, exempt from failure but bounded-and-reported): a dated, append-only record can
+  legitimately narrate a backtick escape and must never be rewritten to satisfy a gate
+  added after the fact — confirmed live by running the naive counter over the whole repo
+  first, which found exactly one such case (`work/WORKLOG.md`, its own entry describing
+  this defect, `` `-- `` used to illustrate a literal backtick). `graphify-out/` is
+  excluded outright — regenerated, never hand-authored.
+- **Why now:** the original PLAN-BACKTICK-IMBALANCE finding was measured in `docs/PLAN.md`,
+  which is now deleted (2026-08-14) — the evidence is gone and nothing was ever recorded
+  as fixing it. DOC-BACKTICK-GATE was the residual filed for that (`work/OPEN-WORK.md`,
+  "No ADR — doc discipline" section).
+- **Tests:** `tests/test_doc_backticks.py` (3 new: the LIVE gate itself, the HISTORY bound,
+  and a synthetic positive/negative pin independent of any real doc's current state).
+  Full suite: 1595 passed, 11 skipped (was 1592/11).
+- **Removed from OPEN-WORK:** DOC-BACKTICK-GATE, and its now-empty "No ADR — doc
+  discipline" section.
+- **Next step:** none — closed.
+
+## 2026-08-15 — DOCTOR-INTEGRITY-UNRESOLVED-ROOT fixed: doctor's integrity check now reads the active sink
+
+- **Built:** `doctorcmd.run` was calling `_integrity(root)` with the raw, unresolved
+  `root` (`:1141`, now `:1146`), while every other ledger check in the same function
+  already used `active = paths.resolve_root(root)` (`:1105`). A project-less user's
+  active sink is their global `~/.cage`; the unresolved-root call silently inspected a
+  directory with no integrity manifest at all and reported a clean chain that was never
+  examined — so a real `altered-history`/`damaged` finding in the global ledger was
+  invisible to `cage doctor`. Fixed by passing `active` instead of `root`
+  (`cage/doctorcmd.py`), one-line call-site change; `_integrity`'s own docstring updated
+  to name the contract explicitly so the next reader doesn't reintroduce it.
+- **Docs:** [ADR-INTEGRITY](../docs/adr/0010_integrity.md) — new Decision bullet stating
+  doctor checks the active sink, same as every sibling ledger check, per the update-rule
+  (a change to what `cage doctor` reports).
+- **Tests:** `tests/test_doctor.py::test_integrity_check_inspects_the_active_not_the_unresolved_root`
+  — seeds an altered-history tamper in the (redirected) global ledger, runs
+  `doctorcmd.run` against a project-less root, asserts the `integrity` check surfaces
+  `warn`/`altered-history`. Verified it fails on the pre-fix call site (reverted locally,
+  reproduced the miss, restored) before confirming it passes with the fix. Full suite:
+  1592 passed, 11 skipped.
+- **Removed from OPEN-WORK:** DOCTOR-INTEGRITY-UNRESOLVED-ROOT (its ADR-INTEGRITY section
+  is now empty and was removed with it).
+- **Next step:** none — closed.
+
+## 2026-08-15 — OPEN-WORK review: two items closed, one stale header entry fixed, one fact removed from UNREAD-FACTS
+
+- **Reviewed every line item against code, tests and git — not against its own markers**
+  (per the file's own maintenance rule). Verified with `grep`/`diff`/`git log`, not assumed.
+- **Closed PLAN-4-REWRITE.** Its premise (`docs/PLAN.md` §4 citing the deleted `insights
+  attrib`) no longer exists: `docs/PLAN.md` was deleted outright in commit `15cfbb4` (message:
+  "drop PLAN.md for the ADR set"), and the earlier PLAN-REMOVED session (WORKLOG.md,
+  2026-08-15) already repointed all 149 code citations + 39 live-doc references to the ADRs
+  before deletion. Nothing left to rewrite.
+- **Closed DOGFOOD-SHIM-STALE's staleness half; the audit half survives as GFX-RECEIPTS-REAUDIT.**
+  `diff bin/graphify cage/data/shims/graphify` and the `.cmd` twin are byte-identical, and
+  `git diff HEAD -- bin/` is empty — the fix that IMPLEMENTATION.md's item text called "staged,
+  not committed" is in fact committed, in `15cfbb4`. The item's own residual (re-run the
+  zero-real-receipts audit now that the metering gap is fixed) is carried forward as its own
+  OPEN-WORK line rather than lost with the parent.
+- **Fixed the header.** `GFX-COV-FIELD` was named in the "Needs Arpit" line but has been
+  closed since 2026-08-08 (`work/regression/README.md`, WORKLOG.md:2089 — both routes
+  verified on real data); the header still cited it. `COVERAGE-STRIKE-2` and
+  `GFX-IDE-PATH-UNPROBED` were also named in the header with **no matching body line** —
+  both are real, still-open, Arpit-blocked items (confirmed against `docs/adr/0008_coverage.md`'s
+  own COVERAGE-STRIKE-3 paragraph and the `‡ UNPROBED` table marks), so each got its own
+  bullet instead (COVERAGE-STRIKE-2 under a new ADR-COVERAGE section; GFX-IDE-PATH-UNPROBED
+  under ADR-GRAPHIFY) rather than staying orphaned references.
+- **UNREAD-FACTS narrowed from five facts to four.** `project` now has a reader:
+  `importcmd.py`'s manifest-naming fallback (`b["project"]`) feeds
+  `manifest.record_import`'s `session_name`, which `chats._title_map` reads as the chat-title
+  fallback for `cage insights chats`. Verified by tracing the call chain, not by re-reading
+  the schema docstring (which still says "a recorded fact with no reader" — that docstring is
+  now stale too, left for the next contact since it's `schema.py` prose, not an ADR).
+  Confirmed still-unread by grep: `route_key` reclaim (`test_canonical_ledger.py` states the
+  backstop is GONE), `state/attest.jsonl` (`attest.read`/`read_by_tool` have zero external
+  callers), `scope` (`ledger.by_scope` has zero callers, no `--scope` CLI flag exists), task
+  `label`/`outcome` (`commitjoin`/`commitview` test presence only, never the value).
+- **Confirmed still open, unchanged:** TASK-GRAIN-SPINE (no metric-kind schema — copilot/
+  kiro/claude — carries a `task` param), DOCGEN-DEAD-REF, CONTINUOUS-CAPTURE,
+  ADR-CLI-PARSE-CHECK, COPILOT-JETBRAINS-UNPROBED, AUTHORSHIP-CODE-CATCHUP (all three of
+  a/b/c still unbuilt — `COVERAGE_GAPS` dict unchanged, `commitview.py` has no `declared`
+  column at all), AUTHORSHIP-PARSERS (none of the four parsers exist; `parse_kiro_cli_tool_runs`
+  found in `transcript.py` is the graphify-savings reader, a different feature, not an
+  authorship line-match parser), DOCTOR-INTEGRITY-UNRESOLVED-ROOT (`doctorcmd.py:1141` still
+  passes unresolved `root` to `_integrity`, confirmed by reading the call site again),
+  DOC-BACKTICK-GATE (no detector exists yet).
+- **No code changed. No suite run** — doc-only review.
+- **Next step:** none required; GFX-RECEIPTS-REAUDIT and GFX-IDE-PATH-UNPROBED both need a
+  real machine session, same as before.
+
+## 2026-08-15 — `cage clean` restored + ADR-CLEANUP (0011): STATE-RETENTION closed
+
+- **Built:** `cage clean` — a new top-level verb (`cli.py`: `cn = sub.add_parser("clean", …)`,
+  `--apply`/`--days N`/`--json`) dispatching to `clicmds.cmd_clean` → the already-built-but-
+  unreachable `cleanup.run_cli` (kept alive since SURFACE-CUT v0.50 deleted `cage data
+  cleanup --apply` with the whole `data` group). Dry-run table by default (house pattern);
+  `--apply` executes; runs regardless of `[cleanup] enabled` (that switch gates only the
+  automatic reminder). Restored as its own top-level command rather than reviving `data`.
+- **Wiring fixed alongside it:** `cleanup._reminder_line` (the auto-warn stderr line) and
+  `cage doctor`'s state check now name the real fix (`cage clean --apply`) instead of
+  apologizing that no command prunes; `verbmap.REMOVED["cleanup"]` changed from an empty
+  tail to `"clean"` (was misrouting the old bare `cage cleanup` spelling into the `data`-group
+  removal sentence, which no longer describes cleanup's fate) — mirrors the existing
+  `graphify` → `interceptor graphify` pattern. Stale `cage data cleanup` references updated
+  in `cage/policy.py`, `docs/example/toml-config.md`, `docs/GLOSSARY.md`.
+- **New ADR:** [docs/adr/0011_cleanup.md](../docs/adr/0011_cleanup.md) — ADR-CLEANUP, the
+  11th live record (Arpit's explicit call: a standalone record, not folded into ADR-CLI).
+  Wired into `docs/adr/README.md` (table row, ownership row, cite-by-name list, frontmatter
+  count 10→11), `CLAUDE.md` (set-size sentence, now ELEVEN with the full list),
+  `tests/test_adr_ownership.py` (`cleanup` moved from `NO_RECORD` to `OWNERS["cleanup"] =
+  "0011_cleanup"`), `work/DOC-REGISTRY.md` (new row).
+- **ADR-CLI updated in the same change:** counts 14/28 → 15/29 top-level/addressable
+  (frontmatter + body + `_ROOT_HELP`'s daily list, now five); §1 mermaid + ASCII twins gain
+  `clean`; `### cage clean` flag table + three examples added; the `Removed and renamed
+  verbs` table's `cleanup`/`graphify` pulled out of the "removed outright" `data`-group row
+  into their own rows (`graphify` was already inaccurate there too — folded into this fix).
+- **Tests:** `tests/test_cleanup.py` — fixed the `_reminder_line`/`maybe_run` assertions to
+  expect the runnable fix instead of "no command prunes them"; replaced the stale "verb is
+  gone" comment block with five real CLI tests (`test_clean_dry_run_default`,
+  `test_clean_apply_prunes`, `test_clean_apply_ignores_cleanup_enabled_env`,
+  `test_clean_json`, `test_clean_days_override`). `tests/fixtures/cli-help.txt` (the
+  `test_cli_tiering.py` fixture — separate from the golden the ADR-CLI block cites) updated
+  to match. Full suite green: 1591 passed, 11 skipped, 0 failed.
+- **OPEN-WORK:** STATE-RETENTION removed (closed by this entry, per the remove-only-after-
+  recording rule).
+- **Next step:** none outstanding for this item. `work/DOC-REGISTRY.md`'s own row *describing*
+  `docs/adr/README.md` still says "the seven records" in its column text, and a few
+  CHANGELOG.md historical entries still say `cage data cleanup` — both left as-is
+  deliberately: the first is unrelated pre-existing staleness (a record-count number in a
+  registry description, out of scope here) and CHANGELOG entries are historical narration of
+  what shipped at the time, not current spec.
+
+## 2026-08-15 — the ADR correctness sweep (P0–P4): ten records made true, AUTHORSHIP skipped
+
+- **Built:** `tests/test_adr_counts.py` (new — 3 assertions re-derived from
+  `cli.build_parser()` and `mcpserver.TOOLS`/`WRITE_TOOLS`: ADR set size, ADR-CLI
+  per-group + total command counts, MCP read-tool count). Confirmed RED on the tree at
+  `15cfbb4` (5 of 7 assertions failing), green after P2/P4 except the one caused by the
+  concurrent session's in-flight `cage clean` addition (see Next step).
+- **P1 — three agent diagrams, mermaid + ASCII twins each:** ADR-CLAUDE's `join_table`
+  box deleted (retired writer, ADR-CONSUMERS' subject matter), the surviving
+  `parse_calls → calls-*` branch marked HISTORY; ADR-COPILOT's `calls row` box deleted,
+  `+ credits verbatim` moved onto `ledger/copilot/`; ADR-KIRO's `credits row` re-parented
+  from a sibling of `ledger/kiro/` to a projection of it.
+- **P2 — ADR-CLI, 7 errors + 1 found while fixing them:** `9 read tools`→1,
+  `four groups (…, data)`→six real subparser groups (`data` deleted), `cage task`
+  3→2 commands, `cage authorship` 5→4, `five groups`/`twenty-seven`→six/twenty-eight,
+  the money-cull date v0.51→v0.50, `--hooks`'s dead budget-blocking claim dropped, the
+  "every line is checked to parse" guarantee narrowed to existence-only (2 examples
+  fixed to actually parse: `study start`/`study join` need a `phase` positional) — plus
+  the Conventions section's `prices`/`study`/`policy`-are-positional-choice bullet,
+  found stale (all six groups are now real subparsers; `Known gaps` already said so).
+  `cage/verbmap.py`'s matching two bugs fixed (v0.51→v0.50; the `human` removal message
+  no longer points at the also-dead `cage task quality`).
+- **P3 — five of six records** (ADR-AUTHORSHIP skipped, see below): ADR-COVERAGE
+  (1.979×/85.2× supersede stale figures, ⚠️/❌ legend drift, the "four ✅ cells" claim
+  corrected to kiro-IDE's actual two no-fallback cells, three IDE interceptor cells
+  ✅→⚠️ to match their own UNPROBED note, and **COVERAGE-STRIKE-3** recorded: the
+  copilot-CLI Chat title cell said `N/A honest empty` two commits after the parser
+  landed); ADR-CONSUMERS (the *Where they sit* diagram pair now shows the P1 dual-write
+  into `ledger/consumer/`); ADR-GRAPHIFY (D4's findstr-literal count 3→4, B7/D6's `%*`
+  forwarding-line count →four, in both prose spots); ADR-LAWS ("MCP is the only surface
+  cage wires" narrowed to "by default" — `--hooks`/`--skills` also wire); ADR-INTEGRITY
+  (22,751→22,802, `22k+`→~89k, `BY_DESIGN` 2→5 entries named, the lock-miss taint
+  corrected from segment- to file-entry-scoped and sticky, the status date normalized to
+  UTC 2026-08-14).
+- **P4:** `docs/adr/README.md`'s cite-by-name list (+4 names); `CLAUDE.md`'s set-size
+  sentence and MCP-surface line (both rewritten to match current code, not just
+  renumbered); 10 `work/DOC-REGISTRY.md` rows bumped; 4 stale code docstrings
+  (`integrity.py` ×2, `savings.py`, `graphifytx.py`, `mcpserver.py`) plus
+  `graphifymeter.py`'s 3 numbered-ADR citations renamed to ADR-GRAPHIFY.
+- **ADR-AUTHORSHIP deliberately NOT fixed.** A live concurrent session reverted the P3
+  edit (44.3%→85.2%, "five integers"→six + `files`, the model-trailer not-built mark,
+  `provenance.jsonl`→`ledger/provenance/`) back to its pre-edit content mid-sweep, and
+  Arpit's call was to skip it and move on rather than fight the collision. Those fixes
+  are still correct and still needed — whoever finishes should re-derive them from
+  `work/adr-correctness-sweep.handoff.md` P3's ADR-AUTHORSHIP table.
+- **Tests: full suite green — 1586 passed, 11 skipped, 0 failed** (`tests/test_adr_counts.py`
+  7/7). The concurrent session's `cage clean`/ADR-CLEANUP (0011) landed fully — its ADR-CLI
+  section, `--help` golden and the two transiently-red tests were all fixed on its own
+  side while this sweep was finishing up; nothing left for this sweep to reconcile there.
+- **Next step:** ADR-AUTHORSHIP is the one remaining gap — re-derive its P3 fixes from
+  `work/adr-correctness-sweep.handoff.md` once the concurrent session's own AUTHORSHIP
+  work (if any) has landed, re-run `tests/test_adr_counts.py` + `just test`, then archive
+  this handoff/prompt pair to `work/archive/v0.51-adr-correctness-sweep.*`.
+
+## 2026-08-15 — ADR-OUTPUT-GOLDENS closed + DOCTOR-DEAD-VERBS + GOLDENS-ORPHANED
+
+- **Built:** three OPEN-WORK items under ADR-CLI, closed in one pass.
+  **DOCTOR-DEAD-VERBS** — `doctorcmd._metering`'s two printed lines (the "last import:
+  never" fallback and the "capture is pull-based" head) named the v0.50-deleted
+  `cage data export`/`cage data watch`; both now name only `cage import`.
+  **GOLDENS-ORPHANED** — deleted the 16 of 27 `tests/fixtures/goldens/*.txt` files read
+  by nothing (verified via repo-wide grep before deleting); repointed the stale
+  `docs/cli-output-spec.md`/`tools.docgen` docstrings in `tests/test_output_spec.py` and
+  `tests/goldenseed.py` at ADR-CLI + `tests/test_adr_output_blocks.py`.
+  **ADR-OUTPUT-GOLDENS** — added seed builders (`goldenseed.graphify_chats`,
+  `goldenseed.why_call`; `_call` gained a `surface` kwarg) and seven new goldens (H1
+  bare `cage`, H2 `import`, W1 `setup --status`, H4 `query saved`, I11 `insights
+  graphify`, I12 `insights why`, A5 `authorship origin`) in `tests/test_output_spec.py`;
+  flipped all seven ADR-CLI blocks from CAPTURED to GATED. `cage doctor` stays the one
+  permanent CAPTURED exception (machine-dependent by construction). Along the way,
+  `_check`'s golden-text helper was fixed to always prepend the `$ cage …` invocation
+  line (previously skipped it for empty argv, which bare `cage` needed) — dead code
+  path, no other golden was affected.
+- **Bonus catch:** the bare-`cage` CAPTURED block had already silently rotted (missing
+  the `clean` verb another concurrent session was landing) — live confirmation of the
+  exact risk ADR-OUTPUT-GOLDENS named. Filed the next instance of the same class,
+  **DOCGEN-DEAD-REF** (`cage/paths.py`'s `builtin_source_docs()` cites the same dead
+  `tools.docgen`, and has no caller anywhere — unresolved, needs a human call).
+- **Files:** `cage/doctorcmd.py` · `tests/goldenseed.py` · `tests/test_output_spec.py` ·
+  `tests/test_adr_output_blocks.py` (unmodified, re-verified) · `docs/adr/0002_cli.md` ·
+  `work/OPEN-WORK.md` · 16 golden files deleted, 7 added.
+- **Tests:** full suite green — `1586 passed, 11 skipped`. Ran concurrently with 5 other
+  peer sessions editing the same working tree (one landing `cage clean` mid-session);
+  no collisions, verified by re-diffing after each edit.
+- **Next step:** none for these three — closed. DOCGEN-DEAD-REF is open and needs
+  Arpit's call (dead code vs. missing replacement).
+
+
 ## 2026-08-14 — CLI-OUTPUT: ADR-CLI carries rendered output, gated
 
 - **Built:** `docs/adr/0002_cli.md` § *What the output looks like* — 15 output blocks

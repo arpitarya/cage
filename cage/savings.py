@@ -44,7 +44,7 @@ def record(root: Path | None = None, *, tool: str, raw_alternative: float, actua
            method: str = "modeled", confidence: float = 1.0, source_files: int = 0,
            import_id: str = "", savings_id: str | None = None, ts: str | None = None,
            **_ignore) -> str:
-    """Append one savings row for ``tool`` into `savings/<tool>/`; return its id (``""``
+    """Append one savings row for ``tool`` into `ledger/<tool>/`; return its id (``""``
     on failure). Fail-open: any error is traced and swallowed, never raised. The push
     sink is the canonical ledger; a non-PII `route_key` is stamped for exact-key
     reclaim, exactly like `metering.record_receipt`."""

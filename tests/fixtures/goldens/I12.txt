@@ -1,0 +1,13 @@
+$ cage insights why c_why1
+c_why1  ·  2026-07-01T12:00:00Z
+  task     fix-handover-bug    route chat    agent claude
+  model    anthropic/claude-sonnet-4-6
+  tokens   8,600 in (0 cached) / 1,500 out
+  latency  0 ms    ok=True
+
+Receipts
+tool        unit    raw alt  actual   saved  method
+----------  ------  -------  ------  ------  --------
+graphify    tokens   30,000   3,000  27,000  modeled
+fux         tokens    8,000   1,600   6,400  modeled
+compressor  tokens   10,000   2,000   8,000  measured

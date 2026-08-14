@@ -12,7 +12,9 @@ over a multi-MB ledger. So the digest is a **chain over appended segments** —
 ``current = sha256(previous ‖ appended_bytes)`` — which costs O(delta) to advance.
 
 **And it advances at SWEEP boundaries, not per row.** `ledger.append_row` is untouched:
-`checkpoint()` is called once at the end of an import, and by `cage doctor`. Two reasons,
+`checkpoint()` is called once at the end of an import — its sole caller is
+`importcmd.py`; `cage doctor` reads the manifest but never checkpoints it (an earlier
+draft did; see `doctorcmd.py`'s comment on why that changed). Two reasons,
 both load-bearing. The hot path stays exactly as fast and exactly as fail-open as it was;
 and the segment list stays short (one entry per sweep, not one per row), which matters
 because **verification replays it**.
@@ -130,7 +132,8 @@ def read_manifest(root: Path) -> dict:
 def checkpoint(root: Path) -> dict:
     """Advance the chain for every tracked file; return the updated manifest.
 
-    Called at the end of an import sweep and by `cage doctor`. **Fail-open throughout** —
+    Called at the end of an import sweep — `importcmd.py` is its sole caller. `cage
+    doctor` reads the manifest but never checkpoints it. **Fail-open throughout** —
     every failure mode leaves the previous manifest intact and returns it.
 
     A file that SHRANK is not chained further: its recorded state is preserved so `verify`

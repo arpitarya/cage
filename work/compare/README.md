@@ -78,3 +78,13 @@ Naming: `<topic>.compare.md`. Written in short points, not walls of prose.
   ADR-CLAUDE; ADR-COVERAGE's authorship veto is recorded as FIRED — its trigger was satisfiable
   on the day it was written). The three code changes are **not built** — OPEN-WORK
   AUTHORSHIP-CODE-CATCHUP.
+- [coverage-strike-gate.compare.md](coverage-strike-gate.compare.md) —
+  **COVERAGE-STRIKE-2**: ADR-COVERAGE's two-strikes trigger (parked full generator) fired
+  on STRIKE 1+2, but STRIKE 3 showed the named remedy would not have caught it. Four
+  options (build the full generator · extend the existing narrow generator to the two
+  ✅/N-A tables using only registries that exist today · build the missing surface-grained
+  registries first · close the two-strikes counter). **Proposed verdict D — close the
+  counter** (STRIKE 1 was table-shaped and cheaply closeable; STRIKE 2 and STRIKE 3 were
+  prose/missing-registry drift no table-diff generator reaches), **with B shippable
+  separately on its own merits** since it is cheap and would have caught STRIKE 1 outright.
+  Awaiting Arpit's accept or override.

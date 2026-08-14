@@ -55,31 +55,28 @@ flowchart TD
         DL["debug-logs"]
         OT["agent-traces.db (SQLite)"]
     end
-    CS --> RC["calls row<br/>+ credits verbatim"]
-    CLI -->|"delta vs previous shutdown"| RC
-    CS --> MM["ledger/copilot/<br/>metric rows"]
-    CLI --> MM
+    CS --> MM["ledger/copilot/<br/>metric rows + credits verbatim"]
+    CLI -->|"delta vs previous shutdown"| MM
     SC --> MM
     DL --> MM
     OT --> MM
     MM -->|"chat + cli-delta ONLY"| SP["ledger.spend()"]
     MM -.->|"sidecar · debuglog · otel<br/>finer views of the SAME traffic<br/>NEVER a spine"| SP
-    SP --> V["cage insights chats · commits · study"]
+    SP --> V["cage insights chats · commits · commit"]
 ```
 
 <details><summary>Same diagram, ASCII</summary>
 
 ```text
   ALWAYS PRESENT
-    VS Code chatSessions (4 roots) ---------> calls row (+ credits verbatim)
-    ~/.copilot/session-state/events.jsonl --> calls row, as a DELTA vs previous shutdown
+    VS Code chatSessions (4 roots) ---------> ledger/copilot/ metric rows (+ credits verbatim)
+    ~/.copilot/session-state/events.jsonl --> ledger/copilot/ metric rows, as a DELTA vs previous shutdown
         (CUMULATIVE at source)                (never an overwrite)
 
   ONLY IF THE SETTING IS ON
     agentHostUsage sidecar  \
     debug-logs               >-------------> ledger/copilot/ metric rows
-    agent-traces.db (SQLite)/                        |
-    (chatSessions + CLI also feed it) ---------------+
+    agent-traces.db (SQLite)/
                                                      |
                              spine = "chat" + "cli-delta" ONLY
                              sidecar/debuglog/otel are finer views
@@ -87,7 +84,7 @@ flowchart TD
                                                      |
                                               ledger.spend()
                                                      |
-                                cage insights chats | commits | study
+                                cage insights chats | commits | commit
 ```
 </details>
 

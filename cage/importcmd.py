@@ -1230,12 +1230,6 @@ def _write_manifest(root: Path, import_id: str, collected: list[dict], health: d
         return
     try:
         from cage import manifest
-        machine_id = ""
-        try:
-            from cage import machine
-            machine_id = machine.machine_id(root) or ""
-        except Exception:  # noqa: BLE001 — machine id is additive
-            machine_id = ""
         names = names or {}
         buckets: dict[tuple[str, str, str], dict] = {}
         for r in collected:
@@ -1259,7 +1253,7 @@ def _write_manifest(root: Path, import_id: str, collected: list[dict], health: d
                 source_path=_tilde(info.get("src", "")),
                 files_scanned=int(info.get("files", 0)),
                 rows_appended=b["rows"], tokens_in=b["tokens_in"], tokens_out=b["tokens_out"],
-                cached_in=b["cached"], ts=ts, session_name=name, machine=machine_id)
+                cached_in=b["cached"], ts=ts, session_name=name)
     except Exception as e:  # noqa: BLE001 — the manifest is an audit trail, never a gate
         debuglog.exception(root, "import.manifest", e, pol=pol)
 

@@ -103,9 +103,10 @@ def _policy(root: Path) -> tuple[str, str]:
 
 def _metering(active: Path) -> tuple[str, str]:
     """Honest three-agent capture matrix (ADR-LAWS Law 1). Capture is **pull-based and the
-    only path**: explicit `cage import` / `cage data export` (and the optional foreground
-    `cage data watch`) capture every surface in ``agents.SURFACES``, client-independent —
-    no hooks, so nothing depends on which client wrote the log. MCP is the wired *read*
+    only path**: explicit `cage import` (SURFACE-CUT, v0.50, deleted the `cage data export`/
+    `cage data watch` alternates) captures every surface in ``agents.SURFACES``,
+    client-independent — no hooks, so nothing depends on which client wrote the log. MCP is
+    the wired *read*
     surface; whether it's installed says nothing about whether capture ran. Surfaces the
     **last import: N ago** staleness signal."""
     wired = agents.status(active)
@@ -116,7 +117,7 @@ def _metering(active: Path) -> tuple[str, str]:
     li = importcmd.last_import(active)
     rel = render.ago(li) if li else ""
     foot = (f"\n      last import: {rel}" if rel
-            else "\n      last import: never — run `cage import` (or `cage data watch`)")
+            else "\n      last import: never — run `cage import`")
     foot += (f"\n      (automate with your own scheduler line, e.g. `{render.scheduler_hint()}`; "
              "cage installs no scheduler.)")
     # Capture health (docs/capture-health): the triple-gated "installed but capturing
@@ -149,7 +150,7 @@ def _metering(active: Path) -> tuple[str, str]:
     else:
         foot += "\n      capture health: every installed agent is capturing"
         level = _OK
-    head = ("capture is pull-based — `cage import`/`cage data export` is the only path "
+    head = ("capture is pull-based — `cage import` is the only path "
             "(no hooks); MCP is the wired read surface:")
     return level, head + "".join(rows) + foot
 
@@ -437,8 +438,8 @@ def _policy_version(root: Path) -> tuple[str, str]:
 
 def _state_dir(root: Path) -> tuple[str, str]:
     """State-dir size + prune-candidate visibility (bloat should be visible before
-    it's a problem). Informational — since v0.50 no command prunes state/, so this
-    reports the size and names no fix it cannot honour."""
+    it's a problem). Informational — names the runnable fix (`cage clean`,
+    STATE-RETENTION)."""
     foot = paths.Footprint(root)
     if not foot.state.exists():
         return _OK, "no state dir yet"
@@ -453,7 +454,7 @@ def _state_dir(root: Path) -> tuple[str, str]:
                   f"({policy.cleanup_days(pol)}d)")
         if stale:
             return _OK, status + (f" · {len(stale)} prune candidate(s) — "
-                                  "no prune command ships since v0.50")
+                                  "`cage clean` to see them, `cage clean --apply` to prune")
         return _OK, status + " · nothing stale"
     except Exception as exc:  # noqa: BLE001 — informational check, never blocks doctor
         return _OK, f"state dir present (scan skipped: {exc})"
@@ -790,6 +791,11 @@ def _out_of_root_fix(ps) -> str:
 
 def _integrity(root: Path) -> tuple[str, str]:
     """The tamper-evidence chain (`cage/integrity.py`, P6).
+
+    Caller passes the **active** sink (`active = paths.resolve_root(root)`), same as
+    every other ledger check in `run()` — a project-less user's global `~/.cage` must
+    be the one inspected, not an unresolved cwd with no `.cage/` at all
+    (DOCTOR-INTEGRITY-UNRESOLVED-ROOT).
 
     **Report-only and never a gate** — the `cage authorship verify` precedent, which is
     report-only and always exits 0. A finding here is a WARN, never a FAIL: cage does not
@@ -1137,7 +1143,7 @@ def run(root: Path) -> dict:
         ("timeline", *_capture_timeline(active)),
         ("capture-quality", *_capture_quality(active)),
         ("trace", *_capture_trace(active)),
-        ("integrity", *_integrity(root)),
+        ("integrity", *_integrity(active)),
         ("interceptor", *_interceptor(root, scan)),
         # The PATH-winning pair must render directly below `interceptor`: they answer
         # the same question at a wider scope (what actually runs, vs what this root

@@ -72,10 +72,11 @@ contradict its own diagrams' six/28; the money cull is dated v0.51 and was v0.50
 advertises budget blocking that no longer exists.
 
 **Line 467 needs care.** It claims every example "is checked to parse". It is not —
-`test_cli_reference.py:177-195` never calls `parse_args`, and `cage study start` / `cage study
-join` (510, 513) both fail on a missing positional. **Fix the two examples and narrow the sentence
-to what the gate checks** (existence). Do not promise the parse check unless you build it — and
-building it is a separate phase, not this one.
+`test_cli_reference.py:177-195` never calls `parse_args`. *(The two examples that proved it,
+`cage study start` / `cage study join`, went with the whole fleet study in v0.51 — STUDY-CUT.
+**The gap is unchanged**: the gate still checks existence only, and the next missing positional
+will ship just as silently.)* **Narrow the sentence to what the gate checks** (existence). Do not
+promise the parse check unless you build it — and building it is a separate phase, not this one.
 
 Sweep the same two bugs out of `cage/verbmap.py` (`:127` v0.51→v0.50; `:132-134` points at the
 dead `cage task quality`).

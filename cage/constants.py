@@ -158,7 +158,11 @@ CAPTURE_ON_READ_THROTTLE_SECS = 60
 PROVENANCE_METHOD_TRUST = {"hooked": 2, "transcript": 1, "heuristic": 0}
 PROVENANCE_CORROBORATION_BONUS = 0.2  # confidence bump when 2 independent paths agree
 
-# `cage insights compare` min-n gate (roadmap P2). Below this many closed tasks a group
+# `cage insights compare` min-n gate (roadmap P2). **Read by no code since v0.51** — its
+# last live reader was the fleet study's paired delta, removed whole by STUDY-CUT. It
+# stays because ADR-GRAPHIFY's veto condition names this number as the sample floor that
+# reopens `answer_hash`; deleting it would leave that veto citing a constant that no
+# longer exists. Below this many closed tasks a group
 # renders "insufficient data (n=X < N)" and is excluded from every delta — the
 # command explains, it never numbers. NOT a vibes number: with n<5 a single
 # outlier task moves the median itself, and the IQR (quartiles) degenerates —

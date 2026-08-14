@@ -1,0 +1,7 @@
+$ cage query saved
+saved · the tokens a tool kept out of the prompt (GROSS)
+  formula:  saved = raw_alternative − actual   (in the receipt's own unit — usually tokens)
+  GROSS: the tokens spent USING the tool — the invoking turn, the context a
+  hook injected — are NOT subtracted. `cage query gross-vs-net` explains.
+  method:   inherits the receipt's method — measured only if the tool truly measured it.
+  code:     cage/savings.py · cage/graphifychat.py · cage/schema.py

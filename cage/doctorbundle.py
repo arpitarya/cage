@@ -119,8 +119,7 @@ def _member_bytes(path: Path) -> bytes:
 def _redact_home(data: bytes) -> bytes:
     """Replace the user's home prefix with ``~`` in every text member. Machine-local
     absolute paths are diagnostic signal, but the account *username* inside them is
-    identity the bundle doesn't need — same spirit as the study bundle's
-    no-hostname/no-username rule, without losing which file a path points at.
+    identity the bundle doesn't need, without losing which file a path points at.
     Also covers the slug-escaped form Claude Code uses for project dir names
     (``/Users/me`` → ``-Users-me``), which embeds the same username."""
     home = str(Path.home())

@@ -45,15 +45,13 @@ EXPECTED_VIEWS = {
     "insights chats", "insights graphify", "insights commits", "insights commit",
     "insights why",
     # EXPORT-SCOPE (2026-08-11): report-shaped views v0.48.0's scope line missed.
-    # Keyed by PARSER LEAF PATH, which is what `_leaves()` walks. `study report` is a
-    # real leaf since CLI-GAPS(b) converted the group to subparsers — before that the
-    # action was a positional, `--export` sat on the group where every marker verb could
-    # reach it, and `cmd_study` refused it at runtime.
-    "authorship summary", "study report",
+    # Keyed by PARSER LEAF PATH, which is what `_leaves()` walks. `study report` was here
+    # too until v0.51 (STUDY-CUT) removed the whole fleet study.
+    "authorship summary",
 }
 
-# Every exportable view's `view=` label is now its parser leaf path — `study` was the
-# last exception and lost it with the subparser conversion.
+# Every exportable view's `view=` label is its parser leaf path — `study` was the last
+# exception and lost it with the subparser conversion, before the group was removed.
 VIEW_LABELS: dict[str, str] = {}
 
 
@@ -290,9 +288,7 @@ def test_every_exportable_view_names_itself():
     p = cli.build_parser()
     for path in sorted(EXPECTED_VIEWS):
         args = p.parse_args([*path.split(), *(["x"] if path == "insights commit" else []),
-                             
-                             *(["c_1"] if path == "insights why" else []),
-                             *(["report"] if path == "study" else [])])
+                             *(["c_1"] if path == "insights why" else [])])
         assert getattr(args, "view", None) == VIEW_LABELS.get(path, path)
 
 
@@ -334,18 +330,6 @@ def test_authorship_summary_exports_all_three_formats(go):
     assert str(d) in err
 
 
-def test_study_report_exports_all_three_formats(go):
-    """Same class, same cause — and it is the one that proves the point: the first wiring
-    here produced no CSV for a view that HAS a `render_csv`, because the hand-rolled
-    branch shadowed it. An artifact missing a format the view owns is the same lie as an
-    empty file, only quieter."""
-    go(["study", "report", "--export"])
-    d = _outdir(go.root, "study report")
-    assert sorted(p.name for p in d.iterdir()) == ["study-report.csv",
-                                                   "study-report.json",
-                                                   "study-report.txt"]
-
-
 def test_a_csv_less_leaf_exports_only_the_formats_it_has(go):
     """A view that owns no CSV renderer writes text + JSON and
     refuses CSV rather than writing an empty one (an empty CSV reads as *no rows*)."""
@@ -355,27 +339,13 @@ def test_a_csv_less_leaf_exports_only_the_formats_it_has(go):
                                                    "insights-why.txt"]
 
 
-def test_a_study_marker_verb_cannot_EVEN_ASK_for_an_export(go, capsys):
-    """`report` is the only study verb that is a rendered view, so after CLI-GAPS(b) it
-    is the only one that carries `--export`. A marker verb no longer refuses at runtime
-    — the flag does not exist on it, and argparse says so (exit 2) before any code runs.
-    What must not change either way: no artifact is written for a marker verb."""
-    del capsys
-    for action in ("id", "stop"):
-        with pytest.raises(SystemExit) as e:
-            cli.main(["study", action, "--export"])
-        assert e.value.code == 2
-        assert not (go.root / ".cage" / "output").exists()
-
-
 @pytest.mark.parametrize("argv", [
     ["authorship", "summary"],
-    ["study", "report"],
 ])
 def test_export_never_changes_these_views_stdout(go, argv):
-    """The binding gate, extended to the three new views: stdout is byte-identical with
-    and without `--export`. If a future export feature needs stdout to move, the feature
-    is wrong."""
+    """The binding gate, extended to the EXPORT-SCOPE views: stdout is byte-identical
+    with and without `--export`. If a future export feature needs stdout to move, the
+    feature is wrong."""
     plain, _ = go(argv)
     exported, _ = go([*argv, "--export"])
     assert plain == exported

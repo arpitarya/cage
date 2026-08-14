@@ -269,111 +269,6 @@ def cmd_policy(args) -> int:
     return emit(args, render.envelope("policy", payload) if args.json else payload, text)
 
 
-class _StudyImportArgs:
-    """The minimal arg shape `importcmd.run` reads for the pre-bundle refresh sweep.
-    Always all-agent — a bundle that omits an agent is not a fleet sample."""
-    path = None
-    project = None
-    agent = "all"
-
-    def __init__(self, since: str | None):
-        self.since = since
-
-
-def _study_sweep(root: Path, since: str | None) -> tuple[bool, int]:
-    """The all-agent import refresh the bundle runs before writing, so a machine that
-    never ran an explicit `cage import` (capture is pull-based) still ships a complete
-    artifact. **Fail-open**: a failed sweep is warned to stderr and the bundle is written
-    from the pre-sweep ledger — a broken parser must never block a fleet participant from
-    sending their data. (`importcmd.run` honors the capture switch itself: `CAGE_CAPTURE=0`
-    / `[capture] enabled=false` ⇒ the sweep is a no-op.)
-
-    Rehomed from the deleted `exportcmd.sweep` in SURFACE-CUT — the bundle was its only
-    surviving caller."""
-    import sys
-    try:
-        before = len(ledger.calls(root))
-        importcmd.run(root, "all", _StudyImportArgs(since))
-        added = len(ledger.calls(root)) - before
-        print(f"↻ imported {added} new call(s)", file=sys.stderr)
-        return True, added
-    except Exception:  # noqa: BLE001 — fail-open: bundle what the ledger already holds
-        print("cage study export: import refresh failed — bundling the ledger as-is.",
-              file=sys.stderr)
-        return False, 0
-
-
-def _study_export(r, args) -> int:
-    """`cage study export` — the one-file fleet bundle (ADR-CONSUMERS), rows + phase markers
-    + a counts-only manifest. The bundle stays **jsonl**: it is the one export that is
-    also an *import* source (`cage import bundle*.zip`), which is why it never grew the
-    csv/otel flags that the deleted `cage data export` carried."""
-    from cage import study
-    pol = _policy(r)
-    refresh = {"ran": False, "new_calls": 0}
-    if getattr(args, "do_import", True) and policy.import_before_export(pol):
-        ran, added = _study_sweep(r, getattr(args, "since", None))
-        refresh = {"ran": ran, "new_calls": added}
-    out = study.export_bundle(r, getattr(args, "out", "") or None, refresh=refresh)
-    tag = (f"self-refreshed: +{refresh['new_calls']} call(s)" if refresh["ran"]
-           else "snapshot only (no sweep)")
-    print(f"✔ study bundle written: {out} (rows + phase markers + counts-only "
-          f"manifest · {tag})")
-    return 0
-
-
-def cmd_study(args) -> int:
-    """Fleet-study verbs (ADR-CONSUMERS). Markers/report act on the *active* ledger
-    (capture lands there); `join` additionally wires this project's agents."""
-    # No runtime refusal for `--csv`/`--export`/`--stamp` on a marker verb any more:
-    # CLI-GAPS(b) gave each study action its own parser, and only `report` — the one
-    # rendered VIEW here — carries them. A marker verb no longer *has* the flag, so
-    # argparse rejects it as a usage error (exit 2) before this function is reached.
-    from cage import machine, study
-    r = ledger_root()
-    if args.action == "id":
-        mid = machine.machine_id(r)
-        print(mid if mid else "not enrolled — `cage study join <phase>` (or `start`) "
-                              "generates the opaque machine id")
-        return 0
-    if args.action == "start":
-        if not args.phase:
-            raise CageError("cage study start needs a phase label (one short token)")
-        mid = study.start(r, args.phase)
-        print(f"✔ phase {args.phase!r} started (machine {mid}) — rows from now on are "
-              "assigned to it by their own timestamps")
-        return 0
-    if args.action == "stop":
-        study.stop(r)
-        print("✔ phase stopped — rows after this marker are unphased until the next start")
-        return 0
-    if args.action == "export":
-        return _study_export(r, args)
-    if args.action == "report":
-        d = study.summarize(r, _policy(r))
-        # Through the ONE chokepoint. The hand-rolled `csv_dest` branch this replaced is
-        # why the first `--export` here silently produced no CSV for a view that owns a
-        # `render_csv` — an artifact missing a format it HAS is the same lie as an empty
-        # file, just quieter.
-        return emit(args, render.envelope("study", d) if args.json else d,
-                    study.render_study(d), csv=lambda: study.render_csv(d), root=r)
-    # join — one-command enrollment: scaffold → wire all four → start → doctor
-    if not args.phase:
-        raise CageError("cage study join needs the starting phase label (e.g. baseline)")
-    initcmd.run(paths.resolve_root(), pointer=False)
-    wired = agents.install(root())
-    mid = study.start(r, args.phase)
-    print(f"✔ enrolled: machine {mid} · phase {args.phase!r} started · wired: "
-          + ", ".join(sorted(wired)))
-    res = doctorcmd.run(root())
-    glyph = {"ok": "✔", "warn": "·", "fail": "✗"}
-    for c in res["checks"]:
-        print(f"  {glyph[c['level']]} {c['name']:<12} {c['detail']}")
-    print(f"\n{glyph[res['status']]} doctor: {res['status']} — automate capture with your "
-          f"own scheduler line, e.g.:  {render.scheduler_hint()}   (cage installs no scheduler)")
-    return 1 if res["status"] == "fail" else 0
-
-
 def cmd_graphify(args) -> int:
     """`cage interceptor graphify -- <REAL> <args…>` — the door both twins call.
 
@@ -621,6 +516,19 @@ def cmd_doctor(args) -> int:
 
 
 
+def cmd_clean(args) -> int:
+    """`cage clean` (STATE-RETENTION) — the manual prune verb over `.cage/state/`'s
+    closed allowlist (`cleanup.py`). Dry-run table by default (house pattern);
+    `--apply` executes. Runs regardless of `[cleanup] enabled` — that switch gates
+    only the automatic reminder (`cleanup.maybe_run`), never a command the user
+    typed. Acts on the active ledger root (`--ledger`/`CAGE_BASE` → project → global),
+    same as `import` — state/ lives beside whichever ledger is active."""
+    from cage import cleanup
+    r = ledger_root()
+    payload, text = cleanup.run_cli(r, _policy(r), apply=args.apply, days=args.days)
+    return emit(args, payload, text)
+
+
 def cmd_debug(args) -> int:
     """Print recent capture-path debug events ($0, metadata-only). When debug is off the
     log won't exist — say how to turn it on rather than printing nothing."""
@@ -696,13 +604,8 @@ def cmd_import(args) -> int:
     and no project. Each agent prints its own count line; the proxy fallback for those
     with no on-disk usage log. Always exits 0 (fail-open).
 
-    With positional BUNDLE args (fleet path, ADR-CONSUMERS), merges study bundles by row
-    identity instead — the analyst's verb; idempotent, a bad bundle is a typed error."""
-    if getattr(args, "bundles", None):
-        from cage import study
-        for line in study.import_bundles(ledger_root(), args.bundles):
-            print(line)
-        return 0
+    The positional ``BUNDLE`` arg went with the fleet study (STUDY-CUT, v0.51): this verb
+    reads on-disk agent logs, and the one zip-merging path cage ever had is gone."""
     for line in importcmd.run(ledger_root(), args.agent, args):
         print(line)
     return 0

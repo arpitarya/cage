@@ -41,15 +41,11 @@ def append_row(root: Path, kind, row: dict) -> bool:
     attributable line in the debug log under ``CAGE_DEBUG=1``. Local import + row
     metadata only (kind, shard path, row id) — the trace is itself fail-open.
 
-    Fleet studies (ADR-CONSUMERS): when this ledger is *enrolled* (an opaque machine id
-    exists in state), the row gains an additive ``machine`` field here — the one write
-    chokepoint every calls/receipts/tasks writer already goes through. Unenrolled
-    ledgers stamp nothing: byte-identical to the legacy contract."""
-    try:
-        from cage import machine  # local: keeps the hot path import-light, no cycle
-        machine.stamp(root, row)
-    except Exception:  # noqa: BLE001 — stamping is additive, never blocks a write
-        pass
+    This used to stamp an additive ``machine`` field from the fleet study's opaque
+    per-machine id. The study was removed whole in v0.51 (STUDY-CUT) and the stamp went
+    with it, so the write path is back to the legacy contract for every ledger. Rows
+    already carrying ``machine`` are untouched and still read — append-only means the
+    recorded past is never rewritten, and an unread key on an old row costs nothing."""
     shard = paths.Footprint(root).shard(kind, row.get("ts", ""))
     ok = append(shard, row)
     if not ok:
@@ -705,12 +701,13 @@ def _spend_row(row: dict) -> dict:
     it would be on a legacy call row, and is NEVER synthesized. `basis` is the one field
     that is not on a call row: it names which ledger the figure came from, so a view can
     state a split instead of blending two bases silently (the `creditprice` precedent)."""
-    # `machine` is in this list because the fleet study partitions by it
-    # (`study.summarize`): omitted, every metric-sourced row lands "unphased" and a
-    # machine's whole plugin phase reads as zero days. Found by a golden, not by
-    # reading — the same class of miss as `route` needing a default below.
+    # `machine` was carried here so the fleet study could partition by it; the study was
+    # removed whole in v0.51 (STUDY-CUT) and nothing groups by the field any more, so it
+    # is no longer carried across. The lesson that put it here still stands for the rest
+    # of this list: a grouping axis dropped in the metric→call normalization silently
+    # empties whichever bucket reads it, and it was found by a golden, not by reading.
     out = {k: row[k] for k in ("id", "ts", "agent", "model", "provider", "session",
-                               "task", "surface", "project", "scope", "machine",
+                               "task", "surface", "project", "scope",
                                "tokens_in", "tokens_out", "cached_in", "cache_write_in",
                                "est_cost_usd", "credits", "billed_with", "latency_ms",
                                "import_id", "route")
