@@ -2,9 +2,13 @@
 
 ## In flight
 
-- **LEDGER-RESTRUCTURE is in flight (2026-08-14)** — nine phases, one shape per producer,
-  spec in [ledger-restructure.handoff.md](ledger-restructure.handoff.md). **PG shipped**
-  (see below); P0–P7 remain.
+- **LEDGER-RESTRUCTURE is BUILT (2026-08-15)** — all nine phases (PG · P0–P7), suite
+  green at **1521**. One shape per producer under `ledger/`; the claude/copilot
+  transcript→`calls` writer is retired; a tamper-evidence chain ships as
+  [ADR-INTEGRITY](../docs/adr/0010_integrity.md). Nothing on disk moved. Outcome in
+  [IMPLEMENTATION.md](IMPLEMENTATION.md); pair archived as
+  `archive/v0.51-ledger-restructure.{handoff,prompt}.md`. **One deviation needs
+  ratification — see KIRO-CALLS-LEG below.**
 - **SURFACE-CUT is BUILT (2026-08-14), suite green** — 14 modules, 15 handlers, 12 test
   files and 16 goldens deleted; MCP cut 6 tools → 2. Outcome recorded in
   [IMPLEMENTATION.md](IMPLEMENTATION.md); decision record in
@@ -80,30 +84,20 @@
   from `tasks.jsonl` (which carries session + ts). Pinned previously in
   `tests/test_compare.py`'s `_MODEL` comment; that file was deleted, so this line is now
   the only record of the seam.
+  **Widened 2026-08-15 (P5):** it is no longer only a *future* view's problem. `taskcorr`
+  and `hookcmd` read `ledger.calls` for a `task`, and claude/copilot stopped writing calls
+  rows — so both now correlate only consumer/custom/kiro rows. Both **say so in place**;
+  deliberately **no** timestamp-proximity fallback was added (forbidden by house law). The
+  fix remains a task grain on the metric kinds — a schema decision, not a patch.
 
-- **LEDGER-SHAPE** — **Arpit, 2026-08-14:** every usage producer owns one directory under
-  `ledger/`. Four asks, spec'd as P1-P4 of
-  [ledger-restructure.handoff.md](ledger-restructure.handoff.md): a **consumer ledger**
-  (`ledger/consumer/`, dual-write — **reverses ADR 0006**, ratified the same day) · kiro
-  **credits** folded into `ledger/kiro/` (copilot needs nothing — it has no credit rows) ·
-  **`imports.jsonl` → `state/`** plus name-lifting for all three agents · **`provenance.jsonl` →
-  `ledger/provenance/`, month-partitioned** (reverses `paths.py`'s explicit *"provenance is
-  intentionally never partitioned (buffer)"*) · **graphify savings → `ledger/graphify/`**. Nothing is moved on disk — every old path stays written-no-more and
-  read-forever. Carries five open decisions (handoff §10.1, 10.3-10.6); **10.5 (the `ledger/`
-  namespace collision between agents, consumers and tools) blocks P4** and **10.3 (whether
-  kiro-CLI gains a spine) changes user-visible output**.
-
-- **METRICS-DUAL-WRITE-END** — **decided 2026-08-14: `calls` capture for the three agents
-  stops. Freeze lifted early by Arpit** (it read *"do not touch before 2026-09-13"*, one full
-  transcript-retention window of cross-check; that window is knowingly forfeited). **Picked up**
-  — folded into the six-phase [ledger-restructure.handoff.md](ledger-restructure.handoff.md) +
-  [.prompt.md](ledger-restructure.prompt.md) as **P5**, not yet executed. Scope is the three agents'
-  **transcript→calls ingest legs only**: the `calls` kind survives, because `ledger.spend()`'s
-  calls loop is still the sole basis for `record_call` consumers, retired `codex`, proxy rows
-  and `[sources.<name>]` custom tools. Handoff §0 (a pre-flight `calls`-vs-metric snapshot to
-  `regression/`) is the mitigation for the lifted freeze and gates every later step.
-  Carries one open decision — **OPEN QUESTION 10.1**, whether `_PARSERS` survives as the
-  `[sources.<name>] format` custom-source contract; blocks only its own deletion.
+- **KIRO-CALLS-LEG** — **needs Arpit: ratify or reverse.** P5 retired the transcript→`calls`
+  writer for claude and copilot; **kiro's leg was KEPT**, deviating from the handoff. Reason:
+  kiro IDE has **no metric twin** (`devdata.sqlite` is absent on every install probed), so
+  that leg is the only reader of `tokens_generated.jsonl` — retiring it ends kiro IDE capture
+  rather than de-duplicating it, and takes ADR-KIRO's routing decision's subject matter and
+  the upgrade-watch's baseline with it. The stated reason for removal (the rows are
+  unsummable) is already handled by `ABSENT_SPINES`. Recorded in ADR-KIRO, pinned by
+  `tests/test_calls_retired.py`; reversing it is deleting five lines in `import_kiro`.
 
 - **AUTHORSHIP-CODE-CATCHUP** — [ADR-AUTHORSHIP](../docs/adr/0009_authorship.md) is
   ratified (Arpit, 2026-08-14) and **three of its decisions are not built**. The record

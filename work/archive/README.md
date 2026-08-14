@@ -251,3 +251,21 @@ unfixed** — a reproduced 120-second hang in the shipped POSIX twin — not a p
 And [CONSTRAINTS.md](v0.49-open-queue-constraints.md) was **never open work**: it is here
 because its directory was emptied, and its rules were **not lifted**; its header names
 which are enforced mechanically and which now survive on prose alone.
+
+
+## v0.51 — LEDGER-RESTRUCTURE (2026-08-15)
+
+[handoff](v0.51-ledger-restructure.handoff.md) · [prompt](v0.51-ledger-restructure.prompt.md)
+— nine phases: the graphify interceptor revived under `cage interceptor graphify`, the
+calls-vs-metric cross-check taken **at the cut** (the freeze was lifted early, so it can
+never be taken again), one directory per producer under `ledger/`, the claude/copilot
+transcript→`calls` writer retired, and a tamper-evidence chain
+([ADR-INTEGRITY](../../docs/adr/0010_integrity.md)).
+
+**Named, not cited.** Two things a future reader should know before opening it. The pair
+was written from a static read and was **wrong in two places the build corrected**: it did
+not notice that the capture manifest is built from the retired leg's rows (so P5 as specced
+would have silently stopped recording every new chat's title), and its P5 scope treated
+kiro like claude and copilot — but **kiro has no metric twin**, so retiring its leg ends
+kiro IDE capture rather than de-duplicating it. That deviation is recorded in ADR-KIRO and
+carried in the queue as **KIRO-CALLS-LEG**.

@@ -238,7 +238,7 @@ cage insights commits --csv --since 30d                  # per-commit rows for a
 
 ## The `$0` guarantee
 
-Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 1348 tests; `cage demo` seeds a real ledger you can read with `cage insights chats`.
+Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 1521 tests; `cage demo` seeds a real ledger you can read with `cage insights chats`.
 
 **Honest limits.** Marginal-by-fixed-order is defensible and `$0`, but it is an *ordering convention*, not a Shapley value (that's a deferred audit mode). And a counterfactual cell is an honest reconstruction, never an invoice — the `method` column says so on every row, on purpose.
 
@@ -246,7 +246,7 @@ Every derived view is parse / arithmetic over the log — **no LLM call, ever, o
 
 Latest release below — full history and detail in [CHANGELOG.md](CHANGELOG.md).
 
-- **v0.50.0 — cage stops measuring money, and the surface narrows to match.** The money subsystem is deleted: fifteen modules, eleven commands, four MCP tools, the `--usd` view and the bundled rate card are gone. Dollars were never measured — they were tokens × a table cage could not verify — so cage now reports only what the vendors record: **tokens and credits**, each with its own absence reason and never summed across agents. The reporting surface narrows with it — **SURFACE-CUT** deletes the ledger rollup, the whole `cage data` group and the task-comparison family (fourteen more modules, MCP down to two tools), leaving views that are per *conversation* and per *commit*: the two units you can act on. **Capture is untouched** — every row those views read is still recorded. And the ADR set becomes **four per-agent records**, one per metered agent, each written for a human and for an agent. ([ADR 0011](work/archive/adr/0011-cage-measures-usage-not-cost.md) · [the cut](work/archive/v0.50-surface-cut.decision.md) · [the ADR set](docs/adr/README.md))
+- **v0.51.0 — one shape per producer, and the ledger can prove it hasn't been edited.** Every producer now owns exactly one directory under `ledger/`: `claude/` `copilot/` `kiro/` (agents) · `consumer/` (your own code via `cage.meter`) · `graphify/` `fux/` `compress/` `responsecache/` (tool savings) · `provenance/` (authorship). The three agents' transcript→`calls` writer is **retired** — for claude it was a second copy of the same traffic, inflated **1.98×**, that no view read. Nothing on disk moved: every legacy file is still read, forever. New: a **tamper-evidence chain** ([ADR-INTEGRITY](docs/adr/0010_integrity.md)) that reports when something already written has changed — report-only, never a gate; the graphify interceptor works again after two days dead (`cage interceptor graphify`); and Copilot CLI chats finally get their names. ([the cross-check](work/regression/2026-08-14-calls-vs-metric-crosscheck.md) · [the ADR set](docs/adr/README.md))
 
 ## The name
 

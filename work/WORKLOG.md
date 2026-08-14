@@ -12,6 +12,44 @@ by milestone) — the worklog is what *happened this session*.
 
 ---
 
+## 2026-08-15 — Claude Code — LEDGER-RESTRUCTURE: nine phases, one shape per producer
+
+- **Asked (Arpit):** execute `work/ledger-restructure.{handoff,prompt}.md` straight through
+  — PG, then P0–P7 — one commit per phase, suite green between phases, no approval pauses.
+- **Done:** all nine phases, eight commits, **1521 passing** (from 1380 with 15 red).
+  Every producer now owns one directory under `ledger/`; the claude/copilot
+  transcript→`calls` writer is retired; a tamper-evidence chain ships as ADR-INTEGRITY.
+  **Nothing on disk was moved** — every legacy path is still read.
+- **Stopped once, deliberately.** Mid-P5 I found that `_write_manifest` returns early on an
+  empty `collected`, and `collected` was filled **only by the leg P5 deletes** — so the spec
+  as written would have silently stopped writing the capture manifest, and every new chat
+  would have lost its title. The handoff's own decision 10.2 said *"verify, don't assume"*
+  about exactly this; the verification came back negative. Reported rather than absorbing a
+  scope change that large. Arpit said carry on.
+- **Decided (mine, flagged for ratification): kiro keeps its `calls` leg.** For claude and
+  copilot the retired leg was a *duplicate* — the metric ledger holds the same facts. Kiro
+  IDE has **no metric twin**, so that leg is the only reader of `tokens_generated.jsonl`:
+  retiring it ends kiro IDE capture rather than de-duplicating it, and takes ADR-KIRO's
+  routing decision's subject matter and the upgrade-watch's baseline with it. The stated
+  reason for removal (unsummable rows) is already handled by `ABSENT_SPINES`. Queue item
+  **KIRO-CALLS-LEG**; reversing it is deleting five lines.
+- **Two mistakes worth recording**, both caught by tests rather than by me:
+  my first P4 read-back used an allowlist of tool names, which made any **third-party**
+  tool's savings rows write-only; and my first P6 doctor check called `checkpoint()`, which
+  **wrote state** and broke doctor's contract that running it records nothing.
+- **Also decided:** the fixture corpus was **split, not regenerated** — `expected.json` is
+  untouched and now asserts the *parsers* (which also makes it the only end-to-end test of
+  the custom-source contract), while a second test asserts the import captures the same
+  *facts*. Regenerating would have blessed whatever the new code produced.
+- **Open:** KIRO-CALLS-LEG needs Arpit. TASK-GRAIN-SPINE widened (only `calls` rows carry a
+  `task`). ADR-COVERAGE-GATE, GFX-IDE-PATH-UNPROBED and GFX-COV-FIELD unchanged.
+- **Next step:** Arpit ratifies or reverses KIRO-CALLS-LEG; then v0.51.0 ships by the
+  release flow (tag → `gh release create` → CI publishes).
+- **Cost: unmeasured — the rule's own source is still dead.** The `Cost:` rule names
+  `cage report`, deleted in v0.50; the surviving reader (`cage insights chats`) is per-chat
+  and cannot isolate a session. This session was long: nine phases, ~30 migrated tests, two
+  new modules, one new ADR. That is UNREAD-FACTS' open item, not an excuse.
+
 ## 2026-08-14 — Cowork — COVERAGE-LEGEND: N/A is not the same mark as ❌
 
 - **Asked (Arpit):** review the coverage table — mark whatever is *not applicable* as

@@ -2,6 +2,97 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
+## v0.51.0 (2026-08-15, unreleased) — one shape per producer, the `calls` writer retires, and the ledger can prove it hasn't been edited
+
+**Built from:** [ledger-restructure.handoff.md](work/archive/v0.51-ledger-restructure.handoff.md) ·
+[ledger-restructure.prompt.md](work/archive/v0.51-ledger-restructure.prompt.md)
+
+**Nothing on disk moved.** Every migration below is *stop writing here, start writing
+there, read both forever*. `calls-*.jsonl`, `credits-*.jsonl`, `savings/<tool>/`,
+`ledger/imports.jsonl` and `ledger/provenance.jsonl` all remain and all still read.
+
+### The shape
+
+Every producer now owns exactly one directory under `ledger/`:
+
+| directory | holds | since |
+|---|---|---|
+| `claude/` `copilot/` `kiro/` | per-agent usage | v0.48–v0.50 |
+| `consumer/` | your own code, via `cage.meter` | **v0.51 (P1)** |
+| `graphify/` `fux/` `compress/` `responsecache/` | tool savings | **v0.51 (P4)** |
+| `provenance/` | authorship, month-partitioned | **v0.51 (P3c)** |
+
+- **P1 — consumers get `ledger/consumer/`**, dual-written beside the `calls` row.
+  A **partial reversal of ADR-CONSUMERS**, recorded in that record rather than contradicted
+  quietly. The kind carries no field a call row could not — which was the original
+  objection, and it stands; the reversal is about *shape*, not richness. `spend()` suppresses
+  a consumer's `calls` twin by **exact id**, never by agent name: an agent-name test would
+  have silently zeroed every pre-v0.51 `lib`/proxy row, which has no twin to replace it.
+- **P2 — kiro's credits move into `ledger/kiro/`.** The top-level `credits-*.jsonl` shard
+  was a **duplicate** of rows `cli-conv` already carried from the same store. Credits
+  *semantics* are preserved at the projection, including the stricter skip rule `cli-conv`
+  does not have. Measured before and after on a real store: **3 rows, identical values**.
+- **P3a — `imports.jsonl` moves to `state/`.** Its behaviour had been a state file's for two
+  releases (labels only, zero numeric cells). It loses `cleanup.NEVER`'s `"ledger/"`
+  umbrella, so it is **named there explicitly** — an append-only audit trail that becomes
+  cleanup-eligible is silent data loss.
+- **P3b — Copilot CLI chats get their names.** They were `""` because cage looked in
+  `events.jsonl`, which genuinely has no title; the name is in the sibling `workspace.yaml`
+  (24 of 32 real sessions). **Kiro carries none at any depth and keeps `""` permanently** —
+  a probed finding, not a gap.
+- **P3c — `provenance.jsonl` becomes `ledger/provenance/provenance-<month>.jsonl`.**
+  **Reverses an explicit in-code decision** (*"provenance is intentionally never partitioned
+  (buffer)"*), recorded in `paths.py` and PLAN §3.6.1 rather than deleted: the premise was
+  right and the conclusion did not follow, because **nothing prunes the buffer**. All five
+  readers span shards.
+- **P4 — savings lift to `ledger/<tool>/`**, all four sources together. `ledger/` is now a
+  flat namespace shared by agents, consumers and tools, so a **reserved-name list** refuses a
+  colliding tool at write time with a named error.
+
+### The `calls` writer retires
+
+- **claude and copilot no longer write `calls` rows.** For claude it was a second copy of the
+  same traffic, **inflated 1.979× on rows and 1.881× on tokens** — measured at the cut
+  ([cross-check](work/regression/2026-08-14-calls-vs-metric-crosscheck.md)), because Claude
+  Code sweeps transcripts at ~30 days and the comparison can never be taken again.
+- **`transcript.parse_calls` and its three siblings are KEPT** — they are the
+  `[sources.<name>] format` custom-source contract, and deleting them would break user config
+  silently. A custom source declaring `format = "claude"` **inherits CLAUDE-DEDUP and
+  CLAUDE-SUBAGENT-KEY**, which ADR-CONSUMERS now states outright.
+- **Kiro keeps its leg** — a deliberate deviation. Kiro IDE has **no metric twin**, so that
+  leg is the only reader of `tokens_generated.jsonl`; retiring it would end kiro IDE capture
+  rather than de-duplicate it.
+- `calls` and `ledger.calls` are **permanent**: 373 retired-agent (`codex`) rows have no
+  other home.
+
+### New: the integrity chain
+
+- **[ADR-INTEGRITY](docs/adr/0010_integrity.md)** — a hash chain over appended segments
+  (`sha256(prev ‖ appended)`), checkpointed once per sweep so `ledger.append_row` is
+  untouched, verified by replay so a change **anywhere** in a file is detectable.
+- **Two verdicts, never blended:** `altered-history` (a recorded prefix changed — never
+  legitimate under append-only) and `damaged` (truncated, which `ledger.read` tolerates by
+  design). Designed churn (`cursors.json`, the logs) is classified `expected`.
+- **Report-only, always exits 0**, surfacing in `cage doctor`. A lock miss marks a segment
+  `unverified` and never breaks the chain — `lockutil` proceeds unlocked by contract.
+- It detects **accident and drift, not an adversary**: anyone who can write the ledger can
+  rewrite the manifest. Stated in the record, not implied.
+
+### Also
+
+- **`cage interceptor graphify`** — the graphify interceptor works again. `cage data
+  graphify`, the verb both twins probed, was deleted by SURFACE-CUT while the shims were left
+  in place; for two days the interceptor route captured **nothing on any OS for any agent**.
+  The B3 marker set **only ever grows** — every retired spelling stays matchable, or a fresh
+  twin can pick an old one as the real binary.
+- Three sites recommended `cage data meter` / `cage data proxy` — verbs **and modules**
+  deleted in v0.50 — as remedies. They now state the absence.
+- `docs/architecture-flow.mermaid` rewritten (it still drew commands deleted two releases
+  ago), `docs/FORMULAS.md` §2.7 corrected (false since **v0.47.0**), and a new gate
+  re-derives that matrix from `graphifytx.GRAPHIFY_COVERAGE`.
+
+**Tests:** 1521 passing (+10 Windows-only skips, +1 opt-in dogfood-age skip).
+
 ## v0.50.0 (2026-08-14, unreleased) — cage stops measuring money, and the surface narrows to match: the money subsystem, the reporting surface and the numeric ADR set are all gone
 
 - **SURFACE-CUT — the reporting surface narrows to match what cage now claims.** With

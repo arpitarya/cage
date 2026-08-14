@@ -23,7 +23,34 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
 
 ---
 
-## State of play (2026-08-14 — pick up here on a model switch)
+## State of play (2026-08-15 — pick up here on a model switch)
+
+- **v0.51 is BUILT and unreleased: LEDGER-RESTRUCTURE, nine phases, 1521 green.** Every
+  producer owns exactly one directory under `ledger/` — `claude/` `copilot/` `kiro/` ·
+  `consumer/` · `graphify/` `fux/` `compress/` `responsecache/` · `provenance/`. The
+  claude/copilot transcript→`calls` writer is **retired**. A tamper-evidence chain ships as
+  [ADR-INTEGRITY](../docs/adr/0010_integrity.md), the tenth live record.
+- **THE RULE THAT MADE THIS SAFE, and inherit it: nothing on disk was ever moved.** Every
+  migration is *stop writing here, start writing there, **read both forever***.
+  `calls-*.jsonl`, `credits-*.jsonl`, `savings/<tool>/`, `ledger/imports.jsonl` and
+  `ledger/provenance.jsonl` all still resolve. **`calls` can never be fully retired** —
+  retired-agent rows (codex) have no other home.
+- **One deviation is UNRATIFIED and it is the first thing to settle: KIRO-CALLS-LEG.** The
+  spec said retire all three legs; I kept kiro's. For claude and copilot the leg was a
+  duplicate; **kiro IDE has no metric twin**, so retiring it ends that surface's capture
+  rather than de-duplicating it. Recorded in ADR-KIRO, pinned by a test, reversible in five
+  lines. Arpit ratifies or reverses.
+- **The one measurement that can never be retaken.** `METRICS-DUAL-WRITE-END`'s freeze was
+  lifted early, so P0's
+  [cross-check](regression/2026-08-14-calls-vs-metric-crosscheck.md) is the sole record of
+  what the two writers disagreed by: **1.979× on rows, 1.881× on tokens** for claude, and a
+  **zero** skip-rule delta for kiro credits. Claude Code sweeps transcripts at ~30 days.
+  Treat that file as irreplaceable evidence, not as a report.
+- **If you are about to "clean up" a legacy path, don't.** Deleting a reader is a separate
+  decision from stopping its writer (the SURFACE-CUT rule), and every legacy file here is
+  load-bearing for someone's history.
+
+## State of play (2026-08-14 — historical)
 
 - **The ADR set is ONE RECORD PER METERED THING PLUS [ADR-LAWS](../docs/adr/0001_laws.md),
   and you cite them BY NAME.** Read ADR-LAWS §1 first — it holds the five laws (pull-only ·

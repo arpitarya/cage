@@ -25,8 +25,16 @@ changelog entry.
 ## Architecture (the one-way data flow)
 
 ```
-record_call / record_receipt  →  .cage/ledger/{calls,receipts,tasks}-YYYY-MM.jsonl  (+ legacy *.jsonl)
-        (meter, plan §5)                      │           · provenance.jsonl (unpartitioned buffer)
+record_call / record_receipt  →  .cage/ledger/  — ONE DIRECTORY PER PRODUCER (v0.51)
+        (meter, plan §5)          │   claude/ copilot/ kiro/   (agent usage, per chat)
+                                  │   consumer/                (cage.meter — dual-written)
+                                  │   graphify/ fux/ compress/ responsecache/  (savings)
+                                  │   provenance/              (authorship, monthly)
+                                  │   receipts-*.jsonl · tasks-*.jsonl
+                                  │   READABLE HISTORY, no longer written:
+                                  │     calls-*.jsonl (retired agents) · credits-*.jsonl
+                                  │     savings/<tool>/ · provenance.jsonl · imports.jsonl
+                                  │   state/imports.jsonl (capture manifest) · integrity.json
                                               ▼  derive ($0, no model)
   cage.toml (pipeline order / capture)   → report · attrib · adoption · chats
                                              · graphify · compare · estimate
@@ -41,6 +49,35 @@ There is no price table, no rate card and no currency on any surface. A leftover
 `.cage/prices.toml` from a pre-0.51 project is never read and never deleted — `cage
 doctor` names it. Do not reintroduce pricing without reversing that ADR; its veto
 condition is numbered and reopenable only by a *measurement*, never an argument.
+
+**The v0.51 shape, and the rule that comes with it.** Every producer owns exactly one
+directory under `ledger/`. **Nothing on disk was ever moved:** each migration is *stop
+writing here, start writing there, read both forever*, so every legacy path still resolves.
+`calls` in particular can never be fully retired — retired-agent rows (codex, 373 in one
+real ledger) have no other home, and `ledger.calls` is permanent. **The claude and copilot
+transcript→`calls` writers are RETIRED** (for claude the row was a second copy of the same
+traffic, inflated 1.979×, that no view resolved from); **kiro's leg is deliberately KEPT**
+because kiro IDE has no metric twin, so retiring it would end that surface's capture rather
+than de-duplicate it (ADR-KIRO; queue item KIRO-CALLS-LEG). `transcript.parse_calls` and its
+three siblings survive as the `[sources.<name>] format` custom-source contract — a source
+declaring `format = "claude"` inherits CLAUDE-DEDUP/SUBAGENT-KEY, which ADR-CONSUMERS states.
+`ledger/` is a flat namespace shared by agents, consumers and tools, so a colliding tool name
+is refused at write time (`paths.reserve_tool_name`).
+
+- **Integrity** ([integrity.py](cage/integrity.py), [ADR-INTEGRITY](docs/adr/0010_integrity.md))
+  — a hash chain over appended segments (`sha256(prev ‖ appended)`), **checkpointed once per
+  import sweep** so `ledger.append_row` is untouched, verified by replaying the recorded
+  segmentation so a change *anywhere* in a file is detectable. **Report-only, always exit 0**
+  (the `cage authorship verify` precedent) — it surfaces in `cage doctor` and never refuses a
+  read, blocks a write, or changes an exit code. **Two verdicts, never blended:**
+  `altered-history` (a recorded prefix changed — never legitimate under append-only) and
+  `damaged` (truncated, which `ledger.read` tolerates *by design*). Designed churn
+  (`cursors.json`, the logs) is classified `expected`, because a report its reader learns to
+  ignore is worse than none. **A lock miss marks a segment `unverified` and never breaks the
+  chain** — `lockutil` proceeds unlocked by contract and must not become load-bearing.
+  Detects **accident and drift, not an adversary**: whoever can write the ledger can rewrite
+  `state/integrity.json`. Never read by a derived view; in `cleanup.NEVER`; excluded from its
+  own hashing.
 
 Three capture-only per-chat metrics siblings — `.cage/ledger/{copilot,kiro,claude}/`
 — hold vendor-verbatim usage facts `calls`/`credits` deliberately don't widen to
@@ -951,7 +988,7 @@ device. Three parts, each load-bearing:
 ## Dev
 
 ```bash
-just test          # python -m pytest -q   (1571 tests; +10 Windows-only skips, +1 opt-in dogfood-age skip)
+just test          # python -m pytest -q   (1521 tests; +10 Windows-only skips, +1 opt-in dogfood-age skip)
 just demo          # seed §4.4 + print attrib/matrix
 cage --version
 ```

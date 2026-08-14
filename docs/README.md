@@ -42,6 +42,14 @@ archived: [copilot](../work/archive/v0.49-copilot-metrics-ledger.handoff.md) ·
 [kiro](../work/archive/v0.49-kiro-metrics-ledger.handoff.md) ·
 [claude](../work/archive/v0.49-claude-metrics-ledger.handoff.md).
 
+**LEDGER-RESTRUCTURE** — one shape per producer under `ledger/`, the retirement of the
+claude/copilot transcript→`calls` writer, and the tamper-evidence chain — was built green
+across nine phases on 2026-08-15 and archived:
+[handoff](../work/archive/v0.51-ledger-restructure.handoff.md) ·
+[prompt](../work/archive/v0.51-ledger-restructure.prompt.md) — the pair is **named, not
+cited**. Its design of record is [ADR-INTEGRITY](adr/0010_integrity.md) plus the reversal
+notes in [ADR-CONSUMERS](adr/0006_consumer.md) and [ADR-KIRO](adr/0005_kiro.md) §2.
+
 **METRICS-PRIMARY** — the flip that made those three ledgers the SOURCE of derived
 spend from a pinned cutover — was built and green on 2026-08-14 and archived:
 [handoff](../work/archive/v0.50-metrics-primary.handoff.md) ·

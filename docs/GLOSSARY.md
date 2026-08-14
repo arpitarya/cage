@@ -426,3 +426,36 @@ is the chat grain — a whole-life total holding a `model_totals` list, which st
 cannot price as one call. Two projections of ONE fold (`transcript._fold_claude_records`),
 never two folds, and never summed together.
 
+
+**per-producer directory** — the shape v0.51 settled on: every producer of usage owns
+exactly one directory under `ledger/` — `claude/` `copilot/` `kiro/` (agents) ·
+`consumer/` (library/proxy) · `graphify/` `fux/` `compress/` `responsecache/` (tool
+savings) · `provenance/` (authorship). The flat namespace is shared by agents, consumers
+and tools, so a tool name that would collide is refused at write time
+(`paths.reserve_tool_name`). Owned by [paths.py](../cage/paths.py).
+
+**readable history** — a file cage no longer writes but reads forever: `calls-*.jsonl`,
+`credits-*.jsonl`, `ledger/savings/<tool>/`, `ledger/imports.jsonl`,
+`ledger/provenance.jsonl`. **No migration ever rewrote or moved one** — every v0.51 move
+is *stop writing here, start writing there, read both*. `calls` in particular can never be
+fully retired: retired-agent rows (codex) have no other home.
+
+**consumer twin** — the `calls` row `metering.record_call` still writes beside its
+`ledger/consumer/` row. It is the rollback (withdrawing the consumer ledger is deleting one
+call site) and `ledger.join_table`'s lookup key for a receipt's `call=`. `ledger.spend`
+suppresses it by **exact id**, never by agent name — an agent-name test would also suppress
+every pre-v0.51 `lib` row, which has no twin to replace it. Owned by
+[metering.py](../cage/metering.py).
+
+**diagnostic union** (`ledger.usage_rows`) — every recorded usage row across every
+producer, **overlapping by construction and never summed**. Distinct from `ledger.spend`,
+the single resolver: this one must see kiro (which has no token spine) and cumulative
+grains, because its question is *did anything arrive*, not *what was used*.
+
+**hash chain / checkpoint** — the tamper-evidence mechanism,
+`current = sha256(previous ‖ appended_bytes)`, advanced once per import sweep so
+`ledger.append_row` stays untouched, and verified by replaying the recorded segmentation.
+Report-only, never a gate. Two verdicts that are never blended: **altered-history** (a
+recorded prefix changed — never legitimate under append-only) and **damaged** (truncated,
+which `ledger.read` tolerates by design). Owned by [integrity.py](../cage/integrity.py),
+[ADR-INTEGRITY](adr/0010_integrity.md).
