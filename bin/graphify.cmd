@@ -85,15 +85,40 @@ rem forwarded %* below (B7). This is why the PATH-walk above sat inside its own
 rem EnableDelayedExpansion scope instead of covering the whole script.
 setlocal DisableDelayedExpansion
 
-rem B5: meter only when a cage command resolves AND still accepts the verb. The second
-rem probe is what catches a renamed verb (F1) instead of silently running unmetered.
+rem B5: meter only when cage can actually RUN the verb - two arms, tried in order. The
+rem `--help` probe is what catches a renamed verb (F1) instead of silently running
+rem unmetered. Arm 1 (the `cage` command) always wins first, so a standard install is
+rem unchanged in behaviour and in latency.
 if "%_CAGE_GF_REENTRY%"=="1" goto cage_gf_direct
 where cage >nul 2>nul
-if errorlevel 1 goto cage_gf_direct
+if errorlevel 1 goto cage_gf_arm2
 call cage data graphify --help >nul 2>nul
-if errorlevel 1 goto cage_gf_direct
+if errorlevel 1 goto cage_gf_arm2
 set "CAGE_GRAPHIFY_SHIM=1"
 call cage data graphify -- "%_CAGE_GF_REAL%" %*
+exit /b %ERRORLEVEL%
+
+rem Arm 2 (B5b, GF-LAUNCHER verdict B): no `cage` COMMAND is not no cage. D8 - the POSIX
+rem twin says `python3` and this one cannot: `python3` is frequently absent on Windows,
+rem where the launcher is `py -3`, with bare `python` as the fallback for a PATH install
+rem that has no launcher. Two spellings, tried in that order; neither resolving means the
+rem call was always going to be unmetered anyway. Flat gotos and no parenthesized block,
+rem for the same B8 reason the PATH walk above is flat.
+:cage_gf_arm2
+py -3 -m cage data graphify --help >nul 2>nul
+if not errorlevel 1 goto cage_gf_arm2_py
+python -m cage data graphify --help >nul 2>nul
+if not errorlevel 1 goto cage_gf_arm2_python
+goto cage_gf_direct
+
+:cage_gf_arm2_py
+set "CAGE_GRAPHIFY_SHIM=1"
+call py -3 -m cage data graphify -- "%_CAGE_GF_REAL%" %*
+exit /b %ERRORLEVEL%
+
+:cage_gf_arm2_python
+set "CAGE_GRAPHIFY_SHIM=1"
+call python -m cage data graphify -- "%_CAGE_GF_REAL%" %*
 exit /b %ERRORLEVEL%
 
 :cage_gf_direct

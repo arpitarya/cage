@@ -1,32 +1,21 @@
-# Cage policy — the only place your project numbers live. Versioned, deterministic
-# (plan §3.3). This file holds your DECISIONS — budgets, pipeline order,
-# capture switches, import sources, and routing (aliases, tool routes). Model PRICES
-# (vendor rate cards) live in a separate file, prices.toml, because they have the
-# opposite lifecycle: yours are preserved on upgrade, prices are replaced wholesale
-# by `cage prices sync` (prices-toml plan §3). Vendor facts there; your decisions here.
+# Cage policy — the only place your project settings live. Versioned, deterministic
+# (plan §3.3). This file holds your DECISIONS — pipeline order, capture switches,
+# import sources, cleanup and authorship settings.
+#
+# There is no price table and no companion prices.toml: cage measures token and credit
+# USAGE, never cost (USAGE-ONLY, ADR 0011). A leftover prices.toml from an older
+# project is simply no longer read — cage never deletes your files, and `cage doctor`
+# points it out.
 
-# policy_version tracks the *non-pricing* defaults: it bumps only when a release
-# adds/changes/removes a bundled tunable, and `cage policy sync` compares it.
-# (The price-research provenance — prices_version/prices_date — lives in prices.toml,
-# next to the rows it dates.) `cage setup` copies this file verbatim.
+# policy_version bumps only when a release adds/changes/removes a bundled tunable,
+# and `cage policy sync` compares it. `cage setup` copies this file verbatim.
 # cage_version is deliberately NOT declared here — it is derived live from
 # cage.__version__ (`policy._bundled`), never a hand-maintained literal (a stale
 # copy drifted for eleven releases). A scaffolded project's cage.toml still gets
 # a cage_version stamp (initcmd.run) — that one IS historical and is never rewritten.
 [meta]
 policy_version = "0.27.0"
-cage_version = "0.44.1"
-
-# Routing decisions (aliases + tool routes) live here — they describe YOUR setup,
-# not a vendor's rate card, so a wholesale `cage prices sync` never touches them.
-#
-# An alias routes a router pseudo-model (or a bare id) to a real price row. The bare
-# Copilot router id `copilot/auto` stays UNPRICED until you route it (a router priced
-# silently is a wrong number). Add one with (this writes cage.toml, not prices.toml):
-#   cage prices alias - copilot/auto --to anthropic/claude-sonnet-4-6
-# or uncomment (the empty-string table is the empty provider Copilot stamps):
-# [alias.""."copilot/auto"]
-# to = "anthropic/claude-sonnet-4-6"
+cage_version = "0.50.0"
 
 # Auto-capture switch. Each agent's hook runs `cage import --agent <itself>` to meter
 # its own on-disk usage log; set enabled=false to pause that without unwiring any hooks
@@ -44,36 +33,10 @@ import_before_export = true
 # 0 restores the always-on line.
 # import_stale_hours = 24
 
-# Display defaults (plan Phase 2.5). Tokens are the measurement and the default;
-# dollars are an interpretation you ask for. usd = true makes `cage report`,
-# `cage insights matrix`, and the bare `cage` headline render their dollar columns without
-# the --usd flag (per-invocation flag > env CAGE_USD > this). Display-only:
-# pricing always computes underneath (budget guards, UNPRICED detection), the
-# money-native views (budget/roi/verdict/compare/estimate) always show dollars,
-# and CSV always carries the full column set.
-[display]
-usd = false
-
-# YOUR plan's credit rate — rung 1 of the copilot pricing ladder (`cage query
-# copilot-credits`). Copilot records the credits GitHub itself billed on each request;
-# cage stores that count verbatim but will not turn it into a dollar until you say what
-# a credit costs you. Ships UNSET on purpose: an assumed rate would be a guess wearing a
-# number, so with none set the credits render as a COUNT and those rows price by
-# token × price-table instead.
-#
-# This lives in cage.toml, NOT prices.toml, and the split is the point: prices.toml is a
-# vendor rate card that `cage prices sync` replaces wholesale, while your overage rate is
-# a decision about your own plan that must survive every sync. Vendor facts move,
-# routing decisions stay. (It is spelled [billing.<agent>] rather than [credits.<agent>]
-# because [credits] is that vendor card's per-model multiplier table — see policy.py.)
-#
-# [billing.copilot]
-# usd_per_credit = 0.04   # your plan's overage rate per AI credit
-
 # State-dir maintenance (.cage/state/ only — a CLOSED allowlist: aged debug.log and
 # hooks-seen.jsonl rows, stale pending-* provenance buffers, cursors whose source log
 # is gone, *.tmp). Never touches ledger/ (tool savings included — a per-tool cleanup
-# class must never be added), cage.toml, prices.toml, machine.json, study.jsonl, or
+# class must never be added), cage.toml, machine.json, study.jsonl, or
 # limits.json — fleet pairing and the audit trail are not cleanup's to lose.
 # Deletion only ever happens via an explicit `cage data cleanup --apply`: the auto
 # path (piggybacked on `cage import`, throttled, fail-open; cage installs no
@@ -171,6 +134,16 @@ path_globs = ["**/events.jsonl"]
 path = "~/Library/Application Support/Code/User/workspaceStorage"
 glob = "*/chatSessions/*.jsonl"
 path_globs = ["**/chatSessions/*.jsonl"]
+
+[[sources.copilot]]
+path = "~/Library/Application Support/Code/User/globalStorage/emptyWindowChatSessions"
+glob = "*.jsonl"
+path_globs = ["**/emptyWindowChatSessions/*.jsonl"]
+
+[[sources.copilot]]
+path = "~/Library/Application Support/Code/User/globalStorage/transferredChatSessions"
+glob = "*.jsonl"
+path_globs = ["**/transferredChatSessions/*.jsonl"]
 
 [[sources.kiro]]
 path = "~/Library/Application Support/Kiro/User/globalStorage/kiro.kiroagent/dev_data/tokens_generated.jsonl"

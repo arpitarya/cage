@@ -12,7 +12,7 @@ by milestone) — the worklog is what *happened this session*.
 
 ---
 
-## 2026-08-14 (Cowork) — CALLS-RETIREMENT specced; the 2026-09-13 freeze lifted early
+## 2026-08-14 (Cowork) — LEDGER-SHAPE: one directory per producer; calls retirement folded in as P5
 
 - **Asked (Arpit):** what is `calls-YYYY-MM.jsonl` for → what is *not* in the `ledger/claude`
   files → same for copilot and kiro → *"i dont believe we need calls files any more create a
@@ -45,8 +45,56 @@ by milestone) — the worklog is what *happened this session*.
   say `calls` is retired would make them lie. The edits are spec'd line-level in handoff §9.5,
   including converting 0003's rejected alternative into a **recorded reversal** rather than
   deleting it — a silently-vanished rejected alternative is how a future agent re-litigates.
-- **Next step:** Arpit rules on 10.1 (or delegates it), then run
-  `work/calls-retirement.prompt.md` on **Opus**. §0 before any deletion.
+- **Then Arpit added four more asks** (same session), and the pair was rewritten as one
+  six-phase program, `work/ledger-restructure.{handoff,prompt}.md`. The old
+  `calls-retirement.*` pair is superseded (moved to `work/_to_delete/`; Arpit deletes it).
+  **The shape:** every producer owns one dir under `ledger/` — `claude/` `copilot/` `kiro/`
+  `consumer/` `graphify/`. `calls`, `credits`, `savings/` become read-forever, written-never.
+- **The sequencing insight that reordered the program:** a **consumer ledger reverses ADR 0006**
+  (*"consumers resolve from `calls` permanently, are never given a metric ledger"* — ratified two
+  commits earlier, same day), and ADR 0006 was the *only* reason the `calls` kind had to survive.
+  So P1 (consumer) must land **before** P5 (calls retirement), and Arpit's original instinct —
+  *"I don't believe we need calls files any more"* — goes from 70% right to fully achievable.
+  **The permanent floor stays: codex rows are append-only history with no other home, so `calls`
+  stops being written but is never deleted.**
+- **Two asks shrank on inspection.** Copilot has **no credit rows at all** (`make_credit` defaults
+  `agent="kiro"`, sole caller is the kiro-CLI parser; copilot credits already live in
+  `ledger/copilot/`) — so the credits fold is kiro-only. And `imports.jsonl` → `state/` is
+  *consistent* with the state law rather than in tension: the law bars state from moving a
+  **number**, and the manifest is already labels-only with zero numeric cells (pinned). It does
+  lose `cleanup.NEVER`'s `"ledger/"` umbrella, so it needs an explicit entry — an audit trail that
+  silently becomes cleanup-eligible is the failure mode.
+- **Fifth ask, same session:** `provenance.jsonl` → `ledger/provenance/`, month-partitioned —
+  folded in as **P3c**, grouped with the `imports.jsonl` move because both are the repo's only
+  unpartitioned append-only files and share one migration shape. **It reverses a third explicit
+  decision**: `paths.py` states *"provenance is intentionally never partitioned (buffer)"*. The
+  reversal holds because nothing prunes that buffer — `cleanup.NEVER` covers `ledger/` and no class
+  touches it — so it is an unbounded file every read scans end-to-end.
+- **The catch worth the most:** `test_authorship_capture.py`'s plant-string test greps written
+  shards to prove no line body or line hash is ever persisted. Left pointing at the old path it
+  passes forever while covering nothing — the strongest PII guard in the repo, silently retired.
+- **Sixth ask → ADR-COVERAGE (`docs/adr/0008_coverage.md`), written and committed.** The six-surface
+  matrix (3 agents × cli/ide) across usage capture, derived surfaces and operational state.
+- **It is deliberately NOT a restatement of ADR-CLAUDE/COPILOT/KIRO/GRAPHIFY** — the template forbids
+  that and the repo's own rule calls a restating record a bug. What it records is the cross-cutting
+  decision that had **no home**: cage already solved "name the absence" in **five** separate places
+  (`ABSENT_SPINES` · `units.ABSENT` · `COVERAGE_GAPS` · `GRAPHIFY_COVERAGE` · `HOOK_EVENTS`/
+  `HOOK_GAPS`); the rule they all obey was never written down. So ADR-COVERAGE owns **the rule and
+  the map**, and each gap table stays owned by its own record — recorded as "no module" in the
+  ownership table, on purpose.
+- **Its veto states its own weakness:** nothing recomputes the matrix from the five code tables, so
+  drift is caught by review alone. A generated matrix is in *deliberately not taken* with a
+  threshold — a sixth gap table, or this record found stale twice (then the two-strikes rule makes
+  it a gate). Flattening prose reasons into ticks is what a generator would cost today.
+- **Same-change docs done:** `docs/adr/README.md` (record list · the "one record per thing" line ·
+  the citation-names line · an ownership row) + `work/DOC-REGISTRY.md`. **Not verified:** no pytest
+  environment on this machine, so `test_adr_ownership.py` was reasoned through, not run — the
+  executor must run `just test`.
+- **New decisions surfaced, not made:** 10.5 the `ledger/` namespace now mixes agents, consumers
+  and tools (**blocks P4**) · 10.6 whether fux/compress/responsecache follow graphify · 10.3
+  whether kiro-CLI gains a spine (**changes user-visible output** — kiro renders `—` today).
+- **Next step:** Arpit rules on 10.5 + 10.3 (10.1/10.4/10.6 have recommendations), then run
+  `work/ledger-restructure.prompt.md` on **Opus**, one phase at a time. P0 before any code.
 - **Cost: unmeasured** — `cage report` was deleted by SURFACE-CUT, so this repo currently has
   no spend surface to dogfood. Worth noting the rule now has no instrument.
 

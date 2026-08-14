@@ -62,8 +62,9 @@
   [ledger-restructure.handoff.md](ledger-restructure.handoff.md): a **consumer ledger**
   (`ledger/consumer/`, dual-write — **reverses ADR 0006**, ratified the same day) · kiro
   **credits** folded into `ledger/kiro/` (copilot needs nothing — it has no credit rows) ·
-  **`imports.jsonl` → `state/`** plus name-lifting for all three agents · **graphify savings →
-  `ledger/graphify/`**. Nothing is moved on disk — every old path stays written-no-more and
+  **`imports.jsonl` → `state/`** plus name-lifting for all three agents · **`provenance.jsonl` →
+  `ledger/provenance/`, month-partitioned** (reverses `paths.py`'s explicit *"provenance is
+  intentionally never partitioned (buffer)"*) · **graphify savings → `ledger/graphify/`**. Nothing is moved on disk — every old path stays written-no-more and
   read-forever. Carries five open decisions (handoff §10.1, 10.3-10.6); **10.5 (the `ledger/`
   namespace collision between agents, consumers and tools) blocks P4** and **10.3 (whether
   kiro-CLI gains a spine) changes user-visible output**.

@@ -6,7 +6,8 @@ update-rule: NO behaviour change lands without its owning ADR updated in the sam
 
 # ADRs — the durable *why*, and the rule that keeps it true
 
-**One record per thing cage meters, plus one for what binds them all and one for the surface it is all read through.**
+**One record per thing cage meters, plus one for what binds them all, one for the surface it is
+all read through, and one for the map of what each surface can and cannot yield.**
 
 | # | record | covers |
 |---|---|---|
@@ -17,6 +18,7 @@ update-rule: NO behaviour change lands without its owning ADR updated in the sam
 | 0005 | [**ADR-KIRO**](0005_kiro.md) | Kiro — the two-store split, machine facts, the absent spine |
 | 0006 | [**ADR-CONSUMERS**](0006_consumer.md) | the things cage meters that are not agents — library, custom sources, retired agents |
 | 0007 | [**ADR-GRAPHIFY**](0007_graphify.md) | graphify — the interceptor twins and the savings receipt |
+| 0008 | [**ADR-COVERAGE**](0008_coverage.md) | what cage can and cannot say, per agent × surface — and why an absence is never a zero |
 
 Each has **two sections**: **§1 for humans** (one screen, diagrams, no jargon) and
 **§2 for agents** (the binding detail — context, decision, consequences, alternatives,
@@ -60,6 +62,7 @@ record to hold it.
 | [ADR-KIRO](0005_kiro.md) | the kiro half of `transcript` · `kirowire` |
 | [ADR-CONSUMERS](0006_consumer.md) | `metering` · `usageparse` · `usagelog` · `manifest` · `machine` · `study` |
 | [ADR-GRAPHIFY](0007_graphify.md) | `graphify*` · `pathshim` · `runshim` · `adoptcmd` · `compress` · `responsecache` |
+| [ADR-COVERAGE](0008_coverage.md) | no module — it owns the cross-cutting *rule* the five gap tables obey (`ABSENT_SPINES` · `units.ABSENT` · `COVERAGE_GAPS` · `GRAPHIFY_COVERAGE` · `HOOK_EVENTS`/`HOOK_GAPS`), each of which stays owned by its own record |
 
 **Shared and infrastructure modules are claimed explicitly, never by silence** — the
 ownership test carries the list and the reason for each. `transcript.py` is deliberately
@@ -68,7 +71,7 @@ otherwise would send a copilot change to the wrong reviewer.
 
 ## Cite them by name, never by number
 
-In prose write **ADR-CLAUDE · ADR-COPILOT · ADR-KIRO · ADR-GRAPHIFY**.
+In prose write **ADR-CLAUDE · ADR-COPILOT · ADR-KIRO · ADR-GRAPHIFY · ADR-COVERAGE**.
 
 A bare "ADR 0001" is now ambiguous — it meant *team ledger aggregation via `refs/notes`*
 for six weeks and there are ~90 live references to the numeric names. The numbers survive

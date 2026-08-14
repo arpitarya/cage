@@ -1,0 +1,11 @@
+{
+  "servers": {
+    "cage": {
+      "type": "stdio",
+      "command": "${workspaceFolder}/.cage/bin/cage-run",
+      "args": [
+        "mcp"
+      ]
+    }
+  }
+}

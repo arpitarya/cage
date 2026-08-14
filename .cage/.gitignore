@@ -5,3 +5,5 @@ ledger/
 out/
 # Machine-local hook buffers (pending edits, session state).
 state/
+# Exported report/insight artifacts (`--export`).
+output/

@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "cage": {
+      "command": "python3",
+      "args": [
+        "-m",
+        "cage",
+        "mcp"
+      ],
+      "disabled": false
+    }
+  }
+}
