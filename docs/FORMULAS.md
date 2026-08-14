@@ -55,8 +55,16 @@ What replaces it is not a formula. It is a **read**:
 
     credits, summed per agent — NEVER across agents.
 
-- **Code:** `cage/units.py` (`summable`, `cross_agent_note`) · `cage/report.py` ·
-  `cage/chats.py`.
+- **Code:** `cage/units.py` (`summable`, `cross_agent_note`) · `cage/ledger.py`
+  (`credits`, `_credit_from_cli_conv`) · `cage/chats.py`. *(`cage/report.py` went with
+  SURFACE-CUT.)*
+- **Two homes, one shape (P2, v0.51):** kiro credits are read from `ledger/kiro/`'s
+  `cli-conv` rows — the live home — **and** from every legacy `credits-<month>.jsonl`
+  shard, forever. The top-level shard is no longer written; nothing was migrated. The
+  projection re-applies the credits **skip rule** (credits ≤ 0 **and** context ≤ 0 ⇒ no
+  row), which `cli-conv` deliberately does not have, and treats a `None` credit as *no
+  signal* rather than a recorded `0.0`. Collapse is unchanged: last-write-wins per
+  session, highest turn count, and a session present in both homes yields **one** row.
 - **The cross-agent law:** a copilot credit is GitHub's own tokens×rates computation
   over a request; a kiro credit is an AWS credit. They share a column heading and
   nothing else, so a total spanning both is refused (`total.credits = None`) and the

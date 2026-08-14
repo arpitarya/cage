@@ -8,6 +8,57 @@ Entry format:
 
 ```
 
+## 2026-08-14 — P2 (ledger-restructure): kiro's credits re-home into `ledger/kiro/`
+
+- **Built:** `ledger._credit_from_cli_conv` (projection) + `_credit_score` ·
+  `ledger.credits` now unions **both homes** · `importcmd._ingest_credits` stops writing
+  the top-level shard (keeping its cursor advance) · `CUMULATIVE_SOURCES` reason reworded
+  · `units.ABSENT["kiro"][TOKENS]` widened.
+- **Why it was safe:** the top-level `credits-<month>.jsonl` shard was a **duplicate**.
+  `ledger/kiro/`'s `cli-conv` rows already carried the same credits, from the same store,
+  through the same shared reader, under the same whitelist.
+- **The crux, resolved rather than papered over.** The two kinds differ in exactly two
+  ways and both are handled at the projection, so credits *semantics* are preserved rather
+  than inherited: (1) the **skip rule** — a credits row needs a real usage signal
+  (credits ≤ 0 **and** context ≤ 0 ⇒ no row), while `cli-conv` emits whenever the store
+  carried a `usage_info` list *including one summing to a real 0.0*; (2) `cli-conv`'s
+  **`None` sentinel**, which reads as no-signal and is never rendered as a recorded `0.0`.
+- **Parity measured twice, before and after.** P0's baseline: 3 credits rows / 3 `cli-conv`
+  rows, same sessions, identical `credits`/`context_pct`/`turns`. After the change, on the
+  same real store: **3 rows, same sessions, byte-identical values**, and no
+  `credits-2026-08.jsonl` written. The skip-rule delta over all 20 conversations is **0** —
+  and that is exactly why the disagreeing case is *constructed* in
+  `tests/test_credits_rehome.py` rather than trusted to a store that happens not to contain
+  one.
+- **One accident removed.** The collapse score was `(turns, id)`, so a tie between a legacy
+  `k_cred…` row and a projected `km_…` one would have been decided by where `_` and `m` sit
+  in ASCII. It is now `(turns, live-writer, id)` — a no-op when only legacy rows exist, so
+  no pre-v0.51 ledger changes what it reports.
+- **Kiro gains no spine (10.3), deliberately.** `cli-conv` stays in `CUMULATIVE_SOURCES`;
+  a credits row inside `spend()` would carry credits with zero tokens, the exact lie
+  `make_credit` exists to prevent. Zero user-visible change on that axis.
+- **`units.ABSENT` finding, fixed.** Kiro's single reason — *"no IDE token store on this
+  install"* — named one surface and one cause, so a reader could fairly conclude the CLI
+  had tokens. **Both** surfaces lack them for two different vendor reasons (IDE: no store
+  at all; CLI: columns exist and are null at 2.16.0 — an upgrade-watch, not a permanent
+  absence). The sentence is rendered verbatim to users, so it had to carry both; two
+  docstrings describing it were swept too.
+- **Nothing on disk moved.** Every `credits-*.jsonl` shard still reads, keeps its own
+  recorded `method` (pre-USAGE-ONLY rows say `estimated` and are never re-tagged), and a
+  session present in both homes collapses to one row rather than double-counting.
+  `schema.make_credit` and `transcript.parse_kiro_cli_credits` are **kept** — history still
+  parses, and the parser is the reference implementation of the semantics the projection
+  preserves.
+- **Files:** `cage/{ledger,importcmd,units,chats,display}.py` · `docs/adr/0005_kiro.md` ·
+  `docs/FORMULAS.md` §1.2 · `docs/architecture-flow.mermaid` ·
+  `tests/test_credits_rehome.py` (new, 14 cases) · `tests/test_kiro_routing.py`.
+- **ADR (ADR-DISCIPLINE):** **ADR-KIRO** — the credits *shape* decision is kept verbatim
+  and its *storage* clause marked ⟲ moved, with the skip-rule difference, the measured
+  zero delta, and the still-not-a-spine consequence all recorded. No new module.
+- **Tests:** `just test` green — **1431 passed**, 11 skipped (+14).
+- **Next:** P3 — `imports.jsonl` → `state/`, names for all three agents (P0.2 changed what
+  is possible here), and `provenance.jsonl` → `ledger/provenance/`.
+
 ## 2026-08-14 — P1 (ledger-restructure): consumers get `ledger/consumer/`, dual-written
 
 - **Built:** `schema.make_consumer_metric` + `CONSUMER_METRIC_SOURCES`/`_FIELDS` (id

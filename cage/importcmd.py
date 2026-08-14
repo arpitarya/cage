@@ -620,11 +620,19 @@ def _ingest_credits(root: Path, name: str, src: Path, files: list[Path], *,
                     pol: dict | None = None, agent_cursor: dict | None = None,
                     graphify_files: list[Path] | None = None,
                     metrics_files: list[Path] | None = None) -> int:
-    """Parse Kiro-CLI SQLite files into *credits* rows and append the ones not already
-    recorded. Credits are their own ledger kind (`credits-<month>.jsonl`) with their own
-    id namespace (`k_cred…`), so they never touch the call-id `seen` set or any call view.
-    Idempotent by row id (turn count folded in — a resumed conversation appends, an
-    unchanged one dedupes); fail-open per file, like `_ingest`.
+    """Drive the Kiro-CLI store's two legs — metrics and graphify — and advance the cursor.
+
+    **The top-level `credits-<month>.jsonl` shard is NO LONGER WRITTEN (P2, v0.51).** It
+    was a duplicate: `ledger/kiro/`'s `cli-conv` rows already carry these credits, from the
+    same store, through the same shared reader (`_kiro_cli_conversations`), under the same
+    whitelist. `ledger.credits` now reads `cli-conv` — re-applying the credits skip rule
+    on the way — **and every existing `credits-*.jsonl` shard, forever**. Nothing on disk
+    moved, nothing was rewritten, and `transcript.parse_kiro_cli_credits` is kept as the
+    reference implementation of the semantics that projection preserves.
+
+    The name and the return value are unchanged so every caller and the stderr rollup stay
+    put; it now returns **0 credits appended**, always, because this leg appends no credits
+    row. That is the honest count, not a placeholder.
 
     **Scoped by cwd** (ADR 0006 *Scope*): the store keys every conversation by the
     directory it ran in, so a sweep into a project ledger reads only that project's tree
@@ -633,17 +641,13 @@ def _ingest_credits(root: Path, name: str, src: Path, files: list[Path], *,
     still reads all of them; `paths.kiro_cli_workspace` makes that call once."""
     workspace = paths.kiro_cli_workspace(root)
     debuglog.event(root, pol=pol, event="import", agent=name, kind="credits",
-                   scoped=bool(workspace))
-    seen_ids = {r.get("id") for r in ledger.read_kind(root, "credits")}
+                   scoped=bool(workspace), writer="retired-p2")
     total = 0
+    # The cursor advance lived inside the credits loop that is now gone. It is NOT
+    # incidental: without it a store is re-read in full on every sweep. Kept here, and
+    # still per-file + fail-open, so an unreadable file never advances past itself.
     for f in files:
         try:
-            rows = transcript.parse_kiro_cli_credits(f, workspace=workspace)
-            for r in rows:
-                if r.get("id") not in seen_ids:
-                    if ledger.append_row(root, "credits", r):
-                        seen_ids.add(r.get("id"))
-                        total += 1
             if agent_cursor is not None:
                 sig = _file_sig(f)
                 if sig is not None:

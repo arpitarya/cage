@@ -19,13 +19,13 @@ flowchart TD
         subgraph producers["one directory per producer"]
             mclaude["claude/chats-YYYY-MM.jsonl"]
             mcopilot["copilot/chats-YYYY-MM.jsonl"]
-            mkiro["kiro/chats-YYYY-MM.jsonl"]
+            mkiro["kiro/chats-YYYY-MM.jsonl<br/>(+ credits since P2)"]
             mconsumer["consumer/calls-YYYY-MM.jsonl<br/>(NEW v0.51 — P1)"]
             msavings["savings/&lt;tool&gt;/savings-YYYY-MM.jsonl"]
         end
         subgraph hist["written by nothing current, read forever"]
             calls["calls-YYYY-MM.jsonl<br/>(retired agents: codex)"]
-            credits["credits-YYYY-MM.jsonl<br/>(kiro CLI)"]
+            credits["credits-YYYY-MM.jsonl<br/>(kiro CLI — re-homed to kiro/ in P2)"]
         end
         receipts["receipts-YYYY-MM.jsonl"]
         tasks["tasks-YYYY-MM.jsonl"]
@@ -38,7 +38,6 @@ flowchart TD
     imp --> mcopilot
     imp --> mkiro
     imp --> calls
-    imp --> credits
     imp --> tasks
     imp --> prov
     yours --> mconsumer

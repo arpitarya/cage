@@ -45,7 +45,17 @@ UNITS = (TOKENS, CREDITS)
 #: row here at all. Reasons are whole sentences: they are rendered verbatim to users.
 ABSENT: dict[str, dict[str, str]] = {
     "claude": {CREDITS: "Claude Code records no credit unit on disk"},
-    "kiro": {TOKENS: "no IDE token store on this install"},
+    # Widened in P2 (v0.51). It read "no IDE token store on this install", which named
+    # ONE surface and one cause — and a reader could fairly conclude the CLI had tokens.
+    # **Both** Kiro surfaces lack them, for two different vendor reasons, and the sentence
+    # is rendered verbatim to users so it has to carry both: the IDE ships no token store
+    # (`devdata.sqlite` is absent on every install probed; its `tokens_generated.jsonl`
+    # twin is 0-output and unsummable), and the CLI's store HAS token columns that are
+    # still NULL (kiro-cli 2.16.0). The second is an upgrade-watch, not a permanent
+    # absence — which is exactly the distinction one clause could not make.
+    "kiro": {TOKENS: "Kiro records no tokens on either surface — the IDE ships no token "
+                     "store, and the CLI's token columns are still null (2.16.0). Its "
+                     "usage is credits"},
 }
 
 

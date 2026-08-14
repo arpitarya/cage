@@ -23,7 +23,8 @@ from dataclasses import dataclass, field
 
 #: The ONLY rendering of "this figure does not exist for this row" — a recorded `0`
 #: always means a measured zero. Since USAGE-ONLY (ADR 0011) the absences it marks are
-#: unit absences (`units.ABSENT`: claude has no credits, kiro has no IDE tokens) and
+#: unit absences (`units.ABSENT`: claude has no credits, kiro has no tokens on either
+#: surface) and
 #: structural ones (a credits-only chat has no token cells), never "couldn't price".
 DASH = "—"
 

@@ -437,9 +437,10 @@ def _unit_absence_notes(shown: list[dict]) -> list[str]:
     policy's own words (`units.ABSENT`).
 
     **The two absences must not read alike** — claude having no credit concept is a
-    vendor law; kiro having no IDE token store is a missing file a future release can
-    ship. A shared `—` in the cell is a column-width fact; the *reason* is what tells
-    the two apart, and it is why neither renders as `0`."""
+    vendor law; kiro having no tokens is two different missing things a future release
+    could ship (no IDE token store at all, and CLI columns that exist but are null). A
+    shared `—` in the cell is a column-width fact; the *reason* is what tells them apart,
+    and it is why neither renders as `0`."""
     seen = {r["agent"] for r in shown if r.get("agent")}
     out = []
     for agent in sorted(seen):

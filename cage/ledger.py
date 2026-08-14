@@ -198,25 +198,103 @@ def calls(root: Path, since: str | None = None) -> list[dict]:
     return read_kind(root, "calls", since=since)
 
 
+def _credit_from_cli_conv(row: dict) -> dict | None:
+    """Project one `ledger/kiro/` `cli-conv` metric row into the **credits row shape**,
+    or ``None`` when the credits skip rule says there is nothing honest to record.
+
+    P2 (v0.51) re-homed kiro's credits: `credits-<month>.jsonl` is no longer written, and
+    `cli-conv` — which reads the same store, through the same shared reader, under the
+    same whitelist — became their home. The top-level shard was a duplicate of it.
+
+    **The credits SEMANTICS are preserved here rather than inherited**, because the two
+    row kinds differ in exactly two ways and both differences matter:
+
+    1. **The skip rule.** `_kiro_cli_credit_row` drops a conversation when credits ≤ 0
+       **and** context ≤ 0 — no usage signal, nothing to say. `cli-conv` is deliberately
+       laxer: it emits whenever the store carried a `usage_info` list at all, *including
+       one summing to a real 0.0*, because a store-verbatim kind records what the store
+       said. `cli-conv` is therefore a **superset**, and the credits rule is re-applied on
+       this projection so a credits reader sees exactly what it always saw.
+       **Measured 2026-08-14: the delta is 0** across all 20 conversations on a real store
+       (all 20 carry `usage_info`; all 20 have credits > 0 or context > 0) — see the
+       [cross-check](../work/regression/2026-08-14-calls-vs-metric-crosscheck.md). n = 20,
+       one machine: that bounds the claim and is *not* a reason to drop the rule, which
+       still guards a case this store happens not to contain.
+    2. **`credits` may be `None`** on a `cli-conv` row (the None-sentinel: no `usage_info`
+       at all, distinct from a recorded 0.0). A credits row has no such sentinel, so
+       `None` is treated as no-signal for the skip test and never rendered as a 0.
+
+    `method="measured"` and `unit="credits"` come from `make_credit`'s own contract — an
+    AWS credit read back verbatim. The projected row keeps the **source row's id**, so a
+    number can be traced to the shard it came from.
+
+    A projection, never a write: nothing is appended anywhere by this function."""
+    credits_val = row.get("credits")
+    if isinstance(credits_val, bool) or not isinstance(credits_val, (int, float)):
+        credits_val = None
+    context = row.get("context_pct", 0.0) or 0.0
+    if (credits_val or 0) <= 0 and context <= 0:
+        return None                      # the credits skip rule, re-applied verbatim
+    return {"id": row.get("id", ""), "ts": row.get("ts", ""),
+            "session": row.get("session", ""), "agent": row.get("agent", "kiro"),
+            "model": row.get("model", ""), "unit": "credits",
+            "credits": float(credits_val or 0.0), "turns": row.get("turns", 0),
+            "context_pct": context, "method": "measured",
+            "surface": row.get("surface", ""), "project": row.get("project", "")}
+
+
+def _credit_score(row: dict, live: bool) -> tuple:
+    """Collapse score for `credits()`: highest turn count wins, then the **live writer**,
+    then id (append order).
+
+    The middle term is P2's addition and it is deliberate rather than incidental. Before
+    P2 the score was `(turns, id)`, and on a tie between a legacy `k_cred…` row and a
+    projected `km_…` one the winner would have been decided by where `_` and `m` sit in
+    ASCII — a real outcome resting on an accident. Preferring the source that is still
+    being written states the intent instead. With legacy rows alone the term is constant,
+    so the ordering is byte-identical to the pre-P2 collapse."""
+    return (row.get("turns", 0), 1 if live else 0, row.get("id", ""))
+
+
 def credits(root: Path, since: str | None = None) -> list[dict]:
     """Kiro-CLI **credits** usage rows (capture-precision §3.4), collapsed
-    **last-write-wins per session**. A resumed conversation appends a fresh row whose id
-    folds in a higher turn count (`schema.make_credit`), so the shard is append-only and
-    a re-import adds zero rows — but a grown conversation's credits must never be *summed*
-    with its earlier partial row. This reader keeps only the highest-turn row per
-    `session` (ties broken by id), the append-only analogue of `_latest_task`. **Read by
-    `cage insights chats`** (CHATS-CREDITS) as its own row shape — a credits row gets its
-    own bucket there and never enters a token/cost aggregate, so reading it can never
+    **last-write-wins per session** across BOTH homes.
+
+    **Two sources, one shape, forever** (P2, v0.51):
+
+    - `ledger/kiro/` `cli-conv` rows — the live home, projected through
+      `_credit_from_cli_conv`, which re-applies the credits skip rule.
+    - `credits-<month>.jsonl` — **no longer written, read forever.** Every real install
+      has rows here (17 in the maintainer's own ledger, `method="estimated"` from before
+      the USAGE-ONLY retag). They are never migrated, rewritten or deleted; append-only
+      means the old shard is history that still counts.
+
+    A resumed conversation appends a fresh row whose id folds in a higher turn count, so
+    both shards are append-only and a re-import adds zero rows — but a grown
+    conversation's credits must never be *summed* with its earlier partial row. This
+    reader keeps only the highest-turn row per `session`, which is also what makes the two
+    sources safe to union: a session captured under both homes collapses to one row rather
+    than double-counting, because they describe the same conversation.
+
+    **Read by `cage insights chats`** (CHATS-CREDITS) as its own row shape — a credits row
+    gets its own bucket there and never enters a token aggregate, so reading it can never
     perturb a *call*-derived number (determinism preserved on that axis); an empty ledger
-    with no credits shard returns []."""
-    rows = read_kind(root, "credits", since=since)
-    latest: dict[str, dict] = {}
-    for r in rows:
-        sess = r.get("session", "")
-        cur = latest.get(sess)
-        if cur is None or (r.get("turns", 0), r.get("id", "")) >= (cur.get("turns", 0), cur.get("id", "")):
-            latest[sess] = r
-    return sorted(latest.values(), key=lambda x: x.get("id", ""))
+    with neither home returns []."""
+    scored: dict[str, tuple[tuple, dict]] = {}
+    for r in read_kind(root, "credits", since=since):
+        key, s = r.get("session", ""), _credit_score(r, live=False)
+        if key not in scored or s >= scored[key][0]:
+            scored[key] = (s, r)
+    for m in kiro_metrics(root, since=since):
+        if m.get("source") != "cli-conv":
+            continue
+        r = _credit_from_cli_conv(m)
+        if r is None:
+            continue
+        key, s = r.get("session", ""), _credit_score(r, live=True)
+        if key not in scored or s >= scored[key][0]:
+            scored[key] = (s, r)
+    return sorted((v[1] for v in scored.values()), key=lambda x: x.get("id", ""))
 
 
 def savings(root: Path, since: str | None = None) -> list[dict]:
@@ -561,7 +639,13 @@ ABSENT_SPINES: dict[str, str] = {
 #: `cli-delta` twin, kiro CLI by the separate credits mechanism.
 CUMULATIVE_SOURCES: dict[str, tuple[str, str]] = {
     "copilot": ("cli", "superseded by the cli-delta twin"),
-    "kiro": ("cli-conv", "kiro-CLI spend is credits-only (ledger.credits), never in calls"),
+    # Reworded in P2 (v0.51). It used to read "credits-only (ledger.credits), never in
+    # calls", which pointed at a shard that is no longer written. `cli-conv` IS the
+    # credits home now — `ledger.credits` projects it — and it stays out of the token
+    # spine for the unchanged reason (10.3): `_spend_row` normalizes every spine row to
+    # the call-row TOKEN shape, so a cli-conv row in `spend()` would carry credits with
+    # zero tokens, which is the exact lie `make_credit` exists to prevent.
+    "kiro": ("cli-conv", "kiro-CLI usage is credits, read by ledger.credits — never tokens"),
 }
 
 

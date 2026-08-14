@@ -322,9 +322,16 @@ def test_cli_credits_import_is_scoped_and_stamped(tmp_path, monkeypatch):
                            + f'\n[[sources.kirocli]]\npath = "{db.as_posix()}"\n'
                              'glob = "*"\nformat = "kiro-cli"\n', encoding="utf-8")
     importcmd.run(root, "all", _args())
-    credits = ledger.read_kind(root, "credits")
+    # P2 (v0.51): the top-level `credits-*.jsonl` shard is no longer WRITTEN — `cli-conv`
+    # rows in `ledger/kiro/` are the credits home and `ledger.credits` projects them.
+    # The property under test is unchanged and is asserted through the reader every
+    # consumer actually uses, which is the stronger place for it: ADR 0006 cwd scoping,
+    # and the `project` stamp. Asserting the raw shard would now pass vacuously on [].
+    assert ledger.read_kind(root, "credits") == [], "the retired shard must stay unwritten"
+    credits = ledger.credits(root)
     assert [c["session"] for c in credits] == ["mine"]   # the other cwd is not this project
     assert credits[0]["project"] == root.name
+    assert credits[0]["method"] == "measured" and credits[0]["unit"] == "credits"
 
 # ── K3 and K4's report-footer cases went with `cage report` (SURFACE-CUT) ────────
 # Three tests pinned `report._kiro_limits_caveat` — the footer stating that kiro rows
