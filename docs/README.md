@@ -59,7 +59,7 @@ agent rather than by time.
 **SURFACE-CUT is BUILT (2026-08-14)** — [handoff](../work/archive/v0.50-surface-cut.handoff.md) ·
 [prompt](../work/archive/v0.50-surface-cut.prompt.md), archived on implement; rationale and
 the six recorded-but-unread facts it leaves behind are in
-[surface-cut.decision.md](../work/surface-cut.decision.md). It deleted `cage report`, all
+[surface-cut.decision.md](../work/archive/v0.50-surface-cut.decision.md). It deleted `cage report`, all
 of `cage data`, `insights attrib|adoption|compare|estimate|calibration` and
 `authorship ledger-sync`, and cut MCP from 6 tools to 2. **Capture is unchanged** — every
 row those views read is still recorded. One phase was deliberately not executed: the

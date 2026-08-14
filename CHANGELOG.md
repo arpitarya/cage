@@ -20,6 +20,12 @@ Full release notes. The README keeps a one-line summary per version; the detail 
   - **`cage insights attrib` is what PLAN §4 called "the attribution engine (the part
     that's actually novel)".** Removing it narrows what cage *is*, deliberately and with
     that stated plainly rather than annotated away.
+  - **Built from:** [handoff](work/archive/v0.50-surface-cut.handoff.md) ·
+    [prompt](work/archive/v0.50-surface-cut.prompt.md) ·
+    [decision record](work/archive/v0.50-surface-cut.decision.md) ·
+    [the CLAUDE.md diff it forced](work/archive/v0.50-surface-cut.claude-md-diff.md),
+    applied in full 2026-08-14 — 24 lines of the always-loaded contract named commands
+    this change deleted, including **two rules that instructed an agent to run one**.
   - **Residual limits, named not buried:** capture becomes `cage import`-only; ledger
     retention loses its only pruning path; the kiro proxy — the one path to all five of
     kiro's wire values — closes permanently; and `--team` goes with `ledgersync`, which

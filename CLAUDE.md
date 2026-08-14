@@ -32,7 +32,7 @@ record_call / record_receipt  →  .cage/ledger/{calls,receipts,tasks}-YYYY-MM.j
                                              · graphify · compare · estimate
                                              · calibration · why · origin
                                              · commits · commit
-                                             + --scope (monorepo slice) · --team · ledger-sync (§3.6)
+                                             + --scope (monorepo slice)   [--team/ledger-sync: deleted v0.50]
                                              + --export → .cage/output/<view>-<stamp>/  (stamped artifact)
 ```
 
@@ -61,7 +61,8 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   receipts also carry an additive optional `scope` (top-level changed dir, same PII
   guard as tasks; empty = the legacy contract, plan §3.6.2); calls additionally carry an
   additive optional `project` (working-dir basename, same PII guard; empty = legacy) — a
-  *derived* `cage report --project` view, deliberately distinct from `scope`'s monorepo
+  **recorded fact with no reader** — its `cage report --project` view was deleted in
+  v0.50; the field is still stamped, deliberately distinct from `scope`'s monorepo
   axis (plan §3.7). The long-lived logs are month-partitioned behind
   `ledger.append_row`/`read_kind` (plan §3.6.1). Calls also carry an additive optional
   `credits` (the provider's own billed figure, verbatim) — the one additive field whose
@@ -139,8 +140,8 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   cost-impact surface (`compare`/`estimate`/`calibration`) depends on. **Old ledgers
   still read**: a pre-0.36 `gap_ms` call or `tool="human"`/`unit="minutes"` receipt
   parses fine and is excluded from money views by `report._is_legacy_human`, with the
-  exclusion **counted and footnoted** on `cage report` — silently dropping it from a
-  total was the one option ruled out. `cage query savings-axis` explains it;
+  exclusion **counted and footnoted** on `cage insights chats` (it was `cage report`
+  until v0.50) — silently dropping it from a total was the one option ruled out. `cage query savings-axis` explains it;
   `tests/test_legacy_ledger.py` pins it. **A v2 exists and it is a different question
   (v0.43).** `cage insights commits` / `commit <sha>` rebuilt agent-vs-human **per
   commit**, and nothing amputated came back: no rate, no USD, no `gap_ms`, no `minutes`
@@ -237,17 +238,15 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   [estimate.py](cage/estimate.py), [calibration.py](cage/calibration.py)
   — plan §4.7–§4.8) — the closed-task join
   (task-id first, session-window fallback; overlaps → smallest task id) yields
-  *observed* stack signatures (`human` excluded; empty ⇒ `agent-only`). `cage
-  compare`: **measured** group totals (recorded tokens), the delta always `estimated` +
-  the observational caveat. `cage insights estimate`: a `modeled` median+IQR **token**
-  band from exact-key history; `--record` stamps additive `est_*` fields **plus the
-  token band bounds** on the *open* task row (plan §3.4) so `cage insights calibration` can
-  score in-band hits against the band as recorded — that **measured hit-rate is the
-  only confidence source; the estimator never self-reports**.
-  a pure composer over attrib/roi/regression/quality + break-even — computes
-  no new statistics, refuses (`INSUFFICIENT DATA`) over approximating. The min-n
-  gates `MIN_COMPARE_N`/`MIN_ESTIMATE_N` live in `constants.py` and **block** —
-  below them the command explains, never numbers. Task `label` (via `cage task outcome
+  *observed* stack signatures (`human` excluded; empty ⇒ `agent-only`).
+  **⚠ THE WHOLE USAGE-IMPACT SURFACE WAS DELETED IN v0.50 (SURFACE-CUT)** — `compare`,
+  `estimate` and `calibration` are gone, along with the `INSUFFICIENT DATA` refusal and
+  the `MIN_COMPARE_N`/`MIN_ESTIMATE_N` blocking gates as *user-facing* behaviour. What
+  survives is the **writer**: `tasks.jsonl` still records outcomes and the additive
+  `est_*` fields, `taskgroup.join_rows` is still the one closed-task join, and
+  `MIN_COMPARE_N` still gates the fleet study. **Nothing reads the task-grain fields**
+  (UNREAD-FACTS). A deleted reader never licensed deleting its writer — see the rule
+  below. Task `label` (via `cage task outcome
   --label`) is one validated token, never a path or free text. Diagnostics: `cage
   doctor --bundle` ([doctorbundle.py](cage/doctorbundle.py)) writes one redacted,
   counts-never-content archive; every capture-path swallow-site logs under
@@ -260,14 +259,15 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   §4.9): opaque random machine id (**opt-in by enrollment** — unenrolled ledgers
   stamp nothing, byte-identical legacy), recorded phase markers in
   `ledger/study.jsonl` (resolved per machine against its own clock), one-file
-  bundles (`cage data export --study` → `cage import bundle*.zip`; merge by row
+  bundles (`cage study export` → `cage import bundle*.zip`; merge by row
   identity — calls/receipts by id, tasks/markers by whole-row so task updates
   survive), the **machine-day** as sample unit, paired delta `estimated` with the
   work-mix caveat, gate = `MIN_COMPARE_N` machines-with-both-phases (blocking).
 - **CSV output (plan §3.9)** ([csvout.py](cage/csvout.py)) — `--csv` on
-  report/attrib/roi/compare/`study report`/calibration, plus raw rows via
-  `cage data export --csv calls|receipts|tasks`
-  (`exportcmd.RAW_CSV_FIELDS`; `--format csv` = legacy `--csv calls`). One shared
+  `cage insights chats`/`graphify`/`commits`/`commit`, `authorship summary` and
+  `study report`, plus the bundle via
+  `cage study export` for the fleet bundle (the raw-row CSV export and
+  `exportcmd.RAW_CSV_FIELDS` went with `cage data` in v0.50). One shared
   data structure per view feeds text AND csv (`render_csv` beside each
   `render_*`) — never compute twice. LF pinned (`lineterminator="\n"` +
   `newline=""` writes), RFC-4180, method/match tags are columns, refusals/
@@ -281,9 +281,11 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   its `tools/docgen` generator were removed in the hookless rebuild; the goldens
   remain the contract.)
 - **OTel GenAI export** ([otelout.py](cage/otelout.py), plan/handoff
-  `work/archive/v0.39-otel-export.handoff.md`) — `cage data export --otel`, a third
-  one-way REPORTING format beside `--csv`/`--study` (never an import source; the
-  fleet bundle stays jsonl). Calls map to `gen_ai.system` / `gen_ai.request.model` /
+  `work/archive/v0.39-otel-export.handoff.md`) — **DELETED in v0.50 with the `data`
+  group (`otelout.py` is gone).** Kept below as the record of a mapping that was
+  carefully chosen and may be wanted again; it describes no live surface.
+  It was `cage data export --otel`, a one-way REPORTING format (never an import source;
+  the fleet bundle stays jsonl). Calls map to `gen_ai.system` / `gen_ai.request.model` /
   `gen_ai.usage.input_tokens` / `output_tokens` / `gen_ai.client.operation.duration`
   (omitted, never a fabricated zero, when `latency_ms` is unknown). **The GenAI
   semantic conventions are pre-stable** (own repo, no 1.0, names can still change) —
@@ -378,7 +380,7 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
 - **View export + the run stamp** ([viewexport.py](cage/viewexport.py),
   [runstamp.py](cage/runstamp.py), compare doc
   [view-export-and-run-stamp](work/compare/view-export-and-run-stamp.compare.md);
-  `cage query view-export`) — `--export` on `cage report` and **every** `cage insights`
+  `cage query view-export`) — `--export` on **every** `cage insights`
   leaf (17 views) writes the rendered view to disk: bare ⇒
   `<ledger>/.cage/output/<view>-<stamp>/` holding **every format that view has** (text ·
   csv where it owns a `render_csv` · json), a path with a known suffix ⇒ that exact file
@@ -399,9 +401,11 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   file, `--export` is an artifact, and only the artifact grows the block; a preamble in
   `--csv` would break the pinned column contract. `cliutil.emit` is the ONE chokepoint
   (export → then exactly one of csv/json/text) — never a second per-handler csv branch.
-  **`.cage/output/` is deliberately NOT `.cage/out/`**: that one is `cage data serve`'s
-  docroot and a stdlib `http.server` is pointed straight at it, so sharing a directory
-  would publish every exported report on the loopback port. **No cleanup class prunes
+  **`.cage/output/` is deliberately NOT `.cage/out/`**: that one *was* `cage data
+  serve`'s docroot, with a stdlib `http.server` pointed straight at it. **The server was
+  deleted in v0.50 and the separation is kept anyway** — a directory that was once
+  web-served is the wrong place to write artifacts, and re-merging them would be
+  invisible until something served it again. **No cleanup class prunes
   it** — cage never deletes an artifact it wrote (OUTPUT-GROWTH carried the
   volume-gated reopen and was closed unactioned 2026-08-12, no size number ever
   measured: [archive/v0.49-output-growth.item.md](work/archive/v0.49-output-growth.item.md)). Bare `cage` (the overview) has **no** `--export`: a
@@ -427,6 +431,13 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   **A stale ADR is a defect of the same class as a missing changelog entry.** The half no
   test can see — *was the record edited in the same commit?* — is carried by review, and
   the test says so rather than implying coverage it does not have.
+- **A reader may be deleted; the writer it read is a separate decision (SURFACE-CUT,
+  2026-08-14).** Capture is cheap, append-only, and irreversible to lose. When a view
+  goes, the fields it read **stay recorded by default**, and the gap is *filed* rather
+  than tidied away — v0.50 left six such recorded-but-unread facts (UNREAD-FACTS), and
+  the tempting cleanup, stopping their writers, would silently narrow what any future
+  view could ever answer. **Stopping a writer needs its own justification, its own ADR
+  update, and its own line in `work/OPEN-WORK.md`.**
 - **Triage before work: a human-blocked queue STOPS the session (Arpit, 2026-08-12).**
   Before doing anything, read `work/OPEN-WORK.md` and ask: *is any item agent-closable
   right now?* If everything remaining needs Arpit — his hands, a ratification, a
@@ -435,7 +446,8 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   work" to fill the hours. "Next: Arpit reviews…" as the *closing* line of a long
   session is the failure mode this rule exists to prevent; as the *opening* line it
   is the rule followed. His time and tokens are money — cage itself can price a
-  session (`cage report`); say the cost out loud rather than running long against a
+  session — **but see the `Cost:` rule below: the command that did it was deleted in
+  v0.50**; say the cost out loud rather than running long against a
   blocked queue. Applies to Cowork and Claude Code alike.
 - **Probe before claiming impossibility (Arpit, 2026-08-12).** Any claim of the form
   "item X needs hardware/tooling that isn't here" must cite a dated row in
@@ -446,9 +458,12 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   twice becomes a test or mechanical gate in the same change that records the second
   occurrence. The OPEN-WORK header went stale **seven times** before
   `tests/test_queue_honesty.py` existed; the lesson tax is capped at two from now on.
-- **Every WORKLOG entry ends with a `Cost:` line (Arpit, 2026-08-12)** — the
-  session's spend from `cage report` (this repo's own product; dogfood it). If
-  unmeasurable, write `Cost: unmeasured — <why>`. Waste that is priced gets stopped;
+- **Every WORKLOG entry ends with a `Cost:` line (Arpit, 2026-08-12)** — the session's
+  spend, measured with cage itself. **⚠ The command this rule named, `cage report`, was
+  deleted in v0.50 (SURFACE-CUT) and the rule has no replacement source yet**: the
+  surviving reader, `cage insights chats`, is per-*chat* and cannot isolate a session.
+  Until one exists, `Cost: unmeasured — <why>` is the honest entry and the naming of a
+  dead command is itself the open item (UNREAD-FACTS).* Waste that is priced gets stopped;
   waste that is prose gets repeated.
 - **Cage measures usage, never cost** ([ADR 0011](work/archive/adr/0011-cage-measures-usage-not-cost.md)).
   No price table, no rate card, no currency on any surface, and **no conversion between
@@ -559,17 +574,20 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   file**: a duplicate table header would make the whole config unparseable and capture
   would silently fall back to the bundle. Callers: `policysync` · `initcmd` ·
   `cage setup --python-launcher`. `cage policy sync` is unambiguously `cage.toml`-only.
-- **Export imports everything first** (plan §3.7) — `cage data export` (plain and `--study`)
-  runs the full all-agent sweep before emitting (`--agent` filters output only);
-  `--no-import` flag > `CAGE_CAPTURE` env > `[capture] import_before_export` policy;
-  fail-open; the study manifest records `refresh: {ran, new_calls}`.
+- **Export imports everything first** (plan §3.7) — `cage study export` runs the full
+  all-agent sweep before emitting; `--no-import` flag > `CAGE_CAPTURE` env >
+  `[capture] import_before_export` policy; fail-open; the study manifest records
+  `refresh: {ran, new_calls}`. (`cage data export` carried this first and was deleted in
+  v0.50; `study export` is the surviving bundle path.)
 - **State cleanup is a closed allowlist, and deletion is manual-only (v0.37)**
   ([cleanup.py](cage/cleanup.py), plan §3.6.4) — aged debug.log/hooks-seen rows, stale
   `pending-*` buffers, orphan cursors, `*.tmp`; never ledger/ (tool savings included —
   see below), cage.toml (and legacy policy.toml), machine.json,
-  study.jsonl, limits.json (by construction). **Deletion only ever happens via an explicit `cage data cleanup
-  --apply`**, which runs regardless of `[cleanup] enabled` — an explicitly-typed command
-  is always honored. The auto path (piggybacked on `importcmd.run`/session-end,
+  study.jsonl, limits.json (by construction). **⚠ NOTHING PRUNES `state/` ANY MORE.** The one deletion path was
+  `cage data cleanup --apply`, deleted in v0.50; `cleanup.py` is kept and its auto path
+  still *warns*, but the explicitly-typed command that was the only thing allowed to
+  delete is gone. This is **STATE-RETENTION** in `work/OPEN-WORK.md`, stated here rather
+  than left as a rule naming a dead verb. The auto path (piggybacked on `importcmd.run`/session-end,
   throttled, fail-open, `cleanup.prune` debug context) only ever **warns**, once per
   throttle interval, on stderr — count, reclaimable size, and the runnable fix, silent
   when nothing is eligible — and never deletes. `[cleanup] enabled` (`CAGE_CLEANUP`
@@ -853,49 +871,55 @@ don't restate them, apply them.
 
 ## Decision records (ADRs)
 
-Architecturally load-bearing decisions live as numbered ADRs in
-[docs/adr/](docs/adr/), authored from [docs/adr/TEMPLATE.md](docs/adr/TEMPLATE.md)
-— the durable *why* behind a design that a future agent would otherwise "fix" back. They are the standing record; cite them inline in this
-file and in the plan at the rule they explain, the way a `plan §` reference is
-cited. Current set: [0001](work/archive/adr/0001-ledger-team-aggregation-notes-not-external-sink.md)
-(team aggregation via `refs/notes`, not an external sink) ·
-[0002](work/archive/adr/0002-universal-capture-global-ledger-explicit-import-export.md)
-(universal pull-based capture, global ledger, no OS scheduler). An ADR-worthy
-decision is one where a wrong call is expensive to reverse and the reasoning isn't
-obvious from the code — the substrate contract, the determinism/method law, the
-`$0`/no-infra wedge, a capture-architecture choice. A one-line dated call goes in
-the plan's decisions log instead.
+**The set is SEVEN records, one per thing cage meters plus two that bind them** —
+[ADR-LAWS](docs/adr/0001_laws.md) · [ADR-CLI](docs/adr/0002_cli.md) ·
+[ADR-CLAUDE](docs/adr/0003_claude.md) · [ADR-COPILOT](docs/adr/0004_copilot.md) ·
+[ADR-KIRO](docs/adr/0005_kiro.md) · [ADR-CONSUMERS](docs/adr/0006_consumer.md) ·
+[ADR-GRAPHIFY](docs/adr/0007_graphify.md). Index, the ownership table and the standing
+rule: [docs/adr/README.md](docs/adr/README.md). Author new ones from
+[docs/adr/TEMPLATE.md](docs/adr/TEMPLATE.md).
 
-**Every ADR carries a reference** (fux's rule) — a plan section, a paper, or a
-concrete example that grounds *why*. An ADR that only asserts is incomplete.
+**Cite them BY NAME — `ADR-KIRO`, never "ADR 0005".** The numbers belong to the eleven
+**superseded** records now frozen in [work/archive/adr/](work/archive/adr/README.md),
+which are **history and must never be cited as current spec**. "ADR 0001" meant *team
+ledger aggregation via `refs/notes`* for six weeks, and ~90 references to the numeric
+names still exist.
 
-**Every ADR ends with a `## Veto condition (when to revisit)`** — cage's own
-device, and the anti-rot mechanism the rest of the fleet lacks. Three parts, each
-load-bearing:
+**Each record has two sections:** **§1 for humans** (one screen, a Mermaid diagram and a
+hand-paired ASCII twin — both required, changed in the same edit) and **§2 for agents**
+(context · decision · consequences · alternatives rejected · reference · veto condition).
 
-- **A falsifiable trigger, numbered where the decision is volume- or
-  measurement-gated.** 0001's is the model: "single-digit GB/yr is fine; 100s of
-  GB is not… **only then, and only with a named volume number**." A veto you can
-  only reopen with a *measurement*, never an *argument*, pre-empts a future agent
-  re-litigating a rejected option from first principles. Name **where** the change
-  lands, too (0001: a new `export` command, notes stays default), so revisiting
-  can't quietly become a redesign.
-- **Contingent vs. invariant, labelled.** Split the parts that auto-revisit on
-  evidence from the parts that are product values and move only by ratified
-  reversal. 0002 does this explicitly: `project` capture returns when a client
-  exposes the cwd; "no OS scheduler" is *not* volume-gated and changes only by
-  reversing the ADR. Pretending every decision is revisitable-on-evidence lies
-  about the ones that are values.
-- **A "deliberately not taken" record** where there's meaningful negative space —
-  an option considered and declined but *not* dogmatically rejected, with its own
-  future threshold (0001's write-path size block). Records the omission as a
-  choice, so the next agent doesn't mistake it for an oversight and doesn't ship it
+**The five laws live in ADR-LAWS and nowhere else** — pull-only · one sink · append-only ·
+counts-never-content · usage-never-cost. **A record that restates a law is a bug, not
+redundancy**: a second copy can drift, and drift there is invisible until it produces a
+wrong number. Determinism, the method law, fail-open-but-never-silent and `$0`/stdlib-only
+bind equally, live in *this* file, and are named-but-not-restated in ADR-LAWS.
+
+An ADR-worthy decision is one where a wrong call is expensive to reverse and the reasoning
+isn't obvious from the code. A one-line dated call goes in the plan's decisions log
+instead.
+
+**Every ADR carries a reference** (fux's rule) — a measurement, a probe, or a concrete
+worked example that grounds *why*. An ADR that only asserts is incomplete.
+
+**Every ADR ends with a `## Veto condition (when to revisit)`** — cage's own anti-rot
+device. Three parts, each load-bearing:
+
+- **A falsifiable trigger, numbered** where the decision is volume- or measurement-gated.
+  Name the number **and where the change lands**, so revisiting cannot quietly become a
+  redesign. A veto reopenable only by a *measurement*, never an *argument*, pre-empts a
+  future agent re-litigating a rejected option from first principles. **Say so explicitly
+  when a trigger is not yet instrumented** — a veto you cannot compute is aspirational
+  (ADR-GRAPHIFY's double-count rate is the worked example: named, and stated UNMEASURED
+  rather than assumed zero).
+- **Contingent vs. invariant, labelled.** Contingent auto-revisits on evidence; invariant
+  moves only by ratified reversal. Pretending every decision is revisitable-on-evidence
+  lies about the ones that are values.
+- **A "deliberately not taken" record** where there's meaningful negative space — an option
+  declined but *not* dogmatically rejected, with its own future threshold. Records the
+  omission as a choice, so the next agent doesn't mistake it for an oversight and ship it
   as a `# v2:` half-build.
 
-Author every ADR from [docs/adr/TEMPLATE.md](docs/adr/TEMPLATE.md), which bakes in
-the three veto devices; the two existing records ([0001](work/archive/adr/0001-ledger-team-aggregation-notes-not-external-sink.md),
-[0002](work/archive/adr/0002-universal-capture-global-ledger-explicit-import-export.md)) are
-the worked examples to copy.
 
 ## Dev
 
@@ -951,12 +975,15 @@ never has to chase them — design of record:
 [dogfood-report.handoff.md](work/archive/v0.44-dogfood-report.handoff.md) (archived
 on implement; the living pattern is `work/dogfood/README.md`).
 
-To refresh: on the dev machine, run the three allowlisted commands — `cage report`,
-`cage insights attrib`, `cage insights adoption` — over the same absolute window
+To refresh: on the dev machine, run the surviving allowlisted commands — **`cage
+insights chats` is the only one left; `cage report`, `insights attrib` and `insights
+adoption` were deleted in v0.50** — over the same absolute window
 (all-time, no `--since`), paste the output verbatim (method tags intact) into a new
 `work/dogfood/<YYYY-MM-DD>.md`, and copy it over `latest.md`. **Never**
-`cage insights chats` or `cage report --project` in a snapshot — chat titles and
-working-dir basenames leak private project names, and this repo is public.
+publish a snapshot containing chat titles or working-dir basenames — they leak private
+project names, and this repo is public. (The old prohibition named `cage insights chats`
+and `cage report --project`; the second is deleted, the first is now the *only* reader,
+so the rule is stated against the **data**, not the command.)
 **Never author a number** — if a command has nothing real to show (an empty task
 ledger, say), the snapshot states that instead of fabricating one.
 `tests/test_dogfood_freshness.py` fails once `latest.md` is >60 days old or its
@@ -983,7 +1010,7 @@ each agent only needs thin idiomatic wiring (`agents.py` orchestrates):
   defects (CLAUDE-DEDUP inflates `calls` ~2-3×; CLAUDE-SUBAGENT-KEY mis-keys
   subagent spend there). No credits field — none exists for Claude Code on disk.
   Capture is **pull-based and
-  global** (plan §3.7): `cage import`/`cage data export` over a **resolved** ledger
+  global** (plan §3.7): `cage import` over a **resolved** ledger
   (`--ledger`/`CAGE_BASE` → project `.cage/` → global `~/.cage`, via `paths.resolve_root`)
   is the universal path that works with no hooks and no project.
   **Kiro is the ONE exception to one-sink-per-sweep** ([ADR 0006](work/archive/adr/0006-kiro-rows-are-machine-facts-not-project-facts.md)):
@@ -1026,8 +1053,9 @@ each agent only needs thin idiomatic wiring (`agents.py` orchestrates):
   — a product invariant, not volume-gated) — no launchd/systemd/cron/
   schtasks, no `cage scheduler`; hands-off automation is the user's own cron/schtasks
   line calling `cage import` (the hint `render.scheduler_hint()` prints is OS-aware,
-  never installed), and `cage data watch` is an optional foreground `sleep` loop they
-  Ctrl-C (exit 130). Per-agent log locations live in **one registry**,
+  never installed). `cage data watch` was that hint's foreground companion and was
+  deleted in v0.50 — capture is now `cage import` plus capture-on-read (CONTINUOUS-CAPTURE
+  in `work/OPEN-WORK.md`). Per-agent log locations live in **one registry**,
   `paths.agent_log_sources()` — per-OS candidates behind it (env overrides always
   win; the Windows Kiro layout is labeled UNVERIFIED-LAYOUT until pinned on a real
   install), probed read-only by `cage doctor --paths` ([pathprobe.py](cage/pathprobe.py),
@@ -1048,8 +1076,8 @@ each agent only needs thin idiomatic wiring (`agents.py` orchestrates):
 - **Read:** `mcpserver.py` (MCP, every agent), `report/attrib/matrix/budget/roi`,
   plus `task outcome`, authorship
   (`origin`/`notes-sync`/`verify`, plan §3.5), and the ledger-scale surface
-  (`--scope` / `--team` filters, `ledger-sync` into refs/notes/cage-ledger via the
-  shared `mergeutil.union_by_id` core, plan §3.6).
+  (`--scope`; **`--team` and `ledger-sync` were deleted in v0.50** — `mergeutil.union_by_id`
+  survives and is still `notes-sync`'s merge core, plan §3.6).
 - **The agent surface is a four-layer ladder, and L0 is the floor**
   ([archive/v0.41-agent-surface-layers.proposal.md](work/archive/v0.41-agent-surface-layers.proposal.md);
   `cage query agent-layers`). **L0 hookless** (pull capture + interceptor + every CLI
@@ -1068,8 +1096,9 @@ each agent only needs thin idiomatic wiring (`agents.py` orchestrates):
   double-capture risk for no gain. L1 buys exactly three things: (a) **agent identity,
   stamped not inferred** — a hook runs *inside* the agent, so `cage hook <event> --agent
   X` states it as a fact; attestations land in `state/attest.jsonl` and join the usage
-  breadcrumb on `args_hash` (an **exact** key), turning `cage insights adoption`'s half A
-  from agent-blind into per-agent. It does **not** fix half B — a graphify savings row's
+  breadcrumb on `args_hash` (an **exact** key). **Its only consumer, `cage insights
+  adoption`, was deleted in v0.50 — the attestation is still written and now read by
+  nothing** (the sharpest of the six UNREAD-FACTS). It does **not** fix half B — a graphify savings row's
   id folds in an *answer* hash no attestation can reconstruct, so `NO_LINK` stays
   structurally true and is not quietly narrowed. (b) **auto task-close** at the session
   boundary, on the **exact session id** — never the most recent task, never by proximity.
@@ -1313,7 +1342,7 @@ each agent only needs thin idiomatic wiring (`agents.py` orchestrates):
 
 This project meters LLM traffic into `.cage/` (a *flux*: $0, deterministic).
 
-- Usage so far: `cage report` · per-tool savings: `cage insights attrib` · per chat: `cage insights chats`
+- Usage per chat: `cage insights chats` · graphify savings per chat: `cage insights graphify`
 - Tokens and credits are recorded as *counts* — cage measures usage, never cost.
 - The ledger carries token counts, never prompt text — PII-safe by construction.
 - Edit pipeline order / capture switches in `.cage/cage.toml`.

@@ -218,6 +218,17 @@ attest-join-command-normalization.
 [v0.49-proposals-readme.md](v0.49-proposals-readme.md) ·
 [v0.49-open-queue-constraints.md](v0.49-open-queue-constraints.md).
 
+**v0.50 — SURFACE-CUT's paper trail.** Four files, and the pair is not the whole story:
+[handoff](v0.50-surface-cut.handoff.md) · [prompt](v0.50-surface-cut.prompt.md) ·
+**[decision record](v0.50-surface-cut.decision.md)** — what was deleted, what survives and
+the residual limits; its *placement* question was answered 2026-08-14 (a cross-cutting
+surface deletion is **not** a per-agent ADR) — and
+**[the CLAUDE.md diff it forced](v0.50-surface-cut.claude-md-diff.md)**, which is the one
+worth reading: SURFACE-CUT falsified **24 lines of the always-loaded contract**, two of
+them *rules instructing an agent to run a command the same change deleted*. It was
+**applied in full on 2026-08-14** and archived; it is kept because the applied diff no
+longer shows what was wrong or why.
+
 **Two things a future reader must not misread.**
 [SHIM-TOOL-DEPS](v0.49-shim-tool-deps.item.md) is a **real, measured defect closed
 unfixed** — a reproduced 120-second hang in the shipped POSIX twin — not a parked idea.

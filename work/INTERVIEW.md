@@ -403,7 +403,7 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
 6 tools → 2; the pair is archived at
 [v0.50-surface-cut.handoff.md](archive/v0.50-surface-cut.handoff.md) ·
 [prompt](archive/v0.50-surface-cut.prompt.md) and the reasoning is in
-[surface-cut.decision.md](surface-cut.decision.md). **Read the decision record before
+[surface-cut.decision.md](archive/v0.50-surface-cut.decision.md). **Read the decision record before
 touching any read surface.** TASK-GRAIN-SPINE did partly close itself, as predicted — the
 three affected views are gone — but the *capture-schema* half survives and is re-scoped in
 OPEN-WORK.

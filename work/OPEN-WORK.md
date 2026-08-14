@@ -5,7 +5,7 @@
 - **SURFACE-CUT is BUILT (2026-08-14), suite green except the shim** — 14 modules, 15
   handlers, 12 test files and 16 goldens deleted; MCP cut 6 tools → 2. Outcome recorded
   in [IMPLEMENTATION.md](IMPLEMENTATION.md); decision record in
-  [surface-cut.decision.md](surface-cut.decision.md). **15 tests remain red, all shim**
+  [surface-cut.decision.md](archive/v0.50-surface-cut.decision.md). **15 tests remain red, all shim**
   (see SHIM-DEAD-VERB below) — that was Arpit's explicit call, not an oversight.
 
 ## Not mine — a concurrent session owns these
@@ -57,22 +57,38 @@
   `tests/test_compare.py`'s `_MODEL` comment; that file was deleted, so this line is now
   the only record of the seam.
 
-- **METRICS-DUAL-WRITE-END** — decide whether `calls` capture for the three agents ever
-  stops. **Do not touch before 2026-09-13** — one full transcript-retention window of
-  clean metric capture. The ADR 0010 gate that framed this (post-cutover gap count at
-  zero) is void: there is no cutover ([ADR 0011](archive/adr/0011-cage-measures-usage-not-cost.md)).
-  The live reason to keep writing `calls` is that it is the **id namespace savings
-  receipts reference** and the fallback basis for every spine-less agent.
+- **LEDGER-SHAPE** — **Arpit, 2026-08-14:** every usage producer owns one directory under
+  `ledger/`. Four asks, spec'd as P1-P4 of
+  [ledger-restructure.handoff.md](ledger-restructure.handoff.md): a **consumer ledger**
+  (`ledger/consumer/`, dual-write — **reverses ADR 0006**, ratified the same day) · kiro
+  **credits** folded into `ledger/kiro/` (copilot needs nothing — it has no credit rows) ·
+  **`imports.jsonl` → `state/`** plus name-lifting for all three agents · **graphify savings →
+  `ledger/graphify/`**. Nothing is moved on disk — every old path stays written-no-more and
+  read-forever. Carries five open decisions (handoff §10.1, 10.3-10.6); **10.5 (the `ledger/`
+  namespace collision between agents, consumers and tools) blocks P4** and **10.3 (whether
+  kiro-CLI gains a spine) changes user-visible output**.
+
+- **METRICS-DUAL-WRITE-END** — **decided 2026-08-14: `calls` capture for the three agents
+  stops. Freeze lifted early by Arpit** (it read *"do not touch before 2026-09-13"*, one full
+  transcript-retention window of cross-check; that window is knowingly forfeited). **Picked up**
+  — folded into the six-phase [ledger-restructure.handoff.md](ledger-restructure.handoff.md) +
+  [.prompt.md](ledger-restructure.prompt.md) as **P5**, not yet executed. Scope is the three agents'
+  **transcript→calls ingest legs only**: the `calls` kind survives, because `ledger.spend()`'s
+  calls loop is still the sole basis for `record_call` consumers, retired `codex`, proxy rows
+  and `[sources.<name>]` custom tools. Handoff §0 (a pre-flight `calls`-vs-metric snapshot to
+  `regression/`) is the mitigation for the lifted freeze and gates every later step.
+  Carries one open decision — **OPEN QUESTION 10.1**, whether `_PARSERS` survives as the
+  `[sources.<name>] format` custom-source contract; blocks only its own deletion.
 
 ## Arpit decides
 
 - **`CLAUDE.md` diff for SURFACE-CUT — proposed, not applied**:
-  [surface-cut.claude-md-diff.md](surface-cut.claude-md-diff.md). **24 lines are false**,
+  [surface-cut.claude-md-diff.md](archive/v0.50-surface-cut.claude-md-diff.md). **24 lines are false**,
   two of them already stale before this change (the ADR restructure moved
   `docs/shim-contract.md` and every numeric ADR path). Two are *rules* naming deleted
   commands: the WORKLOG `Cost:` line and the dogfood snapshot allowlist.
 - **Where does the SURFACE-CUT decision record live?** Written to
-  [surface-cut.decision.md](surface-cut.decision.md) beside its archived pair. The ADR set
+  [surface-cut.decision.md](archive/v0.50-surface-cut.decision.md) beside its archived pair. The ADR set
   became four per-agent records the same day, and this is cross-cutting, so it fits
   neither the live shape nor the frozen archive.
 
