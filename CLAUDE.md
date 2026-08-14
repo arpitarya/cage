@@ -1007,7 +1007,7 @@ device. Three parts, each load-bearing:
 ## Dev
 
 ```bash
-just test          # python -m pytest -q   (1561 tests; +10 Windows-only skips, +1 opt-in dogfood-age skip)
+just test          # python -m pytest -q   (1563 tests; +10 Windows-only skips, +1 opt-in dogfood-age skip)
 just demo          # seed §4.4 + print attrib/matrix
 cage --version
 ```

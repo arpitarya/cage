@@ -2,7 +2,7 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
-## v0.51.0 (2026-08-15, unreleased) — one shape per producer, the `calls` writer retires, the ledger can prove it hasn't been edited, and the fleet study is gone
+## v0.51.0 (2026-08-15) — one shape per producer, the `calls` writer retires, the ledger can prove it hasn't been edited, and the fleet study is gone
 
 **Built from:** [ledger-restructure.handoff.md](work/archive/v0.51-ledger-restructure.handoff.md) ·
 [ledger-restructure.prompt.md](work/archive/v0.51-ledger-restructure.prompt.md)
