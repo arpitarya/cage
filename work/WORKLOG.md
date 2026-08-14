@@ -12,6 +12,54 @@ by milestone) — the worklog is what *happened this session*.
 
 ---
 
+## 2026-08-14 (Cowork) — ADR-LAWS, ADR-CLI (+ an example per command), ADR-CONSUMERS; the set is seven
+
+- **Asked (Arpit), in three steps:** suggest further ADRs → create ADR-LAWS as `0001_laws`
+  and renumber → create `0006_consumer`, convert `docs/CLI.md` into `0002_cli`, move
+  graphify to `0007` → *"cli adr to have example for every cli command available"*.
+- **The set is now seven:** `0001_laws` · `0002_cli` · `0003_claude` · `0004_copilot` ·
+  `0005_kiro` · `0006_consumer` · `0007_graphify`. References repointed across 31 files.
+- **ADR-LAWS** exists because the restructure earlier today created the gap: archiving the
+  eleven numeric ADRs left the five laws' reasoning **only** in a tree headed *never cite
+  as current spec*. For a few hours the sole live statement of *counts, never content* was
+  a table row with **no veto attached**. A law with no veto is a habit. Determinism, the
+  method law, fail-open and `$0` are **named but not restated** — their home is CLAUDE.md,
+  and duplicating them would break the single-home rule this record enforces.
+- **ADR-CLI** absorbs `docs/CLI.md`, plus **an example for all 27 commands**. Examples are
+  **inline code spans, not fenced blocks, on purpose**: the gate skips fences, so an
+  example inside one is invisible to it — and a documented example naming a dead verb is
+  the F1 class in its most convincing disguise. New test
+  `test_every_command_has_a_runnable_example` fails the suite if a command ever ships
+  without one.
+- **⚠ Found and fixed a gate that had gone VACUOUS.** Adding fenced diagrams to that doc
+  broke `test_cli_reference`'s code-span regex — it cannot pair across a fence, so it ate
+  each block as one "span" and every backtick after it paired one position out.
+  `_doc_flags` returned the **empty set**, which made `test_every_documented_flag_exists`
+  pass *trivially* while `test_every_parser_flag_is_documented` reported the entire surface
+  as undocumented. Fix: `_strip_fences`, the same call `test_doc_links.py` already makes.
+  **Both directions restored, neither relaxed.** Related: ASCII diagrams no longer use a
+  backtick as a tree branch (`` `-- `` → `+--`) — one stray backtick unbalances every
+  code-span scan downstream, silently and totally.
+- **ADR-CONSUMERS** records `cage.meter` library rows (`agent="lib"`), custom `[sources]`
+  tools and retired agents (`codex`). No metric ledger, ever — they resolve from `calls`
+  **permanently**. The scoped fallback is the decision: deleting it was measured zeroing
+  **373 codex rows** in one real ledger alone.
+- **Verified:** all **101** assertions of `tests/test_cli_reference.py` pass against the
+  live parser — run in-VM with a stubbed pytest, since the mounted `.venv` is macOS-built.
+  0 live-broken links across 1,639. Every Mermaid block renders under `mmdc`, each with its
+  ASCII twin edited in the same change.
+- **Concurrency, again and symmetrically:** the parallel session's `455ff26` swept in this
+  session's ADR-CLI work (renumbering, Examples, test fixes) under its own message — the
+  mirror of `cb4a4a6` sweeping in SURFACE-CUT. Two sessions sharing one index means
+  whoever commits second carries the other's work. Worth knowing before reading the log.
+- **Open:** TEST-COUNT and PLAN-4-REWRITE still stand; ADR-SURFACE (what cage deliberately
+  no longer does — PLAN §4 still advertises the deleted attribution engine) is the one
+  suggested record still unwritten.
+- **Next step:** `just test` on the dev machine for the real count, then ADR-SURFACE.
+- **Cost: unmeasured — `cage report` no longer exists.** See UNREAD-FACTS.
+
+---
+
 ## 2026-08-14 (Cowork) — v0.50.0 consolidation; SURFACE-CUT + ADR-RESTRUCTURE committed as `cb4a4a6`
 
 - **Asked (Arpit), answering two standing questions:** (1) *"everything would be in version
