@@ -1,7 +1,7 @@
 $ cage insights commit 9e41bcc
-commit 9e41bcc · 2026-07-01 10:00 · main · claude-code · 1 session(s) recorded · calls joined via window
+commit 9e41bcc · 2026-07-01 10:00 · main · claude-code · 1 session(s) recorded · no call joined
 
-  tokens     in 24,000 · out 1,800 · cache read 8,000 · cache write 1,000   (2 call(s))
+  tokens     —  no joinable call — never 0
   origin     agent · confidence 0.67 (transcript) — human only by attestation, unknown by absence
   lines      +6 / −0 total
              agent             3    line-match vs the session's recorded edit blocks
@@ -10,7 +10,7 @@ commit 9e41bcc · 2026-07-01 10:00 · main · claude-code · 1 session(s) record
              unkn              0    below the content gate / binary
   suggested  4 line(s) across 1 session(s)
   kept       3 verbatim · 1 landed-modified · 0 dropped
-  time       wall 1h00m · agent 30m~ · human 0.5~
+  time       wall 1h00m · agent — · human —
 
 file            +  −  agent  human~  unattr  unkn
 --------------  -  -  -----  ------  ------  ----
@@ -31,3 +31,5 @@ generated.json  1  0      0       0       1     0
   commit-window fallback). No USD on this surface, by design.
 · not window-joinable: copilot/cli: one shutdown timestamp per session — every call in a session shares it, so a window join would dump the whole session on one commit · kiro: its rows carry the IMPORT time, not the call time — the log has no per-call timestamp to place
 · not line-matchable: copilot: its stores record usage and prompts, not the text of an edit · kiro: its usage log records token counts only, with no tool-input payload — their commits show as unattr, never 0%
+· 1 commit(s) unattributed — no joinable call. Tokens render '—', never 0:
+  cage has no evidence they cost nothing.

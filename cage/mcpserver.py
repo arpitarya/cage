@@ -2,18 +2,19 @@
 
 A minimal Model Context Protocol server on stdio: newline-delimited JSON-RPC 2.0,
 hand-rolled so it adds no dependency. Publishes Cage's read paths — report /
-attrib / matrix / budget / roi / adoption / why / **verdict / compare** — as MCP
-*tools*, so an agent (Claude Code, Kiro, Copilot) can ask "what did this cost, and
-what saved me money?" and answer from its own ledger. Every read tool is
+attrib / adoption / why / **compare** — as MCP
+*tools*, so an agent (Claude Code, Kiro, Copilot) can ask "what did this use, and
+what saved me tokens?" and answer from its own ledger. Every read tool is
 deterministic and never calls an LLM.
 
     claude mcp add cage -- cage mcp        # or the equivalent for copilot / kiro
 
-**The refusals are the point (L2 of the agent-surface ladder).** `verdict` and
-`compare` are the two views that answer *"is this tool worth keeping"*, and both
-routinely decline to answer: `INSUFFICIENT DATA` when a tool has no receipts,
-`SAVING (GROSS)` when no cost-of-use figure exists, the `MIN_COMPARE_N` block when a
-group is too thin. Those texts cross this boundary **verbatim**, because a tool that
+**The refusals are the point (L2 of the agent-surface ladder).** `compare` answers
+*"is this tool worth keeping"* and routinely declines to: the `MIN_COMPARE_N` block
+fires whenever a group is too thin. (`verdict` was the other half of that pair and went
+with the money subsystem — USAGE-ONLY, ADR 0011 — along with `matrix`, `budget` and
+`roi`; four read tools, nine down to five.) Refusal text crosses this boundary
+**verbatim**, because a tool that
 returns silence where the CLI would have explained itself is worse than no tool — an
 agent reads an empty result as *zero*, which is the one thing it never means. Nothing
 here summarizes, thresholds, or re-derives; each tool renders the same string the CLI
@@ -30,8 +31,7 @@ import json
 import sys
 from pathlib import Path
 
-from cage import (__version__, attribution, budget, matrix, paths, policy,
-                  provenance, report, roi)
+from cage import (__version__, attribution, paths, policy, provenance, report)
 
 PROTOCOL = "2024-11-05"
 
@@ -49,18 +49,8 @@ TOOLS = [
          "by": {"type": "string", "default": "route"}, "since": {"type": "string"},
          "format": _FORMAT}}},
     {"name": "cage_attrib",
-     "description": "Per-tool marginal token/$ savings for a task (the attribution table).",
+     "description": "Per-tool marginal token savings for a task (the attribution table).",
      "inputSchema": {"type": "object", "properties": {"task": {"type": "string"},
-                                                      "format": _FORMAT}}},
-    {"name": "cage_matrix",
-     "description": "Counterfactual permutation table — what every tool combination would cost.",
-     "inputSchema": {"type": "object", "properties": {"task": {"type": "string"}}}},
-    {"name": "cage_budget",
-     "description": "Session/day spend vs the policy ceilings.",
-     "inputSchema": {"type": "object", "properties": {"session": {"type": "string"}}}},
-    {"name": "cage_roi",
-     "description": "Saved $ per tool vs its own cost + added latency.",
-     "inputSchema": {"type": "object", "properties": {"since": {"type": "string"},
                                                       "format": _FORMAT}}},
     {"name": "cage_adoption",
      "description": "Do the agents actually invoke the wired tools? Invocation counts + "
@@ -72,21 +62,9 @@ TOOLS = [
      "description": "Full provenance for one call id: the call + every receipt against it.",
      "inputSchema": {"type": "object", "required": ["call_id"],
                      "properties": {"call_id": {"type": "string"}}}},
-    {"name": "cage_verdict",
-     "description": "Is one tool worth keeping? The one-line answer, composed from "
-                    "attrib/roi/regression/quality — it computes no new statistic. "
-                    "READ THE VERDICT WORD LITERALLY: 'SAVING (GROSS)' means the cost "
-                    "of USING the tool is excluded and unknown, so it is NOT a proven "
-                    "saving; 'INSUFFICIENT DATA' means cage declines to answer and must "
-                    "be relayed as a refusal, never as zero or as 'no savings'.",
-     "inputSchema": {"type": "object", "required": ["tool"],
-                     "properties": {"tool": {"type": "string",
-                                             "description": "the tool name as it appears "
-                                                            "in its savings receipts"},
-                                    "since": {"type": "string"}}}},
     {"name": "cage_compare",
-     "description": "Observational cost comparison between tool stacks over closed "
-                    "tasks — the measured counterpart to verdict's modeled answer. "
+     "description": "Observational usage comparison between tool stacks over closed "
+                    "tasks, in tokens. "
                     "Group totals are measured; the delta is always 'estimated' and "
                     "carries an observational caveat (the groups were not randomized). "
                     "A group with too few tasks is BLOCKED with its own n — relay that "
@@ -151,14 +129,6 @@ def _call(name: str, args: dict) -> tuple[str, dict | None]:
         task = args.get("task") or _latest_task(root)
         data = attribution.attribute(root, task, _pol(root))
         text = attribution.render_csv(data) if as_csv else attribution.render_attrib(data)
-    elif name == "cage_matrix":
-        task = args.get("task") or _latest_task(root)
-        text = matrix.render_matrix(matrix.matrix(root, task, _pol(root)))
-    elif name == "cage_budget":
-        text = budget.render_budget(budget.check(root, _pol(root), session=args.get("session")))
-    elif name == "cage_roi":
-        data = roi.by_tool(root, _pol(root), since=args.get("since"))
-        text = roi.render_csv(data) if as_csv else roi.render_roi(data)
     elif name == "cage_adoption":
         from cage import adoption
         data = adoption.summarize(root, since=args.get("since"))
@@ -166,16 +136,6 @@ def _call(name: str, args: dict) -> tuple[str, dict | None]:
     elif name == "cage_why":
         cid = args["call_id"]
         text = provenance.render_why(provenance.explain(root, cid), cid)
-    elif name == "cage_verdict":
-        from cage import verdict
-        if not args.get("tool"):
-            raise ValueError("cage_verdict needs a 'tool' name (as it appears in its "
-                             "savings receipts) — try cage_roi to list the tools on file")
-        # `verdict.compose` is a pure composer and `render_verdict` is the CLI's own
-        # renderer — so INSUFFICIENT DATA / SAVING (GROSS) / the ⚠ gross note reach the
-        # agent as the exact text a human would read. No summarizing layer here, ever.
-        text = verdict.render_verdict(
-            verdict.compose(root, _pol(root), args["tool"], since=args.get("since")))
     elif name == "cage_compare":
         from cage import compare
         by = tuple(k.strip() for k in (args.get("by") or "stack").split(",") if k.strip())

@@ -437,7 +437,7 @@ def claude_request_metrics(root: Path, since: str | None = None) -> list[dict]:
 # double- or triple-counts — so spend picks exactly one source per (agent, surface) and
 # never adds a second.
 #
-# The choices, and why each is the one that can carry money:
+# The choices, and why each is the one that can carry usage:
 #   claude   `request`   the P1 request-grain row — one per folded (requestId,
 #                        message.id). The chat-grain row is a whole-life total for the
 #                        SAME traffic, so including it would double every chat.
@@ -447,15 +447,16 @@ def claude_request_metrics(root: Path, since: str | None = None) -> list[dict]:
 #                        double its own spend.
 #            `cli-delta` Copilot CLI, per shutdown — the DELTA twin, not the cumulative
 #                        `cli` row beside it (see below).
-#   kiro     `ide`       per LLM call (surface=ide).
+#   kiro     —           no spine. See `ABSENT_SPINES`.
 #
-# **THE SECOND RULE, found while building P0 and not anticipated by the handoff: a spine
-# source must be POINT-IN-TIME, never CUMULATIVE.** A cutover partitions the time axis by
-# each row's own `ts`. A cumulative row carries its session's ENTIRE life in one row
-# stamped at the latest capture, so post-cutover it would land wholly on the metrics side
-# while that same session's earlier traffic is still counted on the `calls` side — a
-# straddling session billed twice, invisibly, because both figures are individually
-# correct. Caught by a straddling fixture, not by reading.
+# **THE SECOND RULE: a spine source must be POINT-IN-TIME, never CUMULATIVE.** A
+# cumulative row carries its session's ENTIRE life in one row stamped at the latest
+# capture, so it would land in the same total as the point-in-time rows describing that
+# session's individual turns — a straddling session counted twice, invisibly, because
+# both figures are individually correct. Caught by a straddling fixture, not by reading.
+# (The rule was found under the retired spend cutover, where the double-count crossed a
+# time boundary; retiring the boundary did not retire the rule — the overlap is between
+# two views of the same traffic, which is a property of the stores, not of the clock.)
 #
 # Copilot's `cli` store is the only place this bites, and it is fixed at capture:
 # `transcript.parse_copilot_cli_metrics` now emits a `cli-delta` row beside every
@@ -474,7 +475,25 @@ def claude_request_metrics(root: Path, since: str | None = None) -> list[dict]:
 SPEND_SOURCES: dict[str, tuple[str, ...]] = {
     "claude": ("request",),
     "copilot": ("chat", "cli-delta"),
-    "kiro": ("ide",),
+    "kiro": (),
+}
+
+#: Agents with **no token spine at all**, each with the reason — stated here rather than
+#: left as a pointer at a store that does not exist, so a reader can tell "this agent has
+#: no token store" from "the source name is a typo".
+#:
+#: Kiro's entry was `("ide",)` through v0.50, naming `devdata.sqlite` — a file that is
+#: **not present on a real Kiro install**. Its *calls* route reads a different file
+#: (`tokens_generated.jsonl`) for the same facts, so the pointer read as a live source
+#: while resolving zero rows forever (KIRO-IDE-METRIC-ROW). Emitting an `ide` metric row
+#: from `tokens_generated.jsonl` instead was rejected on the 2026-08-14 field probe: that
+#: file carries 28 rows totalling 1,576 in / **0 out**, model `"agent"` on every row, and
+#: a byte-identical 6-row block repeated — it is not summable, so a spine built on it
+#: would be a fabricated number, not a measured one. Kiro renders `—` with this reason;
+#: it is never a zero. `transcript.parse_kiro_ide_metrics` is deliberately KEPT so a
+#: future Kiro that ships the store flips this back — `cage doctor` announces the flip.
+ABSENT_SPINES: dict[str, str] = {
+    "kiro": "no IDE token store on this install",
 }
 
 #: Cumulative sources deliberately excluded from `SPEND_SOURCES`, each with the reason —
@@ -494,9 +513,13 @@ def _spend_row(row: dict) -> dict:
     it would be on a legacy call row, and is NEVER synthesized. `basis` is the one field
     that is not on a call row: it names which ledger the figure came from, so a view can
     state a split instead of blending two bases silently (the `creditprice` precedent)."""
+    # `machine` is in this list because the fleet study partitions by it
+    # (`study.summarize`): omitted, every metric-sourced row lands "unphased" and a
+    # machine's whole plugin phase reads as zero days. Found by a golden, not by
+    # reading — the same class of miss as `route` needing a default below.
     out = {k: row[k] for k in ("id", "ts", "agent", "model", "provider", "session",
-                               "task", "surface", "project", "scope", "tokens_in",
-                               "tokens_out", "cached_in", "cache_write_in",
+                               "task", "surface", "project", "scope", "machine",
+                               "tokens_in", "tokens_out", "cached_in", "cache_write_in",
                                "est_cost_usd", "credits", "billed_with", "latency_ms",
                                "import_id", "route")
            if k in row}
@@ -510,42 +533,35 @@ def spend(root: Path, since: str | None = None) -> list[dict]:
     """**The single derive resolver** (METRICS-PRIMARY): every view that asks "what was
     spent" reads this, never `calls()` directly.
 
-    Rows with `ts < constants.SPEND_CUTOVER` resolve from the `calls` ledger; rows at or
-    after it resolve from the three per-agent metric ledgers, normalized by `_spend_row`
-    to the shape `calls` already had. **No row is counted twice**, because the boundary
-    is a partition of the time axis and every row lands on exactly one side of it by its
-    OWN `ts` — never by its session's start, so a chat that began before the cutover and
-    grew after it contributes its early rows to one side and its later rows to the other.
+    **The basis is per-AGENT, and there is no time boundary.** An agent that has a metric
+    ledger resolves from it, always, for all of history; an agent that has none resolves
+    from `calls`, always. A row therefore lands on exactly one side by *whose* it is, and
+    **no row is counted twice**.
 
-    Why forward-only rather than a migration: six months of recorded `calls` history
-    cannot be rebuilt into metric rows (the vendor fields were never captured then, and
-    fabricating them would violate counts-never-content), and all 43 golden fixtures are
-    pre-cutover — so a golden that moves is a bug in THIS function, never a re-bless.
+    This replaced a time-partitioned cutover (`SPEND_CUTOVER`, v0.50, retired with the
+    money subsystem). The cutover existed to protect six months of recorded `calls`
+    history that could not be rebuilt into metric rows; that history is no longer wanted,
+    and retiring the boundary is what makes the corrected pre-cutover metric rows —
+    ~21,900 claude request rows back to Jul 12, and every copilot and kiro row in
+    existence — readable again. It also removes the last thing a reader had to footnote.
 
-    Capture stays dual-write on both sides of the boundary, so the flip is a one-constant
-    rollback rather than a data-loss event.
-
-    **A row with no `ts` resolves to the `calls` side**, the conservative default: it is
-    how every pre-cutover row that predates timestamping already behaves, and the metric
-    kinds have carried a `ts` from their first row, so the case cannot arise there."""
+    **The `calls` fallback is scoped, not universal, and dropping it would lose data.**
+    `cage.meter`'s library rows (`agent="lib"`, the AlphaForge/Anton integration),
+    proxy-metered rows, the retired `codex` agent still sitting in real ledgers, and every
+    `[sources.<name>]` custom tool have no metric ledger and never will under this design.
+    They are not superseded by anything, so they keep resolving from `calls` forever.
+    Deleting this loop entirely — the tempting reading of "one basis" — silently zeroes
+    all of them; measured at 373 codex rows in one real ledger alone."""
     from cage import agents
-    cut = constants.SPEND_CUTOVER
     rows = []
     for r in calls(root, since):
-        # **The cutover is SCOPED to the three agents that have a metric ledger.** A
-        # post-cutover `calls` row is superseded only when its own agent has a spine to be
-        # superseded BY. Everything else — `cage.meter`'s library rows (`agent="lib"`, the
-        # AlphaForge/Anton integration), proxy-metered rows, and every `[sources.<name>]`
-        # custom tool — has no metric ledger and never will under this design, so the
-        # cutover simply does not apply to it and it keeps resolving from `calls` forever.
-        #
-        # Without this scope the flip silently zeroes every library- and proxy-metered
-        # call the moment the clock passes the instant. Found the hard way: the suite went
-        # red across 47 tests when the machine clock crossed `SPEND_CUTOVER` mid-build.
-        # This is NOT the per-agent `calls` fallback rejected earlier for kiro — kiro HAS a
-        # spine (`ide`) and correctly reads zero when its store is absent, exactly as
-        # decided. This is about sources that were never in the flip's scope at all.
-        if (r.get("ts") or "") >= cut and agents.row_surface(r.get("agent")) in SPEND_SOURCES:
+        # Superseded only when this row's own agent HAS a spine to be superseded by.
+        # `SPEND_SOURCES` is the membership test, never `agents.SURFACES`: kiro is in the
+        # table with an empty tuple (`ABSENT_SPINES`), so its `calls` rows are suppressed
+        # here and it renders `—` with a stated reason rather than falling back to a
+        # second basis. Falling back would resurrect exactly the blend this design exists
+        # to remove.
+        if agents.row_surface(r.get("agent")) in SPEND_SOURCES:
             continue
         r["basis"] = "calls"
         rows.append(r)
@@ -557,8 +573,10 @@ def spend(root: Path, since: str | None = None) -> list[dict]:
                (kiro_metrics, "kiro"))
     for read_rows, agent in readers:
         allowed = SPEND_SOURCES[agent]
+        if not allowed:
+            continue  # ABSENT_SPINES — no token store; never a fabricated zero row
         for r in read_rows(root, since):
-            if (r.get("ts") or "") >= cut and r.get("source", "") in allowed:
+            if r.get("source", "") in allowed:
                 rows.append(_spend_row(r))
     return rows
 

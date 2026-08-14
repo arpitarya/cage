@@ -94,7 +94,7 @@ def test_heal_tail_rewrites_dead_verbs_only():
     assert wiringscan.heal_tail("import-claude --project .") == \
         "import --agent claude --project ."
     assert wiringscan.heal_tail("export --json") == "data export --json"
-    assert wiringscan.heal_tail("matrix") == "insights matrix"
+    assert wiringscan.heal_tail("attrib") == "insights attrib"
     # live verbs and unmappable dead ones are returned untouched — heal never guesses
     assert wiringscan.heal_tail("hook-stop") == "hook-stop"
     assert wiringscan.heal_tail("import --agent claude") == "import --agent claude"

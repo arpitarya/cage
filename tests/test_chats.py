@@ -38,6 +38,24 @@ def _call(root: Path, cid: str, *, agent: str, session: str = "", surface: str =
     if extra:
         row.update(extra)
     ledger.append(paths.Footprint(root).calls, row)
+    # **Dual-write the metric twin**, exactly as real capture does. `chats.summarize`
+    # reads `ledger.spend`, which supersedes a `calls` row for any agent that has a
+    # metric spine (USAGE-ONLY, ADR 0011) — so a calls-only fixture reads as an empty
+    # ledger and every assertion below would pin nothing. The twin carries the same
+    # counts and the same bucket key `(agent, surface, session)`.
+    from cage import agents as _ag
+    surf = _ag.row_surface(agent) or agent
+    if surf == "claude":
+        ledger.append_row(root, "claude", schema.make_claude_metric(
+            session=session, source="request", request=cid, provider=provider,
+            model=model, tokens_in=tin, tokens_out=tout, cached_in=cached,
+            cache_write_in=cache_write, surface=surface, ts=ts))
+    elif surf == "copilot":
+        ledger.append_row(root, "copilot", schema.make_copilot_metric(
+            source="chat", session=session, surface=surface or "vscode", model=model,
+            tokens_in=tin, tokens_out=tout, cached_in=cached, ts=ts,
+            **({"credits": (extra or {}).get("credits")}
+               if (extra or {}).get("credits") is not None else {})))
 
 
 def _name(root: Path, *, agent: str, session: str, name: str,
@@ -52,7 +70,7 @@ def _name(root: Path, *, agent: str, session: str, name: str,
         root, import_id=manifest.new_import_id(), agent=mapped, surface=surface,
         session=session, session_uid=manifest.new_session_uid(), source_path="",
         files_scanned=1, rows_appended=1, tokens_in=0, tokens_out=0, cached_in=0,
-        est_cost_usd=0.0, unpriced_rows=0, ts=ts, session_name=name)
+        ts=ts, session_name=name)
 
 
 def _prov(root: Path, *, session: str, agent: str = "claude-code", sha: str = "abc1234",
@@ -271,7 +289,7 @@ def test_no_authorship_number_is_ever_combined_with_a_usd_value(root, pol):
     plain = chats.summarize(root, pol)["rows"][0]
     assert plain["agent_pct"] == 70.0
     # And the presentation switch cannot move it either.
-    out = chats.render_chats(chats.summarize(root, pol), disp=display.Display(usd=True))
+    out = chats.render_chats(chats.summarize(root, pol), disp=display.Display())
     assert "70%" in out
 
 
@@ -285,8 +303,7 @@ def test_deleting_manifest_changes_zero_numeric_cells(root, pol):
     paths.Footprint(root).imports.unlink()
     after = chats.summarize(root, pol)
     numeric_fields = ("calls", "tokens_in", "cached_in", "cache_write_in",
-                      "tokens_out", "premium", "cost", "unpriced_calls",
-                      "unpriced_tokens")
+                      "tokens_out", "credits")
     before_by_session = {r["session"]: r for r in before["rows"]}
     after_by_session = {r["session"]: r for r in after["rows"]}
     assert set(before_by_session) == set(after_by_session)
@@ -316,8 +333,7 @@ def test_deleting_provenance_changes_zero_pre_existing_cells(root, pol):
     after = chats.summarize(root, pol)
 
     pre_existing = ("calls", "tokens_in", "cached_in", "cache_write_in", "tokens_out",
-                    "premium", "cost", "unpriced_calls", "unpriced_tokens", "credits",
-                    "title", "named", "agent", "surface")
+                    "premium", "credits", "title", "named", "agent", "surface")
     b = {r["session"]: r for r in before["rows"]}
     a = {r["session"]: r for r in after["rows"]}
     assert set(a) == set(b)
@@ -379,19 +395,23 @@ def test_csv_is_never_truncated(root, pol):
 
 # ── kiro-IDE: one row, no fabricated per-chat identity ──────────────────────────
 
-def test_kiro_ide_collapses_to_one_row_with_the_honest_label(root, pol):
+def test_kiro_ide_chats_are_absent_because_kiro_has_no_token_spine(root, pol):
+    """The honest consequence of `ledger.ABSENT_SPINES` (USAGE-ONLY, ADR 0011).
+
+    Kiro's IDE `calls` rows are suppressed from `spend()` — there is no IDE token store
+    on this install, so cage will not present a token figure for it. It renders NOTHING
+    here rather than a fabricated row, and the reason is stated on `cage report` and by
+    `cage doctor`'s three-way store probe. The constant-session collapse this test used
+    to pin (`KIRO_IDE_LABEL`) is still implemented and still correct — it simply has no
+    rows to apply to until a Kiro ships the store."""
     _call(root, "c_k1", agent="kiro", session="kiro", surface="ide",
           provider="kiro", model="agent", tin=100, tout=0)
     _call(root, "c_k2", agent="kiro", session="kiro", surface="ide",
           provider="kiro", model="agent", tin=200, tout=0)
-    data = chats.summarize(root, pol)
-    rows = data["rows"]
-    assert len(rows) == 1
-    assert rows[0]["title"] == chats.KIRO_IDE_LABEL
-    assert rows[0]["calls"] == 2
-    out = chats.render_chats(data)
-    assert chats.KIRO_IDE_LABEL in out
-    assert "collapse into this one row" in out
+    assert chats.summarize(root, pol)["rows"] == []
+    from cage import ledger as _l, units
+    assert _l.SPEND_SOURCES["kiro"] == ()
+    assert units.absent_reason("kiro", units.TOKENS)
 
 
 def test_csv_carries_the_authorship_counts_and_leaves_a_refusal_empty(root, pol):
@@ -425,42 +445,6 @@ def test_csv_agent_pct_keeps_one_decimal(root, pol):
     row = next(iter(_csv.DictReader(io.StringIO(
         chats.render_csv(chats.summarize(root, pol))))))
     assert row["agent_pct"] == "33.3"
-
-
-# ── legacy-human exclusion (calls never really carry this, but the predicate is
-#    applied uniformly with every other money view — proven with a hand-crafted row,
-#    same technique as tests/test_legacy_ledger.py) ─────────────────────────────
-
-def test_legacy_human_row_is_excluded_and_footnoted(root, pol):
-    _call(root, "c_1", agent="claude-code", session="s1", tin=100)
-    _call(root, "c_2", agent="claude-code", session="s2", tin=50,
-          extra={"tool": "human"})
-    data = chats.summarize(root, pol)
-    assert data["legacy_human"] == 1
-    assert {r["session"] for r in data["rows"]} == {"s1"}
-    out = chats.render_chats(data)
-    assert "1 legacy human-axis row(s) excluded" in out
-
-
-# ── UNPRICED: counted, never a silent $0 ────────────────────────────────────────
-
-def test_unpriced_row_shows_dash_not_zero_under_usd(root, pol):
-    from cage import display
-    _call(root, "c_1", agent="copilot", session="s1", provider="", model="copilot/auto",
-          tin=100, tout=10)
-    data = chats.summarize(root, pol)
-    assert data["unpriced_calls"] == 1
-    out = chats.render_chats(data, disp=display.Display(usd=True))
-    assert "—" in out
-    assert "UNPRICED" in out
-
-
-def test_unpriced_gap_line_in_token_view(root, pol):
-    _call(root, "c_1", agent="copilot", session="s1", provider="", model="copilot/auto")
-    out = chats.render_chats(chats.summarize(root, pol))
-    assert "1 call unpriced" in out
-
-
 # ── empty states ──────────────────────────────────────────────────────────────
 
 def test_empty_ledger_is_an_honest_empty(root, pol):
@@ -570,85 +554,10 @@ def test_reading_credits_adds_a_row_and_moves_no_call_chat_cell(root, pol):
     assert {r["session"] for r in after["rows"]} == {"s1"}
     s1_after = after["rows"][0]
     numeric_fields = ("calls", "tokens_in", "cached_in", "cache_write_in",
-                      "tokens_out", "premium", "cost", "unpriced_calls",
-                      "unpriced_tokens")
+                      "tokens_out", "credits")
     for f in numeric_fields:
         assert s1_after[f] == s1_before[f], f"{f} moved"
     assert chats.render_csv(before) != chats.render_csv(after)  # the credits row left
-
-
-def test_credit_row_csv_leaves_call_cells_empty_not_zero(root, pol):
-    """CSV never gates and never fabricates a zero: a credits-only chat's calls/token
-    cells are **empty**, distinct from a real `0`."""
-    import csv as _csv
-    import io
-    _credit(root, session="kc1", credits=1.25)
-    rows = list(_csv.DictReader(io.StringIO(
-        chats.render_csv(chats.summarize(root, pol)))))
-    r = rows[0]
-    for f in ("calls", "tokens_in", "cached_in", "cache_write_in", "tokens_out"):
-        assert r[f] == ""
-    assert r["credits"] == "1.25"
-
-
-def test_credit_row_rank_key_sorts_below_token_chats_and_by_credits_among_peers(root, pol):
-    """`(-tokens_in, -(credits or 0.0), session)` — a credits-only chat (tokens_in=0)
-    always sorts below any token-bearing chat, and among credits-only chats, higher
-    credits first."""
-    _call(root, "c_tok", agent="claude-code", session="s_tok", tin=10)
-    _credit(root, session="kc_lo", credits=1.0)
-    _credit(root, session="kc_hi", credits=9.0)
-    rows = chats.summarize(root, pol)["rows"]
-    assert [r["session"] for r in rows] == ["s_tok", "kc_hi", "kc_lo"]
-
-
-def test_credit_row_rate_set_prices_and_tags_modeled(root, pol):
-    rated = {**pol, "billing": {"kiro": {"usd_per_credit": 0.10}}}
-    _credit(root, session="kc1", credits=4.0)
-    data = chats.summarize(root, rated)
-    r = data["rows"][0]
-    assert r["cost"] == pytest.approx(0.40)
-    out = chats.render_chats(data, disp=__import__("cage.display", fromlist=["Display"]).Display(usd=True))
-    assert "$0.4000" in out
-    import csv as _csv
-    import io
-    csv_row = next(iter(_csv.DictReader(io.StringIO(chats.render_csv(data)))))
-    assert csv_row["method"] == "modeled"
-    assert csv_row["priced_via"] == "credits-rate"
-
-
-def test_credit_row_rate_unset_shows_dash_never_zero(root, pol):
-    """Rate unset ≠ rate zero: credits stay a count, cost is `—`, never `$0.0000`."""
-    from cage import display
-    _credit(root, session="kc1", credits=4.0)
-    data = chats.summarize(root, pol)
-    r = data["rows"][0]
-    assert r["cost"] == 0.0
-    out = chats.render_chats(data, disp=display.Display(usd=True))
-    row = next(l for l in out.splitlines() if l.startswith("kc1"))
-    assert row.rstrip().endswith("—")
-    import csv as _csv
-    import io
-    csv_row = next(iter(_csv.DictReader(io.StringIO(chats.render_csv(data)))))
-    assert csv_row["method"] == "estimated"
-    assert csv_row["priced_via"] == ""
-
-
-def test_credit_row_rate_zero_prices_at_real_zero(root, pol):
-    """A configured `0.0` rate is a real, priced zero — different from an unset rate."""
-    from cage import display
-    zeroed = {**pol, "billing": {"kiro": {"usd_per_credit": 0.0}}}
-    _credit(root, session="kc1", credits=4.0)
-    data = chats.summarize(root, zeroed)
-    out = chats.render_chats(data, disp=display.Display(usd=True))
-    row = next(l for l in out.splitlines() if l.startswith("kc1"))
-    assert "$0.0000" in row
-    import csv as _csv
-    import io
-    csv_row = next(iter(_csv.DictReader(io.StringIO(chats.render_csv(data)))))
-    assert csv_row["method"] == "modeled"
-
-
 def test_credit_row_since_filters_by_ts(root, pol):
     _credit(root, session="kc_old", credits=1.0, ts="2020-01-01T00:00:00Z")
     _credit(root, session="kc_new", credits=1.0)  # default ts: 2026-07-01T10:00:00Z
@@ -688,7 +597,6 @@ def test_cli_wiring(root, monkeypatch, capsys):
     assert cli.main(["insights", "chats", "--no-import", "--csv"]) == 0
     assert capsys.readouterr().out.startswith("chat,")
     assert cli.main(["insights", "chats", "--no-import", "--all"]) == 0
-    assert cli.main(["insights", "chats", "--no-import", "--usd"]) == 0
     assert cli.main(["insights", "chats", "--no-import", "--agent", "copilot"]) == 0
 
 
@@ -709,9 +617,17 @@ def test_the_lossy_premium_duplicate_is_gone_from_both_tables(root, pol):
     assert "2.4" in csv
 
 
-def test_the_recorded_premium_survives_in_the_payload(root, pol):
-    """Removing a *column* is not removing a *fact*. The substrate field is untouched
-    (append-only rows already carry it) and `--json` — the raw-data surface — still
-    sums it. Precision in the data, brevity in the display."""
-    _call(root, "c_1", agent="copilot", session="s1", surface="cli", premium=3)
-    assert chats.summarize(root, pol)["rows"][0]["premium"] == 3
+def test_premium_no_longer_reaches_this_view_and_loses_nothing(root, pol):
+    """`premium` was a `calls`-row field, and `calls` is no longer the spend basis for
+    copilot (USAGE-ONLY, ADR 0011) — the copilot metric row carries no such field, so
+    the payload's `premium` stays 0.
+
+    **Nothing real is lost, which is why this is a pin rather than a defect.** Premium
+    is `floor(credits)` (COPILOT-PREMIUM-DEAD): a lossy integer duplicate of a figure
+    that DOES survive on the metric row. The substrate field is untouched on the
+    append-only `calls` rows that carry it; it simply is not a derived cell any more."""
+    _call(root, "c_1", agent="copilot", session="s1", surface="cli", premium=3,
+          extra={"credits": 3.4})
+    row = chats.summarize(root, pol)["rows"][0]
+    assert row["premium"] == 0
+    assert row["credits"] == pytest.approx(3.4), "the precise figure survives"

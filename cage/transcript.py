@@ -1937,3 +1937,49 @@ def parse_kiro_cli_tool_runs(db_path: Path, workspace: str = "") -> list[dict]:
         con.close()
     out.sort(key=lambda c: c["conversation_id"])   # deterministic order
     return out
+
+
+#: The four columns `parse_kiro_ide_metrics` reads from `tokens_generated`. Named here
+#: so the doctor probe below and the parser can never disagree about what "drift" means.
+KIRO_IDE_COLUMNS = ("id", "tokens_prompt", "tokens_generated", "timestamp")
+
+
+def probe_kiro_ide_store(db_path: Path) -> tuple[str, str]:
+    """Why the kiro IDE metric source produced nothing — ``(state, detail)``.
+
+    **Three outcomes that used to render one indistinguishable zero** (USAGE-ONLY P3).
+    `parse_kiro_ide_metrics` is fail-open by design: a missing file, a missing table and
+    a renamed column all return `[]`, so `cage doctor` reported "ide: none yet" for all
+    three and a reader could not tell *Kiro is not installed* from *cage is reading the
+    wrong schema*. Only the last is a cage defect, and it was invisible.
+
+    States: ``"absent"`` (no db — Kiro IDE not installed, or never run) · ``"no-table"``
+    (db exists, no `tokens_generated` table) · ``"drift"`` (table exists but is missing
+    a column cage reads — the schema moved and capture is silently broken) · ``"ok"``
+    (readable; detail carries the row count).
+
+    Read-only and fail-open like the parser: any sqlite error is reported as its own
+    detail string rather than raised."""
+    if not db_path.exists():
+        return "absent", f"no {db_path.name} at {db_path.parent}"
+    try:
+        con = sqlite3.connect(f"file:{db_path}?mode=ro&immutable=1", uri=True)
+    except sqlite3.Error as exc:
+        return "no-table", f"{db_path.name} unreadable: {exc}"
+    try:
+        cur = con.execute("SELECT name FROM sqlite_master "
+                          "WHERE type='table' AND name='tokens_generated'")
+        if cur.fetchone() is None:
+            return "no-table", f"{db_path.name} has no `tokens_generated` table"
+        have = {r[1] for r in con.execute("PRAGMA table_info(tokens_generated)")}
+        missing = [c for c in KIRO_IDE_COLUMNS if c not in have]
+        if missing:
+            return "drift", ("`tokens_generated` is missing column(s) "
+                             f"{', '.join(missing)} — cage reads "
+                             f"{', '.join(KIRO_IDE_COLUMNS)}; the schema moved")
+        n = con.execute("SELECT count(*) FROM tokens_generated").fetchone()[0]
+        return "ok", f"{n} row(s) in `tokens_generated`"
+    except sqlite3.Error as exc:
+        return "drift", f"{db_path.name} probe failed: {exc}"
+    finally:
+        con.close()

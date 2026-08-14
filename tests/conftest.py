@@ -72,3 +72,50 @@ def seeded(proj):
     """The §4.4 worked example seeded into ``proj``; yields (root, call_id)."""
     call_id = demo.seed(proj)
     return proj, call_id
+
+
+def metric_twin(root, row: dict) -> None:
+    """Append the per-agent **metric twin** of a `calls` row, as real capture does.
+
+    Since USAGE-ONLY (ADR 0011) `ledger.spend` supersedes a `calls` row for any agent
+    that HAS a metric ledger — claude and copilot — and partitions by agent rather than
+    by time, so there is no instant a calls-only fixture survives at. A test that seeds
+    only `calls` for those agents is therefore seeding an empty ledger, and every
+    assertion over it would silently pin nothing.
+
+    Real capture dual-writes both rows for exactly this reason (CLAUDE.md, *Adapters*),
+    so a fixture that does the same is not a workaround — it is the shape of the data.
+    Agents with no spine (`lib`, the proxy, `codex`, custom `[sources.<name>]` tools)
+    need no twin: their `calls` rows are never superseded.
+
+    Idempotent per (session, request); safe to call after every `append_row`.
+    """
+    from cage import agents, ledger, schema
+    surface = agents.row_surface(row.get("agent")) or ""
+    common = dict(session=row.get("session", ""), model=row.get("model", ""),
+                  provider=row.get("provider", ""),
+                  tokens_in=row.get("tokens_in", 0),
+                  tokens_out=row.get("tokens_out", 0),
+                  cached_in=row.get("cached_in", 0), ts=row.get("ts"))
+    twin = None
+    if surface == "claude":
+        twin = schema.make_claude_metric(
+            source="request", request=row.get("id", ""),
+            surface=row.get("surface", ""),
+            cache_write_in=row.get("cache_write_in", 0), **common)
+    elif surface == "copilot":
+        twin = schema.make_copilot_metric(
+            source="chat", surface=row.get("surface") or "vscode",
+            request=row.get("id", ""),
+            **({"credits": row["credits"]} if row.get("credits") is not None else {}),
+            **common)
+    if twin is None:
+        return
+    # Carry the grouping axes the metric constructors do not all model but derived views
+    # bucket by — `project` (the `cage report --project` filter), `machine` (the fleet
+    # study), `task`/`scope`. A twin missing one lands in the wrong bucket, not in none,
+    # which is the harder failure to spot.
+    for axis in ("project", "machine", "task", "scope"):
+        if row.get(axis):
+            twin[axis] = row[axis]
+    ledger.append_row(root, surface, twin)

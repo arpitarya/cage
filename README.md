@@ -1,13 +1,15 @@
 # Cage
 
-> **Cost dashboards tell you what your AI stack *spent*. Cage tells you what each tool in it actually *saved* you — **gross and net of the cost of using it** — with a `method` tag on every number.**
+> **Cost dashboards guess what your AI stack spent. Cage counts what it actually *used* — tokens and credits, straight from the vendors' own logs — and what each tool in the stack saved you, with a `method` tag on every number and no invented dollar anywhere.**
 
 [![PyPI](https://img.shields.io/pypi/v/cage-flux.svg)](https://pypi.org/project/cage-flux/)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
 [![Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)](#the-0-guarantee)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-You're paying for an agent, a graph tool, a rules engine, maybe Copilot. At the end of the month someone asks *"is any of this worth it?"* — and the honest answer is a shrug and a Slack thread. Cage meters every LLM call, collects a **savings receipt** from each tool in the stack, and turns the raw stream into an **attribution ledger**: what you spent, what each tool saved you — **gross and net of what using it cost you** — what *every other combination* of tools would have cost, and which tools your agents actually *adopt* when offered. **`$0`, deterministic, zero dependencies, no model in the maintenance path.**
+You're running an agent, a graph tool, a rules engine, maybe Copilot. At the end of the month someone asks *"is any of this worth it?"* — and the honest answer is a shrug and a Slack thread. Cage meters every LLM call, collects a **savings receipt** from each tool in the stack, and turns the raw stream into an **attribution ledger**: what each agent used, what each tool saved you, which conversation burned the tokens, who wrote which commit, and which tools your agents actually *adopt* when offered. **`$0`, deterministic, zero dependencies, no model in the maintenance path.**
+
+**Cage does not price anything, on purpose.** It ships no rate card and computes no dollars — it reports the units the providers themselves record: **tokens** and **credits**. A dollar figure built from a rate card cage cannot check against your invoice is a reconstruction wearing a currency symbol, and this project would rather show you a number it can stand behind. ([ADR 0011.](docs/adr/0011-cage-measures-usage-not-cost.md))
 
 **Named after *John Cage*.** · Python ≥ 3.11 · stdlib only · MIT · sits beside `fux`, `bach`, `wagner`, `orff`.
 
@@ -21,36 +23,41 @@ You're paying for an agent, a graph tool, a rules engine, maybe Copilot. At the 
 
 You ever notice how *everybody's* saving money now? Everybody. The agent's saving money. The graph tool's saving money. Copilot's saving money. Two tools you built over a weekend — saving money. Add it all up and you should be getting a check in the mail. Funny thing about that. The bill went *up*.
 
-Here's the con. Nobody — and I mean *nobody* — can show you the number. They got slides. They got a roadmap. They got a guy named Kevin who "feels like it's a game-changer." What they don't got is one honest figure that says *this* tool saved *this much* on *this* task, and here's what it would've cost to do the boring old way, by hand. Ask for *that* number and watch the room go quiet and somebody suggest we "circle back."
+Here's the con. Nobody — and I mean *nobody* — can show you the number. They got slides. They got a roadmap. They got a guy named Kevin who "feels like it's a game-changer." What they don't got is one honest figure that says *this* tool saved *this much* on *this* task. Ask for *that* number and watch the room go quiet and somebody suggest we "circle back."
 
 And the kicker — you built half of it. So when finance points at you and says "is this worth it," you, the expert, the one who's supposed to *know* — you got a screenshot and a feeling. You're not in trouble for spending the money, folks. You're in trouble because you bought the same fog everybody else did.
 
-**Cage is the thing that ruins the fog.** It's the itemized receipt nobody asks for and everybody needs: the graph tool saved 27,000 tokens here, fux saved 6,400 there — **and what invoking them cost you, netted against it** — plus every other combo you *could've* run, priced out, each number stamped so you know which ones are real and which ones are some computer's best guess. It doesn't do synergy. It does arithmetic.
+**Cage is the thing that ruins the fog.** It's the itemized receipt nobody asks for and everybody needs: the graph tool saved 27,000 tokens here, fux saved 6,400 there, this conversation burned 400,000 and that one burned 900 — each number stamped so you know which ones were counted and which ones are some computer's best guess. It doesn't do synergy. It does arithmetic.
 
-And when cage's own numbers came back saying a session *with* the graph tool cost **more** than one without? It printed that too, labelled, instead of burying it. A savings tool you can't catch lying about savings is just the fog with a logo. ([The finding.](work/regression/2026-08-01-finding-saved-is-gross.md))
+**And here's the part that'll annoy you: cage used to print dollars, and it stopped.** Not because dollars don't matter — because cage was *making them up*. Multiply real tokens by a rate card some maintainer typed in by hand, and you get a confident-looking figure nobody can check against an actual invoice. That's the fog again, in a nicer font. So the rate card went in the bin, eleven commands went with it, and what's left is what the vendors themselves wrote down. A meter you can't catch lying is worth more than a dashboard you can. ([Why.](docs/adr/0011-cage-measures-usage-not-cost.md))
+
+And when cage's own numbers came back saying a session *with* the graph tool used **more** tokens than one without? It printed that too, labelled, instead of burying it. ([The finding.](work/regression/2026-08-01-finding-saved-is-gross.md))
 
 ## See it
 
 ```bash
-$ cage insights matrix --task fix-handover-bug
+$ cage insights attrib --task fix-handover-bug
 ```
 
 ```
-Counterfactual matrix · task 'fix-handover-bug' · anthropic/claude-opus-4-8
-  base 2,000 tok + output 1,500 tok held constant
+Marginal attribution · task 'fix-handover-bug' · anthropic/claude-opus-4-8
 
-graphify  fux  compressor   input tok    cost    source
-   ✗       ✗       ✗           50,000   $0.1725   modeled
-   ✓       ✗       ✗           23,000   $0.0915   modeled
-   ✓       ✓       ✗           16,600   $0.0723   modeled
-   ✓       ✓       ✓            8,600   $0.0483   measured   ← the run you actually made
+tool         unit    gross tok   method
+-----------  ------  ---------   --------
+graphify     tokens     27,000   modeled
+fux          tokens      6,400   modeled
+compressor   tokens      8,000   measured
+TOTAL        tokens     41,400
 
-  full stack vs all-off: 72% cheaper ($0.1725 → $0.0483)
+· saved is GROSS — avoided read cost; it excludes the cost of USING the tool
+  (the invoking turn, the injected context). `cage query gross-vs-net`
 ```
 
-Per-tool savings any meter can attempt. The part no cost dashboard does is the rest of that table — **what each stack you *didn't* run would have cost** — and the `source` column, so you always know which row is an invoice and which is a reconstruction. Only the configuration you actually ran is `measured`; **no projection ever masquerades as an invoice.** That discipline is the whole product.
+Per-tool savings any meter can attempt. The parts most don't: **the marginals sum exactly to the total** — each receipt reports its saving *given the tools upstream of it*, in a fixed visible order, so nothing double-counts — and the `method` column, so you always know which row was counted and which was reconstructed. **No projection ever masquerades as a measurement.** That discipline is the whole product.
 
-*(The table above is the seeded `cage demo` example. Where does cage's own evidence stand? Lab-validated capture across Claude Code, Copilot and Kiro on macOS — and the measured verdict on whether a graph tool nets positive is honestly **still open**: the first paired A/B run found the ON arm costing more, gross savings notwithstanding, at n=1. `cage insights verdict` refuses to call that a saving. Most tools in this space would not show you that sentence.)*
+And read that footnote, because cage prints it every single time: `saved` is **gross**. It's the read cost you avoided, and it does *not* subtract the tokens spent invoking the tool. Cage will not net that for you, because it can't do it honestly at the per-query grain — so it says so instead of quietly picking a number.
+
+*(The table above is the seeded `cage demo` example. Where does cage's own evidence stand? Lab-validated capture across Claude Code, Copilot and Kiro on macOS — and whether a graph tool comes out ahead overall is honestly **still open**: the first paired A/B run found the ON arm using more tokens, gross savings notwithstanding, at n=1. Cage prints that. Most tools in this space would not show you that sentence.)*
 
 ## Quickstart
 
@@ -60,14 +67,14 @@ cd your-project
 cage setup                      # guided wizard: defaults to all agents, wires MCP + graphify
 # non-interactively: cage setup --all   (or --claude / … for just one)
 cage demo                       # seed the worked example
-cage insights matrix                     # the counterfactual permutation table
-cage insights adoption                   # do your agents actually invoke the tools?
-cage insights chats                      # per-chat detail: tokens/cost + agent%, titled where the store has a title
-cage task quality                    # cost per *successful* task
+cage report --by agent          # tokens and credits, per agent
+cage insights attrib            # per-tool marginal token savings
+cage insights adoption          # do your agents actually invoke the tools?
+cage insights chats             # per-chat detail: tokens + agent%, titled where the store has one
 cage query "how is attribution calculated"  # explain any number — live formula, $0
 ```
 
-**Every command, in one page: [docs/CLI.md](docs/CLI.md)** — the 5 daily verbs, the 7
+**Every command, in one page: [docs/CLI.md](docs/CLI.md)** — the 5 daily verbs, the 5
 groups, the hidden plumbing and every flag. It's checked against the live parser by
 `tests/test_cli_reference.py`, so it can't quietly drift out of date.
 
@@ -96,35 +103,37 @@ cage.record_receipt(tool="fux", raw_alternative=8000, actual=1600,
 
 You and a robot helper did the chores. At the end of the day someone wants to know: did the robot actually help, or did it just look busy?
 
-**Cage is the chart on the fridge.** It writes down what each robot chore cost, what the robot's little gadgets saved — *and what switching the gadgets on cost you, taken off the total* — so you can see, in real tokens and real dollars, which helper earned its place and which one just made noise. And it's careful to mark which numbers it actually counted and which ones are its best guess, so nobody gets fooled by a confident-looking total. It does all of this for free, without ever phoning a friend for the answer.
+**Cage is the chart on the fridge.** It writes down how much each robot chore *used up*, and how much the robot's little gadgets saved, so you can see which helper earned its place and which one just made noise. It counts in the robot's own units — never in play money it made up — and it marks which numbers it actually counted and which ones are its best guess, so nobody gets fooled by a confident-looking total. It does all of this for free, without ever phoning a friend for the answer.
 
 ## Why it's different
 
 It's not another cost dashboard. The difference is a set of *properties*, not features:
 
-- **Deterministic.** Every derived view — report, attribution, the counterfactual matrix, ROI — is pure parse/arithmetic over an append-only log. Same ledger + same policy ⇒ identical tables, every time. The numbers never drift because nothing guesses.
-- **Honest by construction.** Every figure carries a `method`: `measured` (a real invoice), `modeled` (a reconstructed counterfactual), or `estimated` (a guess, labelled as one). A projection can never read as an invoice — the one property a "trust me, it paid off" slide can't offer.
+- **Deterministic.** Every derived view — report, attribution, per-chat, authorship — is pure parse/arithmetic over an append-only log. Same ledger + same config ⇒ identical tables, every time. The numbers never drift because nothing guesses.
+- **Honest by construction.** Every figure carries a `method`: `measured` (a recorded fact, read back verbatim), `modeled` (a reconstructed counterfactual), or `estimated` (a guess, labelled as one). A projection can never read as a measurement.
+- **It counts; it does not convert.** Tokens and credits, in the units the vendors record. No rate card, no dollars, and no arithmetic between units — a copilot credit and a kiro credit are never added together, because they are not the same thing.
 - **`$0` and zero-dependency.** Stdlib-only Python, `dependencies = []`. Heavy ML is an opt-in, off-by-default tier (`[embeddings]`, `[ml]`), never on the default path. Portable as a tarball, auditable line by line.
-- **Agent-native.** Every read command takes `--json`; the ledger is served over MCP. Built so an agent can pull its own cost numbers *and verify them*, not just read a chart.
+- **Agent-native.** Every read command takes `--json`; the ledger is served over MCP. Built so an agent can pull its own usage numbers *and verify them*, not just read a chart.
 
-The "so what" chain: deterministic → so the numbers never hallucinate → so each one carries a defensible `method` → so you can put the savings claim in front of finance, or an auditor. That last clause is the one a dashboard can't say.
+The "so what" chain: deterministic → so the numbers never hallucinate → so each one carries a defensible `method` → so you can put the claim in front of anyone who asks. That last clause is the one a dashboard can't say.
 
 ## Honest attribution — the part that survives the room
 
 Anyone can sum a bill. Cage's job is to divide credit **without lying about it**, and it does that with three rules (full design: [docs/PLAN.md](docs/PLAN.md) §4):
 
 - **Marginal-by-fixed-order.** Each tool's receipt reports the saving it produced *given the tools upstream of it*; the marginals sum exactly to the total — no overlap, no double-counting, `$0` to compute, the order fixed and visible (not a black-box Shapley pass).
-- **The counterfactual matrix.** Cage enumerates the 2ⁿ tool on/off permutations and prices each at the task's model. Only the configuration actually run is `measured`; every reconstructed cell is `modeled` (or `estimated`).
-- **Quality-adjusted.** Cost alone is dishonest — you can "save" by degrading answers and paying for the redo. `cage task outcome <task>` closes a task with its outcome, and `cage task quality` reports cost per ***successful*** task, the metric that stops false economies.
+- **Gross, and it says so.** `saved` is the read cost you avoided; it excludes the tokens spent *using* the tool. Cage prints that caveat on every view that shows the number, and reports **no net at all** — netting needs a per-query link that shim receipts structurally don't carry, so cage declines rather than picking one.
+- **Outcome-aware.** Volume alone is dishonest — you can "save" by degrading answers and paying for the redo. `cage task outcome <task>` closes a task with its verdict, and `compare`/`estimate`/`calibration` read it.
 
 ```
-Counterfactual matrix · task t_9f31 · base model anthropic/claude-sonnet-4-6
+Marginal attribution · task t_9f31 · anthropic/claude-sonnet-4-6
 
-compress  graphify  fux    input tok      cost   source
-   ✗         ✗       ✗        24,900   $0.0972   modeled
-   ✓         ✗       ✗        18,200   $0.0771   modeled
-   ✓         ✓       ✗        11,400   $0.0567   modeled
-   ✓         ✓       ✓         8,600   $0.0483   measured
+tool         unit    gross tok   method
+-----------  ------  ---------   --------
+compress     tokens      6,700   measured
+graphify     tokens      6,800   modeled
+fux          tokens      2,800   modeled
+TOTAL        tokens     16,300
 
 full stack vs all-off: ✓ cheaper ($0.0972 → $0.0483)
 ```
@@ -142,8 +151,8 @@ Cage keeps its numbers in **three layers, never mixed**, so any figure is audita
 | Layer | Holds | Lives in |
 | ----- | ----- | -------- |
 | **Contract** | the closed enums (`UNITS`, `METHODS`) — the substrate's shape | `schema.py` |
-| **Policy** | user-tunable economics: prices, budgets, pipeline order, routing | `cage.toml` — *the only place economic numbers live* (previously `policy.toml`; still read as a fallback) |
-| **Constants** | code heuristics not meant as config but that must be reviewable: the token divisor, the matrix ceiling, the provenance ranks, the confidence fallback | `constants.py` |
+| **Policy** | user-tunable settings: pipeline order, capture switches, cleanup, authorship | `cage.toml` (previously `policy.toml`; still read as a fallback) |
+| **Constants** | code heuristics not meant as config but that must be reviewable: the token divisor, the provenance ranks, the confidence fallback | `constants.py` |
 
 And because the math should explain itself, **`cage query`** prints the real formula for any value with its numbers read *live* from policy + constants — never a hard-coded literal, so an explanation can't drift from the code:
 
@@ -154,7 +163,7 @@ marginal-attribution · how per-tool savings sum to the total with no double-cou
   → response-cache); each receipt is its marginal saving given the tools upstream of
   it, so Σ(marginals) = total, no overlap.
   method:   per-row method = the least-trusted receipt for that tool (honest worst-case).
-  code:     cage/attribution.py · cage/matrix.py · cage.toml [tools.order]
+  code:     cage/attribution.py · cage/savings.py · cage.toml [tools.order]
 ```
 
 Reorder `[tools] order` in `cage.toml` and that printed pipeline changes — proof it's the code's actual value, not a slide. It's deterministic and `$0`: a curated explainer registry, no LLM, no network. `cage query` also explains *how cage itself works* (`cage query "how does cage work"` walks the data flow, attribution, method tags — same live-fact guarantee); `cage query --list` for every topic, `--json` for the agent-as-user.
@@ -175,13 +184,13 @@ One append-only log in, every view derived from it for `$0`:
 record_call / record_receipt  →  .cage/ledger/{calls,receipts,tasks,provenance}.jsonl  (append-only)
         (meter, fail-open)                    │
                                               ▼  derive ($0, no model)
-   cage.toml (prices/order/budgets/rates) → report · attrib · matrix · roi
-                                             · budget · why · origin
+   cage.toml (pipeline order / capture)   → report · attrib · chats · adoption
+                                             · compare · why · origin · commits
 ```
 
 You meter at the provider boundary (library adapter, a reverse proxy for clients you can't edit, or by parsing a Claude Code transcript). Everything downstream is a deterministic projection. The ledger carries token **counts**, never prompt bodies — PII-safe by construction; point `CAGE_LEDGER` at a private store to keep even the counts off-disk.
 
-A tool earns rows in `attrib`/`matrix`/`roi` by filing a **savings receipt**, and there are two ways in, by who owns the tool:
+A tool earns rows in `attrib` by filing a **savings receipt**, and there are two ways in, by who owns the tool:
 
 - **In-tool (you own it) — e.g. fux** carries a fail-open `cage_receipt.py` and emits its own `tool="fux"` receipt. Cage stays optional; fux runs unchanged with cage absent.
 - **External adapter (third-party) — e.g. graphify:** `cage data graphify -- graphify query "…"` runs graphify unmodified, passes its output through byte-for-byte, and files a `tool="graphify"` receipt by parsing the cited `source_file`s. graphify is never edited; a metering error never alters its result.
@@ -224,11 +233,11 @@ cage insights attrib --csv                                  # per-tool savings, 
 cage data export --csv calls --since 30d -o calls.csv   # raw ledger rows for a pivot table
 ```
 
-`--csv` works on `report` · `attrib` · `roi` · `compare` · `study report` · `calibration`; raw rows come from `cage data export --csv calls|receipts|tasks`. CSV is one-way reporting — never an import source; the re-importable fleet bundle stays jsonl (`cage data export --study`). The MCP read tools take the same `format: csv`, so an agent wired on any of the three surfaces can fetch a report without shelling out.
+`--csv` works on `report` · `attrib` · `chats` · `adoption` · `compare` · `study report` · `calibration`; raw rows come from `cage data export --csv calls|receipts|tasks`. CSV is one-way reporting — never an import source; the re-importable fleet bundle stays jsonl (`cage data export --study`). The MCP read tools take the same `format: csv`, so an agent wired on any of the three surfaces can fetch a report without shelling out.
 
 ## The `$0` guarantee
 
-Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 1679 tests; `cage demo` reproduces the worked attribution example against a real ledger.
+Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 1571 tests; `cage demo` reproduces the worked attribution example against a real ledger.
 
 **Honest limits.** Marginal-by-fixed-order is defensible and `$0`, but it is an *ordering convention*, not a Shapley value (that's a deferred audit mode). And a counterfactual cell is an honest reconstruction, never an invoice — the `method` column says so on every row, on purpose.
 
@@ -236,11 +245,11 @@ Every derived view is parse / arithmetic over the log — **no LLM call, ever, o
 
 Latest release below — full history and detail in [CHANGELOG.md](CHANGELOG.md).
 
-- **v0.49.1 — session-tracking docs move to root `work/`.** Docs-only, no functional change: `IMPLEMENTATION.md` / `INTERVIEW.md` / `MACHINE.md` / `OPEN-WORK.md` / `WORKLOG.md` moved out of `docs/` into a new root `work/` directory, `OPEN-WORK.md` cleared to a bare empty-queue statement, and a doc silently deleted by the prior release's cleanup restored.
+- **v0.49.1 — cage stops measuring money.** The money subsystem is deleted: fifteen modules, eleven commands, four MCP tools, the `--usd` view and the bundled rate card are gone. Dollars were never measured — they were tokens × a table cage could not verify — so cage now reports only what the vendors record: **tokens and credits**, each with its own absence reason and never summed across agents. The spend cutover is retired with it. ([ADR 0011](docs/adr/0011-cage-measures-usage-not-cost.md))
 
 ## The name
 
-Named after *John Cage*, whose *4′33″* framed four and a half minutes of "silence" so an audience would finally *hear* the ambient cost they'd been ignoring. Cage the tool does the same to your AI stack: it takes the spend and the savings everyone assumed were free or unknowable, and makes them something you can actually account for. It's part of a family of deterministic *substrate → derived views* tools — [fux](https://github.com/arpitarya/fux) (decisions → rules) — and now Cage (LLM traffic + receipts → ledger). The names are deliberate, and they sit beside `bach`, `wagner`, and `orff`.
+Named after *John Cage*, whose *4′33″* framed four and a half minutes of "silence" so an audience would finally *hear* the ambient cost they'd been ignoring. Cage the tool does the same to your AI stack: it takes the usage and the savings everyone assumed were free or unknowable, and makes them something you can actually account for. It's part of a family of deterministic *substrate → derived views* tools — [fux](https://github.com/arpitarya/fux) (decisions → rules) — and now Cage (LLM traffic + receipts → ledger). The names are deliberate, and they sit beside `bach`, `wagner`, and `orff`.
 
 ---
 

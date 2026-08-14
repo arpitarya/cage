@@ -1,9 +1,11 @@
-"""`report` spent-and-saved columns + the bare-`cage` headline banner (§6 handoff).
+"""`report` used-and-saved columns + the bare-`cage` headline banner (§6 handoff).
 
 The §4.4 demo seed (one call, three token-savings receipts) gives exact numbers:
-  spent  = (8600·$3 + 1500·$15)/1e6           = $0.0483
-  saved  = (27000 + 6400 + 8000)·$3/1e6       = $0.1242   (graphify+fux+compressor)
-  net    = saved − spent                       = $0.0759
+  used   = 8600 in + 1500 out
+  saved  = 27000 + 6400 + 8000 = 41,400 tokens  (graphify+fux+compressor), GROSS
+
+The USD half of this file went with the money subsystem (USAGE-ONLY, ADR 0011); every
+figure here is now a token count, and there is no `--usd` view to compare against.
 """
 from __future__ import annotations
 
@@ -11,11 +13,9 @@ import pytest
 
 from cage import cli, demo, display, ledger, metering as meter, policy, report, schema
 
-DEMO_SPENT = 0.0483
-DEMO_SAVED = 0.1242
-DEMO_NET = 0.0759
-
-USD = display.Display(usd=True)  # the $ view — tokens are the render default
+DEMO_TOK_IN = 8600
+DEMO_TOK_OUT = 1500
+DEMO_SAVED_TOK = 41_400
 
 
 def _pol():
@@ -28,18 +28,17 @@ def test_report_by_task_savings_numbers(seeded):
     root, _ = seeded
     rep = report.summarize(root, _pol(), dim="task")
     g = rep["groups"]["fix-handover-bug"]
-    assert g["saved_usd"] == pytest.approx(DEMO_SAVED, abs=1e-6)
-    assert g["net_usd"] == pytest.approx(DEMO_NET, abs=1e-6)
-    assert rep["total"]["saved_usd"] == pytest.approx(DEMO_SAVED, abs=1e-6)
-    assert rep["total"]["net_usd"] == pytest.approx(DEMO_NET, abs=1e-6)
+    assert g["saved_tokens"] == DEMO_SAVED_TOK
+    assert rep["total"]["saved_tokens"] == DEMO_SAVED_TOK
 
 
-def test_report_by_task_render_shows_signed_net(seeded):
+def test_report_by_task_render_shows_gross_tokens_and_the_caveat(seeded):
     root, _ = seeded
-    out = report.render_report(report.summarize(root, _pol(), dim="task"), disp=USD)
-    assert "saved" in out and "net" in out
-    assert "$0.1242" in out          # saved column
-    assert "+$0.0759" in out         # net carries an explicit sign
+    out = report.render_report(report.summarize(root, _pol(), dim="task"))
+    assert "gross tok" in out and "41,400" in out
+    # The gross exclusion is stated wherever the number renders — one phrasing, one
+    # owner (`savings.GROSS_NOTE`), and there is no net to offer instead.
+    assert "saved is GROSS" in out
 
 
 # ── G4 — the graphify day-one repo ceiling in the report footer ──────────────
@@ -81,36 +80,35 @@ def test_report_csv_never_shows_ceiling(seeded):
 
 
 def test_report_tokens_default_no_dollars(seeded):
-    """Tokens are the default view (plan Phase 2.5): no $ anywhere, saved tok
-    gated in, dollars appear only under --usd/[display]."""
+    """Tokens are the ONLY view (USAGE-ONLY, ADR 0011): no `$` anywhere, and no flag
+    that could add one."""
     root, _ = seeded
     rep = report.summarize(root, _pol(), dim="task")
     out = report.render_report(rep)
     assert "$" not in out
     assert "gross tok" in out and "41,400" in out  # token savings still shown (K: gross)
     assert "usd" not in out.splitlines()[0]
-    usd_out = report.render_report(rep, disp=USD)
-    assert usd_out.splitlines()[0].endswith("· usd")
-    assert "$0.1242" in usd_out
 
 
 # ── §6.4 — --by agent attributes via the call; no-call → "—", still in total ─
 
 def test_report_by_agent_attributes_and_dash_bucket(proj):
+    """A receipt linked to a call attributes to that call's agent; an unlinked one
+    lands in `—` and is still counted in the total — the join, not the pricing, is
+    what this pins, and the join is unchanged (USAGE-ONLY, ADR 0011)."""
     pol = _pol()
     call_id = meter.record_call(route="r", provider="anthropic",
                                 model="claude-sonnet-4-6", tokens_in=1000,
                                 tokens_out=0, agent="claude-code", root=proj,
                                 ts="2026-06-01T12:00:00Z")
-    # usd-unit receipts: real dollars regardless of the call (no token pricing needed).
-    meter.record_receipt(tool="graphify", raw_alternative=10.0, actual=0.0,
-                         unit="usd", call=call_id, root=proj)
-    meter.record_receipt(tool="compressor", raw_alternative=5.0, actual=0.0,
-                         unit="usd", call="", root=proj)  # no call → "—"
+    meter.record_receipt(tool="graphify", raw_alternative=10_000, actual=0,
+                         call=call_id, root=proj)
+    meter.record_receipt(tool="compressor", raw_alternative=5_000, actual=0,
+                         call="", root=proj)  # no call → "—"
     rep = report.summarize(proj, pol, dim="agent")
-    assert rep["groups"]["claude-code"]["saved_usd"] == pytest.approx(10.0, abs=1e-6)
-    assert rep["groups"]["—"]["saved_usd"] == pytest.approx(5.0, abs=1e-6)
-    assert rep["total"]["saved_usd"] == pytest.approx(15.0, abs=1e-6)  # both counted
+    assert rep["groups"]["claude-code"]["saved_tokens"] == 10_000
+    assert rep["groups"]["—"]["saved_tokens"] == 5_000
+    assert rep["total"]["saved_tokens"] == 15_000  # both counted
 
 
 # ── §6.5 — a LEGACY human/minutes receipt is excluded AND visibly footnoted ───
@@ -126,9 +124,9 @@ def test_legacy_human_receipt_excluded_from_report_and_footnoted(seeded):
     row["unit"] = "minutes"  # the removed unit, as a v0.35 ledger holds it
     assert ledger.append_row(root, "receipts", row)
     rep = report.summarize(root, pol, dim="task")
-    assert rep["total"]["saved_usd"] == pytest.approx(DEMO_SAVED, abs=1e-6)  # unmoved
+    assert rep["total"]["saved_tokens"] == DEMO_SAVED_TOK  # unmoved
     assert rep["legacy_human"] == 1
-    text = report.render_report(rep, disp=display.Display(usd=True))
+    text = report.render_report(rep)
     assert "legacy human-axis receipt(s) excluded" in text
 
 
@@ -143,16 +141,14 @@ def test_report_other_dims_have_no_savings(seeded, dim):
         assert "saved_usd" not in g and "net_usd" not in g
     header = report.render_report(rep).splitlines()[2]  # title, blank, then columns
     assert "saved" not in header and "net" not in header and "cost" not in header
-    usd_header = report.render_report(rep, disp=USD).splitlines()[2]
-    assert "saved" not in usd_header and "net" not in usd_header and "cost" in usd_header
 
 
 def test_report_json_keys_only_for_attributing_dims(seeded):
     root, _ = seeded
     task = report.summarize(root, _pol(), dim="task")
     model = report.summarize(root, _pol(), dim="model")
-    assert {"saved_usd", "net_usd"} <= set(task["total"])
-    assert "saved_usd" not in model["total"]
+    assert "saved_tokens" in task["total"]
+    assert "saved_tokens" not in model["total"]
 
 
 # ── §6.9 — determinism: same ledger ⇒ byte-identical render ───────────────────
@@ -173,12 +169,8 @@ def test_bare_cage_prints_banner(seeded, monkeypatch, capsys):
     assert cli.main([]) == 0
     out = capsys.readouterr().out
     assert "tokens" in out and "calls" in out and "drill:" in out
-    assert "$" not in out  # tokens are the default headline (handoff §10)
-    assert cli.main(["--usd"]) == 0
-    out = capsys.readouterr().out
-    assert "spent" in out and "saved" in out and "net" in out
-    assert "$0.0483" in out and "$0.1242" in out and "+$0.0759" in out
-    assert "drill:" in out
+    assert "gross saved" in out and "41,400" in out
+    assert "$" not in out  # there is no dollar view to fall back to
 
 
 def test_bare_cage_json_emits_headline_dict(seeded, monkeypatch, capsys):
@@ -188,9 +180,9 @@ def test_bare_cage_json_emits_headline_dict(seeded, monkeypatch, capsys):
     assert cli.main(["--json"]) == 0
     import json
     o = json.loads(capsys.readouterr().out)
-    assert o["spent_usd"] == pytest.approx(DEMO_SPENT, abs=1e-6)
-    assert o["saved_usd"] == pytest.approx(DEMO_SAVED, abs=1e-6)
-    assert o["net_usd"] == pytest.approx(DEMO_NET, abs=1e-6)
+    assert o["tokens"] == DEMO_TOK_IN + DEMO_TOK_OUT
+    assert o["saved_tokens"] == DEMO_SAVED_TOK
+    assert "spent_usd" not in o and "net_usd" not in o
 
 
 def test_bare_cage_empty_ledger_nudges(proj, monkeypatch, capsys):

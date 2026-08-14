@@ -6,14 +6,6 @@ import pytest
 from cage import ledger, metering as meter
 
 
-def test_record_call_computes_cost_from_policy(proj):
-    cid = meter.record_call(route="code-edit", provider="anthropic",
-                            model="claude-sonnet-4-6", tokens_in=8600, tokens_out=1500,
-                            task="t", root=proj)
-    assert cid.startswith("c_")
-    (call,) = ledger.calls(proj)
-    assert call["est_cost_usd"] == pytest.approx(0.0483, abs=1e-6)
-    assert call["task"] == "t"
 
 
 def test_explicit_cost_is_respected(proj):
@@ -60,3 +52,19 @@ def test_metercmd_tolerates_dash_dash_separator(proj):
     assert metercmd.run(proj, ["--", *ok]) == 0
     assert metercmd.run(proj, ["--", *fail]) == 3
     assert metercmd.run(proj, ["--"]) == 2  # separator alone = nothing to run
+
+
+def test_record_call_stores_a_supplied_figure_and_derives_none(tmp_path):
+    """`est_cost_usd` is accepted and stored verbatim (a self-costing provider knows its
+    own figure) but cage never computes one — there is no price table left to compute it
+    from, and no view reads the field (USAGE-ONLY, ADR 0011)."""
+    from cage import ledger, metering, paths
+    (tmp_path / ".cage" / "ledger").mkdir(parents=True)
+    metering.record_call(route="r", provider="selfbill", model="custom",
+                         tokens_in=1000, tokens_out=100, est_cost_usd=0.42,
+                         root=tmp_path)
+    metering.record_call(route="r", provider="anthropic", model="claude-sonnet-4-6",
+                         tokens_in=1_000_000, tokens_out=0, root=tmp_path)
+    supplied, derived = ledger.calls(tmp_path)
+    assert supplied["est_cost_usd"] == 0.42
+    assert derived["est_cost_usd"] == 0.0, "cage must not derive a cost"

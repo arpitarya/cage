@@ -115,10 +115,10 @@ def ceiling_footer_line(d: dict) -> str:
     if not d.get("bounded", True):
         return (f"· graphify repo ceiling ≈ {d['ceiling_tokens']:,} GROSS tokens per "
                 f"architecture question (modeled, UNBOUNDED — pre-community graph) — "
-                f"`cage insights verdict graphify` for the derivation")
+                f"`cage query graphify-coverage` for the derivation")
     return (f"· graphify repo ceiling ≈ {d['ceiling_tokens']:,} GROSS tokens per "
             f"architecture question (modeled, largest community; typical ≈ "
-            f"{d['typical_tokens']:,}) — `cage insights verdict graphify` for the "
+            f"{d['typical_tokens']:,}) — `cage query graphify-coverage` for the "
             f"derivation")
 
 

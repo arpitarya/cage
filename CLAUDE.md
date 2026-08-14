@@ -28,15 +28,19 @@ changelog entry.
 record_call / record_receipt  →  .cage/ledger/{calls,receipts,tasks}-YYYY-MM.jsonl  (+ legacy *.jsonl)
         (meter, plan §5)                      │           · provenance.jsonl (unpartitioned buffer)
                                               ▼  derive ($0, no model)
-  cage.toml (order/budgets/routing)      → report · attrib · matrix · budget · roi
-  + prices.toml (model prices, [credits])   · compare · verdict · why · origin · chats
-                                             · commits · commit · adoption
+  cage.toml (pipeline order / capture)   → report · attrib · adoption · chats
+                                             · graphify · compare · estimate
+                                             · calibration · why · origin
+                                             · commits · commit
                                              + --scope (monorepo slice) · --team · ledger-sync (§3.6)
                                              + --export → .cage/output/<view>-<stamp>/  (stamped artifact)
 ```
 
-Prices live in `prices.toml`; a legacy in-`cage.toml` prices block still reads via the
-fallback. **Vendor facts move, routing decisions stay.**
+**Cage measures token and credit USAGE, never cost** ([ADR 0011](docs/adr/0011-cage-measures-usage-not-cost.md)).
+There is no price table, no rate card and no currency on any surface. A leftover
+`.cage/prices.toml` from a pre-0.51 project is never read and never deleted — `cage
+doctor` names it. Do not reintroduce pricing without reversing that ADR; its veto
+condition is numbered and reopenable only by a *measurement*, never an argument.
 
 Three capture-only per-chat metrics siblings — `.cage/ledger/{copilot,kiro,claude}/`
 — hold vendor-verbatim usage facts `calls`/`credits` deliberately don't widen to
@@ -72,36 +76,13 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   to `cage.toml` on `cage setup` (idempotent, non-destructive), and with both present
   `cage.toml` wins (`cage doctor` names the ignored leftover; a one-line stderr warning
   fires at load). The resolved name lives in **ONE place**, `Footprint.policy`; writers
-  (`pricestoml`/`policysync`) and `cleanup.NEVER` (which protects **both** names) follow
-  it. Bundled default `data/cage.toml`, read-only at runtime. The same rule decides
-  where a **billing rate** lives: `[billing.<agent>] usd_per_credit` is in `cage.toml`,
-  because your plan's overage rate must survive a `cage prices sync` that replaces
-  `prices.toml` wholesale. It is deliberately **not** spelled `[credits.<agent>]` —
-  `[credits]` is the vendor rate card's per-model `per_mtok` table and is in
-  `policy._PRICE_SECTIONS`, so a rate filed there would be read from the prices file and
-  merge as **absent** in every project that has one. The collision is silent, which is
-  exactly why the section is named differently. `cage query config-file` explains it.
-- **Prices file** ([paths.py](cage/paths.py) `Footprint.prices`) — model prices are a
-  **vendor rate card** with the opposite lifecycle to policy (replaced wholesale by
-  `cage prices sync`, never hand-preserved), so they live in `.cage/prices.toml`:
-  every `[prices.<provider>.<model>]` row, `[credits]`, and the `[meta]
-  prices_version/prices_date` counters. `cage.toml` keeps the **routing decisions**
-  (`[alias]`, `[tools.<tool>] price_at`) and `[meta] cage_version/policy_version` —
-  **vendor facts move, routing decisions stay.** The split is **non-breaking**:
-  `prices.toml` → legacy in-`cage.toml` prices → bundled default, resolved in ONE
-  place (`Footprint.prices`); `cage setup` migrates a legacy inline block
-  **money-neutrally** (idempotent, non-destructive); both present ⇒ `prices.toml`
-  wins (`cage doctor` names the shadowed block, one-line stderr warning at load).
-  `policy.load` still returns ONE merged dict, so every pricing consumer
-  (`prices.call_usd`, `policy.price_match`, `convert`, `receiptprice`) is unchanged.
-  `[meta]` splits **per key** — a mis-split silently stops a staleness check firing.
-  `cage query prices-file` explains it.
+  (`tomledit`/`policysync`) and `cleanup.NEVER` (which protects **both** names) follow
+  it. Bundled default `data/cage.toml`, read-only at runtime. `cage query config-file` explains it.
 - **Constants** ([constants.py](cage/constants.py)) — the *third audit layer*. Cage
   keeps its numbers in three places, never mixed: **contract** = the enums in
-  `schema.py`; **policy** = user-economics in `cage.toml` (routing) + `prices.toml`
-  (the vendor rate card half of that layer); **constants** = code
+  `schema.py`; **policy** = user settings in `cage.toml`; **constants** = code
   heuristics not meant as config but that must be reviewable (`CHARS_PER_TOKEN`,
-  `TOKENS_PER_MILLION`, `MAX_MATRIX_TOOLS`, `METHOD_TRUST`, `DEFAULT_CONFIDENCE`,
+  `METHOD_TRUST`, `DEFAULT_CONFIDENCE`,
   `GRAPHIFY_RECEIPT_CONFIDENCE`, `SINCE_WINDOW_DAYS`,
   `PARTITION_GRANULARITY`, and the
   ledger-size threshold `LEDGER_WARN_BYTES` — derived from `LEDGER_ROW_BYTES` ×
@@ -140,101 +121,10 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   read by any derived view) proves capture ran at all; a `CAGE_DEBUG`-gated
   produce/skip log at every receipt push site (graphifymeter/record_receipt/
   responsecache/compress) makes a silently-skipped savings receipt diagnosable.
-- **Attribution** ([attribution.py](cage/attribution.py), [matrix.py](cage/matrix.py))
+- **Attribution** ([attribution.py](cage/attribution.py))
   — the differentiator (plan §4). Marginal-by-fixed-order; a reconstructed
   counterfactual cell is `modeled`/`estimated`, never `measured` (only the recorded
   run is an invoice). `cage demo` must keep reproducing the plan's §4.4 tables.
-- **Gross vs net savings** ([netsaved.py](cage/netsaved.py)) — **every `saved` in the
-  ledger is GROSS**: `raw_alternative − actual` is the *avoided read cost* and excludes
-  the cost of **using** the tool (the invoking turn, a hook's injected context), so a big
-  `saved` and a session that cost more are both true
-  ([finding](work/regression/2026-08-01-finding-saved-is-gross.md)). Two rules follow.
-  (a) The word `gross` appears on every surface that prints the number — report/attrib/
-  roi/overview/ceiling, text **and** CSV (`gross_saved_*`) — from ONE phrasing,
-  `netsaved.GROSS_NOTE`; never re-word it per view. (b) `netsaved.by_tool` nets it at
-  **task level only** — per-query is impossible, shim receipts carry a `task` but no
-  `call`, and inventing that link is forbidden. The attributable-cost rule is the **±120s
-  receipt-window union** (`constants.NET_ATTRIB_WINDOW_S`; symmetric because the invoking
-  turn precedes the receipt and the consuming turn follows it), a deliberate *lower
-  bound*. Net is `modeled` at `NET_SAVED_CONFIDENCE` — **never `measured`** — and a task
-  with no in-window call is *uncovered*: its net reads unavailable, never `= gross`.
-  `cage insights verdict` therefore prints **`SAVING (GROSS)`** when no complete
-  cost-of-use figure exists, but still asserts a bare **COSTING** — the omitted term is
-  ≥ 0, so only the positive side can be wiped out by it. `cage query gross-vs-net`
-  explains it; FORMULAS §2.1/§2.1a is the spec.
-- **Unit→USD** ([convert.py](cage/convert.py)) — the single dispatch for a receipt's
-  `saved` in dollars: `usd` passthrough · `tokens` at model price · `ms`/`gco2` → `$0`
-  (`minutes` was a unit through v0.35 and is now excluded, never priced). `roi`/`attribution` route through it (one place
-  unit semantics live). A **call-less token receipt** (graphify/fux shims — a `task`
-  but no `call`) prices via the ladder in [receiptprice.py](cage/receiptprice.py)
-  (plan §4.5): `[tools.<tool>] price_at` (managed by `cage prices route-tool <tool>
-  --to <provider>/<model>`, `--remove` to delete; dangling targets write with a
-  warning, never priced) → dominant task model (ties: tokens_in → call count →
-  lexicographic) → loudly UNPRICED with a **runnable** per-tool fix line. One
-  implementation; roi/report/attrib/verdict thread the once-per-view `build()` join
-  through it; rung footnoted in text, `priced_via` in CSV; USD keeps the receipt's
-  method. Linked receipts never enter the ladder. **Credits never enter this dispatch**:
-  a *call*'s dollars may resolve by billed credits (see the per-call bullet), but a
-  *receipt*'s `saved` is tokens/usd/ms/gco2 only, and `receiptprice`'s ladder is
-  untouched by COPILOT-CREDITS.
-- **Per-call cost** ([prices.py](cage/prices.py) `call_usd`) — `report`/`budget`
-  **recompute** each call from `tokens × policy` at derive time, falling back to the
-  stored `est_cost_usd` only when the model is unpriced.
-  **The copilot exception, and the one choke point.** `call_usd_match` is the ONE place
-  a call becomes dollars — `call_usd` wraps it, and every USD consumer (report · budget ·
-  chats · compare · verdict · roi · netsaved · study · forecast · quality · freshness ·
-  doctor) reaches a dollar through one of the two — so a pricing rung added there is
-  inherited with **no per-view fork** (grep-pinned by `tests/test_copilot_credits.py`).
-  Since v0.44 a copilot row resolves by a ladder
-  ([creditprice.py](cage/creditprice.py), FORMULAS §1.1a): **rung 0, billed on another
-  row** (`billed_with`) → **recorded `credits` × the configured `[billing.<agent>]
-  usd_per_credit`** → **tokens × price table** → loudly UNPRICED. Rung 1 wins over the
-  table outright, because since 2026-06-01 a Copilot credit *is* GitHub's own
-  tokens×rates computation done with what cage cannot see (what `copilot/auto` routed to,
-  GitHub's current rates) — so it prices that router **exactly** with no price-table row.
-  **Rung 0 is *one basis per group*** (REV-CREDITS defect 2): GitHub computes
-  `totalPremiumRequests` over **every** model in a `session.shutdown`, so the figure
-  lands on one carrier row and every sibling links to it and prices at `$0.00` **on the
-  credits basis**, with the carrier's id as the matched key — *priced, elsewhere, by
-  name*, neither a fabricated `$0` nor UNPRICED. Without it a multi-model shutdown billed
-  the same spend twice. Splitting the credit pro-rata by token share was **rejected**: it
-  would derive per-row credits from tokens, forbidden in both directions.
-  It is **`modeled`, never `measured`**: the count is a recorded fact, the dollar is a
-  rate the user set and cage cannot check against an invoice, and **any aggregate
-  containing one credits-priced row degrades to `modeled`** (`creditprice.method_for`) —
-  the weaker tag always wins, or a configured rate would read as an invoice. **Rate unset
-  ≠ rate zero:** unset skips the rung (and rung 0's suppression with it — the carrier
-  falls to tokens, so the group must too) and credits render as a *count*, never a
-  dollar; `0.0` is a real rate that prices at $0.0000. **Absence ≠ a recorded zero**, and
-  credits are **never derived from tokens in either direction** — so `schema.make_call`'s
-  `credits` defaults to a `None` sentinel rather than the usual omit-at-zero idiom, the
-  one additive field that breaks that pattern and the only way both facts survive. A
-  total spanning both bases prints the split (never blended silently); CSV names the
-  basis per row in `priced_via`. `cage query copilot-credits` explains it.
-  A token-only meter (the
-  transcript meter never sets `est_cost_usd`) thus still costs out, and a
-  self-costing provider Cage can't tokenize keeps its figure. Derive-time only — the
-  ledger is never rewritten. A call prices only if `(provider, model)` is in the
-  table; the transcript meter stamps `provider="anthropic"`, so that key must carry
-  the Claude rows (the bundled `data/cage.toml` does; a project policy must too).
-- **`ledger.credits` in `cage report` (REPORT-CREDITS, 2026-08-13)** — a **second,
-  distinct** credits mechanism from the ladder above: kiro-CLI conversations
-  (`schema.make_credit`) carry no call and no tokens at all, so they can't flow
-  through `call_usd_match`. `report.summarize` folds them in as their own group on
-  the `agent` and default `route` dims only (a synthetic `"credits"` bucket for
-  `route`, since a credits row has no `route` field — other dims are untouched, a
-  credits row doesn't carry `model`/`task` cleanly and `cage insights chats`, §2.13,
-  already owns the per-conversation view). A `credits` column appears only when this
-  view actually joined one (byte-identical CSV/text otherwise); a credits-only
-  group's `calls`/`tok in`/`tok out` render `—` in text, **empty** in CSV — never a
-  fabricated `0`. Priced only through `[billing.<agent>] usd_per_credit`, same rung
-  as `chats.py`. **The one number `cost`/`net vs spend`/CSV `cost_usd` must never
-  silently drop:** the rare group whose calls and credits rows share one bucket sums
-  both into the cell rather than keeping the token-priced half alone, and the report
-  states the split (`· total spans two pricing bases: …`) whenever both are non-zero
-  — found and fixed during the build itself (the first version quietly understated
-  a rated total). FORMULAS §1.7; `cage query copilot-credits` explains the ladder
-  both mechanisms share.
 - **The Tier-1 human axis is GONE (v0.36)** — `human.py`/`humanview.py`/`trend.py`/
   `attention.py`, `cage human`, `cage insights trend`, `matrix --human`,
   `calibration --human`, `[human.*]`, `CAGE_HUMAN_RATE`, `IDLE_CAP_MINUTES`, the
@@ -243,9 +133,9 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   `# v2:` stub. **Do not reintroduce any part of it without a proposal doc.** Two
   things survive and must not be confused with it: (a) provenance `origin="human"`
   ([origin.py](cage/origin.py), `schema.ORIGINS`) is *authorship*, a different
-  question and a different enum; (b) `cage task outcome` / `cage task quality` never
-  belonged to the axis — they sat in the `human` command group by filing accident and
-  moved to the `task` group; `outcome` is the **task-close verb** the whole
+  question and a different enum; (b) `cage task outcome` never belonged to the
+  axis — it sat in the `human` command group by filing accident and moved to the `task`
+  group (its sibling `cage task quality` was money and went with ADR 0011); `outcome` is the **task-close verb** the whole
   cost-impact surface (`compare`/`estimate`/`calibration`) depends on. **Old ledgers
   still read**: a pre-0.36 `gap_ms` call or `tool="human"`/`unit="minutes"` receipt
   parses fine and is excluded from money views by `report._is_legacy_human`, with the
@@ -343,17 +233,17 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   stay complete, `--all` lifts it, and the detail view is never capped. A default
   relative `--since` was rejected — a wall clock in the default path. `cage query
   agent-authorship` explains it.
-- **Cost-impact surface** ([taskgroup.py](cage/taskgroup.py), [compare.py](cage/compare.py),
-  [estimate.py](cage/estimate.py), [calibration.py](cage/calibration.py),
-  [verdict.py](cage/verdict.py) — plan §4.7–§4.8, §8.8) — the closed-task join
+- **Usage-impact surface** ([taskgroup.py](cage/taskgroup.py), [compare.py](cage/compare.py),
+  [estimate.py](cage/estimate.py), [calibration.py](cage/calibration.py)
+  — plan §4.7–§4.8) — the closed-task join
   (task-id first, session-window fallback; overlaps → smallest task id) yields
   *observed* stack signatures (`human` excluded; empty ⇒ `agent-only`). `cage
-  compare`: **measured** group totals (`prices.call_usd` repriced), the delta always
-  `estimated` + the observational caveat. `cage insights estimate`: a `modeled` median+IQR
+  compare`: **measured** group totals (recorded tokens), the delta always `estimated` +
+  the observational caveat. `cage insights estimate`: a `modeled` median+IQR **token**
   band from exact-key history; `--record` stamps additive `est_*` fields **plus the
   token band bounds** on the *open* task row (plan §3.4) so `cage insights calibration` can
   score in-band hits against the band as recorded — that **measured hit-rate is the
-  only confidence source; the estimator never self-reports**. `cage insights verdict <tool>`:
+  only confidence source; the estimator never self-reports**.
   a pure composer over attrib/roi/regression/quality + break-even — computes
   no new statistics, refuses (`INSUFFICIENT DATA`) over approximating. The min-n
   gates `MIN_COMPARE_N`/`MIN_ESTIMATE_N` live in `constants.py` and **block** —
@@ -410,8 +300,8 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   sums rather than coalesces would double-count. **Receipts/savings have no GenAI
   equivalent** — cage-namespaced under `cage.savings[].cage.*`, never an invented
   `gen_ai.*` name; `cage.saved` is GROSS, `cage.saved_usd` prices through the same
-  `receiptprice` ladder every other view uses and is omitted (never `$0`) on an
-  UNPRICED refusal or a non-money unit; `cage.method` always survives. `dependencies
+  receipt's own `unit` (named in `cage.unit`, converted by nothing — there is no
+  `cage.saved_usd` since ADR 0011); `cage.method` always survives. `dependencies
   = []` unchanged — stdlib `json` only, no OTel SDK. `cage query otel-export`
   explains it.
 - **Adoption** ([adoption.py](cage/adoption.py), FORMULAS §2.12) — `cage insights
@@ -544,6 +434,20 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   session's spend from `cage report` (this repo's own product; dogfood it). If
   unmeasurable, write `Cost: unmeasured — <why>`. Waste that is priced gets stopped;
   waste that is prose gets repeated.
+- **Cage measures usage, never cost** ([ADR 0011](docs/adr/0011-cage-measures-usage-not-cost.md)).
+  No price table, no rate card, no currency on any surface, and **no conversion between
+  units in either direction** — tokens↔credits↔anything. `tests/test_usage_only.py`
+  AST-scans every module for a returning currency identifier or a rendered `$N` and fails
+  the suite. Reintroducing pricing is an **ADR reversal, not a feature**: the veto
+  condition names the one thing that reopens it (a provider exposing a per-request billed
+  amount in a store cage already parses, on ≥80% of rows, written up in `work/research/`
+  first) and rules out the rest by name.
+- **A basis change is a fixture migration, and the tests will not tell you politely.**
+  When `ledger.spend()`'s resolution changes, every test seeding the old basis starts
+  asserting over an *empty* ledger — it keeps passing while pinning nothing. Found the
+  hard way retiring the spend cutover (~80 tests). `tests/conftest.py::metric_twin` is
+  the ONE helper that dual-writes a metric row beside a `calls` row, exactly as real
+  capture does; use it rather than a per-file copy.
 - **$0 / stdlib only** — `dependencies = []`. ML is opt-in extras (`[embeddings]`,
   `[ml]`), never imported on the default path.
 - **Fail-open everywhere on the write path** — `ledger.append` returns `False`, it
@@ -585,8 +489,7 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   **A deletion and a move never share a diff** (CODEX-OUT's verdict): if the touching
   change is a removal, do the removal, and leave the seam for the next one.
 - **`[meta] cage_version` is the package version, always** — it is *printed* by
-  `cage prices list` and *copied into every newly scaffolded project*, so a stale literal
-  propagates. Derive it from `cage.__version__` (the `manifest.py` pattern), never
+  *copied into every newly scaffolded project*, so a stale literal propagates. Derive it from `cage.__version__` (the `manifest.py` pattern), never
   hand-maintain it; a project's existing stamp is history and is never rewritten.
   **`policy_version` is deliberately NOT coupled to the release** — it is a content
   counter driving the `cage policy sync` recommendation, and bumping it per release would
@@ -599,8 +502,8 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   "N tests passing" count in the README `$0` section + this file's `just test`
   comment. A shipped version with no changelog entry is a release bug. Nothing to
   hand-edit for `[meta] cage_version` — it derives from `__version__` at read time
-  (`policy._bundled`); just confirm `tests/test_prices_split.py`'s drift-guard test is
-  still green (the checklist item that was missing when it drifted eleven releases).
+  (`policy._bundled`). The `tests/test_prices_split.py` drift-guard this line used to
+  name went with the prices file (ADR 0011).
 - **Never publish from local. Every release ships a GitHub release, and the GitHub
   release *is* the publish trigger.** The one true release flow: bump `__version__`
   + changelog, commit + push `main`, tag `vX.Y.Z`, push the tag, then
@@ -631,26 +534,15 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   turn lacking `uuid`) derives its `call_id` from `(agent, session, model, tokens_in,
   tokens_out, cached_in, ts)` (`transcript._composite_id`) so re-imports dedupe in
   `hooks.append_new` — never a random id. uuid-present rows stay byte-identical.
-- **Pricing is managed** ([pricescmd.py](cage/pricescmd.py), [pricestoml.py](cage/pricestoml.py),
-  plan §3.3) — `cage prices list|unpriced|set|alias|sync` manages the project
-  `[prices]`/`[alias]` tables; writes are text surgery (in-place value edits marked
-  `# cage:custom`, or a deterministic cage-managed block) — never a whole-file rewrite.
-  Writes are a **two-file** split: `cage prices set`/`sync` write **`prices.toml`**
-  (vendor facts); `alias`/`route-tool` write **`cage.toml`** (routing decisions).
-  `cage prices sync` replaces the cage-managed region of `prices.toml` while
-  `# cage:custom` rows survive; `cage policy sync` is unambiguously `cage.toml`-only.
-  The bundled defaults are read-only at runtime and ship split as `data/cage.toml`
-  + `data/prices.toml` (both resolve from the zipapp via `paths.bundled_data()`).
-  `policy.price_match`
-  resolves exact → alias → family over *normalized* ids (`copilot/` route-prefix strip —
-  a closed list; `.`↔`-` folding; effort suffixes low/medium/high/max drop); a normalized
-  match renders `family`, an alias renders `alias`, **never `exact`** (method law), and a
-  dangling alias is `none` — a router is never silently defaulted. `policy.load` merges
-  `prices`/`credits`/`alias` two levels deep (per provider *and* model). The bundle
-  carries `[meta] prices_version` (source URLs cited per row); `doctor`/`prices list`
-  recommend `cage prices sync` when the bundle is newer — never auto-applied. Repricing
-  is derive-time; UNPRICED prints a ⚠ summary on report/overview/compare/study report.
-  cage never fetches a price — research is build-time/user work, not a code path.
+- **TOML writes are text surgery** ([tomledit.py](cage/tomledit.py)) — the ONE module
+  that writes project config text (formerly `pricestoml.py`; its price-specific setters
+  went with ADR 0011, the generic writer did not, so it was renamed rather than deleted).
+  In-place value edits marked `# cage:custom`, or a deterministic cage-managed block —
+  never a whole-file rewrite, because the stdlib has no comment-preserving TOML
+  serializer. Locked, atomic, and it **re-parses the candidate text before replacing the
+  file**: a duplicate table header would make the whole config unparseable and capture
+  would silently fall back to the bundle. Callers: `policysync` · `initcmd` ·
+  `cage setup --python-launcher`. `cage policy sync` is unambiguously `cage.toml`-only.
 - **Export imports everything first** (plan §3.7) — `cage data export` (plain and `--study`)
   runs the full all-agent sweep before emitting (`--agent` filters output only);
   `--no-import` flag > `CAGE_CAPTURE` env > `[capture] import_before_export` policy;
@@ -658,7 +550,7 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
 - **State cleanup is a closed allowlist, and deletion is manual-only (v0.37)**
   ([cleanup.py](cage/cleanup.py), plan §3.6.4) — aged debug.log/hooks-seen rows, stale
   `pending-*` buffers, orphan cursors, `*.tmp`; never ledger/ (tool savings included —
-  see below), cage.toml (and legacy policy.toml), prices.toml, machine.json,
+  see below), cage.toml (and legacy policy.toml), machine.json,
   study.jsonl, limits.json (by construction). **Deletion only ever happens via an explicit `cage data cleanup
   --apply`**, which runs regardless of `[cleanup] enabled` — an explicitly-typed command
   is always honored. The auto path (piggybacked on `importcmd.run`/session-end,
@@ -992,7 +884,7 @@ the worked examples to copy.
 ## Dev
 
 ```bash
-just test          # python -m pytest -q   (1679 tests; +10 Windows-only skips, +1 opt-in dogfood-age skip)
+just test          # python -m pytest -q   (1571 tests; +10 Windows-only skips, +1 opt-in dogfood-age skip)
 just demo          # seed §4.4 + print attrib/matrix
 cage --version
 ```
@@ -1138,7 +1030,7 @@ each agent only needs thin idiomatic wiring (`agents.py` orchestrates):
   fail-open helper [lockutil.py](cage/lockutil.py) (fcntl → msvcrt → proceed-unlocked,
   debug-logged) — never hand-roll another `fcntl` block.
 - **Read:** `mcpserver.py` (MCP, every agent), `report/attrib/matrix/budget/roi`,
-  plus `task outcome`/`task quality`, authorship
+  plus `task outcome`, authorship
   (`origin`/`notes-sync`/`verify`, plan §3.5), and the ledger-scale surface
   (`--scope` / `--team` filters, `ledger-sync` into refs/notes/cage-ledger via the
   shared `mergeutil.union_by_id` core, plan §3.6).
@@ -1165,11 +1057,16 @@ each agent only needs thin idiomatic wiring (`agents.py` orchestrates):
   id folds in an *answer* hash no attestation can reconstruct, so `NO_LINK` stays
   structurally true and is not quietly narrowed. (b) **auto task-close** at the session
   boundary, on the **exact session id** — never the most recent task, never by proximity.
-  (c) `budget.check`'s **first real caller**: `cage hook budget` exits `BLOCK` (2) when
-  `[budgets] on_exceed = "block"`. **Auto-close never claims success:** `tasks.jsonl`'s
+  (There was a third — `budget.check`'s first real caller, `cage hook budget` exiting
+  `BLOCK` (2) — and it went with the money subsystem: `hookcmd.BLOCK` is gone and **every
+  hook event now exits 0**. The `cli.main` guard that catches an argparse `2` from `cage
+  hook` **outlived it and matters more, not less**: `2` is the HOST's "block this tool
+  call" code, so an accidental one from a stale wired event name would block every Bash
+  call in the session — and there is now no path where blocking is ever intended.) **Auto-close never claims success:** `tasks.jsonl`'s
   `outcome` and the quality store (`.cage/outcomes.json`, ok|redo) are *different axes*,
   so the hook writes `outcome="auto"` — closed for compare/estimate/calibration,
-  **invisible to `cage task quality`**. Stamping `ok` would inflate the success rate of
+  **invisible to the outcome store** ([outcomes.py](cage/outcomes.py) — relocated out of
+  the deleted `quality.py`). Stamping `ok` would inflate the success rate of
   every session that merely ended. **Fail-open is absolute** (every event exits 0 on any
   internal failure; the sole non-zero is the deliberate budget block), and **hooks are
   CLI-only** — they do not fire under a VS Code extension, so every L1 fact carries that
@@ -1215,11 +1112,11 @@ each agent only needs thin idiomatic wiring (`agents.py` orchestrates):
   honesty-reviewer · release · lab-runner · windows-shim. Adding a document = adding one
   `Doc` to `steering.DOCS`; there is no second copy to keep in step, nothing to re-bless,
   and **a document on one agent and not the others is not done**.
-- **MCP surface = 9 read tools + exactly ONE write tool** ([mcpserver.py](cage/mcpserver.py),
-  L2 of the agent-surface ladder). Reads: `report`/`attrib`/`matrix`/`budget`/`roi`/
-  `adoption`/`why`/**`verdict`**/**`compare`**. **The refusals are the point** — the two
-  product-question tools routinely decline (`INSUFFICIENT DATA` · `SAVING (GROSS)` · the
-  `MIN_COMPARE_N` block), and each renders through the CLI's *own* renderer so the text
+- **MCP surface = 5 read tools + exactly ONE write tool** ([mcpserver.py](cage/mcpserver.py),
+  L2 of the agent-surface ladder). Reads: `report`/`attrib`/`adoption`/`why`/**`compare`**
+  (nine until ADR 0011 took `matrix`/`budget`/`roi`/`verdict`). **The refusals are the
+  point** — `compare` routinely declines (the `MIN_COMPARE_N` block) and every view that
+  prints a saving carries the GROSS caveat, and each renders through the CLI's *own* renderer so the text
   crosses **byte-identically** (`tests/test_mcp_layer.py` asserts equality with the CLI,
   not substring presence): an agent reads an empty result as **zero**, the one thing a
   refusal never means. **Never add a summarizing layer between a composer and a tool.**
@@ -1280,7 +1177,7 @@ each agent only needs thin idiomatic wiring (`agents.py` orchestrates):
   **Restricted endpoints (docs/restricted-environments.md):** opt-in
   python-launcher mode — `cage setup --python-launcher` persists `[wiring]
   python_launcher = true` (project policy, `policy.python_launcher`, written via
-  `pricestoml.set_wiring`); `agents.install` re-reads it every run and fans it
+  `tomledit.set_wiring`); `agents.install` re-reads it every run and fans it
   out to `runshim.write(python_launcher=)` (interpreter-only `_SH_PY`/`_CMD_PY`
   shim pair — nothing exe-shaped, grep-tested in
   `tests/test_launcher_mode.py` + dummyrepo S12) and to every wire module's
@@ -1396,13 +1293,14 @@ each agent only needs thin idiomatic wiring (`agents.py` orchestrates):
   Cage is wired there as an optional `[cage]` extra (uv path source).
 
 <!-- cage:start -->
-## Cage — LLM cost & savings ledger
+## Cage — LLM usage & savings ledger
 
 This project meters LLM traffic into `.cage/` (a *flux*: $0, deterministic).
 
-- Spend so far: `cage report` · per-tool savings: `cage insights attrib` · budget: `cage insights budget`
-- The ledger carries token *counts*, never prompt text — PII-safe by construction.
-- Edit prices / budgets / pipeline order in `.cage/cage.toml`.
+- Usage so far: `cage report` · per-tool savings: `cage insights attrib` · per chat: `cage insights chats`
+- Tokens and credits are recorded as *counts* — cage measures usage, never cost.
+- The ledger carries token counts, never prompt text — PII-safe by construction.
+- Edit pipeline order / capture switches in `.cage/cage.toml`.
 <!-- cage:end -->
 
 ## graphify

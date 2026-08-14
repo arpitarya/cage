@@ -2,8 +2,8 @@
 (proposal `work/archive/v0.42-chats-view.proposal.md`, handoff
 `work/archive/v0.42-chats-view.handoff.md`).
 
-The differentiating question no cost dashboard answers per-*chat*: which conversation
-spent the tokens, and (where the store carries a title) what was it about? The
+The differentiating question no usage dashboard answers per-*chat*: which conversation
+used the tokens, and (where the store carries a title) what was it about? The
 substrate already carries everything numeric — `session`, `agent`, `surface`,
 `tokens_in`, `tokens_out`, `cached_in`, `cache_write_in`, `credits` are all call-row
 fields (plan §3.1) — so this is pure derive, no substrate change.
@@ -14,10 +14,10 @@ fields (plan §3.1) — so this is pure derive, no substrate change.
    `report`), dropping legacy-human rows (`report._is_legacy_human` — counted,
    footnoted; calls never actually carry `tool`/`unit`, so this only fires against a
    hand-crafted legacy row, but the predicate is applied uniformly with every other
-   money view rather than assumed absent).
+   view rather than assumed absent).
 2. Group by `(agent, surface, session)` — the same bucket key
-   `importcmd._write_manifest` uses. Sum tokens/cached/cache-write/credits; reprice
-   per call via `prices.call_usd_match` (UNPRICED counted per row, never $0).
+   `importcmd._write_manifest` uses. Sum tokens/cached/cache-write, and carry
+   `credits` as a COUNT (never priced — USAGE-ONLY, ADR 0011).
 3. Label — join `session → session_name` from `imports.jsonl`, **labels only** (the
    one carve-out `manifest.py`'s docstring now documents). No name ⇒ the session id.
    Kiro-IDE stamps a constant `session="kiro"`, so every kiro-IDE run already
@@ -27,8 +27,16 @@ fields (plan §3.1) — so this is pure derive, no substrate change.
    (`constants.CHATS_DEFAULT_ROWS`) by default; the cut count is footnoted
    (no-silent-caps law), `--all` lifts it. Ranking/truncation is a render-time
    concern — `summarize()` returns every row so `--all` can never perturb a number.
-5. Render — text via `display.Display`/`Footer` (`--usd` adds the cost column; tokens
-   are the default view); `--csv` from the same rows, untruncated (CSV never gates).
+5. Render — text via `display.Display`/`Footer`; `--csv` from the same rows,
+   untruncated (CSV never gates).
+
+**The two units, and the two absences** (`units.py`): tokens and credits are both
+recorded counts, and neither exists for all three agents — claude records no credit
+unit at all, kiro has no IDE token store. Each absence renders `—` **with its own
+reason** in the footer, never a `0`, because the two are different kinds of fact (a
+vendor law vs. a missing file). And **credits are never summed across agents**: a
+copilot credit is GitHub's tokens×rates figure, a kiro credit is an AWS credit. The
+view states that outright when both are on screen (`units.cross_agent_note`).
 
 **The `agent%` column (CHATS-AUTHOR)** joins one more append-only file: per chat, the
 share of *evidenced* landed lines — `agent_lines / (agent_lines + residual_lines)`
@@ -47,8 +55,8 @@ matchable lines in files *this chat proposed*. Lines in files no session propose
 `commitview`'s `unattributed` — commit-scoped, structurally outside this denominator,
 never redistributed into it. Per-chat there is also no diff to clamp against, so two
 chats that proposed the same landed file each count its lines; **the commit view stays
-the arbiter for any single sha**. No USD, no rate, no minutes ever touches this number
-(the v0.36 law) — it never combines with `cost`.
+the arbiter for any single sha**. No rate and no minutes ever touches this number (the
+v0.36 law), and since ADR 0011 there is no currency in this view to combine with.
 
 **Known honesty limits, stated not fixed** (proposal): a manifest row is written only
 when a sweep *appends* rows for that session, so a chat renamed after its last new
@@ -58,12 +66,10 @@ id display, never backfilled.
 **Kiro-CLI conversations are `credits` rows, not calls (CHATS-CREDITS)** — a
 different row shape with no `tokens_in`/`tokens_out` (`schema.make_credit`), read
 from `ledger.credits` and bucketed the same way as a call chat: one row per
-`(agent, surface, session)`, still money-independent in the direction that matters —
-a credits row can never perturb a *token/cost cell that belongs to a call chat*, it
-only ever adds a row of its own. Rendered with `calls` and all four token cells `—`
-(text) / empty (CSV), `credits` filled, and cost priced only through the existing
-`[billing.<agent>] usd_per_credit` rung (unset ⇒ cost `—`, a count with nowhere to
-convert; `0.0` ⇒ `$0.0000`, a real configured zero). No manifest row exists for a
+`(agent, surface, session)`, still independent in the direction that matters — a
+credits row can never perturb a *token cell that belongs to a call chat*, it only ever
+adds a row of its own. Rendered with `calls` and all four token cells `—` (text) /
+empty (CSV) and `credits` filled. No manifest row exists for a
 kiro-CLI conversation today, so its title always falls back to the session id
 (`named=False`) — a future store-side title is a follow-up, not this change.
 
@@ -74,7 +80,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from cage import agents as _agents
-from cage import authorcapture, creditprice, ledger, manifest, prices, report
+from cage import authorcapture, ledger, manifest, report, units
 from cage.constants import CHATS_DEFAULT_ROWS
 
 KIRO_IDE_LABEL = "kiro (no session identity)"
@@ -185,8 +191,7 @@ def _new_bucket() -> dict:
     # `credits` starts at None, not 0.0 — the same absent-vs-recorded-zero distinction
     # the call field carries (`schema.make_call`). A chat where no request recorded a
     # credit renders `—`; a chat that recorded 0.0 renders `0.00`, and they are
-    # different facts. `basis` tallies which ladder rung actually paid, per rung label,
-    # so `priced_via` can name a mixed chat instead of picking a winner.
+    # different facts.
     # `premium` is still summed and still in the payload (so `--json`, the raw-data
     # surface, keeps the recorded fact) but is rendered by neither table — precision in
     # the data, brevity in the display, the same split shas already follow.
@@ -194,8 +199,7 @@ def _new_bucket() -> dict:
     # call: it never mixes with a call bucket (the key discriminator above), and every
     # renderer reads this flag to dash the token cells instead of printing a lying 0.
     return {"calls": 0, "tokens_in": 0, "cached_in": 0, "cache_write_in": 0,
-            "tokens_out": 0, "premium": 0, "cost": 0.0, "unpriced_calls": 0,
-            "unpriced_tokens": 0, "credits": None, "credits_calls": 0, "basis": {},
+            "tokens_out": 0, "premium": 0, "credits": None, "credits_calls": 0,
             "from_credits": False}
 
 
@@ -223,21 +227,15 @@ def summarize(root: Path, pol: dict, since: str | None = None,
         b["cache_write_in"] += c.get("cache_write_in", 0)
         b["tokens_out"] += c.get("tokens_out", 0)
         b["premium"] += c.get("premium", 0)
-        rec = creditprice.recorded(c)
-        if rec is not None:
-            b["credits"] = (b["credits"] or 0.0) + rec
+        # A recorded credit is kept as a COUNT, verbatim. The None sentinel is
+        # preserved: absent and a recorded 0.0 are different billing facts.
+        rec = c.get("credits")
+        if rec is not None and not isinstance(rec, bool) and isinstance(rec, (int, float)):
+            b["credits"] = (b["credits"] or 0.0) + float(rec)
             b["credits_calls"] += 1
-        usd, match, _ = prices.call_usd_match(pol, c)
-        if (basis := creditprice.via(match)):
-            b["basis"][basis] = b["basis"].get(basis, 0) + 1
-        if match == "none":
-            b["unpriced_calls"] += 1
-            b["unpriced_tokens"] += c.get("tokens_in", 0) + c.get("tokens_out", 0)
-        else:
-            b["cost"] += usd
 
     # Credits rows (kiro-CLI conversations, CHATS-CREDITS): a separate bucket, never
-    # folded into a call bucket's token/cost sums — the discriminator in `_bucket_key`
+    # folded into a call bucket's token sums — the discriminator in `_bucket_key`
     # guarantees that even if a future agent's session id collided with a call chat's.
     for cr in credit_rows:
         b = buckets.setdefault(_bucket_key(cr, credits=True), _new_bucket())
@@ -246,10 +244,6 @@ def summarize(root: Path, pol: dict, since: str | None = None,
         if isinstance(cred, bool) or not isinstance(cred, (int, float)):
             continue
         b["credits"] = (b["credits"] or 0.0) + float(cred)
-        rate = creditprice.rate_for(pol, cr)
-        if rate is not None:
-            b["cost"] += round(float(cred) * rate, 6)
-            b["basis"][creditprice.CREDITS] = b["basis"].get(creditprice.CREDITS, 0) + 1
 
     authorship = _authorship_map(root)
     # A session that appears under more than one surface: provenance carries no surface,
@@ -280,8 +274,9 @@ def summarize(root: Path, pol: dict, since: str | None = None,
 
     return {"since": since, "agent": agent, "rows": rows,
             "legacy_human": legacy_human,
-            "unpriced_calls": sum(r["unpriced_calls"] for r in rows),
-            "unpriced_tokens": sum(r["unpriced_tokens"] for r in rows),
+            # The agents actually present, so a renderer can apply the cross-agent
+            # credit law (`units.summable`) without re-deriving the set.
+            "agents_present": sorted({r["agent"] for r in rows if r["agent"]}),
             "any_calls": bool(raw_calls) or bool(raw_credits)}
 
 
@@ -356,14 +351,18 @@ def _label(r: dict) -> str:
 
 
 def _credits_cell(b: dict) -> str:
-    """The billed-credits cell: `—` when this chat recorded none, else the 2dp sum.
+    """The billed-credits cell: `—` when this chat has no credits, else the 2dp sum.
 
-    `—` reads as *not recorded*, which is the honest statement for a store that only
-    persists credits on some requests (and for claude/kiro, which never do). It is
-    deliberately NOT `0.00` — a recorded zero is a real billing fact and gets that cell
-    to itself. The dash never reaches CSV (`render_csv` emits an empty cell)."""
+    Two different `—`s live here and the footer distinguishes them (`units.ABSENT`):
+    an agent that records **no credit unit at all** (claude) versus a chat on an agent
+    that does, which simply recorded none. Both are `—` in the cell — there is one
+    column width — but never `0.00`: a recorded zero is a real billing fact and gets
+    that cell to itself. The dash never reaches CSV (`render_csv` emits an empty
+    cell)."""
     from cage.display import DASH
-    return DASH if b.get("credits") is None else creditprice.fmt(b["credits"])
+    if b.get("credits") is None:
+        return DASH
+    return f"{b['credits']:,.2f}"
 
 
 def _agent_cell(b: dict) -> str:
@@ -387,21 +386,22 @@ def _num_cell(r: dict, field: str) -> str:
     return DASH if r.get("from_credits") else render.tok(r[field])
 
 
-def _cost_cell(b: dict) -> str:
-    from cage import render
-    from cage.display import DASH
-    if b.get("from_credits"):
-        # No token×table fallback exists for a credits-only chat — unrated means
-        # nothing priced it at all, and that is `—`, never a fabricated `$0.0000`.
-        # A configured `0.0` rate DID price it, so `basis` carries the rung and this
-        # renders the real zero.
-        return render.usd(b["cost"]) if b["basis"].get(creditprice.CREDITS) else DASH
-    if b["unpriced_calls"] and b["unpriced_calls"] == b["calls"] and not b["cost"]:
-        return DASH
-    cell = render.usd(b["cost"])
-    if b["unpriced_calls"]:
-        cell += f" (+{b['unpriced_calls']} unpriced)"
-    return cell
+def _unit_absence_notes(shown: list[dict]) -> list[str]:
+    """One footer line per (agent, unit) absence actually on screen, in the unit
+    policy's own words (`units.ABSENT`).
+
+    **The two absences must not read alike** — claude having no credit concept is a
+    vendor law; kiro having no IDE token store is a missing file a future release can
+    ship. A shared `—` in the cell is a column-width fact; the *reason* is what tells
+    the two apart, and it is why neither renders as `0`."""
+    seen = {r["agent"] for r in shown if r.get("agent")}
+    out = []
+    for agent in sorted(seen):
+        for unit in units.UNITS:
+            reason = units.absent_reason(agent, unit)
+            if reason:
+                out.append(f"· {agent} {unit}: — ({reason})")
+    return out
 
 
 def _authorship_footer(foot, shown: list[dict]) -> None:
@@ -432,7 +432,7 @@ def _authorship_footer(foot, shown: list[dict]) -> None:
 
 def render_chats(data: dict, disp=None, show_all: bool = False,
                  kiro_route: str = "") -> str:
-    """The text table (spec: tokens by default, `--usd` adds cost). ``kiro_route`` is
+    """The text table (tokens and credits — the two units cage records). ``kiro_route`` is
     the already-computed `report.kiro_routed_line` (read at the CLI boundary, like
     `report.render_report`) — why a project view shows no kiro-IDE rows (ADR 0006)."""
     from cage import display as _d
@@ -455,8 +455,6 @@ def render_chats(data: dict, disp=None, show_all: bool = False,
     # lose that. A field with no display is fine; a column that can only mislead is not.
     head = ["chat", "agent", "surface", "calls", "tokens_in", "cached_in",
             "cache_write", "tokens_out", "credits", "agent%"]
-    if disp.usd:
-        head.append("cost")
     rights = set(range(3, len(head)))
 
     table_rows = []
@@ -465,8 +463,6 @@ def render_chats(data: dict, disp=None, show_all: bool = False,
                  _num_cell(r, "tokens_in"), _num_cell(r, "cached_in"),
                  _num_cell(r, "cache_write_in"), _num_cell(r, "tokens_out"),
                  _credits_cell(r), _agent_cell(r)]
-        if disp.usd:
-            cells.append(_cost_cell(r))
         table_rows.append(cells)
 
     title = "Chats"
@@ -474,16 +470,21 @@ def render_chats(data: dict, disp=None, show_all: bool = False,
         title += f" · agent {data['agent']}"
     if data.get("since"):
         title += f" · since {data['since']}"
-    if disp.usd:
-        title += " · usd"
     out = f"{title}\n\n" + render.table(head, table_rows, rights=rights)
 
     foot = _d.Footer()
     if cut:
         foot.gap(f"· {cut} more chat(s) — --all to show")
-    if any(r["credits"] is not None for r in shown):
-        foot.footnote("· cost basis per row: credits×rate where recorded, else "
-                      "token×table (`—` = not recorded) — `cage query copilot-credits`")
+    for line in _unit_absence_notes(shown):
+        foot.footnote(line)
+    # THE CROSS-AGENT LAW (units.py): a credits column spanning two agents is two
+    # different units sharing a heading. The column stays — per-chat credits are each
+    # correct — but the view says outright that they do not add up, so no reader (and
+    # no agent relaying this table) totals them.
+    _credit_agents = {r["agent"] for r in shown
+                      if r.get("credits") is not None and r.get("agent")}
+    if not units.summable(units.CREDITS, _credit_agents):
+        foot.caveat(units.cross_agent_note(_credit_agents))
     _authorship_footer(foot, shown)
     if data.get("legacy_human"):
         n = data["legacy_human"]
@@ -498,14 +499,6 @@ def render_chats(data: dict, disp=None, show_all: bool = False,
                     "counts, so token cells are '—' (`cage query copilot-credits`)")
     if kiro_route:
         foot.caveat(kiro_route)
-    if data.get("unpriced_calls"):
-        if disp.usd:
-            foot.warn(report.unpriced_line({"_": {"calls": data["unpriced_calls"],
-                                                   "tokens": data["unpriced_tokens"]}}))
-        else:
-            n = data["unpriced_calls"]
-            foot.gap(f"· {n} call{'s' if n != 1 else ''} unpriced — matters when you "
-                     f"view $ (`--usd`; cage prices unpriced)")
     tail = foot.render()
     return f"{out}\n\n{tail}" if tail else out
 
@@ -517,19 +510,15 @@ def _csv_num(r: dict, field: str):
 
 
 def _chat_method(r: dict) -> str:
-    """The CSV `method` tag for one chat row.
+    """The CSV `method` tag for one chat row — **`measured` throughout**.
 
-    `creditprice.method_for` alone reads an empty `basis` as `measured` — right for a
-    call bucket (no credits-priced row means every dollar is a straight token
-    reprice), wrong for a credits-only bucket with no configured rate: nothing there
-    was ever token-priced, so `measured` would overclaim. An unrated credits-only chat
-    instead reports its **row's own recorded method** (`schema.make_credit`'s
-    `estimated` — the credit count is real, its use as a token/cost stand-in is not);
-    a rate-priced one is `modeled`, same as rung 1 everywhere else (method law: the
-    weaker tag wins)."""
-    if r.get("from_credits"):
-        return "modeled" if r["basis"].get(creditprice.CREDITS) else "estimated"
-    return creditprice.method_for(r["basis"])
+    Every figure in this view is now a recorded count read back verbatim: tokens from
+    the metric ledger, credits from the provider's own row. The `modeled`/`estimated`
+    grades this used to carry existed because a credit was being turned into a *dollar*
+    at a rate the user configured and cage could not check. With no dollar, there is no
+    inference left to grade down — and kiro's credits are retagged `measured` at the
+    substrate for the same reason (USAGE-ONLY P3, `schema.make_credit`)."""
+    return "measured"
 
 
 def render_csv(data: dict) -> str:
@@ -539,15 +528,12 @@ def render_csv(data: dict) -> str:
     from cage import csvout
     head = ["chat", "agent", "surface", "session", "calls", "tokens_in", "cached_in",
             "cache_write_in", "tokens_out", "credits", "agent_lines",
-            "residual_lines", "agent_pct", "cost_usd", "priced_via", "unpriced_calls",
-            "unpriced_tokens", "method"]
+            "residual_lines", "agent_pct", "method"]
     rows = [[r["title"], r["agent"], r["surface"], r["session"],
              _csv_num(r, "calls"), _csv_num(r, "tokens_in"), _csv_num(r, "cached_in"),
              _csv_num(r, "cache_write_in"), _csv_num(r, "tokens_out"),
              "" if r["credits"] is None else round(r["credits"], 6),
-             *_authorship_csv(r),
-             round(r["cost"], 6), creditprice.basis_of(r["basis"]), r["unpriced_calls"],
-             r["unpriced_tokens"], _chat_method(r)]
+             *_authorship_csv(r), _chat_method(r)]
             for r in data["rows"]]
     return csvout.table(head, rows)
 

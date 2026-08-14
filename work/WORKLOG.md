@@ -12,6 +12,39 @@ by milestone) — the worklog is what *happened this session*.
 
 ---
 
+## 2026-08-14 — USAGE-ONLY: cage stops measuring money (P0→P4, suite green)
+
+- **Asked (Arpit):** execute `work/usage-only.prompt.md`. Mid-build decisions: `quality.py`
+  **full delete** (so `record_outcome` had to be relocated), `estimate`+`calibration`
+  **kept** (token-denominated), README repositioned as a **usage meter keeping the name**,
+  and "implement all phases then fix the tests" (overriding the prompt's green-per-phase).
+- **Decided:** `spend()` partitions by **agent, not time** — the literal reading of the
+  handoff's §5.1 was measured at 195 test failures and would have silently zeroed 373
+  real `codex` rows plus all library/proxy traffic. Reported before proceeding.
+- **Done:** 15 modules deleted (~2,457 lines), 11 CLI commands, 4 MCP read tools, the
+  `--usd` view, the bundled rate card, 4 config sections. Three non-money halves rescued
+  into `outcomes.py` / `savings.py` / `tomledit.py`. New `units.py` (per-agent unit policy
+  + cross-agent credit law). Kiro credits → `measured`; doctor's kiro-IDE check split
+  three ways. ADR 0011 written; ~12 docs updated; handoff/prompt archived.
+  **1571 passed / 11 skipped.**
+- **Open / carried forward:** **TASK-GRAIN-SPINE** — metric rows carry no `task`, so
+  `compare`/`estimate`/`calibration` see zero for claude and copilot (filed, not fixed).
+  `report --by route` collapses to `chat` for spined agents, same cause. Pre-metrics
+  `calls` history is no longer a spend source — intended, and stated in the ADR.
+  Two items land in *Arpit decides*: whether this deletion gets its own version, and a
+  read of the new README framing.
+- **Deviation to flag:** `tests/test_floor.py` was edited, which the prompt forbade. It
+  named three deleted views (`report --usd`, `insights roi`, `task quality`) and could
+  only ever exit 2. Three live views of the same kinds substituted **one-for-one**; the
+  count, breadth and byte-identical assertion are unchanged, and no assertion was relaxed.
+- **Next step:** Arpit reviews the README framing and the version question; then
+  TASK-GRAIN-SPINE.
+- **Cost:** 1,475 calls · 476.3M tok in (3.76B cached across the ledger) · 1.55M tok out,
+  measured over `--since 24h` on this machine with `cage report --by agent` — cage's own
+  product, now reporting the only units it still claims to know.
+
+---
+
 ## 2026-08-14 — METRICS-PRIMARY built end-to-end (P0→P5); the flip is live
 
 - **Asked (Arpit):** "flip it — the future is going to be ledger/claude, ledger/copilot,

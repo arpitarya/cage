@@ -34,7 +34,7 @@ per-chat facts at three grains:
 
 | source | store | what lands |
 |---|---|---|
-| `ide` | IDE `dev_data/devdata.sqlite`, table `tokens_generated` (SQLite, read-only) | per-call tokens — the SAME counter the jsonl already reads, plus a `timestamp` and a cursorable `id` the jsonl never carried |
+| `ide` | IDE `dev_data/devdata.sqlite`, table `tokens_generated` (SQLite, read-only) — **this file does not exist on any Kiro install probed so far** (field probe 2026-08-14: `dev_data/` holds only `tokens_generated.jsonl`), so this source resolves **zero rows** | per-call tokens, *if the store ever ships*: the SAME counter the jsonl reads, plus a `timestamp` and a cursorable `id` the jsonl never carried |
 | `cli-conv` | CLI SQLite store, per conversation | credits (`usage_info` sum, None-sentinel when the list is absent), context%, turn count — cumulative-verbatim, like `credits` rows |
 | `cli-turn` | same store, per `history[]` turn | populated timing/size/tool-use fields (`chunks`, `prompt_bytes`, `response_bytes`, `tool_uses`, `context_pct`), PLUS the token slots that are NULL on every real store probed so far — the **upgrade-watch** |
 
@@ -47,9 +47,22 @@ sink (machine ledger); `cli-conv`/`cli-turn` rows ride the same workspace scopin
 
 ## Known gaps (open)
 
+- **Kiro has NO token spine, and cage says so rather than showing a zero** (v0.51,
+  [ADR 0011](adr/0011-cage-measures-usage-not-cost.md)). `SPEND_SOURCES["kiro"]` is
+  empty and `ledger.ABSENT_SPINES` carries the reason — *"no IDE token store on this
+  install"* — which every view renders as `—` beside the number it replaces.
+  - Through v0.50 that entry pointed at `devdata.sqlite`, **a file that is not there**:
+    it read as a live source while resolving zero rows forever (KIRO-IDE-METRIC-ROW).
+  - Emitting an `ide` spine from `tokens_generated.jsonl` instead — the file the *calls*
+    route already reads — was **rejected on the field probe**: 28 rows totalling
+    1,576 in / **0 out**, model `"agent"` on every row, with a byte-identical 6-row
+    block repeated. It is not summable, so a spine built on it would be fabricated.
+  - `transcript.parse_kiro_ide_metrics` is deliberately **kept** for the day a Kiro ships
+    the store, and `cage doctor`'s kiro-IDE check now distinguishes **db absent /
+    table missing / column drift** so the flip announces itself.
 - **IDE log is coarse by the vendor's doing** — output tokens usually 0, model
   usually the generic `"agent"` (real 16-call probe: 198 in / 0 out). Not fixable
-  from this store, `ide`-source metrics rows included.
+  from this store.
 - **Cache tokens + per-chat IDE credits: persisted by NO kiro store.** They exist
   only on the wire (`metadataEvent.tokenUsage`, `meteringEvent`) — proxy capture is
   the only path; permanently honest-empty from disk. Not a cage gap.
@@ -59,10 +72,11 @@ sink (machine ledger); `cli-conv`/`cli-turn` rows ride the same workspace scopin
 - **No read surface yet for `.cage/ledger/kiro/`** — a `cage insights kiro` view or
   new chats-view columns, and `cage data export --csv kiro`, are parked in
   `work/OPEN-WORK.md`, not built.
-- **Two real-store probes still pending** (`devdata.sqlite`'s exact column list
-  beyond the four assumed; whether IDE session JSONs embed per-message usage) —
-  research doc §6 has the commands; the IDE parser is written to survive either
-  answer (explicit-column SELECT, fail-open).
+- **One real-store probe still pending** (whether IDE session JSONs embed per-message
+  usage). The other — `devdata.sqlite`'s column list — was **answered on 2026-08-14: the
+  file does not exist**, which is why kiro has no token spine (above). The IDE parser
+  survives either answer (explicit-column SELECT, fail-open) and doctor's three-way probe
+  reports which of *absent / no table / column drift* is actually the case.
 
 ## Executive summary (for the meeting)
 

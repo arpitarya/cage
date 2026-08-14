@@ -11,38 +11,30 @@ from cage.explain_types import Explanation
 # ── the registry — fixed order is the tie-break; numbers live in `formula` ──────
 REGISTRY: tuple[Explanation, ...] = (
     Explanation(
-        "cost", ("cost", "price", "dollar", "usd", "value", "calculated", "spend",
-                 "recompute", "est_cost", "billed", "charge"),
-        "what a recorded call costs in USD",
-        "usd = (input·in_price + cached·cache_read + output·out_price) / {per_million}\n"
-        "  recompute from tokens × policy when the model is priced; else fall back to\n"
-        "  the stored est_cost_usd (a provider cage can't tokenize). Derive-time only —\n"
-        "  the ledger is never rewritten.",
-        ("cage/prices.py", "cage/policy.py", "cage.toml [prices]"),
-        "measured — it costs the call that actually ran, from its recorded tokens."),
-    Explanation(
         "saved", ("saved", "savings", "reduction", "shrink", "avoided"),
-        "the tokens/USD a tool kept out of the prompt (GROSS)",
-        "saved = raw_alternative − actual   (USD via the call's model price)\n"
-        "  GROSS: the cost of USING the tool — the invoking turn, the context a hook\n"
-        "  injected — is NOT subtracted. `cage query gross-vs-net` for the net.",
-        ("cage/convert.py", "cage/attribution.py", "cage/netsaved.py"),
+        "the tokens a tool kept out of the prompt (GROSS)",
+        "saved = raw_alternative − actual   (in the receipt's own unit — usually tokens)\n"
+        "  GROSS: the tokens spent USING the tool — the invoking turn, the context a\n"
+        "  hook injected — are NOT subtracted. `cage query gross-vs-net` explains.",
+        ("cage/savings.py", "cage/attribution.py", "cage/schema.py"),
         "inherits the receipt's method — measured only if the tool truly measured it."),
     Explanation(
         "gross-vs-net", ("gross", "net", "cost-of-use", "net-saved", "attributable",
                          "over-claim", "excluded", "using", "adjacent", "window"),
-        "why `saved` is gross, and how the task-level net subtracts the cost of use",
-        "gross    = raw_alternative − actual          (the avoided read — excludes using it)\n"
-        "  cost of use = Σ call_usd(c) over the DISTINCT calls joined to the receipt's task\n"
-        "                whose ts lies within ±{net_window_s}s of ANY of that tool's receipts\n"
-        "                on that task (union per task — an adjacent call counts once)\n"
-        "  net      = gross − cost of use     (covered tasks only; confidence {net_confidence})\n"
-        "  A task with no in-window call is UNCOVERED: net says unavailable, never = gross.\n"
-        "  Per-query netting is impossible — shim receipts carry a task but no call.",
-        ("cage/netsaved.py", "cage/verdict.py", "cage/constants.py"),
-        "gross is modeled (a counterfactual); the subtrahend is measured (recorded tokens\n"
-        "  repriced); net is modeled at its own, lower confidence — it stacks a time-window\n"
-        "  join on top of gross's counterfactual, so it can never be the more credible of the two."),
+        "why `saved` is GROSS, and why cage no longer reports a net",
+        "gross = raw_alternative − actual     (the avoided read — excludes USING the tool)\n"
+        "  The tokens a tool costs to use — the turn that invoked it, the context a hook\n"
+        "  injected — are NOT subtracted. So a large `saved` and a session that consumed\n"
+        "  more tokens overall are BOTH true, and cage prints the caveat every time.\n"
+        "\n"
+        "  There is no net figure any more (USAGE-ONLY, ADR 0011). The task-level net\n"
+        "  priced every in-window call to a common unit, which was a dollar computation;\n"
+        "  per-query netting was never possible at all, because a shim receipt carries a\n"
+        "  task but no call. Cage reports gross only, and says so, rather than reporting\n"
+        "  a net it cannot substantiate.",
+        ("cage/savings.py", "cage/report.py", "cage/attribution.py"),
+        "gross inherits the receipt's own method — modeled for a counterfactual, and\n"
+        "  never upgraded to measured by being printed next to recorded tokens."),
     Explanation(
         "marginal-attribution", ("marginal", "attribution", "attribute", "attrib",
                                  "per-tool", "fixed", "order", "overlap", "credit",
@@ -53,35 +45,26 @@ REGISTRY: tuple[Explanation, ...] = (
         ("cage/attribution.py", "cage/matrix.py", "cage.toml [tools.order]"),
         "per-row method = the least-trusted receipt for that tool (honest worst-case)."),
     Explanation(
-        "matrix", ("matrix", "counterfactual", "permutation", "stack",
-                   "combination", "scenario"),
-        "the 2ⁿ what-would-each-stack-cost table",
-        "enumerate 2^n on/off tool permutations (n ≤ {max_tools}); input tokens =\n"
-        "  base + Σ(actual if on else raw_alternative), costed at the task's model.",
-        ("cage/matrix.py", "cage/constants.py"),
-        "only the configuration actually run is measured; every other cell is modeled\n"
-        "  (estimated if it leans on an estimated receipt) — no projection is an invoice."),
-    Explanation(
         "compare-delta", ("compare", "comparison", "delta", "group", "grouped",
                           "median", "iqr", "observational", "a/b", "ab",
                           "baseline", "agent-only", "cheaper"),
         "how `cage insights compare` contrasts closed-task groups by observed stack",
         "group closed tasks by stack signature (joined receipt tools; task-id join,\n"
         "  session-window fallback); per group report n · median · IQR of measured\n"
-        "  tokens + USD; delta = median(stack) − median(agent-only), same non-stack\n"
+        "  tokens; delta = median(stack) − median(agent-only), same non-stack\n"
         "  keys. Groups below n = {min_compare_n} render a refusal, never a number.",
         ("cage/compare.py", "cage/taskgroup.py", "cage/constants.py"),
-        "group totals are measured (recorded tokens, derive-time repricing); the delta\n"
+        "group totals are measured (recorded tokens); the delta\n"
         "  is estimated — different tasks, nothing randomized, an observed difference\n"
         "  and never a causal claim (the caveat renders on every output)."),
     Explanation(
-        "estimate-band", ("estimate", "estimated-cost", "band", "predict", "forecast-task",
+        "estimate-band", ("estimate", "estimated-tokens", "band", "predict", "forecast-task",
                           "pre-task", "upfront", "before", "how-much-will"),
-        "how `cage insights estimate` bands an unrun task's cost",
+        "how `cage insights estimate` bands an unrun task's token use",
         "band = median + IQR of measured totals over closed tasks matching the exact\n"
         "  keys (scope / label / agent) — no similarity scoring, no ML. Below\n"
         "  n = {min_estimate_n} matching tasks the command refuses. --record stamps\n"
-        "  est_tokens/est_usd/est_n + the token band bounds onto the open task row.",
+        "  est_tokens/est_n + the token band bounds onto the open task row.",
         ("cage/estimate.py", "cage/taskgroup.py", "cage/constants.py"),
         "modeled — history applied to a task that hasn't run is a reconstruction,\n"
         "  never an invoice; its empirical confidence is `cage insights calibration`'s hit-rate."),
@@ -97,21 +80,6 @@ REGISTRY: tuple[Explanation, ...] = (
         "measured — an observed frequency of recorded estimates vs recorded actuals;\n"
         "  this rate *is* the estimator's confidence level (it never self-reports one)."),
     Explanation(
-        "verdict-composition", ("verdict", "saving-or-costing", "worth-it", "keep",
-                                "drop", "net", "break-even", "breakeven", "compose"),
-        "how `cage insights verdict <tool>` reaches SAVING / COSTING / INSUFFICIENT DATA",
-        "a pure composer — no new statistics: net = roi.gross − roi.own_cost over the\n"
-        "  window (verdict = its sign); marginal saving from attribution's latest task;\n"
-        "  drift from regression; redo-rate from quality;\n"
-        "  break-even = net / receipts. ≈$/mo scales net by the receipts' own time-span\n"
-        "  (≥7 days, no clock). Missing input ⇒ INSUFFICIENT DATA, never an approximation.\n"
-        "  NET-2: the cost of USING the tool is excluded unless `netsaved` covers every\n"
-        "  receipt in the window. That term is ≥ 0, so COSTING stays safe to assert but a\n"
-        "  non-negative net reads SAVING (GROSS) / BREAK-EVEN (GROSS), naming the exclusion.",
-        ("cage/verdict.py", "cage/roi.py", "cage/netsaved.py", "cage/regression.py"),
-        "the headline is modeled (it inherits the receipts' modeled savings); every\n"
-        "  input line renders its own tag — measured drift, measured redo-rate."),
-    Explanation(
         "study-pairing", ("study", "fleet", "machines", "laptops", "paired", "pairing",
                           "phase", "enrollment", "bundle", "week-over-week"),
         "how the fleet study pairs machines and computes its delta",
@@ -125,14 +93,6 @@ REGISTRY: tuple[Explanation, ...] = (
         ("cage/study.py", "cage/machine.py", "cage/constants.py"),
         "per-machine-day totals are measured; the paired delta is estimated —\n"
         "  recorded phase intent across different weeks, never a randomized experiment."),
-    Explanation(
-        "roi", ("roi", "return", "worth", "tool-cost", "latency", "investment"),
-        "GROSS saved $ per tool vs that tool's own cost + latency",
-        "per tool: Σ gross_saved_usd  vs  Σ meta.tool_cost_usd  and  Σ meta.added_latency_ms\n"
-        "  net of own cost = gross − own cost (a deterministic tool declares $0 own cost —\n"
-        "  which is NOT the same as free: the cost of USING it is in neither column).",
-        ("cage/roi.py", "cage/convert.py", "cage/netsaved.py"),
-        "inherits each receipt's method; the gross-$ side is only as trusted as its receipts."),
     Explanation(
         "token-heuristic", ("token", "tokens", "chars", "divisor", "heuristic",
                             "tokenize", "tokenizer", "approx"),
@@ -155,14 +115,6 @@ REGISTRY: tuple[Explanation, ...] = (
         "  measured = an actual invoice/run · modeled = reconstructed · estimated = a guess.",
         ("cage/constants.py", "cage/schema.py", "cage/matrix.py"),
         "method is sacred — a projection never reads as measured (cage's core honesty rule)."),
-    Explanation(
-        "budget", ("budget", "ceiling", "cap", "session", "daily", "exceed", "limit"),
-        "session/day spend vs the policy ceilings",
-        "Σ call_usd over the window vs [budgets] session_usd / daily_usd; on_exceed = warn|block.",
-        ("cage/budget.py", "cage/prices.py", "cage.toml [budgets]"),
-        "measured — totals real recorded calls; the ceiling is policy, not a guess."),
-
-    # ── concept entries — how cage itself works, not how a value is computed ───
     Explanation(
         "capture-troubleshooting",
         ("capture", "captured", "capturing", "nothing", "missing", "empty",
@@ -259,7 +211,7 @@ REGISTRY: tuple[Explanation, ...] = (
          "fallback", "migrate-config"),
         "which config file cage reads, and the policy.toml → cage.toml rename",
         "the project config is `.cage/cage.toml` — user-economics the derived views\n"
-        "  read at compute time (prices, budgets, pipeline order, capture\n"
+        "  read at compute time (budgets, pipeline order, capture\n"
         "  switches). It was `policy.toml` through v0.35; the rename is NON-breaking:\n"
         "    · a lone legacy `policy.toml` is still READ (fallback) and MIGRATED to\n"
         "      `cage.toml` on the next `cage setup` (idempotent, never destructive);\n"
@@ -271,33 +223,6 @@ REGISTRY: tuple[Explanation, ...] = (
         ("cage/paths.py", "cage/initcmd.py", "cage/cleanup.py"),
         "n/a — describes the config-file contract, not a number.",
         kind="concept", plan_ref="config-surfaces-and-rename.handoff.md"),
-    Explanation(
-        "prices-file",
-        ("prices-file", "prices-toml", "prices.toml", "vendor-prices", "rate-card",
-         "split", "credits", "where-prices-live"),
-        "which file holds model prices, and why they split out of cage.toml",
-        "model prices are a VENDOR rate card — researched at build time, shipped in the\n"
-        "  bundle, replaced wholesale by `cage prices sync`. Your policy (budgets,\n"
-        "  pipeline order, sources, and ROUTING decisions — [alias],\n"
-        "  [tools.<tool>] price_at) is hand-edited and preserved. Opposite lifecycles,\n"
-        "  so they live in separate files: **vendor facts move, routing decisions stay**.\n"
-        "    · `.cage/prices.toml` holds every [prices.<provider>.<model>] row, [credits],\n"
-        "      and the [meta] prices_version/prices_date counters (project {prices_version_project}).\n"
-        "    · `.cage/cage.toml` keeps everything else — including [alias] and tool routes,\n"
-        "      and [meta] cage_version/policy_version.\n"
-        "  Resolution mirrors the cage.toml rename (one place, `paths.Footprint.prices`):\n"
-        "    · a legacy project with prices still inline in `cage.toml` is READ untouched\n"
-        "      (fallback) and MIGRATED to `prices.toml` on the next `cage setup` —\n"
-        "      money-neutral (rows equal to the bundle drop, customizations become\n"
-        "      overrides), idempotent, never destructive;\n"
-        "    · with BOTH carrying prices, `prices.toml` wins — `cage doctor` names the\n"
-        "      ignored in-cage.toml block and a one-line stderr warning fires at load;\n"
-        "    · `cage prices set`/`sync` write `prices.toml`; `alias`/`route-tool` write\n"
-        "      `cage.toml`; `policy.load` still returns ONE merged dict, so the money\n"
-        "      resolves identically either way. `cleanup` protects both files.",
-        ("cage/paths.py", "cage/policy.py", "cage/initcmd.py"),
-        "n/a — describes the prices-file contract, not a number.",
-        kind="concept", plan_ref="prices-toml.plan.md §3"),
     Explanation(
         "capture-on-read",
         ("capture-on-read", "on-read", "lazy", "sweep", "read-sweep", "hookless",
@@ -378,7 +303,7 @@ REGISTRY: tuple[Explanation, ...] = (
         kind="concept", plan_ref="§4.2"),
     Explanation(
         "matrix-concept", ("permutation", "counterfactual", "2^n", "every-cell"),
-        "the 2ⁿ what-would-each-stack-cost table, and what's real in it",
+        "the 2ⁿ what-would-each-stack-use table, and what's real in it",
         "every on/off permutation of up to {max_tools} tools is enumerated, but only\n"
         "  the cell matching what actually ran is method=measured — every other cell\n"
         "  is a reconstruction (modeled, or estimated if it leans on an estimated\n"
@@ -404,10 +329,10 @@ REGISTRY: tuple[Explanation, ...] = (
         "  claim is first-party. External adapter: cage meters a third-party tool from\n"
         "  the outside (e.g. `cage data graphify -- graphify query …`) without that tool\n"
         "  knowing cage exists — the receipt is filed by cage's wrapper, not the tool.\n"
-        "  Dollars: a receipt linked to a call prices at that call's model; a\n"
-        "  call-less token receipt prices via the resolution ladder — see\n"
-        "  `receipt-pricing` (price_at → task-model → UNPRICED).",
-        ("cage/schema.py", "cage/graphifymeter.py", "cage/receiptprice.py"),
+        "  Units: a receipt is denominated in its OWN unit (tokens, ms, gco2) and\n"
+        "  cage converts nothing between them. Since USAGE-ONLY (ADR 0011) there is\n"
+        "  no currency to convert INTO either.",
+        ("cage/schema.py", "cage/graphifymeter.py", "cage/savings.py"),
         "n/a — describes two receipt-filing strategies, not a number.",
         kind="concept", plan_ref="§4.5"),
     Explanation(
@@ -499,7 +424,7 @@ REGISTRY: tuple[Explanation, ...] = (
                            "constants-vs-policy", "audit-layer"),
         "the three places cage keeps its numbers, never mixed",
         "contract = the closed enums in schema.py ({methods}) · policy = user\n"
-        "  economics in cage.toml (prices, budgets, pipeline order) ·\n"
+        "  routing + behaviour in cage.toml (pipeline order, budgets, capture) ·\n"
         "  constants = code heuristics that must stay reviewable but aren't config\n"
         "  (chars-per-token, the matrix ceiling, the method trust ranking, the\n"
         "  confidence fallback) — see constants.py.",
@@ -523,137 +448,21 @@ REGISTRY: tuple[Explanation, ...] = (
         "n/a — describes the on-disk layout + aggregation, not a number.",
         kind="concept", plan_ref="§3.6"),
     Explanation(
-        "pricing-match", ("pricing-match", "match-kind", "exact", "family", "alias",
-                          "self", "resolve", "price-row", "matched", "footnote"),
-        "how a call's model resolves to a price row (exact → alias → family → self → none)",
-        "resolution order over this policy's {n_price_rows} price rows:\n"
-        "  exact — the raw (provider, model) key has its own row: an invoice.\n"
-        "  alias — an explicit [alias] route (router pseudo-models like copilot/auto);\n"
-        "    explicit routing beats every heuristic, and a dangling alias is none,\n"
-        "    never a fallback guess.\n"
-        "  family — the same-provider row sharing the most leading segments after\n"
-        "    normalization (route prefixes {route_prefixes} strip · '.' folds to '-' ·\n"
-        "    effort tiers {effort_suffixes} drop); needs ≥ {family_min_segments} shared\n"
-        "    segments, so opus never borrows a sonnet price. Renders with a footnote —\n"
-        "    a normalized match is never allowed to read as exact (method law).\n"
-        "  self — no row, but the provider self-reported est_cost_usd at record time.\n"
-        "  none — UNPRICED: a genuine $0 that must surface, never hide in a total.",
-        ("cage/policy.py", "cage/prices.py", "cage/constants.py"),
-        "measured for exact; alias/family are approximations and carry their footnote."),
-    Explanation(
-        "unpriced", ("unpriced", "zero", "0", "billing", "missing-price",
-                     "counted-as-0", "understated", "no-price-row", "dash",
-                     "em-dash", "—"),
-        "what an UNPRICED cell means and how to fix it",
-        "a call whose model matched none bills $0 — the totals are understated and\n"
-        "  every read surface says so out loud rather than hiding it (a wrong number\n"
-        "  is worse than none). In text tables the cell renders `—` (the ONLY\n"
-        "  meaning of the dash: couldn't price; `$0.0000` is always a real zero),\n"
-        "  the TOTAL carries `(+ unpriced)`, and the full ⚠ block renders in the\n"
-        "  `--usd` view (the token default carries one muted pointer). CSV keeps an\n"
-        "  explicit empty + priced_via=none — the glyph never enters data.\n"
-        "  Fix workflow: `cage prices unpriced` lists each\n"
-        "  offending (provider, model) with call count, token volume, and a\n"
-        "  ready-to-run fix line; find the real rate on the vendor's pricing page\n"
-        "  (cage never fetches — no network on any cage code path), then\n"
-        "  `cage prices set <provider> <model> --input … --output …` or, for a\n"
-        "  router pseudo-model, `cage prices alias`. Caveat: self-costed rows\n"
-        "  (stored est_cost_usd) and receipts keep their recorded values.\n"
-        "  Tool receipts refuse the same way: a call-less token receipt no ladder\n"
-        "  rung prices prints its own ⚠ line with a runnable fix —\n"
-        "  {unpriced_hint}\n"
-        "  (see `receipt-pricing` for the ladder).",
-        ("cage/pricescmd.py", "cage/report.py", "cage/prices.py"),
-        "n/a — the $0 is the absence of a number; fixing it makes the totals honest."),
-    Explanation(
-        "receipt-pricing", ("ladder", "call-less", "price_at", "tool-receipt",
-                            "task-model", "dominant", "rung", "graphify-dollars"),
-        "how a call-less token receipt resolves to dollars (the pricing ladder)",
-        "a token receipt with no resolvable call (graphify/fux shims — the saved\n"
-        "  tokens belong to future calls the shim can't know) prices by a\n"
-        "  deterministic ladder, resolved at derive time (never written back):\n"
-        "  1. price_at — explicit routing: [tools.<tool>] price_at = \"provider/model\",\n"
-        "     written by `cage prices route-tool <tool> --to <provider>/<model>`\n"
-        "     (this policy: {tool_routes}). A dangling route is UNPRICED, never a\n"
-        "     fall-through — the dangling-alias rule.\n"
-        "  2. task-model — the dominant model of the calls joined to the receipt's\n"
-        "     task (task-id calls + session-window adoptions): max Σ tokens_in,\n"
-        "     ties → call count → lexicographic provider/model (a total order).\n"
-        "  3. refusal — UNPRICED, loudly: {unpriced_hint}.\n"
-        "  The USD keeps the receipt's own method; the rung is footnoted in\n"
-        "  roi/attrib text and a `priced_via` CSV column. Receipts with a\n"
-        "  resolvable call never enter the ladder (their path is unchanged).",
-        ("cage/receiptprice.py", "cage/convert.py", "cage/roi.py"),
-        "inherits the receipt's method (modeled, never measured); the rung is "
-        "always visible."),
-    Explanation(
-        "repricing", ("repricing", "reprice", "retroactive", "derive-time",
-                      "recompute", "price-change", "fleet-reprice", "back-price"),
-        "why fixing a price re-prices history without touching the ledger",
-        "pricing is derive-time: report/budget/compare/study recompute every call\n"
-        "  as tokens × the *current* policy row on each run — the ledger stores\n"
-        "  counts, not conclusions, and is never rewritten. So an analyst fixing\n"
-        "  cage.toml re-prices every imported bundle row retroactively: same\n"
-        "  ledger + same policy ⇒ same tables; new policy ⇒ honestly new tables.\n"
-        "  Exceptions that do NOT re-derive: self-costed calls (their stored\n"
-        "  est_cost_usd was the provider's own figure) and receipts' recorded values.",
-        ("cage/prices.py", "cage/convert.py", "cage/ledger.py"),
-        "measured — recomputed from each call's recorded tokens at today's policy."),
-    Explanation(
-        "prices-cli", ("prices-cli", "prices", "price-command", "set-price",
-                       "alias-command", "sync", "price-research", "vendor-page"),
-        "the `cage prices` verbs and the research workflow behind them",
-        "cage prices unpriced — what's billing $0, with a ready-to-run fix line each.\n"
-        "  cage prices set <provider> <model> --input <$/Mtok> --output <$/Mtok>\n"
-        "    [--cache-read <$/Mtok>] — idempotent insert-or-update of a project row.\n"
-        "  cage prices alias - copilot/auto --to anthropic/claude-sonnet-4-6 — route a\n"
-        "    router pseudo-model ('-' is the empty provider such rows stamp).\n"
-        "  cage prices route-tool <tool> --to <provider>/<model> — price a tool's\n"
-        "    call-less token receipts (rung 1 of `receipt-pricing`; --remove deletes;\n"
-        "    a dangling target writes with a warning, unlike alias's refusal).\n"
-        "  cage prices list — every visible row, bundled vs project, which wins.\n"
-        "  cage prices sync — diff vs the installed bundle (dry-run; --update + --yes).\n"
-        "  Research: cage never fetches a price — check the vendor's pricing page (or\n"
-        "  search \"<vendor> <model> API pricing\"), then paste the fix line. `set`/`sync`\n"
-        "  write the project prices.toml ({prices_version_project}); alias/route-tool\n"
-        "  write cage.toml (routing decisions — see `prices-file`). The bundled table\n"
-        "  ({prices_version_bundled}) is read-only at runtime. Derived views re-price\n"
-        "  immediately — the ledger is never rewritten.",
-        ("cage/pricescmd.py", "cage/pricestoml.py", "prices.toml [prices]"),
-        "n/a — describes the command surface, not a number.",
-        kind="concept", plan_ref="§3.3"),
-    Explanation(
-        "effort-tiers", ("effort-tiers", "effort", "reasoning-effort", "high", "tier",
-                         "suffix", "punctuation", "dotted", "normalization"),
-        "why claude-sonnet-4.6 and …-high price at the base row",
-        "reasoning-effort tiers change token *consumption* (already measured per\n"
-        "  call), not the per-token unit price — verified against both vendors'\n"
-        "  pricing pages 2026-07-11. So family matching normalizes before comparing:\n"
-        "  route prefixes ({route_prefixes}) strip, '.' folds to '-' (Copilot stamps\n"
-        "  claude-sonnet-4.6; Anthropic rows are dashed), and trailing effort\n"
-        "  segments ({effort_suffixes}) drop. A tier variant prices at its base row\n"
-        "  with the family footnote — never rendered exact. If a vendor ever bills a\n"
-        "  tier at a genuinely different per-token rate, that tier gets its own\n"
-        "  explicit row instead — normalization must never erase a real price.",
-        ("cage/policy.py", "cage/constants.py"),
-        "n/a — describes name normalization, not a number.",
-        kind="concept", plan_ref="§3.3"),
-    Explanation(
-        "policy-versioning", ("policy-versioning", "meta", "prices-version",
-                              "stale-prices", "bundle-newer", "sync-recommendation"),
-        "how cage knows your price table is stale ([meta] + prices sync)",
-        "the bundled prices carry [meta] prices_version {prices_version_bundled};\n"
-        "  `cage setup` (and the first `cage prices set`) stamp the project prices.toml\n"
-        "  with the bundle it derived from (this project: {prices_version_project}).\n"
-        "  `cage doctor` and `cage prices list` compare the two — a newer bundle\n"
-        "  prints one recommendation line to run `cage prices sync`, never\n"
-        "  auto-applied. sync classifies each row: in-sync (equal), customized\n"
-        "  (cage-managed/marked — never clobbered), or drift (provenance unknown —\n"
-        "  cage can't reconstruct which old bundle a row came from, so it lists the\n"
-        "  diff and applies only rows you confirm per --yes).",
-        ("cage/pricescmd.py", "cage/data/prices.toml [meta]", "cage/doctorcmd.py"),
-        "n/a — describes version bookkeeping, not a number.",
-        kind="concept", plan_ref="§3.3"),
+        "policy-versioning", ("policy-versioning", "meta", "policy-version",
+                              "bundle-newer", "sync-recommendation"),
+        "how cage knows your project config is behind the bundle ([meta] + policy sync)",
+        "the bundled defaults carry [meta] policy_version {policy_version_bundled};\n"
+        "  `cage setup` stamps the project cage.toml with the bundle it derived from\n"
+        "  (this project: {policy_version_project}). `cage doctor` compares the two — a\n"
+        "  newer bundle prints one recommendation line to run `cage policy sync`, never\n"
+        "  auto-applied.\n"
+        "\n"
+        "  The parallel prices_version counter is GONE (USAGE-ONLY, ADR 0011) along with\n"
+        "  the price table it tracked. `policy_version` is deliberately NOT the release\n"
+        "  version: it is a content counter, and bumping it per release would tell every\n"
+        "  project its defaults were stale when nothing changed.",
+        ("cage/policysync.py", "cage/data/cage.toml [meta]", "cage/doctorcmd.py"),
+        "measured — a comparison of two recorded stamps, no inference."),
     Explanation(
         "policy-sync", ("policy-sync", "policy-upgrade", "policy-diff", "tunables",
                         "sync-categories", "neutrality", "policy-defaults",
@@ -671,101 +480,11 @@ REGISTRY: tuple[Explanation, ...] = (
         "  a changed default) → listed, applied only per --yes. Neutrality invariant:\n"
         "  on a zero-customization project, --apply changes no derived view by one\n"
         "  byte — adds only pin defaults policy.load was already merging in. Pricing\n"
-        "  tables delegate to `cage prices sync` (one merge brain); nothing ever\n"
+        "  nothing ever\n"
         "  auto-applies either sync.",
-        ("cage/policysync.py", "cage/pricestoml.py", "cage/data/cage.toml [meta]"),
+        ("cage/policysync.py", "cage/tomledit.py", "cage/data/cage.toml [meta]"),
         "n/a — describes the upgrade verb; it never changes a derived number.",
         kind="concept", plan_ref="§3.10"),
-    Explanation(
-        "prices-freshness", ("prices-freshness", "freshness", "stale", "staleness",
-                             "stale-days", "prices-date", "age", "outdated"),
-        "the three local freshness signals behind the pricing staleness note",
-        "cage never fetches a price, so \"are my prices current?\" is answered from\n"
-        "  local evidence only — three signals, one implementation (freshness.py):\n"
-        "  1. sync drift — project [meta] older than the installed bundle\n"
-        "     (project {prices_version_project} vs bundled {prices_version_bundled})\n"
-        "     → the `cage prices sync` recommendation, verbatim.\n"
-        "  2. bundle age — the bundle's own prices_date ({prices_date_bundled}) is\n"
-        "     more than stale_days (now: {prices_stale_days}; policy [prices]\n"
-        "     stale_days, 0 disables) old → \"check for a newer cage release\": a\n"
-        "     faithfully synced project can still be confidently stale.\n"
-        "  3. UNPRICED presence — calls or call-less token receipts billing $0 →\n"
-        "     the existing runnable hints ({unpriced_hint}).\n"
-        "  Two surfaces render the same lines: `cage doctor` (always shown) and the\n"
-        "  `cage report` footer (actionable-only). Clocks: the report footer anchors\n"
-        "  age on the newest ledger ts (data-relative — derived views stay\n"
-        "  deterministic); doctor may use today.",
-        ("cage/freshness.py", "cage/doctorcmd.py"),
-        "n/a — describes the check; the ⚠/· lines it prints are advisory, never a gate.",
-        kind="concept", plan_ref="§3.3"),
-    Explanation(
-        "copilot-pricing", ("copilot-pricing", "copilot", "premium-request", "credits",
-                            "subscription", "seat", "auto", "router"),
-        "how Copilot-served models price (and why copilot/auto stays unpriced)",
-        "Copilot's VS Code store stamps modelIds like copilot/claude-opus-4.6 with\n"
-        "  the provider inferred from the name (→ anthropic), so Copilot-served\n"
-        "  Claude family-prices at the Anthropic API rows after route-prefix\n"
-        "  normalization. That approximates seat/subscription billing — but it is\n"
-        "  also GitHub's own metering basis: since 2026-06-01 Copilot bills\n"
-        "  usage-based AI Credits from token consumption at listed API rates\n"
-        "  (github.blog, retrieved 2026-07-11). The [credits] layer is a separate\n"
-        "  axis (plan-quota multipliers, estimated, off by default) — never blurred\n"
-        "  into per-token prices, and Kiro/Copilot credits are never derived from\n"
-        "  tokens. The bare router id copilot/auto matches no price row by design —\n"
-        "  a router priced silently would be a wrong number — so it resolves one of\n"
-        "  two other ways: a recorded billed credit prices it exactly (rung 1, see\n"
-        "  `cage query copilot-credits`), or you route it explicitly\n"
-        "  (`cage prices alias - copilot/auto --to …`). Neither guesses.",
-        ("cage/transcript.py", "cage/policy.py", "cage/creditprice.py",
-         "cage/data/cage.toml"),
-        "n/a — describes a billing approximation and its provenance.",
-        kind="concept", plan_ref="§3.3, §3.8"),
-    Explanation(
-        "copilot-credits", ("copilot-credits", "credits", "billed", "usd-per-credit",
-                            "billing", "ladder", "rung", "copilot-auto", "priced-via",
-                            "credits-rate", "token-table", "mixed-basis"),
-        "how a copilot row picks its price: the credits → tokens → UNPRICED ladder",
-        "Copilot persists the credits GitHub itself billed — per request in VS\n"
-        "  Code's chatSessions store (copilotCredits), per shutdown in the CLI's\n"
-        "  totalPremiumRequests. Cage records that figure VERBATIM as the call\n"
-        "  field `credits` and resolves each copilot dollar by a 4-rung ladder,\n"
-        "  one rung per row, at the single pricing choke point:\n"
-        "    0. billed on ANOTHER row  — $0.00, credits basis. See ONE BASIS below.\n"
-        "    1. credits × [billing.<agent>] usd_per_credit  — when the row carries\n"
-        "       a recorded credit AND you configured a rate. Tag: modeled.\n"
-        "    2. tokens × price table  — the usual exact/alias/family matching.\n"
-        "    3. UNPRICED  — loud, counted, with runnable fix lines.\n"
-        "  Rung 1 goes first because since 2026-06-01 a credit IS GitHub's own\n"
-        "  tokens×rates computation, made with what cage cannot see: which model\n"
-        "  copilot/auto actually routed to, and GitHub's current rates. So it\n"
-        "  prices copilot/auto exactly, with no price-table row at all.\n"
-        "  Method law: rung 1 is modeled, never measured — the credit COUNT is a\n"
-        "  recorded fact, but the DOLLAR is that count times a rate you set, which\n"
-        "  cage cannot check against an invoice. No rate configured ⇒ rung 1 is\n"
-        "  skipped and credits render as a COUNT, never a dollar.\n"
-        "  Credits are never derived from tokens, in either direction: an absent\n"
-        "  credit stays absent (it falls through to rung 2), and a recorded 0.0 is\n"
-        "  a REAL zero that prices at $0.0000 — a different fact from absence.\n"
-        "  ONE BASIS PER BILLING GROUP (rung 0). GitHub computes\n"
-        "  totalPremiumRequests over EVERY model in a session.shutdown, so that one\n"
-        "  figure lands on a carrier row and every sibling carries `billed_with` =\n"
-        "  the carrier's id. A linked row prices at $0.00 ON THE CREDITS BASIS, with\n"
-        "  the carrier's id as the matched key — priced, elsewhere, by name. Without\n"
-        "  it the carrier billed GitHub's whole-shutdown figure while its siblings\n"
-        "  billed their own tokens at list rates: the same spend, twice.\n"
-        "  `billed_with` is a RECORDED STRUCTURAL FACT, never a computation — which\n"
-        "  is why the alternative, splitting the credit pro-rata by token share, was\n"
-        "  rejected: it would derive per-row credits from tokens. The suppression\n"
-        "  needs a configured rate (with none the carrier itself falls to rung 2, so\n"
-        "  its group must too). Forward-only: rows written before 2026-08-11 carry no\n"
-        "  link and are never rewritten.\n"
-        "  A total spanning both bases is footnoted with the split (never blended\n"
-        "  silently); CSV names the winning basis per row in `priced_via`\n"
-        "  (credits-rate | token-table | mixed).",
-        ("cage/creditprice.py", "cage/prices.py", "cage/schema.py",
-         "cage/transcript.py", "cage/policy.py"),
-        "rung 1: usd = credits × [billing.<agent>] usd_per_credit  (modeled)",
-        kind="concept", plan_ref="§3.1, §3.3"),
     Explanation(
         "copilot-metrics", ("copilot-metrics", "chats-ledger", "modeltotals",
                             "session-credits", "nano-aiu", "sidecar", "debuglog",
@@ -912,7 +631,7 @@ REGISTRY: tuple[Explanation, ...] = (
                     "where-are-dollars"),
         "tokens by default, dollars opt-in, and signal-gated columns",
         "tokens are the measurement; dollars are an interpretation you ask for\n"
-        "  (plan Phase 2.5). `cage report`, `cage insights matrix`, and the bare `cage`\n"
+        "  `cage report` and the bare `cage`\n"
         "  headline render tokens-only until `--usd` asks for currency — or set\n"
         "  `[display] usd = true` for always-on (precedence: flag > env CAGE_USD >\n"
         "  policy). Pricing footnotes and the full ⚠ UNPRICED block belong to the\n"
@@ -1523,7 +1242,7 @@ REGISTRY: tuple[Explanation, ...] = (
         "  would be wrong, not the number.\n"
         "  AUTO-CLOSE NEVER CLAIMS SUCCESS: a session ending is not a job well done, so\n"
         "  the hook writes outcome='auto' — closed for cost comparison, INVISIBLE to\n"
-        "  `cage task quality`, which counts only ok/redo. Stamping 'ok' would inflate\n"
+        "  the outcome store, which holds only ok/redo. Stamping 'ok' would inflate\n"
         "  the success rate of every session that merely finished.\n"
         "  HOOKS ARE CLI-ONLY — they do not fire under a VS Code extension, so every\n"
         "  L1-derived fact is a CLI-session fact and says so wherever it is shown.\n"

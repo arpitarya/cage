@@ -16,6 +16,53 @@ Entry format:
 
 ---
 
+## 2026-08-14 — USAGE-ONLY COMPLETE (P0→P4): the money subsystem is deleted, suite green
+
+- **Implemented:** cage stops measuring money. **15 modules deleted** (~2,457 lines):
+  `prices` · `creditprice` · `receiptprice` · `convert` · `roi` · `netsaved` · `matrix` ·
+  `verdict` · `budget` · `forecast` · `regression` · `recommend` · `quality` ·
+  `pricescmd` · `pricestoml`, plus `data/prices.toml` and the
+  `[prices]`/`[credits]`/`[billing]`/`[alias]` config sections. Eleven CLI commands and
+  four MCP read tools removed (nine read tools → five). Durable decision:
+  [ADR 0011](../docs/adr/0011-cage-measures-usage-not-cost.md).
+  - **P0 — cutover retired.** `constants.SPEND_CUTOVER` gone; `ledger.spend()` partitions
+    by **agent**, not time. `SPEND_SOURCES["kiro"]` emptied and its reason stated in a new
+    `ledger.ABSENT_SPINES` (it named `devdata.sqlite`, absent on every real install).
+  - **P1 — three non-money things relocated, not deleted** (each lived in a money module
+    by accident): outcome store `quality.py` → **`outcomes.py`** (the write half of
+    `cage_task_outcome`, the only MCP mutation); `netsaved.GROSS_NOTE` → **`savings.py`**;
+    the comment-preserving TOML writer `pricestoml.py` → **`tomledit.py`** (still needed by
+    `cage policy sync` and `cage setup --python-launcher`).
+  - **P2 — new `units.py`**, the per-agent unit policy: two absences with **two distinct
+    reasons**, never a `0`; credits **never summed across agents** (`units.summable`),
+    enforced in code and surfaced in `report`/`chats` footers.
+  - **P3 — honesty fixes:** kiro credits retagged `estimated` → `measured`;
+    `transcript.probe_kiro_ide_store` splits doctor's kiro-IDE check three ways
+    (db absent / table missing / column drift).
+  - **P4 — docs:** ADR 0011, README repositioned, PLAN money sections *marked* (its
+    numbering is a live addressing scheme), FORMULAS §1 rewritten + §2.1a/§2.2/§2.4–2.6
+    removed, GLOSSARY reworked, CLI.md/kiro-capture/MACHINE/research header updated,
+    17 DOC-REGISTRY rows stamped, handoff+prompt archived as `v0.51-usage-only.*`.
+- **Four things found by building, not reading** (each corrected in the ADR):
+  (a) `spend()` = metric ledgers only would have **silently zeroed 373 codex rows** plus
+  all library/proxy traffic — the `calls` fallback is scoped, not deletable;
+  (b) `quality.py` and `pricestoml.py` were not money modules, they were money *plus* a
+  load-bearing non-money half; (c) `cage demo` broke — its `claude-code` call had no
+  metric twin and the retired cutover stopped hiding that, so the seeder now dual-writes
+  like real capture; (d) `_spend_row`'s field allowlist omitted `machine`, silently
+  unphasing every metric row in the fleet study.
+- **Files:** 15 deleted + 3 created (`units.py`, `outcomes.py`, `tomledit.py`) + ~40
+  stripped across `cage/`; ~35 test files updated; 3 test files deleted; new
+  `tests/test_usage_only.py` (23 invariants incl. an AST currency gate);
+  `tests/conftest.py` gains the shared `metric_twin` helper.
+- **Tests:** green — **1571 passed / 11 skipped**. `test_floor` swapped three now-dead
+  views for live ones **one-for-one** (count, breadth and byte-identical assertion
+  unchanged). Goldens re-blessed only where a deleted column or a dead command forced it.
+- **Next:** TASK-GRAIN-SPINE (metric rows carry no `task`, so compare/estimate/calibration
+  read zero for claude+copilot) — filed in OPEN-WORK, not fixed here.
+
+---
+
 ## 2026-08-14 — METRICS-PRIMARY P4·P5 COMPLETE: the flip lands, suite green
 
 - **P4 — the id-joined family flipped**, plus the receipt-join fix the earlier session

@@ -179,7 +179,10 @@ def test_kiro_cli_credits_are_not_call_rows(tmp_path):
     r = rows[0]
     assert r["unit"] == "credits" and "tokens_in" not in r and "tokens_out" not in r
     assert abs(r["credits"] - 0.16) < 1e-9 and r["turns"] == 2
-    assert r["method"] == "estimated"          # a proxy, never measured
+    # `measured` since USAGE-ONLY P3 (ADR 0011): the credit was a *proxy for dollars*
+    # cage could not see, which is what made it estimated. With no dollars it stands
+    # in for nothing — it is AWS's own recorded charge, read back verbatim.
+    assert r["method"] == "measured"
     assert r["model"] == "claude-haiku-4.5" and r["surface"] == "cli"
     assert r["session"] == "c1-2-3-4"
 

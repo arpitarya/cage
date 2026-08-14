@@ -1,7 +1,7 @@
 """`cage policy sync` / `cage policy diff` — upgrade the project policy.toml
 to the installed bundle (plan §3.10).
 
-Generalizes `cage prices sync` from the pricing tables to the whole file: adds
+Syncs the whole project config against the bundle: adds
 new sections/keys the bundle gained since the project was inited, refreshes
 stale un-customized defaults, and *never* touches a customized value or deletes
 anything. Dry-run is the default surface; nothing anywhere auto-applies it.
@@ -24,29 +24,30 @@ Four rendered categories (the DoD contract):
 Where the old default is *not* reconstructable (a pre-``policy_version``
 project and a key whose default actually changed) the row falls to a per-key
 confirm bucket (``--yes section.key`` / ``--yes all``) — honest over clever,
-exactly the `prices sync` stance. Pricing-family tables (``[prices]``,
-``[credits]``, ``[alias]``, ``[tools.<name>]`` routes) are never diffed here:
-the one merge brain is `pricescmd.sync_view`, whose summary embeds in this
-output (the scalar ``[tools] order`` pipeline key *is* owned here — it is
-policy, not pricing). Reads resolve like every read surface; writes are the
-`pricestoml` text surgery (comment-preserving, atomic, typed
+honest over clever. Reads resolve like every read surface; writes are the `tomledit`
+text surgery (comment-preserving, atomic, typed
 :class:`~cage.errors.CageError` on refusal).
+
+The pricing-family tables (``[prices]``/``[credits]``/``[alias]``) this used to delegate
+to the pricing sync no longer exist (USAGE-ONLY, ADR 0011), so there is one sync
+again. ``[tools]`` subtables stay undescended: they held the per-tool `price_at` routes,
+and the scalar ``[tools] order`` pipeline key — which *is* owned here — is a leaf.
 """
 from __future__ import annotations
 
 import subprocess
 from pathlib import Path
 
-from cage import paths, policy, pricescmd, pricestoml
+from cage import paths, policy, tomledit
 from cage.errors import CageError
 
 _UNKNOWN_META = "unknown (pre-0.25)"
 
-# Sections whose tables belong to the pricing merge brain (`cage prices sync`)
-# — never diffed or written here. [tools] is split: its scalar keys (the
-# pipeline `order`) are policy and sync here; its subtables ([tools.<name>]
-# price_at routes) are pricing and delegate.
-_DELEGATED = ("prices", "credits", "alias")
+# Sections that were delegated to the pricing merge brain until USAGE-ONLY
+# (ADR 0011) removed it along with the sections themselves. Kept as an empty tuple
+# rather than deleted: `_walk` reads it, and a future delegated family would rejoin
+# here rather than growing a second skip-list.
+_DELEGATED: tuple[str, ...] = ()
 
 # ── the versioned-defaults record ────────────────────────────────────────────
 # Maintenance rule: any release that CHANGES a bundled non-pricing default
@@ -114,7 +115,7 @@ def _walk(tree: dict, known: tuple[str, ...] | None = None) -> dict[tuple[str, .
         leaves = {k: v for k, v in node.items() if not isinstance(v, dict)}
         if leaves:
             tables[prefix] = leaves
-        if prefix == ("tools",):  # subtables are pricing routes — delegated
+        if prefix == ("tools",):  # subtables held the removed price_at routes
             return
         for k, v in node.items():
             if isinstance(v, dict):
@@ -163,7 +164,7 @@ def sync_view(root: Path) -> dict:
     p_meta = project.get("meta", {})
     pv = str(p_meta.get("policy_version") or "")
     text = foot.policy.read_text(encoding="utf-8")
-    owned = pricescmd._custom_headers(text)
+    owned = tomledit.custom_headers(text)
     b_tables = _walk(bundled)
     known = tuple(set(bundled) | set(policy._SECTIONS))
     p_tables = _walk(project, known=known)
@@ -212,24 +213,19 @@ def sync_view(root: Path) -> dict:
             else:
                 customized.append({**item, "reason": "edited"})
 
-    prices_d = pricescmd.sync_view(root)
     return {"no_project": False, "policy_path": str(foot.policy),
             "bundled_meta": b_meta, "project_meta": p_meta,
             "add": add, "update": update, "confirm": confirm,
             "customized": customized, "orphan": orphan,
             "project_own": project_own, "in_sync_n": in_sync_n,
             "recommendation": sync_recommendation(p_meta),
-            "prices": {k: prices_d[k] for k in
-                       ("in_sync", "customized", "drift", "bundled_only",
-                        "project_only", "recommendation")},
-            "prices_text": pricescmd.render_sync(prices_d),
             "git_tracked": _git_tracked(root, foot.policy)}
 
 
 # ── apply ────────────────────────────────────────────────────────────────────
 
 def _fmt_val(v: object) -> str:
-    return pricestoml._fmt_value(v)
+    return tomledit._fmt_value(v)
 
 
 def _key_id(item: dict) -> str:
@@ -260,7 +256,7 @@ def sync_apply(root: Path, d: dict, yes: list[str]) -> list[str]:
                        + " (bundled defaults stay live via the merge)")
             continue
         values = {i["key"]: i["value"] for i in items}
-        res = pricestoml.add_table(root, path, values, comment=comment)
+        res = tomledit.add_table(root, path, values, comment=comment)
         if res["mode"] == "added":
             out.append(f"✔ [{dotted}] added ("
                        + ", ".join(f"{k} = {_fmt_val(v)}"
@@ -272,7 +268,7 @@ def sync_apply(root: Path, d: dict, yes: list[str]) -> list[str]:
                        + " added")
 
     for u in d["update"]:
-        pricestoml.set_table(root, tuple(u["path"]), {u["key"]: u["bundled"]},
+        tomledit.set_table(root, tuple(u["path"]), {u["key"]: u["bundled"]},
                              mark_custom=False)
         out.append(f"✔ [{u['table']}] {u['key']}: {_fmt_val(u['project'])} → "
                    f"{_fmt_val(u['bundled'])}")
@@ -280,7 +276,7 @@ def sync_apply(root: Path, d: dict, yes: list[str]) -> list[str]:
     for c in d["confirm"]:
         kid = _key_id(c)
         if take_all or kid in wanted:
-            pricestoml.set_table(root, tuple(c["path"]), {c["key"]: c["bundled"]},
+            tomledit.set_table(root, tuple(c["path"]), {c["key"]: c["bundled"]},
                                  mark_custom=False)
             applied.add(kid)
             out.append(f"✔ [{c['table']}] {c['key']}: {_fmt_val(c['project'])} → "
@@ -300,7 +296,7 @@ def sync_apply(root: Path, d: dict, yes: list[str]) -> list[str]:
             out.append(f"· [meta] policy_version not stamped — {len(skipped)} "
                        "row(s) await --yes confirmation")
         else:
-            pricestoml.update_meta(root, {"policy_version": bv})
+            tomledit.update_meta(root, {"policy_version": bv})
             out.append(f"✔ [meta] policy_version stamped v{bv}")
     return out
 
@@ -350,8 +346,6 @@ def render(d: dict, updated: list[str] | None = None) -> str:
     if d["project_own"]:
         out.append("· your own keys (not in the bundle) — untouched: "
                    + ", ".join(f"{p['table']}.{p['key']}" for p in d["project_own"]))
-    out += ["", "pricing tables — delegated to `cage prices sync`:",
-            *("  " + line for line in d["prices_text"].splitlines())]
     if updated is not None:
         out += ["", *updated] if updated else \
             ["", "· --apply: nothing to write — already in sync"]

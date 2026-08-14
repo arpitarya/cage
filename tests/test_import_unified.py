@@ -37,7 +37,7 @@ def _claude_line(uuid, tin, tout):
 def test_import_rollup_hand_derived_reference():
     """Assert `_import_rollup` against a hand-computed reference (cage-lab discipline):
     two priced claude turns + one UNPRICED copilot/auto vscode row → exact per-bucket and
-    total lines, with the unpriced row surfacing as UNPRICED, never a silent $0."""
+    total lines, in tokens only (USAGE-ONLY, ADR 0011)."""
     from cage import policy, schema
     pol = policy.load(None)  # bundled prices (anthropic rows present)
     rows = [
@@ -50,16 +50,19 @@ def test_import_rollup_hand_derived_reference():
     ]
     lines = importcmd._import_rollup(rows, pol, deduped=0)
     text = "\n".join(lines)
-    # claude bucket: 2 calls, 3000 in, 300 out, priced (a real $ figure, not UNPRICED)
+    # The rollup is TOKENS-ONLY (USAGE-ONLY, ADR 0011). It used to carry a cost column
+    # and an UNPRICED marker for `copilot/auto`; with no price table there is no
+    # priced/unpriced distinction left to draw, so every bucket reports the same kind of
+    # fact — recorded counts — and no row can be silently understated.
     claude_line = next(l for l in lines if l.strip().startswith("claude"))
     assert "3,000" in claude_line and "300" in claude_line
-    assert "$" in claude_line and "UNPRICED" not in claude_line
-    # copilot/auto bucket: 1 call, UNPRICED (never $0)
+    assert "$" not in claude_line
     cop_line = next(l for l in lines if "vscode" in l)
-    assert "UNPRICED (copilot/auto)" in cop_line
-    # total row: 3 calls, 3500 in, 350 out, and the unpriced count is surfaced
+    assert "500" in cop_line and "UNPRICED" not in cop_line
+    # total row: 3 calls, 3500 in, 350 out — a straight sum of the buckets above
     total_line = next(l for l in lines if l.strip().startswith("total"))
-    assert "3,500" in total_line and "350" in total_line and "(1 unpriced)" in total_line
+    assert "3,500" in total_line and "350" in total_line
+    assert "unpriced" not in total_line and "$" not in total_line
 
 
 def test_import_rollup_empty_is_quiet():

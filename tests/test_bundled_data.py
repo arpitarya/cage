@@ -27,10 +27,6 @@ def test_default_toml_is_the_bundled_file_verbatim():
     assert policy.default_toml() == (REPO_DATA / "cage.toml").read_text(encoding="utf-8")
 
 
-def test_bundled_policy_loads_with_prices():
-    pol = policy._bundled()
-    assert pol.get("prices"), "bundled policy must carry price tables"
-    assert "anthropic" in pol["prices"]
 
 
 def test_distribution_is_wheel_outside_a_zipapp():
@@ -56,3 +52,13 @@ def test_graphify_shim_copies_byte_identical_with_exec_bit(tmp_path, monkeypatch
         assert (shim.parent / name).read_bytes() == (REPO_DATA / "shims" / name).read_bytes()
     if os.name == "posix":
         assert shim.stat().st_mode & stat.S_IXUSR
+
+
+def test_the_bundle_ships_no_price_table():
+    """`data/prices.toml` is gone and `[prices]`/`[credits]`/`[billing]`/`[alias]` are
+    not in the merged policy — cage measures usage, not cost (USAGE-ONLY, ADR 0011)."""
+    from cage import paths, policy
+    assert not (paths.bundled_data() / "prices.toml").is_file()
+    pol = policy.load(None)
+    for section in ("prices", "credits", "billing", "alias"):
+        assert section not in pol, f"[{section}] is back in the bundled policy"

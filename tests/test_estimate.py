@@ -13,7 +13,14 @@ from cage import calibration, clicmds, estimate, ledger, policy, schema, tasks
 from cage.constants import MIN_ESTIMATE_N
 from cage.errors import CageError
 
-_MODEL = dict(route="chat", provider="anthropic", model="claude-opus-4-8", agent="claude-code")
+# `agent="lib"` deliberately, NOT a real agent surface. The task-grouped views below
+# (compare/estimate/calibration) join spend to a task by the row's own `task` field, and
+# a METRIC row carries none — the transcript stores have no task concept. So for claude
+# and copilot, whose spend resolves from the metric ledger (USAGE-ONLY, ADR 0011), these
+# views currently see zero tokens. That is a real gap, filed as TASK-GRAIN-SPINE in
+# work/OPEN-WORK.md; it is not what these tests are about, so they seed a spine-less
+# agent whose `calls` rows still carry `task` and still resolve.
+_MODEL = dict(route="chat", provider="anthropic", model="claude-opus-4-8", agent="lib")
 
 
 def _run_task(root, tid, tin, ts, close=True, label="bugfix", agent_name="claude"):
@@ -38,10 +45,9 @@ def test_band_exact_and_modeled(seeded):
     d = estimate.band(root, pol, label="bugfix")
     assert d["ok"] and d["n"] == 5 and d["method"] == "modeled"
     assert d["tokens"] == {"median": 12_500.0, "q1": 11_500.0, "q3": 13_500.0}
-    assert d["usd"] == {"median": 0.0725, "q1": 0.0675, "q3": 0.0775}
     text = estimate.render_estimate(d)
     assert "median 12,500 · IQR 11,500–13,500" in text
-    assert "modeled" in text and "never an invoice" in text
+    assert "modeled" in text and "never a record" in text
     assert "none self-reported" in text  # the estimator never claims confidence
 
 
@@ -65,7 +71,6 @@ def test_record_stamps_band_on_open_task(seeded):
     d = estimate.band(root, pol, label="bugfix")
     assert estimate.record(root, "new-task", d) is True
     row = tasks.read(root)["new-task"]
-    assert row["est_tokens"] == 12_500.0 and row["est_usd"] == 0.0725
     assert row["est_n"] == 5
     assert (row["est_tokens_q1"], row["est_tokens_q3"]) == (11_500.0, 13_500.0)
     assert "outcome" not in row  # still open
@@ -105,7 +110,7 @@ def test_calibration_exact_hit_rate(seeded):
 
 def test_legacy_estimate_without_band_skipped_not_scored(seeded):
     root, pol = seeded
-    tasks.record(root, "legacy", est_tokens=12_500.0, est_usd=0.07, est_n=5,
+    tasks.record(root, "legacy", est_tokens=12_500.0, est_n=5,
                  snapshot=False)  # a pre-band row: point fields only
     _run_task(root, "legacy", 12_000, "2026-07-04T10:00:00Z")
     c = calibration.summarize(root, pol)

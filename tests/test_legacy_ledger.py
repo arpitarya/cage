@@ -22,8 +22,7 @@ import json
 
 import pytest
 
-from cage import (attribution, budget, cli, display, forecast, ledger, paths,
-                  policy, quality, regression, report, roi, schema)
+from cage import attribution, cli, display, ledger, paths, policy, report, schema
 
 _M = dict(route="chat", provider="anthropic", model="claude-sonnet-4-6",
           agent="claude-code")
@@ -43,6 +42,16 @@ def legacy(tmp_path, monkeypatch):
                              call_id=f"c_legacy{i}", **_M)
         c["gap_ms"] = gap          # the removed field, exactly as v0.35 wrote it
         assert ledger.append_row(root, "calls", c)
+        # The metric twin. `ledger.spend` supersedes a `calls` row for any agent with a
+        # metric spine (USAGE-ONLY, ADR 0011), and these rows are `agent="claude-code"`,
+        # so a calls-only legacy fixture would read as ZERO here. That is the real
+        # behaviour for a pre-metrics claude ledger and it is pinned on its own below
+        # (`test_a_spined_agents_calls_are_superseded_with_no_twin`); this fixture is
+        # about the removed HUMAN axis, so it dual-writes to isolate that question.
+        assert ledger.append_row(root, "claude", schema.make_claude_metric(
+            session="s-legacy", source="request", request=f"r{i}",
+            provider="anthropic", model="claude-sonnet-4-6",
+            tokens_in=10_000, tokens_out=1_000, ts=f"2026-06-1{i}T10:00:00Z"))
 
     # A real (still-supported) token receipt, so the money views have something
     # to actually total — the legacy rows must not disturb it.
@@ -96,20 +105,32 @@ def test_report_reads_every_dimension(legacy, dim):
 def test_derived_views_do_not_raise(legacy):
     pol = _pol()
     assert attribution.attribute(legacy, "t-legacy", pol)["steps"]
-    assert roi.by_tool(legacy, pol)["tools"]
-    assert budget.check(legacy, pol) is not None
-    assert quality.summarize(legacy, pol=pol)["tasks"] == 1
-    assert regression.detect(legacy, pol=pol) is not None
-    assert forecast.project(legacy, pol) is not None
+    assert report.summarize(legacy, pol, dim="agent")["total"]["calls"] == 2
+    assert report.overview(legacy, pol)["tokens"] > 0
+
+
+def test_a_spined_agents_calls_are_superseded_with_no_twin(tmp_path):
+    """The user-visible consequence of retiring the cutover, pinned rather than
+    discovered: a claude/copilot `calls` row with NO metric twin resolves to nothing.
+
+    Pre-metrics history (claude `calls` rows older than the metric routes) therefore
+    reads as zero in every derived view. The rows are never deleted — the ledger is
+    append-only and `join_table` still resolves a receipt's `call` id against them — but
+    they are no longer a spend source. That was the decision USAGE-ONLY made (the
+    corrected metric rows are the basis; the inflated `calls` history is not)."""
+    root = tmp_path / "p"
+    paths.Footprint(root).ledger.mkdir(parents=True, exist_ok=True)
+    assert ledger.append_row(root, "calls", schema.make_call(
+        tokens_in=99_000, tokens_out=9_000, call_id="c_orphan", **_M))
+    assert ledger.spend(root) == []
+    assert len(ledger.calls(root)) == 1, "the row itself is never deleted"
 
 
 @pytest.mark.parametrize("argv", [
-    ["report"], ["report", "--usd"], ["report", "--by", "task", "--csv"],
-    ["insights", "attrib"], ["insights", "roi"], ["insights", "matrix"],
-    ["insights", "budget"], ["insights", "compare"], ["insights", "calibration"],
-    ["insights", "verdict", "graphify"], ["insights", "why", "c_legacy0"],
-    ["insights", "forecast"], ["insights", "regression"], ["insights", "recommend"],
-    ["task", "quality"], ["data", "export", "--no-import", "--csv", "calls"],
+    ["report"], ["report", "--by", "task", "--csv"],
+    ["insights", "attrib"], ["insights", "compare"], ["insights", "calibration"],
+    ["insights", "why", "c_legacy0"], ["insights", "chats"],
+    ["data", "export", "--no-import", "--csv", "calls"],
 ])
 def test_cli_read_surfaces_exit_zero(legacy, argv, monkeypatch):
     monkeypatch.setenv("CAGE_CAPTURE", "0")
@@ -124,8 +145,6 @@ def test_legacy_receipts_never_enter_a_money_total(legacy):
     # Only the graphify receipt's 7,000 saved tokens count; 90 minutes and $120
     # of removed-axis "savings" contribute nothing.
     assert rep["total"]["saved_tokens"] == 7_000
-    graphify_only = roi.by_tool(legacy, pol)["tools"]
-    assert set(graphify_only) == {"graphify"}
     steps = attribution.attribute(legacy, "t-legacy", pol)["steps"]
     assert [s["tool"] for s in steps] == ["graphify"]
 
@@ -134,7 +153,7 @@ def test_the_exclusion_is_counted_and_footnoted(legacy):
     """The decision, made visible. Three legacy rows in, three named in the footer."""
     rep = report.summarize(legacy, _pol(), dim="task")
     assert rep["legacy_human"] == 3
-    text = report.render_report(rep, disp=display.Display(usd=True))
+    text = report.render_report(rep, disp=display.Display())
     assert "3 legacy human-axis receipt(s) excluded" in text
     assert "removed in v0.36" in text and "cage query savings-axis" in text
 
@@ -148,7 +167,7 @@ def test_a_clean_ledger_says_nothing(tmp_path):
     rep = report.summarize(root, policy.load(None), dim="task")
     assert rep["legacy_human"] == 0
     assert "legacy human-axis" not in report.render_report(
-        rep, disp=display.Display(usd=True))
+        rep, disp=display.Display())
 
 
 # ── 4. the substrate really is gone (a write can never re-create these rows) ───

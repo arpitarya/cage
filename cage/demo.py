@@ -2,14 +2,14 @@
 
 One agent task ("explain why handover does X, then fix it") whose context
 decomposes into three disjoint slices, each shrunk by a different deterministic
-tool. After seeding, `cage insights attrib` and `cage insights matrix` reproduce the plan's tables
+tool. After seeding, `cage insights attrib` reproduces the plan's tables
 against a real ledger — proof the attribution engine works, not just an assertion.
 """
 from __future__ import annotations
 
 from pathlib import Path
 
-from cage import ledger, metering
+from cage import ledger, metering, schema
 
 TASK = "fix-handover-bug"
 # (tool, slice without it, slice with it, how the alternative is known)
@@ -22,17 +22,23 @@ _BASE = 2000   # sys+user prompt, always present
 _OUT = 1500    # output held constant
 
 # The worked example is RECORDED HISTORY, so it carries a fixed instant rather than
-# `now()`. Two reasons, and the second is the one that made this a bug:
+# `now()`: §4.4's tables are fixed numbers, and a seeder stamped with the wall clock was
+# never reproducible in the sense the rest of cage is.
 #
-#  1. Determinism. §4.4's tables are fixed numbers; a seeder whose rows are stamped with
-#     the wall clock was never reproducible in the sense the rest of cage is.
-#  2. METRICS-PRIMARY. `ledger.spend` supersedes a post-cutover `calls` row for any of the
-#     three metric-ledger agents, and this row is stamped `agent="claude-code"`. Seeded at
-#     `now()` it landed after `constants.SPEND_CUTOVER` and vanished from every derived
-#     view — `cage demo` printed empty tables, breaking the standing invariant that it
-#     must keep reproducing §4.4. A demo has no transcript store to capture from, so no
-#     metric twin can ever exist for it; the fixed pre-cutover instant is what makes it
-#     honest history rather than a row waiting to be superseded by nothing.
+# **THE SEEDER DUAL-WRITES, and it must.** `ledger.spend` supersedes a `calls` row for
+# any agent that has a metric spine, and this row is stamped `agent="claude-code"` —
+# which has one. A calls-only seed therefore resolves to NOTHING and `cage demo` prints
+# empty tables, breaking the standing invariant that it reproduces §4.4.
+#
+# A pinned pre-cutover instant used to hide this (METRICS-PRIMARY, v0.50); USAGE-ONLY
+# retired the cutover, so the row is superseded for all of history and the protection is
+# gone. Writing both rows is the honest fix rather than a second dodge: it is exactly
+# what real capture does for claude (dual-write, CLAUDE.md), so the demo now exercises
+# the same resolution path a real ledger does instead of a special case that only
+# survives because of where a boundary happens to sit.
+#
+# The `calls` row is still required — it is the id namespace the savings receipts
+# reference (`call=<c_ id>`), which is what `cage insights attrib` joins on.
 _TS = "2026-06-01T12:00:00Z"
 
 
@@ -50,6 +56,13 @@ def seed(root: Path) -> str:
         route="code-edit", provider="anthropic", model="claude-sonnet-4-6",
         tokens_in=actual_in, tokens_out=_OUT, task=TASK, agent="claude-code",
         session="demo", root=root, ts=_TS)
+    # The metric twin — the row `ledger.spend` actually reads for a claude-agent chat.
+    # Same tokens, same instant: the two rows describe ONE piece of traffic, exactly as a
+    # real dual-write capture records it.
+    ledger.append_row(root, "claude", schema.make_claude_metric(
+        session="demo", source="request", request="demo-r1",
+        provider="anthropic", model="claude-sonnet-4-6",
+        tokens_in=actual_in, tokens_out=_OUT, ts=_TS))
     for tool, without, with_, method in _SLICES:
         metering.record_receipt(tool=tool, raw_alternative=without, actual=with_,
                                 call=call_id, task=TASK, method=method, root=root,

@@ -178,12 +178,15 @@ def test_no_command_named_in_the_reference_is_dead(doc):
 
 def test_the_dead_command_detector_actually_detects():
     """A gate is only worth having if it fires. Pin both regimes."""
-    assert _resolvable("insights attrib") and _resolvable("prices list")
-    assert _resolvable("hook budget") and _resolvable("query gross-vs-net")
+    assert _resolvable("insights attrib") and _resolvable("study report")
+    assert _resolvable("hook tool") and _resolvable("query gross-vs-net")
     assert not _resolvable("rep")            # no argparse abbreviation
     assert not _resolvable("insights attribute")
-    assert not _resolvable("prices delete")  # closed choice list
+    assert not _resolvable("study delete")   # closed choice list
     assert not _resolvable("attrib")         # the pre-v0.32 spelling, now grouped
+    # the money surface, gone in v0.51 (USAGE-ONLY, ADR 0011)
+    assert not _resolvable("prices list") and not _resolvable("insights roi")
+    assert not _resolvable("hook budget") and not _resolvable("task quality")
 
 
 # ── 3. the flag vocabulary is bidirectional ───────────────────────────────────

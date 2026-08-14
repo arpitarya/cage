@@ -19,7 +19,7 @@ reads one report. This module holds all of it:
 - **The unit is the machine-day.** Capture-only fleets never close tasks, so
   per-task medians would be empty by construction; a study's question is "what
   does a week cost", and its natural sample is one machine's one day. Group
-  totals per machine×phase are **measured** (recorded tokens, `prices.call_usd`
+  totals per machine×phase are **measured** (recorded tokens
   repricing); the paired delta — each machine's own phase-B median daily minus
   its phase-A median daily, then the **median of those paired deltas** (controls
   between-machine variance) — is **`estimated`**: different weeks, different
@@ -36,7 +36,7 @@ import statistics
 import zipfile
 from pathlib import Path
 
-from cage import ids, ledger, machine, paths, prices, render, schema
+from cage import ids, ledger, machine, paths, render, schema
 from cage.constants import MIN_COMPARE_N
 from cage.errors import CageError
 
@@ -227,9 +227,8 @@ def summarize(root: Path, pol: dict) -> dict:
             continue
         day = _day(c.get("ts", ""))
         slot = per.setdefault(mid, {}).setdefault(phase, {}).setdefault(
-            day, {"tokens": 0, "usd": 0.0, "calls": 0, "agents": set()})
+            day, {"tokens": 0, "calls": 0, "agents": set()})
         slot["tokens"] += c.get("tokens_in", 0) + c.get("tokens_out", 0)
-        slot["usd"] += prices.call_usd(pol, c)
         slot["calls"] += 1
         slot["agents"].add(c.get("agent", ""))
 
@@ -245,19 +244,15 @@ def summarize(root: Path, pol: dict) -> dict:
                                      max(days) if days else _day(span[0][0])) if span else []
             gaps = [d for d in expected if d not in days]
             daily_tok = [float(days[d]["tokens"]) for d in sorted(days)]
-            daily_usd = [round(days[d]["usd"], 6) for d in sorted(days)]
             entry["phases"][phase] = {
                 "days": len(days), "gaps": gaps,
                 "agents": sorted({a for d in days.values() for a in d["agents"]}),
                 "tokens": _dist(daily_tok) if daily_tok else None,
-                "usd": _dist(daily_usd) if daily_usd else None,
             }
         machines.append(entry)
 
-    from cage.compare import unpriced_detail  # local: keeps the import graph light
     d = {"phases": order, "machines": machines, "unphased_calls": unphased,
-         "min_n": MIN_COMPARE_N, "caveat": CAVEAT,
-         "unpriced_detail": unpriced_detail(root, pol)}
+         "min_n": MIN_COMPARE_N, "caveat": CAVEAT}
     if len(order) >= 2:
         a, b = order[0], order[1]
         d["pair"] = [a, b]
@@ -271,31 +266,19 @@ def summarize(root: Path, pol: dict) -> dict:
         else:
             dt = [m["phases"][b]["tokens"]["median"] - m["phases"][a]["tokens"]["median"]
                   for m in paired]
-            du = [round(m["phases"][b]["usd"]["median"] - m["phases"][a]["usd"]["median"], 6)
-                  for m in paired]
             d["delta"] = {"ok": True, "method": "estimated",
                           "d_tokens_per_day": statistics.median(dt),
-                          "d_usd_per_day": round(statistics.median(du), 6),
                           "per_machine": {m["machine"]: round(x, 6)
-                                          for m, x in zip(paired, du)}}
+                                          for m, x in zip(paired, dt)}}
         # pooled per phase: every machine-day is one sample
         pooled = {}
         for phase in (a, b):
             days = [float(day["tokens"]) for mid in per.values()
                     for day in mid.get(phase, {}).values()]
-            usd = [round(day["usd"], 6) for mid in per.values()
-                   for day in mid.get(phase, {}).values()]
-            pooled[phase] = ({"n_days": len(days), "tokens": _dist(sorted(days)),
-                              "usd": _dist(sorted(usd))} if days else {"n_days": 0})
+            pooled[phase] = ({"n_days": len(days),
+                              "tokens": _dist(sorted(days))} if days else {"n_days": 0})
         d["pooled"] = pooled
     return d
-
-
-def _unpriced_tail(d: dict) -> list[str]:
-    if not d.get("unpriced_detail"):
-        return []
-    from cage.report import unpriced_line
-    return ["", unpriced_line(d["unpriced_detail"])]
 
 
 def render_csv(d: dict) -> str:
@@ -309,30 +292,28 @@ def render_csv(d: dict) -> str:
     - ``delta`` — the paired-by-machine delta, ``estimated``, caveat in ``note``;
       a refused delta carries the reason and no numbers (refusal survives to CSV).
     - ``pooled`` — one row per compared phase (machine-days, measured dists).
-    - ``unpriced`` — mirrors the text ⚠ warning when it renders.
 
     Column contract: `csvout.py` (`cage query csv-output`)."""
     from cage import csvout
     head = ["kind", "machine", "phase", "days", "gap_days", "agents", "n",
-            "median_tokens", "q1_tokens", "q3_tokens", "median_usd", "q1_usd",
-            "q3_usd", "d_tokens_per_day", "d_usd_per_day", "method", "note"]
-    dist_blank = [None] * 6
+            "median_tokens", "q1_tokens", "q3_tokens", "d_tokens_per_day",
+            "method", "note"]
+    dist_blank = [None] * 3
     rows = []
     for m in d["machines"]:
         for phase, p in m["phases"].items():
             if not p["days"]:
                 rows.append(["coverage", m["machine"], phase, 0, "", "", None,
-                             *dist_blank, None, None, "",
+                             *dist_blank, None, "",
                              "MISSING — no rows in this phase"])
                 continue
             rows.append(["coverage", m["machine"], phase, p["days"], p["gaps"],
                          p["agents"], None,
                          p["tokens"]["median"], p["tokens"]["q1"], p["tokens"]["q3"],
-                         round(p["usd"]["median"], 6), round(p["usd"]["q1"], 6),
-                         round(p["usd"]["q3"], 6), None, None, "measured", ""])
+                         None, "measured", ""])
     if d["unphased_calls"]:
         rows.append(["unphased", None, None, None, "", "", d["unphased_calls"],
-                     *dist_blank, None, None, "",
+                     *dist_blank, None, "",
                      "before enrollment or unenrolled machines; excluded from deltas"])
     if "pair" in d:
         a, b = d["pair"]
@@ -340,26 +321,20 @@ def render_csv(d: dict) -> str:
         if delta["ok"]:
             rows.append(["delta", None, f"{b}-{a}", None, "", "",
                          d["paired_machines"], *dist_blank,
-                         delta["d_tokens_per_day"], delta["d_usd_per_day"],
-                         delta["method"], d["caveat"]])
+                         delta["d_tokens_per_day"], delta["method"], d["caveat"]])
         else:
             rows.append(["delta", None, f"{b}-{a}", None, "", "",
-                         d["paired_machines"], *dist_blank, None, None, "",
+                         d["paired_machines"], *dist_blank, None, "",
                          delta["reason"]])
         for phase in (a, b):
             p = d["pooled"][phase]
             if not p["n_days"]:
                 rows.append(["pooled", None, phase, None, "", "", 0, *dist_blank,
-                             None, None, "", "no machine-days"])
+                             None, "", "no machine-days"])
                 continue
             rows.append(["pooled", None, phase, None, "", "", p["n_days"],
                          p["tokens"]["median"], p["tokens"]["q1"], p["tokens"]["q3"],
-                         round(p["usd"]["median"], 6), round(p["usd"]["q1"], 6),
-                         round(p["usd"]["q3"], 6), None, None, "measured", ""])
-    if d.get("unpriced_detail"):
-        from cage.report import unpriced_line
-        rows.append(["unpriced", None, None, None, "", "", None, *dist_blank,
-                     None, None, "", unpriced_line(d["unpriced_detail"])])
+                         None, "measured", ""])
     return csvout.table(head, rows)
 
 
@@ -386,7 +361,7 @@ def render_study(d: dict) -> str:
                    "or unenrolled machines; excluded from deltas)")
     if "pair" not in d:
         out += ["", "only one phase recorded — nothing to pair yet."]
-        return "\n".join(out + _unpriced_tail(d))
+        return "\n".join(out)
     a, b = d["pair"]
     out.append("")
     delta = d["delta"]
@@ -395,8 +370,7 @@ def render_study(d: dict) -> str:
     else:
         out.append(f"paired-by-machine delta ({b} − {a}, median of per-machine deltas, "
                    f"n={d['paired_machines']} machines):")
-        out.append(f"  {delta['d_tokens_per_day']:+,.0f} tok/day · "
-                   f"{render.signed_usd(delta['d_usd_per_day'])}/day per machine "
+        out.append(f"  {delta['d_tokens_per_day']:+,.0f} tok/day per machine "
                    f"({delta['method']})")
         out.append(f"  ⚠ {d['caveat']}")
     out.append("")
@@ -407,6 +381,6 @@ def render_study(d: dict) -> str:
             out.append(f"  {phase:<12} no machine-days")
             continue
         out.append(f"  {phase:<12} n={p['n_days']} days · median "
-                   f"{p['tokens']['median']:,.0f} tok · {render.usd(p['usd']['median'])} "
-                   f"(IQR {render.usd(p['usd']['q1'])}–{render.usd(p['usd']['q3'])})")
-    return "\n".join(out + _unpriced_tail(d))
+                   f"{p['tokens']['median']:,.0f} tok (IQR "
+                   f"{p['tokens']['q1']:,.0f}–{p['tokens']['q3']:,.0f})")
+    return "\n".join(out)

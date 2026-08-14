@@ -6,7 +6,7 @@ import os
 
 import pytest
 
-from cage import cli, initcmd, policy, policysync, pricescmd, pricestoml
+from cage import cli, initcmd, policy, policysync, tomledit
 from cage.errors import CageError
 from cage.paths import Footprint
 
@@ -80,8 +80,8 @@ def test_neutrality_apply_keeps_every_derived_view_byte_identical(v016, seeded, 
     """Zero-customization project: --apply must not change one byte of any
     derived view — adds only pin defaults `policy.load` was already using."""
     views = [["report"], ["report", "--by", "model"], ["insights", "attrib"],
-             ["insights", "budget"], ["task", "quality"],
-             ["insights", "matrix"]]
+             ["insights", "chats"], ["insights", "attrib"],
+             ["insights", "chats"]]
 
     def snap():
         outs = []
@@ -149,7 +149,7 @@ def test_hand_edited_value_is_kept_customized_never_clobbered(v016, capsys):
 def test_marked_and_block_owned_tables_stay_customized(v016, capsys):
     p = _policy_path(v016)
     p.write_text(p.read_text().replace(
-        f"[{_EXAMPLE_TABLE}]", f"[{_EXAMPLE_TABLE}]   {pricestoml.CUSTOM_MARK}"))
+        f"[{_EXAMPLE_TABLE}]", f"[{_EXAMPLE_TABLE}]   {tomledit.CUSTOM_MARK}"))
     p.write_text(p.read_text().replace(f'{_EXAMPLE_KEY} = "{_EXAMPLE_DEFAULT}"',
                                        f'{_EXAMPLE_KEY} = "task_custom"'))
     d = policysync.sync_view(v016)
@@ -167,7 +167,7 @@ def test_update_category_refreshes_stale_old_default(v016, monkeypatch, capsys):
     p = _policy_path(v016)
     p.write_text(p.read_text().replace(f'{_EXAMPLE_KEY} = "{_EXAMPLE_DEFAULT}"',
                                        f'{_EXAMPLE_KEY} = "task_finished"'))
-    pricestoml.update_meta(v016, {"policy_version": "0.20.0"})
+    tomledit.update_meta(v016, {"policy_version": "0.20.0"})
     assert cli.main(["policy", "diff"]) == 0
     out = capsys.readouterr().out
     assert "update (1)" in out
@@ -177,7 +177,7 @@ def test_update_category_refreshes_stale_old_default(v016, monkeypatch, capsys):
     capsys.readouterr()
     assert policy.load_project_raw(p)[_EXAMPLE_TABLE][_EXAMPLE_KEY] == _EXAMPLE_DEFAULT
     # the refresh must NOT mark the table user-owned — it stays sync-updatable
-    assert pricestoml.CUSTOM_MARK not in p.read_text().split(
+    assert tomledit.CUSTOM_MARK not in p.read_text().split(
         f"[{_EXAMPLE_TABLE}]")[1].split("[")[0]
 
 
@@ -187,7 +187,7 @@ def test_update_known_version_differing_from_old_default_is_customized(v016, mon
     p = _policy_path(v016)
     p.write_text(p.read_text().replace(f'{_EXAMPLE_KEY} = "{_EXAMPLE_DEFAULT}"',
                                        f'{_EXAMPLE_KEY} = "task_custom"'))
-    pricestoml.update_meta(v016, {"policy_version": "0.20.0"})
+    tomledit.update_meta(v016, {"policy_version": "0.20.0"})
     d = policysync.sync_view(v016)
     assert not d["update"] and not d["confirm"]
     assert any(c["key"] == _EXAMPLE_KEY and c["reason"] == "edited"
@@ -196,7 +196,7 @@ def test_update_known_version_differing_from_old_default_is_customized(v016, mon
 
 def test_confirm_bucket_pre_version_needs_yes(v016, monkeypatch, capsys):
     """Pre-policy_version file + a key whose default actually changed: not
-    reconstructable → listed, applied only per --yes (matching prices sync)."""
+    reconstructable → listed, applied only per --yes."""
     monkeypatch.setattr(policysync, "DEFAULT_CHANGES",
                         {(_EXAMPLE_TABLE, _EXAMPLE_KEY): (("0.25.0", "task_finished"),)})
     p = _policy_path(v016)
@@ -332,11 +332,6 @@ def test_git_tracked_policy_prints_the_review_with_git_note(v016, capsys):
     out = capsys.readouterr().out
     assert "cage.toml is git-tracked — review any applied change with git" in out
     assert ".bak" in out  # "cage writes no .bak files"
-
-
-def test_delegated_prices_summary_matches_a_direct_prices_sync(v016):
-    d = policysync.sync_view(v016)
-    assert d["prices_text"] == pricescmd.render_sync(pricescmd.sync_view(v016))
 
 
 def test_json_envelope(v016, capsys):

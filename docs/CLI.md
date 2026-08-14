@@ -1,7 +1,7 @@
 # CLI
 
-**Every `cage` command in one place.** 16 top-level entries — 5 daily verbs, 7 groups,
-4 hidden plumbing commands — resolving to **55 addressable commands**. The front door
+**Every `cage` command in one place.** 14 top-level entries — 5 daily verbs, 5 groups,
+4 hidden plumbing commands — resolving to **41 addressable commands**. The front door
 (`cage --help`) shows only the curated five plus the group names; this file is the
 whole surface.
 
@@ -28,10 +28,11 @@ here. A rename that misses this file turns the suite red. See
   prefix match.
 - **Exit codes:** `0` ok · `1` error (`error: <msg>`; full traceback only under
   `CAGE_DEBUG=1`) · `2` argparse usage · `130` interrupt. `cage authorship verify` is
-  report-only and **always exits 0**; `cage hook budget` exits `2` on a deliberate
-  budget block. **`cage hook` is the one verb that does NOT exit `2` on a usage
-  error** — for it, `2` already means *block the tool call*, so an argparse failure
-  exits `0` with the fix on stderr (see the `hook` section).
+  report-only and **always exits 0**, and so is every `cage hook` event — the budget
+  block that once returned `2` went with the money subsystem (ADR 0011). **`cage hook`
+  is the one verb that does NOT exit `2` on a usage error**: to the HOST, `2` already
+  means *block the tool call*, so an argparse failure exits `0` with the fix on stderr
+  (see the `hook` section).
 - **Two error regimes, never mixed.** Write paths are fail-open (return `False`,
   swallow, never raise into a request). Only the read/CLI boundary raises.
 
@@ -54,7 +55,7 @@ as-is.
 ### Export flags
 
 `cage report`, every `cage insights` view, and the three other report-shaped views —
-`cage authorship summary`, `cage study report`, `cage task quality` — take these two, so
+`cage authorship summary` and `cage study report` — take these two, so
 they are documented once here rather than repeated in each table
 ([`cage/viewexport.py`](../cage/viewexport.py), `cage query view-export`):
 
@@ -91,7 +92,6 @@ prunes it — cage never deletes an artifact it wrote.
 |---|---|
 | `--version` | print the version (labels `(zipapp)` when run from `cage.pyz`) |
 | `--json` | machine-readable output (bare `cage`: the headline dict) |
-| `--usd` | bare `cage`: add dollar figures to the headline (tokens are the default; `[display] usd = true` for always-on) |
 | `--ledger DIR` | use this cage base dir as the active ledger, overriding project/global resolution (the `.cage`-equivalent holding `ledger/`, `state/` and the policy file) |
 | `--help` | the curated front door |
 | `--no-import` · `--quiet` · `--why-ledger` | see [Capture-on-read flags](#capture-on-read-flags) |
@@ -114,7 +114,6 @@ Where the spend went. Tokens are the default view; dollars are opt-in.
 | `--scope DIR` | filter to one monorepo top-level dir (plan §3.6.2) |
 | `--project [NAME]` | filter to one project (working-dir basename; `.` or the bare flag = current dir). Exact for Claude only (plan §3.7) |
 | `--team` | read the merged `refs/notes/cage-ledger` team view (plan §3.6.3) |
-| `--usd` | add dollar columns |
 | `--all-columns` | force the full column grid even without savings signal (for scripts wanting a fixed shape; CSV never gates) |
 | `--json` | machine-readable output |
 | `--csv [PATH]` | emit as CSV (stdout, or to `PATH`) |
@@ -220,22 +219,14 @@ rather than guessing.
 | Command | What it answers |
 |---|---|
 | `cage insights attrib` | per-tool marginal savings for a task (plan §4.2) |
-| `cage insights matrix` | counterfactual permutation table for a task (plan §4.4) |
-| `cage insights roi` | saved $ per tool vs its own cost + latency |
 | `cage insights adoption` | do your agents actually invoke the tools you wired? (counts only — nothing here is priced) |
 | `cage insights chats` | per-chat detail: tokens/cached/cost by `(agent, surface, session)`, titled where the store has a title (local-only — no `--team`) |
-| `cage insights graphify` | per-chat graphify usage & GROSS saving: recorded tokens · the modeled without-graphify counterfactual · saved% (tokens-only — no `--usd`) |
 | `cage insights commits` | one row per commit: tokens, human hours, and the `agent / human~ / unattr / unkn` line split. **No USD on this surface, by design** (the v1 veto, kept) |
 | `cage insights commit SHA` | one commit in detail: tokens · origin + confidence · the four line buckets · suggested-vs-kept counts · per-file table · wall/agent/human time |
-| `cage insights verdict` | one-line answer: is this tool saving or costing? A pure composer over attrib/roi/regression/quality — computes no new statistics and refuses (`INSUFFICIENT DATA`) over approximating |
-| `cage insights budget` | session/day spend vs policy ceilings (plan §8.1) |
 | `cage insights compare` | **measured** comparison of closed tasks grouped by stack (n · median · IQR; the delta is `estimated` + observational) |
 | `cage insights estimate` | pre-task cost band (median + IQR) from matching closed tasks — `modeled`, refuses thin history |
 | `cage insights calibration` | **measured** hit-rate of recorded estimates vs actuals — the estimator's only confidence source |
 | `cage insights why` | full provenance: a call + every receipt against it |
-| `cage insights forecast` | project monthly spend vs the budget (plan §8.5) |
-| `cage insights regression` | alert when cost-per-call drifts up (plan §8.3) |
-| `cage insights recommend` | cheapest-path: which tools to enable/skip (plan §8.4) |
 
 Flags, beyond the [capture-on-read three](#capture-on-read-flags) and the
 [export two](#export-flags) — **every view in this group takes `--export`/`--stamp`**
@@ -245,22 +236,14 @@ new insight cannot ship un-exportable):
 | Command | Flags |
 |---|---|
 | `cage insights attrib` | `--task ID` (default: most recent) · `--scope DIR` · `--team` · `--json` · `--csv [PATH]` |
-| `cage insights matrix` | `--task ID` · `--scope DIR` · `--usd` (adds the cost column; the token grid always renders) · `--json` · `--html PATH` (standalone page, no CDN) |
-| `cage insights roi` | `--since WINDOW` · `--json` · `--csv [PATH]` · `--export [PATH]` · `--stamp` |
 | `cage insights adoption` | `--since WINDOW` · `--json` · `--csv [PATH]` |
-| `cage insights chats` | `--since WINDOW` · `--agent {claude,copilot,kiro,all}` · `--all` (every chat; default is top 20 by `tokens_in`) · `--usd` · `--json` · `--csv [PATH]` |
 | `cage insights graphify` | `--since WINDOW` · `--agent {claude,copilot,kiro,all}` · `--all` (every receipt-bearing chat; default is top 20 by `saved`) · `--all-chats` (include chats with no graphify receipts too) · `--json` · `--csv [PATH]` |
 | `cage insights commits` | `--since WINDOW` · `--all` (every commit; default is the 20 newest) · `--json` · `--csv [PATH]` |
 | `cage insights commit SHA` | positional `SHA` (short or full) · `--files` (every file; default is the 8 largest) · `--json` · `--csv [PATH]` |
-| `cage insights verdict TOOL` | positional `TOOL` (name as it appears on receipts, e.g. `graphify`) · `--since WINDOW` (default: all history) · `--json` |
-| `cage insights budget` | `--session ID` · `--scope DIR` · `--json` |
 | `cage insights compare` | `--scope DIR` · `--label WORD` · `--by KEYS` (comma-separated from `stack,scope,label`; `stack` always included) · `--json` · `--csv [PATH]` |
 | `cage insights estimate` | `--scope DIR` · `--label WORD` · `--agent NAME` · `--record TASK` (stamp the band onto that **open** task row so calibration can score it at close) · `--json` |
 | `cage insights calibration` | `--json` · `--csv [PATH]` |
 | `cage insights why CALL_ID` | positional `CALL_ID` · `--json` |
-| `cage insights forecast` | `--json` |
-| `cage insights regression` | `--since WINDOW` (recent window vs the baseline before it) · `--tolerance F` (drift fraction that trips the flag) · `--json` |
-| `cage insights recommend` | `--since WINDOW` · `--json` |
 
 `compare`, `estimate` and `calibration` are gated by `MIN_COMPARE_N` /
 `MIN_ESTIMATE_N` in `constants.py` — below the gate they **explain, never number**.
@@ -279,7 +262,6 @@ different claims. See `cage query agent-authorship`.
 |---|---|---|
 | `cage task outcome TASK` | close a task with its outcome (`ok` by default) | `--redo` (mark as needing a redo) · `--label WORD` (one short token: letters/digits/`._-`, ≤32 chars, for `cage insights compare` grouping — never a path or free text) |
 | `cage task time DURATION` | attest how long **you** spent on a task — `45m` · `2h` · `1h30m` · a bare number of minutes. Written as `human_minutes` + `human_minutes_method = "attested"` | `--task ID` (default: the most recent) |
-| `cage task quality` | quality-adjusted cost: cost per *successful* task (plan §8.2) | `--json` · `--export [PATH]` · `--stamp` |
 
 `cage task time` is the **only** unmarked human number cage will ever print: it always
 outranks the wall-clock estimator in `cage insights commits` (rendered `*`, versus the
@@ -320,44 +302,6 @@ defaults to a dry-run print.
 
 ---
 
-## `cage prices` — 6 actions
-
-Manage the project's rate card. Writes are text surgery, never a whole-file rewrite,
-and split by lifecycle: `set`/`sync` write **`prices.toml`** (vendor facts);
-`alias`/`route-tool` write **`cage.toml`** (routing decisions).
-
-| Action | What it does |
-|---|---|
-| `cage prices list` | every visible row: bundled vs project, plus origin and `[meta]` |
-| `cage prices unpriced` | what's billing `$0`, with a runnable fix line each |
-| `cage prices set PROVIDER MODEL` | insert/update a project price row |
-| `cage prices alias PROVIDER MODEL` | route a router pseudo-model to a real price row |
-| `cage prices route-tool TOOL` | price a tool's call-less receipts (plan §4.5) |
-| `cage prices sync` | diff vs the installed bundle (dry-run by default) |
-
-Each action is a **real subparser** since 2026-08-11 (CLI-GAPS(b)), so it owns its own
-flags and its own `--help`; a flag named below appears on that action alone.
-
-| Flag | Owner |
-|---|---|
-| `--input F` · `--output F` · `--cache-read F` | `set` — USD per MTok of input / output / cached input (cache-read defaults to 0.1× input) |
-| `--to P/M` | `alias` · `route-tool` — target price row as `<provider>/<model>` |
-| `--remove` | `route-tool` — delete the tool's route from the managed block |
-| `--update` | `sync` — apply bundled values to rows confirmed via `--yes`; restamp `[meta]` |
-| `--yes PROV/MODEL` | `sync` — confirm one drifted row (repeatable; `all` confirms every one) |
-| `--since WINDOW` | `unpriced` — window like `7d` / `2w` |
-| `--json` | every action |
-
-Positionals: `set`/`alias` take `PROVIDER MODEL` (`-` means the empty provider some
-router rows stamp; the model exactly as `cage prices unpriced` printed it);
-`route-tool` takes the tool name. Bare `cage prices` prints the action list.
-
-**cage never fetches a price** — research is yours, off the code path. Repricing is
-derive-time, so fixing the table re-prices every historical row; the ledger is never
-rewritten.
-
----
-
 ## `cage study` — 5 actions
 
 The P5 fleet study (plan §4.9). Opaque random machine id, **opt-in by enrollment** — an
@@ -392,8 +336,8 @@ machines-with-both-phases.
 | `--yes SECTION.KEY` | `sync` — confirm one non-reconstructable row (repeatable; `all` confirms every one shown) |
 | `--json` | every action |
 
-Customized values are never modified and orphans never deleted; pricing tables delegate
-to `cage prices sync`. **Nothing ever auto-applies this** — hints recommend, humans run.
+Customized values are never modified and orphans never deleted. **Nothing ever
+auto-applies this** — hints recommend, humans run.
 
 ---
 
@@ -401,8 +345,8 @@ to `cage prices sync`. **Nothing ever auto-applies this** — hints recommend, h
 
 ### `cage data export`
 
-Import (refresh) first, then emit. `--agent` filters the *output* only — the sweep is
-always all-agent.
+`cage data export` imports (refreshes) first, then emits. `--agent` filters the
+*output* only — the sweep is always all-agent.
 
 | Flag | Meaning |
 |---|---|
@@ -414,7 +358,7 @@ always all-agent.
 | `--project NAME` | filter to one project (basename; `.` = current dir). Claude-exact (plan §3.7) |
 | `--agent {claude,copilot,kiro}` | filter to one agent |
 | `--no-import` | skip the import-first refresh; emit the ledger exactly as-is |
-| `-o, --output FILE` | write to `FILE` (default: stdout) |
+| `--output FILE` (`-o`) | write to `FILE` (default: stdout) |
 | `--study [PATH]` | write one fleet-study bundle instead (rows + phase markers + counts-only manifest; default name `cage-study-<machine>.zip`) |
 
 CSV and OTel are **one-way reporting formats — never an import source**. The
@@ -447,11 +391,11 @@ Callable but deliberately absent from `cage --help`.
 | `cage mcp` | run the MCP server over stdio — 9 read tools + exactly one write tool (`cage_task_outcome`). Wired automatically by `cage setup` | — |
 | `cage demo` | seed the plan §4.4 worked example and print the attribution and matrix tables | — |
 | `cage debug` | tail the metadata-only debug log (`CAGE_DEBUG=1` to populate) | `--tail N` (default 20) · `--json` (one JSON event per line) |
-| `cage hook EVENT` | the opt-in **L1** lifecycle entry point, invoked by wired agents, not by hand | positional `EVENT ∈ {session-start, session-end, tool, budget}` · `--agent NAME` (required — stamped, never inferred) · `--session ID` · `--command CMD` (hashed for attestation, never stored) |
+| `cage hook EVENT` | the opt-in **L1** lifecycle entry point, invoked by wired agents, not by hand | positional `EVENT ∈ {session-start, session-end, tool}` · `--agent NAME` (required — stamped, never inferred) · `--session ID` · `--command CMD` (hashed for attestation, never stored) |
 
-`cage hook` is **fail-open absolute**: every event exits `0` on any internal failure.
-The sole non-zero is `cage hook budget` returning `2` when
-`[budgets] on_exceed = "block"`.
+`cage hook` is **fail-open absolute, and now unconditionally**: every event exits `0`,
+on any internal failure and otherwise. The budget block was the only non-zero this verb
+ever returned, and it went with the money subsystem (ADR 0011).
 
 **That absoluteness extends to the argparse boundary, and it is the reason `hook` is
 exempt from the usual exit `2`.** Exit `2` is the block verdict, wired to

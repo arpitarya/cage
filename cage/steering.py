@@ -179,10 +179,12 @@ model call on the read path.
 - Copy **method tags** through verbatim. `measured` is an invoice. `modeled` and
   `estimated` are reconstructions. They are not interchangeable, and dropping the tag
   turns a reconstruction into a claim.
-- **Relay refusals; never smooth them.** `INSUFFICIENT DATA` means cage declines to
-  answer — report that, do not substitute zero or "no savings". `SAVING (GROSS)` means
-  the cost of *using* the tool is excluded and unknown, so it is not a proven saving.
-  A blocked comparison means too few closed tasks, not "no difference".
+- **Relay refusals; never smooth them.** A `—` with a reason means cage declines to
+  answer — report that, do not substitute zero. `GROSS` means the tokens spent *using*
+  the tool are excluded, so a saving is not a net. A blocked comparison means too few
+  closed tasks, not "no difference".
+- **Cage measures usage, not cost.** Tokens and credits, never dollars. If asked what
+  something cost, give the usage and say cage does not price it.
 - Do no arithmetic on cage's output. If two numbers need combining, there is a cage
   view that already does it correctly.
 
@@ -190,11 +192,10 @@ model call on the read path.
 
 | question | command |
 |---|---|
-| what has this cost? | `cage report --by agent --since 7d` |
+| what has this used? | `cage report --by agent --since 7d` |
 | which tool actually saved anything? | `cage insights attrib` |
-| is tool X worth keeping? | `cage insights verdict <tool>` |
-| did the stack with X really cost less? | `cage insights compare` |
-| are we over budget? | `cage insights budget` |
+| did the stack with X really use fewer tokens? | `cage insights compare` |
+| which conversation used the tokens? | `cage insights chats` |
 | do the agents actually use the tools? | `cage insights adoption` |
 | why is this number what it is? | `cage query "how is attribution calculated"` |
 
@@ -248,7 +249,7 @@ is correct rather than an obstacle to work around.
 
 - **Do not guess the outcome.** `ok` means the work stood up; `--redo` means it did not.
   If you genuinely cannot tell, leave the task open and say so — an invented `ok`
-  inflates the success rate `cage task quality` reports, permanently and silently.
+  inflates the success rate every outcome-reading view sees, permanently and silently.
 - **Do not close a task twice to change your mind about it.** Re-closing appends a
   superseding row; the earlier one stays on disk. That is by design, not a bug to route
   around.
@@ -275,12 +276,11 @@ calculate on top is an untagged second implementation of the attribution engine.
 
 | the question | the command |
 |---|---|
-| what did we spend? | `cage report --by agent --since 7d` (`--by route/model/day`) |
+| what did we use? | `cage report --by agent --since 7d` (`--by route/model/day`) |
 | what did each tool save? | `cage insights attrib` |
-| is tool X worth keeping? | `cage insights verdict <tool>` |
-| did the stack with X really cost less? | `cage insights compare` |
-| what would other tool combinations have cost? | `cage insights matrix` |
-| are we over budget? | `cage insights budget` |
+| did the stack with X really use fewer tokens? | `cage insights compare` |
+| which conversation used the tokens? | `cage insights chats` |
+| how much did graphify save per chat? | `cage insights graphify` |
 | do the agents actually invoke the tools? | `cage insights adoption` |
 | where did this one number come from? | `cage insights why <call-id>` |
 | how is this calculated? | `cage query "how is attribution calculated"` |
@@ -289,13 +289,18 @@ Add `--csv` to hand over a spreadsheet; the CSV carries the same method tags as 
 
 ## Relaying the answer
 
-- **Method tags are part of the number.** `measured` is an invoice. `modeled` and
-  `estimated` are reconstructions. Carry the word through into your sentence — "$4.10,
-  modeled" is honest; "$4.10" is not.
-- **`SAVING (GROSS)` is not a saving.** It means the cost of *using* the tool is
-  excluded and unknown. Say so. `COSTING` has no such qualifier and can be stated flat,
-  because the omitted term only makes it more negative.
-- **`INSUFFICIENT DATA` is the answer, not the absence of one.** Report the refusal and
+- **Method tags are part of the number.** `measured` is a recorded fact. `modeled` and
+  `estimated` are reconstructions. Carry the word through into your sentence —
+  "412k tokens, modeled" is honest; "412k tokens" is not.
+- **`GROSS` is not a net.** A `saved` figure excludes the tokens spent *using* the
+  tool — the invoking turn, the context a hook injected. Say so; cage reports no net
+  and you must not compute one.
+- **Cage measures usage, never cost.** There is no price table, no budget and no dollar
+  anywhere in it. If asked what something cost, report tokens and credits and say cage
+  does not price them — never convert, never estimate a rate.
+- **Credits are never summed across agents.** A copilot credit is GitHub's own
+  tokens×rates figure; a kiro credit is an AWS credit. Report them per agent.
+- **A refusal is the answer, not the absence of one.** Report it and
   what would lift it (usually: close more tasks). Never substitute zero, never write
   "no savings", never fall back to a different view that happens to produce a number.
 - **A blocked comparison means too few closed tasks**, not "no difference between the
@@ -388,14 +393,14 @@ absent — particularly latency, cost, and anything priced.
 
 ## 3. A dropped caveat
 
-`SAVING (GROSS)`, `UNPRICED`, the observational note on a comparison delta, a min-n
+`GROSS`, a `—` with its reason, the observational note on a comparison delta, a min-n
 block, the CLI-only limit on a hook-derived fact. These travel **with** the number, into
 every surface: text, CSV, MCP, and any summary. A refusal that reaches one surface and
 not another is the bug.
 
 ## 4. A refusal turned into a value
 
-`INSUFFICIENT DATA` must not become `0`, `""`, an empty table, or a silently skipped
+A refusal must not become `0`, `""`, an empty table, or a silently skipped
 section. Look for an `except` that swallows a refusal, an `if not data: return` that
 renders nothing where the CLI would have explained itself, and any default that fills a
 gap the code could not fill honestly.

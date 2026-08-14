@@ -92,14 +92,16 @@ def test_receipt_carries_cage_namespaced_savings_never_gen_ai(root, capsys):
     assert row["cage.saved"] == 400.0
     assert row["cage.method"] == "modeled"
     assert row["cage.confidence"] == 0.6
-    assert row["cage.saved_usd"] > 0
+    assert row["cage.saved"] > 0
     # No invented gen_ai.* key anywhere in a savings row.
     assert not any(k.startswith("gen_ai.") for k in row)
 
 
-def test_unpriced_receipt_omits_saved_usd_never_zero(root, monkeypatch, capsys):
-    # A call-less token receipt with no call, no task-model history, no price_at
-    # route resolves nowhere on the ladder — UNPRICED, must be omitted, not $0.
+def test_a_call_less_receipt_still_exports_its_saving_in_its_own_unit(root, monkeypatch, capsys):
+    """This pinned `cage.saved_usd` being OMITTED when the pricing ladder refused.
+    There is no ladder and no `saved_usd` any more (USAGE-ONLY, ADR 0011) — a receipt
+    exports its saving in its OWN unit, and `cage.unit` names it so a consumer never has
+    to guess. A call-less receipt is no longer a special case at all."""
     ledger.append_row(root, "receipts", schema.make_receipt(
         tool="fux", raw_alternative=200, actual=50, unit="tokens",
         method="modeled", confidence=0.6))
@@ -107,18 +109,10 @@ def test_unpriced_receipt_omits_saved_usd_never_zero(root, monkeypatch, capsys):
     doc = json.loads(capsys.readouterr().out)
     row = doc["cage.savings"][0]
     assert "cage.saved_usd" not in row
-    assert row["cage.saved"] == 150.0
+    assert row["cage.saved"] == 150.0 and row["cage.unit"] == "tokens"
+    assert row["cage.method"] == "modeled"
 
 
-def test_ms_unit_receipt_omits_saved_usd_not_money(root):
-    ledger.append_row(root, "receipts", schema.make_receipt(
-        tool="compress", raw_alternative=500, actual=100, call="c_1", task="t1",
-        unit="ms", method="modeled", confidence=0.6))
-    row = otelout._savings_row(
-        ledger.receipts(root)[0], {"c_1": {"provider": "anthropic",
-                                           "model": "claude-opus-4-8"}}, {}, {})
-    assert "cage.saved_usd" not in row
-    assert row["cage.unit"] == "ms"
 
 
 def test_legacy_human_rows_excluded_and_counted(root, capsys):
@@ -188,39 +182,5 @@ def test_agent_project_filters_apply_to_calls_only(root, capsys):
 
 # ── "omitted, never zero" must survive an UNPRICED model (REV-HARDEN P2) ──────
 
-def test_an_unpriced_linked_receipt_omits_saved_usd_rather_than_exporting_zero(tmp_path):
-    """`policy.price` returns a zero row for a model it cannot price, so
-    `prices.input_cost_usd` yields a hard `0.0` that is indistinguishable from a real
-    zero. Exported, that is a fabricated dollar figure — the one thing this document
-    format promises never to emit.
-
-    The review filed this against `otelout`, which is wrong: its omit-on-None logic is
-    already correct. The `0.0` is produced one level down in `convert`, which is where
-    the fix belongs — putting it in `otelout` would mean a second copy of the pricing
-    ladder there, and the credits rung already drifted between two copies once."""
-    from cage import convert, otelout, policy, schema
-    pol = policy.load(None)
-    call = schema.make_call(route="chat", provider="nobody", model="no-such-model",
-                            tokens_in=100, tokens_out=10, call_id="c_u")
-    rec = schema.make_receipt(tool="graphify", raw_alternative=5000, actual=1000,
-                              call="c_u")
-    assert convert.saved_usd(rec, call, pol) == 0.0          # the legacy shape stands
-    assert convert.saved_usd_opt(rec, call, pol) is None      # ...but it is UNPRICED
-
-    doc = json.loads(otelout.render([call], [rec], [call], pol))
-    row = doc["cage.savings"][0]
-    assert "cage.saved_usd" not in row, row
-    assert row["cage.saved"] == 4000.0 and row["cage.method"]   # counts still exported
 
 
-def test_a_genuinely_zero_saving_still_exports_its_zero(tmp_path):
-    """The distinction the Optional exists for: absent because unpriceable is not the
-    same fact as priced and worth nothing."""
-    from cage import convert, policy, schema
-    pol = policy.load(None)
-    call = schema.make_call(route="chat", provider="anthropic",
-                            model="claude-opus-4-8", tokens_in=100, tokens_out=10,
-                            call_id="c_z")
-    rec = schema.make_receipt(tool="graphify", raw_alternative=1000, actual=1000,
-                              call="c_z")
-    assert convert.saved_usd_opt(rec, call, pol) == 0.0

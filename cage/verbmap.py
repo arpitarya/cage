@@ -23,20 +23,26 @@ REMOVED: dict[str, str] = {
     "import-claude": "import --agent claude",
     # → insights
     "attrib": "insights attrib",
-    "matrix": "insights matrix",
-    "roi": "insights roi",
-    "verdict": "insights verdict",
-    "budget": "insights budget",
     "compare": "insights compare",
     "estimate": "insights estimate",
     "calibration": "insights calibration",
     "why": "insights why",
-    "forecast": "insights forecast",
-    "regression": "insights regression",
-    "recommend": "insights recommend",
+    # The money subsystem, removed outright in USAGE-ONLY (ADR 0011) — cage measures
+    # usage, not cost. An empty tail means "removed, no replacement": `direction()`
+    # explains from `_BODIES` below and `wiringscan.heal_tail` never rewrites to it.
+    # These were `insights <verb>` for one release before removal, so BOTH spellings
+    # are still out there in wired artifacts and shell history.
+    "matrix": "",
+    "roi": "",
+    "verdict": "",
+    "budget": "",
+    "forecast": "",
+    "regression": "",
+    "recommend": "",
+    "prices": "",
+    "quality": "",
     # → task (v0.36: the `human` group is gone; these two were never the human axis)
     "outcome": "task outcome",
-    "quality": "task quality",
     # the Tier-1 agent-vs-human axis, removed outright in v0.36 (see _BODIES)
     "human": "",
     "human-record": "",
@@ -68,7 +74,21 @@ REMOVED: dict[str, str] = {
 
 # Verbs whose removal needs a sentence, not a tail. Checked before the generic
 # empty-tail message so each removal explains its own reason.
+_MONEY_REMOVED = (
+    "was removed in v0.51 with the whole money subsystem — cage measures token and "
+    "credit USAGE, not cost. There is no replacement command: no price table, no "
+    "budget, no ROI, no dollar anywhere (`cage query gross-vs-net`). Nearest usable "
+    "views: `cage report` (tokens/credits by any dimension), `cage insights attrib` "
+    "(per-tool gross token savings), `cage insights chats` (per conversation)")
+
 _BODIES: dict[str, str] = {
+    **{v: f"'{v}' {_MONEY_REMOVED}" for v in
+       ("matrix", "roi", "verdict", "budget", "forecast", "regression", "recommend",
+        "prices")},
+    "quality": ("'quality' was removed in v0.51 — it reported cost per successful "
+                "task, and cage no longer measures cost. The OUTCOME half survives: "
+                "`cage task outcome <task>` still records ok/redo, and "
+                "`cage insights compare` / `calibration` still read it"),
     "human": ("'human' was removed in v0.36 — the agent-vs-human cost axis is gone. "
               "Its two non-human subcommands moved: `cage task outcome`, "
               "`cage task quality` (`cage query savings-axis`)"),

@@ -1,7 +1,7 @@
-"""`cage insights estimate` — a pre-task cost band from matching closed tasks (roadmap P3).
+"""`cage insights estimate` — a pre-task **token** band from matching closed tasks (roadmap P3).
 
-Not a prediction model: the band is the **median + IQR of what matching closed
-tasks actually cost** (via `taskgroup.stats` — measured totals), tagged
+Not a prediction model: the band is the **median + IQR of the tokens matching closed
+tasks actually used** (via `taskgroup.stats` — measured totals), tagged
 ``modeled`` because applying history to a task that hasn't run is a
 reconstruction, never an invoice. Matching is exact-key only (``--scope`` /
 ``--label`` / ``--agent``) — no similarity scoring, no ML (cage law).
@@ -11,12 +11,18 @@ reason — a band over noise is worse than no band. Deterministic: same ledger �
 same estimate; no clocks in the math.
 
 ``--record <task>`` stamps the estimate onto that **open** task row as additive
-fields — ``est_tokens`` / ``est_usd`` / ``est_n`` plus the band bounds
-``est_tokens_q1`` / ``est_tokens_q3`` (needed so `cage insights calibration` can score
-in-band hits against the band *as it was at estimate time*; recomputing later
-over grown history would score a different band). Bounds are recorded for
-tokens only — tokens are the ground-truth quantity; USD re-prices as policy
-changes. The write is fail-open (`tasks.record`); recording onto an
+fields — ``est_tokens`` / ``est_n`` plus the band bounds ``est_tokens_q1`` /
+``est_tokens_q3`` (needed so `cage insights calibration` can score in-band hits against
+the band *as it was at estimate time*; recomputing later over grown history would score
+a different band).
+
+**This view survived the money deletion** (USAGE-ONLY, ADR 0011) because its band was
+always token-denominated — tokens were the ground-truth quantity and USD merely
+re-priced them. Only the `est_usd` half is gone; `est_tokens` and the bounds, which are
+what `calibration` actually scores, are untouched. A pre-existing `est_usd` on an old
+task row is left exactly where it is (append-only) and read by nothing.
+
+The write is fail-open (`tasks.record`); recording onto an
 already-closed task is refused at the CLI boundary — a retroactive estimate is
 exactly what calibration must never count.
 
@@ -57,8 +63,7 @@ def band(root: Path, pol: dict, *, scope: str | None = None, label: str | None =
                            "closed tasks) — refusing to print a band over noise")}
     return {"ok": True, "n": n, "keys": keys, "min_n": MIN_ESTIMATE_N,
             "method": "modeled",
-            "tokens": _dist([float(r["tokens"]) for r in rows]),
-            "usd": _dist([r["usd"] for r in rows])}
+            "tokens": _dist([float(r["tokens"]) for r in rows])}
 
 
 def record(root: Path, task_id: str, est: dict) -> bool:
@@ -68,7 +73,6 @@ def record(root: Path, task_id: str, est: dict) -> bool:
                         est_tokens=est["tokens"]["median"],
                         est_tokens_q1=est["tokens"]["q1"],
                         est_tokens_q3=est["tokens"]["q3"],
-                        est_usd=est["usd"]["median"],
                         est_n=est["n"])
 
 
@@ -82,14 +86,12 @@ def render_estimate(d: dict, recorded: str = "") -> str:
     if not d["ok"]:
         return (f"{head}\n\n{d['reason']}\n"
                 "close more matching tasks (`cage task outcome <task>`) or widen the keys.")
-    t, u = d["tokens"], d["usd"]
+    t = d["tokens"]
     lines = [head, "",
              f"  n = {d['n']} matching closed tasks",
              f"  tokens: median {t['median']:,.0f} · IQR {t['q1']:,.0f}–{t['q3']:,.0f}",
-             f"  usd:    median {render.usd(u['median'])} · IQR "
-             f"{render.usd(u['q1'])}–{render.usd(u['q3'])}",
-             f"  method: {d['method']} — history applied to an unrun task, never an invoice",
+             f"  method: {d['method']} — history applied to an unrun task, never a record",
              "  confidence: none self-reported — `cage insights calibration` measures the hit-rate"]
     if recorded:
-        lines.append(f"  ✔ recorded onto open task {recorded!r} (est_tokens/est_usd/est_n + band)")
+        lines.append(f"  ✔ recorded onto open task {recorded!r} (est_tokens/est_n + band)")
     return "\n".join(lines)

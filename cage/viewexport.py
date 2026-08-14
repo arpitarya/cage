@@ -26,7 +26,7 @@ always (the same payload `--json` prints), CSV only where that view owns a
 `render_csv`. Asking for a format a view cannot produce is a typed refusal naming the
 gap — never an empty file, which would read as *this view has no rows*.
 
-`--html` stays `cage insights matrix`'s own flag: it renders a standalone dashboard
+`--html` was the matrix view's own flag: it rendered a standalone dashboard
 page (`serve.write_html`), a different artifact with a different purpose, and folding
 it in here would make one flag mean two things.
 

@@ -50,14 +50,14 @@ def test_live_order_in_payload():
 def test_json_has_same_fields_as_text(proj, monkeypatch, capsys):
     monkeypatch.chdir(proj)
     metering._policy_for.cache_clear()
-    assert cli.main(["query", "cost", "--json"]) == 0
+    assert cli.main(["query", "saved", "--json"]) == 0
     data = json.loads(capsys.readouterr().out)
     assert set(data) == {"id", "kind", "keywords", "summary", "formula", "code_refs",
                           "method_note", "plan_ref"}
-    assert data["id"] == "cost"
+    assert data["id"] == "saved"
     assert data["kind"] == "calculation"
     pol = policy.load(None)
-    text = explain.render(explain._BY_ID["cost"], pol)
+    text = explain.render(explain._BY_ID["saved"], pol)
     assert data["formula"].splitlines()[0] in text  # same interpolated formula
 
 
@@ -83,13 +83,11 @@ def test_unmatched_suggests_not_guesses(proj, monkeypatch, capsys):
 
 # ── exact-id and natural-language both resolve deterministically ───────────────
 @pytest.mark.parametrize("q,expected", [
-    ("cost", "cost"),
+    ("saved", "saved"),
     ("savings-axis", "savings-axis"),
     ("what happened to the human axis", "savings-axis"),
-    ("how is the value getting calculated", "cost"),
-    ("counterfactual permutation table", "matrix"),
+    ("counterfactual permutation table", "matrix-concept"),
     ("what are the method tags", "method-tags"),
-    ("am i over budget", "budget"),
     ("how does cage work", "overview"),
 ])
 def test_match_is_deterministic(q, expected):
@@ -107,12 +105,12 @@ def test_every_concept_entry_has_code_refs_and_plan_ref():
 
 
 def test_calculation_entries_unchanged_kind():
-    calc_ids = {"cost", "saved", "gross-vs-net", "marginal-attribution", "matrix",
-                "roi", "token-heuristic",
-                "confidence", "method-tags",
-                "budget", "compare-delta", "estimate-band", "calibration-hit-rate",
-                "verdict-composition", "study-pairing",
-                "pricing-match", "unpriced", "repricing", "receipt-pricing"}
+    # The money entries (cost/roi/budget/matrix/verdict-composition/pricing-match/
+    # unpriced/repricing/receipt-pricing) went with the subsystem they explained
+    # (USAGE-ONLY, ADR 0011).
+    calc_ids = {"saved", "gross-vs-net", "marginal-attribution", "token-heuristic",
+                "confidence", "method-tags", "compare-delta", "estimate-band",
+                "calibration-hit-rate", "study-pairing", "policy-versioning"}
     for e in explain.REGISTRY:
         if e.id in calc_ids:
             assert e.kind == "calculation"
@@ -196,22 +194,19 @@ def test_list_kind_filter(proj, monkeypatch, capsys):
             assert line not in out
 
 
-def test_pricing_and_cleanup_entries_render_live(proj, monkeypatch):
+
+
+def test_cleanup_and_capture_entries_render_live(proj, monkeypatch):
+    """The live-interpolation contract, on the entries that survived the money
+    deletion: no `{placeholder}` may reach a rendered formula."""
     monkeypatch.chdir(proj)
     pol = policy.load(None)
-    new_ids = {"pricing-match", "unpriced", "repricing", "prices-cli", "effort-tiers",
-               "policy-versioning", "copilot-pricing", "cleanup", "import-before-export"}
+    live_ids = {"policy-versioning", "cleanup", "import-before-export"}
     by_id = {e.id: e for e in explain.REGISTRY}
-    assert new_ids <= set(by_id)
-    for i in new_ids:
+    assert live_ids <= set(by_id)
+    for i in live_ids:
         text = explain.render(by_id[i], pol)
         assert "{" not in text.split("code:")[0], f"{i} left an unfilled placeholder"
-    # live interpolation: the row count tracks the resolved policy
-    n = sum(len(v) for v in pol["prices"].values())
-    assert f"{n} price rows" in explain.render(by_id["pricing-match"], pol)
-    pol2 = {**pol, "prices": {**pol["prices"], "x": {"m": {"input": 1.0, "output": 1.0,
-                                                          "cache_read": 0.1}}}}
-    assert f"{n + 1} price rows" in explain.render(by_id["pricing-match"], pol2)
-    # and the bundled prices_version is the bundle's own stamp, not a literal
-    stamp = policy.bundled_raw()["meta"]["prices_version"]
-    assert stamp in explain.render(by_id["prices-cli"], pol)
+    # the bundled policy_version is the bundle's own stamp, not a literal
+    stamp = str(policy.bundled_raw()["meta"]["policy_version"])
+    assert stamp in explain.render(by_id["policy-versioning"], pol)

@@ -49,11 +49,11 @@ def _save(path: Path, data: dict) -> None:
 _HOOK_EVENTS = (
     ("SessionStart", "session-start", ""),
     ("SessionEnd", "session-end", ""),
-    # PreToolUse on Bash: the only verified point where cage can (a) see which agent ran
-    # which command — the attestation `adoption`'s half A needs — and (b) BLOCK a paid
-    # call before it happens, which is `budget.check`'s first real caller.
+    # PreToolUse on Bash: the only verified point where cage can see which agent ran
+    # which command — the attestation `adoption`'s half A needs. A second PreToolUse
+    # entry wired the budget block until USAGE-ONLY (ADR 0011) removed it with the rest
+    # of the money subsystem; cage now emits no blocking exit from any hook.
     ("PreToolUse", "tool", "Bash"),
-    ("PreToolUse", "budget", "Bash"),
 )
 
 

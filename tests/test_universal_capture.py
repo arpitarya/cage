@@ -14,6 +14,7 @@ import io
 import json
 from types import SimpleNamespace
 
+from conftest import metric_twin
 from cage import (clicmds, exportcmd, importcmd, initcmd, ledger, paths, policy,
                   report, transcript, watchcmd)
 from srcseed import mkcage
@@ -131,11 +132,13 @@ def test_report_project_filter(tmp_path, monkeypatch):
     (root / ".cage").mkdir(parents=True)
     monkeypatch.chdir(root)
     from cage import schema
-    for proj, tin in (("alpha", 100), ("beta", 200), ("alpha", 300)):
-        ledger.append_row(root, "calls", schema.make_call(
+    for i, (proj, tin) in enumerate((("alpha", 100), ("beta", 200), ("alpha", 300))):
+        _row = schema.make_call(
             route="chat", provider="anthropic", model="claude-opus-4-8",
             tokens_in=tin, tokens_out=10, agent="claude-code", project=proj,
-            ts="2026-06-01T12:00:00Z"))
+            session=f"s{i}", ts="2026-06-01T12:00:00Z")
+        ledger.append_row(root, "calls", _row)
+        metric_twin(root, _row)   # claude has a spine; `spend()` reads the twin
     rep = report.summarize(root, policy.load(None), dim="project", project="alpha")
     assert set(rep["groups"]) == {"alpha"}
     assert rep["total"]["calls"] == 2 and rep["total"]["tokens_in"] == 400
@@ -226,7 +229,8 @@ def test_export_json_summary_totals_match_report(tmp_path, capsys):
     summary = json.loads(capsys.readouterr().out)
     rep = report.summarize(root, pol, dim="agent")
     assert summary["total"]["calls"] == rep["total"]["calls"]
-    assert round(summary["total"]["usd"], 6) == round(rep["total"]["usd"], 6)
+    assert summary["total"]["tokens_in"] == rep["total"]["tokens_in"]
+    assert summary["total"]["tokens_out"] == rep["total"]["tokens_out"]
 
 
 def test_export_filters(tmp_path, capsys):

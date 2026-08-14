@@ -1,9 +1,9 @@
 """`cage insights compare` — measured comparison of closed tasks grouped by stack (roadmap P2).
 
 The question attribution can't answer: not "what does graphify *model* as saved"
-but "did tasks that ran with graphify **measurably** cost less than tasks that
-didn't". Group totals are *measured* (recorded tokens, derive-time repricing);
-the **delta between groups is `estimated`** — the tasks differ, nothing was
+but "did tasks that ran with graphify **measurably** use fewer tokens than tasks that
+didn't". Group totals are *measured* (recorded tokens); the delta between groups is
+**`estimated`** — the tasks differ, nothing was
 randomized, so it is an observed difference, never a causal claim. The caveat
 renders on every output; `method` stays sacred.
 
@@ -21,9 +21,8 @@ from __future__ import annotations
 import statistics
 from pathlib import Path
 
-from cage import creditprice, ledger, prices, render, taskgroup
+from cage import render, taskgroup
 from cage.constants import MIN_COMPARE_N
-from cage.report import unpriced_line
 
 CAVEAT = ("observed difference across different tasks — not a controlled experiment; "
           "stacks are per-task observed receipt sets, not configured pipelines")
@@ -56,12 +55,11 @@ def summarize(root: Path, pol: dict, *, by: tuple[str, ...] = ("stack",),
         else:
             g["ok"] = True
             g["tokens"] = _dist([float(r["tokens"]) for r in rows])
-            g["usd"] = _dist([r["usd"] for r in rows])
-            # Method law: one credit-priced call anywhere in the group degrades the
-            # whole group to `modeled` — the weaker tag always wins, or a configured
-            # rate reads as an invoice. Same rule and same helper as report/chats.
-            g["method"] = creditprice.method_for(
-                {creditprice.CREDITS: sum(r.get("credit_calls", 0) for r in rows)})
+            # Every figure is recorded tokens, so every eligible group is `measured`.
+            # The credit-basis degradation this used to apply went with the money
+            # subsystem (USAGE-ONLY, ADR 0011): a credit was only ever a *pricing*
+            # basis, and there is no price left for it to weaken.
+            g["method"] = "measured"
         groups.append(g)
 
     # deltas: each eligible stack vs the eligible agent-only group sharing every
@@ -79,27 +77,9 @@ def summarize(root: Path, pol: dict, *, by: tuple[str, ...] = ("stack",),
         deltas.append({**{k: g[k] for k in non_stack},
                        "stack": g["stack"], "baseline": taskgroup.AGENT_ONLY,
                        "d_median_tokens": g["tokens"]["median"] - base["tokens"]["median"],
-                       "d_median_usd": round(g["usd"]["median"] - base["usd"]["median"], 6),
                        "method": "estimated"})
-    d = {"by": list(keys), "min_n": MIN_COMPARE_N, "groups": groups,
-         "deltas": deltas, "caveat": CAVEAT,
-         "unpriced_detail": unpriced_detail(root, pol)}
-    return d
-
-
-def unpriced_detail(root: Path, pol: dict) -> dict:
-    """Ledger-wide ``{prov/model: {calls, tokens}}`` of none-match calls — shared by
-    the compare/study UNPRICED warning (an analyst must see the gap before
-    publishing a total; the group numbers themselves stay as computed)."""
-    detail: dict[str, dict] = {}
-    for c in ledger.spend(root):
-        if prices.call_usd_match(pol, c)[1] != "none":
-            continue
-        u = detail.setdefault(f"{c.get('provider') or '—'}/{c.get('model') or '—'}",
-                              {"calls": 0, "tokens": 0})
-        u["calls"] += 1
-        u["tokens"] += c.get("tokens_in", 0) + c.get("tokens_out", 0)
-    return dict(sorted(detail.items()))
+    return {"by": list(keys), "min_n": MIN_COMPARE_N, "groups": groups,
+            "deltas": deltas, "caveat": CAVEAT}
 
 
 def _tok(x: float) -> str:
@@ -114,34 +94,27 @@ def render_csv(d: dict) -> str:
       refusal in ``note`` and carries no numbers — the command explains, never
       numbers, in CSV too);
     - ``delta`` rows are tagged ``estimated`` and carry the observational caveat
-      in ``note`` — the caveat survives into the spreadsheet;
-    - one ``unpriced`` row mirrors the text view's ⚠ warning when it renders.
+      in ``note`` — the caveat survives into the spreadsheet.
 
     Column contract: `csvout.py` (`cage query csv-output`)."""
     from cage import csvout
     keys = d["by"]
     head = ["kind", *keys, "baseline", "n", "median_tokens", "iqr_lo_tokens",
-            "iqr_hi_tokens", "median_usd", "iqr_lo_usd", "iqr_hi_usd",
-            "d_median_tokens", "d_median_usd", "method", "note"]
-    blank = [None] * 6
+            "iqr_hi_tokens", "d_median_tokens", "method", "note"]
+    blank = [None] * 3
     rows = []
     for g in d["groups"]:
         key_cells = [g[k] or "—" for k in keys]
         if g["ok"]:
             rows.append(["group", *key_cells, None, g["n"],
                          g["tokens"]["median"], g["tokens"]["q1"], g["tokens"]["q3"],
-                         round(g["usd"]["median"], 6), round(g["usd"]["q1"], 6),
-                         round(g["usd"]["q3"], 6), None, None, g["method"], ""])
+                         None, g["method"], ""])
         else:
-            rows.append(["group", *key_cells, None, g["n"], *blank, None, None,
+            rows.append(["group", *key_cells, None, g["n"], *blank, None,
                          "", g["reason"]])
     for dl in d["deltas"]:
         rows.append(["delta", *[dl.get(k) or "—" for k in keys], dl["baseline"],
-                     None, *blank, dl["d_median_tokens"], dl["d_median_usd"],
-                     dl["method"], d["caveat"]])
-    if d.get("unpriced_detail"):
-        rows.append(["unpriced", *[None] * len(keys), None, None, *blank, None,
-                     None, "", unpriced_line(d["unpriced_detail"])])
+                     None, *blank, dl["d_median_tokens"], dl["method"], d["caveat"]])
     return csvout.table(head, rows)
 
 
@@ -150,33 +123,27 @@ def render_compare(d: dict) -> str:
         return ("No closed tasks to compare — close tasks with `cage task outcome <task>` "
                 "(optionally `--label <word>`), then re-run `cage insights compare`.")
     keys = d["by"]
-    headers = [*keys, "n", "median tok", "IQR tok", "median $", "IQR $"]
+    headers = [*keys, "n", "median tok", "IQR tok"]
     rows = []
     for g in d["groups"]:
         head = [str(g[k]) or "—" for k in keys]
         if g["ok"]:
             rows.append([*head, str(g["n"]),
                          _tok(g["tokens"]["median"]),
-                         f"{_tok(g['tokens']['q1'])}–{_tok(g['tokens']['q3'])}",
-                         render.usd(g["usd"]["median"]),
-                         f"{render.usd(g['usd']['q1'])}–{render.usd(g['usd']['q3'])}"])
+                         f"{_tok(g['tokens']['q1'])}–{_tok(g['tokens']['q3'])}"])
         else:
-            rows.append([*head, str(g["n"]), g["reason"], "", "", ""])
-    # The headline carries the weakest method any eligible group earned — a header
-    # that says `measured` over a modeled row is the same lie as a mislabelled cell.
-    _methods = {g.get("method", "measured") for g in d["groups"] if g["ok"]}
-    _basis = "modeled" if "modeled" in _methods else "measured"
-    out = [f"Stack comparison · closed tasks · {_basis} group totals "
+            rows.append([*head, str(g["n"]), g["reason"], ""])
+    out = ["Stack comparison · closed tasks · measured group totals "
            "(tokens = in+out per task)", "",
            render.table(headers, rows, rights={len(keys), len(keys) + 1,
-                                               len(keys) + 2, len(keys) + 3, len(keys) + 4})]
+                                               len(keys) + 2})]
     if d["deltas"]:
         out.append("")
         for dl in d["deltas"]:
             extra = "".join(f" · {k}={dl[k]}" for k in keys if k != "stack" and dl.get(k))
             out.append(f"Δ {dl['stack']} vs {dl['baseline']}{extra}: "
-                       f"{dl['d_median_tokens']:+,.0f} tok · "
-                       f"{render.signed_usd(dl['d_median_usd'])} per task (median, {dl['method']})")
+                       f"{dl['d_median_tokens']:+,.0f} tok per task "
+                       f"(median, {dl['method']})")
         out.append(f"  ⚠ {d['caveat']}")
     else:
         eligible = [g for g in d["groups"] if g["ok"]]
@@ -185,6 +152,4 @@ def render_compare(d: dict) -> str:
                else "no eligible non-baseline group")
         out.append("")
         out.append(f"no delta: {why} (each side needs n ≥ {d['min_n']}).")
-    if d.get("unpriced_detail"):
-        out += ["", unpriced_line(d["unpriced_detail"])]
     return "\n".join(out)

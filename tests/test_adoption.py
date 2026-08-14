@@ -6,7 +6,7 @@ boundary itself, not just the rendering — a blend of any two would still "look
 
 Also pinned here: the diagnostic-only invariant. This is the first view that READS the
 usage breadcrumb, so it is the one place that could quietly turn a count into a price.
-It never does, and `test_no_currency_anywhere` / `test_adoption_does_not_perturb_money_views`
+It never does, and `test_no_currency_anywhere` / `test_adoption_does_not_perturb_derived_views`
 are what keep that true rather than aspirational.
 """
 from __future__ import annotations
@@ -16,6 +16,7 @@ from pathlib import Path
 
 import pytest
 
+from conftest import metric_twin
 from cage import adoption, ledger, paths, schema, usagelog
 from cage.policy import load as load_policy
 
@@ -27,11 +28,12 @@ def root(proj):
 
 
 def _call(root: Path, cid: str, *, agent: str, session: str = "", ts: str = "2026-07-01T09:00:00Z"):
-    ledger.append(paths.Footprint(root).calls,
-                  schema.make_call(route="chat", provider="anthropic",
-                                   model="claude-sonnet-4-6", tokens_in=100,
-                                   tokens_out=50, agent=agent, session=session,
-                                   ts=ts, call_id=cid))
+    row = schema.make_call(route="chat", provider="anthropic",
+                           model="claude-sonnet-4-6", tokens_in=100,
+                           tokens_out=50, agent=agent, session=session,
+                           ts=ts, call_id=cid)
+    ledger.append(paths.Footprint(root).calls, row)
+    metric_twin(root, row)   # `spend()` reads the twin for a spined agent (ADR 0011)
 
 
 def _saving(root: Path, *, tool: str = "graphify", session: str = "", call: str = "",
@@ -282,18 +284,18 @@ def test_no_currency_anywhere(root):
     assert blob.lower().count("price") == 1
 
 
-def test_adoption_does_not_perturb_money_views(root):
-    """Reading the usage log must not make it readable BY a money view — report/roi stay
+def test_adoption_does_not_perturb_derived_views(root):
+    """Reading the usage log must not make it readable BY a derived view — report stays
     byte-identical across an adoption render (the GC1 invariant, from the new caller)."""
-    from cage import report, roi
+    from cage import report
     (root / "store.py").write_text("x = 1\n" * 200)
     _usage(root)
     _call(root, "c_1", agent="claude-code", session="s1")
     _saving(root, session="s1")
     pol = load_policy(paths.Footprint(root).policy)
-    before = (report.render_report(report.summarize(root, pol)), roi.by_tool(root, pol))
+    before = report.render_report(report.summarize(root, pol))
     adoption.render_adoption(adoption.summarize(root))
-    after = (report.render_report(report.summarize(root, pol)), roi.by_tool(root, pol))
+    after = report.render_report(report.summarize(root, pol))
     assert before == after
 
 

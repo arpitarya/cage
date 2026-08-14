@@ -32,7 +32,44 @@ def _call(root: Path, cid: str, *, provider: str, model: str, agent: str,
     if machine:
         row["machine"] = machine
     ledger.append(paths.Footprint(root).calls, row)
+    _metric_twin(root, row)
     return row["id"]
+
+
+def _metric_twin(root: Path, row: dict) -> None:
+    """Append the per-agent metric twin, exactly as real capture dual-writes it.
+
+    `ledger.spend` supersedes a `calls` row for any agent that HAS a metric ledger
+    (USAGE-ONLY, ADR 0011), partitioning by agent rather than by time — so a calls-only
+    golden seed renders an EMPTY table for claude and copilot. Agents with no spine
+    (`lib`, `codex`, kiro) need no twin: their rows are never superseded (kiro's are
+    suppressed outright, `ledger.ABSENT_SPINES`)."""
+    from cage import agents as _ag
+    surface = _ag.row_surface(row.get("agent")) or ""
+    common = dict(session=row.get("session", ""), model=row.get("model", ""),
+                  provider=row.get("provider", ""), tokens_in=row.get("tokens_in", 0),
+                  tokens_out=row.get("tokens_out", 0),
+                  cached_in=row.get("cached_in", 0), ts=row.get("ts"))
+    twin = None
+    if surface == "claude":
+        twin = schema.make_claude_metric(
+            source="request", request=row.get("id", ""),
+            surface=row.get("surface", ""),
+            cache_write_in=row.get("cache_write_in", 0),
+            metric_id=f"clm_{row.get('id', '')}", **common)
+    elif surface == "copilot":
+        twin = schema.make_copilot_metric(
+            source="chat", surface=row.get("surface") or "vscode",
+            request=row.get("id", ""),
+            metric_id=f"cpm_{row.get('id', '')}", **common)
+    if twin is None:
+        return
+    # Carry the axes the metric constructors do not model but the derived views group
+    # by — the fleet study buckets per MACHINE, and a twin without one lands unphased.
+    for axis in ("machine", "project", "task", "scope"):
+        if row.get(axis):
+            twin[axis] = row[axis]
+    ledger.append_row(root, surface, twin)
 
 
 def _receipt(root: Path, rid: str, *, tool: str, raw: float, actual: float,
@@ -123,29 +160,19 @@ def spend_only(root: Path) -> None:
 
 
 def stale(root: Path) -> None:
-    """Spec R6: a healthy table whose advice gate fires — ledger anchored 61 days
-    past the bundled prices_date (data-relative, clock-free) plus a 3-day-old
-    last-import cursor (the one documented clock carve-out)."""
+    """Spec R6: a healthy table whose advice gate fires — a 3-day-old last-import
+    cursor (the one documented clock carve-out).
+
+    The 61-days-past-`prices_date` anchor this used to compute is gone with the price
+    file (USAGE-ONLY, ADR 0011); the import-age advice is what remains, and it needs no
+    price stamp. A fixed instant keeps the golden clock-free."""
     import datetime as _dt
-    from cage import policy
-    stamped = _dt.date.fromisoformat(str(policy.bundled_raw()["meta"]["prices_date"]))
-    anchor = stamped + _dt.timedelta(days=61)
-    ts = f"{anchor.isoformat()}T09:00:00Z"
-    # METRICS-PRIMARY: this seed is deliberately FUTURE-dated (61 days past the bundled
-    # prices_date, to fire the prices-age advice), so it lands POST-cutover and is the one
-    # golden whose basis genuinely changed. Production dual-writes, so the fixture does
-    # too: `ledger.spend` supersedes the `calls` row with the claude request-grain metric
-    # row below, while `ledger.join_table` still resolves the receipt's `call="c_st1"` so
-    # the saving stays attributed to its agent. `agent="claude-code"` is what
-    # `transcript.parse_calls` and `make_claude_metric` both actually stamp — the old
-    # `"claude"` here was the SURFACE name, which no real row carries.
+    ts = "2026-07-02T09:00:00Z"
+    # `ledger.spend` reads the metric twin `_call` writes; `ledger.join_table` still
+    # resolves the receipt's `call="c_st1"`, so the saving stays attributed to its agent.
     _call(root, "c_st1", provider="anthropic", model="claude-sonnet-4-6",
-          agent="claude-code", tin=912_400, tout=61_200, ts=ts, task="t_r6")
-    ledger.append_row(root, "claude", schema.make_claude_metric(
-        source="request", session="s_r6", request="req_r6",
-        model="claude-sonnet-4-6", provider="anthropic",
-        tokens_in=912_400, tokens_out=61_200, requests=1, ts=ts,
-        metric_id="clm_st1"))
+          agent="claude-code", tin=912_400, tout=61_200, ts=ts, task="t_r6",
+          session="s_r6")
     _receipt(root, "r_0601", tool="graphify", raw=100_000, actual=20_000,
              ts=ts, call="c_st1", task="t_r6")
     now = _dt.datetime.now(_dt.timezone.utc)
@@ -219,20 +246,8 @@ def compare_estimate(root: Path) -> None:
         _task(root, tid, label="refactor", ts=_ts(day + 3, 20))
 
 
-def matrix_task(root: Path) -> None:
-    """Spec I7/I8: one task, one tool, a joined priced call — the 2¹ grid."""
-    _call(root, "c_m1", provider="anthropic", model="claude-sonnet-4-6",
-          agent="claude", tin=1_660, tout=0, ts=_ts(5), task="t_9f31",
-          session="s_m")
-    _receipt(root, "r_0701", tool="graphify", raw=22_171, actual=1_660,
-             ts=_ts(5, 10), call="", task="t_9f31")
 
 
-def matrix_unpriceable(root: Path) -> None:
-    """Spec I8 (second block): a task-less, call-less receipt — the token grid
-    still renders; only the cost column explains its absence."""
-    _receipt(root, "r_0801", tool="graphify", raw=22_171, actual=1_660,
-             ts=_ts(5, 10))
 
 
 def _usage_row(root: Path, *, op: str, outcome: str, route: str, ts: str) -> None:
@@ -314,7 +329,7 @@ def _chat_name(root: Path, *, agent: str, session: str, name: str, ts: str) -> N
         root, import_id=manifest.new_import_id(), agent=agent, surface="",
         session=session, session_uid=manifest.new_session_uid(), source_path="",
         files_scanned=1, rows_appended=1, tokens_in=0, tokens_out=0, cached_in=0,
-        est_cost_usd=0.0, unpriced_rows=0, ts=ts, session_name=name)
+        ts=ts, session_name=name)
 
 
 def chats_titled(root: Path) -> None:

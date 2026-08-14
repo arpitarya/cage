@@ -9,7 +9,7 @@ the ones the modules used to inline, (b) the demo's §4.4 numbers are unchanged
 from __future__ import annotations
 
 from cage import (attribution, compress, constants, graphifymeter,
-                  ledger, matrix, origin, policy)
+                  ledger, origin, policy)
 
 
 # ── the modules read their heuristics from constants (the move actually landed) ─
@@ -18,7 +18,6 @@ def test_modules_import_from_constants():
     assert graphifymeter.toks("y" * 40) == round(40 / constants.CHARS_PER_TOKEN)
     assert ledger._UNIT is constants.SINCE_WINDOW_DAYS
     assert attribution._TRUST is constants.METHOD_TRUST
-    assert constants.MAX_MATRIX_TOOLS == 12 and matrix.MAX_MATRIX_TOOLS == 12
 
 
 # ── the values are exactly the ones that used to be inlined (no retune) ────────
@@ -39,23 +38,9 @@ def test_demo_attribution_matches_plan(seeded):
     data = attribution.attribute(root, "fix-handover-bug", pol)
     by_tool = {s["tool"]: s for s in data["steps"]}
     assert by_tool["graphify"]["saved_tokens"] == 27000
-    assert by_tool["graphify"]["saved_usd"] == 0.081
     assert data["total_saved_tokens"] == 41400
-    assert data["total_saved_usd"] == 0.1242
 
 
-def test_demo_matrix_full_stack_cell(seeded):
-    root, _ = seeded
-    pol = policy.load(None)
-    data = matrix.matrix(root, "fix-handover-bug", pol)
-    full_off = next(r for r in data["rows"] if not any(r["on"].values()))
-    full_on = next(r for r in data["rows"] if all(r["on"].values()))
-    assert full_off["input_tok"] == 50000 and full_off["cost_usd"] == 0.1725
-    assert full_on["input_tok"] == 8600 and full_on["cost_usd"] == 0.0483
-    assert full_on["source"] == "measured" and full_off["source"] == "modeled"
-
-
-# ── DEFAULT_CONFIDENCE stays a reviewable constant, not a scattered literal ────
 def test_default_confidence_ladder_is_the_one_source():
     # `origin.explain` is the surviving consumer after the Tier-1 human axis was
     # removed in v0.36: it reads the ladder, never an inlined 0.7.

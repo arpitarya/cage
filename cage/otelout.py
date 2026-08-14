@@ -35,13 +35,13 @@ back with an honest value:
 
 **Receipts/savings have no GenAI equivalent — decision: cage-namespaced, never an
 invented `gen_ai.*` name.** Each lands in a separate `cage.savings` array under
-`cage.*` keys. `cage.saved` is always GROSS (`netsaved.GROSS_NOTE`) — the avoided
-read cost, never netted against the cost of using the tool. `cage.saved_usd` prices
-through the same resolution ladder every other view uses (`receiptprice`/`convert`)
-and is **omitted, never zero**, when the ladder refuses (UNPRICED) or the unit isn't
-money (`ms`/`gco2`) — never a fabricated dollar figure. `cage.method` always
-survives so a `modeled`/`estimated` number can never arrive at a vendor looking
-measured. Legacy Tier-1 human-axis rows (`tool="human"` / `unit="minutes"`, axis
+`cage.*` keys. `cage.saved` is always GROSS (`savings.GROSS_NOTE`) — the avoided
+read cost, never netted against the cost of using the tool. There is **no
+`cage.saved_usd`**: it priced through the `receiptprice`/`convert` ladder, which went
+with the money subsystem (USAGE-ONLY, ADR 0011). `cage.unit` still names the receipt's
+own unit, so a consumer reads the figure in the unit it was recorded in and cage
+converts nothing. `cage.method` always survives so a `modeled`/`estimated` number can
+never arrive at a vendor looking measured. Legacy Tier-1 human-axis rows (`tool="human"` / `unit="minutes"`, axis
 removed v0.36) are excluded the same way `report.py` excludes them, and counted in
 `cage.meta.legacy_human_excluded`.
 
@@ -50,7 +50,6 @@ stable per-row key order, LF pinned, no clock, no randomness.
 """
 from __future__ import annotations
 
-from cage import convert, receiptprice
 from cage.constants import (OTEL_SEMCONV_SOURCE, OTEL_SEMCONV_STATUS,
                             OTEL_SEMCONV_VERSION, OTEL_SEMCONV_VERSION_MEANS)
 
@@ -87,23 +86,7 @@ def _call_span(call: dict) -> dict:
     return span
 
 
-def _saved_usd(r: dict, calls_by_id: dict, idx: dict, pol: dict) -> float | None:
-    """USD for one receipt's gross `saved`, or ``None`` when there is no honest
-    figure — an UNPRICED ladder refusal, or a non-money unit (`ms`/`gco2`)."""
-    unit = r.get("unit", "tokens")
-    if unit == "usd":
-        return float(r.get("saved", 0.0))
-    if unit != "tokens":  # ms / gco2 — not money, never a fabricated $0
-        return None
-    if receiptprice.eligible(r, calls_by_id):
-        res = receiptprice.resolve(r, idx, pol)
-        return res[0] if res is not None else None  # None = UNPRICED, omit
-    # The Optional variant: an unpriced model must OMIT the field, not export a
-    # hard 0.0 that reads as "this saving was worth nothing".
-    return convert.saved_usd_opt(r, calls_by_id.get(r.get("call"), {}), pol)
-
-
-def _savings_row(r: dict, calls_by_id: dict, idx: dict, pol: dict) -> dict:
+def _savings_row(r: dict) -> dict:
     row = {
         "cage.id": r.get("id", ""),
         "cage.ts": r.get("ts", ""),
@@ -117,22 +100,18 @@ def _savings_row(r: dict, calls_by_id: dict, idx: dict, pol: dict) -> dict:
         row["cage.task"] = r["task"]
     if r.get("call"):
         row["cage.call"] = r["call"]
-    usd = _saved_usd(r, calls_by_id, idx, pol)
-    if usd is not None:
-        row["cage.saved_usd"] = round(usd, 6)
     return row
 
 
 def render(calls: list[dict], receipts: list[dict], all_calls: list[dict], pol: dict) -> str:
     """One deterministic JSON document: `cage.meta` (semconv pin) + `calls`
-    (`gen_ai.*` spans) + `cage.savings` (cage-namespaced receipts). ``all_calls`` is
-    the *unfiltered* call set so the receipt pricing ladder (`receiptprice.build`)
-    can resolve a call-less receipt's task-model rung even when `--since`/`--project`
-    narrowed the emitted `calls` array."""
+    (`gen_ai.*` spans) + `cage.savings` (cage-namespaced receipts).
+
+    ``all_calls`` and ``pol`` are accepted and unused. They fed the receipt pricing
+    ladder, which is gone (USAGE-ONLY, ADR 0011); the parameters stay so every caller's
+    signature is unchanged and a `--since`-narrowed export keeps the same shape."""
     import json
 
-    calls_by_id = {c["id"]: c for c in all_calls}
-    idx = receiptprice.build(all_calls, receipts)
     legacy = [r for r in receipts if _is_legacy_human(r)]
     priced_receipts = [r for r in receipts if not _is_legacy_human(r)]
     doc = {
@@ -144,6 +123,6 @@ def render(calls: list[dict], receipts: list[dict], all_calls: list[dict], pol: 
             "legacy_human_excluded": len(legacy),
         },
         "calls": [_call_span(c) for c in calls],
-        "cage.savings": [_savings_row(r, calls_by_id, idx, pol) for r in priced_receipts],
+        "cage.savings": [_savings_row(r) for r in priced_receipts],
     }
     return json.dumps(doc, ensure_ascii=False, indent=2) + "\n"

@@ -24,7 +24,7 @@ import json
 import sys
 from pathlib import Path
 
-from cage import csvout, importcmd, ledger, otelout, prices
+from cage import csvout, importcmd, ledger, otelout
 from cage.errors import CageError
 from cage.schema import CALL_FIELDS, RECEIPT_FIELDS
 
@@ -84,9 +84,10 @@ def _filtered(root: Path, since: str | None, project: str | None, agent: str | N
     ``spend=False`` (the default) reads the `calls` ledger VERBATIM — the raw jsonl/csv
     export is a dump of that kind and must stay exactly what the ledger stores.
     ``spend=True`` reads `ledger.spend`, the derive resolver, and is used for the JSON
-    **summary**, whose stated contract is that its totals match `cage report`. Post-cutover
-    the two genuinely differ (METRICS-PRIMARY), so the summary would silently disagree with
-    the report it promises to match if it kept reading raw rows."""
+    **summary**, whose stated contract is that its totals match `cage report`. The two
+    genuinely differ for any agent with a metric spine (METRICS-PRIMARY), so the summary
+    would silently disagree with the report it promises to match if it kept reading raw
+    rows."""
     src = ledger.spend(root, since=since) if spend else ledger.calls(root, since=since)
     rows = ledger.since(src, since)
     rows = ledger.by_project(rows, project)
@@ -107,18 +108,17 @@ def _csv(rows: list[dict], kind: str = "calls") -> str:
 
 
 def _bucket() -> dict:
-    return {"calls": 0, "tokens_in": 0, "tokens_out": 0, "usd": 0.0}
+    return {"calls": 0, "tokens_in": 0, "tokens_out": 0}
 
 
 def _summary(rows: list[dict], pol: dict) -> dict:
-    """Totals + breakdowns by agent/model/project. ``usd`` is recomputed per call via the
-    same `prices.call_usd` `cage report` uses, so the summary totals match `cage report`."""
+    """Totals + breakdowns by agent/model/project, in TOKENS. `pol` is accepted and
+    unused — no figure here is priced (USAGE-ONLY, ADR 0011)."""
     total = _bucket()
     by_agent: dict[str, dict] = {}
     by_model: dict[str, dict] = {}
     by_project: dict[str, dict] = {}
     for c in rows:
-        usd = prices.call_usd(pol, c)
         ti, to = c.get("tokens_in", 0), c.get("tokens_out", 0)
         for table, key in ((by_agent, c.get("agent") or "—"),
                            (by_model, c.get("model") or "—"),
@@ -127,11 +127,9 @@ def _summary(rows: list[dict], pol: dict) -> dict:
             g["calls"] += 1
             g["tokens_in"] += ti
             g["tokens_out"] += to
-            g["usd"] += usd
         total["calls"] += 1
         total["tokens_in"] += ti
         total["tokens_out"] += to
-        total["usd"] += usd
     return {"total": total, "by_agent": by_agent, "by_model": by_model, "by_project": by_project}
 
 

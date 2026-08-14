@@ -3,7 +3,7 @@ doc: research — the definitive fetch spec for Kiro per-chat tokens in/out, cac
 date: 2026-08-13
 verified-against: aws/amazon-q-developer-cli `main` (clone 2026-08-13, kiro-cli's upstream) · d-kuro/kirocc `main` + ZyphrZero/kiro.rs `main` (clones 2026-08-13, both carry real captured payloads) · kiro-usage 0.1.3 (PyPI wheel, community tracker) · cage HEAD (`transcript.py`, `paths.py`; real-store probes of 2026-08-01 / 2026-08-07, kiro-cli 2.16.0)
 relates: 2026-08-13-copilot-per-chat-usage-fetch-spec.md (the copilot analog) · 2026-08-07-graphify-store-evidence.md (kiro-cli store shape, truncation marker) · ADR 0006 (kiro rows are machine facts) · ADR 0009 (tool-run bodies transient)
-unverified: real-store probes of the IDE `devdata.sqlite` and IDE session JSONs are PENDING — folder access to `~/Library/Application Support/Kiro` and `~/Library/Application Support/kiro-cli` was not grantable from this Cowork session; §6 lists the exact read-only commands to close them
+unverified: ONE probe remains — whether IDE session JSONs embed per-message usage. The `devdata.sqlite` probe was CLOSED on 2026-08-14 with a negative result: **the file does not exist on a real Kiro install** (`dev_data/` holds only `tokens_generated.jsonl` — 28 rows, 1,576 in / 0 out, model `"agent"` throughout, one byte-identical 6-row block repeated, i.e. not summable). Consequence: kiro has **no token spine** in cage — `SPEND_SOURCES["kiro"]` is empty and `ledger.ABSENT_SPINES` states the reason (USAGE-ONLY, ADR 0011). §6 lists the command that closes the remaining one
 ---
 
 # Kiro per-chat usage: where every number lives, exactly

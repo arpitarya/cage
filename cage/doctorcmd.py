@@ -16,7 +16,7 @@ from pathlib import Path
 
 import datetime as _dt
 
-from cage import (agents, debuglog, importcmd, ledger, paths, policy, prices, render,
+from cage import (agents, debuglog, importcmd, ledger, paths, policy, render,
                   schema, wiringscan)
 
 _OK, _WARN, _FAIL = "ok", "warn", "fail"
@@ -54,20 +54,17 @@ def _policy(root: Path) -> tuple[str, str]:
     except Exception as exc:  # noqa: BLE001 — surface the parse error, don't raise
         return _FAIL, f"{active.name} failed to load: {exc}"
     name = active.name if active.exists() else "no project config (bundled defaults apply)"
-    n_prices = sum(len(r) for r in pol.get("prices", {}).values() if isinstance(r, dict))
-    prices_name = foot.prices.name if foot.prices.exists() else "bundled default"
-    prices_note = f"prices from {prices_name} ({n_prices} rows)"
     shadowed = foot.shadowed_config
-    shadowed_prices = foot.shadowed_prices
     if shadowed is not None:
-        return _WARN, (f"config: {name} loads, {prices_note} "
-                       f"— but a legacy {shadowed.name} sits beside it and is ignored; "
-                       f"delete it (cage.toml wins)")
-    if shadowed_prices is not None:
-        return _WARN, (f"config: {name} loads, {prices_note} — but a legacy "
-                       f"[prices]/[credits] block in {shadowed_prices.name} is ignored "
-                       f"({paths.PRICES_FILENAME} wins); remove those tables")
-    return _OK, f"config: {name} loads, {prices_note}"
+        return _WARN, (f"config: {name} loads — but a legacy {shadowed.name} sits "
+                       f"beside it and is ignored; delete it (cage.toml wins)")
+    # A leftover `prices.toml` is INERT, not shadowed: cage stopped reading prices
+    # entirely (USAGE-ONLY, ADR 0011). Say so rather than leave a file sitting in
+    # `.cage/` that still looks live — but never delete it; it is the user's.
+    if foot.prices.exists() and foot.prices != active:
+        return _OK, (f"config: {name} loads — note: {foot.prices.name} is no longer "
+                     "read (cage measures usage, not cost); safe to delete")
+    return _OK, f"config: {name} loads"
 
 
 def _metering(active: Path) -> tuple[str, str]:
@@ -224,71 +221,6 @@ def _capture_quality(root: Path) -> tuple[str, str]:
                    "for some agents):" + "".join(lines))
 
 
-def _pricing(root: Path) -> tuple[str, str]:
-    """Scan recorded calls for models that bill $0 with no exact *or* family price
-    row — the silent-$0 sharp edge. A wrong $0 must read as UNPRICED here, not hide."""
-    try:
-        pol = policy.load(paths.Footprint(root).policy)
-        calls = ledger.calls(root)
-    except Exception:  # noqa: BLE001 — a broken policy/ledger is reported by other checks
-        return _OK, "no priced ledger to check yet"
-    from cage import receiptprice
-    dangling = receiptprice.dangling_routes(pol)
-    if dangling:  # a broken explicit route needs no calls to be wrong (plan §4.5)
-        broken = ", ".join(f"[tools.{t}] price_at = {v!r}" for t, v in dangling.items())
-        return _WARN, ("dangling tool route(s) — no price row resolves, the tool's "
-                       f"receipts stay UNPRICED: {broken}")
-    if not calls:
-        return _OK, "no calls recorded yet — nothing to price-check"
-    unpriced, family = set(), set()
-    for c in calls:
-        _, match, _ = prices.call_usd_match(pol, c)
-        tag = f"{c.get('provider') or '—'}/{c.get('model') or '—'}"
-        if match == "none":
-            unpriced.add(tag)
-        elif match == "family":
-            family.add(tag)
-    if unpriced:
-        return _WARN, ("UNPRICED models billing $0 (run `cage prices unpriced` for "
-                       "ready-to-run fix lines): " + ", ".join(sorted(unpriced)))
-    if family:
-        return _OK, "all models priced (some by family approx): " + ", ".join(sorted(family))
-    return _OK, "all recorded models have an exact price row"
-
-
-def _credits(root: Path) -> tuple[str, str]:
-    """Billed-credit coverage: how many recorded rows carry the provider's own credit
-    figure, and whether a rate exists to price them (COPILOT-CREDITS rung 1).
-
-    **Advisory only — this check never fails, and never warns.** Credit coverage is a
-    property of the *store*, not of the user's setup: VS Code persists `copilotCredits`
-    on some requests and not others, and no action on this machine changes that. Calling
-    partial coverage a fault would be blaming someone for a vendor's logging, and would
-    train readers to ignore a red line they cannot clear. What it does buy is the answer
-    to "why is some copilot spend priced differently from the rest", visible before
-    anyone asks — plus the one actionable case (credits recorded, rate unset), stated as
-    an `ok` with a runnable fix rather than an alarm."""
-    from cage import creditprice
-    try:
-        pol = policy.load(paths.Footprint(root).policy)
-        calls = ledger.calls(root)
-    except Exception:  # noqa: BLE001 — a broken policy/ledger is reported by other checks
-        return _OK, "no ledger to check yet"
-    withc = [c for c in calls if creditprice.recorded(c) is not None]
-    if not withc:
-        return _OK, "no billed credits recorded — every row prices by token × table"
-    agents_ = sorted({c.get("agent") or "?" for c in withc})
-    surfaces = sorted({c.get("surface") or "?" for c in withc})
-    where = f"{'/'.join(agents_)} credits on {len(withc)}/{len(calls)} rows ({', '.join(surfaces)})"
-    unrated = [c for c in withc if creditprice.unrated(pol, c)]
-    if unrated:
-        return _OK, (f"{where}; no rate set — shown as counts, priced by token × table. "
-                     + creditprice.rate_hint(creditprice.agents_needing_rate(unrated)))
-    rates = sorted({policy.credit_rate(pol, a) for a in agents_} - {None})
-    shown = ", ".join(f"${r:g}/cr" for r in rates)
-    return _OK, f"{where}; rate set ({shown}) — those rows price by credits × rate"
-
-
 # The VS Code setting that turns on each of the three opt-in Copilot-metrics stores
 # (COPILOT-METRICS handoff §4.6) — named here so an absent gated source tells the user
 # exactly how to enable it, the same "state, not a fault" discipline `_credits` uses.
@@ -355,9 +287,23 @@ def _kiro_metrics(active: Path) -> tuple[str, str]:
     for s in schema.KIRO_METRIC_SOURCES:
         n = counts.get(s, 0)
         if s == "ide":
-            lines.append(f"ide: {n} row(s)" if n
-                         else "ide: none yet — run the research §6 schema probe if "
-                              "Kiro IDE is in use")
+            # THE THREE-WAY SPLIT (USAGE-ONLY P3). A zero here used to mean any of
+            # three things and named none of them: no store, no table, or a schema
+            # cage no longer matches. Only the third is a cage defect, and it was the
+            # one the old single zero hid. `ide` is also NOT a spend spine any more
+            # (`ledger.ABSENT_SPINES`) — this check is how a future Kiro that ships
+            # the store announces itself.
+            if n:
+                lines.append(f"ide: {n} row(s)")
+            else:
+                from cage import transcript
+                state, detail = transcript.probe_kiro_ide_store(paths.kiro_devdata_db())
+                lines.append({
+                    "absent": f"ide: no store — {detail} (Kiro IDE not installed/used)",
+                    "no-table": f"ide: store present but unusable — {detail}",
+                    "drift": f"ide: ⚠ SCHEMA DRIFT — {detail}",
+                    "ok": f"ide: store readable ({detail}) but 0 imported — run `cage import`",
+                }[state])
         elif s == "cli-turn":
             if not n:
                 lines.append("cli-turn: none yet")
@@ -423,32 +369,11 @@ def _claude_metrics(active: Path) -> tuple[str, str]:
     return _OK, detail
 
 
-def _bundled_prices(root: Path) -> tuple[str, str]:
-    """Compare the project policy's [meta] against the installed bundle's — a newer
-    bundle means researched price rows this project isn't using yet. Recommendation
-    only, never auto-applied (`cage prices sync` is the user's move)."""
-    try:
-        from cage import pricescmd
-        foot = paths.Footprint(root)
-        # prices_version lives in the prices file after the split (prices-toml plan §2.1):
-        # read it there, not the policy file, or a migrated project reads as pre-0.19.
-        if not foot.prices.exists():
-            return _OK, "no project config — the installed bundle's prices apply directly"
-        project = policy.load_project_raw(foot.prices)
-    except Exception:  # noqa: BLE001 — a broken prices file is reported by the policy check
-        return _OK, "project prices unreadable — see the policy check"
-    bundled_v = str(policy.bundled_raw().get("meta", {}).get("prices_version") or "?")
-    rec = pricescmd.sync_recommendation(project.get("meta", {}))
-    if rec:
-        return _WARN, rec
-    return _OK, f"project prices are current with the bundle ({bundled_v})"
-
-
 def _policy_version(root: Path) -> tuple[str, str]:
-    """The non-price sibling of `_bundled_prices` (plan §3.10): a newer bundled
+    """Policy-defaults drift (plan §3.10): a newer bundled
     ``policy_version`` means tunables/defaults this project hasn't discovered.
     Recommendation only, never auto-applied (`cage policy sync` is the user's
-    move; pure price drift keeps the `cage prices sync` hint above)."""
+    move)."""
     try:
         from cage import policysync
         if not paths.Footprint(root).policy.exists():
@@ -461,33 +386,6 @@ def _policy_version(root: Path) -> tuple[str, str]:
     if rec:
         return _WARN, rec
     return _OK, f"project policy defaults are current with the bundle (v{bundled_v})"
-
-
-def _prices_age(root: Path) -> tuple[str, str]:
-    """The bundle's *own* age (plan §3.3) — a project faithfully synced to a
-    6-month-old bundle is confidently stale. Doctor is a diagnostic, not a derived
-    view, so wall-clock today is the right anchor here (and the handoff wants the
-    age visible even on an empty ledger); the report footer stays data-relative.
-    One wording, one home: `freshness.age_line`."""
-    import datetime as _dt
-
-    from cage import freshness
-    try:
-        pol = policy.load(paths.Footprint(root).policy)
-    except Exception:  # noqa: BLE001 — a broken policy is reported by the policy check
-        return _OK, "project policy unreadable — see the policy check"
-    sd = policy.prices_stale_days(pol)
-    if sd <= 0:
-        return _OK, "age check disabled ([prices] stale_days = 0)"
-    line = freshness.age_line(pol, _dt.date.today())
-    if line:
-        return _WARN, line
-    meta = policy.bundled_raw().get("meta", {})
-    stamped = freshness._parse_date(meta.get("prices_date") or meta.get("prices_version"))
-    if stamped is None:
-        return _OK, "bundled [meta] carries no parseable prices_date — nothing to age"
-    n = (_dt.date.today() - stamped).days
-    return _OK, f"bundled prices are {n} days old (stale after {sd})"
 
 
 def _state_dir(root: Path) -> tuple[str, str]:
@@ -1038,7 +936,7 @@ def version_footer(root: Path) -> dict:
     """The honest "versions installed" answer (handoff §5): running cage (+ `zipapp`
     tag), the bundled `[meta]` versions, and the project policy's `[meta]` if one
     exists — per-artifact versions are unknowable (artifacts are stampless), this is
-    the closest real signal. Reuses the same project-vs-bundle read `_bundled_prices`/
+    the closest real signal. Reuses the same project-vs-bundle read
     `_policy_version` already do."""
     from cage import __version__
     bundled = policy.bundled_raw().get("meta", {})
@@ -1135,12 +1033,8 @@ def run(root: Path) -> dict:
         ("tool", *_tool()),
         ("footprint", *_footprint(active, source)),
         ("policy", *_policy(active)),
-        ("pricing", *_pricing(active)),
-        # Directly below `pricing`: a credits-priced row is exactly the row `pricing`
-        # would otherwise have called UNPRICED, so the two lines answer one question.
-        ("credits", *_credits(active)),
-        # Directly below `credits`: same "vendor-recorded facts, advisory only" tier,
-        # widened from the priced `credits` field to the whole COPILOT-METRICS row.
+        # The `pricing` and `credits` checks lived here until USAGE-ONLY (ADR 0011);
+        # both existed only to police a price table cage no longer has.
         ("copilot-metrics", *_copilot_metrics(active)),
         # Directly below `copilot-metrics`: the kiro twin of the same "vendor-recorded
         # facts, advisory only" tier (KIRO-METRICS handoff §4.6).
@@ -1149,8 +1043,6 @@ def run(root: Path) -> dict:
         # retention nudge neither copilot nor kiro's checks need (CLAUDE-METRICS
         # handoff §4.6).
         ("claude-metrics", *_claude_metrics(active)),
-        ("prices-meta", *_bundled_prices(active)),
-        ("prices-age", *_prices_age(active)),
         ("policy-version", *_policy_version(active)),
         ("state", *_state_dir(active)),
         ("portability", *_portability(root)),

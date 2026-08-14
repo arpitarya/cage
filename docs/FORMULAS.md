@@ -3,16 +3,19 @@
 Every computed number in cage, in one place: the formula, where it lives in code,
 its **method tag**, and the knobs that move it. Derived from the source at
 v0.36 — `cage query <id>` prints the live version of most of these with your
-actual policy values interpolated.
+actual config values interpolated.
 
 Three standing laws frame everything below:
 
-- **`method` is sacred.** `measured` = a real invoice/run · `modeled` =
+- **`method` is sacred.** `measured` = a recorded fact, read back verbatim · `modeled` =
   reconstructed · `estimated` = a guess. Trust rank
   `{measured: 2, modeled: 1, estimated: 0}` (`constants.METHOD_TRUST`). A
   projection never reads as measured.
-- **Derive-time only.** Money is recomputed from tokens × policy on every read;
-  the ledger is never rewritten. Change a price, re-read, get new numbers.
+- **Derive-time only.** Every view is recomputed from the log on each read; the ledger
+  is never rewritten. Change the config, re-read, get new tables.
+- **Counts, never conversions.** Cage records tokens and credits and reports them in
+  those units. It ships no rate card, computes no currency, and converts between no two
+  units in either direction ([ADR 0011](adr/0011-cage-measures-usage-not-cost.md)).
 - **Determinism.** No clocks or randomness in any formula here. Same ledger +
   same policy ⇒ same output, byte for byte.
 
@@ -20,214 +23,58 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
 
 ---
 
-## 1. Money
+## 1. Usage — the two recorded units
 
-### 1.1 Per-call cost — `measured`
+**Cage computes no money.** The whole of what was §1 (per-call cost, the credit
+pricing ladder, input-only counterfactual cost, budget, forecast, cost drift,
+quality-adjusted cost, the two kiro cost sections) was deleted with the money
+subsystem — USAGE-ONLY, [ADR 0011](adr/0011-cage-measures-usage-not-cost.md). There is
+no rate card, no price table and no dollar on any surface.
 
-```
-full_in = max(0, tokens_in − cached_in)
-usd     = (full_in·input + cached_in·cache_read + tokens_out·output) / 1_000_000
-```
+What replaces it is not a formula. It is a **read**:
 
-- Code: [prices.call_cost_usd / call_usd_match](../cage/prices.py) · knobs:
-  `prices.toml [prices]` (split out of `cage.toml`, prices-toml plan §3;
-  a legacy in-`cage.toml` block still reads via the fallback) ·
-  `TOKENS_PER_MILLION = 1_000_000`.
-- Cached input bills at the `cache_read` rate, not `input` — this is why a
-  cache-heavy ledger's headline is dominated by cache reads.
-- **Match ladder** (`call_usd_match` → `credits | exact | alias | family | self | none`):
-  a recorded billed credit + a configured rate ⇒ `credits` (§1.1a, and it wins
-  outright); else an exact/alias/family price row ⇒ recompute from tokens; no row
-  but a stored `est_cost_usd` ⇒ `self` (a provider cage can't tokenize,
-  self-reporting); neither ⇒ `none` = **UNPRICED**, surfaced loudly, never a
-  silent `$0`.
-- A normalized match renders `family`/`alias`, never `exact` (method law applied
-  to pricing).
-- **`call_usd_match` is the ONE pricing choke point.** Every USD consumer in cage
-  (report · budget · chats · compare · verdict · roi · netsaved · study · forecast ·
-  quality · freshness · doctor) reaches a dollar through it or its `call_usd`
-  wrapper, so a rung added there is inherited with no per-view fork.
+### 1.1 Tokens — `measured`
 
-### 1.1a Billed-credit pricing (rung 1) — `modeled`, never `measured`
+    tokens_in / tokens_out / cached_in / cache_write_in, summed over the rows
+    `ledger.spend()` returns.
 
-```
-usd = credits · [billing.<agent>] usd_per_credit
-```
+- **Code:** `cage/ledger.py` (`spend`, `SPEND_SOURCES`) · `cage/report.py`.
+- **Basis, and it is per AGENT, not per instant:** an agent with a metric ledger
+  resolves from it for all of history; an agent without one (`lib`, the proxy, the
+  retired `codex`, custom `[sources.*]` tools) resolves from `calls`. There is no time
+  cutover — `SPEND_CUTOVER` was retired with the money subsystem.
+- **`measured`** throughout: every figure is a recorded count read back verbatim.
 
-Code: [creditprice.resolve](../cage/creditprice.py), reached from
-`prices.call_usd_match`. Knob: `cage.toml [billing.<agent>] usd_per_credit`
-(**unset by default**). Explained by `cage query copilot-credits`.
+### 1.2 Credits — `measured`
 
-| rung | applies when | tag |
+    credits, summed per agent — NEVER across agents.
+
+- **Code:** `cage/units.py` (`summable`, `cross_agent_note`) · `cage/report.py` ·
+  `cage/chats.py`.
+- **The cross-agent law:** a copilot credit is GitHub's own tokens×rates computation
+  over a request; a kiro credit is an AWS credit. They share a column heading and
+  nothing else, so a total spanning both is refused (`total.credits = None`) and the
+  view says why. Enforced in code, not by convention.
+- **Absence ≠ zero, twice over.** A recorded `0.0` is a real billing fact; an absent
+  value is written as no key at all (`schema.make_call`'s None sentinel — the one
+  additive field that breaks the omit-at-zero idiom). And an agent that records no
+  credits *at all* renders `—` with its own sentence (`units.ABSENT`), never a `0`.
+
+### 1.3 The two absences — `units.ABSENT`
+
+Neither unit is universal, and the two gaps are different kinds of fact, so they never
+render alike:
+
+| agent | tokens | credits |
 |---|---|---|
-| 0 · `credits-rate`, **$0.00** | the row carries `billed_with` (its billing is on another row) **and** a rate is configured | `modeled` |
-| 1 · `credits-rate` | the row carries a recorded `credits` **and** a rate is configured | `modeled` |
-| 2 · `token-table` | otherwise, if the model resolves a price row (§1.1) | `measured` |
-| 3 · UNPRICED | neither | none — loud, counted, two runnable fixes |
+| claude | value | `—` *"Claude Code records no credit unit on disk"* — a vendor law |
+| copilot | value | value |
+| kiro | `—` *"no IDE token store on this install"* — a missing file a future Kiro can ship | value |
 
-- **Rung 0 · one basis per shutdown** (REV-CREDITS defect 2, closed 2026-08-11 —
-  [compare](../work/compare/copilot-pricing-basis.compare.md)). GitHub computes
-  `totalPremiumRequests` over **every** model in a `session.shutdown`, so the figure
-  lands on one carrier row and every sibling carries `billed_with = <carrier id>`. Such a
-  row prices at `$0.00` **on the credits basis** with the carrier's id as the matched key
-  — *priced, elsewhere, by name*. Without it the carrier billed GitHub's whole-shutdown
-  figure while its siblings billed their own tokens at list rates: the same spend twice.
-  Splitting the credit pro-rata by token share was **rejected** — it would derive per-row
-  credits from tokens, forbidden in both directions. The suppression is conditional on a
-  rate existing (with none, the carrier falls to rung 2 and so must the group).
-  **Forward-only:** rows written before the change are never rewritten and still split.
+`cage doctor`'s kiro-IDE check distinguishes **db absent / table missing / column
+drift**, so the fixable case announces itself rather than reading as permanent.
 
-- **Why rung 1 outranks a perfectly good price row:** since 2026-06-01 a Copilot
-  credit *is* GitHub's own tokens×rates computation, done with what cage cannot see —
-  which model `copilot/auto` actually routed to, and GitHub's current rates. It
-  prices that router *exactly*, with no price-table row at all.
-- **The tag is `modeled` and the reason is the split of fact and interpretation:**
-  the credit *count* is recorded on the row, but the *dollar* is that count times a
-  rate the user configured, which cage cannot check against an invoice. Any aggregate
-  containing one credits-priced row degrades to `modeled` — the weaker tag always
-  wins (`creditprice.method_for`), because a mixed cell claiming `measured` would let
-  a configured rate read as an invoice.
-- **Rate unset is not rate zero.** Unset ⇒ rung 1 is skipped and credits render as a
-  **count**, never a dollar. A rate of exactly `0.0` is a different, legitimate
-  statement and does price, at `$0.0000`.
-- **Absence ≠ zero, and neither is derived from tokens.** No recorded credit ⇒ fall
-  through to rung 2; a recorded `0.0` ⇒ a real zero priced through rung 1 (§3.1).
-- **Never blended silently:** a total spanning both bases prints the split
-  (`creditprice.split_footnote`), and CSV names the winning basis per row in
-  `priced_via` (`credits-rate | token-table | mixed`).
-- A credits-priced row contributes **no** `cache_usd` split — its dollar never came
-  from the price table, so attributing a slice of it to `cache_read` would describe a
-  total that was never token-derived.
-
-### 1.2 Input-only cost (counterfactual cells) — `modeled`
-
-```
-usd = tokens_in · input / 1_000_000
-```
-
-Code: [prices.input_cost_usd](../cage/prices.py). Used by the matrix, where only
-input volume differs between cells.
-
-### 1.3 Budget — `measured`
-
-```
-Σ call_usd(window)  vs  policy [budgets] session_usd / daily_usd
-on_exceed = warn | block
-```
-
-Code: [budget.py](../cage/budget.py). The totals are measured; the ceiling is
-policy, not a guess.
-
-### 1.4 Forecast — `estimated`
-
-```
-per_day   = Σ call_usd / span_days
-projected = per_day × 30
-blows     = projected > (daily_usd × 30)
-day_blown = ⌊(daily_usd × 30) / per_day⌋ + 1
-```
-
-Code: [forecast.project](../cage/forecast.py). Linear extrapolation of observed
-spend — no seasonality, no model.
-
-### 1.5 Cost-per-call drift (regression) — `measured` totals, `estimated` verdict
-
-```
-mean(window) = Σ call_usd(rows) / n
-drift        = (recent_mean − base_mean) / base_mean
-regressed    = drift > tolerance            (default tolerance 0.2)
-```
-
-Code: [regression.detect](../cage/regression.py). Split at `--since`; both sides
-repriced at derive time.
-
-### 1.6 Quality-adjusted cost — `measured`
-
-```
-per_task    = Σ call_usd / task_count
-per_success = Σ call_usd / ok_count        (None when ok = 0 — never faked)
-```
-
-Code: [quality.summarize](../cage/quality.py) · outcomes in `.cage/outcomes.json`
-(`ok | redo`). Cost per *successful* task is the metric that catches false
-economies.
-
-### 1.7 Kiro CLI cost — credit-derived, `estimated` (by vendor design; no token counts exist)
-
-```
-Kiro CLI usage = credits + context_usage_percentage        (never token counts)
-credit row: schema.make_credit, method = "estimated", recorded not priced
-```
-
-- Code: [transcript.parse_kiro_cli_credits](../cage/transcript.py) →
-  `credits-YYYY-MM.jsonl`, a **distinct row kind** (never a `tokens_in=0` call).
-- **Which conversations enter the sum** (2026-08-01, [ADR 0006](adr/0006-kiro-rows-are-machine-facts-not-project-facts.md)
-  *Scope*): the store keys each conversation by the cwd it ran in, so a sweep into a
-  project ledger sums only that project's **directory tree** and stamps `project` on the
-  row; a sweep into the machine ledger sums all of them. Knob:
-  `paths.kiro_cli_workspace`. Reading unscoped from a project (the behaviour through
-  v0.35) summed every conversation on the machine into every ledger.
-  **This is the opposite of the kiro *IDE* store**, whose rows carry no cwd and are
-  therefore machine-level by construction — see §1.7a.
-- **Why `estimated` is final — not a temporary limit.** Kiro CLI (the Amazon Q /
-  CodeWhisperer CLI) reports usage only as **credits + context %**; its store's
-  token fields (`total_tokens`/`uncached_input_tokens`/`output_tokens`/
-  `cache_read/write_input_tokens`) are **null on every turn**, floor and large-input
-  alike. There is no token count to measure, so no `measured`/`modeled` cost is
-  derivable — only a credit-derived `estimated` one, always.
-- **The proxy route was tried and closed (P2, 2026-07-28 —
-  [`work/regression/2026-07-28-kiro-proxy-probe.md`](../work/regression/2026-07-28-kiro-proxy-probe.md)).**
-  `cage data meter` (the in-path proxy, [proxy.py](../cage/proxy.py)) sets only
-  `ANTHROPIC_BASE_URL`/`OPENAI_BASE_URL`; kiro-cli honors **neither** — it routes to
-  AWS CodeWhisperer / Amazon Q (`api.codewhisperer.service`/`api.q.service`), speaks
-  a SigV4 AWS protocol `usageparse` can't read, and cage's plaintext reverse-proxy
-  can't MITM its TLS. Two real probe turns under the proxy recorded **0 call rows**.
-  Even a perfect intercept would parse null tokens (the same reason the store is null).
-- **Method law:** a *proxy-measured* Kiro number could be `measured` — but that path
-  does not exist for Kiro. The credit-derived number is `estimated`, always; the two
-  are never blurred.
-- **Two read surfaces, both derive-only (REPORT-CREDITS, 2026-08-13).**
-  `cage insights chats` (§2.13) renders one row per conversation; `cage report`
-  (`report.py`) folds credits into its own `--by agent` / default `--by route`
-  table, a new `credits` column present only when this view actually joined a
-  `ledger.credits` row (other dims, and a ledger with none, are byte-identical to
-  before). A credits-only group's `calls`/`tok in`/`tok out` cells are `—` in text /
-  **empty** in CSV — absence, never a fabricated `0` — while its `credits` cell
-  carries the recorded figure. `cost` prices only through `[billing.<agent>]
-  usd_per_credit` — unset ⇒ `—`, a configured `0.0` ⇒ a real `$0.0000` — the same
-  ladder rung `creditprice.rate_for` already serves `chats.py`. **The one number a
-  report total must never silently drop:** a group whose calls and credits rows
-  share one bucket (rare — an agent whose calls and call-less credits conversations
-  land in the same ledger root) sums both into that cell rather than keeping only
-  the token-priced half, and `render_report` names the split
-  (`· total spans two pricing bases: …`) whenever both sides are non-zero — the same
-  discipline `creditprice.split_footnote` applies to the copilot per-call ladder.
-  `net vs spend` subtracts the same full sum, so a rated credits dollar can never
-  read as an uncounted saving. CSV `method` degrades to `modeled` whenever any group
-  priced via this rung (`creditprice.method_for`, weaker tag wins) — the same rule
-  as the existing per-call credits ladder, extended to cover this second population.
-
-### 1.7a Kiro IDE cost — which *ledger* the rows are summed in
-
-```
-kiro-IDE rows → the machine ledger (~/.cage), one copy per machine
-             → unless --ledger/CAGE_BASE names a sink (then: that sink)
-```
-
-- Code: [paths.kiro_ledger / kiro_routed](../cage/paths.py) · the leg is
-  `importcmd._kiro_leg`. Decision:
-  [ADR 0006](adr/0006-kiro-rows-are-machine-facts-not-project-facts.md).
-- **Not a formula change — a *domain* change.** The per-row arithmetic is untouched;
-  what changed is which rows are in a project's sum at all. `tokens_generated.jsonl` is
-  one global file with no project, session or per-turn `ts`, so every ledger that
-  imported it summed the same turns. Now exactly one ledger holds them.
-- **Knobs:** `--ledger`/`CAGE_BASE` (or `CAGE_LEDGER`) collapse the two sinks and the
-  override wins; `[capture] enabled` must be on in **both** the project and the machine
-  ledger for the routed leg to run.
-- **Limit that survives:** a kiro-IDE row's `ts` is stamped at import, so it can be
-  summed but never *windowed* — `--since` includes or excludes it by when the import
-  ran ([finding](../work/regression/2026-08-01-finding-kiro-rows-carry-no-time-session-project.md)).
-  Pre-0.36 duplicated rows in a project ledger are never rewritten and still sum.
+---
 
 ## 2. Savings
 
@@ -241,62 +88,34 @@ saved = raw_alternative − actual                       ← GROSS: avoided read
   round-trip, the context a hook injected, a re-read a thin answer provokes. So
   cage can truthfully print a large `saved` for a session that cost *more* than
   its unassisted twin ([finding](../work/regression/2026-08-01-finding-saved-is-gross.md)).
-- Every surface says `gross` for this number: `report`'s `gross`/`gross tok`
-  columns, `attrib`'s `gross tok`/`gross $`, `roi`'s `gross saved`, the overview
-  headline, the graphify ceiling/history band, and CSV's `gross_saved_*`. One
-  phrasing, one home: `netsaved.GROSS_NOTE`.
+- Every surface says `gross` for this number: `report`'s `gross tok` column,
+  `attrib`'s `gross tok`, the overview headline, the graphify ceiling/history band,
+  and CSV's `gross_saved_tokens`. One phrasing, one home: `savings.GROSS_NOTE`
+  (relocated from the deleted `netsaved.py` — the netting was money, the *caveat* is
+  not).
 - Code: [schema.make_savings / make_receipt](../cage/schema.py) — **derived at
   construction**, so the stored number can never be edited into disagreement.
-- USD conversion dispatches on `unit` ([convert.saved_usd](../cage/convert.py)):
-  `usd` passthrough · `tokens` at the model's input price · `ms` / `gco2` → `$0`
-  (real, not missing). `minutes` was a unit through v0.35 (the removed human
-  axis); a legacy `minutes` row is excluded from money and footnoted, never priced.
+- **A receipt is denominated in its own `unit` and cage converts nothing.** A
+  `tokens` receipt contributes tokens; `ms`/`gco2` receipts are recorded, readable
+  per-task, and contribute to no token total. The `convert.saved_usd` dispatch that
+  used to turn all of them into dollars is gone (ADR 0011). `minutes` was a unit
+  through v0.35 (the removed human axis); a legacy `minutes` row is excluded and
+  footnoted, never silently dropped.
 
-### 2.1a Net saved (cost of use) — `modeled`, its own lower confidence
+### 2.1a Net saved — **removed, and not replaced**
 
-```
-cost of use = Σ prices.call_usd(c)  over the DISTINCT calls joined to the receipt's
-              task whose ts lies within ±NET_ATTRIB_WINDOW_S (120s) of ANY of that
-              tool's receipts on that task        (union per task — counted once)
-net         = gross − cost of use                        (covered tasks only)
-```
+Cage reported a task-level net (`gross − the attributable cost of use`) through v0.50.
+It is gone with the money subsystem: netting required pricing every in-window call to a
+common unit, and **per-query netting was never computable at all** — a shim receipt
+carries a `task` but no `call`, and inventing that link is forbidden.
 
-- Code: [netsaved.by_tool](../cage/netsaved.py) · knobs:
-  `constants.NET_ATTRIB_WINDOW_S = 120`, `constants.NET_SAVED_CONFIDENCE = 0.4`.
-  Live: `cage query gross-vs-net`. Rendered by `cage insights verdict <tool>`.
-- **Why the window.** Shim receipts are *call-less* (a `task`, never a `call`), so
-  per-query netting is impossible and is not attempted. Of the three computable
-  candidates: *the whole task* charges the tool for work it merely assisted (it
-  measures task size); *only turns carrying a tool-use block* is sharper but no
-  ledger field marks one, so it needs a capture-time change. The ±window is the
-  honest computable middle. **Symmetric** because both adjacent turns are
-  cost-of-use — the turn that *invoked* the tool precedes the receipt, the turn
-  that *consumed* its output follows it.
-- **A lower bound.** A re-read three turns later is not counted. Net is the
-  optimistic end of the range, never the pessimistic one.
-- **Coverage refuses rather than approximates.** A task whose receipts join no
-  in-window call is UNCOVERED — its net is *unavailable*, never rendered equal to
-  gross. Since one in-window call at a priced model implies a non-zero subtrahend,
-  `net == gross` cannot be produced by a failed join.
-- **Method:** gross is `modeled`; the subtrahend is `measured` (recorded tokens
-  repriced through the same `prices.call_usd` as `report`/`budget`); **net is
-  `modeled`** at `0.4` — below gross's own confidence, because it stacks a
-  time-window join on top of gross's counterfactual. Net is never `measured`.
+So cage reports **gross only, and says so on every view that prints the number**
+(`savings.GROSS_NOTE`, one phrasing, one owner). A large `saved` and a session that
+consumed more tokens overall remain simultaneously true; the caveat is what makes that
+readable rather than misleading.
 
-### 2.2 Call-less token receipt pricing ladder — `modeled`
-
-A `tokens` receipt with a task but no call (graphify/fux shims) prices via
-[receiptprice.resolve](../cage/receiptprice.py):
-
-```
-1. policy [tools.<tool>] price_at          (cage prices route-tool → cage.toml)
-2. dominant model of the task              (ties: tokens_in → call count → lexicographic)
-   priced against prices.toml [prices]
-3. UNPRICED + a runnable per-tool fix line
-```
-
-Linked receipts never enter the ladder. Rung is footnoted in text, `priced_via`
-in CSV.
+The §2.2 call-less receipt **pricing ladder** (`price_at` → dominant task model →
+UNPRICED) went with it — there is nothing left to price into.
 
 ### 2.3 Marginal attribution — per-row method = least-trusted receipt for that tool
 
@@ -309,63 +128,6 @@ each receipt's credit = its marginal saving given the tools upstream of it
 Code: [attribution.py](../cage/attribution.py). Marginal-by-fixed-order is
 deliberate: Shapley is fairer but combinatorial, and cage is `$0`
 ([PLAN.md](PLAN.md) §4, §10).
-
-### 2.4 Counterfactual matrix — one `measured` cell, the rest `modeled`
-
-```
-enumerate 2ⁿ on/off tool permutations        (n ≤ MAX_MATRIX_TOOLS = 12 ⇒ 4096 rows)
-cell input tokens = base + Σ(actual if tool on else raw_alternative)
-cell usd          = input_cost_usd(cell tokens) at the task's model
-```
-
-Code: [matrix.py](../cage/matrix.py). Only the configuration actually run is
-`measured`; every other cell is `modeled` — `estimated` if it leans on an
-estimated receipt.
-
-### 2.5 ROI — inherits each receipt's method
-
-```
-per tool:  Σ gross_saved_usd  vs  Σ meta.tool_cost_usd  and  Σ meta.added_latency_ms
-net of own cost =  gross_saved_usd − cost_usd
-verdict         =  enable if net > 0 else skip           (cage insights recommend)
-```
-
-Code: [roi.py](../cage/roi.py), [recommend.py](../cage/recommend.py). A
-deterministic tool declares `$0` of its **own** cost — which is *not* the same as
-free: the cost of *using* it is in neither column (§2.1, §2.1a). Columns are named
-for exactly that: `gross saved` / `net of own cost` (CSV: `gross_saved_usd`,
-`net_of_own_cost_usd`).
-
-### 2.6 Verdict — `modeled` headline, per-line tags below
-
-A pure composer — computes no new statistics
-([verdict.py](../cage/verdict.py)):
-
-```
-net        = roi.gross − roi.own_cost [− netsaved.cost_of_use, if it covers the window]
-             → sign gives SAVING / COSTING
-break_even = net / receipt_count
-≈$/mo      = net scaled by the receipts' own time span (≥ 7 days, no clock)
-```
-
-Plus marginal saving (attribution), **net of use** (§2.1a), drift (regression),
-redo-rate (quality). A missing input ⇒ **INSUFFICIENT DATA**, never an
-approximation.
-
-**The gross qualifier (NET-2).** The cost of use is subtracted only when
-`netsaved` covers **every** receipt in the window; otherwise it is not subtracted
-at all. The omitted term is **≥ 0**, and the refusal rule follows from that
-asymmetry rather than from taste:
-
-| roi net | cost of use known | verdict |
-|---|---|---|
-| `< 0` | either | **COSTING** — omission can only worsen it, so the sign is safe |
-| `≥ 0` | no / partial | **SAVING (GROSS)** / **BREAK-EVEN (GROSS)** + a ⚠ naming the exclusion and pointing at `cage insights compare` |
-| any | yes, complete | **SAVING / COSTING / BREAK-EVEN** on `net of use` |
-
-A distinct verdict rather than INSUFFICIENT DATA because gross is a genuinely
-computed number — the defect was the *label*, not the arithmetic, and discarding
-the figure would hide the very comparison the finding exists to make visible.
 
 ### 2.7 graphify transcript receipt — `modeled` (graphify-capture GC2)
 
@@ -438,7 +200,7 @@ args_hash/answer_hash are route-independent (binary spelling dropped, answer str
     typical       = median over communities' corpus tokens   ·   whole corpus = context only
 ```
 
-- **Both are GROSS** (§2.1): the cost of *running* the query is not subtracted, so
+- **Both are GROSS** (§2.1): the tokens spent *running* the query are not subtracted, so
   the ceiling is a bound on avoided reading, never on net spend. Both renderers say
   so on their own line.
 
@@ -513,7 +275,8 @@ agent*. Two halves, never blended — they have different precision:
   found an agent; otherwise an unattributed row could belong to any agent, so the claim
   drops to *no savings row attributed to them*. Neither is ever stated as proof of
   non-use.
-- **No currency anywhere.** Nothing here calls `convert`/`receiptprice`/`prices`; §2.11's
+- **No currency anywhere** — and since ADR 0011 that is true of every view, not just
+  this one. §2.11's
   diagnostic-only invariant holds unchanged, asserted from this new caller in
   `tests/test_adoption.py`.
 - CSV column contract: `section` · `dimension` · `key` · `agent` · `tool` · `rows` ·
@@ -526,7 +289,7 @@ agent*. Two halves, never blended — they have different precision:
 
 `cage insights chats` ([chats.py](../cage/chats.py)) is a pure group-by over `calls`,
 summed per `(agent, surface, session)` bucket — every column is a straight ledger field
-or the existing `prices.call_usd_match` (§1). No formula lives here that isn't already
+or the existing token sums (§1). No formula lives here that isn't already
 spec'd elsewhere.
 
 | column | source |
@@ -536,12 +299,10 @@ spec'd elsewhere.
 | `calls` | count of call rows in the bucket |
 | `tokens_in` / `cached_in` / `cache_write_in` / `tokens_out` | summed straight off the matching call field |
 | ~~`premium`~~ | **no column since 2026-08-11** (COPILOT-PREMIUM-DEAD). It is `floor(credits)` — the same counter as an int — so it stood beside `credits` as a lossy duplicate that printed `0` for every row cage writes (`totalPremiumRequests` is fractional; `int()` floors, `make_call` omits). Still summed into the payload, so `--json` keeps the recorded fact; the *field* is untouched |
-| `credits` | summed `calls.credits`, or `—` when **no** call in the bucket recorded one (absence, not zero — §1.1a). Text renders 2dp; CSV carries the full float and leaves the cell **empty** when absent, so `—` never enters data |
+| `credits` | summed `calls.credits`, or `—` when **no** call in the bucket recorded one (absence, not zero — §1.2). Text renders 2dp; CSV carries the full float and leaves the cell **empty** when absent, so `—` never enters data. Never summed across agents (§1.2) |
 | `agent%` | `agent_lines / (agent_lines + residual_lines)` over the provenance rows sharing this chat's `(agent, session)` — **read** from §2.14's recorded counts, never re-matched. Refuses (`—`, footnoted) three ways; see below |
 | `agent_lines` / `residual_lines` (CSV only) | the two sums the share is built from, raw counts. **Empty — not `0` — on a refusal**, like `credits` |
 | `agent_pct` (CSV only) | the same share as `0–100` with **1dp** (`csvout.cell` trims a cosmetic trailing zero); empty when refused |
-| `cost` (`--usd` only) | `Σ prices.call_usd_match(pol, call)` per row (§1); UNPRICED counted, never a silent `$0` |
-| `priced_via` (CSV only) | which rung paid for this bucket — `credits-rate` \| `token-table` \| `mixed` when its rows split, empty when nothing priced |
 
 - **The one carve-out:** `chat` is the only column that reads `imports.jsonl` — a
   **label**, not a number. Every other column derives from `calls` + policy alone, and
@@ -587,7 +348,7 @@ spec'd elsewhere.
   counts only, and deleting it moves **zero** pre-existing cell; only the authorship
   cells fall to `—`. Same terms as the `chat`-label carve-out, pinned by the same test
   file. **No USD, no rate, no minutes ever touches it** (the v0.36 law): `agent%` never
-  combines with `cost`, and `--usd` moves no authorship cell (asserted per-formula in
+  combines with a spend figure, and no presentation switch moves an authorship cell (asserted per-formula in
   `tests/test_chats.py`, since this module legitimately imports `prices` for `cost`).
 - **Two stated limits.** A provenance row carries no `surface`, so a session split
   across surfaces attaches its counts to **every** such bucket — footnoted, because
@@ -813,8 +574,8 @@ saved%   = 100 × Σsaved / without              (None when tokens is None or wi
   build a counterfactual from, footnoted.
 - **Never clamped.** `saved` can be negative (the answer cost more than the read it
   avoided) and `without` can then fall below `tokens`; both render honestly.
-- **GROSS throughout** (`netsaved.GROSS_NOTE`, §2.1) — per-chat NET is not computable:
-  netsaved's attributable-cost rule needs a call-level tool-use mark this ledger
+- **GROSS throughout** (`savings.GROSS_NOTE`, §2.1) — per-chat NET is not computable:
+  the attributable-cost rule needed a call-level tool-use mark this ledger
   doesn't carry, so this view is explicitly GROSS and says so on every render.
 - **`method`/`confidence`** per chat are the worst-case across its joined receipts
   (least-trusted method wins, confidence is the min) — the exact
@@ -827,7 +588,7 @@ saved%   = 100 × Σsaved / without              (None when tokens is None or wi
 - **A session split across surfaces** (rare — savings rows carry no surface) attaches
   its receipts to every chat bucket sharing that session, footnoted (`gfx_split`), the
   `auth_split` precedent (§2.13).
-- Tokens-only — **no `--usd` on this view** (the v0.36 no-blend law). Ranking
+- Tokens-only, like every view since ADR 0011 (and the v0.36 no-blend law before it). Ranking
   `(-saved, session)`, top-20 (`GRAPHIFY_CHATS_DEFAULT_ROWS`), `--all` lifts the cut
   (footnoted, never silent); CSV is always untruncated and never filters by receipts.
   Explained by `cage query graphify-chats`.
@@ -842,7 +603,7 @@ included — see [PLAN.md](PLAN.md) §4.6 and the CHANGELOG's v0.36 *Removed* se
 The one rule that outlives them, because pre-0.36 ledgers still hold the rows:
 
 - A legacy `tool="human"` / `unit="minutes"` receipt is worth **`$0` in
-  `convert.saved_usd`** and is **excluded from every money view** by
+  any unit conversion** and is **excluded from every derived total** by
   [`report._is_legacy_human`](../cage/report.py) — there is no rate left to price it
   at. The exclusion is **counted and footnoted** on `cage report`
   (`· N legacy human-axis receipt(s) excluded …`), never applied silently.
@@ -972,7 +733,7 @@ Never mixed, by design ([CLAUDE.md](../CLAUDE.md) *Constants*):
 | Layer | Home | Example |
 |---|---|---|
 | **Contract** | `schema.py` closed enums | `METHODS`, `UNITS` |
-| **Policy** | `cage.toml` (your decisions) + `prices.toml` (vendor rate card) | budgets, human rate, tool order, routing · **prices**/`[credits]` in `prices.toml` |
+| **Policy** | `cage.toml` (your decisions) | tool order, capture switches, cleanup, authorship. **No `prices.toml`** — the rate card went with ADR 0011 |
 | **Constants** | `constants.py` (code heuristics, reviewable) | `CHARS_PER_TOKEN`, `MIN_COMPARE_N`, `IDLE_CAP_MINUTES` |
 
 Several constants are **policy-preferred fallbacks** — the policy value wins when

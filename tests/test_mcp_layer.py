@@ -1,6 +1,6 @@
 """L2 — MCP: the two product-question tools, the one write tool, and the refusals.
 
-`verdict` and `compare` answer *"is this tool worth keeping"*, and both routinely
+`compare` answers *"is this tool worth keeping"*, and it routinely
 **decline**. This file's premise is that the declining is the valuable part: an agent
 that receives an empty result reads it as **zero**, which is the one thing a refusal
 never means. So every refusal is asserted **byte-identically against the CLI's own
@@ -19,8 +19,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from cage import (agents, cfgio, clicmds, compare, ledger, mcpserver, policy, quality,
-                  roi, schema, tasks, verdict)
+from cage import (agents, cfgio, clicmds, compare, ledger, mcpserver, outcomes,
+                  policy, schema, tasks)
 from cage.constants import MIN_COMPARE_N
 
 _MODEL = dict(route="chat", provider="anthropic", model="claude-opus-4-8",
@@ -72,15 +72,6 @@ def _text(name, args=None):
 
 # ── the tools exist, and the read/write split is explicit ─────────────────────
 
-def test_tools_list_carries_verdict_compare_and_the_one_write_tool(mcp):
-    names = {t["name"] for t in mcpserver.TOOLS}
-    assert {"cage_report", "cage_attrib", "cage_matrix", "cage_budget", "cage_roi",
-            "cage_adoption", "cage_why", "cage_verdict", "cage_compare",
-            "cage_task_outcome"} == names
-    listed = mcpserver._handle({"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
-    assert {t["name"] for t in listed["result"]["tools"]} == names
-
-
 def test_exactly_one_write_tool_in_the_whole_ladder(mcp):
     """The ladder's read/write asymmetry is the design. A second write tool added by
     analogy would need this line changed — which is the point of asserting it."""
@@ -100,7 +91,7 @@ def test_no_read_tool_writes_to_the_ledger(mcp):
     for t in mcpserver.TOOLS:
         if t["name"] in mcpserver.WRITE_TOOLS:
             continue
-        args = {"tool": "graphify"} if t["name"] == "cage_verdict" else {}
+        args = {}
         if t["name"] == "cage_why":
             args = {"call_id": "nope"}
         mcpserver._call(t["name"], args)
@@ -115,38 +106,6 @@ def _close(root, tid, ts="2026-06-10T10:00:00Z", label=""):
 
 
 # ── the refusals cross the boundary VERBATIM ──────────────────────────────────
-
-def test_verdict_insufficient_data_reaches_the_agent_verbatim(mcp):
-    """No receipts for the tool ⇒ cage refuses. The agent must get the refusal, not an
-    empty string it will read as 'nothing was saved'."""
-    text = _text("cage_verdict", {"tool": "never-ran"})
-    assert "INSUFFICIENT DATA" in text
-    assert text == verdict.render_verdict(
-        verdict.compose(mcp, policy.load(None), "never-ran"))
-    assert text.strip(), "a refusal must never arrive as silence"
-
-
-def test_verdict_saving_gross_reaches_the_agent_verbatim(mcp):
-    """Savings computable, cost-of-use not ⇒ `SAVING (GROSS)`, never a bare SAVING.
-    The qualifier is the whole finding (work/regression/2026-08-01-finding-saved-is-gross.md);
-    an MCP wrapper that dropped it would re-tell the lie the CLI was fixed to stop."""
-    _seed_gross_only(mcp)
-    d = verdict.compose(mcp, policy.load(None), "graphify")
-    assert d["gross_of_use"] is True and d["verdict"] == "SAVING (GROSS)"
-    text = _text("cage_verdict", {"tool": "graphify"})
-    assert "SAVING (GROSS)" in text and "GROSS" in text
-    assert text == verdict.render_verdict(d)
-
-
-def test_verdict_costing_is_still_asserted_bare(mcp):
-    """The asymmetry that makes the refusal principled rather than timid: the omitted
-    term is >= 0, so only the *positive* side can be wiped out by it."""
-    _seed_costing(mcp)
-    text = _text("cage_verdict", {"tool": "pricey-ml"})
-    assert "COSTING" in text and "COSTING (GROSS)" not in text
-    assert text == verdict.render_verdict(
-        verdict.compose(mcp, policy.load(None), "pricey-ml"))
-
 
 def test_compare_min_n_block_reaches_the_agent_verbatim(mcp):
     """A group below MIN_COMPARE_N is BLOCKED and says its own n. An agent that got
@@ -184,25 +143,11 @@ def test_compare_rejects_an_unknown_by_key_with_the_choices(mcp):
     assert "stack, scope, label" in reply["result"]["content"][0]["text"]
 
 
-def test_verdict_without_a_tool_name_explains_instead_of_KeyError(mcp):
-    reply = mcpserver._handle({"jsonrpc": "2.0", "id": 4, "method": "tools/call",
-                               "params": {"name": "cage_verdict", "arguments": {}}})
-    assert reply["result"]["isError"] is True
-    assert "cage_roi" in reply["result"]["content"][0]["text"]  # names the way forward
-
-
-# ── MCP and the CLI cannot disagree ───────────────────────────────────────────
-
 def test_mcp_output_is_byte_identical_to_the_cli(mcp, capsys):
     """One composer, one renderer, two transports. If these ever diverge, one surface
     is summarizing — the failure this layer exists to prevent."""
     _seed_gross_only(mcp)
     _close(mcp, "t-0")
-
-    assert clicmds.cmd_verdict(SimpleNamespace(
-        tool="graphify", since=None, json=False, csv=None, no_import=True)) == 0
-    assert capsys.readouterr().out.rstrip("\n") == _text(
-        "cage_verdict", {"tool": "graphify"}).rstrip("\n")
 
     assert clicmds.cmd_compare(SimpleNamespace(
         by="stack", scope=None, label=None, json=False, csv=None, no_import=True)) == 0
@@ -217,7 +162,9 @@ def test_task_outcome_closes_a_task_through_the_cli_path(mcp):
     assert "fix-bug" in text and "ok" in text and "bugfix" in text
     row = tasks.read(mcp)["fix-bug"]
     assert row["outcome"] == "ok" and row["label"] == "bugfix"
-    assert quality.summarize(mcp, pol=policy.load(None))  # the quality view sees it
+    # The outcome STORE sees it — `outcomes.py`, relocated out of the deleted
+    # `quality.py` precisely so this write path survived the money deletion.
+    assert outcomes.load(mcp)["fix-bug"] == "ok"
 
 
 def test_task_outcome_and_the_cli_verb_share_one_implementation(mcp, capsys):

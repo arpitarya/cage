@@ -4,9 +4,9 @@
 > calls** through an AI tool stack. It meters every LLM call, collects a
 > **savings receipt** from each tool in the stack (Claude vs. not, graphify vs.
 > not, fux vs. not, cache vs. not…), and turns the raw stream into an
-> **attribution ledger** — what you spent, what each tool saved you, and what
-> any *other* combination of tools would have cost. `$0`, stdlib-only,
-> deterministic, and independent of any single AI tool.
+> **attribution ledger** — what each agent used, what each tool saved you, and who
+> wrote which commit. `$0`, stdlib-only, deterministic, and independent of any single
+> AI tool. **Usage, never cost** (v0.51, [ADR 0011](adr/0011-cage-measures-usage-not-cost.md)).
 
 Status: **the design of record — and substantially BUILT.** This document defines the
 category, the substrate, the attribution engine, and the build order. It was written at
@@ -19,6 +19,16 @@ actually built; [OPEN-WORK.md](../work/OPEN-WORK.md) is what is left.
 > **marked, never deleted or renumbered**. A section headed **REMOVED in vX.Y** is
 > correct history: the feature is gone, the anchor stays so every other citation keeps
 > resolving. Where this file and `CLAUDE.md` disagree, **CLAUDE.md wins**.
+
+> **v0.51 note — MONEY IS GONE, and it is the largest thing this plan now over-states.**
+> Cage measures token and credit **usage**; it computes no cost, ships no rate card, and
+> converts between no two units. Every passage below about prices, budgets, ROI, the
+> counterfactual *cost* matrix, verdicts, forecasts, cost drift and quality-adjusted cost
+> describes a subsystem that **no longer exists** — read it as history. The `spend
+> cutover` of §3.14 is retired with it (`ledger.spend` partitions by *agent*, not time).
+> The durable decision, with its alternatives and veto condition, is
+> [ADR 0011](adr/0011-cage-measures-usage-not-cost.md); the sections most affected are
+> **§3.1, §3.3, §3.14, §4.4, §4.5, §6, §7 and all of §8**.
 
 > **v0.36 note — the hookless rebuild.** Cage's capture is now **pull-based**
 > (`cage import` / capture-on-read) and needs no hooks. This plan predates that and still
@@ -97,7 +107,7 @@ speaks the protocol works; nothing is named, nothing is required. That is what
 Everything derives from three artifacts Cage owns. They are plain text,
 diffable, and stdlib-parseable.
 
-### 3.1 The call record — ground-truth spend
+### 3.1 The call record — ground-truth usage (`est_cost_usd` retained but READ BY NOTHING since v0.51)
 
 One row per real LLM call, emitted by the **meter** at the provider boundary.
 This is the invoice-grade truth; provider `usage` fields are authoritative.
@@ -186,7 +196,7 @@ A tool that *eliminates a call entirely* (a response-cache hit, a skipped
 deterministic answer) emits a receipt with `actual: 0` and the full alternative
 cost — Cage's "4′33″" case, the highest-value receipt there is.
 
-### 3.3 The policy file — prices, tools, budgets, quality
+### 3.3 The policy file — prices, tools, budgets, quality · **prices/budgets REMOVED in v0.51**
 
 Versioned config, the only place numbers like price tables live. Deterministic.
 
@@ -1262,7 +1272,7 @@ absolute entries keep working until then.
 
 ---
 
-## 6. Tiers — `$0` core, AI strictly optional
+## 6. Tiers — `$0` core, AI strictly optional · **money content REMOVED in v0.51**
 
 | Tier | Extra            | What it adds                                                      | Needs a model? |
 | ---- | ---------------- | ---------------------------------------------------------------- | -------------- |
@@ -1331,7 +1341,7 @@ carry the Claude rows.
 
 ---
 
-## 8. What else Cage should do
+## 8. What else Cage should do · **§8.1–8.5 REMOVED in v0.51** (budget, quality-adjusted cost, cost drift, cheapest-path, forecast — all money)
 
 Beyond track-and-attribute, the substrate unlocks the following. **The numbered items
 below ARE §8.1 … §8.8** — five shipped modules cite those anchors

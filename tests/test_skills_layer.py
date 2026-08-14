@@ -76,8 +76,11 @@ def test_the_analyst_skill_relays_every_refusal_unsmoothed():
     """The refusals are what an agent is most likely to paper over, so the skill that
     reads numbers must name each one and say what it does NOT mean."""
     body = next(d for d in SKILLS if d.id == "cage-analyst").body
-    for phrase in ("INSUFFICIENT DATA", "SAVING (GROSS)", "measured", "modeled",
-                   "estimated", "min-n" if "min-n" in body else "closed tasks"):
+    # `INSUFFICIENT DATA` / `SAVING (GROSS)` were verdict's words and went with it
+    # (USAGE-ONLY, ADR 0011). The refusals that remain are the gross caveat, the `—`
+    # with a reason, and the min-n block — each still named, each still explained.
+    for phrase in ("GROSS", "measured", "modeled", "estimated",
+                   "min-n" if "min-n" in body else "closed tasks"):
         assert phrase.lower() in body.lower(), phrase
     # The two rules that are easiest to get subtly wrong.
     assert "never substitute zero" in body.lower()

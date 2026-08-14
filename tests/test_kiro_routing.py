@@ -255,23 +255,23 @@ def test_k3_kiro_limit_states_no_time_session_or_project():
     """K3 (finding: kiro rows carry no time/session/project). Fires on ANY kiro row —
     a wider gate than the input-only caveat, because the limit holds even if kiro one
     day reports output tokens."""
-    line = report._kiro_limits_caveat(_rep(kiro_rows=3), usd=False)
+    line = report._kiro_limits_caveat(_rep(kiro_rows=3))
     assert "no per-turn time, session or project" in line
-    assert report._kiro_limits_caveat(_rep(kiro_rows=0), usd=False) == ""
+    assert report._kiro_limits_caveat(_rep(kiro_rows=0)) == ""
 
 
 def test_k3_composes_with_the_input_only_caveat_without_repeating_it():
-    both = report._kiro_limits_caveat(_rep(kiro_rows=3, kiro_input_only=True), usd=True)
-    assert "input-only log — cost understated" in both and "also carry" in both
+    both = report._kiro_limits_caveat(_rep(kiro_rows=3, kiro_input_only=True))
+    assert "input-only log — tok out not recorded" in both and "also carry" in both
     assert both.count("kiro:") == 1
 
 
 def test_k3_names_the_since_window_as_the_reading_that_would_be_wrong():
     """The `ts` is stamped at IMPORT, so a window includes/excludes kiro rows by when
     the import ran — not coarse, *wrong*. It gets its own ⚠."""
-    windowed = report._kiro_limits_caveat(_rep(kiro_rows=3, since="7d"), usd=False)
+    windowed = report._kiro_limits_caveat(_rep(kiro_rows=3, since="7d"))
     assert "timestamped at IMPORT" in windowed
-    assert "IMPORT" not in report._kiro_limits_caveat(_rep(kiro_rows=3), usd=False)
+    assert "IMPORT" not in report._kiro_limits_caveat(_rep(kiro_rows=3))
 
 
 def test_k4_blank_surface_reads_as_the_source_does_not_say():

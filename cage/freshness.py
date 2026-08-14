@@ -1,73 +1,38 @@
-"""Local pricing-freshness signals (plan §3.3) — sync drift, bundle age, UNPRICED.
+"""Local staleness signals — what is left of them after USAGE-ONLY (ADR 0011).
 
-Cage never fetches a price (no network on any cage code path), so "are my
-prices current?" is answered from **local evidence only**, by three signals:
+This module carried **four** signals through v0.50, three of which were pricing:
 
-1. **sync drift** — the project ``[meta]`` is older than the installed bundle's
-   → the existing `cage prices sync` recommendation, verbatim.
-2. **bundle age** — the bundle's own ``[meta] prices_date`` is more than
-   ``stale_days`` old (policy ``[prices] stale_days``,
-   ``constants.PRICES_STALE_DAYS`` fallback; ``0`` disables) → a faithfully
-   synced project can still be confidently stale.
-3. **UNPRICED presence** — calls or call-less token receipts billing $0 → the
-   existing runnable fix hints, byte-for-byte.
+1. *sync drift* — the project's `[meta] prices_version` older than the bundle's;
+2. *bundle age* — the bundle's own `prices_date` older than `stale_days`;
+3. *UNPRICED presence* — calls and call-less token receipts billing $0;
+4. **policy-defaults drift** — the project's `[meta] policy_version` older than the
+   bundle's (plan §3.10).
 
-Plus one *opt-in* non-price sibling: **policy-defaults drift** (the project
-``[meta] policy_version`` is older than the bundle's → the `cage policy sync`
-recommendation, plan §3.10) — printed by the post-commit hook and doctor,
-never by the report footer, because policy drift changes no derived number.
+The money subsystem's deletion took 1–3 with it: there is no price table, no rate card,
+no `prices.toml` staleness to report, and no priced/unpriced distinction left to make.
+**Signal 4 survives unchanged** and is the module's whole surface now.
 
-One implementation, three surfaces (the csvout lesson): the git post-commit
-hook, `cage doctor`, and the `cage report` footer all render lines from
-:func:`freshness`. Determinism law: derived views pass ``today=None`` so the
-age math anchors on the newest ledger ``ts`` (data-relative, clock-free —
-same ledger + policy ⇒ same lines); the post-commit hook and doctor (a
-write-path event and a diagnostic, where the clock is already allowed) pass
-wall-clock today. Print-only everywhere — a freshness line never gates,
-blocks, or exits non-zero.
+It is deliberately *not* folded into `policysync` — the caller relationship runs the
+other way (`policy_line` defers to `policysync.sync_recommendation` for the wording, one
+home for the string), and a view importing `freshness` for a drift line should not have
+to import the module that performs the sync.
+
+Print-only, exactly as before: a freshness line never gates, blocks, or exits non-zero.
+It also never changes a derived number — policy drift cannot, because `policy.load`
+already merges the bundled defaults in — which is why this line surfaces on diagnostics
+and write-path events (doctor, the post-commit hook) and never in a view's footer.
 """
 from __future__ import annotations
 
-import datetime as _dt
 from pathlib import Path
 
-from cage import ledger, paths, policy, prices
-
-_AGE_LINE = "bundled prices are {n} days old — check for a newer cage release"
-
-
-def _parse_date(s: object) -> _dt.date | None:
-    try:
-        return _dt.date.fromisoformat(str(s)[:10])
-    except (TypeError, ValueError):
-        return None
-
-
-def sync_line(root: Path) -> str | None:
-    """Signal 1 — verbatim :func:`pricescmd.sync_recommendation` (one wording,
-    one home). No project policy.toml at all ⇒ the bundle applies directly —
-    nothing can be stale (the `prices list`/doctor rule). A pre-v0.19 project
-    policy (no ``[meta]``) reads as older-than-bundle and fires the hint."""
-    from cage import pricescmd  # deferred: CLI-layer module, keep import light
-    foot = paths.Footprint(root)
-    # prices_version lives in the prices file after the split (prices-toml plan §2.1) —
-    # read it there, not the policy file, or a migrated project reads as pre-0.19 and
-    # the staleness hint fires falsely. `foot.prices` is the legacy cage.toml for an
-    # un-split project, so this stays correct across both layouts.
-    if not foot.prices.exists():
-        return None
-    meta = policy.load_project_raw(foot.prices).get("meta", {})
-    return pricescmd.sync_recommendation(meta)
+from cage import paths, policy
 
 
 def policy_line(root: Path) -> str | None:
-    """The non-price sibling of :func:`sync_line` — verbatim
-    :func:`policysync.sync_recommendation` (plan §3.10). Opt-in for callers:
-    price drift can make a report's *dollars* stale so it belongs in the money
-    view, but policy-defaults drift never changes a derived number
-    (`policy.load` already merges the bundled defaults in) — so this line
-    surfaces on diagnostics and write-path events (doctor, post-commit hook),
-    never in the report footer."""
+    """Verbatim :func:`policysync.sync_recommendation` (plan §3.10) — one wording, one
+    home. No project policy file ⇒ the bundle applies directly and nothing can be
+    stale."""
     from cage import policysync  # deferred: CLI-layer module, keep import light
     foot = paths.Footprint(root)
     if not foot.policy.exists():
@@ -76,86 +41,13 @@ def policy_line(root: Path) -> str | None:
     return policysync.sync_recommendation(meta)
 
 
-def age_line(pol: dict, anchor: _dt.date | None) -> str | None:
-    """Signal 2 — the bundle's own age against ``anchor``. ``stale_days <= 0``
-    disables (documented opt-out); no anchor (empty ledger on the data-relative
-    path) or an unparseable ``[meta]`` date ⇒ no line — never a guess."""
-    sd = policy.prices_stale_days(pol)
-    if sd <= 0 or anchor is None:
-        return None
-    meta = policy.bundled_raw().get("meta", {})
-    stamped = _parse_date(meta.get("prices_date") or meta.get("prices_version"))
-    if stamped is None:
-        return None
-    n = (anchor - stamped).days
-    if n <= sd:
-        return None
-    return _AGE_LINE.format(n=n)
+def freshness(root: Path, pol: dict, *, include_policy: bool = False) -> list[str]:
+    """Zero-or-more actionable lines, ``[]`` when clean.
 
-
-def unpriced_lines(root: Path, pol: dict, calls: list[dict] | None = None,
-                   receipts: list[dict] | None = None) -> list[str]:
-    """Signal 3 — UNPRICED calls and call-less token receipts, rendered by the
-    existing helpers byte-for-byte (`report.unpriced_line`,
-    `receiptprice.unpriced_receipts_line`) — reused, never re-phrased."""
-    from cage import receiptprice, report  # deferred: report imports this module
-    calls = ledger.spend(root) if calls is None else calls
-    receipt_rows = ledger.receipts(root) if receipts is None else receipts
+    ``pol`` is accepted and unused — it fed the price-age signal. The signature keeps
+    both parameters so callers are unchanged across the money deletion; only
+    ``include_policy=True`` can produce a line at all now."""
     out: list[str] = []
-    detail: dict[str, dict] = {}
-    for c in calls:
-        _, match, _ = prices.call_usd_match(pol, c)
-        if match != "none":
-            continue
-        d = detail.setdefault(f"{c.get('provider') or '—'}/{c.get('model') or '—'}",
-                              {"calls": 0, "tokens": 0})
-        d["calls"] += 1
-        d["tokens"] += c.get("tokens_in", 0) + c.get("tokens_out", 0)
-    if detail:
-        out.append(report.unpriced_line(dict(sorted(detail.items()))))
-    by_id = {c.get("id"): c for c in calls}
-    idx = receiptprice.build(calls, receipt_rows)  # once per view, never per receipt
-    agg = {"receipts": 0, "tokens": 0, "tools": set()}
-    for r in receipt_rows:
-        if r.get("tool") == "human" or r.get("unit") == "minutes":
-            # Legacy Tier-1 row — excluded by decision, not a pricing gap
-            continue
-        if receiptprice.eligible(r, by_id) and receiptprice.resolve(r, idx, pol) is None:
-            agg["receipts"] += 1
-            agg["tokens"] += int(r.get("saved", 0.0))
-            agg["tools"].add(r.get("tool", ""))
-    if agg["receipts"]:
-        out.append(receiptprice.unpriced_receipts_line(
-            {**agg, "tools": sorted(agg["tools"])}))
-    return out
-
-
-def freshness(root: Path, pol: dict, *, today: _dt.date | None = None,
-              include_unpriced: bool = True, include_policy: bool = False,
-              rows: list[dict] | None = None) -> list[str]:
-    """The signal check — zero-or-more actionable lines, ``[]`` when clean.
-
-    ``today=None`` ⇒ data-relative anchor (newest ledger ``ts``) for derived
-    views; a caller on a clock-allowed path passes today's date. ``rows`` lets
-    a view that already loaded the calls (report) skip a second ledger scan.
-    ``include_unpriced=False`` is for `render_report`, which prints the same
-    UNPRICED lines natively — one home for the strings, no double-print.
-    ``include_policy=True`` adds the non-price :func:`policy_line` — the
-    post-commit hook opts in; the report footer never does (policy drift
-    changes no derived number)."""
-    calls = ledger.spend(root) if rows is None else rows
-    if today is not None:
-        anchor: _dt.date | None = today
-    else:
-        newest = ledger.newest_ts(calls)
-        anchor = newest.date() if newest is not None else None
-    out: list[str] = []
-    if (s := sync_line(root)) is not None:
-        out.append(s)
     if include_policy and (p := policy_line(root)) is not None:
         out.append(p)
-    if (a := age_line(pol, anchor)) is not None:
-        out.append(a)
-    if include_unpriced:
-        out.extend(unpriced_lines(root, pol, calls=calls))
     return out

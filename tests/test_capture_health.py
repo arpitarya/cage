@@ -20,6 +20,7 @@ from types import SimpleNamespace
 # three metric-ledger agents, so an unstamped (now()) fixture row would vanish.
 LEDGER_TS = "2026-06-01T12:00:00Z"
 
+from conftest import metric_twin
 from cage import (agents, cleanup, importcmd, ledger, paths, policy, report,
                   schema)
 from srcseed import mkcage
@@ -268,11 +269,12 @@ def test_health_write_failure_does_not_break_import(tmp_path, monkeypatch):
 
 def test_render_report_is_pure_of_the_filesystem(tmp_path, monkeypatch):
     root = _isolate(tmp_path, monkeypatch)
-    ledger.append(paths.Footprint(root).calls,
-                  schema.make_call(route="r", provider="anthropic",
-                                   model="claude-sonnet-4-6", agent="claude",
-                                   tokens_in=1000, tokens_out=100, session="s",
-                                   ts=LEDGER_TS))
+    _row = schema.make_call(route="r", provider="anthropic",
+                            model="claude-sonnet-4-6", agent="claude",
+                            tokens_in=1000, tokens_out=100, session="s",
+                            ts=LEDGER_TS)
+    ledger.append(paths.Footprint(root).calls, _row)
+    metric_twin(root, _row)   # claude has a spine; `spend()` reads the twin (ADR 0011)
     rep = report.summarize(root, policy.load(None), dim="agent")
     H = {"copilot": _rec()}
     a = report.render_report(rep, health=H)
@@ -288,11 +290,12 @@ def test_render_report_is_pure_of_the_filesystem(tmp_path, monkeypatch):
 
 def test_table_is_byte_identical_with_and_without_a_warning(tmp_path, monkeypatch):
     root = _isolate(tmp_path, monkeypatch)
-    ledger.append(paths.Footprint(root).calls,
-                  schema.make_call(route="r", provider="anthropic",
-                                   model="claude-sonnet-4-6", agent="claude",
-                                   tokens_in=1000, tokens_out=100, session="s",
-                                   ts=LEDGER_TS))
+    _row = schema.make_call(route="r", provider="anthropic",
+                            model="claude-sonnet-4-6", agent="claude",
+                            tokens_in=1000, tokens_out=100, session="s",
+                            ts=LEDGER_TS)
+    ledger.append(paths.Footprint(root).calls, _row)
+    metric_twin(root, _row)   # claude has a spine; `spend()` reads the twin (ADR 0011)
     rep = report.summarize(root, policy.load(None), dim="agent")
     without = report.render_report(rep, health=None)
     withw = report.render_report(rep, health={"copilot": _rec()})
@@ -303,11 +306,12 @@ def test_table_is_byte_identical_with_and_without_a_warning(tmp_path, monkeypatc
 
 def test_csv_never_carries_the_warning(tmp_path, monkeypatch):
     root = _isolate(tmp_path, monkeypatch)
-    ledger.append(paths.Footprint(root).calls,
-                  schema.make_call(route="r", provider="anthropic",
-                                   model="claude-sonnet-4-6", agent="claude",
-                                   tokens_in=1000, tokens_out=100, session="s",
-                                   ts=LEDGER_TS))
+    _row = schema.make_call(route="r", provider="anthropic",
+                            model="claude-sonnet-4-6", agent="claude",
+                            tokens_in=1000, tokens_out=100, session="s",
+                            ts=LEDGER_TS)
+    ledger.append(paths.Footprint(root).calls, _row)
+    metric_twin(root, _row)   # claude has a spine; `spend()` reads the twin (ADR 0011)
     rep = report.summarize(root, policy.load(None), dim="agent")
     csv = report.render_csv(rep)                          # render_csv takes no health
     assert "⚠" not in csv and "capture is off" not in csv

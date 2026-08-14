@@ -47,6 +47,15 @@ spend from a pinned cutover — was built and green on 2026-08-14 and archived:
 [handoff](../work/archive/v0.50-metrics-primary.handoff.md) ·
 [prompt](../work/archive/v0.50-metrics-primary.prompt.md). Its design of record is
 [ADR 0010](adr/0010-metric-ledgers-are-the-spend-source-forward-only-cutover.md).
+
+**USAGE-ONLY** — the deletion of the money subsystem, and the largest removal in the
+project's history — was built and green on 2026-08-14 and archived:
+[handoff](../work/archive/v0.51-usage-only.handoff.md) ·
+[prompt](../work/archive/v0.51-usage-only.prompt.md). Its design of record is
+[ADR 0011](adr/0011-cage-measures-usage-not-cost.md), which also **supersedes the money
+half of ADR 0010**: the spend cutover is retired and `ledger.spend()` partitions by
+agent rather than by time.
+
 **`work/` root now carries no handoff/prompt pair** — nothing is in flight.
 
 **One thing each of the three left open is not a pair and does not live here:** a

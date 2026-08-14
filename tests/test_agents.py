@@ -179,7 +179,7 @@ def test_mcp_tools_list_and_call(seeded, monkeypatch):
     monkeypatch.chdir(root)
     listed = mcpserver._handle({"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
     names = {t["name"] for t in listed["result"]["tools"]}
-    assert {"cage_report", "cage_attrib", "cage_budget", "cage_why"} <= names
+    assert {"cage_report", "cage_attrib", "cage_why"} <= names
     called = mcpserver._handle({"jsonrpc": "2.0", "id": 2, "method": "tools/call",
                                 "params": {"name": "cage_report", "arguments": {}}})
     assert "Ledger by route" in called["result"]["content"][0]["text"]

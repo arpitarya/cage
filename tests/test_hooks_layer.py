@@ -11,7 +11,8 @@ against the failure modes rather than the features:
 - **No double capture.** The hook runs the same sweep every other trigger runs, so a
   turn captured by a hook and then by a pull import is one row, not two.
 - **Fail-open, absolutely.** Every failure mode a hook can have exits 0 — a broken cage
-  must never break someone's session. The one non-zero is a deliberate budget block.
+  must never break someone's session. Since USAGE-ONLY (ADR 0011) removed the
+  budget block, EVERY event exits 0 — there is no non-zero left.
 - **Identity is stamped, never inferred**, and every gap is *named*: an agent that
   cannot do something appears in `agents.HOOK_GAPS`, and a fact derived from hooks
   carries the CLI-only limit wherever it is shown.
@@ -169,8 +170,8 @@ def test_every_wired_hook_verb_is_live_in_the_parser(proj_at):
 
 # ── the acceptance criterion: the layer changes no number ─────────────────────
 
-_VIEWS = (["report", "--by", "agent"], ["insights", "attrib"], ["insights", "roi"],
-          ["insights", "adoption"], ["task", "quality"], ["insights", "budget"])
+_VIEWS = (["report", "--by", "agent"], ["insights", "attrib"], ["insights", "chats"],
+          ["insights", "adoption"], ["insights", "graphify"], ["insights", "commits"])
 
 
 def _render(root, capsys):
@@ -237,7 +238,7 @@ def test_every_event_exits_zero_when_everything_fails(event, proj_at, monkeypatc
         raise RuntimeError("underlying failure")
     for target in ("cage.importcmd.ensure_captured", "cage.ledger.calls",
                    "cage.attest.record_session", "cage.attest.record_tool",
-                   "cage.budget.check", "cage.tasks.read"):
+                   "cage.tasks.read"):
         monkeypatch.setattr(target, boom, raising=False)
     assert hookcmd.run(_args(event, session="s1")) == 0
 
@@ -262,9 +263,6 @@ def test_unknown_event_is_swallowed(proj_at):
 # produces — used to block EVERY Bash call in the session, silently: a blocked tool
 # call reads to the user as the agent refusing, not as cage failing.
 
-def test_a_stale_hook_event_exits_zero_instead_of_blocking_every_tool_call(capsys):
-    assert hookcmd.BLOCK == 2                      # the collision this guards
-    assert cli.main(["hook", "not-an-event", "--agent", "claude"]) == 0
 
 
 def test_an_incomplete_hook_invocation_also_fails_open(capsys):
@@ -293,14 +291,6 @@ def test_the_interception_is_scoped_to_hook_and_nothing_else():
     assert e.value.code == 0
 
 
-def test_a_real_block_still_reaches_the_host_through_the_same_boundary(proj_at, capsys):
-    """The fix must swallow the *accidental* 2 without swallowing the deliberate one.
-    Asserted through `cli.main` — the path the host actually invokes — because that is
-    where both codes travel; `hookcmd.run` alone could not tell them apart."""
-    _call(proj_at, "t1", "s1")
-    _budgets(proj_at, 0.0001, "block")
-    assert cli.main(["hook", "budget", "--agent", "claude",
-                     "--session", "s1"]) == hookcmd.BLOCK
 
 
 # ── agent identity: stamped, never inferred ───────────────────────────────────
@@ -434,15 +424,17 @@ def test_session_end_closes_this_sessions_open_tasks(proj_at):
 
 
 def test_auto_close_is_not_a_success_claim(proj_at):
-    """`compare`/`estimate`/`calibration` need a *closed* task; `cage task quality` needs
+    """`compare`/`estimate`/`calibration` need a *closed* task; the outcome STORE needs
     a *judged* one. Stamping `ok` because a session ended would inflate the success rate
-    of every session that merely finished."""
-    from cage import policy, quality, taskgroup
+    of every session that merely finished.
+
+    The store moved from `quality.py` to `outcomes.py` when the money view around it was
+    deleted (USAGE-ONLY, ADR 0011); the two-axes rule this pins is untouched."""
+    from cage import outcomes, taskgroup
     _call(proj_at, "t1", "s1")
     assert hookcmd.run(_args("session-end", session="s1")) == 0
-    assert "t1" in taskgroup.closed_tasks(proj_at)              # eligible for cost comparison
-    q = quality.summarize(proj_at, pol=policy.load(None))
-    assert q["ok"] == 0 and q["redo"] == 0                # invisible to the quality axis
+    assert "t1" in taskgroup.closed_tasks(proj_at)         # eligible for comparison
+    assert outcomes.load(proj_at) == {}                    # invisible to the outcome axis
 
 
 def test_session_end_with_no_session_declines_rather_than_guessing(proj_at):
@@ -459,37 +451,6 @@ def test_an_already_closed_task_is_not_reopened_or_relabelled(proj_at):
     assert clicmds.cmd_outcome(SimpleNamespace(task="t1", redo=True, label="")) == 0
     assert hookcmd.run(_args("session-end", session="s1")) == 0
     assert tasks.read(proj_at)["t1"]["outcome"] == "redo"  # the human's verdict stands
-
-
-# ── budget: the first real caller of budget.check ─────────────────────────────
-
-def _budgets(root, cap, on_exceed):
-    fp = paths.Footprint(root)
-    fp.base.mkdir(parents=True, exist_ok=True)
-    fp.policy.write_text(f'[budgets]\nsession_usd = {cap}\ndaily_usd = {cap}\n'
-                         f'on_exceed = "{on_exceed}"\n', encoding="utf-8")
-
-
-def test_budget_hook_blocks_only_when_policy_says_block(proj_at, capsys):
-    _call(proj_at, "t1", "s1")                    # a real, priced call
-    _budgets(proj_at, 0.0001, "block")
-    assert hookcmd.run(_args("budget", session="s1")) == hookcmd.BLOCK
-    err = capsys.readouterr().err
-    assert "BLOCKED" in err and "on_exceed" in err and "cage insights budget" in err
-
-
-def test_budget_hook_is_advisory_under_warn(proj_at, capsys):
-    _call(proj_at, "t1", "s1")
-    _budgets(proj_at, 0.0001, "warn")
-    assert hookcmd.run(_args("budget", session="s1")) == 0
-    assert "not blocking" in capsys.readouterr().err
-
-
-def test_budget_hook_is_silent_under_the_ceiling(proj_at, capsys):
-    _call(proj_at, "t1", "s1")
-    _budgets(proj_at, 1000.0, "block")
-    assert hookcmd.run(_args("budget", session="s1")) == 0
-    assert capsys.readouterr().err == ""
 
 
 # ── every gap is named, never silently two-of-three ───────────────────────────
@@ -620,7 +581,7 @@ def test_every_document_obeys_the_never_compute_rule(proj_at):
 
 def test_steering_says_to_relay_refusals_verbatim(proj_at):
     body = steering.by_layer("L1")[0].body
-    for phrase in ("INSUFFICIENT DATA", "SAVING (GROSS)", "measured", "modeled",
+    for phrase in ("refusal", "GROSS", "measured", "modeled",
                    "never produce a cage number yourself"):
         assert phrase.lower() in body.lower(), phrase
 

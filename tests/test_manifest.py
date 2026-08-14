@@ -123,7 +123,7 @@ def test_manifest_is_never_read_by_a_derived_view(tmp_path, monkeypatch):
     manifest.record_import(root, import_id="i_x", agent="claude", surface="", session="s1",
                            session_uid="n_x", source_path="~/x", files_scanned=1,
                            rows_appended=1, tokens_in=1, tokens_out=1, cached_in=0,
-                           est_cost_usd=0.0, unpriced_rows=0, ts="2026-07-01T00:00:00Z")
+                           ts="2026-07-01T00:00:00Z")
     buf2 = io.StringIO()
     with contextlib.redirect_stdout(buf2):
         cli.main(["--ledger", str(root), "insights", "attrib"])

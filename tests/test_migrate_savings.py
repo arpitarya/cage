@@ -49,10 +49,10 @@ def _run(root, *args):
     return buf.getvalue()
 
 
-def _money_views(root):
+def _derived_views(root):
     return (_run(root, "insights", "attrib"),
             _run(root, "report"),
-            _run(root, "insights", "roi"))
+            _run(root, "insights", "chats"))
 
 
 def test_dry_run_writes_nothing_and_reports_what_would_copy(tmp_path, monkeypatch):
@@ -93,13 +93,13 @@ def test_receipts_jsonl_byte_identical_after_apply(tmp_path, monkeypatch):
     assert _receipts_bytes(root) == before  # never rewritten (append-only)
 
 
-def test_money_views_byte_identical_before_and_after(tmp_path, monkeypatch):
+def test_derived_views_byte_identical_before_and_after(tmp_path, monkeypatch):
     root = _root(tmp_path, monkeypatch)
     _legacy_graphify(root, saved_from=40000, ts="2026-05-10T00:00:00Z")
     _legacy_graphify(root, saved_from=2000, ts="2026-06-11T00:00:00Z")
-    before = _money_views(root)
+    before = _derived_views(root)
     migratecmd.apply(root)
-    after = _money_views(root)
+    after = _derived_views(root)
     assert after == before  # the migration changed no reported number
 
 

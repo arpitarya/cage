@@ -6,9 +6,7 @@ agent        calls   tok in  tok out  gross tok
 claude-code      1  912,400   61,200     80,000
 TOTAL            1  912,400   61,200     80,000
 
+· claude credits: — (Claude Code records no credit unit on disk)
 · saved is GROSS — avoided read cost; it excludes the cost of USING the tool
   (the invoking turn, the injected context). `cage query gross-vs-net`
-  net vs spend = gross − this window's spend, not net of the tools' cost of use.
 · last import: 3d ago — `cage import` to refresh
-· bundled prices are 61 days old — check for a newer cage release
-  (`cage query prices-freshness` explains)

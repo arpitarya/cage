@@ -3,7 +3,6 @@
 GC4: `cage doctor` reports graph.json staleness vs HEAD.
 GC5a: a history band over graphify receipts, refusing below MIN_ESTIMATE_N.
 GC5b: a deterministic day-one repo ceiling from graph.json (same graph ⇒ same band).
-GC5c: `insights verdict graphify` composes both, staying a pure composer.
 """
 from __future__ import annotations
 
@@ -13,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from cage import doctorcmd, graphifymodel, savings, verdict
+from cage import doctorcmd, graphifymodel, savings
 from cage.constants import MIN_ESTIMATE_N
 from cage.policy import load as load_policy
 from cage import paths
@@ -109,31 +108,6 @@ def test_history_band_at_min_n_is_a_band(proj):
     assert d["ok"] and d["n"] == MIN_ESTIMATE_N
     assert d["tokens"]["q1"] <= d["tokens"]["median"] <= d["tokens"]["q3"]
     assert d["method"] == "modeled"
-
-
-# ── GC5c: verdict composes both, refusal intact ─────────────────────────────
-
-def test_verdict_graphify_shows_ceiling_even_with_no_history(proj, monkeypatch):
-    monkeypatch.chdir(proj)
-    _graph(proj, ["a.py", "b.py"])
-    d = verdict.compose(proj, load_policy(paths.Footprint(proj).policy), "graphify")
-    assert d["verdict"] == "INSUFFICIENT DATA"       # no receipts → refusal intact
-    assert "forward" in d and d["forward"]["ceiling"]["ok"]
-    text = verdict.render_verdict(d)
-    assert "INSUFFICIENT DATA" in text
-    assert "repo ceiling" in text and "modeled" in text  # ceiling shown pre-history
-
-
-def test_verdict_graphify_composes_history_when_present(proj, monkeypatch):
-    monkeypatch.chdir(proj)
-    _graph(proj, ["a.py", "b.py"])
-    for i in range(MIN_ESTIMATE_N):
-        savings.record(proj, tool="graphify", unit="tokens", raw_alternative=2000,
-                       actual=200, op="query", savings_id=f"s_h{i:03d}")
-    d = verdict.compose(proj, load_policy(paths.Footprint(proj).policy), "graphify")
-    assert d["verdict"].split(" (")[0] in ("SAVING", "COSTING", "BREAK-EVEN")  # receipts exist
-    text = verdict.render_verdict(d)
-    assert "history band" in text and "repo ceiling" in text
 
 
 # ── GC4: doctor graph staleness ─────────────────────────────────────────────

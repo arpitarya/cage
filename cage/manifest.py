@@ -80,8 +80,7 @@ def _imports_path(root: Path) -> Path:
 def record_import(root: Path, *, import_id: str, agent: str, surface: str,
                   session: str, session_uid: str, source_path: str, files_scanned: int,
                   rows_appended: int, tokens_in: int, tokens_out: int, cached_in: int,
-                  est_cost_usd: float, unpriced_rows: int, ts: str,
-                  session_name: str = "", machine: str = "") -> bool:
+                  ts: str, session_name: str = "", machine: str = "") -> bool:
     """One manifest row per (agent, surface, session) an import sweep captured rows from
     (plan §4). `session` is the log's own session id; `session_uid` is the cage-minted
     `n_…` id unique to this row; `session_name` is the best-available human name (``""``
@@ -90,9 +89,7 @@ def record_import(root: Path, *, import_id: str, agent: str, surface: str,
            "ts": ts, "agent": agent, "surface": surface, "session": session,
            "source_path": source_path, "files_scanned": int(files_scanned),
            "rows_appended": int(rows_appended), "tokens_in": int(tokens_in),
-           "tokens_out": int(tokens_out), "cached_in": int(cached_in),
-           "est_cost_usd": round(float(est_cost_usd), 6),
-           "unpriced_rows": int(unpriced_rows)}
+           "tokens_out": int(tokens_out), "cached_in": int(cached_in)}
     if session_name:
         row["session_name"] = session_name
     if machine:

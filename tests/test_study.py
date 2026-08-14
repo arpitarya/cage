@@ -18,7 +18,14 @@ from cage import clicmds, ledger, machine, paths, policy, schema, study, tasks
 from cage.constants import MIN_COMPARE_N
 from cage.errors import CageError
 
-_MODEL = dict(route="chat", provider="anthropic", model="claude-opus-4-8", agent="claude-code")
+# `agent="lib"` deliberately, NOT a real agent surface. The task-grouped views below
+# (compare/estimate/calibration) join spend to a task by the row's own `task` field, and
+# a METRIC row carries none — the transcript stores have no task concept. So for claude
+# and copilot, whose spend resolves from the metric ledger (USAGE-ONLY, ADR 0011), these
+# views currently see zero tokens. That is a real gap, filed as TASK-GRAIN-SPINE in
+# work/OPEN-WORK.md; it is not what these tests are about, so they seed a spine-less
+# agent whose `calls` rows still carry `task` and still resolve.
+_MODEL = dict(route="chat", provider="anthropic", model="claude-opus-4-8", agent="lib")
 
 
 def _seed_machine(base, name, plugin_days, baseline=True):
@@ -154,14 +161,14 @@ def test_report_exact_coverage_and_paired_delta(fleet):
     missing = next(m for m in d["machines"] if not m["phases"]["plugin"]["days"])
     assert missing["phases"]["baseline"]["days"] == 3
     assert d["delta"] == {"ok": True, "method": "estimated",
-                          "d_tokens_per_day": -7_000.0, "d_usd_per_day": -0.035,
+                          "d_tokens_per_day": -7_000.0,
                           "per_machine": d["delta"]["per_machine"]}
-    assert set(d["delta"]["per_machine"].values()) == {-0.035}
+    assert set(d["delta"]["per_machine"].values()) == {-7_000.0}
     assert d["pooled"]["baseline"]["n_days"] == 21 and d["pooled"]["plugin"]["n_days"] == 17
     text = study.render_study(d)
     assert "⚠ gap days: 2026-06-09" in text
     assert "MISSING — no rows in this phase" in text
-    assert "-7,000 tok/day · -$0.0350/day per machine (estimated)" in text
+    assert "-7,000 tok/day per machine (estimated)" in text
     assert "not a randomized experiment" in text
     assert "n=6 machines" in text  # only complete machines pair
 

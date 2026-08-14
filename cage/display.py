@@ -2,34 +2,35 @@
 
 Two jobs, one home, so no view grows its own copy of the logic:
 
-- :class:`Display` — the resolved presentation switches for a render call:
-  ``usd`` (tokens are the default; dollars are the interpretation you ask for —
-  plan Phase 2.5) and ``all_columns`` (the fixed-shape escape hatch that undoes
-  signal-gating for scripts). Resolution precedence: per-invocation flag > env
-  ``CAGE_USD`` > policy ``[display] usd`` (`policy.display_usd`).
+- :class:`Display` — the resolved presentation switches for a render call. Only
+  ``all_columns`` remains (the fixed-shape escape hatch that undoes signal-gating for
+  scripts): the ``usd`` switch and its flag/env/policy precedence went with the money
+  subsystem (USAGE-ONLY, ADR 0011). There is one view now, so there is nothing to
+  switch between.
 - :class:`Footer` — the per-invocation collector for everything that renders
-  below a table: pricing footnotes (``≈``), data caveats (``·``), ⚠ blocks,
-  signal-gating explanations, and advice lines (import age, price freshness).
+  below a table: footnotes (``≈``), data caveats (``·``), ⚠ blocks,
+  signal-gating explanations, and advice lines (import age, policy drift).
   Lines dedupe (first occurrence wins) and render once, in a FIXED order:
   footnotes → caveats → warns → gating explanations → advice. A command
   invocation therefore speaks each note exactly once, at the bottom.
 
-Display is presentation only — pricing always computes underneath (budget
-guards, UNPRICED detection, verdict inputs), and the money-native views
-(budget/roi/verdict/compare/estimate) never consult it. CSV never gates and
-never sees any of this (`cage query csv-output`).
+Display is presentation only, and CSV never gates or sees any of it
+(`cage query csv-output`).
 """
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-DASH = "—"  # the ONLY rendering of "couldn't price" — $0.0000 always means a real zero
+#: The ONLY rendering of "this figure does not exist for this row" — a recorded `0`
+#: always means a measured zero. Since USAGE-ONLY (ADR 0011) the absences it marks are
+#: unit absences (`units.ABSENT`: claude has no credits, kiro has no IDE tokens) and
+#: structural ones (a credits-only chat has no token cells), never "couldn't price".
+DASH = "—"
 
 
 @dataclass(frozen=True)
 class Display:
     """Resolved presentation switches, threaded through the render layer."""
-    usd: bool = False
     all_columns: bool = False
 
 
@@ -37,18 +38,16 @@ DEFAULT = Display()
 
 
 def resolve(args, pol: dict) -> Display:
-    """Flag > env > policy, resolved once at the CLI boundary. ``args`` is the
-    argparse namespace; a missing attribute reads as "flag not given"."""
-    from cage import policy
-    flag = getattr(args, "usd", False)
-    return Display(usd=bool(flag) or policy.display_usd(pol),
-                   all_columns=bool(getattr(args, "all_columns", False)))
+    """Resolved once at the CLI boundary. ``args`` is the argparse namespace; a missing
+    attribute reads as "flag not given". ``pol`` is accepted and unused — the one
+    policy-backed switch here was ``[display] usd`` (USAGE-ONLY, ADR 0011)."""
+    return Display(all_columns=bool(getattr(args, "all_columns", False)))
 
 
 @dataclass
 class Footer:
     """Collects the below-the-table lines for one command invocation."""
-    _footnotes: list[str] = field(default_factory=list)  # ≈ pricing approximations
+    _footnotes: list[str] = field(default_factory=list)  # ≈ qualifications
     _caveats: list[str] = field(default_factory=list)    # · data-fidelity notes
     _warns: list[str] = field(default_factory=list)      # ⚠ blocks (may be multi-line)
     _gaps: list[str] = field(default_factory=list)       # · signal-gating explanations

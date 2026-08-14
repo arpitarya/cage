@@ -19,6 +19,25 @@ from pathlib import Path
 
 from cage import debuglog, ledger, paths, schema
 
+#: The ONE phrasing of the gross exclusion. Every view that prints a `saved`/`gross`
+#: figure prints this same line — a relabel that lives in one place cannot drift.
+#:
+#: **This outlived the money subsystem on purpose** (USAGE-ONLY, ADR 0011). It lived in
+#: `netsaved.py`, which was deleted because *netting* was a dollar computation; the
+#: gross/net **distinction** is not. Every `saved` is still the avoided read cost in
+#: TOKENS and still excludes the tokens spent USING the tool, so a large `saved` and a
+#: session that consumed more tokens overall remain simultaneously true. Deleting the
+#: note with the module would have removed the honesty caveat while leaving the number
+#: it qualifies — the one outcome this phrasing exists to prevent.
+#:
+#: The task-level net (`netsaved.by_tool`) is gone and is NOT reimplemented in tokens:
+#: it required pricing each in-window call to a common unit, and per-query netting was
+#: never computable (shim receipts carry a `task` but no `call`). Cage therefore reports
+#: gross only, and says so.
+GROSS_NOTE = (
+    "· saved is GROSS — avoided read cost; it excludes the cost of USING the tool\n"
+    "  (the invoking turn, the injected context). `cage query gross-vs-net`")
+
 
 def record(root: Path | None = None, *, tool: str, raw_alternative: float, actual: float,
            op: str = "", session: str = "", task: str = "", unit: str = "tokens",

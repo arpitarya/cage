@@ -5,7 +5,7 @@ Two properties, both load-bearing:
 1. **Every graphify run files a usage row** (shim route here; transcript route is
    covered in the GC2/GC3 tests) with `{op, args_hash, exit, ms, outcome}` — proving
    usage even when no receipt is filed (the F1 blind spot).
-2. **Usage rows never perturb a derived money view** — report/attrib/roi are
+2. **Usage rows never perturb a derived view** — report/attrib are
    byte-identical whether or not the usage log exists. The row lives in `state/`,
    which no derived view reads; this asserts that invariant rather than trusting it.
 """
@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from cage import graphifymeter, paths, report, roi, usagelog
+from cage import graphifymeter, paths, report, usagelog
 from cage.policy import load as load_policy
 
 
@@ -93,15 +93,15 @@ def test_usage_rows_do_not_perturb_derived_views(proj):
 
     # snapshot the money views WITH the usage log present
     rep_with = report.render_report(report.summarize(proj, pol))
-    roi_with = roi.by_tool(proj, pol)
+    rep_with = report.summarize(proj, pol, "agent")
 
     # delete the usage log entirely and re-derive — must be byte-identical
     paths.Footprint(proj).usage_log.unlink()
     rep_without = report.render_report(report.summarize(proj, pol))
-    roi_without = roi.by_tool(proj, pol)
+    rep_without = report.summarize(proj, pol, "agent")
 
     assert rep_with == rep_without
-    assert roi_with == roi_without
+    assert rep_with == rep_without
 
 
 def test_summary_counts_match_rows(proj):

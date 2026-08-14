@@ -54,18 +54,26 @@ _WIRING_ARTIFACTS = (
     ".kiro/steering",            # L1/L3 · kiro steering
 )
 
-# The derived views the floor pins. Money, savings, adoption and the raw CSV — a layer
+# The derived views the floor pins. Usage, savings, adoption and the raw CSV — a layer
 # that leaked into any of them would move one of these. `--no-import` keeps the read a
 # pure function of the ledger (capture-on-read is pinned off suite-wide anyway).
+#
+# **Three entries changed in USAGE-ONLY (ADR 0011), and the gate did not weaken.** The
+# list named `report --usd`, `insights roi` and `task quality`; all three commands were
+# deleted with the money subsystem, so the old list could only ever exit 2. They are
+# replaced ONE-FOR-ONE by live views of the same kinds — a second report shape, a
+# second savings view, a second per-conversation view — so the count, the breadth and
+# the byte-identical assertion are unchanged. This is the substitution the standing
+# rule allows; what it forbids is *relaxing an assertion*, and none was relaxed.
 _VIEWS = (
     ["report", "--by", "agent"],
-    ["report", "--by", "agent", "--usd"],
+    ["report", "--by", "model"],
     ["report", "--csv"],
     ["insights", "attrib"],
-    ["insights", "roi"],
+    ["insights", "graphify"],
     ["insights", "adoption"],
     ["insights", "chats"],
-    ["task", "quality"],
+    ["insights", "commits"],
 )
 
 

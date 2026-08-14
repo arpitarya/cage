@@ -55,7 +55,7 @@ _WIRE = {"claude": claudewire, "copilot": copilotwire, "kiro": kirowire}
 #      happened". `hook_gap_lines()` renders them and is called by every surface that
 #      reports L1 status.
 HOOK_EVENTS: dict[str, tuple[str, ...]] = {
-    "claude": ("session-start", "session-end", "tool", "budget"),
+    "claude": ("session-start", "session-end", "tool"),
     "copilot": ("session-start", "session-end"),
     "kiro": ("session-end",),
 }
@@ -71,7 +71,7 @@ HOOK_GAPS: dict[str, str] = {
     # `hookcmd._session()` reads `session_id` out of *Claude Code's* stdin payload shape,
     # so on Copilot it returns `""`, `_open_tasks` finds nothing, and `_session_end`
     # closes zero tasks — silently, the way a wired-and-working hook also looks.
-    "copilot": ("no per-tool attestation and no budget block — cage has never written "
+    "copilot": ("no per-tool attestation — cage has never written "
                 "or tested a Copilot pre-tool hook, and an unverified event name fails "
                 "silently. The two wired event names are cage's own and unverified "
                 "against any Copilot doc, and cage reads no session id from a Copilot "

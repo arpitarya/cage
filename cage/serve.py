@@ -1,4 +1,8 @@
-"""`cage data serve` — a minimal local dashboard over the ledger ($0, stdlib http.server)."""
+"""`cage data serve` — a minimal local dashboard over the ledger ($0, stdlib http.server).
+
+The ROI and Budget panels went with the money subsystem (USAGE-ONLY, ADR 0011); what
+remains is usage, which is what cage now measures.
+"""
 from __future__ import annotations
 
 import html
@@ -6,7 +10,7 @@ import http.server
 from functools import partial
 from pathlib import Path
 
-from cage import budget, paths, policy, report, roi
+from cage import paths, policy, report
 
 _CSS = ("body{font:14px ui-monospace,SFMono-Regular,monospace;background:#0e1116;"
         "color:#e6edf3;max-width:900px;margin:2rem auto;padding:0 1rem}"
@@ -24,19 +28,18 @@ def _page(title: str, blocks: dict[str, str]) -> str:
 
 
 def write_html(path: str, title: str, blocks: dict[str, str]) -> None:
-    """Write a standalone page to ``path`` (used by `--html` on matrix)."""
+    """Write a standalone page to ``path``."""
     Path(path).write_text(_page(title, blocks), encoding="utf-8")
 
 
 def dashboard_html(root: Path) -> str:
     pol = policy.load(paths.Footprint(root).policy)
     blocks = {
-        "Spend by route": report.render_report(report.summarize(root, pol, "route")),
-        "Spend by model": report.render_report(report.summarize(root, pol, "model")),
-        "ROI by tool": roi.render_roi(roi.by_tool(root, pol)),
-        "Budget": budget.render_budget(budget.check(root, pol)),
+        "Usage by route": report.render_report(report.summarize(root, pol, "route")),
+        "Usage by model": report.render_report(report.summarize(root, pol, "model")),
+        "Usage by agent": report.render_report(report.summarize(root, pol, "agent")),
     }
-    return _page("LLM cost ledger", blocks)
+    return _page("LLM usage ledger", blocks)
 
 
 def serve(root: Path, port: int = 8788) -> int:

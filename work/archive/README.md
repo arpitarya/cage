@@ -11,6 +11,19 @@ moves here once its work is built and green, tagged with the version it rides. T
 v0.36 pairs were archived while that release was still pending — their header says
 so. This keeps `docs/` root as a true list of *work not yet done*.
 
+## 2026-08-14 — v0.51 USAGE-ONLY
+
+[`v0.51-usage-only.handoff.md`](v0.51-usage-only.handoff.md) ·
+[`v0.51-usage-only.prompt.md`](v0.51-usage-only.prompt.md) — the money subsystem's
+deletion (15 modules, 11 commands, 4 MCP tools, the bundled rate card). Built and green
+2026-08-14 at 1571 passed / 11 skipped. Living decision:
+[ADR 0011](../../docs/adr/0011-cage-measures-usage-not-cost.md).
+
+**Two facts in the handoff were wrong at execution time** and are corrected in the ADR —
+worth knowing before citing it: §9.5 called `work/OPEN-WORK.md` stale (it had already
+been reconciled), and §5.1's "`spend()` = the three metric ledgers" would have silently
+zeroed every library-, proxy- and `codex`-metered row.
+
 ## 2026-07-28 — the v0.36 consolidation
 
 The whole v0.36 cycle (24 files: import-ledger · cage-lab · capture-precision ·

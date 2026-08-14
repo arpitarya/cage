@@ -22,15 +22,14 @@ not a pipeline tool). Empty set ⇒ ``agent-only``. Signatures are per-task
 *observed* receipt sets, not configured pipelines — a caveat every consumer
 renders.
 
-**Totals are measured** — tokens are the recorded ``tokens_in + tokens_out`` of
-the joined calls; USD is recomputed per call at derive time via
-`prices.call_usd` (the same authoritative path `report`/`budget` use).
+**Totals are measured** — tokens are the recorded ``tokens_in + tokens_out`` of the
+joined calls. Tokens are the only denominator since USAGE-ONLY (ADR 0011).
 """
 from __future__ import annotations
 
 from pathlib import Path
 
-from cage import ledger, prices, tasks
+from cage import ledger, tasks
 
 AGENT_ONLY = "agent-only"
 GROUP_KEYS = ("stack", "scope", "label")
@@ -104,22 +103,18 @@ def _task_scope(row: dict) -> str:
 
 def stats(root: Path, pol: dict) -> list[dict]:
     """One stat row per closed task, in sorted task-id order:
-    ``{task, stack, scope, label, calls, tokens, usd, credit_calls}``. Tasks whose
-    joined call set is empty still appear (tokens/usd 0, calls 0) — consumers decide
+    ``{task, stack, scope, label, agents, calls, tokens}``. Tasks whose
+    joined call set is empty still appear (tokens 0, calls 0) — consumers decide
     whether to exclude them, visibly.
 
-    ``credit_calls`` counts the calls priced through the **credits** rung, so a
-    consumer can apply the method law without re-pricing: a credit-priced dollar is
-    `modeled` (a recorded count times a rate *you* configured), a token-priced one is
-    `measured`. Carried here rather than recomputed downstream because this is where
-    the pricing decision is already being made — `compare` claimed `measured` for
-    every group precisely because the basis was not available to it."""
-    from cage import creditprice
+    `pol` is accepted and unused: the per-call pricing that used to happen here, and the
+    ``credit_calls`` basis counter that rode along with it, went with the money subsystem
+    (USAGE-ONLY, ADR 0011). Every figure is now token-denominated and `measured`, so a
+    consumer has no basis split left to apply."""
     joined = join(root)
     rows = []
     for tid, trow in sorted(closed_tasks(root).items()):
         j = joined.get(tid, {"calls": [], "receipts": []})
-        priced = [prices.call_usd_match(pol, c) for c in j["calls"]]
         rows.append({
             "task": tid,
             "stack": signature(j["receipts"]),
@@ -128,8 +123,6 @@ def stats(root: Path, pol: dict) -> list[dict]:
             "agents": sorted(trow.get("agents") or []),
             "calls": len(j["calls"]),
             "tokens": sum(c.get("tokens_in", 0) + c.get("tokens_out", 0) for c in j["calls"]),
-            "usd": round(sum(p[0] for p in priced), 6),
-            "credit_calls": sum(1 for p in priced if p[1] == creditprice.MATCH),
         })
     return rows
 

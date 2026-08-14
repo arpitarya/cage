@@ -33,6 +33,19 @@ def _call(root: Path, cid: str, *, agent: str, session: str = "", surface: str =
                            tokens_in=tin, tokens_out=tout, agent=agent,
                            session=session, surface=surface, ts=ts, call_id=cid)
     ledger.append(paths.Footprint(root).calls, row)
+    # Dual-write the metric twin — `graphifychat` reuses `chats.summarize`, which reads
+    # `ledger.spend`; a calls-only fixture is superseded to nothing for any agent with a
+    # metric spine (USAGE-ONLY, ADR 0011). Same counts, same bucket key.
+    from cage import agents as _ag
+    surf = _ag.row_surface(agent) or agent
+    if surf == "claude":
+        ledger.append_row(root, "claude", schema.make_claude_metric(
+            session=session, source="request", request=cid, provider=provider,
+            model=model, tokens_in=tin, tokens_out=tout, surface=surface, ts=ts))
+    elif surf == "copilot":
+        ledger.append_row(root, "copilot", schema.make_copilot_metric(
+            source="chat", session=session, surface=surface or "vscode", model=model,
+            tokens_in=tin, tokens_out=tout, ts=ts))
 
 
 def _credit(root: Path, *, session: str, agent: str = "kiro", credits: float = 3.5,
@@ -288,7 +301,7 @@ def test_empty_no_savings_at_all_diagnoses(root, pol):
     assert "No graphify savings recorded yet." in out
     assert "cage query graphify-coverage" in out
     assert "cage doctor" in out
-    assert "cage insights roi" in out
+    assert "cage insights attrib" in out
 
 
 def test_empty_filtered_blames_the_filter_when_savings_exist_elsewhere(root, pol):

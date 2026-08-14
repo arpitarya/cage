@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from cage import convert, creditprice, ledger, paths, policy, prices, render
+from cage import ledger, paths, policy, render, units
 from cage.constants import TOKENS_PER_MILLION
 
 DIMENSIONS = ("route", "agent", "model", "provider", "day", "task")
@@ -21,29 +21,12 @@ def _key(call: dict, dim: str) -> str:
 
 
 def _new_group() -> dict:
-    # unpriced_* ride in the same pass as the totals (one structure feeds text AND
-    # csv — plan §3.9): the text view warns from `unpriced_detail`; the CSV shows
-    # the same gap per group so a spreadsheet can't publish an understated total.
     # `credits` starts at None, not 0.0 — the absent-vs-recorded-zero distinction
     # every credits field in cage carries (REPORT-CREDITS, matching `chats.py`'s
     # `_new_bucket`). A group no `ledger.credits` row ever joined stays None and
     # renders `—`; one that joined a recorded `0.0` renders `0.00` — different facts.
-    return {"calls": 0, "tokens_in": 0, "tokens_out": 0, "cached_in": 0, "usd": 0.0,
-            "cache_usd": 0.0, "unpriced_calls": 0, "unpriced_tokens": 0,
-            "credits": None, "credits_usd": 0.0, "credits_rated": False}
-
-
-def _cache_read_usd(pol: dict, provider: str, model: str, cached_in: int) -> float:
-    """F5 (work/regression/2026-07-22-capture-report.md): the cache-read-billed
-    slice of a call's cost alone — `cached_in` tokens at the model's real
-    `cache_read` per-million rate, never a hardcoded discount fraction, so the
-    split stays correct if pricing changes. A component of `prices.call_cost_usd`'s
-    total, split out here (report-only concern) rather than growing `prices.py`
-    past its stated ≤50-line budget. Meaningful only for a call that priced through
-    a real row (exact/alias/family) — a `self`-priced or unpriced call has no
-    token-level cache split to report."""
-    p = policy.price(pol, provider, model)
-    return round(cached_in * p["cache_read"] / TOKENS_PER_MILLION, 6)
+    return {"calls": 0, "tokens_in": 0, "tokens_out": 0, "cached_in": 0,
+            "credits": None}
 
 
 def _team_rows(root: Path, team: bool):
@@ -109,34 +92,26 @@ def _is_legacy_human(r: dict) -> bool:
 
 def _nonhuman_savings(all_calls: list[dict], receipts: list[dict], pol: dict,
                       scope: str | None = None):
-    """Yield ``(receipt, call, saved_usd, rung, model_key)`` per non-human receipt
-    (already window-filtered). ``all_calls`` is the *unfiltered* join table so an
-    in-window receipt can still find its (possibly older) call.
+    """Yield ``(receipt, call)`` per non-human receipt (already window-filtered).
+    ``all_calls`` is the *unfiltered* join table so an in-window receipt can still find
+    its (possibly older) call — that join is what attributes a saving to an agent.
 
-    **Legacy Tier-1 rows are excluded, never priced.** The agent-vs-human axis was
+    **Legacy Tier-1 rows are excluded, never counted.** The agent-vs-human axis was
     removed in v0.36, but ledgers are append-only: a pre-0.36 ``tool="human"`` receipt
-    (and any ``unit="minutes"`` row) has no USD route left. Skipping it here is a
+    (and any ``unit="minutes"`` row) belongs to no surviving axis. Skipping it here is a
     *decision*, so it is COUNTED and footnoted (``legacy_human`` below) rather than
-    silently dropped from a total — `cage query savings-axis` explains it.
-    USD comes only through the one unit→USD dispatch (`convert.saved_usd`); a call-less
-    token receipt prices via the resolution ladder (`receiptprice`, plan §4.5) —
-    ``rung`` names its path (``"unpriced"`` when rung 3 refused; ``""`` off-ladder)
-    and ``model_key`` the resolved ``provider/model`` (`""` off-ladder or refused).
-    With ``scope`` set, only receipts in that top-level dir count (plan §3.6.2).
-    """
-    from cage import receiptprice
+    silently dropped — `cage query savings-axis` explains it.
+
+    The USD half of this generator — `convert.saved_usd` and the `receiptprice` ladder
+    that priced a call-less token receipt — went with the money subsystem (USAGE-ONLY,
+    ADR 0011). Savings are token-denominated and the join is unchanged.
+
+    With ``scope`` set, only receipts in that top-level dir count (plan §3.6.2)."""
     by_id = {c.get("id"): c for c in all_calls}
-    idx = receiptprice.build(all_calls, receipts)  # once per view, never per receipt
     for r in ledger.by_scope(receipts, scope):
         if _is_legacy_human(r):
             continue
-        call = by_id.get(r.get("call"), {})
-        if receiptprice.eligible(r, by_id):
-            res = receiptprice.resolve(r, idx, pol)
-            yield (r, call, (res[0] if res else 0.0),
-                   (res[1] if res else "unpriced"), (res[2] if res else ""))
-        else:
-            yield r, call, convert.saved_usd(r, call, pol), "", ""
+        yield r, by_id.get(r.get("call"), {})
 
 
 def summarize(root: Path, pol: dict, dim: str = "route", since: str | None = None,
@@ -154,22 +129,7 @@ def summarize(root: Path, pol: dict, dim: str = "route", since: str | None = Non
                          else ledger.since(read_receipts(root, pol, since=since), since))
     calls = ledger.by_project(ledger.by_scope(_grouping_calls(root, since, tc), scope), project)
     groups: dict[str, dict] = {}
-    unpriced: dict[str, dict] = {}   # provider/model that billed $0 → calls/tokens
-    family: dict[str, str] = {}      # model → matched key (approximate, no exact row)
-    alias: dict[str, str] = {}       # model → routed prov/model (explicit [alias] row)
     kiro = {"calls": 0, "tokens_in": 0, "tokens_out": 0}  # input-only-log caveat (Phase 1.5)
-    # COPILOT-CREDITS: the two-basis split behind the totals. A total that sums a
-    # credits-priced and a token-priced cell must SAY so (verdict C rule 4 — the axes
-    # are never blended silently), and credits recorded with no rate to price them must
-    # surface as a count rather than vanish into the UNPRICED bucket unexplained.
-    # Tallied PER AGENT, then reduced. The split footnote is a claim about one agent's
-    # rows ("copilot priced on two bases"), so the token side must count only that
-    # agent's token-priced calls — a global tally would attribute claude's spend to
-    # copilot's basis split, which is how the first version of this read.
-    cred_by_agent: dict[str, dict] = {}
-    cred = {"unrated_calls": 0, "unrated_total": 0.0,    # recorded, but no rate
-            "unrated_agents": set(),
-            "unpriced_with_credits": 0}                  # rung-3 rows that DO carry credits
     for c in calls:
         g = groups.setdefault(_key(c, dim), _new_group())
         g["calls"] += 1
@@ -181,44 +141,12 @@ def summarize(root: Path, pol: dict, dim: str = "route", since: str | None = Non
             kiro["calls"] += 1
             kiro["tokens_in"] += c.get("tokens_in", 0)
             kiro["tokens_out"] += c.get("tokens_out", 0)
-        usd, match, key = prices.call_usd_match(pol, c)
-        g["usd"] += usd
-        # A credits-priced row has NO token-level cache split to report: its dollar did
-        # not come from the price table at all, so attributing a slice of it to
-        # `cache_read` would describe a total that was never token-derived.
-        if match not in ("none", "self", creditprice.MATCH):
-            g["cache_usd"] += _cache_read_usd(pol, c.get("provider") or "",
-                                              c.get("model") or "", c.get("cached_in", 0))
-        ca = cred_by_agent.setdefault(c.get("agent") or "—",
-                                      {"calls": 0, "total": 0.0, "usd": 0.0,
-                                       "token_calls": 0, "token_usd": 0.0})
-        if match == creditprice.MATCH:
-            ca["calls"] += 1
-            ca["total"] += creditprice.recorded(c) or 0.0
-            ca["usd"] += usd
-        else:
-            if match != "none":
-                ca["token_calls"] += 1
-                ca["token_usd"] += usd
-            if creditprice.unrated(pol, c):
-                cred["unrated_calls"] += 1
-                cred["unrated_total"] += creditprice.recorded(c) or 0.0
-                cred["unrated_agents"].add(c.get("agent") or "")
-                if match == "none":
-                    cred["unpriced_with_credits"] += 1
-        if match == "none":
-            u = unpriced.setdefault(f"{c.get('provider') or '—'}/{c.get('model') or '—'}",
-                                    {"calls": 0, "tokens": 0,
-                                     "provider": c.get("provider") or "",
-                                     "model": c.get("model") or ""})
-            u["calls"] += 1
-            u["tokens"] += c.get("tokens_in", 0) + c.get("tokens_out", 0)
-            g["unpriced_calls"] += 1
-            g["unpriced_tokens"] += c.get("tokens_in", 0) + c.get("tokens_out", 0)
-        elif match == "family":
-            family[c.get("model") or "—"] = key or "—"
-        elif match == "alias":
-            alias[c.get("model") or "—"] = key or "—"
+        # A call row may carry the provider's own billed `credits` figure. It is summed
+        # as a COUNT, never priced (USAGE-ONLY, ADR 0011), and the None sentinel is
+        # preserved — absent and a recorded 0.0 are different billing facts.
+        rec = c.get("credits")
+        if rec is not None and not isinstance(rec, bool) and isinstance(rec, (int, float)):
+            g["credits"] = (g["credits"] or 0.0) + float(rec)
     # REPORT-CREDITS: `ledger.credits` (kiro-CLI conversations — no call, no tokens)
     # folds into the SAME `groups` dict as calls, on the two dims where a credits row
     # has a clean, non-colliding key: `agent` (its own field) and the default `route`
@@ -226,11 +154,9 @@ def summarize(root: Path, pol: dict, dim: str = "route", since: str | None = Non
     # bucketing it into the "—" catch-all would blend it with unrelated legacy rows).
     # Every other dim (model/provider/day/task) is deliberately untouched — a credits
     # row doesn't carry those fields cleanly, and CHATS-CREDITS already covers the
-    # per-conversation view (`cage insights chats`). Never folded into `usd`/`tokens_*`:
-    # a group's `credits` is its own field, read only by its own column.
-    unrated_agents: set[str] = set()
-    unrated_calls_n = 0
-    unrated_total = 0.0
+    # per-conversation view (`cage insights chats`). Never folded into `tokens_*`:
+    # a group's `credits` is its own field, read only by its own column — and since
+    # USAGE-ONLY (ADR 0011) it is a COUNT, never priced.
     if dim in ("route", "agent"):
         raw_credits = ledger.credits(root)
         credit_rows = ledger.by_project(ledger.by_scope(
@@ -244,94 +170,46 @@ def summarize(root: Path, pol: dict, dim: str = "route", since: str | None = Non
             if isinstance(cr_val, bool) or not isinstance(cr_val, (int, float)):
                 continue
             g["credits"] = (g["credits"] or 0.0) + float(cr_val)
-            rate = creditprice.rate_for(pol, cr)
-            if rate is not None:
-                g["credits_usd"] += round(float(cr_val) * rate, 6)
-                g["credits_rated"] = True
-            else:
-                unrated_calls_n += 1
-                unrated_total += float(cr_val)
-                unrated_agents.add(cr.get("agent") or "")
+    # THE CROSS-AGENT CREDIT LAW (`units.summable`): a total is formed only when every
+    # credit in view belongs to ONE agent. Copilot credits are GitHub's tokens×rates
+    # figure and kiro credits are AWS credits — summing them would invent a unit. When
+    # they span agents the total is `None` and the view says why, exactly as it does for
+    # an agent that records no credits at all; a `0` is never substituted for either.
+    _credit_agents = {a for g in groups.values() if g["credits"] is not None
+                      for a in (g.get("agents") or [])}
+    _credits_summable = units.summable(units.CREDITS, _credit_agents)
     total = {"calls": sum(g["calls"] for g in groups.values()),
-             "usd": sum(g["usd"] for g in groups.values()),
              "tokens_in": sum(g["tokens_in"] for g in groups.values()),
              "tokens_out": sum(g["tokens_out"] for g in groups.values()),
              "cached_in": sum(g["cached_in"] for g in groups.values()),
-             "cache_usd": sum(g["cache_usd"] for g in groups.values()),
-             "unpriced_calls": sum(g["unpriced_calls"] for g in groups.values()),
-             "unpriced_tokens": sum(g["unpriced_tokens"] for g in groups.values()),
              "credits": (sum(g["credits"] or 0.0 for g in groups.values())
-                        if any(g["credits"] is not None for g in groups.values())
+                        if (_credits_summable
+                            and any(g["credits"] is not None for g in groups.values()))
                         else None),
-             "credits_usd": sum(g["credits_usd"] for g in groups.values()),
-             # Whether ANY group's credits actually priced — the TOTAL row's own cost
-             # cell reads this flag (never `credits_usd > 0`, which can't tell a real
-             # priced `$0.0000` from "nothing priced" — the same absence-vs-zero rule
-             # every credits figure in cage carries).
-             "credits_rated": any(g["credits_rated"] for g in groups.values())}
-    unrated_credits = {"calls": unrated_calls_n, "total": unrated_total,
-                       "agents": sorted(unrated_agents - {""})}
-    unpriced_receipts = {"receipts": 0, "tokens": 0, "tools": set()}  # rung-3 refusals (§4.5)
-    rung_models: set[tuple[str, str, str]] = set()  # (rung, tool, model) → usd-view footnotes
-    if dim in SAVINGS_DIMS:  # second pass over receipts → saved + net (§3.1)
-        total_saved = 0.0
-        for r, call, saved, rung, model_key in _nonhuman_savings(
-                all_calls, windowed_receipts, pol, scope):
+             "credits_agents": sorted(_credit_agents),
+             "credits_summable": _credits_summable}
+    if dim in SAVINGS_DIMS:  # second pass over receipts → gross saved tokens (§3.1)
+        for r, call in _nonhuman_savings(all_calls, windowed_receipts, pol, scope):
             key = str(r.get("task") or "—") if dim == "task" else str(call.get("agent") or "—")
             g = groups.setdefault(key, _new_group())  # receipt-only group (e.g. "—" bucket)
-            g["saved_usd"] = g.get("saved_usd", 0.0) + saved
-            if r.get("unit", "tokens") == "tokens":  # tokens measure regardless of pricing
+            # Only a token-denominated receipt contributes tokens. A `ms`/`gco2` receipt
+            # is still recorded and still readable per-task (`cage insights attrib`), but
+            # cage converts nothing between units — in either direction.
+            if r.get("unit", "tokens") == "tokens":
                 g["saved_tokens"] = g.get("saved_tokens", 0) + int(r.get("saved", 0.0))
-            total_saved += saved
-            if rung == "unpriced":
-                g["unpriced_saved_tokens"] = (g.get("unpriced_saved_tokens", 0)
-                                              + int(r.get("saved", 0.0)))
-                unpriced_receipts["receipts"] += 1
-                unpriced_receipts["tokens"] += int(r.get("saved", 0.0))
-                unpriced_receipts["tools"].add(r.get("tool", ""))
-            elif model_key:
-                rung_models.add((rung, r.get("tool", ""), model_key))
         for g in groups.values():
-            g.setdefault("saved_usd", 0.0)
             g.setdefault("saved_tokens", 0)
-            g.setdefault("unpriced_saved_tokens", 0)
-            # Net is against the FULL spend, including a rated credits dollar — the
-            # same sum `_cost_cell` shows, so "net vs spend" can never overstate a
-            # saving by silently excluding money the cost column already counts.
-            g["net_usd"] = g["saved_usd"] - g["usd"] - (g["credits_usd"] if g["credits_rated"] else 0.0)
-        total["saved_usd"] = total_saved
-        total["net_usd"] = (total_saved - total["usd"]
-                            - (total["credits_usd"] if total["credits_rated"] else 0.0))
         total["saved_tokens"] = sum(g["saved_tokens"] for g in groups.values())
-        total["unpriced_saved_tokens"] = sum(g["unpriced_saved_tokens"] for g in groups.values())
-    unpriced_receipts["tools"] = sorted(unpriced_receipts["tools"])
     for g in groups.values():  # sets → sorted lists (JSON-safe payload, one structure)
         g["agents"] = sorted(g.get("agents") or [])
-    # Pricing-freshness footer lines (plan §3.3): data-relative (today=None ⇒
-    # anchored on the newest ledger ts, never the wall clock — derived views stay
-    # deterministic), over the same team-aware rows the table renders. UNPRICED is
-    # excluded here because render_report prints those exact lines natively.
+    # Policy-defaults drift, the one freshness signal that outlived the price file
+    # (`freshness.py`). Opt-in for the caller; the report footer does not take it,
+    # because policy drift changes no derived number.
     from cage import freshness
-    fresh = freshness.freshness(root, pol, include_unpriced=False, rows=all_calls)
-    cred["unrated_agents"] = sorted(a for a in cred["unrated_agents"] if a)
-    # An agent earns the mixed-basis footnote only if ITS OWN rows split across both
-    # rungs; one agent priced by credits and a different one by tokens is not a mixed
-    # basis, it is two agents. `calls`/`usd` stay as the view-wide credits totals the
-    # CSV method tag and the doctor line read.
-    cred["by_agent"] = {a: v for a, v in sorted(cred_by_agent.items())
-                        if v["calls"] and v["token_calls"]}
-    cred["calls"] = sum(v["calls"] for v in cred_by_agent.values())
-    cred["usd"] = sum(v["usd"] for v in cred_by_agent.values())
-    cred["total"] = sum(v["total"] for v in cred_by_agent.values())
+    fresh = freshness.freshness(root, pol)
     return {"dim": dim, "since": since, "project": project, "scope": scope,
-            "groups": groups, "credits": cred,
-            # `ledger_credits_unrated`: the REPORT-CREDITS rate-unset advisory — distinct
-            # from `credits` above (the pre-existing per-call COPILOT-CREDITS ladder dict).
-            "ledger_credits_unrated": unrated_credits,
-            "total": total, "unpriced": sorted(unpriced), "family": family,
-            "alias": alias, "unpriced_detail": dict(sorted(unpriced.items())),
-            "unpriced_receipts": unpriced_receipts, "freshness": fresh,
-            "rung_models": sorted(rung_models),
+            "groups": groups,
+            "total": total, "freshness": fresh,
             "has_receipts": any(not _is_legacy_human(r)
                                 for r in ledger.by_scope(windowed_receipts, scope)),
             "legacy_human": sum(1 for r in ledger.by_scope(windowed_receipts, scope)
@@ -343,16 +221,6 @@ def summarize(root: Path, pol: dict, dim: str = "route", since: str | None = Non
             # kiro does report output tokens.
             "kiro_rows": kiro["calls"],
             "any_calls": bool(raw_calls)}
-
-
-def unpriced_line(detail: dict) -> str:
-    """The one-line UNPRICED warning every read surface prints the same way
-    (report/compare/study): a fleet analyst must see the gap before publishing a
-    total. ``detail`` is ``{key: {"calls": n, "tokens": n}}``."""
-    calls = sum(d["calls"] for d in detail.values())
-    tokens = sum(d["tokens"] for d in detail.values())
-    return (f"⚠ {calls} calls ({render.tok(tokens)} tokens) UNPRICED — totals "
-            f"understated; run 'cage prices unpriced' (`cage query unpriced` explains)")
 
 
 def _last_import_line(last_import: str | None, stale_hours: int | None = None) -> str:
@@ -423,7 +291,7 @@ def kiro_routed_line(root: Path, pol: dict | None = None, verb: str = "report") 
     ``verb`` is the command the runnable fix should name, so the *one* phrasing can be
     reused by any view that shows no kiro (`cage insights chats` passes its own). It
     varies the fix line only — the explanation itself is never re-worded per view, the
-    `netsaved.GROSS_NOTE` discipline."""
+    `savings.GROSS_NOTE` discipline."""
     from cage import paths
     sink = paths.kiro_routed(root)
     if sink is None:
@@ -439,7 +307,7 @@ def kiro_routed_line(root: Path, pol: dict | None = None, verb: str = "report") 
             f"`cage --ledger {paths.Footprint(sink).base} {verb}`)")
 
 
-def _kiro_limits_caveat(rep: dict, usd: bool) -> str:
+def _kiro_limits_caveat(rep: dict) -> str:
     """The kiro HONEST-LIMIT line (K3, [finding](work/regression/2026-08-01-finding-kiro-rows-carry-no-time-session-project.md)),
     stated where a kiro number could be misread. Kiro's IDE log records **no per-turn
     timestamp, no session id and no project**: its `ts` is stamped at import, `session` is
@@ -450,9 +318,7 @@ def _kiro_limits_caveat(rep: dict, usd: bool) -> str:
     if not rep.get("kiro_rows"):
         return ""
     if rep.get("kiro_input_only"):
-        base = ("· kiro: input-only log — cost understated" if usd
-                else "· kiro: input-only log — tok out not recorded")
-        base += "; its rows also carry"
+        base = "· kiro: input-only log — tok out not recorded; its rows also carry"
     else:
         base = "· kiro: its rows carry"
     base += " no per-turn time, session or project (`cage query kiro-routing`)"
@@ -509,94 +375,17 @@ def _render_empty(rep: dict) -> str:
     return _EMPTY
 
 
-def _unpriced_block(detail: dict, credits: dict | None = None) -> str:
-    """The `--usd` view's ⚠ UNPRICED block (spec R4): counts headline + one
-    **runnable** fix line per unpriced provider/model (the one fix-line builder,
-    `pricescmd.fix_line` — reused, never re-phrased). ``detail`` rows lacking the
-    provider/model split (legacy payloads) fall back to the `cage prices
-    unpriced` pointer.
-
-    ``credits`` adds the SECOND fix line when some of these unpriced rows carry a
-    recorded credit (COPILOT-CREDITS): those rows need no price-table row at all —
-    they need a rate — and offering only the alias fix would send a reader to solve
-    the harder problem. The line states how many of the unpriced rows it would fix,
-    so it never over-claims to cover the whole block."""
-    from cage import pricescmd
-    calls = sum(d["calls"] for d in detail.values())
-    tokens = sum(d["tokens"] for d in detail.values())
-    head = f"⚠ {calls} calls ({render.tok(tokens)} tokens) UNPRICED — totals understated"
-    fixes = []
-    for d in detail.values():
-        if "provider" in d or "model" in d:
-            fixes.append(f"  fix: {pricescmd.fix_line(d.get('provider', ''), d.get('model', ''))}")
-        else:
-            fixes.append("  run: cage prices unpriced   # per-model fix lines")
-    lines = [head, *dict.fromkeys(fixes)]
-    n = (credits or {}).get("unpriced_with_credits", 0)
-    if n:
-        lines.append(f"  or:  {creditprice.rate_hint((credits or {}).get('unrated_agents', []))}"
-                     f" — {n} of these rows carry recorded credits")
-    return "\n".join(lines)
-
-
 def overview(root: Path, pol: dict, since: str | None = None) -> dict:
-    """The bare-`cage` headline: spent / saved / net / tokens over the window (§4)."""
+    """The bare-`cage` headline: calls / tokens used / gross tokens saved (§4)."""
     calls = ledger.since(ledger.spend(root, since=since), since)
-    spent, unpriced_calls, unpriced_tokens = 0.0, 0, 0
-    for c in calls:
-        usd, match, _ = prices.call_usd_match(pol, c)
-        spent += usd
-        if match == "none":
-            unpriced_calls += 1
-            unpriced_tokens += c.get("tokens_in", 0) + c.get("tokens_out", 0)
     tokens = sum(c.get("tokens_in", 0) + c.get("tokens_out", 0) for c in calls)
     rcpts = ledger.since(read_receipts(root, pol, since=since), since)
-    saved = sum(s for _, _, s, _, _ in _nonhuman_savings(ledger.join_table(root), rcpts, pol))
+    saved = sum(int(r.get("saved", 0.0))
+                for r, _ in _nonhuman_savings(ledger.join_table(root), rcpts, pol)
+                if r.get("unit", "tokens") == "tokens")
     return {"since": since, "empty": not calls, "calls": len(calls),
-            "spent_usd": spent, "saved_usd": saved, "net_usd": saved - spent,
-            "tokens": tokens, "unpriced_calls": unpriced_calls,
-            "unpriced_tokens": unpriced_tokens,
+            "tokens": tokens, "saved_tokens": saved,
             "has_receipts": any(not _is_legacy_human(r) for r in rcpts)}
-
-
-def _cost_cell(g: dict, total: bool = False) -> str:
-    """`—` is the only rendering of "couldn't price" — a group whose every call
-    refused to price shows the dash, never `$0.0000` (a self-costed est fallback
-    keeps its real figure). A TOTAL over a partial gap says so inline.
-
-    A **credits-only** group (`calls == 0`, REPORT-CREDITS) has no token-priced cost
-    at all — its cell prices only through the credits rate (`—` when unrated, a real
-    `$0.0000` when a configured `0.0` rate priced it). A group whose calls *and*
-    credits rows share one bucket (rare — an agent whose real calls and its
-    call-less credits conversations landed in the same root) **sums both** rather
-    than silently dropping the credits side — a total that quietly omitted a rated
-    dollar would understate spend, the one thing this cell must never do. The
-    caller states the split (`render_report`'s total-spans-two-bases footnote)
-    whenever both sides are non-zero, so the sum is never presented as one basis."""
-    from cage.display import DASH
-    credits_usd = g["credits_usd"] if g.get("credits_rated") else 0.0
-    if not g["calls"]:
-        if g.get("credits") is not None:
-            return render.usd(credits_usd) if g.get("credits_rated") else DASH
-        return DASH
-    if (g.get("unpriced_calls") and g["unpriced_calls"] == g["calls"]
-            and not g["usd"] and not credits_usd):
-        return DASH
-    cell = render.usd(g["usd"] + credits_usd)
-    if total and g.get("unpriced_calls"):
-        cell += " (+ unpriced)"
-    return cell
-
-
-def _saved_cells(g: dict, cost_dashed: bool) -> list[str]:
-    """saved/net cells: a group whose only savings signal refused to price is a
-    `—`, never a `$0.0000` that reads as "measured nothing" — and net is
-    unknowable whenever the cost itself couldn't price."""
-    from cage.display import DASH
-    if g.get("unpriced_saved_tokens") and not g.get("saved_usd"):
-        return [DASH, DASH]
-    saved = render.usd(g["saved_usd"])
-    return [saved, DASH if cost_dashed else render.signed_usd(g["net_usd"])]
 
 
 def _display_name(name: str, g: dict, dim: str) -> str:
@@ -609,13 +398,15 @@ def _display_name(name: str, g: dict, dim: str) -> str:
 
 
 def _credits_cell(g: dict) -> str:
-    """`—` when this group joined no `ledger.credits` row, else the 2dp sum — the
-    same absent-vs-recorded-zero rule `chats.py`'s `_credits_cell` follows."""
+    """`—` when this group recorded no credits, else the 2dp sum — the same
+    absent-vs-recorded-zero rule `chats.py`'s `_credits_cell` follows. Never a `0`
+    stand-in for an agent that has no credit unit at all (`units.ABSENT`); the footer
+    names that absence separately."""
     from cage.display import DASH
-    return DASH if g.get("credits") is None else creditprice.fmt(g["credits"])
+    return DASH if g.get("credits") is None else f"{g['credits']:,.2f}"
 
 
-def _row(name: str, g: dict, savings_cols: bool, usd_view: bool, total: bool = False,
+def _row(name: str, g: dict, savings_cols: bool, total: bool = False,
         has_credits: bool = False) -> list[str]:
     from cage.display import DASH
     # A credits-only group (calls == 0, REPORT-CREDITS) carries no token facts at
@@ -627,23 +418,17 @@ def _row(name: str, g: dict, savings_cols: bool, usd_view: bool, total: bool = F
              DASH if no_calls else render.tok(g["tokens_out"])]
     if has_credits:
         cells.append(_credits_cell(g))
-    if not usd_view and savings_cols:
+    if savings_cols:
         cells.append(render.tok(g.get("saved_tokens", 0)))
-    if usd_view:
-        cost = _cost_cell(g, total=total)
-        cells.append(cost)
-        if savings_cols:
-            cells += _saved_cells(g, cost_dashed=cost == DASH)
     return cells
 
 
 def render_report(rep: dict, last_import: str | None = None, disp=None,
                   stale_hours: int | None = None, health: dict | None = None,
                   ceiling: dict | None = None, kiro_route: str = "") -> str:
-    """The text report (spec §1, R1–R6): tokens by default, dollars on ``disp.usd``
-    (plan Phase 2.5); saved columns signal-gate on receipts-in-window
-    (``disp.all_columns`` restores the full grid); pricing footnotes and the full
-    ⚠ block belong to the `--usd` view; footer lines dedupe into one
+    """The text report (spec §1, R1–R6): tokens and credits — the two units cage
+    records (USAGE-ONLY, ADR 0011). Saved columns signal-gate on receipts-in-window
+    (``disp.all_columns`` restores the full grid); footer lines dedupe into one
     fixed-order block (`display.Footer`). CSV is untouched by all of it.
 
     ``health`` is the per-agent capture-health record (`importcmd.capture_health`, read
@@ -663,92 +448,57 @@ def render_report(rep: dict, last_import: str | None = None, disp=None,
     disp = disp or _d.DEFAULT
     if not rep["groups"]:
         return _render_empty(rep)
-    savings = "saved_usd" in rep["total"]  # only task/agent attribute receipts (§3.1)
+    savings = "saved_tokens" in rep["total"]  # only task/agent attribute receipts (§3.1)
     savings_cols = savings and (rep.get("has_receipts", True) or disp.all_columns)
     # REPORT-CREDITS: the column exists only when this view actually joined a
     # `ledger.credits` row — an unrelated dim (model/provider/day/task) or a ledger
     # with no credits at all stays byte-identical to before this feature.
-    has_credits = rep["total"].get("credits") is not None
-    rows = [_row(_display_name(name, g, rep["dim"]), g, savings_cols, disp.usd,
+    # Driven by the GROUPS, not the total: a cross-agent credit set has `total` None by
+    # law (`units.summable`) while every per-group cell is still correct and must render.
+    has_credits = any(g.get("credits") is not None for g in rep["groups"].values())
+    rows = [_row(_display_name(name, g, rep["dim"]), g, savings_cols,
                 has_credits=has_credits)
-            for name, g in sorted(rep["groups"].items(), key=lambda kv: -kv[1]["usd"])
+            for name, g in sorted(rep["groups"].items(),
+                                  key=lambda kv: (-(kv[1]["tokens_in"] + kv[1]["tokens_out"]),
+                                                  -(kv[1]["credits"] or 0.0), kv[0]))
             # 0-call receipt-only buckets never render (Phase 1.3); a 0-call CREDITS
             # bucket does — it is the one thing this view exists to show.
             if g["calls"] or g["credits"] is not None]
-    rows.append(_row("TOTAL", rep["total"], savings_cols, disp.usd, total=True,
+    rows.append(_row("TOTAL", rep["total"], savings_cols, total=True,
                      has_credits=has_credits))
     head = [rep["dim"], "calls", "tok in", "tok out"]
     if has_credits:
         head.append("credits")
-    if not disp.usd and savings_cols:
+    if savings_cols:
         head.append("gross tok")  # K: gross, never bare "saved" (net-savings handoff)
-    if disp.usd:
-        head.append("cost")
-        if savings_cols:
-            head += ["gross", "net vs spend"]
     title = f"Ledger by {rep['dim']}"
     if rep.get("project"):
         title += f" · project {rep['project']}"
     if rep["since"]:
         title += f" · since {rep['since']}"
-    if disp.usd:
-        title += " · usd"
     out = f"{title}\n\n" + render.table(head, rows, rights=set(range(1, len(head))))
     foot = _d.Footer()
-    if disp.usd:
-        from cage import receiptprice
-        if rep.get("family"):
-            foot.footnote("≈ priced by family (approximate — no exact price row):\n"
-                          + "\n".join(f"  {m} → {k}"
-                                      for m, k in sorted(rep["family"].items())))
-        if rep.get("alias"):
-            foot.footnote("≈ priced by alias (explicit routing — policy [alias]):\n"
-                          + "\n".join(f"  {m} → {k}"
-                                      for m, k in sorted(rep["alias"].items())))
-        for rung, tool, key in rep.get("rung_models", []):
-            foot.footnote(receiptprice.footnote(rung, tool, key))
-        # COPILOT-CREDITS: a total spanning both pricing bases names the split, and
-        # credits with no rate render as a COUNT — never silently as a dollar, never
-        # silently as nothing.
-        cr = rep.get("credits") or {}
-        for agent, v in (cr.get("by_agent") or {}).items():
-            foot.footnote(creditprice.split_footnote(
-                agent, v["calls"], v["total"], v["usd"], v["token_calls"], v["token_usd"]))
-        if cr.get("unrated_calls"):
-            foot.gap(creditprice.unrated_line(cr["unrated_calls"], cr["unrated_total"],
-                                              cr.get("unrated_agents", [])))
-        # REPORT-CREDITS: the rate-unset advisory for `ledger.credits` rows — a
-        # DIFFERENT population from `cr` above (calls that carry a `credits` field,
-        # COPILOT-CREDITS). These are call-less conversations, so the line says
-        # "conversation(s)", never "call(s)" — a credits row was never a call.
-        lcu = rep.get("ledger_credits_unrated") or {}
-        if lcu.get("calls"):
-            n = lcu["calls"]
-            foot.gap(f"· {n} conversation{'s' if n != 1 else ''} carry recorded credits "
-                     f"({creditprice.fmt(lcu['total'])} cr) — not priced; "
-                     f"{creditprice.rate_hint(lcu.get('agents', []))}")
-        # REPORT-CREDITS: a `cost`/TOTAL cell can now sum a token-priced dollar and a
-        # rate-priced credits dollar (`_cost_cell`, never silently dropping the
-        # credits side — the one thing a total must not do). Whenever both sides are
-        # non-zero the split is named, the same discipline `creditprice.split_footnote`
-        # already applies to the copilot per-call ladder above.
-        if rep["total"].get("credits_rated") and rep["total"]["usd"]:
-            foot.footnote(f"· total spans two pricing bases: {render.usd(rep['total']['usd'])} "
-                          f"from token-priced calls + {render.usd(rep['total']['credits_usd'])} "
-                          "from credits×rate (`cage query copilot-credits`)")
-        t = rep["total"]
-        # F5 (work/regression/2026-07-22-capture-report.md): a headline like
-        # "8.2B tokens, $7,046" reads as alarming when it's almost entirely
-        # prefix-cache re-reads billed at a discount. One line, real numbers —
-        # no other report structure changes.
-        if t.get("tokens_in"):
-            cache_tok_pct = render.pct(t.get("cached_in", 0), t["tokens_in"])
-            cache_usd_pct = render.pct(t.get("cache_usd", 0.0), t["usd"]) if t["usd"] else "—"
-            foot.caveat(f"· cache: {cache_tok_pct} of input tokens were cache reads, "
-                        f"{cache_usd_pct} of cost ({render.usd(t.get('cache_usd', 0.0))} "
-                        f"of {render.usd(t['usd'])})")
+    # THE CROSS-AGENT CREDIT LAW (`units.py`): when the credits column spans more than
+    # one agent there is no total to print — copilot credits are GitHub's tokens×rates
+    # figure, kiro credits are AWS credits. Per-group cells stay (each is correct); the
+    # TOTAL cell renders `—` via `_credits_cell` because `summarize` set it to None, and
+    # this line says why rather than leaving a bare dash.
+    if has_credits and not rep["total"].get("credits_summable", True):
+        foot.caveat(units.cross_agent_note(rep["total"].get("credits_agents", [])))
+    # The per-agent unit absences actually on screen, each in its own words — a vendor
+    # law (claude has no credit unit) must not read like a missing file (kiro has no IDE
+    # token store). Neither is ever rendered as a `0`.
+    # Mapped through `agents.row_surface`: a group's `agents` holds the ROW value
+    # (`claude-code`), while `units.ABSENT` is keyed by surface (`claude`).
+    from cage import agents as _agents
+    for _agent in sorted({_agents.row_surface(a) or a
+                          for g in rep["groups"].values()
+                          for a in (g.get("agents") or [])}):
+        for _unit in units.UNITS:
+            if (_reason := units.absent_reason(_agent, _unit)):
+                foot.footnote(f"· {_agent} {_unit}: — ({_reason})")
     # K3/K4: the two HONEST-LIMITs, each stated where its number could be misread.
-    if (kiro_caveat := _kiro_limits_caveat(rep, disp.usd)):
+    if (kiro_caveat := _kiro_limits_caveat(rep)):
         foot.caveat(kiro_caveat)
     if (surf := _surface_caveat(rep)):
         foot.caveat(surf)
@@ -760,27 +510,16 @@ def render_report(rep: dict, last_import: str | None = None, disp=None,
         # here would be the one thing the removal was not allowed to do.
         foot.caveat(f"· {rep['legacy_human']} legacy human-axis receipt(s) excluded "
                     "from savings — the agent-vs-human axis was removed in v0.36 and "
-                    "these rows have no price route (`cage query savings-axis`)")
+                    "these rows belong to no surviving axis (`cage query savings-axis`)")
     if rep.get("project"):
         foot.caveat("· project view is exact for Claude only — Copilot/Kiro logs "
                     "carry no project, so their spend is excluded from this filter.")
-    if disp.usd:
-        from cage import receiptprice
-        if rep.get("unpriced_detail"):
-            foot.warn(_unpriced_block(rep["unpriced_detail"], rep.get("credits")))
-        if rep.get("unpriced_receipts", {}).get("receipts"):
-            foot.warn(receiptprice.unpriced_receipts_line(rep["unpriced_receipts"]))
     if savings_cols:  # K: what the gross column excludes, in the ONE shared phrasing
-        from cage import netsaved
-        foot.caveat(netsaved.GROSS_NOTE + "\n  net vs spend = gross − this window's "
-                    "spend, not net of the tools' cost of use.")
+        from cage import savings as _savings
+        foot.caveat(_savings.GROSS_NOTE)
     if savings and not rep.get("has_receipts", True):
         foot.gap("· no savings receipts in this window — wire a tool to measure savings\n"
                  "  (`cage query receipts` explains)")
-    if not disp.usd and rep["total"].get("unpriced_calls"):
-        n = rep["total"]["unpriced_calls"]
-        foot.gap(f"· {n} call{'s' if n != 1 else ''} unpriced — matters when you "
-                 f"view $ (`--usd`; cage prices unpriced)")
     for w in capture_warnings(health):  # installed-but-capturing-nothing (docs/capture-health)
         foot.warn(w)
     if ceiling:  # G4: graphify day-one repo ceiling (modeled, token-native, footer-only)
@@ -788,10 +527,7 @@ def render_report(rep: dict, last_import: str | None = None, disp=None,
         foot.advice(graphifymodel.ceiling_footer_line(ceiling))
     foot.advice(_last_import_line(last_import, stale_hours))
     for l in rep.get("freshness") or []:  # actionable-only — silent when clean (§3.3)
-        if l.startswith("bundled prices are"):
-            foot.advice(f"· {l}\n  (`cage query prices-freshness` explains)")
-        else:
-            foot.advice(f"· {l}")
+        foot.advice(f"· {l}")
     tail = foot.render()
     return f"{out}\n\n{tail}" if tail else out
 
@@ -799,33 +535,26 @@ def render_report(rep: dict, last_import: str | None = None, disp=None,
 def render_csv(rep: dict) -> str:
     """CSV over the same `summarize()` payload the text table renders — one
     structure, two renderers (they cannot disagree). Rows sort like the text view
-    (spend-descending) + a TOTAL row. Raw numbers, not $-formatted strings; the
-    per-group UNPRICED gap keeps the understatement visible in a spreadsheet.
-    `method` column: measured — recorded tokens repriced at derive time (the
-    `repricing` query entry); spend is never a projection. The savings columns are
-    named for what they are — `gross_saved_usd` excludes the cost of *using* the tool,
-    and `net_vs_spend_usd` nets it against this window's spend, not against that cost
-    (net-savings handoff, K). Column contract in docs/FORMULAS.md §2."""
+    (usage-descending) + a TOTAL row.
+
+    `method` column: **measured** throughout — every figure is a recorded count read
+    back verbatim. The `modeled` degradation this used to carry existed because a
+    configured credit rate was producing dollars cage could not check against an
+    invoice; with no dollars there is no inference to grade down (USAGE-ONLY, ADR 0011).
+
+    `gross_saved_tokens` is named for what it is — it excludes the tokens spent *using*
+    the tool (`savings.GROSS_NOTE`). Column contract in docs/FORMULAS.md §2."""
     from cage import csvout
-    savings = "saved_usd" in rep["total"]
+    savings = "saved_tokens" in rep["total"]
     # REPORT-CREDITS: the column exists only when this view joined a `ledger.credits`
     # row — an unaffected dim or a ledger with no credits stays byte-identical
     # (the same conditional-column pattern the savings pair already uses above).
-    has_credits = rep["total"].get("credits") is not None
+    # Driven by the GROUPS, not the total: a cross-agent credit set has `total` None by
+    # law (`units.summable`) while every per-group cell is still correct and must render.
+    has_credits = any(g.get("credits") is not None for g in rep["groups"].values())
     head = [rep["dim"], "calls", "tokens_in", "tokens_out", "cached_in",
-            *(("credits",) if has_credits else ()), "cost_usd",
-            *(("gross_saved_usd", "net_vs_spend_usd") if savings else ()),
-            "unpriced_calls", "unpriced_tokens", "method"]
-    # Method law: `measured` is only true while every priced cell came from tokens ×
-    # price table. A credits-priced row (either basis — a call carrying its own
-    # `credits` field, COPILOT-CREDITS, or a call-less `ledger.credits` conversation,
-    # REPORT-CREDITS) makes the view's dollars partly a function of a configured rate,
-    # so the whole view degrades to `modeled` (`creditprice.method_for`). This is
-    # view-level, not per-group: the CSV's `cost_usd` rows share one basis statement,
-    # and a per-group tag would let a reader sum `measured` rows into a total that isn't.
-    credits_priced = (rep.get("credits", {}).get("calls", 0)
-                      + sum(1 for g in rep["groups"].values() if g.get("credits_rated")))
-    method = creditprice.method_for({creditprice.CREDITS: credits_priced})
+            *(("credits",) if has_credits else ()),
+            *(("gross_saved_tokens",) if savings else ()), "method"]
     def cells(name, g):
         # A credits-only group (calls == 0) leaves calls/tokens_in/tokens_out/cached_in
         # EMPTY, never `0` — the same absence-vs-measured-zero rule the text view's `—`
@@ -836,58 +565,37 @@ def render_csv(rep: dict) -> str:
                "" if no_calls else g["tokens_out"], "" if no_calls else g["cached_in"]]
         if has_credits:
             row.append("" if g.get("credits") is None else round(g["credits"], 6))
-        # `cost_usd` sums the token-priced and rate-priced credits dollars — the same
-        # never-silently-drop-a-rated-dollar rule `_cost_cell` follows. Empty (not a
-        # fabricated `0`) only when NEITHER side ever priced this row.
-        rated_usd = g["credits_usd"] if g.get("credits_rated") else 0.0
-        if no_calls and g.get("credits") is not None and not g.get("credits_rated"):
-            row.append("")
-        else:
-            row.append(round(g["usd"] + rated_usd, 6))
-        row += ((round(g["saved_usd"], 6), round(g["net_usd"], 6)) if savings else ())
-        row += [g["unpriced_calls"], g["unpriced_tokens"], method]
+        row += ((g.get("saved_tokens", 0),) if savings else ())
+        row.append("measured")
         return row
     rows = [cells(name, g)
-            for name, g in sorted(rep["groups"].items(), key=lambda kv: -kv[1]["usd"])]
+            for name, g in sorted(rep["groups"].items(),
+                                  key=lambda kv: (-(kv[1]["tokens_in"] + kv[1]["tokens_out"]),
+                                                  -(kv[1]["credits"] or 0.0), kv[0]))]
     rows.append(cells("TOTAL", rep["total"]))
     return csvout.table(head, rows)
 
 
 def render_overview(o: dict, last_import: str | None = None, disp=None) -> str:
-    """The bare-`cage` headline — same display rules as the report (handoff §10:
-    tokens by default, `--usd`/`[display] usd` for currency; saved/net gate on
-    receipts existing in the window)."""
+    """The bare-`cage` headline — tokens used and gross tokens saved. The saved half
+    gates on receipts existing in the window."""
     from cage import display as _d
     disp = disp or _d.DEFAULT
     if o["empty"]:
         return _EMPTY
     win = f"({o['since']})" if o["since"] else "(all time)"
-    if not disp.usd:
-        head = f"{render.tok(o['tokens'])} tokens  ·  {o['calls']} calls   {win}"
-    elif o.get("has_receipts", True):
-        head = (f"spent {render.usd(o['spent_usd'])}  ·  gross saved "
-                f"{render.usd(o['saved_usd'])}"
-                f"  ·  net {render.signed_usd(o['net_usd'])}  ·  {render.tok(o['tokens'])} tokens"
-                f"   {win}")
-    else:
-        head = (f"spent {render.usd(o['spent_usd'])}  ·  {render.tok(o['tokens'])} tokens"
-                f"   {win}")
+    head = f"{render.tok(o['tokens'])} tokens  ·  {o['calls']} calls   {win}"
+    if o.get("has_receipts", True):
+        head = (f"{render.tok(o['tokens'])} tokens  ·  gross saved "
+                f"{render.tok(o['saved_tokens'])} tok  ·  {o['calls']} calls   {win}")
     drill = ("  drill:  cage report --by agent   ·   cage insights why <call>"
              "   ·   cage insights attrib --task <t>")
     out = f"{head}\n{drill}"
     foot = _d.Footer()
-    if o.get("unpriced_calls"):
-        if disp.usd:
-            foot.warn(unpriced_line({"_": {"calls": o["unpriced_calls"],
-                                           "tokens": o["unpriced_tokens"]}}))
-        else:
-            n = o["unpriced_calls"]
-            foot.gap(f"· {n} call{'s' if n != 1 else ''} unpriced — matters when you "
-                     f"view $ (`--usd`; cage prices unpriced)")
-    if disp.usd and o.get("has_receipts", True):  # K: the gross exclusion, one phrasing
-        from cage import netsaved
-        foot.caveat(netsaved.GROSS_NOTE)
-    if disp.usd and not o.get("has_receipts", True):
+    if o.get("has_receipts", True):  # K: the gross exclusion, one phrasing
+        from cage import savings as _savings
+        foot.caveat(_savings.GROSS_NOTE)
+    else:
         foot.gap("· no savings receipts in this window — wire a tool to measure savings\n"
                  "  (`cage query receipts` explains)")
     tail = foot.render()

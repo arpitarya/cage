@@ -78,37 +78,15 @@ def test_R1_report_tokens_default(run):
     seed.set_last_import(go.root, _now())
     out = go("R1", ["report", "--by", "agent"])
     assert "$0" not in out and "gross tok" in out  # no dollar figures by default
-    assert "kiro: input-only log — tok out not recorded" in out
-    assert "unpriced — matters when you view $" in out
+    # Same reason as above: kiro contributes no spend rows, so its input-only caveat
+    # has no number to qualify and correctly does not render.
+    assert "kiro: input-only log" not in out
 
 
-def test_R2_report_usd(run):
-    go = run(seed.wmh)
-    seed.set_last_import(go.root, _now())
-    out = go("R2", ["report", "--by", "agent", "--usd"])
-    assert "· usd" in out.splitlines()[0]
-    assert "≈ priced by family" in out and "≈ graphify priced at task model" in out
-    assert "kiro: input-only log — cost understated" in out
-    assert out.count("⚠") == 1
 
 
-def test_R3_report_usd_no_receipts(run):
-    go = run(seed.spend_only)
-    seed.set_last_import(go.root, _now())
-    out = go("R3", ["report", "--by", "agent", "--usd"])
-    header = out.splitlines()[3]
-    assert "saved" not in header and "net" not in header  # spend-only grid
-    assert "no savings receipts in this window" in out
 
 
-def test_R4_report_by_model_unpriced(run):
-    go = run(seed.wmh)
-    seed.set_last_import(go.root, _now())
-    out = go("R4", ["report", "--by", "model", "--usd"])
-    assert "—" in out                      # the fully-unpriced bucket's cost cell
-    assert "(+ unpriced)" in out           # the TOTAL says the gap out loud
-    assert "agent (kiro)" in out           # generic model bucket named by its agent
-    assert "fix: cage prices" in out
 
 
 def test_R5_report_empty(run):
@@ -119,13 +97,15 @@ def test_R5_report_empty(run):
 
 
 def test_R6_report_stale_advice(run):
+    """The import-age advice — the one staleness signal that outlived the price file.
+
+    This test also pinned `bundled prices are N days old`; that signal went with the
+    price table (USAGE-ONLY, ADR 0011). What it was really guarding — advice renders
+    ONCE, at the bottom, never inline — is kept and now asserted on the surviving line."""
     go = run(seed.stale)
     out = go("R6", ["report", "--by", "agent"])
     assert "last import: 3d ago" in out
-    assert "bundled prices are 61 days old" in out
-    # advice renders once, at the bottom, with its runnable explain pointer
-    assert "(`cage query prices-freshness` explains)" in out
-    assert out.count("bundled prices are") == 1
+    assert out.count("last import:") == 1
 
 
 def test_R7_report_capture_health_warning(run):
@@ -143,22 +123,10 @@ def test_R7_report_capture_health_warning(run):
 
 # ── §2 · insights surfaces (current verb names — Phase 3 regroups the doors) ──
 
-def test_I2_verdict_saving(run):
-    go = run(seed.verdict_saving)
-    out = go("I2", ["insights", "verdict", "graphify"])
-    assert "SAVING" in out and "marginal saving" in out
 
 
-def test_I3_verdict_costing_negative_net(run):
-    go = run(seed.verdict_costing)
-    out = go("I3", ["insights", "verdict", "graphify"])
-    assert "COSTING" in out
 
 
-def test_I4_verdict_insufficient(run):
-    go = run(seed.wmh)
-    out = go("I4", ["insights", "verdict", "fux"], expect_exit=0)
-    assert "INSUFFICIENT DATA" in out
 
 
 def test_I5_compare_groups_and_refusal(run):
@@ -177,27 +145,10 @@ def test_I6_estimate_band_and_refusal(run):
     assert "insufficient history" in out  # refuses with the gate named, exit 0
 
 
-def test_I7_matrix_tokens_default(run):
-    go = run(seed.matrix_task)
-    out = go("I7", ["insights", "matrix", "--task", "t_9f31"])
-    assert "cost" not in out and "$" not in out
-    assert "22,171" in out and "1,660" in out
-    assert "✓ smaller" in out
 
 
-def test_I8_matrix_usd(run):
-    go = run(seed.matrix_task)
-    out = go("I8a", ["insights", "matrix", "--task", "t_9f31", "--usd"])
-    assert "base model anthropic/claude-sonnet-4-6" in out
-    assert "$0.0665" in out and "$0.0050" in out and "✓ cheaper" in out
 
 
-def test_I8_matrix_usd_unpriceable(run):
-    go = run(seed.matrix_unpriceable)
-    out = go("I8b", ["insights", "matrix", "--usd"])
-    assert "22,171" in out                       # the token grid never refuses
-    assert "cost column unavailable" in out
-    assert "fix: cage prices route-tool graphify" in out
 
 
 def test_I9_adoption_both_halves(run):
@@ -253,8 +204,11 @@ def test_I10_chats_titled(run):
 def test_I10_chats_untitled_and_kiro(run):
     go = run(seed.chats_untitled)
     out = go("I10b", ["insights", "chats"])
-    assert "kiro (no session identity)" in out
-    assert "collapse into this one row" in out
+    # kiro no longer renders here at all: it has no token spine, so its rows are
+    # suppressed from `spend()` and the view shows a reason rather than a figure
+    # (`ledger.ABSENT_SPINES`, USAGE-ONLY ADR 0011). The constant-session collapse
+    # this asserted is still implemented — it simply has no rows to apply to.
+    assert "kiro" not in out.split("agent%")[1]
     assert "s_cu2" in out                        # no title ⇒ the honest session id
 
 
@@ -284,55 +238,14 @@ def _prices_project(root: Path) -> None:
                      "--to", "anthropic/claude-sonnet-4-6"]) == 0
 
 
-def test_P1_prices_list(run, capsys):
-    go = run(seed.wmh)
-    _prices_project(go.root)
-    capsys.readouterr()  # drop the setup output
-    go("P1", ["prices", "list"])
 
 
-def test_P2_prices_unpriced(run, capsys):
-    go = run(seed.wmh)
-    out = go("P2a", ["prices", "unpriced"])
-    assert "fix: cage prices" in out
-    # …and the clean state on a fully-priced ledger
-    from cage import pricescmd, policy
-    d = pricescmd.unpriced_view(go.root, policy.load(None))
-    assert d["total_calls"] == 2  # the two copilot/auto calls
 
 
-def test_P2b_prices_unpriced_clean(run):
-    go = run(seed.spend_only)
-    out = go("P2b", ["prices", "unpriced"])
-    assert "✔" in out
 
 
-def test_P3_prices_writes(run, capsys):
-    from cage import initcmd
-    go = run()
-    initcmd.run(go.root)
-    capsys.readouterr()
-    out = go("P3a", ["prices", "set", "anthropic", "claude-sonnet-4.6",
-                     "--input", "3.00", "--output", "15.00", "--cache-read", "0.30"])
-    assert "re-price immediately" in out
-    out = go("P3b", ["prices", "route-tool", "graphify",
-                     "--to", "anthropic/claude-sonnet-4-6"])
-    assert "graphify" in out
 
 
-def test_P4_prices_sync(run, capsys):
-    from cage import initcmd, pricestoml
-    go = run()
-    initcmd.run(go.root)
-    # prices_version lives in prices.toml after the split — backdate it there so the
-    # staleness path renders (prices-toml plan §2.1).
-    pricestoml.update_meta(go.root, {"prices_version": "2020-01-01"},
-                           target=pricestoml.prices_meta_target(go.root))
-    capsys.readouterr()
-    go("P4a", ["prices", "sync"])
-    go("P4b", ["prices", "sync", "--update"])
-    out = go("P4c", ["prices", "sync"])
-    assert "already in sync" in out.lower() or "in sync" in out
 
 
 # ── §4 · cage study ───────────────────────────────────────────────────────────
@@ -367,9 +280,9 @@ def test_S4_study_report_refusal(run):
 # ── §5 · cage policy ──────────────────────────────────────────────────────────
 
 def _old_policy_project(root: Path) -> None:
-    from cage import initcmd, pricestoml
+    from cage import initcmd, tomledit
     initcmd.run(root)
-    pricestoml.update_meta(root, {"policy_version": "0.19.0"})
+    tomledit.update_meta(root, {"policy_version": "0.19.0"})
 
 
 def test_P5_policy_diff(run, capsys):
@@ -380,13 +293,6 @@ def test_P5_policy_diff(run, capsys):
     assert "dry-run" in out or "nothing written" in out
 
 
-def test_P6_policy_sync(run, capsys):
-    go = run()
-    _old_policy_project(go.root)
-    capsys.readouterr()
-    go("P6a", ["policy", "sync", "--apply"])
-    out = go("P6b", ["policy", "sync"])
-    assert "in sync" in out
 
 
 # ── overview (bare cage — handoff §10) ────────────────────────────────────────
@@ -398,26 +304,10 @@ def test_O1_overview_tokens_default(run):
     assert "$0" not in out  # no dollar figures on the token headline
 
 
-def test_O2_overview_usd(run):
-    go = run(seed.wmh)
-    out = go("O2", ["--usd"])
-    assert "spent" in out and "saved" in out and "net" in out
 
 
 # ── the named negative-net law (plan Phase 2.2) ───────────────────────────────
 
-def test_negative_net_with_receipts_always_renders(run, capsys):
-    """A negative net backed by real receipts is NEVER suppressed, smoothed, or
-    gated away — the metric that can embarrass a tool is the product."""
-    go = run(seed.verdict_costing)
-    assert cli.main(["report", "--by", "task", "--usd"]) == 0
-    out = capsys.readouterr().out
-    assert "net" in out and "-$" in out          # the column renders, negative
-    assert cli.main(["insights", "roi"]) == 0
-    out = capsys.readouterr().out
-    assert "-$" in out or "-0." in out           # roi's net is negative too
-    assert cli.main(["insights", "verdict", "graphify"]) == 0
-    assert "COSTING" in capsys.readouterr().out
 
 
 # ── determinism: goldens are stable under a double run ────────────────────────
@@ -425,9 +315,9 @@ def test_negative_net_with_receipts_always_renders(run, capsys):
 def test_goldens_deterministic_double_run(run, capsys):
     go = run(seed.wmh)
     seed.set_last_import(go.root, _now())
-    assert cli.main(["report", "--by", "agent", "--usd"]) == 0
+    assert cli.main(["report", "--by", "agent"]) == 0
     a = capsys.readouterr().out
-    assert cli.main(["report", "--by", "agent", "--usd"]) == 0
+    assert cli.main(["report", "--by", "agent"]) == 0
     assert a == capsys.readouterr().out
 
 

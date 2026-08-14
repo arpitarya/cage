@@ -8,23 +8,30 @@
 - **KIRO-METRICS-CSV** — `cage data export --csv kiro`. Same parked scope-out.
 - **CLAUDE-METRICS-CSV** — `cage data export --csv claude`. Same parked scope-out.
 
-- **KIRO-IDE-METRIC-ROW** — defect (found 2026-08-14 by METRICS-PRIMARY): kiro reads
-  **zero** post-cutover. Its metric `ide` route parses `devdata.sqlite`, which does not
-  exist on this machine, while its *calls* route parses `tokens_generated.jsonl`, which
-  does — two different files for the same facts. Measured on a clean re-import: 28
-  post-cutover kiro calls → 0 metric rows. Fix: emit an `ide` metric row from
-  `tokens_generated.jsonl`, the file the calls route already reads. Arpit accepted the
-  zero as the interim behaviour ([ADR 0010](../docs/adr/0010-metric-ledgers-are-the-spend-source-forward-only-cutover.md)
-  veto condition, contingent).
+- **TASK-GRAIN-SPINE** — defect (found 2026-08-14 by USAGE-ONLY): a metric row carries no
+  `task` field, so `cage insights compare` / `estimate` / `calibration` see **zero** for
+  claude and copilot — the agents whose spend resolves from the metric ledger. The
+  `taskgroup` window fallback cannot help: it builds windows from task-carrying calls,
+  and there are none. Same root cause makes `report --by route` collapse to `chat`.
+  Candidate fix: derive the window from `tasks.jsonl` (which carries session + ts)
+  instead of from task-carrying calls. Pinned in `tests/test_compare.py`'s `_MODEL`
+  comment so the seam is visible where it bites.
 
 - **METRICS-DUAL-WRITE-END** — decide whether `calls` capture for the three agents ever
   stops. **Do not touch before 2026-09-13** — one full transcript-retention window of
-  clean metric capture, and then only with the post-cutover gap count at zero (ADR 0010
-  veto condition, contingent).
+  clean metric capture. The ADR 0010 gate that framed this (post-cutover gap count at
+  zero) is void: there is no cutover ([ADR 0011](../docs/adr/0011-cage-measures-usage-not-cost.md)).
+  The live reason to keep writing `calls` is that it is the **id namespace savings
+  receipts reference** and the fallback basis for every spine-less agent.
 
 ## Arpit decides
 
-**None.**
+- **Does cage keep a release-shaped version for USAGE-ONLY?** The work is committed
+  under the unreleased v0.49.1 changelog heading (as METRICS-PRIMARY was). `__version__`
+  is untouched at `0.49.1`. A deletion this large arguably wants its own version;
+  releasing is Arpit's call and never happens from a laptop.
+- **README positioning is DONE but worth a read** — cage is now described as a usage
+  meter that deliberately refuses to price. If that framing is wrong, it is one file.
 
 ## How this file is maintained
 

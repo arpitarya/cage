@@ -29,12 +29,12 @@ def test_help_matches_the_plan_mock_verbatim():
     """`cage --help` renders the curated front door byte-for-byte (plan Phase 3 mock)."""
     got = _run(["--help"]).stdout
     assert got == FIXT.read_text(encoding="utf-8")
-    # structural anchors: five daily verbs, six group names, no usage/options noise.
-    assert got.startswith("cage — measure what your AI agents spend")
+    # structural anchors: five daily verbs, the group names, no usage/options noise.
+    assert got.startswith("cage — measure what your AI agents use")
     assert "usage:" not in got and "positional arguments" not in got
     for line in ("  report ", "  import ", "  setup ", "  doctor ", "  query "):
         assert line in got
-    for grp in ("insights", "task", "authorship", "prices", "study", "policy", "data"):
+    for grp in ("insights", "task", "authorship", "study", "policy", "data"):
         assert f"  {grp} " in got or f"  {grp}  " in got
 
 

@@ -2,8 +2,9 @@
 
 Tool-agnostic and fail-open: you call it, it doesn't wrap you, and a metering
 error never propagates into the request path (plan §5, §10). Records token *counts*
-and cost — never prompt bodies. Cost is computed from `policy.toml` when the caller
-doesn't supply one (Orff already knows its cost, so it passes `est_cost_usd`).
+— never prompt bodies, and since USAGE-ONLY (ADR 0011) never a derived cost either.
+A caller that already knows its own billed figure (Orff passes `est_cost_usd`) still
+has it stored verbatim; cage computes none and reads none.
 """
 from __future__ import annotations
 
@@ -13,7 +14,7 @@ from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
 
-from cage import debuglog, ledger, paths, policy, prices, schema
+from cage import debuglog, ledger, paths, policy, schema
 
 
 def _resolve_root(root: Path | None) -> Path:
@@ -51,12 +52,14 @@ def record_call(*, route: str, provider: str, model: str, tokens_in: int = 0,
     that don't supply it leave it "" (the legacy, non-monorepo case). `meter()` resolves
     it best-effort via `_scope_for`."""
     r = _resolve_root(root)
-    if est_cost_usd is None:
-        est_cost_usd = prices.call_cost_usd(_policy_for(str(r)), provider, model,
-                                            tokens_in, tokens_out, cached_in)
+    # `est_cost_usd` is **accepted and stored, never computed** (USAGE-ONLY, ADR 0011).
+    # The field stays on the row under the append-only law and a self-costing provider's
+    # own figure is still recorded verbatim, but cage no longer derives one — there is no
+    # price table left to derive it from, and no view reads it.
     row = schema.make_call(route=route, provider=provider, model=model,
                            tokens_in=tokens_in, tokens_out=tokens_out,
-                           cached_in=cached_in, est_cost_usd=est_cost_usd,
+                           cached_in=cached_in,
+                           est_cost_usd=0.0 if est_cost_usd is None else est_cost_usd,
                            scope=scope, **fields)
     return row["id"] if ledger.append_row(r, "calls", row) else ""
 

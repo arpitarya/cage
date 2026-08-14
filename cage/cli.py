@@ -21,32 +21,30 @@ from cage.report import DIMENSIONS
 # (the generated docs/cli-output-spec.md was removed in the hookless rebuild);
 # any edit ⇒ re-bless with CAGE_BLESS_GOLDENS=1.
 _ROOT_HELP = """\
-cage — measure what your AI agents spend, prove what your tools save
+cage — measure what your AI agents use, prove what your tools save
 
 daily:
-  report      where the spend went (tokens; add $ views via [display])
+  report      where the tokens went (tokens; add $ views via [display])
   import      pull every agent's usage into the ledger
   setup       make this project (or --global) metered — scaffold + wire
   doctor      is capture healthy? (--paths shows every probed location)
   query       ask cage how any number or mechanism works
 
 groups (run any group name for its commands):
-  insights    attrib · matrix · roi · adoption · chats · graphify · commits ·
-              commit · verdict · budget · compare · estimate · calibration ·
-              why · forecast · regression · recommend
-  task        outcome · time · quality
+  insights    attrib · adoption · chats · graphify · commits · commit ·
+              compare · estimate · calibration · why
+  task        outcome · time
   authorship  origin · summary · verify · notes-sync · ledger-sync
-  prices      list · unpriced · set · alias · route-tool · sync
   study       join · start · stop · report · id
   policy      diff · sync
   data        export · cleanup · migrate-savings · watch · serve ·
               proxy · meter · graphify
 
 $ cage report --since 7d          # the daily number
-$ cage insights verdict graphify  # is this tool paying for itself?
+$ cage insights chats            # which conversation used the tokens?
 $ cage task outcome t_9f31        # close a task so compare/estimate can see it
 $ cage study join baseline        # enroll this laptop in the fleet study
-$ cage prices route-tool graphify --to copilot/claude-sonnet-4.6
+$ cage insights graphify         # per-chat graphify saving
 """
 
 
@@ -141,9 +139,6 @@ def build_parser() -> argparse.ArgumentParser:
     _dist = " (zipapp)" if _paths.distribution() == "zipapp" else ""
     p.add_argument("--version", action="version", version=f"cage {__version__}{_dist}")
     p.add_argument("--json", action="store_true", help="machine-readable output (bare cage: the headline dict)")
-    p.add_argument("--usd", action="store_true",
-                   help="bare cage: add dollar figures to the headline (tokens are "
-                        "the default; `[display] usd = true` for always-on)")
     p.add_argument("--ledger", metavar="DIR", help="use this cage base dir as the active "
                    "ledger (overrides the project/global resolution; the .cage-equivalent "
                    "holding ledger/, state/ and policy.toml)")
@@ -162,9 +157,6 @@ def build_parser() -> argparse.ArgumentParser:
                      help="filter to one project (working-dir basename; '.' or bare flag = "
                           "current dir). Exact for Claude only (§3.7)")
     rep.add_argument("--team", action="store_true", help="read the merged refs/notes/cage-ledger team view (§3.6.3)")
-    rep.add_argument("--usd", action="store_true",
-                     help="add dollar columns (tokens are the default view; "
-                          "`[display] usd = true` in policy for always-on)")
     rep.add_argument("--all-columns", action="store_true", dest="all_columns",
                      help="force the full column grid even without savings signal "
                           "(scripts wanting fixed shape; CSV never gates)")
@@ -277,12 +269,11 @@ def build_parser() -> argparse.ArgumentParser:
     _json_flag(qy)
     qy.set_defaults(fn=clicmds.cmd_query)
 
-    # ── group: insights (attribution + money views, the differentiator) ────────
+    # ── group: insights (attribution + usage views, the differentiator) ────────
     insights = _group(sub, "insights",
-                       "per-tool savings & money views: attrib · matrix · roi · "
-                       "adoption · chats · commits · commit · verdict · budget · "
-                       "compare · estimate · calibration · why · forecast · "
-                       "regression · recommend")
+                       "per-tool savings & usage views: attrib · adoption · chats · "
+                       "graphify · commits · commit · compare · estimate · "
+                       "calibration · why")
 
     at = insights.add_parser("attrib", help="per-tool marginal savings for a task (§4.2)")
     at.add_argument("--task", help="task id (default: most recent)")
@@ -293,28 +284,6 @@ def build_parser() -> argparse.ArgumentParser:
     _capture_flags(at)
     _export_flags(at, "insights attrib")
     at.set_defaults(fn=clicmds.cmd_attrib)
-
-    mx = insights.add_parser("matrix", help="counterfactual permutation table for a task (§4.4)",
-                             epilog="example:\n  cage insights matrix --usd     # add the cost column",
-                             formatter_class=argparse.RawDescriptionHelpFormatter)
-    mx.add_argument("--task", help="task id (default: most recent)")
-    mx.add_argument("--scope", metavar="DIR", help="filter to one monorepo top-level dir (§3.6.2)")
-    mx.add_argument("--usd", action="store_true",
-                    help="add the cost column (the token grid is the default and "
-                         "always renders; `[display] usd = true` for always-on)")
-    _json_flag(mx)
-    _html_flag(mx)
-    _capture_flags(mx)
-    _export_flags(mx, "insights matrix")
-    mx.set_defaults(fn=clicmds.cmd_matrix)
-
-    ro = insights.add_parser("roi", help="saved $ per tool vs its own cost + latency")
-    ro.add_argument("--since", metavar="WINDOW", help="window like 30d / 2w")
-    _json_flag(ro)
-    _csv_flag(ro)
-    _capture_flags(ro)
-    _export_flags(ro, "insights roi")
-    ro.set_defaults(fn=clicmds.cmd_roi)
 
     ad = insights.add_parser("adoption",
                              help="do your agents actually invoke the tools you wired? "
@@ -335,9 +304,6 @@ def build_parser() -> argparse.ArgumentParser:
                     help="filter to one agent (default: all)")
     ch.add_argument("--all", action="store_true",
                     help="show every chat (default: top 20 by tokens_in)")
-    ch.add_argument("--usd", action="store_true",
-                    help="add the cost column (tokens are the default view; "
-                         "`[display] usd = true` for always-on)")
     _json_flag(ch)
     _csv_flag(ch)
     _capture_flags(ch)
@@ -388,24 +354,6 @@ def build_parser() -> argparse.ArgumentParser:
     _export_flags(cd, "insights commit")
     cd.set_defaults(fn=clicmds.cmd_commit)
 
-    vd = insights.add_parser("verdict",
-                             help="one-line answer: is this tool saving or costing? "
-                                  "(pure composer over attrib/roi/regression/quality)")
-    vd.add_argument("tool", help="tool name as it appears on receipts (e.g. graphify)")
-    vd.add_argument("--since", metavar="WINDOW", help="window like 30d / 2w (default: all history)")
-    _json_flag(vd)
-    _capture_flags(vd)
-    _export_flags(vd, "insights verdict")
-    vd.set_defaults(fn=clicmds.cmd_verdict)
-
-    bd = insights.add_parser("budget", help="session/day spend vs policy ceilings (§8.1)")
-    bd.add_argument("--session", help="session id to total against the session cap")
-    bd.add_argument("--scope", metavar="DIR", help="filter to one monorepo top-level dir (§3.6.2)")
-    _json_flag(bd)
-    _capture_flags(bd)
-    _export_flags(bd, "insights budget")
-    bd.set_defaults(fn=clicmds.cmd_budget)
-
     cp = insights.add_parser("compare",
                              help="measured comparison of closed tasks grouped by stack "
                                   "(n · median · IQR; the delta is estimated, observational)")
@@ -449,27 +397,6 @@ def build_parser() -> argparse.ArgumentParser:
     _export_flags(wy, "insights why")
     wy.set_defaults(fn=clicmds.cmd_why)
 
-    fc = insights.add_parser("forecast", help="project monthly spend vs the budget (§8.5)")
-    _json_flag(fc)
-    _capture_flags(fc)
-    _export_flags(fc, "insights forecast")
-    fc.set_defaults(fn=clicmds.cmd_forecast)
-
-    rg = insights.add_parser("regression", help="alert when cost-per-call drifts up (§8.3)")
-    rg.add_argument("--since", default="7d", metavar="WINDOW", help="recent window vs the baseline before it")
-    rg.add_argument("--tolerance", type=float, default=0.2, help="drift fraction that trips the flag")
-    _json_flag(rg)
-    _capture_flags(rg)
-    _export_flags(rg, "insights regression")
-    rg.set_defaults(fn=clicmds.cmd_regression)
-
-    rc = insights.add_parser("recommend", help="cheapest-path: which tools to enable/skip (§8.4)")
-    rc.add_argument("--since", metavar="WINDOW")
-    _json_flag(rc)
-    _capture_flags(rc)
-    _export_flags(rc, "insights recommend")
-    rc.set_defaults(fn=clicmds.cmd_recommend)
-
     # ── group: task (the task-outcome axis the cost-impact views read) ─────────
     # These two lived under the `human` group until v0.36 purely by filing accident:
     # neither is the removed Tier-1 human-cost axis. `outcome` is the task-CLOSE verb
@@ -498,12 +425,6 @@ def build_parser() -> argparse.ArgumentParser:
     tt.add_argument("duration", help="45m · 2h · 1h30m · a bare number of minutes")
     tt.add_argument("--task", help="task id (default: the most recent)")
     tt.set_defaults(fn=clicmds.cmd_task_time)
-
-    ql = task.add_parser("quality", help="quality-adjusted cost: cost per successful task (§8.2)")
-    _json_flag(ql)
-    _capture_flags(ql)
-    _export_flags(ql, "task quality")
-    ql.set_defaults(fn=clicmds.cmd_quality)
 
     # ── group: authorship (who wrote which files + its git-notes distribution) ──
     authorship = _group(sub, "authorship",
@@ -553,67 +474,6 @@ def build_parser() -> argparse.ArgumentParser:
     _json_flag(ls)
     ls.set_defaults(fn=clicmds.cmd_ledger_sync)
 
-    # ── group: prices ──────────────────────────────────────────────────────────
-    # CLI-GAPS(b), closed 2026-08-11. These three groups took their action as a
-    # POSITIONAL CHOICE, which made the front door asymmetric with every other group in
-    # two ways a user actually hits: `cage prices set --help` rendered the *group's*
-    # help rather than `set`'s, and the flag list was a flat union — `--input` appeared
-    # under `list`, `--apply` under `diff`. Real subparsers give each action its own
-    # help and its own flags, and an inapplicable flag is now an argparse usage error
-    # (exit 2) instead of a runtime refusal. `set_defaults(action=…)` keeps the handler
-    # dispatch byte-identical, so `pricescmd`/`policysync`/`study` are untouched.
-    pr_g = sub.add_parser("prices",
-                        help="manage the price tables the ledger reprices against: "
-                             "list · unpriced · set · alias · route-tool · sync (§3.3)",
-                        epilog="examples:\n"
-                               "  cage prices unpriced                     # what's billing $0, with a fix line each\n"
-                               "  cage prices set anthropic claude-sonnet-5 --input 2 --output 10 --cache-read 0.20\n"
-                               "  cage prices alias - copilot/auto --to anthropic/claude-sonnet-4-6\n"
-                               "  cage prices route-tool graphify --to anthropic/claude-sonnet-4-6\n"
-                               "  cage prices list                         # every visible row: bundled vs project\n"
-                               "  cage prices sync                         # dry-run diff vs the installed bundle\n"
-                               "Writes land in the project policy.toml (the bundled table is read-only);\n"
-                               "derived views re-price immediately — the ledger is never rewritten.\n"
-                               "cage never fetches a price: research is yours (vendor pricing page).",
-                        formatter_class=argparse.RawDescriptionHelpFormatter)
-    pr_g.set_defaults(fn=lambda _a, _g=pr_g: (_g.print_help(), 0)[1])
-    pr = pr_g.add_subparsers(dest="prices_cmd", metavar="<command>", required=False)
-
-    def _prices(name: str, help_text: str):
-        q = pr.add_parser(name, help=help_text)
-        _json_flag(q)
-        q.set_defaults(fn=clicmds.cmd_prices, action=name)
-        return q
-
-    _prices("list", "every visible price row: bundled vs project, with [meta]")
-    pr_un = _prices("unpriced", "models billing $0 today, each with a runnable fix line")
-    pr_un.add_argument("--since", metavar="WINDOW", help="window like 7d / 2w")
-    pr_set = _prices("set", "insert or update one project price row (# cage:custom)")
-    pr_set.add_argument("provider", help="provider key ('-' = the empty provider some "
-                        "router rows stamp)")
-    pr_set.add_argument("model", help="model id exactly as `cage prices unpriced` "
-                        "printed it")
-    pr_set.add_argument("--input", type=float, help="USD per MTok of input")
-    pr_set.add_argument("--output", type=float, help="USD per MTok of output")
-    pr_set.add_argument("--cache-read", dest="cache_read", type=float,
-                        help="USD per MTok of cached input (default: 0.1× input)")
-    pr_al = _prices("alias", "route a router pseudo-model at a real price row")
-    pr_al.add_argument("provider", help="provider key ('-' = the empty provider)")
-    pr_al.add_argument("model", help="the router pseudo-model to route")
-    pr_al.add_argument("--to", help="target price row as <provider>/<model>")
-    pr_rt = _prices("route-tool", "price a tool's call-less receipts (plan §4.5)")
-    pr_rt.add_argument("provider", metavar="TOOL", help="the tool name")
-    pr_rt.add_argument("model", nargs="?", help=argparse.SUPPRESS)
-    pr_rt.add_argument("--to", help="target price row as <provider>/<model>")
-    pr_rt.add_argument("--remove", action="store_true",
-                       help="delete the tool's route from the managed block")
-    pr_sy = _prices("sync", "diff the project rows against the installed bundle")
-    pr_sy.add_argument("--update", action="store_true",
-                       help="apply bundled values to rows confirmed via --yes; "
-                            "restamp [meta] (default: dry-run)")
-    pr_sy.add_argument("--yes", action="append", metavar="PROV/MODEL",
-                       help="confirm one drifted row (repeatable; 'all' confirms every "
-                            "drifted row)")
 
     # ── group: study ───────────────────────────────────────────────────────────
     st_g = sub.add_parser("study",
@@ -659,7 +519,7 @@ def build_parser() -> argparse.ArgumentParser:
                                "  cage policy sync --apply                 # write adds+updates, stamp [meta] policy_version\n"
                                "  cage policy sync --apply --yes all       # also accept the per-key confirm bucket\n"
                                "Customized values are never modified, orphans never deleted; pricing\n"
-                               "tables delegate to `cage prices sync` (its summary embeds here).\n"
+
                                "Nothing ever auto-applies this — hints recommend, humans run.",
                         formatter_class=argparse.RawDescriptionHelpFormatter)
     po_g.set_defaults(fn=lambda _a, _g=po_g: (_g.print_help(), 0)[1])
@@ -863,7 +723,7 @@ def _hook_usage_failopen(scan: list[str]) -> None:
         from cage import debuglog, paths
         debuglog.event(paths.resolve_root(), event="hook", produced=False,
                        skip_reason=f"usage-error:{bad or 'incomplete'}",
-                       detail="exited 0 instead of 2 (2 is the BLOCK verdict)")
+                       detail="exited 0 instead of 2 (2 is the HOST's block code)")
     except Exception:  # noqa: BLE001 — this IS the fail-open path; never raise from it
         pass
 
@@ -897,13 +757,19 @@ def main(argv: list[str] | None = None) -> int:
         args = build_parser().parse_args(argv)
     except SystemExit as exc:
         # `cage hook` is the ONE verb where argparse's usage exit is not merely an
-        # error: **exit 2 IS the block verdict** (`hookcmd.BLOCK`), wired to
-        # `PreToolUse`/`Bash`. So a stale wired event name — the exact thing a rename
-        # produces, and the class this repo has already paid for twice — would block
-        # EVERY Bash call in the session, and silently, because a blocked tool call
-        # reads to the user as the agent refusing. Fail-open is absolute *inside*
-        # `hookcmd.run`; this is the boundary standing in front of it.
-        if tok == "hook" and exc.code == hookcmd.BLOCK:
+        # error. **Exit 2 is the HOST's "block this tool call" code** on a
+        # `PreToolUse`/`Bash` hook — Claude Code's documented meaning, and the other
+        # hosts treat any non-zero the same way. So a stale wired event name — the exact
+        # thing a rename produces, and the class this repo has already paid for twice —
+        # would block EVERY Bash call in the session, and silently, because a blocked
+        # tool call reads to the user as the agent refusing.
+        #
+        # **This guard OUTLIVED cage's own budget block** (USAGE-ONLY, ADR 0011). Cage no
+        # longer emits 2 deliberately anywhere — `hookcmd.BLOCK` is gone and every event
+        # exits 0 — which makes an *accidental* 2 from argparse strictly worse than
+        # before: there is now no path where blocking is intended, so any block is a bug.
+        # The literal is the host's constant, not cage's, and is why it is spelled here.
+        if tok == "hook" and exc.code == 2:
             _hook_usage_failopen(scan)
             return 0
         raise

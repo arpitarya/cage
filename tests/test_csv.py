@@ -10,7 +10,7 @@ import io
 import pytest
 
 from cage import (attribution, calibration, cli, compare, csvout, exportcmd,
-                  ledger, metering, policy, report, roi, schema,
+                  ledger, metering, policy, report, schema,
                   study, tasks)
 
 POL = policy.load(None)
@@ -18,29 +18,28 @@ POL = policy.load(None)
 # ── goldens over the seeded §4.4 demo ledger (no volatile fields render) ──────
 
 REPORT_GOLDEN = (
-    "route,calls,tokens_in,tokens_out,cached_in,cost_usd,unpriced_calls,unpriced_tokens,method\n"
-    "code-edit,1,8600,1500,0,0.0483,0,0,measured\n"
-    "TOTAL,1,8600,1500,0,0.0483,0,0,measured\n")
+    "route,calls,tokens_in,tokens_out,cached_in,method\n"
+    "chat,1,8600,1500,0,measured\n"
+    "TOTAL,1,8600,1500,0,measured\n")
 
+# The spend and the savings land in DIFFERENT task buckets, and that is honest, not a
+# bug: a claude metric row carries no `task` field at all (the transcript store has no
+# such concept), so the spend groups under `—` while the receipts — which DO carry a
+# task — group under it. `report --by task` therefore attributes savings but not spend
+# for any agent with a metric spine. Inherent to METRICS-PRIMARY; USAGE-ONLY only
+# widened it from post-cutover rows to all of history.
 REPORT_TASK_GOLDEN = (
-    "task,calls,tokens_in,tokens_out,cached_in,cost_usd,gross_saved_usd,net_vs_spend_usd,"
-    "unpriced_calls,unpriced_tokens,method\n"
-    "fix-handover-bug,1,8600,1500,0,0.0483,0.1242,0.0759,0,0,measured\n"
-    "TOTAL,1,8600,1500,0,0.0483,0.1242,0.0759,0,0,measured\n")
+    "task,calls,tokens_in,tokens_out,cached_in,gross_saved_tokens,method\n"
+    "—,1,8600,1500,0,0,measured\n"
+    "fix-handover-bug,,,,,41400,measured\n"
+    "TOTAL,1,8600,1500,0,41400,measured\n")
 
 ATTRIB_GOLDEN = (
-    "tool,gross_saved_tokens,gross_saved_usd,method,confidence,priced_via\n"
-    "graphify,27000,0.081,modeled,1,\n"
-    "fux,6400,0.0192,modeled,1,\n"
-    "compressor,8000,0.024,measured,1,\n"
-    "TOTAL,41400,0.1242,,,\n")
-
-ROI_GOLDEN = (
-    "tool,receipts,gross_saved_usd,own_cost_usd,net_of_own_cost_usd,added_latency_ms,method,"
-    "priced_via\n"
-    "graphify,1,0.081,0,0.081,0,modeled,call\n"
-    "compressor,1,0.024,0,0.024,0,measured,call\n"
-    "fux,1,0.0192,0,0.0192,0,modeled,call\n")
+    "tool,unit,gross_saved_tokens,method,confidence\n"
+    "graphify,tokens,27000,modeled,1\n"
+    "fux,tokens,6400,modeled,1\n"
+    "compressor,tokens,8000,measured,1\n"
+    "TOTAL,tokens,41400,,\n")
 
 
 def test_report_csv_golden(seeded):
@@ -61,19 +60,12 @@ def test_attrib_csv_golden(seeded):
     assert attribution.render_csv(data) == ATTRIB_GOLDEN
 
 
-def test_roi_csv_golden(seeded):
-    root, _ = seeded
-    data = roi.by_tool(root, POL)
-    assert roi.render_csv(data) == ROI_GOLDEN
-
-
 def test_csv_determinism_double_run(seeded):
     """Same ledger + same policy ⇒ byte-identical CSV on every view (flux law)."""
     root, _ = seeded
     renders = [
         lambda: report.render_csv(report.summarize(root, POL, dim="route")),
         lambda: attribution.render_csv(attribution.attribute(root, "fix-handover-bug", POL)),
-        lambda: roi.render_csv(roi.by_tool(root, POL)),
         lambda: compare.render_csv(compare.summarize(root, POL)),
         lambda: calibration.render_csv(calibration.summarize(root, POL)),
         lambda: study.render_csv(study.summarize(root, POL)),
@@ -91,18 +83,18 @@ def test_text_and_csv_same_numbers(seeded):
     from cage import display
     root, _ = seeded
     rep = report.summarize(root, POL, dim="route")
-    text = report.render_report(rep, disp=display.Display(usd=True))
+    text = report.render_report(rep, disp=display.Display())
     rows = list(_csv.reader(io.StringIO(report.render_csv(rep))))
     head, total = rows[0], rows[-1]
-    usd = float(total[head.index("cost_usd")])
-    assert usd == pytest.approx(rep["total"]["usd"], abs=1e-6)
-    assert f"${usd:,.4f}" in text  # the text table prints the same figure
+    tok_in = int(total[head.index("tokens_in")])
+    assert tok_in == rep["total"]["tokens_in"]
+    assert f"{tok_in:,}" in text  # the text table prints the same figure
 
     data = attribution.attribute(root, "fix-handover-bug", POL)
     arows = list(_csv.reader(io.StringIO(attribution.render_csv(data))))
-    saved = float(arows[-1][arows[0].index("gross_saved_usd")])
-    assert saved == pytest.approx(data["total_saved_usd"], abs=1e-9)
-    assert f"${saved:,.4f}" in attribution.render_attrib(data)
+    saved = int(arows[-1][arows[0].index("gross_saved_tokens")])
+    assert saved == data["total_saved_tokens"]
+    assert f"{saved:,}" in attribution.render_attrib(data)
 
 
 def test_method_tag_column_on_every_view(seeded):
@@ -111,22 +103,12 @@ def test_method_tag_column_on_every_view(seeded):
     headers = [
         report.render_csv(report.summarize(root, POL, dim="route")),
         attribution.render_csv(attribution.attribute(root, "fix-handover-bug", POL)),
-        roi.render_csv(roi.by_tool(root, POL)),
         compare.render_csv(compare.summarize(root, POL)),
         calibration.render_csv(calibration.summarize(root, POL)),
         study.render_csv(study.summarize(root, POL)),
     ]
     for out in headers:
         assert "method" in out.splitlines()[0].split(",")
-
-
-def test_priced_via_column_where_text_footnotes(seeded):
-    """The receipt-pricing rung is a CSV column wherever the text view footnotes
-    it (roi + attrib, plan §4.5) — the spreadsheet sees the provenance too."""
-    root, _ = seeded
-    for out in (attribution.render_csv(attribution.attribute(root, "fix-handover-bug", POL)),
-                roi.render_csv(roi.by_tool(root, POL))):
-        assert "priced_via" in out.splitlines()[0].split(",")
 
 
 def test_attrib_csv_keeps_estimated_tag(proj):
@@ -189,7 +171,7 @@ def test_compare_csv_refusal_carries_no_numbers(proj):
     rows = list(_csv.reader(io.StringIO(compare.render_csv(compare.summarize(proj, POL)))))
     head, g = rows[0], rows[1]
     assert "insufficient data" in g[head.index("note")]
-    assert g[head.index("median_tokens")] == "" and g[head.index("median_usd")] == ""
+    assert g[head.index("median_tokens")] == ""
 
 
 def test_study_csv_refused_delta_and_coverage(proj):
@@ -211,7 +193,7 @@ def test_study_csv_refused_delta_and_coverage(proj):
     assert kinds.count("coverage") == 2 and "pooled" in kinds
     delta = next(r for r in rows[1:] if r[0] == "delta")
     assert "insufficient machines" in delta[head.index("note")]
-    assert delta[head.index("d_usd_per_day")] == ""  # refused ⇒ no number
+    assert delta[head.index("d_tokens_per_day")] == ""  # refused ⇒ no number
 
 
 def test_calibration_csv_summary_and_tasks(proj):
@@ -339,8 +321,7 @@ def test_cli_csv_views_exit_zero_and_match_library(seeded, monkeypatch, capsys):
     root, _ = seeded
     monkeypatch.chdir(root)
     metering._policy_for.cache_clear()
-    for argv in (["report", "--csv"], ["insights", "attrib", "--csv"], ["insights", "roi", "--csv"],
-                 ["insights", "compare", "--csv"], ["insights", "calibration", "--csv"],
+    for argv in (["report", "--csv"], ["insights", "attrib", "--csv"],                  ["insights", "compare", "--csv"], ["insights", "calibration", "--csv"],
                  ["study", "report", "--csv"]):
         assert cli.main(argv) == 0, argv
     # stdout is pure CSV data — the last command's output starts with its header
@@ -357,12 +338,11 @@ def test_mcp_format_csv_parity(seeded, monkeypatch):
     # structured field, never in the rendered text (capture-architecture Phase 1).
     assert mcpserver._call("cage_report", {"format": "csv"})[0] == REPORT_GOLDEN
     assert mcpserver._call("cage_attrib", {"format": "csv"})[0] == ATTRIB_GOLDEN
-    assert mcpserver._call("cage_roi", {"format": "csv"})[0] == ROI_GOLDEN
     # default stays the text table
     assert mcpserver._call("cage_report", {})[0].startswith("Ledger by route")
     # every CSV-capable tool declares the param
     for tool in mcpserver.TOOLS:
-        if tool["name"] in ("cage_report", "cage_attrib", "cage_roi"):
+        if tool["name"] in ("cage_report", "cage_attrib"):
             assert "format" in tool["inputSchema"]["properties"]
 
 

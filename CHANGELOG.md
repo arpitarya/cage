@@ -2,7 +2,59 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
-## v0.49.1 (2026-08-12, gains a second, third and fourth change 2026-08-13, a fifth, sixth and seventh 2026-08-14) — session-tracking docs move to root work/, kiro-CLI conversations get a chat row, `cage report` gains a credits column, a new per-chat graphify view, and new per-chat Copilot, Kiro, and Claude metrics ledgers
+## v0.49.1 (2026-08-12, gains a second, third and fourth change 2026-08-13, a fifth through eighth 2026-08-14) — cage stops measuring money, session-tracking docs move to root work/, kiro-CLI conversations get a chat row, `cage report` gains a credits column, a new per-chat graphify view, and new per-chat Copilot, Kiro, and Claude metrics ledgers
+
+- **USAGE-ONLY — cage measures token and credit USAGE, never cost.** The largest
+  removal in the project's history and a deliberate narrowing of what it claims:
+  fifteen modules (~2,457 lines), eleven CLI commands, four MCP read tools, the `--usd`
+  view, the bundled rate card and four config sections are **gone**. Dollars were never
+  measured — they were recorded tokens × a hand-researched table cage is forbidden to
+  fetch and cannot check against an invoice — so they are no longer printed at all.
+  Full rationale, alternatives and veto condition:
+  [ADR 0011](docs/adr/0011-cage-measures-usage-not-cost.md).
+  - **Deleted:** `prices` · `creditprice` · `receiptprice` · `convert` · `roi` ·
+    `netsaved` · `matrix` · `verdict` · `budget` · `forecast` · `regression` ·
+    `recommend` · `quality` · `pricescmd` · `pricestoml`, plus `data/prices.toml` and
+    the `[prices]`/`[credits]`/`[billing]`/`[alias]` sections. `cage prices` and
+    `cage insights {matrix,roi,verdict,budget,forecast,regression,recommend}` and
+    `cage task quality` now print a direction rather than exiting 1 (`verbmap.REMOVED`).
+  - **Three non-money things were relocated, not deleted** — each lived in a money
+    module by accident: the outcome store (`quality.py` → **`outcomes.py`**, the write
+    half of `cage_task_outcome`, the only mutation on the MCP surface), the gross
+    caveat (`netsaved.GROSS_NOTE` → **`savings.py`**), and the comment-preserving TOML
+    writer (`pricestoml.py` → **`tomledit.py`**, still needed by `cage policy sync`).
+  - **The spend cutover is retired.** `constants.SPEND_CUTOVER` is gone;
+    `ledger.spend()` partitions by **agent**, not by time. An agent with a metric
+    ledger resolves from it for all of history; an agent without one (`lib`, the proxy,
+    the retired `codex`, custom `[sources.*]` tools) keeps resolving from `calls` — that
+    fallback is scoped, not deleted, and dropping it would have silently zeroed 373
+    codex rows in one real ledger alone.
+  - **New: `units.py`, the per-agent unit policy.** Neither unit is universal, and each
+    absence renders `—` with **its own reason**, never a `0`: Claude Code records no
+    credit unit on disk; kiro has no IDE token store. And **credits are never summed or
+    ranked across agents** — a copilot credit is GitHub's tokens×rates figure, a kiro
+    credit is an AWS credit — enforced in code (`units.summable`), not by convention.
+  - **`SPEND_SOURCES["kiro"]` no longer names a dead source.** It pointed at
+    `devdata.sqlite`, which does not exist on a real install, so it read as live while
+    resolving zero rows forever. Kiro's absence is now stated (`ledger.ABSENT_SPINES`);
+    emitting a spine from `tokens_generated.jsonl` was rejected on a field probe (28
+    rows, 1,576 in / **0 out**, a repeated 6-row block — not summable).
+  - **Honesty fixes:** kiro credits retagged `estimated` → **`measured`** (AWS's own
+    recorded charge; the old tag existed only while they proxied for dollars), and
+    `cage doctor`'s kiro-IDE check now distinguishes **db absent / table missing /
+    column drift** instead of one indistinguishable zero — only the third is a cage
+    defect, and it was the one the single zero hid.
+  - **Gated by a new `tests/test_usage_only.py`** (23 invariants): an AST scan for
+    currency identifiers and rendered `$N`, the one-basis resolver, the two distinct
+    absence reasons, the cross-agent credit law, the None-sentinel credits rule, and
+    the three-way kiro probe. `tests/test_floor.py` swapped three now-dead views for
+    live ones **one-for-one** — the gate did not weaken.
+  - **Known gap, filed not hidden:** metric rows carry no `task`, so `compare` /
+    `estimate` / `calibration` currently see zero for claude and copilot
+    (**TASK-GRAIN-SPINE** in `work/OPEN-WORK.md`). `report --by route` likewise
+    collapses to `chat` for those agents.
+  - Built from: [usage-only.handoff.md](work/archive/v0.51-usage-only.handoff.md) ·
+    [usage-only.prompt.md](work/archive/v0.51-usage-only.prompt.md).
 
 - **WORK-DIR:** `IMPLEMENTATION.md`, `INTERVIEW.md`, `MACHINE.md`, `OPEN-WORK.md`, and
   `WORKLOG.md` moved from `docs/` to a new root `work/` directory, on Arpit's explicit

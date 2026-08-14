@@ -17,7 +17,9 @@ the probe (DOC-REGISTRY row bumps with it).
 |---|---|---|---|
 | Claude Code installed + hooks field-verified | yes | 2026-08-02 | L1-FIELD claude leg, verified with evidence (WORKLOG) |
 | GitHub Copilot installed | yes | 2026-08-12 | probed during the GF-LAUNCHER build (WORKLOG, *"the premise I got wrong"*) |
-| Kiro installed | yes | 2026-08-12 | probed during the GF-LAUNCHER build (WORKLOG, *"the premise I got wrong"*) |
+| Kiro IDE installed | yes | 2026-08-12 | probed during the GF-LAUNCHER build (WORKLOG, *"the premise I got wrong"*) |
+| Kiro IDE `devdata.sqlite` present | **no** | 2026-08-14 | `dev_data/` holds only `tokens_generated.jsonl` — 28 rows, 1,576 in / **0 out**, model `"agent"`, one 6-row block repeated (not summable). This is why kiro has no token spine (`ledger.ABSENT_SPINES`, ADR 0011) |
+| Kiro CLI installed | yes | 2026-08-14 | its `conversations_v2` store is the source of the `credits` rows; token slots still NULL (kiro-cli 2.16.0, upgrade-watch armed) |
 | copilot + kiro hooks fire (L1) | unverified | 2026-08-12 | L1-FIELD still open — `--status` claims yes, not field-verified |
 
 The consequence worth stating: with Kiro installed, **KIRO-MCP-FIELD's five-minute

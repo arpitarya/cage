@@ -4,7 +4,8 @@ Chats
 chat                 agent    surface  calls  tokens_in  cached_in  cache_write  tokens_out  credits  agent%
 -------------------  -------  -------  -----  ---------  ---------  -----------  ----------  -------  ------
 fix the flaky test   claude   —            1    900,000          0            0      60,000        —     62%
-refactor the parser  copilot  —            1    196,801          0            0       9,621        —       —
+refactor the parser  copilot  vscode       1    196,801          0            0       9,621        —       —
 
+· claude credits: — (Claude Code records no credit unit on disk)
 · agent% is the share of evidenced lines in files this chat touched — not a share of the chat's work; lines in files no chat proposed belong to no chat (`cage query agent-authorship`)
 · agent% `—` for copilot: its stores record usage and prompts, not the text of an edit · kiro: its usage log records token counts only, with no tool-input payload

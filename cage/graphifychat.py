@@ -5,7 +5,7 @@ world), the modeled without-graphify counterfactual, and the GROSS saved share
 Reuses `chats.summarize` verbatim for the chat universe (title, normalized agent +
 surface, session, token sums, `from_credits` marks) and joins `ledger.savings` rows
 onto it by `session` alone — a savings row carries no agent field at all. Every
-figure here is GROSS (`netsaved.GROSS_NOTE`): per-chat NET is not computable
+figure here is GROSS (`savings.GROSS_NOTE`): per-chat NET is not computable
 (netsaved's attributable-cost rule needs a call-level tool-use mark this ledger
 doesn't carry).
 
@@ -99,7 +99,7 @@ def summarize(root: Path, pol: dict, since: str | None = None,
 
 _HINT = ("next: cage query graphify-coverage   which agent surfaces can file a receipt\n"
         "      cage doctor                    check capture is wired and healthy\n"
-        "      cage insights roi              per-tool saved $ vs its own cost")
+        "      cage insights attrib          per-tool gross token savings")
 
 
 def _render_empty(data: dict, all_chats: bool, kiro_route: str = "") -> str:
@@ -169,7 +169,7 @@ def render_view(data: dict, show_all: bool = False, all_chats: bool = False,
                kiro_route: str = "") -> str:
     """The text table. Default rows are receipt-bearing chats only (`--all-chats`
     lifts it); rank `(-saved, session)`; top-20, `--all` lifts the cut."""
-    from cage import netsaved, render
+    from cage import render, savings
 
     rows = data["rows"]
     shown_rows = rows if all_chats else [r for r in rows if r["has_gfx"]]
@@ -196,7 +196,7 @@ def render_view(data: dict, show_all: bool = False, all_chats: bool = False,
     foot = _d.Footer()
     if cut:
         foot.gap(f"· {cut} more chat(s) — --all to show")
-    foot.footnote(netsaved.GROSS_NOTE)
+    foot.footnote(savings.GROSS_NOTE)
     foot.footnote("· tokens is the chat's recorded tokens_in + tokens_out — the "
                  "WITH-graphify world (cached/cache-write excluded); without gfx = "
                  "tokens + Σsaved is the MODELED without-graphify counterfactual — "

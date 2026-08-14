@@ -1,12 +1,13 @@
 $ cage report --by agent
 Ledger by agent
 
-agent    calls     tok in  tok out
--------  -----  ---------  -------
-copilot      1  1,968,011   96,212
-claude       1    912,400   61,200
-TOTAL        2  2,880,411  157,412
+agent        calls     tok in  tok out
+-----------  -----  ---------  -------
+copilot          1  1,968,011   96,212
+claude-code      1    912,400   61,200
+TOTAL            2  2,880,411  157,412
 
+· claude credits: — (Claude Code records no credit unit on disk)
 ⚠ kiro: ~/.kiro exists but ~/.kiro/sessions matched 0 files — capture is off for this agent.
   cage doctor --paths      (if you don't use kiro: [sources.kiro] replace=true, paths=[] )
 · no savings receipts in this window — wire a tool to measure savings

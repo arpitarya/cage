@@ -66,17 +66,16 @@ def test_doctor_records_nothing_in_the_project(proj):
 def test_every_check_has_a_known_level(proj):
     res = doctorcmd.run(proj)
     names = {c["name"] for c in res["checks"]}
-    assert names == {"tool", "footprint", "policy", "pricing",
-                     # billed-credit coverage — advisory beside `pricing`, never a fault:
-                     # partial coverage is the vendor's logging, not the user's setup
-                     "credits",
-                     # COPILOT-METRICS: same advisory tier, widened to the whole row
+    # `pricing`, `credits`, `prices-age` and `prices-meta` all went with the money
+    # subsystem (USAGE-ONLY, ADR 0011) — each existed only to police a price table.
+    assert names == {"tool", "footprint", "policy",
+                     # COPILOT-METRICS: vendor-recorded facts, advisory only
                      "copilot-metrics",
                      # KIRO-METRICS: the kiro twin of the same advisory tier
                      "kiro-metrics",
                      # CLAUDE-METRICS: the claude twin, plus a retention nudge
                      "claude-metrics",
-                     "prices-meta", "prices-age", "policy-version",
+                     "policy-version",
                      "state", "portability",
                      # the price of kiro's MCP going path-free/committable: *which*
                      # `python3` resolves, probed rather than assumed

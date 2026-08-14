@@ -23,7 +23,51 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
 
 ---
 
-## State of play (2026-08-13 — pick up here on a model switch)
+## State of play (2026-08-14 — pick up here on a model switch)
+
+- **Cage no longer measures money, and this is the biggest thing to internalise before
+  you touch anything.** USAGE-ONLY deleted the whole money subsystem: 15 modules
+  (~2,457 lines), 11 CLI commands, 4 MCP read tools, the `--usd` view, the bundled rate
+  card, and the `[prices]`/`[credits]`/`[billing]`/`[alias]` config sections. Cage
+  reports **tokens and credits** — the units the vendors themselves record — and
+  converts between nothing. Read
+  [ADR 0011](../docs/adr/0011-cage-measures-usage-not-cost.md) before proposing anything
+  that produces a currency figure; it has a numbered veto condition, and "a user could
+  configure their own rate" is already in *deliberately not taken*.
+- **The spend cutover is retired.** `ledger.spend()` partitions by **agent**, not time.
+  ADR 0010 still stands on *why the metric ledgers are the source*; its cutover half is
+  superseded.
+- **Suite: 1571 passed / 11 skipped.** Down from 1842 because ~270 assertions tested
+  money. `tests/test_usage_only.py` is the new regression pin (23 invariants, incl. an
+  AST scan that fails if a currency identifier or a rendered `$N` reappears anywhere).
+- **Three lessons from this build, each of which cost real time:**
+  1. **A "money module" is often money *plus* something load-bearing.** `quality.py`
+     held the outcome store — the write half of the only MCP mutation cage has.
+     `pricestoml.py` held the generic comment-preserving TOML writer that
+     `cage policy sync` needs. Both would have been silent amputations. **Before
+     deleting a module, list what would break that has nothing to do with the reason
+     you are deleting it.**
+  2. **The literal reading of a handoff can be the wrong one, and it is cheap to
+     check.** §5.1 said "`spend()` = the three metric ledgers". Implementing it
+     literally: 195 test failures, and it would have silently zeroed **373 real `codex`
+     rows** plus all library/proxy traffic. Two throwaway implementations and two suite
+     runs settled it in ten minutes. **Measure the blast radius before arguing about
+     the wording.**
+  3. **Fixtures encode the old architecture, and they fail *quietly*.** Retiring the
+     cutover meant every test seeding `calls` rows for claude/copilot was seeding an
+     empty ledger — assertions that pinned nothing rather than assertions that failed.
+     The fix is one shared `metric_twin` helper in `conftest.py`; the lesson is that a
+     basis change is a fixture migration, and the tests will not tell you politely.
+- **Known gap, filed not hidden: TASK-GRAIN-SPINE.** Metric rows carry no `task`, so
+  `compare`/`estimate`/`calibration` read **zero** for claude and copilot. Same cause
+  collapses `report --by route` to `chat` for those agents. It is the top of OPEN-WORK.
+- **Two things need Arpit** (in OPEN-WORK's *Arpit decides*): whether this deletion gets
+  its own version — it currently sits under the unreleased v0.49.1 changelog heading with
+  `__version__` untouched — and a read of the repositioned README.
+
+---
+
+## State of play (2026-08-13 — historical)
 
 - **`docs/` vs `work/` split moved further: doc-registry, research, regression,
   dogfood, compare, cage-lab, and archive now live under root `work/`, not `docs/`.**
@@ -332,7 +376,12 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
 
 ## In flight + the single next step
 
-**Update 2026-08-12 (latest) — nothing is in flight and there is no queue left. The
+**Update 2026-08-14 (latest) — nothing is in flight. USAGE-ONLY is built and green;
+`work/` root carries no handoff/prompt pair. The single next step is Arpit's: read the
+repositioned README, decide the version question, then TASK-GRAIN-SPINE — the one live
+measured defect in the queue.**
+
+**Update 2026-08-12 — historical. Nothing was in flight and there was no queue left. The
 single next step is Arpit's: unjam git (`rm -f .git/index.lock`), delete the emptied
 `docs/open/`, `docs/proposals/` and `_to_delete/`, run `just test`, and decide whether
 SHIM-TOOL-DEPS genuinely stays closed — it is the only closure that is a live measured

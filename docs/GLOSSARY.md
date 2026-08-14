@@ -17,7 +17,7 @@ is part of the definition.
 and is a pure function of it — same ledger + same policy ⇒ same tables. Owned by
 [schema.py](../cage/schema.py).
 
-**derive** — computing a view (`report`, `attrib`, `roi`, …) from the ledger at read
+**derive** — computing a view (`report`, `attrib`, `chats`, …) from the ledger at read
 time. No clocks, no randomness, no network, no model. The ledger is never rewritten
 by a derive.
 
@@ -34,31 +34,27 @@ single `CageError` → `error: <msg>` + exit 1).
 **call** — one recorded LLM request: token counts, model, provider, ids. Prompt
 bodies are never a field — counts only, PII-safe by construction.
 
-**receipt** — a recorded *saving* (tokens/USD/ms/gCO₂ not spent). A call-less token
-receipt (graphify/fux shims) prices via the ladder in
-[receiptprice.py](../cage/receiptprice.py). See **legacy human row** for the
-`tool="human"` / `unit="minutes"` rows a pre-0.36 ledger still holds.
+**receipt** — a recorded *saving*, in its own `unit` (tokens/ms/gCO₂ not spent). Cage
+converts between no two units, so a `tokens` receipt contributes tokens and nothing
+else. See **legacy human row** for the `tool="human"` / `unit="minutes"` rows a pre-0.36
+ledger still holds.
 
 **gross saved** — every `saved` in the ledger, and the only savings figure cage measures
 per query: `raw_alternative − actual`, the *avoided read cost*. It excludes the cost of
 **using** the tool (the invoking turn, the round-trip, a hook's injected context), so a
-large gross and a session that cost more are both true at once
+large gross and a session that used more tokens overall are both true at once
 ([finding](../work/regression/2026-08-01-finding-saved-is-gross.md)). Every surface says `gross`,
-from one phrasing (`netsaved.GROSS_NOTE`).
+from one phrasing (`savings.GROSS_NOTE`) — **and cage reports no net at all**, see
+**net saved**.
 
-**cost of use** — what invoking a tool costs, as opposed to what the tool spends on
-*itself* (`meta.tool_cost_usd`, which graphify honestly declares as `$0`). Confusing the
-two is what made `verdict` print a bare SAVING. See **attributable cost**.
+**cost of use** — the tokens invoking a tool costs, as opposed to what it saves.
+**Cage does not compute it**, which is exactly why every `saved` is labelled GROSS.
 
-**attributable cost** — the computable stand-in for cost of use
-([netsaved.py](../cage/netsaved.py)): the **distinct** calls joined to a receipt's task
-whose `ts` falls within ±`NET_ATTRIB_WINDOW_S` (120s) of *any* of that tool's receipts on
-that task, unioned so an adjacent call is charged once. A lower bound by construction.
-
-**net saved** — `gross − attributable cost`, per task. `modeled` at its own lower
-confidence (0.4): it stacks a time-window join on top of gross's counterfactual, so it
-is never `measured`. A task with no in-window call is **uncovered** and its net reads
-*unavailable* — `net == gross` is structurally impossible, which is the point.
+**net saved** — **removed in v0.51** ([ADR 0011](adr/0011-cage-measures-usage-not-cost.md)),
+along with `netsaved.py` and the ±120s attributable-cost window it was built on. Netting
+required pricing every in-window call to a common unit — a dollar computation — and
+per-query netting was never computable at all, because a shim receipt carries a `task`
+but no `call`. Cage reports gross and says so, rather than a net it cannot substantiate.
 
 **usage row** (graphify-capture GC1) — a diagnostic breadcrumb, one per graphify run,
 `{op, args_hash, exit, ms, outcome}` in `state/graphify-usage.jsonl`
@@ -167,9 +163,10 @@ no routing, which is what an explicit `--ledger`/`CAGE_BASE` produces.
 (`mergeutil.union_by_id`). A dev machine's sync defaults to a dry-run print. Why a
 git ref, not an external sink: [ADR 0001](adr/0001-ledger-team-aggregation-notes-not-external-sink.md).
 
-**UNPRICED** — a call/receipt whose `(provider, model)` has no price row. Bills `$0`
-and *says so* (a ⚠ summary), rather than silently understating a total. Fixed with
-one pasted `cage prices set`/`alias` line; repricing is derive-time and retroactive.
+**UNPRICED** — **gone in v0.51.** It named a call or receipt whose `(provider, model)`
+had no price row. With no price table there is no priced/unpriced distinction left to
+draw: every row reports the same kind of fact, a recorded count
+([ADR 0011](adr/0011-cage-measures-usage-not-cost.md)).
 
 **capture-on-read** — a *read* (`report`/`insights *`/MCP read tools) triggers
 `ensure_captured` before rendering (throttled, fail-open, gated by policy), so a
@@ -318,30 +315,23 @@ up with zero code change the day Kiro starts filling them. `cage doctor`'s
 one call, recorded verbatim. Copilot persists it per request in VS Code's chatSessions
 store (`copilotCredits`) and per shutdown in the CLI (`totalPremiumRequests`); since
 2026-06-01 it *is* GitHub's own tokens×rates computation, made with what cage cannot see
-(what `copilot/auto` routed to, GitHub's current rates). Rung 1 of the pricing ladder.
-**Absence and zero are different facts** — no recorded credit falls through to the token
-rung, a recorded `0.0` is a real zero priced at `$0.0000` — and credits are never derived
-from tokens in either direction. [creditprice.py](../cage/creditprice.py), FORMULAS §1.1a.
-Not to be confused with **`[credits]`** (the vendor rate card's per-model `per_mtok`
-multipliers, in `prices.toml`) or with Kiro-CLI **credit rows** (a whole different row
-kind, `schema.make_credit`).
+(what `copilot/auto` routed to, GitHub's current rates). **Reported as a count, never
+priced** — the ladder that turned it into a dollar went with ADR 0011.
+**Absence and zero are different facts** — an absent credit is written as no key at all,
+a recorded `0.0` is a real zero — and credits are never derived from tokens in either
+direction. **Never summed across agents** (see **cross-agent credit law**). FORMULAS §1.2.
+Not to be confused with Kiro-CLI **credit rows** (a different row kind,
+`schema.make_credit`).
 
-**`billed_with`** — the `billed_with` call field: the id of the row that carries *this*
-row's billing, when the provider computed **one** billed figure over a **group** of calls
-(a Copilot-CLI `session.shutdown` reports `totalPremiumRequests` across every model in
-it). A linked row is **rung 0**: it prices at `$0.00` on the *credits* basis with the
-carrier's id as the matched key — *priced, elsewhere, by name*, which is neither a
-fabricated `$0` nor UNPRICED. A **recorded structural fact**, never a derived number:
-splitting the group credit pro-rata by token share was rejected precisely because it
-would derive credits from tokens. Empty = this row bills for itself.
-[creditprice.billed_elsewhere](../cage/creditprice.py), FORMULAS §1.1a, PLAN §3.1.
+**cross-agent credit law** — a credits total may span **one** agent only
+([units.summable](../cage/units.py)). A copilot credit is GitHub's tokens×rates figure; a
+kiro credit is an AWS credit. They share a column heading and nothing else, so a total
+over both is refused (`None`) and the view states why. Enforced in code, not convention.
 
-**`[billing.<agent>] usd_per_credit`** — *your* plan's rate for one billed credit, and
-the switch that turns rung 1 on. Lives in `cage.toml`, not `prices.toml`, because it is
-a decision about your own plan that must survive a `cage prices sync` — vendor facts
-move, routing decisions stay. **Unset by default:** with no rate, credits render as a
-*count* and those rows price by token × table. Unset ≠ `0.0`, which is a real rate that
-prices at zero. [policy.credit_rate](../cage/policy.py).
+**unit absence** — a unit an agent does not record at all
+([units.ABSENT](../cage/units.py)). Claude Code records no credit unit on disk; kiro has
+no IDE token store on this install. Each renders `—` **with its own sentence** — one is a
+vendor law, the other a missing file a future release can ship — and **never a `0`**.
 
 **agent line** — an added line in a commit that exactly matches (after whitespace
 normalization, above `MIN_MATCH_CHARS`) a line the agent's transcript records it having
@@ -400,18 +390,26 @@ inside the commit's own second out of it and break the inclusive bound
 join as a *distinct* fact from "another project's call": adopting unstamped rows would
 pull every other repo's spend onto this repo's commits.
 
-**cutover (spend cutover)** — `constants.SPEND_CUTOVER`, the pinned UTC **literal** at
-which derived spend stops resolving from the `calls` ledger and starts resolving from the
-three per-agent metric ledgers. Never `now()` and never configurable: a computed cutover
-would make yesterday's report irreproducible tomorrow. Rows resolve by their **own `ts`**,
-so a chat straddling it contributes to both sides — once each. See
-[ADR 0010](adr/0010-metric-ledgers-are-the-spend-source-forward-only-cutover.md).
+**cutover (spend cutover)** — **retired in v0.51.** `constants.SPEND_CUTOVER` was a
+pinned UTC literal partitioning derived spend by time: `calls` before it, metric ledgers
+after. It existed only to protect unrebuildable `calls` history, and that history is no
+longer wanted, so the boundary is gone with nothing in its place
+([ADR 0011](adr/0011-cage-measures-usage-not-cost.md)). Do not reintroduce a
+time-partitioned basis without reversing that ADR.
 
 **spend resolver** — `ledger.spend(root, since)`, the ONE function every derived view asks
-"what was spent". Pre-cutover `calls` rows plus post-cutover metric rows, normalized to
-one shape with a `basis` field naming which ledger the figure came from. Distinct from
-`ledger.join_table`, which is `spend()` *plus* the superseded `calls` rows and exists only
-so a receipt's `call` id still resolves — a **lookup table, never a sum source**.
+"what was used". Partitions **by agent, not by time**: an agent with a metric ledger
+resolves from it for all of history; an agent without one (`lib`, the proxy, the retired
+`codex`, custom `[sources.*]` tools) resolves from `calls`. Each row carries a `basis`
+field naming which ledger it came from. Distinct from `ledger.join_table`, which is
+`spend()` *plus* the superseded `calls` rows and exists only so a receipt's `call` id
+still resolves — a **lookup table, never a sum source**.
+
+**absent spine** — an agent listed in `SPEND_SOURCES` with an **empty** source tuple and
+a stated reason ([ledger.ABSENT_SPINES](../cage/ledger.py)). kiro is the only one: its
+entry named `devdata.sqlite` through v0.50, a file that does not exist on a real install,
+so it read as live while resolving zero rows forever. Its `calls` rows are suppressed
+rather than falling back to a second basis, and the view says why.
 
 **spend spine** — the one metric `source` per (agent, surface) allowed to carry money
 (`ledger.SPEND_SOURCES`). Each metric kind deliberately holds several overlapping views of

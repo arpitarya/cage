@@ -1,15 +1,12 @@
 $ cage report --by agent
 Ledger by agent
 
-agent    calls     tok in  tok out  gross tok
--------  -----  ---------  -------  ---------
-copilot      4  1,968,011   96,212    100,000
-claude       2    912,400   61,200    160,000
-kiro         2    699,122        0          0
-TOTAL        8  3,579,533  157,412    311,340
+agent        calls     tok in  tok out  gross tok
+-----------  -----  ---------  -------  ---------
+copilot          4  1,968,011   96,212    100,000
+claude-code      2    912,400   61,200          0
+TOTAL            6  2,880,411  157,412    311,340
 
-· kiro: input-only log — tok out not recorded; its rows also carry no per-turn time, session or project (`cage query kiro-routing`)
+· claude credits: — (Claude Code records no credit unit on disk)
 · saved is GROSS — avoided read cost; it excludes the cost of USING the tool
   (the invoking turn, the injected context). `cage query gross-vs-net`
-  net vs spend = gross − this window's spend, not net of the tools' cost of use.
-· 2 calls unpriced — matters when you view $ (`--usd`; cage prices unpriced)

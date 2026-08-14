@@ -1,26 +1,30 @@
-"""Write price/alias/meta rows into the *project* policy.toml (plan §3.3).
+"""Comment-preserving TOML text surgery on the *project* `cage.toml` — the only
+module that writes policy text.
 
-The only module that writes policy text. The bundled policy is read-only at
-runtime — every `cage prices set/alias/sync` mutation lands in the project file,
-and `policy.load`'s two-level merge keeps un-shadowed bundled rows live.
+**Formerly `pricestoml.py`.** Its price-specific setters (`set_price`, `set_credit`,
+`set_alias`, `set_tool_route`, the `prices.toml` write target and the price `[meta]`
+counters) went with the money subsystem (USAGE-ONLY, ADR 0011). The *generic writer*
+underneath them did not: `cage policy sync` and `cage setup --python-launcher` still
+need comment-preserving, atomic, locked table edits, and deleting the module wholesale
+would have taken those with it. Renamed to say what it actually is.
 
-There is no comment-preserving TOML serializer in the stdlib, so cage never
-rewrites the whole file. Two write modes, both text surgery on the original:
+The bundled policy is read-only at runtime — every mutation lands in the project file.
 
-- **in-place** — the target table already exists outside the managed block: only
-  its `key = value` lines are rewritten (surrounding comments survive) and the
-  header gains a ``# cage:custom`` mark so `prices sync` knows the row is
-  user-owned, never to be clobbered by bundled values.
+There is no comment-preserving TOML serializer in the stdlib, so cage never rewrites
+the whole file. Two write modes, both text surgery on the original:
+
+- **in-place** — the target table already exists outside the managed block: only its
+  `key = value` lines are rewritten (surrounding comments survive) and the header gains
+  a ``# cage:custom`` mark so a later sync knows the row is user-owned.
 - **managed block** — the table doesn't exist yet: it is (re)generated inside one
-  clearly marked block appended at the end of the file. The block is regenerated
-  deterministically (sorted providers, sorted models) on every write, so two
-  inserts in either order produce identical bytes.
+  clearly marked block appended at the end of the file, deterministically (sorted
+  tables, sorted keys), so two inserts in either order produce identical bytes.
 
-TOML forbids declaring the same table twice, and a duplicate header would make
-the whole project policy unparseable — capture would silently fall back to the
-bundled table. So every mutation (a) refuses when a table exists both inside and
-outside the block, and (b) re-parses the full candidate text *before* atomically
-replacing the file. These are CLI commands, not capture paths — failures raise
+TOML forbids declaring the same table twice, and a duplicate header would make the whole
+project policy unparseable — capture would silently fall back to the bundled table. So
+every mutation (a) refuses when a table exists both inside and outside the block, and
+(b) re-parses the full candidate text *before* atomically replacing the file. These are
+CLI commands, not capture paths — failures raise
 :class:`~cage.errors.CageError` at the boundary, never fail-open silence.
 """
 from __future__ import annotations
@@ -37,8 +41,8 @@ except ModuleNotFoundError:  # pragma: no cover  (Python <3.11)
 from cage import lockutil, paths
 from cage.errors import CageError
 
-BLOCK_START = "# --- cage:prices managed block — written by `cage prices`; edits inside are regenerated ---"
-BLOCK_END = "# --- cage:prices end ---"
+BLOCK_START = "# --- cage:managed block — written by cage; edits inside are regenerated ---"
+BLOCK_END = "# --- cage:managed end ---"
 CUSTOM_MARK = "# cage:custom"
 
 _BARE_KEY = re.compile(r"^[A-Za-z0-9_-]+$")
@@ -54,8 +58,8 @@ def _fmt_seg(seg: str) -> str:
 
 
 def table_header(*path: str) -> str:
-    """``table_header("prices", "anthropic", "claude-x")`` →
-    ``[prices.anthropic."claude-x"]``."""
+    """``table_header("tools", "graphify")`` → ``[tools.graphify]``; a segment needing
+    quotes gets them (``table_header("sources", "my tool")`` → ``[sources."my tool"]``)."""
     return "[" + ".".join(_fmt_seg(p) for p in path) + "]"
 
 
@@ -248,28 +252,15 @@ def _require_footprint(root: Path) -> paths.Footprint:
 
 def _project_policy(root: Path) -> Path:
     """The project *policy* file (cage.toml/legacy policy.toml) — the write target for
-    routing decisions ([alias], [tools.<tool>] routes, [wiring], policy [meta])."""
+    routing decisions ([tools] order, [wiring], [meta])."""
     return _require_footprint(root).policy
-
-
-def _project_prices(root: Path) -> Path:
-    """The project *prices* file — the write target for vendor facts ([prices]/[credits]
-    and the price [meta] counters). Resolves to prices.toml (creating it on first write),
-    or the legacy in-cage.toml prices file when that is where prices still live
-    (prices-toml plan §3, `paths.resolve_prices_file`)."""
-    return _require_footprint(root).prices
-
-
-_PRICES_HEAD = ("# Cage model prices — vendor rate cards (rows here shadow the bundled "
-                "defaults via\n# policy.load's two-level merge). Replaced wholesale by "
-                "`cage prices sync`.\n\n")
 
 
 def _write_table(root: Path, path: tuple[str, ...], values: dict,
                  mark_custom: bool = True, *, target: Path | None = None,
                  created_head: str | None = None) -> dict:
-    """Insert-or-update one leaf table in ``target`` (defaults to the project policy file;
-    a price write passes the prices file); returns
+    """Insert-or-update one leaf table in ``target`` (defaults to the project policy
+    file); returns
     ``{"mode": "in-place"|"block"|"created"|"unchanged", "before": dict|None, "after": dict}``."""
     pol_path = target if target is not None else _project_policy(root)
     result = {"path": pol_path}
@@ -331,38 +322,6 @@ def _assemble(before: str, block: dict[tuple[str, ...], dict], after: str,
     return f"{head}{BLOCK_START}\n{body}\n{BLOCK_END}\n{after}"
 
 
-def set_price(root: Path, provider: str, model: str, row: dict) -> dict:
-    """Idempotent insert-or-update of ``[prices.<provider>."<model>"]`` — a vendor fact,
-    so it lands in the **prices** file (prices.toml, or the legacy in-cage.toml prices)."""
-    return _write_table(root, ("prices", provider, model), dict(row),
-                        target=_project_prices(root), created_head=_PRICES_HEAD)
-
-
-def set_credit(root: Path, provider: str, model: str, row: dict) -> dict:
-    """Idempotent insert-or-update of ``[credits.<provider>."<model>"]`` — the AI-credit
-    multiplier table, a vendor fact, so it lands in the **prices** file alongside the
-    rate rows (prices-toml plan §2)."""
-    return _write_table(root, ("credits", provider, model), dict(row),
-                        target=_project_prices(root), created_head=_PRICES_HEAD)
-
-
-def set_alias(root: Path, provider: str, model: str, target: str) -> dict:
-    """Idempotent insert-or-update of ``[alias.<provider>."<model>"] to = ...`` — a routing
-    decision about *your* setup, so it stays in the **policy** file (cage.toml)."""
-    return _write_table(root, ("alias", provider, model), {"to": target})
-
-
-def set_tool_route(root: Path, tool: str, target: str) -> dict:
-    """Idempotent insert-or-update of ``[tools.<tool>] price_at = ...`` — the
-    rung-1 route for call-less token receipts (plan §4.5)."""
-    return _write_table(root, ("tools", tool), {"price_at": target})
-
-
-def remove_tool_route(root: Path, tool: str) -> dict:
-    """Idempotent delete of ``[tools.<tool>]`` from the managed block."""
-    return remove_table(root, ("tools", tool))
-
-
 def remove_table(root: Path, path: tuple[str, ...]) -> dict:
     """Delete one leaf table from the *managed block only*; returns
     ``{"mode": "removed"|"absent", "before": dict|None}``.
@@ -390,20 +349,11 @@ def remove_table(root: Path, path: tuple[str, ...]) -> dict:
         return {**result, "mode": "removed", "before": before_vals}
 
 
-def update_meta(root: Path, meta: dict, *, target: Path | None = None) -> dict:
-    """Stamp ``[meta]`` in-place (in the policy file by default; a prices meta stamp —
-    prices_version/prices_date — passes ``target=_project_prices(root)``). ``[meta]``
-    splits per key across the two files (prices-toml plan §2.1), so callers pass only the
-    keys that belong in ``target`` and never the price keys into the policy file."""
-    return _write_table(root, ("meta",), dict(meta), target=target,
-                        created_head=_PRICES_HEAD if target is not None else None)
-
-
-def prices_meta_target(root: Path) -> Path:
-    """The prices-file path a price [meta] stamp (prices_version/prices_date) writes to —
-    exposed so `cage prices` callers route the price counters without importing the
-    private helper."""
-    return _project_prices(root)
+def update_meta(root: Path, meta: dict) -> dict:
+    """Stamp ``[meta]`` in-place in the project policy file. The per-key split across a
+    second prices file went with the money subsystem (USAGE-ONLY, ADR 0011); there is
+    one target again."""
+    return _write_table(root, ("meta",), dict(meta))
 
 
 def set_wiring(root: Path, values: dict) -> dict:
@@ -458,3 +408,21 @@ def add_table(root: Path, path: tuple[str, ...], values: dict,
         lines[idx:idx] = [pre + "".join(chunk) + post]
         _atomic_write(pol_path, "".join(lines))
         return {**result, "mode": "added", "before": None, "after": values}
+
+
+def custom_headers(text: str) -> set[tuple[str, ...]]:
+    """Table paths the user owns: marked ``# cage:custom`` or inside the managed block
+    (a table cage wrote there on the user's instruction is customized by definition).
+
+    Lived in `pricescmd` until USAGE-ONLY (ADR 0011) deleted that module; it is generic
+    text surgery, not pricing, and `cage policy sync` still needs it to know which
+    tables it must never clobber."""
+    owned: set[tuple[str, ...]] = set()
+    before, body, after = split_block(text)
+    for line in (before + after).splitlines():
+        if CUSTOM_MARK in line:
+            hp = _header_path(line.split(CUSTOM_MARK)[0].rstrip())
+            if hp:
+                owned.add(tuple(hp))
+    owned.update(_block_tables(body))
+    return owned

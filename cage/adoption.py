@@ -169,7 +169,16 @@ def _agent_half(root: Path, since: str | None) -> dict:
     directly; otherwise a non-empty ``session`` resolves through the calls that share it.
     A row reaching neither is agent-unknown, with the *reason* recorded — never guessed
     at from a timestamp, and never bucketed as "other"."""
-    all_calls = ledger.spend(root)          # unfiltered: an in-window row may link an older call
+    # **`join_table`, not `spend()`** — this is an IDENTITY join (which agent owns this
+    # saving), never a sum. `join_table` is the documented lookup surface for exactly
+    # that: `spend()` plus the `calls` rows it superseded, so a receipt written with
+    # `call=<c_ id>` still resolves to its agent instead of falling into the unattributed
+    # bucket. Using `spend()` here would silently unattribute every saving belonging to
+    # an agent whose spend now resolves from a metric row with a different id — and
+    # would drop kiro entirely, since kiro has no token spine at all
+    # (`ledger.ABSENT_SPINES`). Adoption is a counts-only diagnostic; nothing here is
+    # summed, so the union is safe by the same argument `report` makes for receipts.
+    all_calls = ledger.join_table(root)     # unfiltered: an in-window row may link an older call
     by_id, by_session, seen = {}, {}, set()
     for c in all_calls:
         surface = _agents.row_surface(c.get("agent")) or ""

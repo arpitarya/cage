@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pytest
 
+from conftest import metric_twin
 from cage import (authorcapture, commitjoin, importcmd, ledger, linematch, paths,
                   policy, schema)
 from cage.constants import MIN_MATCH_CHARS
@@ -510,9 +511,11 @@ def test_chat_sums_reconcile_with_the_per_commit_buckets(repo, tmp_path):
     buckets = commitview._buckets(linematch.commit_diff(repo, sha), prov)
 
     (root / ".cage" / "ledger").mkdir(parents=True, exist_ok=True)
-    ledger.append(paths.Footprint(root).calls, schema.make_call(
+    _row = schema.make_call(
         route="chat", provider="anthropic", model="claude-sonnet-4-6", tokens_in=10,
-        agent="claude-code", session="sess-a", ts="2026-07-01T09:00:00Z", call_id="c1"))
+        agent="claude-code", session="sess-a", ts="2026-07-01T09:00:00Z", call_id="c1")
+    ledger.append(paths.Footprint(root).calls, _row)
+    metric_twin(root, _row)   # claude has a spine; `spend()` reads the twin (ADR 0011)
     row = chats.summarize(root, load_policy(paths.Footprint(root).policy))["rows"][0]
 
     assert row["agent_lines"] == buckets["agent"] == 2

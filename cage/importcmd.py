@@ -1002,62 +1002,43 @@ def run_agent(root: Path, agent: str, args, *, pol: dict | None = None,
 
 
 def _import_rollup(collected: list[dict], pol: dict, deduped: int) -> list[str]:
-    """The loud per-agent×surface token/cost rollup (plan §2.2), built from the rows this
-    run actually appended (``collected`` — no second ledger read). Cost reuses the ONE
-    pricing dispatch (`prices.call_usd_match`); a row the price table can't match
-    (`copilot/auto`, kiro `agent`) is counted UNPRICED, never silently `$0`. Returns []
-    when nothing was appended (an empty import stays quiet)."""
+    """The loud per-agent×surface token rollup (plan §2.2), built from the rows this run
+    actually appended (``collected`` — no second ledger read). Tokens only since
+    USAGE-ONLY (ADR 0011): there is no price table left, so there is no priced/unpriced
+    distinction to report. Returns [] when nothing was appended (an empty import stays
+    quiet)."""
     if not collected:
         return []
-    from cage import prices
     # bucket key: (surface-name display, surface) — e.g. ("claude", ""), ("copilot", "cli")
     buckets: dict[tuple[str, str], dict] = {}
     for r in collected:
         a = agents.row_surface(r.get("agent")) or r.get("agent") or "?"
         surf = r.get("surface", "")
         b = buckets.setdefault((a, surf), {"calls": 0, "tokens_in": 0, "cached": 0,
-                                           "tokens_out": 0, "cost": 0.0, "unpriced": 0,
-                                           "unpriced_models": set()})
+                                           "tokens_out": 0})
         b["calls"] += 1
         b["tokens_in"] += int(r.get("tokens_in", 0))
         b["cached"] += int(r.get("cached_in", 0))
         b["tokens_out"] += int(r.get("tokens_out", 0))
-        usd, match, _ = prices.call_usd_match(pol, r)
-        if match == "none":
-            b["unpriced"] += 1
-            b["unpriced_models"].add(r.get("model") or "?")
-        else:
-            b["cost"] += usd
 
     def order(k):
         a = k[0]
         return (agents.SURFACES.index(a) if a in agents.SURFACES else len(agents.SURFACES), k[1])
 
-    def cost_cell(b: dict) -> str:
-        if b["unpriced"] and not b["cost"]:
-            return f"UNPRICED ({', '.join(sorted(b['unpriced_models']))})"
-        cell = f"${b['cost']:,.2f}"
-        if b["unpriced"]:
-            cell += f"  (+{b['unpriced']} unpriced)"
-        return cell
-
     hdr = f"  {'agent':<8} {'surface':<7} {'calls':>6} {'tokens_in':>12} " \
-          f"{'cached':>11} {'tokens_out':>11}   cost"
+          f"{'cached':>11} {'tokens_out':>11}"
     lines = ["", hdr]
-    tot = {"calls": 0, "tokens_in": 0, "cached": 0, "tokens_out": 0, "cost": 0.0, "unpriced": 0}
+    tot = {"calls": 0, "tokens_in": 0, "cached": 0, "tokens_out": 0}
     for k in sorted(buckets, key=order):
         b = buckets[k]
         surf = k[1] or "—"
         lines.append(f"  {k[0]:<8} {surf:<7} {b['calls']:>6} {b['tokens_in']:>12,} "
-                     f"{b['cached']:>11,} {b['tokens_out']:>11,}   {cost_cell(b)}")
-        for f in ("calls", "tokens_in", "cached", "tokens_out", "cost", "unpriced"):
+                     f"{b['cached']:>11,} {b['tokens_out']:>11,}")
+        for f in ("calls", "tokens_in", "cached", "tokens_out"):
             tot[f] += b[f]
-    lines.append("  " + "─" * 66)
-    total_cost = f"${tot['cost']:,.2f}"
-    if tot["unpriced"]:
-        total_cost += f"  ({tot['unpriced']} unpriced)"
+    lines.append("  " + "─" * 55)
     lines.append(f"  {'total':<8} {'':<7} {tot['calls']:>6} {tot['tokens_in']:>12,} "
-                 f"{tot['cached']:>11,} {tot['tokens_out']:>11,}   {total_cost}")
+                 f"{tot['cached']:>11,} {tot['tokens_out']:>11,}")
     if deduped:
         lines.append(f"  ({deduped} already-recorded call(s) deduped)")
     return lines
@@ -1076,7 +1057,7 @@ def _write_manifest(root: Path, import_id: str, collected: list[dict], health: d
     if not collected:
         return
     try:
-        from cage import manifest, prices
+        from cage import manifest
         machine_id = ""
         try:
             from cage import machine
@@ -1089,18 +1070,13 @@ def _write_manifest(root: Path, import_id: str, collected: list[dict], health: d
             a = agents.row_surface(r.get("agent")) or r.get("agent") or "?"
             key = (a, r.get("surface", ""), r.get("session", ""))
             b = buckets.setdefault(key, {"rows": 0, "tokens_in": 0, "tokens_out": 0,
-                                         "cached": 0, "cost": 0.0, "unpriced": 0, "project": ""})
+                                         "cached": 0, "project": ""})
             b["rows"] += 1
             b["tokens_in"] += int(r.get("tokens_in", 0))
             b["tokens_out"] += int(r.get("tokens_out", 0))
             b["cached"] += int(r.get("cached_in", 0))
             if not b["project"] and r.get("project"):
                 b["project"] = r.get("project")  # claude cwd basename — the name fallback
-            usd, match, _ = prices.call_usd_match(pol, r)
-            if match == "none":
-                b["unpriced"] += 1
-            else:
-                b["cost"] += usd
         for (a, surf, session), b in buckets.items():
             info = health.get(a, {})
             # lifted title → claude cwd basename → "" (copilot CLI / kiro carry no title).
@@ -1111,8 +1087,7 @@ def _write_manifest(root: Path, import_id: str, collected: list[dict], health: d
                 source_path=_tilde(info.get("src", "")),
                 files_scanned=int(info.get("files", 0)),
                 rows_appended=b["rows"], tokens_in=b["tokens_in"], tokens_out=b["tokens_out"],
-                cached_in=b["cached"], est_cost_usd=b["cost"], unpriced_rows=b["unpriced"],
-                ts=ts, session_name=name, machine=machine_id)
+                cached_in=b["cached"], ts=ts, session_name=name, machine=machine_id)
     except Exception as e:  # noqa: BLE001 — the manifest is an audit trail, never a gate
         debuglog.exception(root, "import.manifest", e, pol=pol)
 

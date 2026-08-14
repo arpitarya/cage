@@ -11,21 +11,23 @@ proof that adding this layer moves no number).
   2. **Auto task-close** — `session-end` closes the tasks this session opened, which
      unblocks `compare` / `estimate` / `calibration` in one stroke; they are starved
      for exactly one reason, that nobody runs `cage task outcome`.
-  3. **Budget enforcement** — `budget` gives `budget.check` its first real caller. It
-     is the only path in cage that can stop a paid call *before* it happens.
+L1 bought a third thing until USAGE-ONLY (ADR 0011): **budget enforcement**, the one
+path in cage that could stop a call *before* it happened. It went with the money
+subsystem — a ceiling needs a currency — taking the `budget` event, the `BLOCK` exit
+code and the only non-zero exit this entrypoint had.
 
-**Fail-open is absolute here.** A hook runs in the agent's turn, so any internal
-failure exits **0** and is traced under `CAGE_DEBUG` — a broken cage must never break
-someone's session. The single exception is `hook budget`, whose non-zero exit is not a
-failure but the designed verdict; it is still 0 unless the policy says `block`.
+**Fail-open is absolute here, and now unconditionally.** A hook runs in the agent's
+turn, so any internal failure exits **0** and is traced under `CAGE_DEBUG` — a broken
+cage must never break someone's session. **Every event exits 0**; there is no longer any
+exception to that rule.
 
-**Auto-close never claims success.** `tasks.record(outcome=...)` and the quality store
-(`.cage/outcomes.json`, ok|redo) are *different axes*: closing a task makes it eligible
-for cost comparison, while ok/redo is a judgement only a human or an explicit
-`cage task outcome` can make. So the session-end hook writes ``outcome = "auto"`` —
-closed for `compare`/`estimate`/`calibration`, and **invisible to `cage task quality`**,
-which counts only rows that say ok or redo. A hook that stamped `ok` would silently
-inflate the success rate of every session that merely *ended*.
+**Auto-close never claims success.** `tasks.record(outcome=...)` and the outcome store
+(`outcomes.py`, `.cage/outcomes.json`, ok|redo) are *different axes*: closing a task
+makes it eligible for comparison, while ok/redo is a judgement only a human or an
+explicit `cage task outcome` can make. So the session-end hook writes ``outcome =
+"auto"`` — closed for `compare`/`estimate`/`calibration`, and **invisible to the outcome
+store**, which holds only rows that say ok or redo. A hook that stamped `ok` would
+silently inflate the success rate of every session that merely *ended*.
 
 **CLI-only.** Hooks do not fire under a VS Code extension, so everything above applies
 to CLI sessions only (`attest.LIMIT`) — a caveat that must travel with every number
@@ -41,12 +43,7 @@ from cage import attest, debuglog
 
 # Every event this entrypoint accepts. Closed — the wiring writes exactly these, and
 # `wiringscan` checks them against the live parser, so an unlisted one is a dead verb.
-EVENTS = ("session-start", "session-end", "tool", "budget")
-
-# The exit code a blocking budget verdict returns. 2 is Claude Code's documented
-# "block the tool call and show stderr to the agent" code; the other hosts treat any
-# non-zero the same way. Never used for an *error* — errors exit 0 (fail-open).
-BLOCK = 2
+EVENTS = ("session-start", "session-end", "tool")
 
 # `tasks.jsonl` outcome for a hook-closed task. NOT "ok": see the module docstring.
 AUTO = "auto"
@@ -91,7 +88,8 @@ def _open_tasks(root: Path, session: str) -> list[str]:
 
 
 def run(args) -> int:
-    """Dispatch one hook event. Always 0 except a deliberate budget block."""
+    """Dispatch one hook event. **Always 0** — the budget block was the only non-zero
+    exit and it went with the money subsystem (USAGE-ONLY, ADR 0011)."""
     event = getattr(args, "event", "")
     agent = getattr(args, "agent", "") or ""
     try:
@@ -106,8 +104,6 @@ def run(args) -> int:
               file=sys.stderr)
         return 0
     try:
-        if event == "budget":
-            return _budget(root, args, agent)
         if event == "session-start":
             return _session_start(root, args, agent)
         if event == "session-end":
@@ -195,26 +191,3 @@ def _session(args) -> str:
     `session-end` declines rather than closing the most recent task by proximity."""
     return (getattr(args, "session", "") or ""
             or str(_payload().get("session_id") or ""))
-
-
-def _budget(root: Path, args, agent: str) -> int:
-    """`budget.check`'s first real caller — the only place cage can stop a paid call.
-
-    Advisory unless the policy says so: `on_exceed = "warn"` (the default) always
-    returns 0, and only `on_exceed = "block"` over a ceiling returns :data:`BLOCK`.
-    The message goes to **stderr**, where every host surfaces it to the agent.
-    """
-    from cage import budget, paths, policy
-    pol = policy.load(paths.Footprint(root).policy)
-    verdict = budget.check(root, pol, session=_session(args) or None)
-    if verdict["proceed"]:
-        if verdict["over"]:
-            print("⚠ cage: over budget (policy on_exceed = 'warn' — not blocking)",
-                  file=sys.stderr)
-        return 0
-    over = [ax for ax, v in verdict["scopes"].items() if v["over"]]
-    print(f"cage: BLOCKED — {'/'.join(over)} budget ceiling exceeded "
-          f"([budgets] on_exceed = 'block' in .cage/cage.toml). "
-          f"Run `cage insights budget` for the figures.", file=sys.stderr)
-    debuglog.event(root, event="hook", agent=agent, produced=True, skip_reason="")
-    return BLOCK

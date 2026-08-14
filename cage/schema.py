@@ -244,7 +244,7 @@ def make_savings(*, tool: str, raw_alternative: float, actual: float, op: str = 
 
 def make_credit(*, session: str, credits: float, agent: str = "kiro",
                 model: str = "", surface: str = "", context_pct: float = 0.0,
-                turns: int = 0, method: str = "estimated", ts: str | None = None,
+                turns: int = 0, method: str = "measured", ts: str | None = None,
                 project: str = "", credit_id: str | None = None) -> dict:
     """One **credits** usage row — a deliberately *distinct* row kind for a source that
     reports credits, not tokens (Kiro CLI's SQLite store; capture-precision §3.4).
@@ -253,11 +253,20 @@ def make_credit(*, session: str, credits: float, agent: str = "kiro",
     token-based average and cost-per-call. Credits are the only usage signal Kiro CLI's
     store carries (`total_tokens` etc. are null even with an explicit model — proven by
     the §0 probe), so they get their own shape, in their own ``credits-<month>.jsonl``
-    shard, read by no call-based view. **Never `measured`** — the credit *value* is real,
-    but as a stand-in for the tokens/cost cage cannot see it is a proxy, so `estimated`.
-    **Recorded, not priced** by default (an unattested credit→USD rate would be a guess
-    wearing a number — handoff §6). Counts/metadata only: session id, model, timestamps,
-    a turn *count*, context %; never a prompt or response body.
+    shard, read by no call-based view.
+
+    **`measured`, retagged from `estimated` in USAGE-ONLY (P3, ADR 0011).** The old tag
+    was right for the question then being asked and is wrong for the one asked now. A
+    credit was being used as a *stand-in for the dollars cage could not see* — a proxy,
+    hence `estimated`. Cage no longer reports dollars, so the credit is no longer
+    standing in for anything: it is AWS's own recorded charge for the conversation, read
+    back verbatim, which is exactly what `measured` means everywhere else in cage.
+    Grading it down now would be the mirror of the error the method law exists to
+    prevent — understating provenance is still misstating it.
+
+    **Never priced**, and there is nothing left to price it with. Counts/metadata only:
+    session id, model, timestamps, a turn *count*, context %; never a prompt or response
+    body.
 
     `credit_id` is supplied by the parser as a deterministic id that folds in the turn
     count, so a *resumed* conversation (more credits) appends a fresh row while an

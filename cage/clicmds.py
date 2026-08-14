@@ -4,11 +4,11 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from cage import (adoptcmd, agents, attribution, budget, compare, demo, doctorcmd,
-                  explain, exportcmd, forecast, graphifymeter, importcmd, initcmd,
-                  ledger, ledgersync, matrix, mcpserver, metercmd, metering, notessync,
-                  origin, paths, policy, provenance, proxy, quality, recommend, regression,
-                  render, report, roi, serve, tasks, verifycmd, watchcmd)
+from cage import (adoptcmd, agents, attribution, compare, demo, doctorcmd,
+                  explain, exportcmd, graphifymeter, importcmd, initcmd,
+                  ledger, ledgersync, mcpserver, metercmd, metering, notessync,
+                  origin, outcomes, paths, policy, provenance, proxy,
+                  render, report, serve, tasks, verifycmd, watchcmd)
 from cage.cliutil import captured_read_root, csv_dest, emit, ledger_root, root
 from cage.constants import COMMITS_DEFAULT_ROWS
 from cage.errors import CageError
@@ -99,34 +99,6 @@ def cmd_attrib(args) -> int:
                                  team=getattr(args, "team", False))
     return emit(args, data, attribution.render_attrib(data),
                 csv=lambda: attribution.render_csv(data), root=r)
-
-
-def cmd_matrix(args) -> int:
-    from cage import display
-    r = captured_read_root(args)
-    pol = _policy(r)
-    task = args.task or _latest_task(r)
-    data = matrix.matrix(r, task, pol, scope=getattr(args, "scope", None))
-    text = matrix.render_matrix(data, usd=display.resolve(args, pol).usd)
-    if getattr(args, "html", None):
-        serve.write_html(args.html, f"Matrix · {task}", {f"Matrix · {task}": text})
-        print(f"✔ wrote {args.html}")
-        return 0
-    return emit(args, data, text, root=r)
-
-
-def cmd_budget(args) -> int:
-    r = captured_read_root(args)
-    verdict = budget.check(r, _policy(r), session=args.session,
-                           scope=getattr(args, "scope", None))
-    return emit(args, verdict, budget.render_budget(verdict), root=r)
-
-
-def cmd_roi(args) -> int:
-    r = captured_read_root(args)
-    data = roi.by_tool(r, _policy(r), since=args.since)
-    return emit(args, data, roi.render_roi(data),
-                csv=lambda: roi.render_csv(data), root=r)
 
 
 def cmd_adoption(args) -> int:
@@ -257,19 +229,11 @@ def cmd_demo(_args) -> int:
     call_id = demo.seed(root)
     verb = "already seeded" if already else "Seeded"
     print(f"✔ {verb} the §4.4 worked example (task {demo.TASK!r}, call {call_id}).")
-    print("  Now run:  cage insights attrib   ·   cage insights matrix   ·   cage report")
+    print("  Now run:  cage insights attrib   ·   cage report")
     return 0
 
 
 # ── §8 ledger features ───────────────────────────────────────────────────────
-
-def cmd_quality(args) -> int:
-    lr = captured_read_root(args)
-    s = quality.summarize(lr, pol=_policy(lr))
-    # No `csv=`: this view owns no `render_csv`, so `--export` refuses that format with a
-    # typed message rather than writing an empty file (an empty CSV reads as *no rows*).
-    return emit(args, s, quality.render_quality(s), root=lr)
-
 
 _LABEL = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,31}\Z")
 
@@ -289,7 +253,7 @@ def close_task(root, task: str, *, redo: bool = False, label: str = "") -> str:
         # `cage insights compare --by label`, never free text, a path, or a message.
         raise CageError("label must be one short token (letters/digits/._-, ≤32 chars) "
                         "— no spaces, slashes, or paths")
-    quality.record_outcome(root, task, ok=not redo)
+    outcomes.record_outcome(root, task, ok=not redo)
     tasks.record(root, task, outcome="redo" if redo else "ok", label=label)
     tag = f" (label: {label})" if label else ""
     return f"✔ recorded {task!r} as {'redo' if redo else 'ok'}{tag}."
@@ -395,24 +359,6 @@ def cmd_calibration(args) -> int:
                 csv=lambda: calibration.render_csv(d), root=r)
 
 
-def cmd_verdict(args) -> int:
-    from cage import verdict
-    r = captured_read_root(args)
-    d = verdict.compose(r, _policy(r), args.tool, since=args.since)
-    return emit(args, render.envelope("verdict", d) if args.json else d,
-                verdict.render_verdict(d), root=r)
-
-
-def cmd_prices(args) -> int:
-    """`cage prices <list|unpriced|set|alias|sync>` (plan §3.3). Reads and writes
-    both act on the *resolved* ledger root — writes land in that root's project
-    policy.toml; the bundled table is read-only at runtime."""
-    from cage import pricescmd
-    r = ledger_root()
-    payload, text = pricescmd.run(args, r, _policy(r))
-    return emit(args, render.envelope("prices", payload) if args.json else payload, text)
-
-
 def cmd_policy(args) -> int:
     """`cage policy <diff|sync>` (plan §3.10) — upgrade the resolved root's
     project policy.toml to the installed bundle; dry-run by default, never
@@ -491,26 +437,6 @@ def cmd_study(args) -> int:
           f"own scheduler line, e.g.:  {render.scheduler_hint()}   (cage installs no scheduler)")
     return 1 if res["status"] == "fail" else 0
 
-
-def cmd_regression(args) -> int:
-    lr = captured_read_root(args)
-    r = regression.detect(lr, since=args.since, tolerance=args.tolerance, pol=_policy(lr))
-    return emit(args, r, regression.render_regression(r), root=lr)
-
-
-def cmd_recommend(args) -> int:
-    lr = captured_read_root(args)
-    r = recommend.recommend(lr, _policy(lr), since=args.since)
-    return emit(args, r, recommend.render_recommend(r), root=lr)
-
-
-def cmd_forecast(args) -> int:
-    lr = captured_read_root(args)
-    f = forecast.project(lr, _policy(lr))
-    return emit(args, f, forecast.render_forecast(f), root=lr)
-
-
-# ── adapters: proxy / meter / mcp / agents (plan §5, §6) ─────────────────────
 
 def cmd_proxy(args) -> int:
     return proxy.serve(root(), port=args.port, upstream=args.upstream)
@@ -636,11 +562,11 @@ def cmd_setup(args) -> int:
     # wiring path below — agents.install re-reads it from policy on every run, which
     # is also why a later plain `cage setup` preserves the mode with no flag repeated.
     if getattr(args, "python_launcher", False):
-        from cage import pricestoml
+        from cage import tomledit
         if not paths.Footprint(here).policy.exists():
             initcmd.run(here)  # the mode needs a project policy file to live in
             print("✔ .cage/ scaffolded (needed to persist the wiring mode)")
-        res = pricestoml.set_wiring(here, {"python_launcher": True})
+        res = tomledit.set_wiring(here, {"python_launcher": True})
         print(f"✔ wiring mode → python-launcher ({res['mode']}, {res['path']})")
 
     all_agents = getattr(args, "all_agents", False)
