@@ -8,6 +8,47 @@ Entry format:
 
 ```
 
+## 2026-08-15 — v0.51.1: DUMMYREPO-STALE-VERBS closed whole, and two CI checks were asserting the opposite of their names
+
+- **Built (`tools/dummyrepo/run.py`):** `assert_exact_rows` → `assert_captured_facts` —
+  token totals in each agent's own metric tree, replacing an exact-row compare against
+  `calls*.jsonl` that P5/KIRO-CALLS-LEG made permanently empty. Added `_BASIS_SOURCE`, a
+  local mirror of `ledger.SPEND_SOURCES`: a metric file carries the same facts at two
+  grains (claude `transcript`+`request`, copilot `cli`+`cli-delta`), so an unfiltered sum
+  **double-counts every token** — caught because the first fix reported exactly 2×.
+  `shard_bytes` now `rglob`s the whole ledger (it compared `b"" == b""` before). S3's torn
+  shard, S8's determinism sweep, S16's needles and S17's read moved to surviving views.
+  S18's assertion was **inverted** — it required the healed shim to name `cage data
+  graphify`, the deleted verb, which is what *stale* means; now pins `cage interceptor
+  graphify`. **Retired six scenarios whole** (S5/S6/S7/S11/S14/S15 — compare, estimate,
+  verdict, prices, the receipt ladder): subject matter deleted by SURFACE-CUT and ADR 0011,
+  ids never reused (S9/S10 precedent).
+- **Built (`tools/cigraphify.py`):** `_savings_rows` reads **both** savings homes — P4
+  (v0.51) lifted savings to `ledger/<tool>/` and this still read `ledger/savings/`, so the
+  `intercept` check reported the F1 regression it exists to detect **while the interceptor
+  worked perfectly**. `doctor-dead`'s kill step targeted a string the shim no longer
+  contains, making it a no-op that demanded a healthy install fail; it now targets the live
+  probe and **raises if the edit matches nothing**. Leg went 4/7 → **7/7**.
+- **Built (`tests/test_win_graphify_shim.py`):** `_check_attr` keys on repo-relative POSIX
+  paths. `str(Path)` renders backslashes on Windows while `git check-attr` answers in
+  forward slashes, so the lookup missed and the empty dict read as *unpinned* — Windows CI
+  red against a correctly-pinned repo.
+- **Released:** `__version__` 0.51.1, CHANGELOG entry, README *What's new* replaced
+  (latest-only rule).
+- **Files:** `tools/dummyrepo/run.py` · `tools/cigraphify.py` ·
+  `tests/test_win_graphify_shim.py` · `cage/__init__.py` · `CHANGELOG.md` · `README.md` ·
+  `work/OPEN-WORK.md` · this file · `work/WORKLOG.md`.
+- **Test status:** `just test` **1563 passed, 11 skipped** (unchanged — no `cage/` code
+  changed) · `python -m tools.dummyrepo` **10/10** · `python -m tools.cigraphify` **7/7**
+  (macOS local, real graphify binary).
+- **Evidence:** the graphify path is now *measured* end-to-end — 1 savings row, ~2,562
+  tokens gross, through the shim on a real PATH.
+- **Queue:** **DUMMYREPO-STALE-VERBS removed** (closed). **GFX-RECEIPTS-REAUDIT narrowed**
+  — neither the shim nor the interceptor can still explain the 2026-07-22 empty-receipts
+  finding; what remains is auditing this repo's own `~/.cage`.
+- **Next step:** confirm the v0.51.1 release attaches `cage.pyz`; then the real-ledger half
+  of GFX-RECEIPTS-REAUDIT.
+
 ## 2026-08-15 — v0.51.0 shipped; DUMMYREPO-STALE-VERBS found and S13 fixed
 
 - **Built:** committed and pushed the staged ADR-CONFIG doc change, then ran the full

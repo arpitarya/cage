@@ -12,6 +12,42 @@ by milestone) — the worklog is what *happened this session*.
 
 ---
 
+## 2026-08-15 — Claude Code — v0.51.1: the CI-only tooling caught up with three releases
+
+- **Asked:** "cicd failed fix it and yes publish a patch version."
+- **Done:** closed DUMMYREPO-STALE-VERBS whole rather than the S13 slice. Suite green
+  (1563), dummyrepo **10/10**, graphify leg **4/7 → 7/7**; shipped v0.51.1 so the
+  `cage.pyz` asset attaches again. No `cage/` behaviour changed — every fix is dev tooling
+  plus one test's path handling.
+- **Two checks were asserting the opposite of their own names**, and both would have
+  stayed green-looking forever if the verbs hadn't broken first:
+  - `cigraphify`'s **`intercept`** reported "the interceptor did not reach cage" — the F1
+    regression it exists to detect — while the interceptor was working perfectly. It read
+    `ledger/savings/`, which **P4 emptied** when savings lifted to `ledger/<tool>/`.
+  - **`doctor-dead`** "killed" the shim by replacing a string the shim stopped containing
+    in v0.51, so it replaced nothing and then demanded doctor fail on a healthy install.
+    It now raises if the kill edit matches nothing — a no-op kill must never pass silently.
+- **The near-miss worth recording:** my first pass at S1/S2 summed each agent's metric file
+  whole and got exactly **2×** the fixture totals. That is not a fixture problem — a metric
+  file carries the same facts at two grains (claude `transcript`+`request`, copilot
+  `cli`+`cli-delta`), and `ledger.SPEND_SOURCES` exists precisely to pick one. Had the
+  fixtures been less exact, a doubled token count would have shipped as the new baseline.
+- **Retired six scenarios instead of rewriting them** (S5/S6/S7/S11/S14/S15): compare,
+  estimate, verdict, prices, receipt ladder — subject matter deleted by SURFACE-CUT and
+  ADR 0011. Ids are never reused (S9/S10 precedent), so the live set is gappy on purpose;
+  a scenario retargeted at a different question is a new scenario wearing an old id.
+- **Root cause of the whole class:** `main` sat **42 commits unpushed** across all of v0.50
+  and v0.51, and both broken tools are CI-only — so `just test` was green the entire time
+  and nothing local could see any of it. The long unpushed window is what let three
+  releases' drift land at once.
+- **Queue:** DUMMYREPO-STALE-VERBS **removed**. GFX-RECEIPTS-REAUDIT **narrowed to the real
+  ledger** — the shim/interceptor path is now measured working (1 row, ~2,562 tok gross),
+  so it is no longer a candidate explanation for the 2026-07-22 empty-receipts finding.
+- **Cost:** unmeasured — same dead source (`cage report`) the rule still names; tracked as
+  UNREAD-FACTS.
+- **Next step:** confirm v0.51.1's release attaches `cage.pyz`, then audit this repo's own
+  `~/.cage` for real receipts.
+
 ## 2026-08-15 — Claude Code — v0.51.0 shipped; DUMMYREPO-STALE-VERBS found and S13 fixed
 
 - **Asked:** "commit push and publish a new version."

@@ -2,6 +2,75 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
+## v0.51.1 (2026-08-15) — the CI-only test tooling had gone stale against three releases, and nothing local could see it
+
+**No cage behaviour changed.** Every fix here is in build-time tooling
+(`tools/dummyrepo`, `tools/cigraphify`) and one test's path handling. The `cage` package
+is byte-identical in behaviour to v0.51.0 — this release exists so the **`cage.pyz`
+release asset** ships again, since the job that builds and attaches it is the job that
+was red.
+
+### How it went unseen
+
+`main` sat **42 commits ahead of `origin/main`**, unpushed, across the whole of v0.50
+(SURFACE-CUT) and v0.51. Pushing for the v0.51.0 release was the first time any of that
+work ran on GitHub Actions. `just test` was green throughout and still is — the two dev
+tools that broke are **CI-only** (`python -m tools.dummyrepo`, `python -m tools.cigraphify`),
+imported by no test and run by no local command. The lesson is the F1 class one layer out:
+*a gate nothing runs locally is a gate that rots silently*, and the length of the unpushed
+window is what let three releases' worth of drift land at once.
+
+### The scenario runner (`tools/dummyrepo`)
+
+- **The ledger basis had moved and the helpers had not.** `assert_exact_rows` compared
+  against `calls*.jsonl`, which P5 and KIRO-CALLS-LEG made **permanently empty** for all
+  three built-in agents — so S1/S2 asserted an exact row match against nothing. Replaced
+  by `assert_captured_facts`, which asserts **token totals** in each agent's own metric
+  tree, exactly the split (and for exactly the reason) that `tests/test_fixture_corpus.py`
+  already made in-tree. Row *grain* is deliberately not asserted: it legitimately changed.
+- **Filtering by `source` is not optional**, and this is the subtle half. A metric file
+  carries the same facts at two grains — claude `transcript` (per chat) *and* `request`
+  (per request); copilot `cli` (cumulative) *and* `cli-delta` — so summing the file whole
+  **double-counts every token**. The runner now mirrors `ledger.SPEND_SOURCES`; kiro's
+  capture-only `ide-log` is named so KIRO-CALLS-LEG's relocation stays provably lossless.
+- `shard_bytes` (the idempotency probe) globbed `calls*` too, so its before/after compare
+  was `b"" == b""` — passing no matter what a re-import did. Now `rglob`s the whole ledger.
+- **S18 asserted the opposite of its own invariant**: it required the healed shim to name
+  `cage data graphify`, the verb SURFACE-CUT deleted, when naming it is precisely what
+  *stale* means. Now pinned to the live `cage interceptor graphify`.
+- **Six scenarios retired, not rewritten** — S5 (`insights compare`), S6 (`estimate`/
+  `calibration`), S7 (`verdict`), S11/S14/S15 (the whole `prices` surface and the receipt
+  pricing ladder). Their subject matter was deleted by SURFACE-CUT and ADR 0011's money
+  cull, so there is nothing left to assert. Ids are **never reused** (the S9/S10 precedent),
+  which is why the live set is gappy on purpose.
+- S3's torn-shard probe, S8's determinism sweep, S16's needles and S17's read all moved to
+  surviving views.
+
+### The graphify CI leg (`tools/cigraphify`) — 4/7 → **7/7**
+
+- **`intercept` was reporting the F1 regression it exists to detect, and the interceptor
+  was fine.** `_savings_rows` read `ledger/savings/`, which **P4 (v0.51) emptied** when
+  savings lifted to `ledger/<tool>/`. The receipt was written correctly the whole time.
+  Both trees are read now — *stop writing here, start writing there, read both forever*.
+  Measured after the fix: **1 savings row, ~2,562 tokens gross**. This also narrows
+  `GFX-RECEIPTS-REAUDIT`: neither the shim nor the interceptor can still be the
+  explanation for the 2026-07-22 empty-receipts finding.
+- **`doctor-dead` was a no-op that asserted a healthy install must fail.** It "killed" the
+  shim with `bytes.replace("cage data graphify --help", …)` — a string the shim stopped
+  containing in v0.51, so it replaced nothing and then demanded doctor fail on the
+  untouched, working shim. Now targets the live probe **and raises if the edit matched
+  nothing**, so this check can never again silently test the opposite of its name.
+
+### One real test bug, Windows-only
+
+`test_posix_twin_is_pinned_to_lf_in_the_working_tree` keyed its lookup on `str(Path)`,
+which renders backslashes on Windows while `git check-attr` answers in forward slashes —
+so the lookup missed and the empty dict read as *unpinned*. It reddened Windows CI against
+a **correctly pinned** repo, which is the failure mode that trains a maintainer to ignore
+a gate. Keyed on repo-relative POSIX paths now; `.gitattributes` was right all along.
+
+**Tests:** 1563 passing (unchanged) · dummyrepo 10/10 · graphify leg 7/7.
+
 ## v0.51.0 (2026-08-15) — one shape per producer, the `calls` writer retires, the ledger can prove it hasn't been edited, and the fleet study is gone
 
 **Built from:** [ledger-restructure.handoff.md](work/archive/v0.51-ledger-restructure.handoff.md) ·

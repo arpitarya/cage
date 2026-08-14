@@ -176,9 +176,17 @@ def test_cmd_twin_is_crlf():
 def _check_attr(*paths_: Path) -> dict[str, dict[str, str]]:
     """`git check-attr -a` — the *resolved* attributes, which is the only thing that
     decides what a checkout writes. Parsing `.gitattributes` by hand would re-test the
-    pattern syntax rather than its effect."""
+    pattern syntax rather than its effect.
+
+    Keyed by **repo-relative POSIX path**, which is both what we hand git and what git
+    echoes back. Passing `str(Path)` and looking the same string up again is wrong on the
+    one OS this file is about: `str()` renders `cage\\data\\shims\\graphify` on Windows,
+    git answers in forward slashes, the lookup misses, and every assertion below reads the
+    empty dict as *unpinned* — a red CI on a correctly-pinned repo, which is the failure
+    mode that trains a maintainer to ignore the gate."""
     repo = Path(__file__).resolve().parents[1]
-    r = subprocess.run(["git", "check-attr", "-a", "--", *(str(p) for p in paths_)],
+    keys = [p.resolve().relative_to(repo).as_posix() for p in paths_]
+    r = subprocess.run(["git", "check-attr", "-a", "--", *keys],
                        cwd=repo, capture_output=True, text=True)
     if r.returncode != 0:
         pytest.skip(f"git check-attr unavailable: {r.stderr.strip()}")
@@ -187,6 +195,11 @@ def _check_attr(*paths_: Path) -> dict[str, dict[str, str]]:
         path, attr, value = line.split(": ", 2)
         out.setdefault(path, {})[attr] = value
     return out
+
+
+def _attr_key(p: Path) -> str:
+    """The `_check_attr` key for ``p`` — one spelling, shared by helper and caller."""
+    return p.resolve().relative_to(Path(__file__).resolve().parents[1]).as_posix()
 
 
 def test_posix_twin_is_pinned_to_lf_in_the_working_tree():
@@ -204,7 +217,7 @@ def test_posix_twin_is_pinned_to_lf_in_the_working_tree():
     attrs = _check_attr(SH, CMD)
     # `-a` prints nothing at all for a file with no attributes — which is precisely the
     # unpinned state — so this must read as "no pin", never as a KeyError.
-    sh, cmd = attrs.get(str(SH), {}), attrs.get(str(CMD), {})
+    sh, cmd = attrs.get(_attr_key(SH), {}), attrs.get(_attr_key(CMD), {})
 
     assert sh.get("text") == "set", f"the POSIX twin is unpinned: {sh}"
     assert sh.get("eol") == "lf", f"the POSIX twin has no LF pin: {sh}"

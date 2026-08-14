@@ -4,7 +4,9 @@
 Scaffolds a disposable repo *beside* the cage checkout, sandboxes every agent
 home (env overrides — nothing touches the real machine), plants the sanitized
 fixture corpus (`tests/fixtures/transcripts/`) in each agent's real log
-location, and runs the scenario matrix S1–S18, printing a pass/fail table.
+location, and runs the scenario matrix, printing a pass/fail table. The live set is
+`SCENARIOS` — ids are never reused, so it is deliberately gappy (S5/S6/S7/S9/S10/S11/
+S14/S15 were retired with the subsystems they tested).
 
 Build-time only: **stdlib-only, never imported by cage at runtime, never in the
 wheel** (`pyproject` packages only `cage*`). It shells
@@ -14,10 +16,10 @@ here (the default sandbox name is timestamped): this is a dev tool, not a
 derived view; cage's determinism law applies to what *cage* prints, which S8
 asserts byte-for-byte.
 
-Scenario slots not yet backed by a shipped phase (S3–S7) render PENDING with
-their phase, and the steps that need a live agent (a real CLI prompt, a real
-VS Code extension turn) print as an explicit MANUAL checklist — never skipped
-silently (handoff §9 acceptance rule).
+A scenario slot not yet backed by a shipped phase renders PENDING with its phase,
+and the steps that need a live agent (a real CLI prompt, a real VS Code extension
+turn) print as an explicit MANUAL checklist — never skipped silently (handoff §9
+acceptance rule).
 
 Usage:
     python -m tools.dummyrepo                 # run everything automatable
@@ -141,12 +143,21 @@ def plant(specs: list[dict], env: dict) -> None:
         shutil.copyfile(spec["dir"] / spec["log"], dst)
 
 
+def _read_jsonl(shard: Path) -> list[dict]:
+    rows = []
+    for line in shard.read_text(encoding="utf-8").splitlines():
+        if line.strip():
+            rows.append(json.loads(line))
+    return rows
+
+
 def _ledger_rows_at(ledger_dir: Path) -> list[dict]:
+    """`calls*.jsonl` rows. **No built-in agent writes these any more** (P5 retired
+    claude's and copilot's legs, KIRO-CALLS-LEG kiro's) — what still lands here is a
+    `[sources.<name>]` custom tool, which is exactly what S17 reads."""
     rows = []
     for shard in sorted(ledger_dir.glob("calls*.jsonl")):
-        for line in shard.read_text(encoding="utf-8").splitlines():
-            if line.strip():
-                rows.append(json.loads(line))
+        rows.extend(_read_jsonl(shard))
     return rows
 
 
@@ -154,10 +165,34 @@ def ledger_rows(repo: Path) -> list[dict]:
     return _ledger_rows_at(repo / ".cage" / "ledger")
 
 
-def global_ledger_rows(env: dict) -> list[dict]:
-    """Kiro's IDE log is a machine fact and routes to $CAGE_HOME's ledger, never the
-    project one (ADR 0006) — read it the same way `ledger_rows` reads a project."""
-    return _ledger_rows_at(Path(env["CAGE_HOME"]) / ".cage" / "ledger")
+#: The one source per agent whose rows are that agent's token basis — a local mirror of
+#: `ledger.SPEND_SOURCES` (the runner shells out and must not import cage, so the table is
+#: copied; if the two disagree, `ledger.py` is right). **Filtering is not optional here:**
+#: a metric file carries the SAME facts at two grains — claude `transcript` (per chat) and
+#: `request` (per request), copilot `cli` (cumulative) and `cli-delta` — so summing the
+#: file whole double-counts every token, which is exactly what it did before this table
+#: existed. Kiro is the one agent with no spend spine at all (`ABSENT_SPINES`); `ide-log`
+#: is capture-only, and is named so the relocation KIRO-CALLS-LEG performed can still be
+#: proven lossless rather than skipped.
+_BASIS_SOURCE: dict[str, tuple[str, ...]] = {
+    "claude": ("request",),
+    "copilot": ("chat", "cli-delta"),
+    "kiro": ("ide-log",),
+}
+
+
+def _metric_rows_at(ledger_dir: Path, agent: str) -> list[dict]:
+    """That agent's basis-grain metric rows (`ledger/<agent>/chats-*.jsonl`, v0.51's
+    one-directory-per-producer shape) — where the three built-in agents' captured usage
+    lives now that no built-in leg writes `calls`."""
+    base = ledger_dir / agent
+    if not base.is_dir():
+        return []
+    allowed = _BASIS_SOURCE[agent]
+    rows = []
+    for shard in sorted(base.glob("chats*.jsonl")):
+        rows.extend(r for r in _read_jsonl(shard) if r.get("source", "") in allowed)
+    return rows
 
 
 # Minted fresh every `cage import` sweep (the manifest-row FK, import-ledger plan §4) —
@@ -166,39 +201,43 @@ def global_ledger_rows(env: dict) -> list[dict]:
 _ALWAYS_VOLATILE = ("import_id",)
 
 
-def _assert_rows_at(actual_rows: list[dict], specs: list[dict], where: str) -> None:
-    expected, volatile = [], {}
+def assert_captured_facts(repo: Path, specs: list[dict], env: dict) -> None:
+    """Every spec's captured **token totals** must land in the ledger that agent
+    captures into, and no built-in agent may write a `calls` row.
+
+    **Asserted on the facts, not the row shape — the same split, for the same reason, as
+    `tests/test_fixture_corpus.py`.** P5 (claude, copilot) and KIRO-CALLS-LEG (kiro)
+    retired the transcript→`calls` legs, so the exact-row comparison this helper used to
+    make now runs against a permanently empty `calls` glob: it would pass while pinning
+    nothing (the basis-change trap CLAUDE.md names). The row *grain* legitimately moved
+    (copilot CLI: 2 call rows → 1 `cli-delta` row), so a row count is not asserted either
+    — token totals are the invariant that survived the change, verified identical before
+    and after P5. `expected.json` keeps its byte-for-byte assertion in the pytest suite,
+    pointed at the parsers directly; blessing whatever the new code emits here would have
+    thrown away the evidence the corpus exists to hold.
+
+    Kiro routes to the machine ledger, never the project one (ADR-KIRO)."""
     for spec in specs:
-        expected.extend(spec["rows"])
-        for r in spec["rows"]:
-            volatile[r["id"]] = spec["volatile"]
-    actual = []
-    for row in actual_rows:
-        row = dict(row)
-        for v in _ALWAYS_VOLATILE:
-            row.pop(v, None)
-        for v in volatile.get(row["id"], ()):
-            if not row.pop(v, None):
-                raise Fail(f"row {row['id']} missing volatile field {v!r}")
-        actual.append(row)
-    a = sorted(actual, key=lambda r: r["id"])
-    e = sorted(expected, key=lambda r: r["id"])
-    if a != e:
-        raise Fail(f"imported rows != fixture expectation in the {where} ledger "
-                   f"({len(a)} vs {len(e)} rows; first diff: " +
-                   next((f"{x} != {y}" for x, y in zip(a, e) if x != y),
-                        "row-count mismatch")[:400])
-
-
-def assert_exact_rows(repo: Path, specs: list[dict], env: dict) -> None:
-    """Every non-kiro spec's rows must land exactly in the project ledger; kiro's IDE
-    log routes to the machine ledger instead (ADR 0006), so its rows are asserted
-    against $CAGE_HOME rather than folded into the same local comparison."""
-    local_specs = [s for s in specs if s["agent"] != "kiro"]
-    kiro_specs = [s for s in specs if s["agent"] == "kiro"]
-    _assert_rows_at(ledger_rows(repo), local_specs, "project")
-    if kiro_specs:
-        _assert_rows_at(global_ledger_rows(env), kiro_specs, "machine (kiro, ADR 0006)")
+        agent = spec["agent"]
+        sink = (Path(env["CAGE_HOME"]) / ".cage" / "ledger") if agent == "kiro" else \
+            (repo / ".cage" / "ledger")
+        where = "machine (kiro, ADR-KIRO)" if agent == "kiro" else "project"
+        want_in = sum(r.get("tokens_in", 0) for r in spec["rows"])
+        want_out = sum(r.get("tokens_out", 0) for r in spec["rows"])
+        got = _metric_rows_at(sink, agent)
+        if not got:
+            raise Fail(f"{agent}: capture produced no {agent}/chats-*.jsonl rows in the "
+                       f"{where} ledger")
+        got_in = sum(r.get("tokens_in", 0) for r in got)
+        got_out = sum(r.get("tokens_out", 0) for r in got)
+        if (got_in, got_out) != (want_in, want_out):
+            raise Fail(f"{agent}: captured token totals != fixture expectation in the "
+                       f"{where} ledger (in {got_in} vs {want_in}, out {got_out} vs {want_out})")
+    # No built-in leg writes a `calls` row any more. Not vacuous: the totals above already
+    # proved the same facts DID land, so an empty `calls` here means relocated, not lost.
+    if (stray := ledger_rows(repo)):
+        raise Fail(f"a built-in agent wrote {len(stray)} `calls` row(s) — the retired "
+                   f"leg is back: {sorted({r.get('agent') for r in stray})}")
 
 
 def assert_pii_clean(repo: Path) -> None:
@@ -217,7 +256,12 @@ def assert_pii_clean(repo: Path) -> None:
 
 
 def shard_bytes(repo: Path) -> bytes:
-    return b"".join(f.read_bytes() for f in sorted((repo / ".cage" / "ledger").glob("calls*.jsonl")))
+    """Every ledger shard, for the idempotency checks — `rglob`, not a `calls*` glob, so
+    the per-agent metric trees (`ledger/<agent>/chats-*.jsonl`, where captured usage
+    actually lands since v0.51) are covered. A `calls`-only glob would compare two empty
+    byte strings and pass no matter what a re-import did."""
+    base = repo / ".cage" / "ledger"
+    return b"".join(f.read_bytes() for f in sorted(base.rglob("*.jsonl")))
 
 
 # ── scenarios ────────────────────────────────────────────────────────────────
@@ -237,7 +281,7 @@ def s1_cli(base: Path) -> str:
     specs = fixture_specs("cli")
     plant(specs, env)
     expect_ok(repo, env, "import")
-    assert_exact_rows(repo, specs, env)
+    assert_captured_facts(repo, specs, env)
     assert_pii_clean(repo)
     expect_ok(repo, env, "doctor")
     clone_note = _clone_simulation(base, repo, env)
@@ -279,7 +323,7 @@ def s2_vscode(base: Path) -> str:
     specs = fixture_specs("vscode")
     plant(specs, env)
     expect_ok(repo, env, "import")
-    assert_exact_rows(repo, specs, env)
+    assert_captured_facts(repo, specs, env)
     before = shard_bytes(repo)
     expect_ok(repo, env, "import")
     if shard_bytes(repo) != before:
@@ -329,15 +373,20 @@ def s3_broken_setups(base: Path) -> str:
     del env["CAGE_LEDGER"]
     checks.append("unwritable-ledger")
 
-    # (c) truncated shard tail — reads stay tolerant, report exits 0.
+    # (c) truncated shard tail — reads stay tolerant, the view exits 0. Torn on a *metric*
+    # shard: since P5/KIRO-CALLS-LEG no built-in agent writes `calls`, so the old
+    # `calls*.jsonl` glob matched nothing and died with StopIteration before it could
+    # assert anything.
     repo, env = make_sandbox(base, "s3-truncated")
     expect_ok(repo, env, "setup", "--project-only", "--no-graphify")
     plant(fixture_specs("cli"), env)
     expect_ok(repo, env, "import")
-    shard = next(iter(sorted((repo / ".cage" / "ledger").glob("calls*.jsonl"))))
-    with shard.open("a", encoding="utf-8") as fh:
+    shards = sorted((repo / ".cage" / "ledger").rglob("*.jsonl"))
+    if not shards:
+        raise Fail("truncated-shard: import wrote no ledger shard to tear")
+    with shards[0].open("a", encoding="utf-8") as fh:
         fh.write('{"id": "c_torn", "ts": "2026-06-14T')  # crash mid-append
-    expect_ok(repo, env, "report")
+    expect_ok(repo, env, "insights", "chats")
     checks.append("truncated-shard")
 
     # (d) empty log — imports 0 rows, no error.
@@ -379,273 +428,6 @@ def s4_bundle(base: Path) -> str:
     return f"{len(names)} members · PII grep clean"
 
 
-# Seeder for S5 — run *inside* the sandbox with cage's own row factories (schema/
-# ledger/tasks), so the scenario exercises the real substrate, not a hand-rolled
-# imitation. 5 agent-only tasks (totals 10.5k–14.5k tok), 5 graphify (4.5k–6.5k,
-# one spanning June+July shards), plus a 2-task group the min-n gate must refuse.
-# (The handoff's S5 sketch said 3+3, which predates MIN_COMPARE_N=5 — a 3-task
-# group would itself be refused, so the runner seeds 5+5.)
-_S5_SEED = """
-import sys
-from pathlib import Path
-from cage import ledger, schema, tasks
-root = Path(sys.argv[1])
-M = dict(route="chat", provider="anthropic", model="claude-opus-4-8", agent="claude-code")
-def call(tid, tin, tout, ts):
-    ledger.append_row(root, "calls", schema.make_call(
-        tokens_in=tin, tokens_out=tout, task=tid, session=f"s-{tid}", ts=ts, **M))
-def receipt(tid, tool, ts):
-    ledger.append_row(root, "receipts", schema.make_receipt(
-        tool=tool, raw_alternative=1000, actual=100, task=tid, ts=ts))
-def close(tid, ts):
-    tasks.record(root, tid, outcome="ok", ts=ts, snapshot=False)
-for i, tin in enumerate((10000, 11000, 12000, 13000, 14000)):
-    call(f"plain-{i}", tin, 500, f"2026-06-1{i}T10:00:00Z"); close(f"plain-{i}", f"2026-06-1{i}T18:00:00Z")
-for i, tin in enumerate((4000, 4500, 6000, 6500)):
-    tid = f"graph-{(0, 1, 3, 4)[i]}"
-    call(tid, tin, 500, f"2026-06-2{i}T10:00:00Z"); receipt(tid, "graphify", f"2026-06-2{i}T10:00:00Z")
-    close(tid, f"2026-06-2{i}T18:00:00Z")
-call("graph-2", 3000, 250, "2026-06-28T10:00:00Z")
-call("graph-2", 2000, 250, "2026-07-02T10:00:00Z")   # cross-month pair
-receipt("graph-2", "graphify", "2026-06-28T10:00:00Z"); close("graph-2", "2026-07-02T18:00:00Z")
-for i, tin in enumerate((3000, 3200)):
-    tid = f"both-{i}"
-    call(tid, tin, 500, f"2026-06-0{i + 1}T10:00:00Z")
-    receipt(tid, "graphify", f"2026-06-0{i + 1}T10:00:00Z"); receipt(tid, "fux", f"2026-06-0{i + 1}T10:00:00Z")
-    close(tid, f"2026-06-0{i + 1}T18:00:00Z")
-"""
-
-
-def s5_compare(base: Path) -> str:
-    """S5 — seeded task groups: `cage insights compare` exact medians, delta tagged estimated
-    with the observational caveat, n=2 group refused, byte-identical re-run."""
-    repo, env = make_sandbox(base, "s5-compare")
-    expect_ok(repo, env, "setup", "--project-only", "--no-graphify")
-    r = _sh([sys.executable, "-c", _S5_SEED, str(repo)], cwd=repo, env=env)
-    if r.returncode != 0:
-        raise Fail(f"S5 seeding failed: {r.stderr.strip()[:300]}")
-    out = expect_ok(repo, env, "insights", "compare")
-    for needle in ("12,500", "5,500", "insufficient data (n=2 < 5)",
-                   "-7,000 tok · -$0.0350 per task (median, estimated)",
-                   "not a controlled experiment"):
-        if needle not in out:
-            raise Fail(f"compare output missing {needle!r}")
-    if expect_ok(repo, env, "insights", "compare") != out:
-        raise Fail("cage insights compare not byte-identical across two runs")
-    return "exact medians · delta estimated + caveat · n=2 refused · byte-identical"
-
-
-# Seeder for S6 — history first, then the estimate→record→run→close loop happens
-# through the real CLI (`cage insights estimate --record`, `cage task outcome`), so the scenario
-# proves the shipped verbs, not library internals.
-_S6_SEED = """
-import sys
-from pathlib import Path
-from cage import ledger, schema, tasks
-root, phase = Path(sys.argv[1]), sys.argv[2]
-M = dict(route="chat", provider="anthropic", model="claude-opus-4-8", agent="claude-code")
-def call(tid, tin, ts):
-    ledger.append_row(root, "calls", schema.make_call(
-        tokens_in=tin, tokens_out=500, task=tid, session=f"s-{tid}", ts=ts, **M))
-if phase == "history":
-    for i, tin in enumerate((10000, 11000, 12000, 13000, 14000)):
-        call(f"hist-{i}", tin, f"2026-06-1{i}T10:00:00Z")
-        tasks.record(root, f"hist-{i}", outcome="ok", ts=f"2026-06-1{i}T18:00:00Z",
-                     snapshot=False, label="bugfix")
-else:  # the estimated tasks actually run
-    call("new-in-band", 12100, "2026-07-01T10:00:00Z")
-    call("new-over", 19500, "2026-07-02T10:00:00Z")
-"""
-
-
-def s6_estimate(base: Path) -> str:
-    """S6 — estimate → --record → run → close → calibration exact hit-rate."""
-    repo, env = make_sandbox(base, "s6-estimate")
-    expect_ok(repo, env, "setup", "--project-only", "--no-graphify")
-    r = _sh([sys.executable, "-c", _S6_SEED, str(repo), "history"], cwd=repo, env=env)
-    if r.returncode != 0:
-        raise Fail(f"S6 seeding failed: {r.stderr.strip()[:300]}")
-    out = expect_ok(repo, env, "insights", "estimate", "--label", "bugfix")
-    for needle in ("n = 5 matching closed tasks", "median 12,500 · IQR 11,500–13,500",
-                   "modeled"):
-        if needle not in out:
-            raise Fail(f"estimate output missing {needle!r}")
-    if cage(repo, env, "insights", "estimate", "--label", "nope").stdout.find("insufficient history") < 0:
-        raise Fail("estimate did not refuse thin history")
-    for tid in ("new-in-band", "new-over"):
-        expect_ok(repo, env, "insights", "estimate", "--label", "bugfix", "--record", tid)
-    r = _sh([sys.executable, "-c", _S6_SEED, str(repo), "run"], cwd=repo, env=env)
-    if r.returncode != 0:
-        raise Fail(f"S6 run-phase seeding failed: {r.stderr.strip()[:300]}")
-    for tid in ("new-in-band", "new-over"):
-        expect_ok(repo, env, "task", "outcome", tid, "--label", "bugfix")
-    cal = expect_ok(repo, env, "insights", "calibration")
-    for needle in ("n = 2 closed tasks with estimates",
-                   "in-band hit-rate: 50% (1/2", "measured"):
-        if needle not in cal:
-            raise Fail(f"calibration output missing {needle!r}")
-    if expect_ok(repo, env, "insights", "calibration") != cal:
-        raise Fail("cage insights calibration not byte-identical across two runs")
-    return "band exact · refusal · --record→close loop · 50% hit-rate exact"
-
-
-# Seeder for S7 — a clearly net-positive tool (graphify: 10k tokens saved per
-# receipt, $0 own cost) and a clearly net-negative one (pricey-ml: $0.005 saved
-# per receipt vs $0.50 own cost), receipts linked to priced calls.
-_S7_SEED = """
-import sys
-from pathlib import Path
-from cage import ledger, schema
-root = Path(sys.argv[1])
-M = dict(route="chat", provider="anthropic", model="claude-opus-4-8", agent="claude-code")
-def seed(tool, tid, saved, ts, cost=0.0):
-    call = schema.make_call(tokens_in=1000, tokens_out=100, task=tid,
-                            session=f"s-{tid}", ts=ts, **M)
-    ledger.append_row(root, "calls", call)
-    ledger.append_row(root, "receipts", schema.make_receipt(
-        tool=tool, raw_alternative=saved + 100, actual=100, task=tid, call=call["id"],
-        ts=ts, meta={"tool_cost_usd": cost} if cost else {}))
-for i in range(8):
-    seed("graphify", f"t-{i}", 10000, f"2026-06-1{i}T10:00:00Z")
-    seed("pricey-ml", f"c-{i}", 1000, f"2026-06-1{i}T10:00:00Z", cost=0.5)
-"""
-
-
-def s7_verdict(base: Path) -> str:
-    """S7 — verdict on seeded net-positive / net-negative tools + the honest
-    insufficient-data path; inputs render with method tags; byte-identical."""
-    repo, env = make_sandbox(base, "s7-verdict")
-    expect_ok(repo, env, "setup", "--project-only", "--no-graphify")
-    r = _sh([sys.executable, "-c", _S7_SEED, str(repo)], cwd=repo, env=env)
-    if r.returncode != 0:
-        raise Fail(f"S7 seeding failed: {r.stderr.strip()[:300]}")
-    pos = expect_ok(repo, env, "insights", "verdict", "graphify")
-    for needle in ("graphify is SAVING", "/mo net (modeled)", "(modeled)",
-                   "computes no new statistics"):
-        if needle not in pos:
-            raise Fail(f"SAVING verdict missing {needle!r}")
-    neg = expect_ok(repo, env, "insights", "verdict", "pricey-ml")
-    if "pricey-ml is COSTING" not in neg or "break-even" not in neg:
-        raise Fail("COSTING verdict wrong for the net-negative tool")
-    ghost = expect_ok(repo, env, "insights", "verdict", "ghost-tool")
-    if "INSUFFICIENT DATA" not in ghost:
-        raise Fail("missing insufficient-data path for a receipt-less tool")
-    if expect_ok(repo, env, "insights", "verdict", "graphify") != pos:
-        raise Fail("cage insights verdict not byte-identical across two runs")
-    return "SAVING + COSTING + INSUFFICIENT DATA · tags rendered · byte-identical"
-
-
-# Seeder for S11 — the field-report shape: an empty-provider router key
-# (`copilot/auto`, what the VS Code Copilot store stamps) and an unknown-vendor
-# model, both genuinely UNPRICED (no est_cost_usd — transcript calls carry none).
-_S11_SEED = """
-import sys
-from pathlib import Path
-from cage import ledger, schema
-root = Path(sys.argv[1])
-for i in range(3):
-    ledger.append_row(root, "calls", schema.make_call(
-        route="chat", provider="", model="copilot/auto", tokens_in=15000,
-        tokens_out=2000, agent="copilot", ts=f"2026-07-0{i+1}T10:00:00Z",
-        call_id=f"c_auto{i}"))
-ledger.append_row(root, "calls", schema.make_call(
-    route="chat", provider="mistral", model="mistral-large-3", tokens_in=1000000,
-    tokens_out=200000, agent="copilot", ts="2026-07-02T10:00:00Z", call_id="c_m1"))
-"""
-
-_S11_BACKDATE = """
-import sys
-from pathlib import Path
-from cage import pricestoml
-root = Path(sys.argv[1])
-pricestoml.update_meta(root, {"prices_version": "2020-01-01"},
-                       target=pricestoml.prices_meta_target(root))
-"""
-
-
-def s11_prices(base: Path) -> str:
-    """S11 — pricing management (CLAUDE.md): seeded unpriced calls surface with
-    exact counts + fix lines; `prices set`/`alias` reprice the report to exact
-    expected USD (idempotent, ledger untouched); a backdated [meta] triggers the
-    sync recommendation in list/doctor; `sync --update` restamps; byte-identical."""
-    repo, env = make_sandbox(base, "s11-prices")
-    expect_ok(repo, env, "setup", "--project-only", "--no-graphify")
-    r = _sh([sys.executable, "-c", _S11_SEED, str(repo)], cwd=repo, env=env)
-    if r.returncode != 0:
-        raise Fail(f"S11 seeding failed: {r.stderr.strip()[:300]}")
-
-    # 1. unpriced: exact grouping, exact fix lines, deterministic
-    unp = expect_ok(repo, env, "prices", "unpriced")
-    for needle in ("—/copilot/auto   3 calls   51,000 tokens",
-                   "mistral/mistral-large-3   1 calls   1,200,000 tokens",
-                   "cage prices alias - 'copilot/auto' --to <provider>/<model>",
-                   "cage prices set mistral 'mistral-large-3' --input <IN> --output <OUT>",
-                   "4 calls (1,251,000 tokens) billing $0",
-                   "cage never fetches prices"):
-        if needle not in unp:
-            raise Fail(f"prices unpriced missing {needle!r}")
-    if expect_ok(repo, env, "prices", "unpriced") != unp:
-        raise Fail("prices unpriced not byte-identical across two runs")
-
-    # 2. set (validated, idempotent) + alias (target must be an exact row)
-    shards = shard_bytes(repo)
-    set_out = expect_ok(repo, env, "prices", "set", "mistral", "mistral-large-3",
-                        "--input", "2", "--output", "6", "--cache-read", "0.2")
-    if "before: (none)" not in set_out or "re-price immediately" not in set_out:
-        raise Fail(f"prices set output unexpected: {set_out[:200]}")
-    again = expect_ok(repo, env, "prices", "set", "mistral", "mistral-large-3",
-                      "--input", "2", "--output", "6", "--cache-read", "0.2")
-    if "no change" not in again:
-        raise Fail("prices set is not idempotent")
-    expect_ok(repo, env, "prices", "alias", "-", "copilot/auto",
-              "--to", "anthropic/claude-sonnet-4-6")
-
-    # 3. report re-prices to exact expected USD; the ledger was never rewritten.
-    # Dollars are opt-in now (plan Phase 2.5) — the repricing lives in the --usd view.
-    rep = expect_ok(repo, env, "report", "--by", "model", "--usd")
-    for needle in ("$3.2000",     # mistral: 1M×$2 + 200k×$6 per MTok
-                   "$0.2250",     # auto→sonnet-4-6: 45k×$3 + 6k×$15 per MTok
-                   "$3.4250",     # total
-                   "priced by alias (explicit routing — policy [alias]):",
-                   "copilot/auto → anthropic/claude-sonnet-4-6"):
-        if needle not in rep:
-            raise Fail(f"repriced report missing {needle!r}")
-    if "UNPRICED" in rep:
-        raise Fail("report still shows UNPRICED after set+alias")
-    # the token default carries no dollar figures at all
-    tok_rep = expect_ok(repo, env, "report", "--by", "model")
-    if "$" in tok_rep:
-        raise Fail("token-default report leaked a dollar figure")
-    if shard_bytes(repo) != shards:
-        raise Fail("repricing rewrote the ledger — it must be derive-time only")
-    if "every recorded call prices" not in expect_ok(repo, env, "prices", "unpriced"):
-        raise Fail("prices unpriced did not come up clean after set+alias")
-
-    # 4. backdated [meta] → the sync recommendation in list and doctor; --update restamps
-    r = _sh([sys.executable, "-c", _S11_BACKDATE, str(repo)], cwd=repo, env=env)
-    if r.returncode != 0:
-        raise Fail(f"S11 meta backdate failed: {r.stderr.strip()[:300]}")
-    lst = expect_ok(repo, env, "prices", "list")
-    if "bundled prices are newer (" not in lst or "cage prices sync" not in lst:
-        raise Fail("prices list did not recommend sync for a stale [meta]")
-    if "bundled prices are newer (" not in expect_ok(repo, env, "doctor"):
-        raise Fail("doctor did not recommend sync for a stale [meta]")
-    if "bundled prices are newer (" not in expect_ok(repo, env, "prices", "sync"):
-        raise Fail("prices sync dry-run did not carry the recommendation")
-    if "prices_version restamped" not in expect_ok(repo, env, "prices", "sync", "--update"):
-        raise Fail("prices sync --update did not restamp [meta]")
-    lst2 = expect_ok(repo, env, "prices", "list")
-    if "bundled prices are newer (" in lst2:
-        raise Fail("recommendation survived the restamp")
-    if expect_ok(repo, env, "prices", "list") != lst2:
-        raise Fail("prices list not byte-identical across two runs")
-    if expect_ok(repo, env, "report", "--by", "model", "--usd") != rep:
-        raise Fail("report not byte-identical across two runs")
-    assert_pii_clean(repo)
-    return ("unpriced exact + fix lines · set/alias reprice to $3.4250 exact · "
-            "ledger untouched · stale meta → sync rec · restamp clears it")
-
-
 def s8_determinism(base: Path) -> str:
     """S8 — determinism sweep: derived views byte-identical across runs, and
     CAGE_DEBUG=1 does not change any derived output."""
@@ -654,9 +436,12 @@ def s8_determinism(base: Path) -> str:
     specs = fixture_specs("cli")
     plant(specs, env)
     expect_ok(repo, env, "import")
-    views = (("report",), ("report", "--by", "model"), ("insights", "attrib"),
-             ("insights", "matrix"), ("insights", "budget"), ("insights", "roi"),
-             ("report", "--csv"), ("insights", "attrib", "--csv"))
+    # The surviving read surface. `report` and `insights attrib/matrix/budget/roi` were
+    # deleted (SURFACE-CUT v0.50, ADR 0011's money cull) — the determinism law binds
+    # whatever cage actually prints, so the sweep follows the surface rather than
+    # asserting over dead verbs.
+    views = (("insights", "chats"), ("insights", "graphify"), ("insights", "commits"),
+             ("insights", "chats", "--csv"), ("insights", "graphify", "--csv"))
     first = {v: expect_ok(repo, env, *v) for v in views}
     for v in views:
         if expect_ok(repo, env, *v) != first[v]:
@@ -754,156 +539,6 @@ def s13_pyz(base: Path) -> str:
     return f"zipapp labelled · demo+import ok · insights chats deterministic · wheel↔pyz parity ({built})"
 
 
-# Seeder for S14 — call-less token receipts against every ladder rung (ADR-GRAPHIFY).
-# Fixed timestamps; the receipts deliberately carry no call id (the graphify-shim
-# shape) so pricing must resolve via the ladder, never the linked-call path.
-_S14_SEED = """
-import sys
-from pathlib import Path
-from cage import ledger, schema
-root = Path(sys.argv[1])
-def call(model, tin, task, ts):
-    ledger.append_row(root, "calls", schema.make_call(
-        route="chat", provider="anthropic", model=model, tokens_in=tin,
-        tokens_out=100, task=task, session=f"s-{task}", ts=ts, agent="claude-code"))
-def receipt(tool, task, ts):
-    ledger.append_row(root, "receipts", schema.make_receipt(
-        tool=tool, raw_alternative=10100, actual=100, task=task, ts=ts))
-# rung 2 plain: opus dominates t-r2 on tokens_in
-call("claude-opus-4-6", 6000, "t-r2", "2026-06-10T10:00:00Z")
-call("claude-sonnet-4-6", 4000, "t-r2", "2026-06-10T10:01:00Z")
-receipt("graphify", "t-r2", "2026-06-10T10:02:00Z")
-# rung 2 tie-break: tokens tied 5000-5000, sonnet wins on call count
-call("claude-opus-4-6", 5000, "t-tie", "2026-06-11T10:00:00Z")
-call("claude-sonnet-4-6", 2500, "t-tie", "2026-06-11T10:01:00Z")
-call("claude-sonnet-4-6", 2500, "t-tie", "2026-06-11T10:02:00Z")
-receipt("tiebreak", "t-tie", "2026-06-11T10:03:00Z")
-# rung 1: an explicit [tools.zed] price_at route (no calls at all on t-r1a)
-receipt("zed", "t-r1a", "2026-06-12T10:00:00Z")
-# rung 3: no route, no calls -> refuses, loudly
-receipt("fux", "t-orphan", "2026-06-13T10:00:00Z")
-"""
-
-
-def s14_receipt_ladder(base: Path) -> str:
-    """S14 — the tool-receipt pricing ladder (ADR-GRAPHIFY): call-less token receipts
-    price via [tools.<tool>] price_at (rung 1), the task's dominant model with
-    deterministic tie-breaks (rung 2), or refuse loudly (rung 3); the rung is
-    footnoted in text and a `priced_via` CSV column; byte-identical runs."""
-    repo, env = make_sandbox(base, "s14-receipt-ladder")
-    expect_ok(repo, env, "setup", "--project-only", "--no-graphify")
-    routed = expect_ok(repo, env, "prices", "route-tool", "zed",
-                       "--to", "anthropic/claude-sonnet-4-6")
-    if "✔ [tools.zed]" not in routed:
-        raise Fail("prices route-tool did not confirm the write")
-    r = _sh([sys.executable, "-c", _S14_SEED, str(repo)], cwd=repo, env=env)
-    if r.returncode != 0:
-        raise Fail(f"S14 seeding failed: {r.stderr.strip()[:300]}")
-    out = expect_ok(repo, env, "insights", "roi")
-    for needle in (
-            "≈ zed priced via [tools.zed] price_at (anthropic/claude-sonnet-4-6)",
-            "≈ graphify priced at task model (anthropic/claude-opus-4-6)",
-            "≈ tiebreak priced at task model (anthropic/claude-sonnet-4-6)",
-            "⚠ 1 tool receipt(s) (10,000 tokens saved) UNPRICED — totals understated:",
-            "run: cage prices route-tool fux --to <provider>/<model>"
-            "  (or run in a metered session)"):
-        if needle not in out:
-            raise Fail(f"roi missing {needle!r}")
-    csv = expect_ok(repo, env, "insights", "roi", "--csv", "-")
-    header = csv.splitlines()[0]
-    if not header.endswith(",priced_via"):
-        raise Fail(f"roi --csv missing priced_via column: {header!r}")
-    if "zed,1,0.03,0,0.03,0,modeled,price_at" not in csv:
-        raise Fail("rung-1 CSV row wrong (10k tokens at $3/M must be $0.03)")
-    attrib = expect_ok(repo, env, "insights", "attrib", "--task", "t-r2")
-    if "≈ graphify priced at task model (anthropic/claude-opus-4-6)" not in attrib:
-        raise Fail("attrib missing the task-model footnote")
-    if expect_ok(repo, env, "insights", "roi") != out:
-        raise Fail("cage insights roi not byte-identical across two runs")
-    return "route via verb · 3 rungs + tie-break priced · UNPRICED hint runnable · byte-identical"
-
-
-# Seeder for S15 — one call stamped 100 days after the *bundled* prices_date, so
-# the report footer's data-relative age math yields an exact, clock-free N=100.
-_S15_SEED = """
-import datetime, sys
-from pathlib import Path
-from cage import ledger, policy, schema
-root = Path(sys.argv[1])
-meta = policy.bundled_raw().get("meta", {})
-stamped = datetime.date.fromisoformat(str(meta.get("prices_date"))[:10])
-ts = (stamped + datetime.timedelta(days=100)).isoformat() + "T10:00:00Z"
-ledger.append_row(root, "calls", schema.make_call(
-    route="chat", provider="mistral", model="mistral-large-3", tokens_in=10000,
-    tokens_out=1000, agent="copilot", ts=ts, call_id="c_s15"))
-"""
-
-_S15_OPTOUT = """
-import sys
-from pathlib import Path
-# [prices] is a price section: `policy.load` reads it from prices.toml when that file
-# exists beside cage.toml (prices-toml plan §2.1) — cage.toml would be silently ignored.
-p = Path(sys.argv[1]) / ".cage" / "prices.toml"
-p.write_text(p.read_text(encoding="utf-8") + '\\n[prices]\\nstale_days = 0\\n',
-             encoding="utf-8")
-"""
-
-
-def s15_freshness(base: Path) -> str:
-    """S15 — pricing freshness (CLAUDE.md): a backdated project [meta] puts the
-    staleness note on the `cage report` footer (the surviving surface — the
-    post-commit hook was removed with the hook machinery); `sync --update` silences
-    it; the footer ages the bundle data-relatively (newest ledger ts, exact N,
-    byte-identical); `stale_days = 0` opts out and, as a scalar under [prices], must
-    never crash provider iteration."""
-    repo, env = make_sandbox(base, "s15-freshness")
-    expect_ok(repo, env, "setup", "--project-only", "--no-graphify")
-
-    # Seed a call first — the report footer (the freshness surface now that the
-    # post-commit hook is gone) only renders when the ledger has a table to show.
-    r = _sh([sys.executable, "-c", _S15_SEED, str(repo)], cwd=repo, env=env)
-    if r.returncode != 0:
-        raise Fail(f"S15 seeding failed: {r.stderr.strip()[:300]}")
-
-    # 1. backdated [meta] → the sync note appears on the report footer, ·-prefixed and
-    #    runnable (a fresh, synced project emits none — the footer stays silent).
-    r = _sh([sys.executable, "-c", _S11_BACKDATE, str(repo)], cwd=repo, env=env)
-    if r.returncode != 0:
-        raise Fail(f"S15 meta backdate failed: {r.stderr.strip()[:300]}")
-    rep = expect_ok(repo, env, "report")
-    if "bundled prices are newer (" not in rep or "cage prices sync" not in rep:
-        raise Fail(f"report footer missing the staleness note: {rep[-300:]!r}")
-
-    # 2. sync --update restamps → the note disappears (silent when clean)
-    expect_ok(repo, env, "prices", "sync", "--update")
-    if "bundled prices are newer (" in expect_ok(repo, env, "report"):
-        raise Fail("staleness note survived `prices sync --update`")
-
-    # 3. data-relative bundle age in the report footer: the seeded call is 100 days
-    # past the bundled prices_date → exact N=100, no wall clock, byte-identical
-    rep = expect_ok(repo, env, "report")
-    if "· bundled prices are 100 days old — check for a newer cage release" not in rep:
-        raise Fail(f"report footer missing the data-relative age line: {rep[-300:]!r}")
-    if expect_ok(repo, env, "report") != rep:
-        raise Fail("report with freshness footer not byte-identical across two runs")
-    # the seeded unpriced call surfaces the UNPRICED ⚠ on the money view
-    if "UNPRICED" not in expect_ok(repo, env, "report", "--usd"):
-        raise Fail("report --usd missing the UNPRICED hint for an unpriced call")
-
-    # 5. stale_days = 0 opts the age signal out — and, being a scalar under
-    # [prices], must not crash prices list/sync (the hardened iteration sites)
-    r = _sh([sys.executable, "-c", _S15_OPTOUT, str(repo)], cwd=repo, env=env)
-    if r.returncode != 0:
-        raise Fail(f"S15 opt-out write failed: {r.stderr.strip()[:300]}")
-    if "days old — check for a newer cage release" in expect_ok(repo, env, "report"):
-        raise Fail("stale_days = 0 did not disable the age signal")
-    expect_ok(repo, env, "prices", "list")   # scalar under [prices] must not crash
-    expect_ok(repo, env, "prices", "sync")
-    assert_pii_clean(repo)
-    return ("backdated meta → report-footer note · sync silences it · "
-            "data-relative 100-day footer exact + byte-identical · stale_days=0 opt-out")
-
-
 # Seeder for S16 — priced calls so every derived view has real numbers to hold
 # byte-identical across the policy apply.
 _S16_SEED = """
@@ -968,8 +603,7 @@ def s16_policy_sync(base: Path) -> str:
                    "+ [cleanup] warn = true",
                    "keep (1)",
                    '[quality] signal = "task_custom" (bundled "task_ok")',
-                   "bundled policy defaults are newer",
-                   "pricing tables — delegated to `cage prices sync`"):
+                   "bundled policy defaults are newer"):
         if needle not in diff:
             raise Fail(f"policy diff missing {needle!r}")
     if expect_ok(repo, env, "policy", "diff") != diff:
@@ -978,8 +612,7 @@ def s16_policy_sync(base: Path) -> str:
         raise Fail("doctor missing the policy-version recommendation")
 
     # 2. behavior-neutrality: --apply changes no derived view by one byte
-    views = [("report",), ("report", "--by", "model"), ("insights", "attrib"),
-             ("insights", "budget"), ("task", "quality")]
+    views = [("insights", "chats"), ("insights", "graphify"), ("insights", "commits")]
     before = [expect_ok(repo, env, *v) for v in views]
     applied = expect_ok(repo, env, "policy", "sync", "--apply")
     for needle in ("✔ [capture] import_before_export = true added",
@@ -1041,9 +674,12 @@ def s17_sources(base: Path) -> str:
     if not rows or any(r["agent"] != "myrouter" for r in rows):
         raise Fail(f"custom-tool rows not stamped agent=myrouter: "
                    f"{sorted({r['agent'] for r in rows})}")
-    rep = expect_ok(repo, env, "report", "--by", "agent")
-    if "myrouter" not in rep:
-        raise Fail(f"report --by agent does not split out the custom tool: {rep[:200]!r}")
+    # `report --by agent` was the read side of this assertion and is gone (SURFACE-CUT).
+    # The recorded fact — a custom source's rows carry its own agent name — is asserted
+    # against the rows above; `insights chats` is the surviving view that must render it.
+    chats = expect_ok(repo, env, "insights", "chats")
+    if "myrouter" not in chats:
+        raise Fail(f"insights chats does not show the custom tool: {chats[:300]!r}")
 
     paths_out = expect_ok(repo, env, "doctor", "--paths")
     for needle in ("myrouter  (custom tool, format=claude)", "[policy]",
@@ -1055,7 +691,7 @@ def s17_sources(base: Path) -> str:
 
     expect_ok(repo, env, "query", "sources")   # concept entry renders
     assert_pii_clean(repo)
-    return ("custom tool → rows agent=myrouter · report --by agent splits it · "
+    return ("custom tool → rows agent=myrouter · insights chats shows it · "
             "doctor --paths shows [policy] + custom section + rejected glob · "
             "no false portability warn (uncommitted)")
 
@@ -1112,8 +748,12 @@ def s18_stale_wiring(base: Path) -> str:
             raise Fail("re-running setup did not strip the dead cage hook")
         raise Fail("cage reduced settings.json to nothing of anyone's but left the "
                    f"file behind — an empty settings file is a diff with no meaning:\n{body}")
+    # The refreshed shim must probe the verb the CLI actually has. `cage data graphify`
+    # (what this line pinned) was deleted by SURFACE-CUT and the interceptor was restored
+    # in v0.51 as `cage interceptor graphify` — pinning the dead spelling asserted the
+    # opposite of the invariant, since a shim naming it is precisely what "stale" means.
     shim = (bin_dir / "graphify").read_text(encoding="utf-8")
-    if "cage data graphify" not in shim:
+    if "cage interceptor graphify" not in shim:
         raise Fail("re-running setup did not refresh the stale graphify interceptor")
 
     doc2 = cage(repo, env, "doctor").stdout
@@ -1134,28 +774,29 @@ def s18_stale_wiring(base: Path) -> str:
 
 
 # id → (phase that ships it, callable or None-if-pending)
+# **Retired, and never to be re-added under the same id** (the S9/S10 precedent — S10 went
+# with the human axis, S9 with the fleet study): S5 `insights compare` · S6 `insights
+# estimate`/`calibration` · S7 `insights verdict` · S11/S14/S15 the whole `prices` surface
+# and the receipt-pricing ladder. Their subject matter was deleted by SURFACE-CUT (v0.50)
+# and ADR 0011's money cull, so there is nothing left for them to assert — they are gone
+# rather than rewritten, because a scenario retargeted at a different question is a new
+# scenario wearing an old id.
 SCENARIOS: dict[str, tuple[str, object]] = {
     "S1": ("P0", s1_cli),
     "S2": ("P0", s2_vscode),
     "S3": ("P1", s3_broken_setups),
     "S4": ("P1", s4_bundle),
-    "S5": ("P2", s5_compare),
-    "S6": ("P3", s6_estimate),
-    "S7": ("P4", s7_verdict),
     "S8": ("P0", s8_determinism),
-    "S11": ("pricing", s11_prices),
     "S12": ("restricted", s12_launcher),
     "S13": ("restricted", s13_pyz),
-    "S14": ("pricing", s14_receipt_ladder),
-    "S15": ("pricing", s15_freshness),
-    "S16": ("pricing", s16_policy_sync),
+    "S16": ("policy", s16_policy_sync),
     "S17": ("sources", s17_sources),
     "S18": ("stale-wiring", s18_stale_wiring),
 }
 
 MANUAL_CHECKLIST = """\
 MANUAL steps (need a live agent — capture is pull-based, so a `cage import` is the trigger):
-  [ ] per agent: one real prompt → `cage import` then `cage report` shows the row
+  [ ] per agent: one real prompt → `cage import` then `cage insights chats` shows the row
   [ ] same prompt, import twice → deduped, no double count (cursor + id-dedupe)
   [ ] per VS Code extension: one real prompt → row appears after `cage import`\
 """

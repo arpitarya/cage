@@ -152,11 +152,24 @@ def _cage(args: str, *, cwd: Path, env: dict, check: bool = True):
 
 
 def _savings_rows(project: Path) -> list[dict]:
+    """Every savings row, from **both** homes — P4 (v0.51) lifted savings out of
+    `ledger/savings/<tool>/` into `ledger/<tool>/`, and the migration law is *stop writing
+    here, start writing there, read both forever*. Reading only the old tree made this
+    module blind to every row cage now writes: the interceptor filed its receipt exactly
+    as designed and the check reported it had never reached cage, which reads as the F1
+    regression it exists to detect."""
+    ledger = project / ".cage" / "ledger"
+    roots = [ledger / "savings"]                      # pre-P4
+    roots += [d for d in sorted(ledger.glob("*")) if d.is_dir() and d.name != "savings"]
     out = []
-    for p in sorted((project / ".cage" / "ledger" / "savings").rglob("*.jsonl")):
-        for line in p.read_text(encoding="utf-8").splitlines():
-            if line.strip():
-                out.append(json.loads(line))
+    for root in roots:
+        if not root.is_dir():
+            continue
+        for p in sorted(root.rglob("savings*.jsonl")) if root.name != "savings" \
+                else sorted(root.rglob("*.jsonl")):
+            for line in p.read_text(encoding="utf-8").splitlines():
+                if line.strip():
+                    out.append(json.loads(line))
     return out
 
 
@@ -258,8 +271,18 @@ def check_a_killed_shim_reports_dead(project: Path, env: dict) -> str:
     shim_env = _env(Path(env["HOME"]).parent, project, on_path=project / "bin")
     shim = project / "bin" / ("graphify.cmd" if os.name == "nt" else "graphify")
     original = shim.read_bytes()
-    shim.write_bytes(original.replace(b"cage data graphify --help",
-                                      b"cage graphify --help"))
+    # Kill the shim by pointing its capability probe at a verb the CLI does not have.
+    # The source spelling must be the LIVE one: this replaced `cage data graphify --help`,
+    # deleted by SURFACE-CUT and restored as `cage interceptor graphify` in v0.51, so the
+    # replace silently matched nothing and the "killed" shim was the healthy one — the
+    # check then demanded doctor fail on a working install. A no-op edit here makes this
+    # whole check assert the opposite of its name, so it is verified, not assumed.
+    killed = original.replace(b"cage interceptor graphify --help", b"cage graphify --help")
+    if killed == original:
+        raise Fail("could not kill the shim: its live capability probe "
+                   "(`cage interceptor graphify --help`) was not found — this check "
+                   "would have tested a healthy shim")
+    shim.write_bytes(killed)
     try:
         res = json.loads(_cage("doctor --json", cwd=project, env=shim_env,
                                check=False).stdout)
@@ -278,26 +301,30 @@ def check_derivation_is_deterministic(project: Path, env: dict) -> str:
     """Same ledger + same policy ⇒ same table, twice. And the present leg must add
     **only** savings rows: graphify files receipts, never calls, so the calls table stays
     byte-identical to an absent leg's."""
-    a = _cage("report --no-import --csv", cwd=project, env=env, check=False)
-    b = _cage("report --no-import --csv", cwd=project, env=env, check=False)
+    # `cage report` was this check's view and is gone (SURFACE-CUT v0.50); `insights
+    # graphify` is the surviving one — and the better fit, since it is the view that
+    # actually renders what this leg produces.
+    view = "insights graphify --no-import --csv"
+    a = _cage(view, cwd=project, env=env, check=False)
+    b = _cage(view, cwd=project, env=env, check=False)
     # Both runs must have SUCCEEDED and PRODUCED something before their equality means
     # anything. With `check=False` and only `a.stdout != b.stdout` to go on, two crashed
     # runs compared `"" == ""` and the check reported determinism it had never observed —
     # the same vacuous-green class as the undersized corpus this module exists to prevent.
     for label, r in (("first", a), ("second", b)):
         if r.returncode != 0:
-            raise Fail(f"the {label} `cage report --csv` run exited {r.returncode} — "
+            raise Fail(f"the {label} `cage {view}` run exited {r.returncode} — "
                        f"determinism was never actually compared\n{r.stderr}")
         if not r.stdout.strip():
-            raise Fail(f"the {label} `cage report --csv` run printed nothing — "
+            raise Fail(f"the {label} `cage {view}` run printed nothing — "
                        "two empty outputs are equal for the wrong reason")
     if a.stdout != b.stdout:
-        raise Fail("two `cage report --csv` runs over one ledger disagree")
+        raise Fail(f"two `cage {view}` runs over one ledger disagree")
     calls = project / ".cage" / "ledger"
     stray = [p.name for p in calls.glob("calls*.jsonl")]
     if stray:
         raise Fail(f"the graphify leg produced call rows, not just savings: {stray}")
-    return "report reproducible; savings-only, no call rows"
+    return "insights graphify reproducible; savings-only, no call rows"
 
 
 CHECKS = (

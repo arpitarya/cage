@@ -3,9 +3,7 @@
 Every item sits under its owning ADR ([ownership map](../docs/adr/README.md)) — an item
 with no record is a decision with nothing to hold it. **Needs Arpit:**
 CONTINUOUS-CAPTURE · COVERAGE-STRIKE-2 · two hands-only probes (GFX-IDE-PATH-UNPROBED ·
-COPILOT-JETBRAINS-UNPROBED). **Agent-closable now:** DUMMYREPO-STALE-VERBS — GitHub
-Actions CI is red on every OS/Python cell; S13 alone is fixed (unblocks future releases'
-`cage.pyz`), the rest is mechanical per-scenario verb swaps.
+COPILOT-JETBRAINS-UNPROBED).
 
 ## [ADR-LAWS](../docs/adr/0001_laws.md) — substrate
 
@@ -43,30 +41,6 @@ Actions CI is red on every OS/Python cell; S13 alone is fixed (unblocks future r
   two examples were shipped missing a required positional and would have failed (they
   were `study start`/`study join`, both since removed with the fleet study — the *gap*
   is unchanged). A real parse-check is a separate gate to build, not a docs edit.
-- **DUMMYREPO-STALE-VERBS** — `tools/dummyrepo/run.py`, the CI-only scenario runner
-  (`python -m tools.dummyrepo`, no `pytest` coverage — `just test` never exercises it),
-  is loaded with calls to verbs SURFACE-CUT (v0.50) and the money removal (v0.51) deleted:
-  `report` · `insights compare/estimate/verdict` · `prices *`. **Confirmed on real GitHub
-  Actions 2026-08-15** — the v0.51.0 release push was the first time any post-SURFACE-CUT
-  commit actually ran there (the branch sat 40+ commits ahead of `origin/main`,
-  unpushed). Every `build` matrix cell (3 OS × 4 Python) and the `graphify present` leg
-  went red; the release's `smoke-pyz` chain went red too, so **v0.51.0 shipped to PyPI
-  with no `cage.pyz` asset attached** (S13 alone was fixed same-day, unblocking future
-  releases — commit message names it; this release itself won't retroactively gain the
-  asset, since a tag doesn't move and the pyz is CI-built-only by rule). Failing
-  scenarios and their symptom: **S1/S2** (`imported rows != fixture expectation`, 0 vs
-  4/2 rows — needs its own root-cause, may not be verb-staleness) · **S3**
-  (`StopIteration`) · **S5** (`insights compare` gone) · **S6** (`insights estimate`
-  gone) · **S7** (`insights verdict` gone) · **S8/S17** (`report` gone) · **S11/S14**
-  (`prices` gone) · **S15** (`Invalid isoformat string: 'None'`, seeding bug) · **S16**
-  (policy diff expects a pricing-tables line that no longer exists) · **S18** (setup
-  re-run doesn't refresh a stale graphify interceptor — may be a real regression, not
-  just staleness). The `graphify present` leg's determinism check also calls
-  `cage report --csv`. **Also seen, likely unrelated:** a Windows-only pytest failure,
-  `tests/test_win_graphify_shim.py::test_posix_twin_is_pinned_to_lf_in_the_working_tree`
-  ("the POSIX twin is unpinned: {}") — worth a look but not triaged here. Fix is
-  mechanical per scenario (swap the dead verb for a surviving read view, per the S13
-  pattern) except where noted above as a possible real bug.
 
 ## [ADR-COPILOT](../docs/adr/0004_copilot.md)
 
@@ -119,15 +93,17 @@ Actions CI is red on every OS/Python cell; S13 alone is fixed (unblocks future r
   `‡ UNPROBED` on this account alone. Run one graphify query from a real IDE terminal (VS Code
   / Kiro / JetBrains) and check whether a receipt files. Pair with COPILOT-JETBRAINS-UNPROBED
   (ADR-COPILOT) — same class of probe, same machine visit could do both.
-- **GFX-RECEIPTS-REAUDIT** — residual of the now-closed DOGFOOD-SHIM-STALE. `bin/graphify` /
-  `bin/graphify.cmd` had drifted to the SURFACE-CUT-deleted data-group verb (last touched
-  `b30e20e`), so every graphify run inside this repo fell through **unmetered** — a live
-  candidate explanation for the zero-real-receipts finding in
-  [regression/2026-07-22-finding-receipts-empty.md](regression/2026-07-22-finding-receipts-empty.md).
-  Verified 2026-08-15: both shims now match `cage/data/shims/graphify{,.cmd}` byte-for-byte
-  and are committed (`15cfbb4`), `cage doctor` reports `✔ wiring`. Re-run that audit to confirm
-  real receipts file now that the metering gap is closed — the old zero is no longer trustworthy
-  either way.
+- **GFX-RECEIPTS-REAUDIT** — narrowed to the real ledger only, 2026-08-15. The end-to-end
+  path is now **measured working**: `tools/cigraphify`'s `intercept` check drives a bare
+  `graphify query` through the shim on a real PATH and files **1 savings row, ~2,562
+  tokens gross** (7/7 checks, macOS local). It had reported the opposite for two releases
+  because the *checker* read the pre-P4 `ledger/savings/`, which P4 (v0.51) emptied — the
+  receipt was always being written to `ledger/graphify/`. So neither the shim nor the
+  interceptor is a candidate explanation for
+  [regression/2026-07-22-finding-receipts-empty.md](regression/2026-07-22-finding-receipts-empty.md)
+  any more. **What remains** is re-auditing this repo's own `~/.cage` for real receipts —
+  the old zero is untrustworthy in both directions, and a CI sandbox passing does not
+  establish that day-to-day runs here are metered.
 
 ## [ADR-CONFIG](../docs/adr/0012_config.md) — `cage.toml`
 
