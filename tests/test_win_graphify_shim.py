@@ -35,7 +35,19 @@ windows_only = pytest.mark.skipif(os.name != "nt", reason="cmd.exe — Windows h
 # B3's marker set. The single source of truth for "is this a cage interceptor", carried
 # in three places that must move together: sh `grep -Eq`, cmd `findstr /C:`, and
 # `pathshim._INTERCEPTOR`.
-MARKERS = ("cage data graphify", "cage graphify", "graphify metering interceptor")
+#
+# **The set only ever GROWS** (PG, v0.51). Every entry below a retired spelling is still
+# installed on real disks; if it stops being recognised, a fresh twin can select an old
+# twin as the real binary and B3's anti-recursion proof is holed for exactly the machines
+# that never get healed. `test_the_marker_set_never_shrinks` pins that as a rule.
+MARKERS = ("cage interceptor graphify",       # current (PG, v0.51)
+           "cage data graphify",              # SURFACE-CUT era (v0.28–v0.50)
+           "cage graphify",                   # pre-tiering `cage adopt` era
+           "graphify metering interceptor")   # the header comment, verb-independent
+
+# The verb path both twins probe and invoke today (B5). One tuple, so a future rename
+# updates the contract in one place rather than in five assertions.
+LIVE_VERB = ("interceptor", "graphify")
 
 
 # ── contract: the twins agree (every OS) ────────────────────────────────────────
@@ -58,7 +70,7 @@ def test_every_twin_names_only_live_verbs(shim):
     """B5, and the F1 detector applied to both copies. A dead verb here means the
     capability probe fails and graphify runs unmetered and silently."""
     verbs = wiringscan.verbs_in_shell(shim.read_text(encoding="utf-8"))
-    assert ("data", "graphify") in verbs
+    assert LIVE_VERB in verbs
     assert [v for v in verbs if not wiringscan.is_live_verb(v)] == []
 
 
@@ -69,7 +81,20 @@ def test_the_three_marker_copies_cover_the_same_set():
         assert pathshim._INTERCEPTOR.search(marker), marker
         assert f'/C:"{marker}"' in CMD.read_text(encoding="utf-8"), marker
     sh_text = SH.read_text(encoding="utf-8")
-    assert "cage (data )?graphify|graphify metering interceptor" in sh_text
+    assert "cage (data |interceptor )?graphify|graphify metering interceptor" in sh_text
+
+
+def test_the_marker_set_never_shrinks():
+    """PG's own rule, as a gate: **every retired spelling stays matchable, forever.**
+
+    `MARKERS` above is allowed to grow and never to lose an entry, so this asserts the
+    *retired* ones by literal — a future edit that "tidies" an old verb out of the
+    alternation reddens here instead of silently un-holing the recursion proof against
+    shims already installed on machines that will never be healed."""
+    for retired in ("cage data graphify", "cage graphify"):
+        assert retired in MARKERS, retired
+        assert pathshim._INTERCEPTOR.search(retired), retired
+        assert f'/C:"{retired}"' in CMD.read_text(encoding="utf-8"), retired
 
 
 def test_the_twins_can_never_select_each_other():
@@ -97,7 +122,7 @@ def test_cmd_twin_disables_delayed_expansion_before_forwarding_args():
     assert "enabledelayedexpansion" in text.lower()          # the walk turns it on...
     assert "disabledelayedexpansion" in text.lower()         # ...and turns it back off
     disable_at = text.lower().index("disabledelayedexpansion")
-    for marker in ('call cage data graphify -- "%_cage_gf_real%" %*',
+    for marker in ('call cage interceptor graphify -- "%_cage_gf_real%" %*',
                   'call "%_cage_gf_real%" %*'):
         assert text.lower().index(marker) > disable_at, marker
 

@@ -10,8 +10,9 @@ All three agents now persist a usage log to disk, so the hookless path is an on-
 - **claude / copilot** — `~/.claude/projects/**/*.jsonl`,
   `~/.copilot/session-state/*/events.jsonl`.
 - **kiro** — `kiro.kiroagent/dev_data/tokens_generated.jsonl` (coarse: prompt tokens are
-  reliable, output tokens often 0, model frequently the generic `"agent"`). The proxy
-  (`cage data meter -- <cmd>`) stays the higher-fidelity fallback when Kiro's log is too thin.
+  reliable, output tokens often 0, model frequently the generic `"agent"`). **There is no
+  higher-fidelity fallback any more** — the metering proxy that was one went with the `data`
+  group in v0.50 (SURFACE-CUT); a thin Kiro log is now a stated limit, not a routable one.
 
 This is the ONLY capture path (capture is pull-based; MCP is the wired *read* surface).
 It dedupes by call id (`ledger.append_new`), so a call seen by two racing imports (or an
@@ -965,8 +966,14 @@ _ADAPTERS = {"claude": import_claude, "copilot": import_copilot, "kiro": import_
 
 
 def proxy_line(agent: str) -> str:
-    """The supported hookless path for an agent that writes no usage transcript."""
-    return f"· {agent}: no on-disk usage log — meter via the proxy: cage data meter -- <cmd>"
+    """What cage can say about an agent that writes no usage transcript.
+
+    It used to name a remedy — `cage data meter -- <cmd>`, the metering proxy. SURFACE-CUT
+    (v0.50) deleted that command **and** `proxy.py`/`metercmd.py` with it, so the line went
+    on prescribing a fix that could not be run: the F1 class in prose, printed on stdout.
+    A stated absence is worth more than a false remedy, so this now says what is true."""
+    return (f"· {agent}: no on-disk usage log — cage cannot capture this surface "
+            "(the metering proxy that was the fallback went in v0.50)")
 
 
 def run_agent(root: Path, agent: str, args, *, pol: dict | None = None,

@@ -49,7 +49,7 @@ from cage import cfgio, paths, verbmap
 _GIT_HOOK_MARKER = "# cage-managed-hook"
 
 # `cage <verb>` inside a shell script (the graphify interceptor) — this is what finds
-# the `cage data graphify --help` capability probe that gates the whole shim.
+# the `cage interceptor graphify --help` capability probe that gates the whole shim.
 _SHELL_CAGE = re.compile(r"(?:^|[\s|&;(])cage\s+([a-z][a-z0-9-]*(?:\s+[a-z][a-z0-9-]*)?)")
 # A `#` at start-of-line or after whitespace opens a shell comment. Comments MUST be
 # stripped before the verb scan: the shim's own prose ("# cage absent → identical,

@@ -1,6 +1,7 @@
 ---
 adr: coverage — what cage can and cannot say, per agent × surface
-status: current as of 2026-08-14 · six surfaces mapped · five gap tables, one owner each · kiro-IDE is the floor
+status: current as of 2026-08-14 · six surfaces mapped · five gap tables, one owner each · kiro-IDE is the floor ·
+  the interceptor row is LIVE again as of v0.51 (dead 2026-08-12 → 2026-08-14; the window is recorded, not erased)
 audience: §1 humans (skim) · §2 agents (build)
 update-rule: ANY change to what a surface can capture — a new store, a vendor field appearing or disappearing, a gap opening or closing — updates the matrix in §1 AND the owning gap table named in §2, in the same change, and bumps its DOC-REGISTRY row
 ---
@@ -14,7 +15,10 @@ equivalent, and every gap between them is *stated at the point you would otherwi
 number* — never rounded to zero, never quietly omitted.
 
 Read the matrix as: **✅** works · **⚠️** works with a stated limit · **❌** structurally
-cannot, and cage says whose limitation it is.
+cannot, and cage says whose limitation it is. One row carries a fourth mark — **⛔** *live in code,
+dead in fact*: a route that is built, tested and installed and still captures nothing, because cage
+broke it. It is defined and dated under *Graphify capture, route by route* below. A ⛔ is the only
+mark here that cage itself is expected to clear.
 
 ### The flow
 
@@ -67,8 +71,61 @@ flowchart LR
 |---|---|---|---|---|---|---|
 | Authorship (agent vs human) | ✅ | ✅ | ❌ stores keep prompts, not edit text | ❌ | ❌ token counts only | ❌ |
 | Tool savings, from the store | ✅ | ✅ | ✅ | ✅ | ⚠️ output capped — a long answer files **nothing** | ❌ persists no assistant output |
-| Tool savings, via the interceptor | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ *the only route here* |
+| Tool savings, via the interceptor | ✅ † | ✅ †‡ | ✅ † | ✅ †‡ | ✅ † | ✅ †‡ *the only route here* |
 | Chat title | ✅ | ✅ | ❌ honest empty | ✅ | ❌ honest empty | ❌ |
+
+**Graphify capture, route by route** — the *Tool savings* rows above, opened up. graphify is the one
+thing cage meters that is not an agent, it can be seen from four directions, and those directions do
+**not** degrade together. ADR-GRAPHIFY owns each route's mechanism; this table owns only what each
+surface can be *said* to yield.
+
+| | claude CLI | claude IDE | copilot CLI | copilot IDE | kiro CLI | kiro IDE |
+|---|---|---|---|---|---|---|
+| Query receipt, from the store | ✅ | ✅ *same store* | ✅ | ✅ | ⚠️ stdout capped ~2000 tok — a long answer files **nothing** | ❌ no assistant output persisted |
+| Report-read receipt, from the store | ✅ | ✅ | ✅ | ✅ | ✅ `fs_read` — the cap cannot reach it | ❌ |
+| Either, via the PATH interceptor | ✅ † | ✅ †‡ | ✅ † | ✅ †‡ | ✅ † | ✅ †‡ |
+| Per-chat attribution of a store row | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| Per-chat attribution of an interceptor row | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+
+**† Invocation-gated, and that is a real limit, not a formality.** The interceptor files a receipt
+only when graphify is invoked as a bare `graphify` **through a shell whose PATH carries the
+project's `bin/`**. It is a route, never a guarantee — which is exactly why the four store routes
+above exist to catch what it misses.
+
+**‡ UNPROBED for the three IDE surfaces (2026-08-14).** That an IDE-spawned terminal inherits the
+project's `bin/` on PATH was **never measured**; Arpit chose to skip the probe. This repo's law is
+that a gap is closed by a probe and never by an argument, so these three cells are an **assumption
+marked as one** — nothing in this record or anywhere else may state IDE interceptor coverage as
+measured. The check is one command: run `graphify query …` in a Kiro IDE terminal and see whether a
+receipt lands. **If it does not, kiro-IDE has no capture route at all.**
+
+**The window this row was dead, recorded rather than erased.** From **2026-08-12** (`cb4a4a6`,
+SURFACE-CUT) to **2026-08-14** (v0.51, PG) the interceptor route captured **nothing on any surface**:
+the shims went on probing `cage data graphify`, a verb deleted with the whole `data` group, so every
+call fell through to the unmetered binary and kiro-IDE filed nothing at all. `cage doctor` FAILed
+correctly throughout; its fix hint named a refresh that reproduced the same dead verb. Restored as
+`cage interceptor graphify`. This paragraph is not history-keeping for its own sake — a silently
+re-ticked cell would say the route always worked, and any savings number for that window is a
+genuine undercount.
+
+Two consequences the per-cell marks do not carry on their own:
+
+- **kiro-IDE currently files nothing at all.** Its store cannot size a counterfactual and its only
+  other route is ⛔. While that mark stands, kiro-IDE has no graphify capture whatsoever.
+- **An interceptor row is never attributable to a chat — by law, not by gap.** The shim runs as a
+  subprocess with no session env var, so it stamps `session=""`, an honest absence (ADR-GRAPHIFY,
+  invariant). Those rows land in `cage insights graphify`'s *unassignable* bucket and are footnoted
+  there. This is the one place in this record where a ❌ is a **deliberate refusal to fabricate**
+  rather than a missing capability, and it must never be closed by inferring the session from
+  timestamp proximity.
+
+**Whose limitation each graphify gap is** — the §1 rule, applied:
+
+- **Vendor's, might change:** kiro-CLI's ~2000-token stdout cap; kiro-IDE persisting no assistant
+  output. Both watched, neither worked around.
+- **Cage's, and named as such:** every ⛔. The only cage-owned gap in the graphify picture, and
+  naming it as cage's is the point — a reader must not mistake it for a vendor limit.
+- **A deliberate refusal, not a gap:** the interceptor row's absent per-chat attribution.
 
 **Operational state**
 
@@ -203,6 +260,9 @@ Every cell traces to a dated probe or a measurement, not an assumption:
 | kiro-CLI truncation is real, not theoretical | 23 `truncat` hits across 1,132 real parts were all the command's own output — the guard keys on a missing output carrier or a non-zero exit instead |
 | authorship match rate is bounded by how people edit | 44.3% repo-wide; repeated edits to one file commit only the final state |
 | a single human bucket misleads | 76.6% `human~` on cage's own repo, 89% of it one commit of generated JSON |
+| the interceptor route was dead on every surface, 2026-08-12 → 2026-08-14 | its shims probed `cage data graphify`, deleted in `cb4a4a6`; verified against the live parser (2026-08-14), fixed the same day |
+| the new verb did not match the marker regex until the set was grown | `pathshim._INTERCEPTOR` evaluated directly before the change — the B3 marker set **grew**, and no retired spelling was removed (2026-08-14) |
+| both twins still self-identify mid-migration | both carry `graphify metering interceptor` in their headers, so old↔new shims still skip each other (2026-08-14) |
 | claude's two readers disagree by exactly 2× | 43,973 rows vs 21,955 folded requests over the full matched window |
 
 ### Veto condition (when to revisit)
@@ -248,6 +308,16 @@ alone. A veto you cannot compute is aspirational — this one is, for now.
   a tick, and the reason is the valuable half. **Threshold to revisit: a sixth gap table
   appears, or this record is found stale twice.** The second occurrence makes it a gate,
   per the two-strikes rule.
+  **⚠️ STRIKE 1 — 2026-08-14.** This record shipped asserting *Tool savings, via the
+  interceptor* ✅ on all six surfaces on the same day the verb behind that route was
+  deleted, and the drift was caught by a reading session rather than by anything in the
+  repo. That is exactly the failure this item was parked against.
+  **The cheap partial was taken instead of the generator (v0.51):**
+  `tests/test_formulas_coverage.py` re-derives `docs/FORMULAS.md` §2.7's matrix from
+  `graphifytx.GRAPHIFY_COVERAGE` — surfaces and ✅/❌ verdicts, never the prose reasons,
+  which is the half worth keeping hand-written. **It does not yet cover the two tables in
+  THIS record**, which still rely on review; extending it here is the obvious next step
+  and is filed as such. The full generator stays not-taken on its original threshold.
 - **A `cage coverage` command.** Not taken — the surface was just cut back hard, and this
   is reference material, not an operational read. **Threshold: a user asks "can cage even
   see X?" in a way `cage doctor` cannot already answer.**

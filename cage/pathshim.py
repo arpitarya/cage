@@ -5,8 +5,8 @@ graphify interceptor, because the interceptor is a **PATH** mechanism: the one t
 is whichever `graphify` the shell resolves first, and it can live in a *different
 project's* `bin/` — outside every root cage scans. That gap is not hypothetical. On a
 real machine an adopt-era shim in another repo won on PATH, probed the pre-rename
-pre-rename bare `graphify` verb (now `cage data graphify`), failed its own capability
-guard, fell through to `exec "$REAL"`,
+bare `graphify` verb (the door is now `cage interceptor graphify`), failed its own
+capability guard, fell through to `exec "$REAL"`,
 and ran graphify **unmetered and silently** for nine days while `cage doctor`, run
 inside cage, reported ✅ (the finding was filed 2026-07-30 as OPEN-WORK §B2; the queue is
 now an index and that section is gone — the mechanism is `wiringscan.py` and
@@ -46,13 +46,19 @@ from typing import NamedTuple
 
 from cage import wiringscan
 
-# The shim's own predicate, in Python. `data/shims/graphify` carries the same expression
-# as a `grep -Eq` because it must stay zero-dep shell — an intentional duplicate of the
-# kind `CHARS_PER_TOKEN` already has in the third-party shims, and the two must be
-# changed together. It matches BOTH the current form (`cage data graphify`) and the
-# pre-rename adopt-era one (the bare `graphify` verb, or the header comment), so
-# a stale shim can never be misclassified as the real binary and quietly excused.
-_INTERCEPTOR = re.compile(r"cage (?:data )?graphify|graphify metering interceptor")
+# The shim's own predicate, in Python — the THIRD of three copies of one marker set
+# (`data/shims/graphify`'s `grep -Eq`, `graphify.cmd`'s two `findstr` lines, this regex).
+# The duplication is forced: the twins must stay zero-dep shell, the same intentional
+# duplicate `CHARS_PER_TOKEN` already has in the third-party shims. All three change
+# together (ADR-GRAPHIFY §2 B3).
+#
+# **The set only ever GROWS.** It matches the current form (`cage interceptor graphify`),
+# the SURFACE-CUT-era one (`cage data graphify`) and the pre-rename adopt-era one (the
+# bare `graphify` verb, or the header comment). Removing a retired spelling would let a
+# stale shim on a real disk be misclassified as the real binary — quietly excused here,
+# and selected as REAL by a fresh twin over there, which holes B3's anti-recursion proof.
+_INTERCEPTOR = re.compile(
+    r"cage (?:data |interceptor )?graphify|graphify metering interceptor")
 
 # A shim is a small shell script and its marker sits in the first ~2 KiB. Capping the
 # read keeps classifying a multi-megabyte real binary to one block, and keeps this a

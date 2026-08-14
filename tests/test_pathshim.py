@@ -27,7 +27,7 @@ pytestmark = posix_only
 
 # ── builders ────────────────────────────────────────────────────────────────────
 
-def _interceptor(path: Path, verb: str = "data graphify") -> Path:
+def _interceptor(path: Path, verb: str = "interceptor graphify") -> Path:
     """A cage interceptor probing ``cage <verb>`` — the current form by default, an
     adopt-era one when handed a dead verb."""
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -77,14 +77,15 @@ def test_live_when_the_winner_names_current_verbs(tmp_path, monkeypatch):
 
 
 def test_dead_when_the_winner_probes_a_renamed_verb(tmp_path, monkeypatch):
-    """The exact live failure: `cage graphify` was renamed to `cage data graphify`."""
+    """The exact live failure: an adopt-era shim still probing the bare `cage graphify`,
+    two renames behind the live `cage interceptor graphify`."""
     root = _managed(tmp_path / "proj")
     _interceptor(root / "bin" / "graphify", verb="graphify")
     _path(monkeypatch, root / "bin")
     ps = pathshim.classify(root)
     assert ps.state == "dead"
     assert ps.verbs == ("graphify",)
-    assert ps.fix_tail == "data graphify"       # verbmap supplies the HINT only
+    assert ps.fix_tail == "interceptor graphify"   # verbmap supplies the HINT only
 
 
 def test_dead_when_the_verb_was_removed_outright(tmp_path, monkeypatch):
@@ -186,7 +187,7 @@ def test_setup_heals_a_dead_path_winner_in_another_cage_managed_root(tmp_path, m
 
     res = agents.install(here, ("claude",))
     assert res["graphify"]["path_shim"].startswith(f"refreshed {shim}")
-    assert "cage data graphify" in shim.read_text()
+    assert "cage interceptor graphify" in shim.read_text()
     assert pathshim.classify(here).state in ("live", "shadowed")
 
     before = shim.read_bytes()

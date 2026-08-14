@@ -225,9 +225,11 @@ def test_scan_reports_remediation_only_when_one_exists(homes):
     _plant_everything(homes)
     by_verb = {d.command: d for d in wiringscan.run(homes, assets=False).dead}
     assert by_verb["import-claude"].fix == "import --agent claude"
-    # `graphify` (the top-level spelling) now maps to an empty tail — the `data` group
-    # is gone, so there is no replacement to point at.
-    assert by_verb["graphify"].fix == ""
+    # `graphify` (the top-level, pre-tiering spelling) maps to a REAL tail again: the
+    # `data` group is still gone, but the interceptor door it fronted came back as
+    # `cage interceptor graphify` (PG, v0.51), so an artifact carrying the adopt-era
+    # spelling is healable rather than merely reportable.
+    assert by_verb["graphify"].fix == "interceptor graphify"
     # `adopt` was removed outright, never renamed (and is absent from verbmap.REMOVED —
     # the reason detection uses the parser). No replacement may ever be invented for it.
     assert wiringscan.remediation(("adopt",)) == ""
@@ -283,7 +285,7 @@ def test_graphify_shim_is_refreshed_then_left_alone(homes):
     assert adoptcmd.refresh_shim(homes) is True          # stale → rewritten
     assert adoptcmd.refresh_shim(homes) is False         # current → untouched
     body = (homes / "bin" / "graphify").read_text(encoding="utf-8")
-    assert "cage data graphify" in body and "cage graphify " not in body
+    assert "cage interceptor graphify" in body and "cage graphify " not in body
 
 
 def test_refresh_never_creates_a_shim(homes):

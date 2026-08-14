@@ -12,6 +12,7 @@ groups (run any group name for its commands):
   authorship  origin · summary · verify · notes-sync
   study       join · start · stop · report · export · id
   policy      diff · sync
+  interceptor graphify
 
 $ cage import                     # pull every agent's usage into the ledger
 $ cage insights chats            # which conversation used the tokens?

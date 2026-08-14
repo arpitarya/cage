@@ -148,8 +148,19 @@ saved           = raw_alternative − actual        (filed only when > 0; else n
 - **claude + copilot CLI** (F1, 2026-07-29): both carry command + result, and both route
   through the same `_file_query` (shared counterfactual/id/deferral, ADR 0005 — dedupe and
   the two acceptance tests hold for copilot too, `cage/graphifytx.py:detect_and_file_copilot`).
-  Copilot **VS Code** is usage-row-only (F2: its `chatSessions` log has the command but not
-  the result, so no counterfactual). **Kiro is HONEST-LIMIT** (no tool bodies in the log).
+- **FOUR of five store surfaces file receipts, and the fifth says why not.** The single
+  source of truth is `graphifytx.GRAPHIFY_COVERAGE`, and
+  `tests/test_formulas_coverage.py` re-derives this list from it — the two-strikes gate for
+  a drift review caught twice (this paragraph called copilot-VS-Code *usage-row-only* and
+  kiro *HONEST-LIMIT* for three releases after both routes shipped in **v0.47.0**):
+
+  | agent / surface | files receipts? | why |
+  |---|---|---|
+  | claude cli+vscode | ✅ | transcript Bash `tool_use` paired with its `tool_result` (one store, both surfaces) |
+  | copilot cli | ✅ | `events.jsonl` `tool.execution_start`/`complete`, paired by `toolCallId` |
+  | copilot vscode | ✅ | `chatSessions` `run_in_terminal` — `commandLine.original` + `cwd.path` + output |
+  | kiro cli | ✅ | `conversations_v2` `execute_bash` — but a >~2000-token answer is truncated and correctly files **nothing** |
+  | kiro ide | ❌ | the store persists no assistant output at all (26/26 empty completions, probed 2026-08-07). The PATH interceptor is the only route here |
 
 ### 2.8 graphify report-read receipt — `modeled`, weaker (graphify-capture GC2)
 
@@ -189,7 +200,12 @@ args_hash/answer_hash are route-independent (binary spelling dropped, answer str
 
 ### 2.10 graphify forward model — `modeled` band/ceiling, never a measured total (GC5)
 
-[graphifymodel](../cage/graphifymodel.py), composed into `insights verdict graphify`:
+[graphifymodel](../cage/graphifymodel.py). ⚠️ **Nothing reads it.** Both consumers —
+`insights verdict graphify` and `cage report`'s ceiling footer — were deleted in v0.50
+(SURFACE-CUT); the module is reachable only from `tests/` and the explain registry. It is
+an UNREAD-FACTS item (GFX-MODEL-ORPHAN), kept because it is the only surface that ever
+answered *"what would graphify save me here"* with **no receipts on hand** — the day-one
+question, currently unanswerable by any command. The formula below is recorded, not live:
 
 ```
 (a) history band  = median + IQR of graphify receipts' GROSS saved tokens (refuses < MIN_ESTIMATE_N=5)
@@ -223,8 +239,9 @@ outcome}`, [usagelog](../cage/usagelog.py)). **Never priced, never read by a mon
 `args_hash` is a hash, never the query text (counts-never-content).
 
 **It is `sha1(argv[1:])` — the tail, `argv[0]` excluded — on every route.** The shim
-invoked the meter as `cage data graphify -- "$REAL" "$@"` (that verb was deleted in
-v0.50; the twins now fail their probe and pass through), so `argv[0]` is an absolute,
+invokes the meter as `cage interceptor graphify -- "$REAL" "$@"` (the verb was `cage data
+graphify` until v0.50 deleted it and v0.51 restored the door under the new spelling), so
+`argv[0]` is an absolute,
 machine-specific path; folding it in makes a key nothing else can reproduce. This is the
 same exclusion `graphifymeter.content_signature` documents (§2.10), and the reason the
 §2.12 attestation join read zero for nine days

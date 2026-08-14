@@ -5,7 +5,7 @@ The 0-real-receipts mystery (F1) had no way to tell *"graphify ran 47×, 3 recei
 44 unmeasurable"* from *"graphify never ran"* — a parse-miss files no receipt (right
 for savings, never fabricate), so real usage went invisible. This module fixes the
 observability half: **one row per graphify run** on every route (PATH/native shim,
-`cage data graphify`, transcript-detected at import), recording
+`cage interceptor graphify`, transcript-detected at import), recording
 ``ts · op · args_hash · exit · ms · outcome`` — never the query text.
 
 Discipline mirrors `capturelog.py` exactly:

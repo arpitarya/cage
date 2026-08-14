@@ -2,11 +2,14 @@
 
 ## In flight
 
-- **SURFACE-CUT is BUILT (2026-08-14), suite green except the shim** — 14 modules, 15
-  handlers, 12 test files and 16 goldens deleted; MCP cut 6 tools → 2. Outcome recorded
-  in [IMPLEMENTATION.md](IMPLEMENTATION.md); decision record in
-  [surface-cut.decision.md](archive/v0.50-surface-cut.decision.md). **15 tests remain red, all shim**
-  (see SHIM-DEAD-VERB below) — that was Arpit's explicit call, not an oversight.
+- **LEDGER-RESTRUCTURE is in flight (2026-08-14)** — nine phases, one shape per producer,
+  spec in [ledger-restructure.handoff.md](ledger-restructure.handoff.md). **PG shipped**
+  (see below); P0–P7 remain.
+- **SURFACE-CUT is BUILT (2026-08-14), suite green** — 14 modules, 15 handlers, 12 test
+  files and 16 goldens deleted; MCP cut 6 tools → 2. Outcome recorded in
+  [IMPLEMENTATION.md](IMPLEMENTATION.md); decision record in
+  [surface-cut.decision.md](archive/v0.50-surface-cut.decision.md). The 15 shim tests it
+  knowingly left red were closed by PG.
 
 ## Not mine — a concurrent session owns these
 
@@ -21,14 +24,35 @@
 
 ## Agent-closable
 
-- **SHIM-DEAD-VERB** — `bin/graphify` + `bin/graphify.cmd` probe `cage data graphify`,
-  deleted by SURFACE-CUT. **15 tests red** (`test_pathshim` ×8, `test_win_graphify_shim`
-  ×5, `test_wiringscan` ×1, `test_gf_launcher_arm2` ×1). No user breakage: contract B5
-  gates metering behind a capability probe and B6 requires passthrough, so an installed
-  shim fails the probe and `exec`s the real binary unmetered. Graphify savings still land
-  via the transcript/store routes at `cage import`. Arpit chose 2026-08-14 to leave the
-  subsystem untouched this build; closing it means either removing the interceptor
-  (9 modules + both twins + ADR-GRAPHIFY §2) or giving it a live verb to probe.
+- **GFX-MODEL-ORPHAN** — `graphifymodel` has no reader. `repo_ceiling` (the bounded
+  "worth installing here" band) and `history_band` are reachable only from `tests/` and the
+  explain registry; both consumers — `insights verdict graphify` and `cage report`'s ceiling
+  footer — were deleted. UNREAD-FACTS class, so the same decision applies: earn a read
+  surface or retire the module. Worth noting before retiring it: it is the **only** surface
+  that ever answered *"what would graphify save me here"* with no receipts on hand — the
+  day-one question, currently unanswerable by any command. **PG (2026-08-14) confirmed it
+  blocks nothing** and left the module untouched; `docs/FORMULAS.md` §2.10 now says out
+  loud that nothing reads it, so the orphan is at least no longer described as live.
+
+- **ADR-COVERAGE-GATE** — `tests/test_formulas_coverage.py` (v0.51) re-derives
+  `docs/FORMULAS.md` §2.7's graphify matrix from `graphifytx.GRAPHIFY_COVERAGE`, closing
+  ADR-COVERAGE's two-strikes trigger for that table. **It does not cover ADR-COVERAGE's own
+  two graphify tables**, which still rely on review alone — the same drift, one doc over.
+  Extending the same parse there is small; the full generator stays not-taken.
+
+- **GFX-IDE-PATH-UNPROBED** — hands-only, Arpit's machine, and it is the one assumption
+  this program records as an assumption. Interceptor coverage on the three **IDE** surfaces
+  assumes an IDE-spawned terminal inherits the project's `bin/` on PATH; that was never
+  measured (Arpit chose to skip the probe, 2026-08-14). ADR-COVERAGE marks those cells `‡`.
+  One command closes it: run `graphify query …` in a Kiro IDE terminal and see whether a
+  receipt lands. **If it does not, kiro-IDE has no capture route at all** and this
+  program's scope changes. Pair with GFX-COV-FIELD in one sitting.
+
+- **GFX-COV-FIELD** — hands-only, Arpit's machine: `cage import --rescan-graphify`, then
+  `cage query graphify-coverage`, then `cage insights graphify`. Expect near-zero (0 real
+  receipts at the 2026-07-22 audit; 0 graphify commands in 1,132 real VS Code terminal runs
+  probed 2026-08-07) — **and the two-day interceptor outage means any figure for
+  2026-08-12 → 08-14 is a known undercount**, not a measurement of adoption.
 
 - **UNREAD-FACTS** — SURFACE-CUT left **six recorded-but-unreadable facts**: capture still
   writes them and no view reads them. `route_key` reclaim (writer `savings.record`) ·

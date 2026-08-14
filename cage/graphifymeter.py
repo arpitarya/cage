@@ -1,7 +1,7 @@
-"""`cage data graphify -- graphify <args>` — meter a third-party tool without touching it.
+"""`cage interceptor graphify -- graphify <args>` — meter a third-party tool without touching it.
 
 graphify is read-only, so cage measures it the way it meters any tool it doesn't own
-(`cage data meter`, `cage import`): run it as a subprocess, pass stdout/stderr/exit
+(`cage import`): run it as a subprocess, pass stdout/stderr/exit
 through **unchanged**, and on the side parse the captured answer to file one
 token-saving receipt. A metering error never alters graphify's result (fail-open).
 
@@ -254,10 +254,10 @@ def _resolve_argv(cmd: list[str]) -> list[str]:
 def run(root: Path, argv: list[str], task: str = "") -> int:
     """Run `graphify <argv>` transparently; meter on the side. Returns its exit code."""
     cmd = list(argv)
-    if cmd and cmd[0] == "--":            # tolerate `cage data graphify -- graphify …`
+    if cmd and cmd[0] == "--":            # tolerate `cage interceptor graphify -- graphify …`
         cmd = cmd[1:]
     if not cmd:
-        print("usage: cage data graphify -- graphify <query|path|explain> …", file=sys.stderr)
+        print("usage: cage interceptor graphify -- graphify <query|path|explain> …", file=sys.stderr)
         return 2
     # Only a measured read verb can ever file a receipt — skip both snapshot reads
     # (each a full receipts-shard scan) for install/--help/unknown-verb runs.
@@ -266,7 +266,7 @@ def run(root: Path, argv: list[str], task: str = "") -> int:
     import time
     from cage import usagelog
     # **The tail, never argv[0]** (L1-FIELD Q3). The shim invokes us as
-    # `cage data graphify -- "$REAL" "$@"`, so `cmd[0]` is an *absolute, machine-specific*
+    # `cage interceptor graphify -- "$REAL" "$@"`, so `cmd[0]` is an *absolute, machine-specific*
     # path — folding it in produced a key nothing else could reproduce, and the exact
     # `args_hash` join in `cage insights adoption`'s attested table read zero for nine
     # days while both stores held rows for the same run. `content_signature` already
@@ -278,7 +278,7 @@ def run(root: Path, argv: list[str], task: str = "") -> int:
         proc = subprocess.run(_resolve_argv(cmd), capture_output=True, text=True,
                               env={**os.environ, "CAGE_GRAPHIFY_METERED": "1"})
     except (OSError, ValueError) as exc:
-        print(f"cage data graphify: could not run {cmd[0]!r}: {exc}", file=sys.stderr)
+        print(f"cage interceptor graphify: could not run {cmd[0]!r}: {exc}", file=sys.stderr)
         usagelog.record(root, op=op, args_hash=ah, exit=127,
                         ms=int((time.monotonic() - t0) * 1000), outcome="error",
                         route="shim")

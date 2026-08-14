@@ -1,6 +1,6 @@
 ---
 adr: graphify
-status: current as of 2026-08-14 · four capture routes live · savings in tokens, gross, never priced
+status: current as of 2026-08-14 · four capture routes live (the interceptor route was DEAD 2026-08-12 → 2026-08-14; see the note under Decision) · savings in tokens, gross, never priced
 audience: §1 humans (skim) · §2 agents (build)
 update-rule: ANY change to graphify capture (route · shim twin · receipt id · signature · contract behaviour) updates this doc in the same change, and bumps its DOC-REGISTRY row. THE INTERCEPTOR CONTRACT LIVES HERE — docs/shim-contract.md was absorbed and removed 2026-08-14
 ---
@@ -33,7 +33,7 @@ nine days and two wrong hypotheses to learn why one of them was needed.
 ```mermaid
 flowchart TD
     U["you run: graphify query …"] --> SH["bin/graphify shim<br/>(twin: .cmd on Windows)"]
-    SH -->|"cage can run"| M["metered: cage data graphify -- REAL …"]
+    SH -->|"cage can run"| M["metered: cage interceptor graphify -- REAL …"]
     SH -->|"cage cannot run"| R["real binary, unmetered<br/>output identical either way"]
     M --> RC1["receipt filed NOW<br/>session = '' (honest absence)"]
     subgraph later["later, at cage import"]
@@ -55,7 +55,7 @@ flowchart TD
         v
    bin/graphify shim  (twin: bin/graphify.cmd on Windows)
         |
-        |-- cage CAN run  --> metered:  cage data graphify -- <REAL> ...
+        |-- cage CAN run  --> metered:  cage interceptor graphify -- <REAL> ...
         |                        |
         |                        +--> receipt filed NOW, session = "" (honest absence)
         |
@@ -126,6 +126,27 @@ flowchart TD
 **The receipt id includes `session`; cross-route convergence is a content-key deferral,
 not id-collision; the shim stamps its session honest-empty; and the interceptor is a
 hand-paired twin installed on every OS against one written contract.**
+
+> **The verb the twins call is `cage interceptor graphify` (PG, v0.51), and it is
+> VISIBLE.** It replaces `cage data graphify`, which SURFACE-CUT deleted with the whole
+> `data` group on **2026-08-12** while leaving both twins probing it. For two days the
+> interceptor route captured **nothing** — on every OS, for every agent — and every `cage
+> setup` in that window installed a shim that could never meter; kiro-IDE, whose only
+> savings route is the interceptor, filed nothing at all. Restored **2026-08-14**.
+>
+> Three things that decision record, because each is a lesson rather than a rename:
+>
+> 1. **The group is `interceptor`, not `graphify`** — §2 designates this contract *"the
+>    template every future tool interceptor copies"*, so a second tool lands as a sibling
+>    leaf with no restructuring. A consequence of an existing decision, not a new one.
+> 2. **Visible, not `argparse.SUPPRESS`.** A verb a written artifact depends on is a
+>    contract; hiding it is what let its deletion read as removing a human command. The
+>    cost is an ADR-CLI row, a flag list and an example — cheap next to two days of silent
+>    capture loss.
+> 3. **Only machine doors moved.** `cage insights graphify`, the `query` explainers,
+>    doctor's five graphify checks and `import --rescan-graphify` stay where they are.
+>    Moving the doctor checks would have re-introduced F1 by reorganisation: **they are
+>    what caught this bug.**
 
 - **`id = "s_" + sha1(session | op | args_hash | answer_hash)`**
   (`graphifymeter.receipt_id`). Session-inclusive ⇒ the same query in two sessions is two
@@ -208,10 +229,17 @@ matched case-sensitively; any one of them means "this is a cage interceptor, nev
 it as the real binary":
 
 ```
-cage data graphify              # the current capability probe / invocation
+cage interceptor graphify       # the current capability probe / invocation
+cage data graphify              # the SURFACE-CUT era (v0.28 - v0.50)
 cage graphify                   # the pre-rename (adopt-era) form
 graphify metering interceptor   # the header self-identification
 ```
+
+**The marker set only ever GROWS — a retired spelling is never removed.** Every retired
+form is still installed on real disks and may never be healed. If one stops being
+recognised, a fresh twin can select an *old* twin as the real binary, and B3's
+anti-recursion proof is holed for exactly the machines that never get healed. Pinned by
+`tests/test_win_graphify_shim.py::test_the_marker_set_never_shrinks`.
 
 Every twin must carry at least one marker **in its own text**, so twins skip each other.
 Filename matching is forbidden: on Windows the real binary and the twin can share a name,
@@ -230,16 +258,18 @@ is *can cage run*, never *is there a `cage` command* — those differ more often
 look. Both arms failing ⇒ run the real binary unmetered.
 
 - **Arm 1 — the `cage` command.** Always tried first, so a standard install is unchanged
-  in behaviour and in latency: (1) a `cage` command resolves; (2) `cage data graphify
-  --help` exits 0 — the capability probe, which is what catches a renamed verb (the F1
-  root cause).
+  in behaviour and in latency: (1) a `cage` command resolves; (2) `cage interceptor
+  graphify --help` exits 0 — the capability probe, which is what catches a renamed verb
+  (the F1 root cause). **It caught this one, and doctor reported it correctly for two
+  days; what was missing was a fix hint that could actually fix it.**
 - **Arm 2 (B5b) — the interpreter.** Reached only when arm 1 misses. Same two-step shape,
   through `python3 -m cage` (sh) / `py -3` then `python` (cmd — divergence **D8**):
-  (3) the interpreter resolves; (4) `<interpreter> -m cage data graphify --help` exits 0.
+  (3) the interpreter resolves; (4) `<interpreter> -m cage interceptor graphify --help`
+  exits 0.
 
-The metered form is exactly `[<interpreter> -m ]cage data graphify -- <REAL> <args…>`.
-**B3's marker set needs no addition** — `cage data graphify` is still a substring of the
-arm-2 invocation, so twins still recognise and skip each other.
+The metered form is exactly `[<interpreter> -m ]cage interceptor graphify -- <REAL>
+<args…>`. **The arm-2 invocation needs no marker of its own** — it contains the arm-1
+verb as a substring, so twins still recognise and skip each other.
 
 *Why arm 2 exists (GF-LAUNCHER, verdict B accepted 2026-08-12):* `cage setup
 --python-launcher` (`cage query restricted-env`) removes the `cage` command **by design**, so under it neither twin
@@ -316,7 +346,7 @@ the "cage absent" assumption), and never nothing.
 | **D5** | `if exist` only — no execute-bit test | Windows has no execute bit | existence is the whole test |
 | **D6** | `%*` instead of `"$@"` | cmd has no argument array | quoting is preserved as *typed*, the closest available; this is why delayed expansion must be off (B7) at both lines that forward `%*` |
 | **D7** | the B4 message uses an ASCII hyphen where sh uses an em dash | a `.cmd` is read in the console's OEM codepage; an em dash renders as mojibake | one character of the shim's own diagnostic differs. graphify's own output is untouched. |
-| **D8** | arm 2 (B5b) says `py -3` then `python`, where sh says `python3` | `python3` is frequently absent on Windows; the launcher is `py -3`, with bare `python` as the fallback for a PATH install with no launcher | two probes instead of one, in that order. Neither resolving means the call was always going to be unmetered. **Permanent** — it cannot be collapsed without breaking one OS or the other |
+| **D8** | arm 2 (B5b) says `py -3` then `python`, where sh says `python3` (both spelling `-m cage interceptor graphify`) | `python3` is frequently absent on Windows; the launcher is `py -3`, with bare `python` as the fallback for a PATH install with no launcher | two probes instead of one, in that order. Neither resolving means the call was always going to be unmetered. **Permanent** — it cannot be collapsed without breaking one OS or the other |
 
 **Fail-open last resort (cmd only).** If the PATH walk finds nothing — a pathologically
 quoted PATH entry the batch tokenizer cannot split, or an empty `PATHEXT` — the twin asks

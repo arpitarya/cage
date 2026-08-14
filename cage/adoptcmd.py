@@ -9,7 +9,7 @@ ships in the `cage-flux` PyPI package:
      (e.g. `--claude`). With no surface flag, no agent is wired — that is a separate,
      explicit step (`cage setup --wire-only <agent>`). One ledger, many surfaces.
   3. graphify interceptor  — drop bin/graphify (routes `graphify query…` through
-     `cage data graphify`) and add bin/ to the shell rc PATH (unless --no-graphify).
+     `cage interceptor graphify`) and add bin/ to the shell rc PATH (unless --no-graphify).
 
 The interceptor ships as bundled package data — a **twin pair**, `data/shims/graphify`
 (POSIX sh) and `data/shims/graphify.cmd` (Windows), copied verbatim. Both are installed

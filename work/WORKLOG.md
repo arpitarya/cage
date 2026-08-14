@@ -12,6 +12,81 @@ by milestone) — the worklog is what *happened this session*.
 
 ---
 
+## 2026-08-14 — Cowork — graphify review after SURFACE-CUT: the interceptor route is dead, and the fork that leaves
+
+- **Asked:** re-review the graphify subsystem against the current tree (SURFACE-CUT,
+  ADR restructure, ledger-restructure in flight), read ADR-GRAPHIFY, and propose what to
+  do about the historical-graphify-usage question raised earlier in the same chat.
+- **Done:** review only, no product code. Filed
+  [compare/graphify-interceptor-verb.compare.md](compare/graphify-interceptor-verb.compare.md)
+  (fork + matrix + proposed verdict + reopen trigger), indexed it in compare/README, and
+  amended OPEN-WORK: SHIM-DEAD-VERB gains the two facts it was missing, plus two new items
+  (GFX-DOC-FALSE, GFX-MODEL-ORPHAN).
+- **The finding that changes the picture:** SHIM-DEAD-VERB is worse than the queue line
+  said. `cage setup` **still installs the dead twin** (`adoptcmd.run(graphify=True)` copies
+  package data verbatim), so a fresh scaffold today writes an artifact that can never meter
+  — damage accrues per install, not just on machines already scaffolded. And **doctor's fix
+  hint cannot fix it**: `_interceptor` correctly FAILs (the F1 lesson held — detection
+  works), but points at `cage setup --wire-only`, while `verbmap.REMOVED["graphify"] = ""`
+  and `wiringscan.heal_tail` skips empty fixes. Second-order: **kiro-IDE now files nothing
+  at all** — ADR-COVERAGE marks the interceptor as *"the only route here"* for that surface
+  and its own Consequences section predicted exactly this outcome.
+- **Decided (proposed, Arpit's call):** **verdict B — restore `cage data graphify` as a
+  hidden verb at the identical spelling.** Cost is 8 lines (the deleted leaf is 6 lines of
+  parser + a 2-line handler; `graphifymeter.run` was never touched). Decisive argument:
+  B3's marker set is already compiled into every shim on every machine, so B is the **only**
+  option that heals the field with zero user action — any new spelling leaves installed
+  shims permanently dead. It concedes nothing to SURFACE-CUT either: `mcp`/`demo`/`debug`
+  are already hidden machine-spawned verbs in the same file. Fallback if the surface must
+  stay cut is **C (honest-dead)**, never D — D is the only option under which damage accrues.
+- **Open (Arpit):** accept or override B. Whether the interceptor is worth keeping *on its
+  merits* is option A's real question and deserves its own fork — it should not be settled
+  as a side effect of a deleted verb.
+- **Carried from the earlier exchange:** the historical-usage answer still stands, and it is
+  the one part of the subsystem SURFACE-CUT left intact — `--rescan-graphify`,
+  `cage query graphify-coverage` and `cage insights graphify` all survive, and
+  GRAPHIFY-CHATS shipped. Still hands-only (GFX-COV-FIELD): `cage import --rescan-graphify`
+  then `cage insights graphify`. Worth pairing with ledger-restructure **P0.1**, whose
+  real-ledger snapshot *"can never be taken again once P4 lands"* — the graphify baseline
+  has the same one-shot property.
+- **Then, same session — Arpit chose a NEW verb over the restore, and scoped it wider.** Eight
+  questions asked across two rounds, all answered. Locked: **D1** new spelling `cage interceptor
+  graphify` · **D2** group + single leaf, REMAINDER, old shape verbatim · **D3** **visible** on the
+  front door · **D4** machine doors move in, human-read surfaces stay (`insights graphify`, the
+  `query` explainers, the five doctor checks and `--rescan-graphify` all stay put — moving the
+  doctor checks would re-introduce F1 by reorg) · **D5** heal via verbmap, no permanent alias ·
+  **D6** interceptor rows keep `session=""`, kiro-IDE regains a total with attribution honestly
+  absent · **D7** the IDE-PATH probe is skipped.
+- **Written:** **PG** — a full phase at the head of
+  [ledger-restructure.handoff.md](ledger-restructure.handoff.md) (PG.0 measured facts · PG.1 the
+  seven decisions · PG.2–PG.4 build + tests + the records ADR-DISCIPLINE binds · PG.5–PG.6 the three
+  adjacent findings · PG.7 coupling to P4), a **PG change-map table**, and the matching PG block +
+  10 acceptance criteria in [the prompt](ledger-restructure.prompt.md). Programme is now nine phases.
+- **Corrected my own estimate out loud:** the compare doc's "8 lines" was for the *identical*
+  spelling. D1 makes it ~12 files — CLI leaf + handler, both twins, **three** marker copies plus a
+  fourth literal at `doctorcmd.py` ~756, `verbmap`, doctor hint text, 15 tests that assert the
+  contract, ADR-GRAPHIFY §2, ADR-CLI (visible ⇒ row + flags + example, count 27 → 28).
+- **Two implementation facts found while spec'ing, both counter-intuitive:** shim healing runs
+  through `adoptcmd.refresh_shim` (a **whole-file rewrite from package data**), *not*
+  `wiringscan.heal_tail` — which is why D5 works at all; and `heal_tail` splits on the first token,
+  so a config artifact naming `data graphify` would never heal (`parts[0] == "data"`, not a
+  `REMOVED` key). Both recorded in PG.3 as verify-don't-assume.
+- **ADR-COVERAGE reviewed and edited** (Arpit's follow-up): the interceptor row was ✅ on all six
+  surfaces on the day its verb was deleted — corrected to a new **`⛔` mark** (*live in code, dead in
+  fact*), legend updated, a **graphify route-by-route table** added (query · report-read ·
+  interceptor · per-chat attribution ×2, with whose-limitation-is-it applied), three findings dated
+  into *Reference*, and **STRIKE 1** recorded against the parked generated-matrix item — its own
+  veto names two strikes as the gate trigger, and it was caught by a reading session rather than by
+  anything in the repo. DOC-REGISTRY row bumped, as that record's update-rule requires.
+- **⚠️ Concurrency:** a Claude Code session rewrote **and staged** both ledger-restructure docs
+  mid-edit (open questions resolved into a Decisions table, a Change map added); `.git/index.lock`
+  was present at the end of this session. My first patch aborted on a stale anchor and wrote
+  nothing — re-anchored to the new structure rather than fighting it. **Anyone committing should
+  check both files still carry §PG before assuming a clean tree.**
+- **Open (Arpit):** accept or override PG's plan as written. GFX-MODEL-ORPHAN is his call and
+  blocks nothing — if unanswered when PG completes, leave `graphifymodel` untouched and carry it.
+- **Cost:** unmeasured — no spend surface in this repo (`cage report` deleted by SURFACE-CUT).
+
 ## 2026-08-14 (Cowork) — LEDGER-SHAPE: one directory per producer; calls retirement folded in as P5
 
 - **Asked (Arpit):** what is `calls-YYYY-MM.jsonl` for → what is *not* in the `ledger/claude`

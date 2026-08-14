@@ -248,9 +248,13 @@ def _capture_quality(root: Path) -> tuple[str, str]:
         return _OK, "every capturing agent's log carries real output-token data"
     lines = []
     for a, g in sorted(thin):
+        # This used to end "Higher-fidelity: cage data meter -- <cmd> (see `cage data
+        # proxy`)". SURFACE-CUT (v0.50) deleted both verbs AND their modules, so doctor
+        # was prescribing a fix that cannot be run — the F1 class, printed as advice. A
+        # coarse log is now a stated limit, which is the true thing to say.
         lines.append(f"\n      · {a}: {g['calls']:,} call(s), {g['tokens_in']:,} input "
-                     f"token(s), 0 output — coarse/input-only capture. Higher-fidelity: "
-                     f"cage data meter -- <{a} cmd>  (see `cage data proxy`)")
+                     f"token(s), 0 output — coarse/input-only capture, and there is no "
+                     f"higher-fidelity route: the metering proxy went in v0.50")
     return _WARN, ("capture is present but token-thin (input-only log, by design "
                    "for some agents):" + "".join(lines))
 
@@ -703,7 +707,7 @@ def _path_interceptor(root: Path) -> tuple[str, str]:
 def _launcher_gap(root: Path) -> tuple[str, str]:
     """GF-LAUNCHER: python-launcher mode removes `cage` from PATH entirely, but the
     graphify interceptor's capability probe (docs/adr/0007_graphify.md B5) needs exactly that — it
-    runs `cage data graphify --help` before deciding whether to meter. So **neither twin**
+    runs `cage interceptor graphify --help` before deciding whether to meter. So **neither twin**
     can ever meter a graphify call in this mode; both degrade to correct, unmetered
     passthrough, silently. That combination — launcher mode ON, an interceptor installed
     — is precisely where the silent gap bites, and it is otherwise invisible: nothing
@@ -753,7 +757,7 @@ def _arm2_interpreter() -> tuple[str, bool]:
         if not shutil.which(argv[0]):
             continue
         try:
-            probe = subprocess.run([*argv, "-m", "cage", "data", "graphify", "--help"],
+            probe = subprocess.run([*argv, "-m", "cage", "interceptor", "graphify", "--help"],
                                    capture_output=True, timeout=30)
         except (OSError, subprocess.SubprocessError):
             continue
@@ -772,7 +776,7 @@ def _out_of_root_fix(ps) -> str:
                 f"rewrites the shim), or delete {ps.winner}")
     return (f"delete {ps.winner} (graphify then runs unmetered but unbroken), or replace "
             "its `cage " + " ".join(ps.verbs) + "` probe with `cage "
-            + (ps.fix_tail or "data graphify") + "`")
+            + (ps.fix_tail or "interceptor graphify") + "`")
 
 
 def _hook_bypass(root: Path) -> tuple[str, str]:
@@ -890,7 +894,7 @@ def _receipts(active: Path, scan) -> tuple[str, str]:
         return _WARN, ("receipts: 0 — the graphify interceptor is dead (see wiring "
                        "above); fix it before concluding the tools are unused")
     return _WARN, ("receipts: 0 — attribution has no data yet; savings are recorded by "
-                   "`cage data graphify -- …`, the fux/compressor shims, and the "
+                   "`cage interceptor graphify -- …`, the fux/compressor shims, and the "
                    "response cache")
 
 

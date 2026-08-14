@@ -374,6 +374,16 @@ def cmd_study(args) -> int:
     return 1 if res["status"] == "fail" else 0
 
 
+def cmd_graphify(args) -> int:
+    """`cage interceptor graphify -- <REAL> <args…>` — the door both twins call.
+
+    Restored under a new spelling after SURFACE-CUT deleted `cage data graphify` with the
+    whole `data` group while leaving the shims probing it (ADR-GRAPHIFY B5). The metering
+    engine was never deleted — only this two-line leaf and its parser entry."""
+    from cage import graphifymeter
+    return graphifymeter.run(root(), args.argv, task=args.task)
+
+
 def cmd_mcp(_args) -> int:
     return mcpserver.serve()
 

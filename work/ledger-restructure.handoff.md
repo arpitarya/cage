@@ -11,6 +11,12 @@ and three data migrations on append-only stores. The diagnosis is the work.
 **Status:** Ready to build — P0 gates everything.
 **Rides version:** v0.51.0 (unreleased; v0.50.0 current)
 **Supersedes:** `work/calls-retirement.{handoff,prompt}.md` — folded in as **P4**.
+**Absorbs (Arpit, 2026-08-14):** **PG** — revive the graphify interceptor as a new CLI
+`cage interceptor graphify`, plus three adjacent graphify findings (GFX-DOC-FALSE,
+GFX-MODEL-ORPHAN, GFX-COV-FIELD). **PG runs FIRST, before/alongside P0** — it needs none of
+P0's ledger evidence, and until it lands every `cage setup` writes an interceptor that can
+never meter. Seven decisions locked in PG.1; the fork they resolve is
+[compare/graphify-interceptor-verb.compare.md](compare/graphify-interceptor-verb.compare.md).
 
 **Stress-tested:**
 - **Challenged:** all four asks, plus the sequencing between them.
@@ -42,6 +48,7 @@ and three data migrations on append-only stores. The diagnosis is the work.
 
 | # | Phase | Gate |
 |---|---|---|
+| **PG** | Graphify capture — `cage interceptor graphify`, the twins, three adjacent findings | **Runs first.** Independent of P0's evidence; damage accrues until it lands. |
 | **P0** | Evidence — cross-check snapshot + two store probes + research doc | **Blocks everything.** No real ledger ⇒ stop. |
 | **P1** | Consumer ledger `ledger/consumer/`, dual-write | Anton-safe; reverses ADR 0006 |
 | **P2** | Fold kiro `credits-*.jsonl` into `ledger/kiro/` | Row-count parity measured, not assumed |
@@ -57,6 +64,184 @@ savings) · `provenance/` (authorship) — with month-partitioned shards and a p
 `calls`, `credits`, `savings/` and `provenance.jsonl` remain as **readable history that is no
 longer written**. The only file that leaves `ledger/` is `imports.jsonl`, which was never ledger
 data — it is an audit trail, and P3 moves it to `state/` where its behaviour already said it belonged.
+
+---
+
+## PG — Graphify capture: revive the interceptor as `cage interceptor graphify`
+
+*(Runs FIRST, before/alongside P0 — Arpit, 2026-08-14. It needs none of P0's ledger evidence,
+and every day it waits `cage setup` writes another dead artifact. Full fork, matrix and reopen
+trigger: [compare/graphify-interceptor-verb.compare.md](compare/graphify-interceptor-verb.compare.md).)*
+
+**Ask:** graphify capture works from claude, copilot and kiro, CLI **and** extension. Today the
+interceptor leg is dead on every one of them.
+
+### PG.0 — What is actually true (measured 2026-08-14, not inferred)
+
+| # | fact | evidence |
+|---|---|---|
+| 1 | Both twins probe `cage data graphify` | `cage/data/shims/graphify` ×6 · `graphify.cmd` ×9 |
+| 2 | That verb does not exist | no `add_parser("data"…)` in `cli.py`; the group went in `cb4a4a6` |
+| 3 | The metering engine is **intact** | `graphifymeter.run(root, argv, task)` untouched — only the CLI leaf that called it was deleted |
+| 4 | The deleted leaf was 6 lines + a 2-line handler | `cli.py` ~646-651 · `clicmds.cmd_graphify` ~449, both at `cb4a4a6^` |
+| 5 | **`cage setup` still installs the dead twin** | `cmd_setup` → `adoptcmd.run(graphify=True)` → copies package data verbatim. **Damage accrues per install.** |
+| 6 | `cage doctor` **correctly FAILs** — the F1 lesson held | `_interceptor` via `scan.dead_interceptors`; `_path_interceptor` state `dead` |
+| 7 | …but its **fix hint cannot fix it** | hint says re-run `cage setup --wire-only`; `verbmap.REMOVED["graphify"] = ""` ⇒ `heal_tail` returns the tail unchanged |
+| 8 | 15 tests red | `test_pathshim` ×8 · `test_win_graphify_shim` ×5 · `test_wiringscan` ×1 · `test_gf_launcher_arm2` ×1 |
+| 9 | **kiro-IDE now files nothing at all** | ADR-COVERAGE marks the interceptor *"the only route here"* for that surface; its Consequences section predicted this exactly |
+| 10 | `cage interceptor graphify` does **not** match the marker regex | `pathshim._INTERCEPTOR` = `cage (?:data )?graphify\|graphify metering interceptor` — verified by execution |
+| 11 | The mixed field is safe anyway | **both** twins carry `graphify metering interceptor` in their headers, so old↔new twins still skip each other through marker 3 during migration |
+
+### PG.1 — Decisions (Arpit, 2026-08-14 — locked, do not re-litigate)
+
+| # | decision |
+|---|---|
+| D1 | **New spelling `cage interceptor graphify`**, not a restore of `cage data graphify`. |
+| D2 | **Group `interceptor`, single leaf `graphify`**, REMAINDER positional — `cage interceptor graphify -- <REAL> <args…>`, the old shape verbatim. Probe: `cage interceptor graphify --help`. |
+| D3 | **VISIBLE on the front door**, not `argparse.SUPPRESS`. Costs an ADR-CLI row **and** an example (see PG.4). |
+| D4 | **Machine doors move in; human-read surfaces stay put.** `cage interceptor graphify` hosts only what the interceptor, a hook or MCP invokes. **Explicitly NOT moved:** `insights graphify` · `query graphify-shims`/`graphify-coverage` · the five `doctor` graphify checks · `import --rescan-graphify`. |
+| D5 | **Heal via verbmap** — old shims are rewritten by `cage setup --wire-only`. **No permanent `cage data graphify` alias.** |
+| D6 | **Interceptor-filed rows keep `session=""`** (ADR-GRAPHIFY invariant). kiro-IDE regains a savings **total**; those rows sit in `insights graphify`'s unassignable bucket, footnoted. Per-chat attribution there is honestly absent, not fabricated. |
+| D7 | **The IDE-PATH probe is skipped** — see PG.6, and read it before relying on any IDE claim. |
+
+**⚠ Corrected cost.** The compare doc's "8 lines" was for the *identical* spelling. D1 makes this
+~12 files: CLI leaf + handler · both twins · **three** marker copies · `verbmap` · doctor hint text ·
+15 tests (they assert the contract, so they change rather than merely go green) · ADR-GRAPHIFY §2 ·
+ADR-CLI. Budget it as a real change, not a patch.
+
+### PG.2 — The verb
+
+- New group `interceptor` in `cli.build_parser()`, one leaf `graphify`, `--task` flag and
+  `nargs=argparse.REMAINDER` positional — **identical to the deleted leaf** (`cb4a4a6^:cage/cli.py`
+  ~646-651). Handler is two lines: `return graphifymeter.run(root(), args.argv, task=args.task)`.
+- Group named `interceptor` (not `graphify`) **on purpose**: ADR-GRAPHIFY §2 designates the contract
+  *"the template every future tool interceptor copies"*, so a second tool lands as a sibling leaf
+  with no restructuring. Record that as a consequence, **not** as a new decision.
+- **Do not** add `status`, `coverage` or any sibling leaf. D4 keeps those where they are.
+
+### PG.3 — The twins, the marker set, and the heal path
+
+**The marker set is ADDITIVE. Never remove `cage data graphify` or `cage graphify`.** Old shims
+exist on real disks and may never be healed; if they stop being recognised as interceptors, a new
+twin can select an old twin as the real binary and B3's anti-recursion mechanism is holed. Three
+copies move together, as ADR-GRAPHIFY §2 B3 requires:
+
+| copy | file | change |
+|---|---|---|
+| sh `grep -Eq` | `cage/data/shims/graphify` ~21 | add `cage interceptor graphify` to the alternation |
+| cmd `findstr /C:` | `cage/data/shims/graphify.cmd` ~56, ~71 | **two sites**, both `findstr` lines |
+| Python | `cage/pathshim.py` `_INTERCEPTOR` ~55 | extend the regex |
+
+Both twins' **invocation** lines (B5 arm 1 and arm 2) and their header comments change to the new
+verb. The cmd twin's arm-2 probe at `doctorcmd.py` ~756 (`[*argv, "-m", "cage", "data", "graphify",
+"--help"]`) is a **fourth literal** — sweep for it; it is not in B3's list and is easy to miss.
+
+**⚠ How healing actually works — verify before writing.** A shim is healed by
+`adoptcmd.refresh_shim`, which **rewrites the whole file from package data** (`agents.py` ~172,
+~184). It does **not** go through `wiringscan.heal_tail`. So D5 works through `cage setup
+--wire-only` without touching `heal_tail` at all.
+
+`verbmap` still must change, for a different reason: `REMOVED["graphify"] = ""` currently routes
+`cage graphify` into the `_DATA_REMOVED` sentence (*"removed, no replacement"*), which becomes a
+**lie** the moment `interceptor graphify` exists. Set `REMOVED["graphify"] = "interceptor graphify"`
+and pull `"graphify"` out of the `_DATA_REMOVED` tuple in `_BODIES` (~117).
+
+**Known limitation, decide explicitly:** `heal_tail` splits the tail on its **first** token, so a
+config artifact naming `cage data graphify …` yields `parts[0] == "data"`, which is not a `REMOVED`
+key, and returns unchanged. Adding `"data": "interceptor"` would be wrong (it would rewrite `data
+cleanup` → `interceptor cleanup`). **Check whether any config artifact — MCP entry, hook entry —
+actually names `data graphify`.** If none does, record that and change nothing. If one does, add a
+two-token head lookup rather than a bad single-token mapping.
+
+### PG.4 — Tests and the records ADR-DISCIPLINE binds to this phase
+
+- **The 15 red tests change, they do not merely go green.** `test_win_graphify_shim` reads both
+  twins' text and checks them against the contract; `test_pathshim` asserts classification.
+- **`cage setup` must stop shipping a dead artifact** — that is the accruing damage (fact 5), and it
+  falls out of PG.2+PG.3. Pin it: a test that a freshly scaffolded `bin/graphify` names a verb the
+  live parser accepts. **That test is the gate that would have caught SURFACE-CUT**, so write it
+  even though the immediate bug is fixed.
+- **Doctor's fix hint must become true.** `_interceptor` ~653 and `_path_interceptor`'s `dead`
+  branch both tell the user to re-run `cage setup --wire-only`; after PG.3 that is actually
+  curative. Assert it end to end: dead shim → doctor FAIL → `setup --wire-only` → doctor OK.
+- **ADR-GRAPHIFY §2** — B3's marker table, B5's two arms, and D8 all name the verb. Same commit.
+- **ADR-CLI (`0002_cli.md`)** — D3 makes this visible, so `test_cli_reference.py` demands **a row,
+  a flag list, and an entry under `## Examples — one per command`**, and
+  `test_the_headline_count_matches_the_parser` requires the headline leaf count to move 27 → 28.
+  ⚠️ `work/OPEN-WORK.md` claims that test is already failing because `docs/CLI.md` was deleted
+  mid-absorption — **that entry is stale**: the absorption completed and ADR-CLI carries the
+  Examples section. Confirm against the suite before assuming you inherited a red test.
+
+### PG.5 — GFX-DOC-FALSE (in scope, Arpit)
+
+Three docs assert graphify state that is false. Two were written the day it stopped being true, and
+ADR-DISCIPLINE — ratified the same day — requires the owning record to move in the same change.
+
+- **ADR-GRAPHIFY** frontmatter: *"four capture routes live"*. State the real count and date it.
+- **ADR-COVERAGE** — ✅ **already corrected in the 2026-08-14 Cowork review; do not redo it.** The
+  interceptor row now reads `⛔` (a fifth mark, defined there as *live in code, dead in fact*), a
+  **graphify route-by-route table** was added, three findings were dated into *Reference*, and
+  **STRIKE 1** was recorded against the parked generated-matrix item. **PG's remaining job is one
+  edit:** when the route is live again, flip every `⛔` to `✅` and turn the explanatory paragraph
+  into a dated note — the record says so in as many words. **Do not delete that paragraph**; the
+  window in which the row was false is the evidence behind the strike.
+- **`docs/FORMULAS.md` §2.7** — false since **v0.47.0** (two doc restructures ago). Still calls
+  copilot **VS Code** *"usage-row-only (F2: its `chatSessions` log has the command but not the
+  result)"* and kiro *"HONEST-LIMIT (no tool bodies in the log)"*. Both routes shipped in v0.47.0
+  and both are ✅ in `graphifytx.GRAPHIFY_COVERAGE`. **§2.10** additionally composes into `insights
+  verdict graphify`, a command SURFACE-CUT deleted.
+- **This is the drift ADR-COVERAGE's own veto says is *"caught by review alone."*** Review missed it
+  twice. Under the house two-strikes rule that makes it a **gate candidate** — propose a test that
+  re-derives the matrix from `GRAPHIFY_COVERAGE`, or record why not.
+
+### PG.6 — GFX-MODEL-ORPHAN and GFX-COV-FIELD (in scope; both need Arpit)
+
+- **GFX-MODEL-ORPHAN — a decision, not a build.** `graphifymodel` has no reader: `repo_ceiling`
+  (the community-bounded ceiling) and `history_band` are reachable only from `tests/` and the
+  explain registry, since both consumers — `insights verdict graphify` and `cage report`'s ceiling
+  footer — were deleted. UNREAD-FACTS class. **Before retiring it, note what is lost:** it is the
+  only surface that ever answered *"what would graphify save me here"* with **no receipts on hand**
+  — the day-one question, currently unanswerable by any command. **Arpit's call, and it
+  blocks nothing:** if it is unanswered when PG otherwise completes, leave the module
+  untouched and carry the item forward. The executor never stops for it.
+- **GFX-COV-FIELD — hands-only, Arpit's machine.** `cage import --rescan-graphify`, then
+  `cage query graphify-coverage`, then `cage insights graphify`. **Pair it with P0.1 in one
+  sitting:** both measurements are one-shot before P4/P5 land. Expect near-zero — 0 real receipts
+  at the 2026-07-22 audit, and 0 graphify commands in the 1,132 real VS Code terminal runs probed
+  2026-08-07.
+- **⚠️ UNPROBED ASSUMPTION, recorded loudly (D7).** "The interceptor covers the IDE surfaces"
+  assumes an IDE-spawned terminal inherits the project's `bin/` on PATH. **This was never
+  measured. Arpit chose to skip the probe on 2026-08-14.** It is therefore an *assumption* in a
+  repo whose law is that a gap is closed by a probe and never by an argument — and it is the F2
+  class pointed the other way. **Nothing in this program may state IDE interceptor coverage as
+  measured.** The check, if it is ever wanted, is one command: run `graphify query …` in a Kiro IDE
+  terminal during the GFX-COV-FIELD sitting and see whether a receipt lands. If it does not,
+  kiro-IDE has **no** capture route at all and this program's scope changes.
+
+### PG.7 — Coupling to the rest of the program
+
+- **P4 moves graphify savings to `ledger/graphify/`.** `graphifymeter` is one of its four named push
+  sites. PG landing first means **P4 moves a live writer** and can be verified end to end through a
+  real interceptor run rather than only through the store routes.
+- **PG does not touch the ledger**, so it does not disturb P0's snapshot: reviving the interceptor
+  changes only *future* capture and files nothing retroactively.
+- **10.5/10.6 are now resolved** (flat namespace + a write-time reserved-name list; *all*
+  savings sources move to `ledger/<tool>/`). PG revives a graphify **writer**, so `graphify`
+  must be on that reserved list — it already is under 10.6's *"every name reserved per
+  10.5"*. Confirm it explicitly rather than inheriting it by implication.
+
+### PG — Hard limits
+
+- **Never remove a marker string.** The set only grows (PG.3).
+- **Never fabricate a session for an interceptor-filed row.** `session=""` is an ADR-GRAPHIFY
+  invariant, and a timestamp-proximity join is forbidden by house law. D6 accepts the consequence.
+- **Never claim IDE interceptor coverage as measured** (D7 / PG.6).
+- **Do not move `insights graphify`, the `query` explainers, the doctor checks, or
+  `--rescan-graphify`** (D4). Moving the doctor checks in particular would re-introduce F1 by reorg:
+  they are what caught this very failure.
+- **Do not decide GFX-MODEL-ORPHAN alone.**
+- B6 passthrough is unchanged throughout: `graphify`'s stdout, stderr and exit code are identical
+  metered or not, at every point in the migration.
 
 ---
 
@@ -350,203 +535,122 @@ survives, and the chain never lies.
   `docs/adr/README.md`'s ownership table **and** `tests/test_adr_ownership.py`'s `OWNERS`, and give
   it a record with a veto condition, **in the same commit**.
 
-### Open questions
+### Decisions — all resolved by Arpit, 2026-08-14. Nothing here blocks.
 
-- **10.7 — threat model.** *Detect corruption* and *detect tampering* are different features with
-  different failure modes. Corruption-detection risks turning tolerated truncation into a scary
-  report; tamper-detection is meaningful only because the append-only law says a changed prefix is
-  never legitimate. **Recommend: tamper-evidence, report-only.** Decide before designing.
-- **10.8 — which files?** Ledger shards only, or `state/` too, or config? `cage.toml` is *meant* to
-  be user-edited, so a change there is normal — hashing it produces noise, not signal.
-  **Recommend: append-only ledger data only.**
-- **10.9 — where does the manifest live?** `state/integrity.json` (prunable-by-location, needs the
-  `NEVER` entry) vs `ledger/integrity/` (protected, but then it is ledger-shaped data that is not a
-  usage row). *Recommend `state/` + the `NEVER` entry.*
+**The executor does not stop to ask.** Every question this handoff previously carried is decided
+below, with the reason, so the run is uninterrupted.
 
----
-
-## ⚠ ADR-DISCIPLINE — landed 2026-08-14, mid-spec, and it changes how P7 works
-
-A parallel session shipped **ADR-DISCIPLINE** (`02c3c98`) while this handoff was being written:
-*"No behaviour change lands without its ADR updated in the same change."* It is **test-enforced** —
-`tests/test_adr_ownership.py` (new, 160 lines) fails when a module in `cage/` is claimed by no
-record, and `docs/adr/README.md` carries the ownership table it mirrors.
-
-**Consequence for this program: P7 is not a trailing phase.** Each of P1–P6 updates its own owning
-ADR **in its own commit**. P7 is what remains — the cross-cutting doc set, the archive, and the two
-reversals' final wording. A phase that ships behaviour and defers its record is a defect of the same
-class as a missing changelog entry.
-
-**Also binding on P1 and P4:** *"a new module is a new decision."* `schema.make_consumer_metric`'s
-home, any new reader module, and any new path helper must be claimed in **both**
-`docs/adr/README.md`'s ownership table **and** `OWNERS` in `tests/test_adr_ownership.py`, or the
-suite goes red — by design, at exactly the moment a new decision is being made with nothing to hold it.
-
-**And the escape is explicit, not silent:** a change that touches no recorded decision must say
-**`no ADR affected` out loud**. That sentence is the rule working, not an exemption from it.
-
-**Second thing that landed:** `work/surface-cut.claude-md-diff.md` **no longer exists and its 24
-false lines were applied** — it is archived at `work/archive/v0.50-surface-cut.claude-md-diff.md`
-and CLAUDE.md is now accurate. Earlier drafts of this handoff told you to fold CLAUDE.md edits into
-that pending diff. **Do not.** Edit CLAUDE.md directly — still *proposing* the diff for Arpit rather
-than silently applying it, per the agent-steering rule.
+| # | Decision | Reason |
+|---|---|---|
+| **10.1** `_PARSERS` | **Keep** `_PARSERS` **and the four parsers alive as the custom-source route only.** Delete only the built-in agent ingest legs. | Deleting them breaks the `[sources.<name>] format` config contract — a silent break in user config. Smallest reversible diff. **Caveat to document:** a custom source declaring `format = "claude"` inherits CLAUDE-DEDUP/SUBAGENT-KEY; say so in ADR-CONSUMERS rather than leaving it discoverable. |
+| **10.2** manifest FK | **Verify, don't assume.** `_lift_names` is parse-only and should be independent of the calls leg — confirm titles still land and `imports.jsonl` still coheres after P5. | A verification step, never a design choice. |
+| **10.3** kiro spine | **NO. Kiro gains no spine; `cli-conv` stays out of `SPEND_SOURCES`; kiro keeps rendering `—`.** Credits move to `ledger/kiro/` as *storage*; the *reader* stays a separate credits axis. | **Research-backed:** `_spend_row` normalizes every spine row to the **call-row (token) shape**. A cli-conv row in `spend()` would carry credits with zero tokens — exactly the lie `make_credit` exists to prevent (*"a call with `tokens_in=0` … poisons every token-based average"*). `spend()` is the token spine and `units.ABSENT["kiro"][TOKENS]` is true. Zero user-visible change. |
+| **10.4** consumer dir name | **`ledger/consumer/`.** | Matches ADR-CONSUMERS' own vocabulary. |
+| **10.5** namespace collision | **Flat namespace + a reserved-name list, validated at write time**, refusing with a named error. Reserve `agents.SURFACES` ∪ `{consumer, provenance}` ∪ every savings tool name. | Keeps the one-dir-per-producer shape; makes the collision *impossible* rather than unlikely. No second migration of the existing `ledger/<agent>/` dirs. |
+| **10.6** other savings sources | **Move them all in P4** — `graphify`, `fux`, `compress`, `responsecache` → `ledger/<tool>/`. Every name reserved per 10.5. | One row kind must not live in two shapes permanently. Consistent with the program's stated goal. |
+| **10.7** integrity threat model | **Both, reported as two distinct verdicts:** `altered-history` (a prefix that was already written changed — never legitimate under the append-only law) and `damaged` (truncated/garbled tail). | Arpit's call. They are different failures and must never be blended into one scary word. |
+| **10.8** integrity scope | **Ledger data *and* `state/` files.** | Arpit's call. ⚠️ See the noise note in P6 — `cursors.json` is rewritten wholesale every import and the logs are pruned by design, so those changes are **expected** and must be classified as such, not reported as findings. |
+| **10.9** integrity manifest home | **`state/integrity.json`**, added to `cleanup.NEVER`, and **excluded from its own hashing** (a manifest cannot hash itself). | Follows 10.8: it is state, and it must be protected the moment it lands there — the P3a lesson. |
 
 ---
 
-## P7 — ADRs and docs
+## Change map — file · symbol · what changes
 
-Two reversals. **Both recorded, neither deleted** — a silently-vanished rejected alternative is how
-a future agent re-litigates it from first principles.
+Line numbers are from **v0.50.0** and are a starting point, not a contract: **verify each, and where
+this table disagrees with the code, the code wins.** Patterns to copy are named so nothing is invented.
 
-- **ADR 0007 (graphify)** — the interceptor behaviour contract. P4 moves where a receipt lands, so
-  the twin-pair spec and any path it names must follow. **Change a twin ⇒ change the contract and
-  `pathshim._INTERCEPTOR` together.** Verify no marker-set drift.
-- **ADR 0006 (consumer) — the big one.** Its central decision (*"resolve from `calls` permanently,
-  are never given a metric ledger"*) is **reversed by P1**. Rewrite the Decision, record the
-  reversal with date + Arpit's call, and **restate what did not change**: retired-agent rows stay in
-  `calls` forever, fail-open is still absolute, `cage.meter` is still the public name. Update the
-  veto condition — the current one has no trigger for this reversal, which is itself a finding.
-- **ADR 0003 (claude)** — `calls` to past tense; the rejected alternative *"Stop writing `calls`"*
-  becomes a recorded reversal; update the mermaid **and** ASCII flow; frontmatter `status:`;
-  CLAUDE-DEDUP / CLAUDE-SUBAGENT-KEY become **closed-by-deletion** with the 2.00× measurement kept.
-- **ADR 0004 (copilot)** — same treatment. The CLI credit-delta loss was calls-parser-only and is
-  **closed by deletion, not fixed.** Note copilot needed no P2 work and why.
-- **ADR 0005 (kiro)** — P2's re-homing + P4's leg removal. Keep `ABSENT_SPINES` and the
-  upgrade-watch language intact.
-- **ADR 0001 (laws)** — check whether the state-dir law and the append-only law need P3/P1 wording.
-  **Propose, don't unilaterally rewrite a law.**
-- **`work/OPEN-WORK.md`** — METRICS-DUAL-WRITE-END is already marked picked-up; remove on
-  completion, recording the outcome in IMPLEMENTATION.md **first**. Extend TASK-GRAIN-SPINE (P4).
-  Close **TEST-COUNT**. Carry forward anything unresolved as its own item.
-- **`work/IMPLEMENTATION.md`** — an entry per phase, not one at the end.
-- **`work/WORKLOG.md`** — with a `Cost:` line. Note: `cage report` was deleted by SURFACE-CUT, so
-  `Cost: unmeasured — no spend surface in this repo` is the honest value today.
-- **`work/INTERVIEW.md`** — succession-critical. The next model must not try to restore either the
-  calls writer or the top-level credits shard.
-- **`CHANGELOG.md` + README "What's new"** (README keeps only the latest entry — replace, don't
-  append) · **`docs/adr/0002_cli.md`** if any surface moved · **`docs/FORMULAS.md`** +
-  **`cage/explain_data.py`** (it names `parse_calls` at ~496; the registry ships in the binary and
-  must agree) · **`docs/architecture-flow.mermaid`** (three stages move) · **`docs/GLOSSARY.md`** ·
-  **`work/DOC-REGISTRY.md`** (bump every touched row) · **`docs/example/toml-config.md`** if
-  `[sources]` semantics move.
-- **`CLAUDE.md`** — ⚠️ **PROPOSE, do not silently apply.** As of `5f4d3fc` it is *accurate* (the
-  SURFACE-CUT diff was applied and archived), so edit it directly — but surface the diff for
-  Arpit's review rather than rewriting the always-loaded contract unannounced.
-- **`docs/adr/README.md` ownership table + `tests/test_adr_ownership.py` `OWNERS`** — required for
-  every new module. Both, same change, or the suite goes red.
-- **Archive this pair** to `work/archive/v0.51-ledger-restructure.{handoff,prompt}.md` with the
-  archive header, linked from the CHANGELOG ("Built from: …"), and update the `docs/README.md` +
-  `work/archive/README.md` indexes. Progress line → 100%.
+### PG — graphify interceptor
 
----
+| file | symbol | change |
+|---|---|---|
+| `cage/cli.py` | new `interceptor` group + `graphify` leaf | **visible** (D3); `--task` + `nargs=REMAINDER`, identical to the deleted leaf at `cb4a4a6^` ~646-651 |
+| `cage/clicmds.py` | new `cmd_graphify` | two lines: `return graphifymeter.run(root(), args.argv, task=args.task)` |
+| `cage/data/shims/graphify` | header · B5 arms · `_cage_is_interceptor` (~21) | new verb in both invocations; **add** the new marker to the `grep -Eq` alternation |
+| `cage/data/shims/graphify.cmd` | header · B5 arms · `findstr /C:` (~56, ~71) | **two findstr sites**; same additive marker rule |
+| `cage/pathshim.py` | `_INTERCEPTOR` (~55) | extend the regex — `cage interceptor graphify` does **not** match it today (verified) |
+| `cage/doctorcmd.py` | arm-2 probe (~756) | a **fourth** literal `["-m","cage","data","graphify","--help"]`, outside B3's list — easy to miss |
+| `cage/verbmap.py` | `REMOVED["graphify"]` · `_BODIES` (~117) | `""` → `"interceptor graphify"`; pull `graphify` out of the `_DATA_REMOVED` tuple or `cage graphify` keeps printing a now-false "no replacement" |
+| `cage/adoptcmd.py` | `refresh_shim` | **no change** — it rewrites the whole file from package data, which is what makes D5's heal work |
+| `docs/adr/0007_graphify.md` | §2 B3 markers · B5 arms · D8 | same commit (ADR-DISCIPLINE) |
+| `docs/adr/0002_cli.md` | new row + flags + example | D3 is visible ⇒ `test_cli_reference.py` needs all three, and the headline count moves 27 → 28 |
+| `docs/adr/0008_coverage.md` | interceptor row + the new graphify table | see PG.5 |
+| `docs/FORMULAS.md` | §2.7 · §2.10 | false since v0.47.0 / cites a deleted command |
+| tests | `test_pathshim` ×8 · `test_win_graphify_shim` ×5 · `test_wiringscan` ×1 · `test_gf_launcher_arm2` ×1 | **updated to the new contract**, not merely made green |
+| tests | new: scaffold-names-a-live-verb · doctor-FAIL→setup→doctor-OK | the gate that would have caught SURFACE-CUT |
 
-## Current state
+### P1 — consumer ledger
 
-- Repo `/Users/arpitarya/my_programs/cage`, v0.50.0, `main`.
-- **The CLI is far smaller than CLAUDE.md claims** (SURFACE-CUT removed `report`, `insights
-  attrib`/`adoption`/`compare`/`estimate`/`calibration`, the whole `data` group). Live leaves:
-  `import · setup · doctor · query · insights {chats,graphify,commits,commit,why} · task
-  {outcome,time} · authorship {origin,summary,verify,notes-sync} · study {…} · policy {diff,sync} ·
-  mcp · demo · debug · hook`. **`cli.build_parser()` is ground truth. CLAUDE.md is not.**
+| file | symbol | change |
+|---|---|---|
+| `cage/schema.py` | new `make_consumer_metric` · `CONSUMER_METRIC_SOURCES` · `CONSUMER_METRIC_FIELDS` | copy the shape of `make_claude_metric` (~310-434): closed source enum, omit-at-zero counts, None-sentinel for any billed figure, deterministic `metric_id` folding the row's own values. Grain `call`; id namespace `csm_` |
+| `cage/paths.py` | new `consumer_dir` · `consumer_shard(ts)` | copy `copilot_dir`/`copilot_shard` (~1140) — the dir mechanism, **not** a generalization of `shard()` |
+| `cage/paths.py` | `shard()` (~1214-1224) · `shards()` | add `"consumer"` to the dir-routing branch beside `copilot`/`kiro`/`claude` |
+| `cage/ledger.py` | new `consumer_metrics` / `consumer_metrics_raw` | mirror `claude_metrics` (latest-per-key collapse at read time) |
+| `cage/ledger.py` | `SPEND_SOURCES` (~475) | add `"consumer": ("call",)` |
+| `cage/ledger.py` | `_spend_row` (~509) | confirm the field whitelist carries what a consumer row needs; **never synthesize an absent field** |
+| `cage/metering.py` | `record_call` (~46-64) | **dual-write** — keep the existing `ledger.append_row(r, "calls", row)` and add the consumer metric row. Fail-open on both |
+| `cage/agents.py` | `row_surface` (~33) | map the consumer agent name to its surface |
+| `docs/adr/README.md` + `tests/test_adr_ownership.py` | ownership table + `OWNERS` | claim every new module — **both**, same commit, or the suite reddens |
 
-**Read first**
+### P2 — kiro credits → `ledger/kiro/`
 
-| file | why |
-|---|---|
-| `docs/adr/0006_consumer.md` Decision | the decision P1 reverses — read before writing code |
-| `cage/ledger.py` `spend()` ~550-583, `join_table()` ~584-610, `credits()` ~201-219 | the three readers this program moves |
-| `cage/ledger.py` `SPEND_SOURCES` / `ABSENT_SPINES` / `CUMULATIVE_SOURCES` ~475-506 | the tables P1 and P2 edit |
-| `cage/importcmd.py` ~1290-1310 **and ~1138-1150** | gate 3, twice |
-| `cage/transcript.py` `_kiro_cli_conversations`, `_kiro_cli_credit_row`, `parse_kiro_cli_metrics` | P2's shared reader and the skip-rule difference |
-| `cage/manifest.py` docstring | P3's carve-out, stated in full |
-| `cage/cleanup.py` `NEVER` ~313 | why P3 needs an explicit entry |
-| `tests/conftest.py` `metric_twin` ~77-100 | names exactly which agents need no twin |
+| file | symbol | change |
+|---|---|---|
+| `cage/transcript.py` | `parse_kiro_cli_credits` (~1699) · `_kiro_cli_credit_row` | stop emitting the top-level credits row |
+| `cage/transcript.py` | `parse_kiro_cli_metrics` (~1726) | `cli-conv` becomes the credits home. **Reconcile the two skip rules** — `_kiro_cli_credit_row` drops a conversation when credits ≤ 0 **and** context ≤ 0; `cli-conv` emits whenever `usage_info` is present, even summing to a real `0.0`. `cli-conv` is a **superset**; measure the delta against P0.1 |
+| `cage/ledger.py` | `credits()` (~201-219) | read `cli-conv` rows **and** the legacy `credits-*.jsonl` shards. **Keep the last-write-wins-per-session collapse** (highest `turns`, ties by id) — that is what makes a cumulative source safe |
+| `cage/ledger.py` | `CUMULATIVE_SOURCES` (~503) | keep the exclusion (10.3); **reword the reason** — it currently points at `ledger.credits`/`calls` |
+| `cage/units.py` | `ABSENT` (~46-49) | ⚠️ **finding:** kiro's single reason (*"no IDE token store on this install"*) under-describes — **both** surfaces lack tokens, for two different vendor reasons (IDE has no store; CLI's slots are null). Widen the reason or split it |
+| `cage/schema.py` | `make_credit` (~246) | **keep** — history still parses. Just stop calling it |
 
-## Non-negotiables
+### P3 — the two unpartitioned files
 
-- **Fail-open on write paths** — `append` returns `False`, never raises; `meter()` swallows in
-  cleanup. **But never silent:** every swallow site logs under `CAGE_DEBUG`
-  (`tests/test_debug_coverage.py` audits this).
-- **Append-only, always.** No migration rewrites, re-homes or deletes an existing row. Every old
-  path stays readable forever.
-- **Counts-never-content.** No prompt bodies, no line bodies, no line hashes. The manifest's
-  `session_name` is the one recorded widening and is local-only.
-- **`$0` / stdlib-only** — `dependencies = []`.
-- **Determinism** — no clocks/random in derived views; ids carry the only entropy.
-- **`method` is sacred** — never let a projection read as `measured`.
-- **No currency, no rate card, no unit conversion** (ADR 0011). `tests/test_usage_only.py` AST-scans
-  for this.
-- **A removed path is a wiring migration** — sweep `install.sh`, `justfile`, `tools/dummyrepo`, the
-  steering `Doc` literals, `docs/adr/0002_cli.md`. And a **citation migration** —
-  `grep -rho "docs/[a-z0-9-]*\.md" cage/*.py | sort -u`.
-- **Do not touch:** existing `calls-*.jsonl` / `credits-*.jsonl` shards · `schema.make_call` ·
-  `ledger.join_table` · `transcript.parse_kiro_ide_metrics` · the authorship path
-  (`parse_provenance`, `parse_edits`, `linematch`, `commitjoin`) · the graphify savings routes.
+| file | symbol | change |
+|---|---|---|
+| `cage/paths.py` | `imports` (~1111) | → `Footprint.state`; add a `CAGE_IMPORTS_LOG` override matching `capture_log`/`attest_log` |
+| `cage/manifest.py` | `_imports_path` · `_append` · `read` (~114) | write new, **read both** locations forever |
+| `cage/cleanup.py` | `NEVER` (~313) | add `imports.jsonl` explicitly — it loses the `"ledger/"` umbrella |
+| `cage/chats.py` | `_names` (~144) | unchanged behaviour; confirm titles do not regress to session ids |
+| `cage/paths.py` | `provenance` (~1102) | → `provenance_dir` + `provenance_shard(ts)`; route `"provenance"` through `shard()`'s dir branch |
+| `cage/paths.py` | `shard()` docstring (~1218) | **rewrite** the *"provenance is intentionally never partitioned (buffer)"* line as a recorded reversal — do not just delete it |
+| `cage/ledger.py` | `provenance()` (~645) | union of sharded + legacy; gains `since=` |
+| `cage/originrecord.py` | rows (~91) · append (~178) | partition-aware append; shard-spanning read |
+| `cage/chats.py` | (~179) | `agent%` must render **identical values** — it reads counts, never re-derives |
+| `cage/doctorbundle.py` | (~70-72) | ⚠️ reads `foot.provenance` **directly** for a row count — would under-report in a bundle |
+| `cage/notessync.py` | merge path | must read **every** shard, or it re-pushes or drops rows in `refs/notes` |
+| `tests/test_authorship_capture.py` | plant-string test | ⚠️ **must grep the new directory** — left on the old path it passes forever while covering nothing |
 
-## Edge cases & risks
+### P4 — savings → `ledger/<tool>/`
 
-| case | expected |
-|---|---|
-| Ledger with codex/proxy rows only | `spend()` unchanged row-for-row. Assert against P0.1. |
-| Receipt with `call=<old calls id>` | Still resolves — `join_table` unions historical `calls`. |
-| Existing `ledger/imports.jsonl` | Still read after P3. Titles must not regress to session ids. |
-| Existing `credits-*.jsonl` | Still read after P2. Same rendered values in `insights chats`. |
-| Existing `provenance.jsonl` | Still read after P3c. `agent%` and `authorship origin/summary/verify` render identically. |
-| Provenance row with unparseable `ts` | Falls back to the legacy unpartitioned file — never dropped. |
-| `notes-sync` after P3c | Reads every shard. A partial read re-pushes or drops rows in `refs/notes`. |
-| Anton / a `cage.meter` consumer | Keeps working through P1's dual-write. **Fail-open ⇒ a break is silent.** Test it. |
-| Kiro-routed sweep (`_kiro_leg`) | Has its **own** `seen`/`captured` build. Two sites. |
-| Fresh install, no rows | doctor says *not yet captured*, never *broken*. Check wording. |
-| Tests seeding `calls` for the 3 agents | **Pass while pinning nothing.** See below. |
+| file | symbol | change |
+|---|---|---|
+| `cage/paths.py` | `savings_dir` (~1114) · `savings_shard` (~1120) · `savings_shards` (~1129) | write to `ledger/<tool>/`; `savings_shards` returns new **and** legacy `savings/*/` |
+| `cage/paths.py` | new reserved-name list + write-time validation | 10.5 — `agents.SURFACES` ∪ `{consumer, provenance}` ∪ savings tool names; refuse with a named error |
+| `cage/ledger.py` | `savings()` (~222-235) | union both trees, deterministic order |
+| `cage/cleanup.py` | `NEVER` comment (~308-312) | it names the old path and warns about moving the tree — update it; the standing rule (**no per-tool cleanup class, ever**) is unchanged |
+| `tests/test_cleanup.py` | `ledger/savings/<tool>/` survival case | add a twin for the new path |
+| push sites | `graphifymeter` · `graphifytx` (~535) · `metering.record_receipt` (~67) · `responsecache` · `compress` | resolve through **one** path helper — never a second literal |
 
-**The named trap.** CLAUDE.md: *"A basis change is a fixture migration, and the tests will not tell
-you politely."* It bit this repo once at ~80 tests. **Green is not evidence here.** Migrate fixtures
-via `conftest.metric_twin` — never a per-file copy — across `test_import_unified.py`,
-`test_transcript.py`, `test_universal_capture.py`, `test_capture_health.py`, `test_claude_metrics.py`,
-`test_claude_request_grain.py`, `test_copilot_metrics.py`, `test_kiro_routing.py`, `test_chats.py`.
+### P5 — retire the calls writer
 
-## Testing & validation
+| file | symbol | change |
+|---|---|---|
+| `cage/transcript.py` | `parse_calls` (~67) · `parse_copilot_calls` (~705) · `parse_copilot_vscode_calls` (~975) · `parse_kiro_calls` (~1410) | **KEPT** (10.1) — reachable only via `_PARSERS` for custom sources. **Do not "fix" them**; ADR-CLAUDE forbids it |
+| `cage/importcmd.py` | claude leg (~514) · `_parse_copilot_any` (~575) · copilot leg (~852) · kiro leg (~946) | remove the built-in `_ingest(...)` calls |
+| `cage/importcmd.py` | `_PARSERS` (~603) | **KEPT** — the custom-source contract |
+| `cage/importcmd.py` | `captured` / gate 3 (~1298) **and the kiro-leg twin** (~1144) | **two sites.** Rebuild from the metric ledgers ∪ surviving `calls` rows. Left alone, a healthy install reports all three agents as *never captured* |
+| `cage/doctorcmd.py` | (~169, ~234) | same repoint |
+| `cage/taskcorr.py` (~99) · `cage/hookcmd.py` (~83) | `ledger.calls` reads | degrade **stated, not silent**; extend TASK-GRAIN-SPINE. No timestamp-proximity fallback |
+| `cage/explain_data.py` | (~496) | names `parse_calls` — the registry ships in the binary and must agree |
+| `tests/test_calls_retired.py` | new | zero new `calls` rows for the three agents **and** non-zero from a `record_call` |
 
-- `just test` (1571 + 10 Windows skips + 1 opt-in dogfood skip). Update the count in README's `$0`
-  section and the CLAUDE.md diff; closes **TEST-COUNT**.
-- **New:** `test_calls_retired.py` (P5 gate, both directions) · a P6 test that deleting the
-  integrity manifest moves zero numeric cells, that a lock-miss yields `unverified` rather than a
-  broken chain, and that a tolerated truncated tail is never reported as tampering · a P1 dual-write test · a P2 parity
-  test vs P0.1 · a P3 test that the old `imports.jsonl` path is still read **and** that
-  `cleanup.NEVER` protects the new one · a P3c test that `ledger.provenance` unions legacy +
-  sharded rows and that all four readers span shards.
-- **Extend, do not just keep green:** `tests/test_authorship_capture.py`'s plant-string test must
-  grep the new `ledger/provenance/` directory. Left pointing at the old file it passes forever while
-  covering nothing — the strongest PII guard in the repo, silently retired.
-- **Keep green:** `test_chats.py::test_deleting_manifest_changes_zero_numeric_cells` (P3 must not
-  weaken it) · `test_cleanup.py`'s survival cases · `test_floor.py` · `test_usage_only.py` ·
-  `test_debug_coverage.py` · `test_cli_reference.py` · `test_queue_honesty.py`.
-- **Goldens:** `CAGE_BLESS_GOLDENS=1 pytest tests/test_output_spec.py`. Re-bless **only** where
-  output legitimately changed. An unexpected golden change is a finding, not a diff to accept.
-- Manual: `cage import` then `cage doctor` on the real ledger after each phase.
+### P6 — integrity
 
-## Open questions
-
-- **10.1 — custom `[sources.<name>]` tools: `consumer/` or `calls`?** Also decides whether
-  `_PARSERS` and the `format` key survive. Blocks only the `_PARSERS` deletion; every other step
-  proceeds. *Recommend: leave both alone this program — smallest reversible diff. Escalate before
-  choosing otherwise.*
-- **10.2 — manifest FK.** `_ingest` stamps `import_id` on calls rows as the FK back to the manifest;
-  P4 deletes that leg. Verify the manifest still coheres and that titles still land (`_lift_names`
-  is parse-only and should be independent — **confirm, don't assume**).
-- **10.3 — `CUMULATIVE_SOURCES` after P2.** If `cli-conv` becomes the credits home with a
-  last-write-wins collapse, is its exclusion from `SPEND_SOURCES` still right, or does kiro-CLI gain
-  a spine? **This is a spine decision — do not make it silently.** Kiro currently renders `—` with
-  a stated reason; changing that changes user-visible output.
-- **10.4 — consumer dir name.** `ledger/consumer/` (matches ADR 0006's vocabulary) vs `ledger/lib/`
-  (matches `agent="lib"`). Cosmetic but permanent once written. *Recommend `consumer/`.*
-- **10.5 — `ledger/` namespace collision (P3c + P4).** After this program `ledger/` holds **four
-  categories** in one flat namespace: agent usage (`claude/` `copilot/` `kiro/`), consumer
-  (`consumer/`), tool savings (`graphify/`) and authorship (`provenance/`). A custom
-  `[sources.<name>]` tool, or a future agent, sharing a name with any of them lands two row kinds
-  in one directory. Reserve names against `agents.SURFACES` + a reserved list, namespace as
-  `ledger/tools/<tool>/`, or validate at write time. **Blocks P4; P3c should follow whatever is
-  decided here.**
-- **10.6 — do the other savings sources move too?** `fux`, `compress`, `responsecache` also file
-  receipts. Graphify-only leaves one row kind in two shapes, permanently. *Recommend moving all in
-  P4; escalate if you disagree.*
+| file | symbol | change |
+|---|---|---|
+| `cage/integrity.py` | new module | chain `current = sha256(prev ‖ appended_bytes)` per file. **Two verdicts, never blended:** `altered-history` (prefix changed) · `damaged` (truncated/garbled tail) |
+| `cage/lockutil.py` | `locked()` | **reuse** — never a second `fcntl` block. A lock-miss marks the segment `unverified`; it never breaks the chain |
+| `cage/paths.py` | new `integrity` path + `integrity.lock` | `state/integrity.json`, **excluded from its own hashing** |
+| `cage/cleanup.py` | `NEVER` | add `integrity.json` |
+| `cage/doctorcmd.py` | new check | report-only, **always exit 0** (the `authorship verify` precedent) |
+| — | expected-change classification | ⚠️ 10.8 covers `state/`, but `cursors.json` is rewritten wholesale every import and the logs are pruned by design. Those changes are **expected** and must be classified as such — an integrity report that flags them every run trains its reader to ignore it |

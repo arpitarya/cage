@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# cage: graphify metering interceptor — routes queries through `cage data graphify` so
+# cage: graphify metering interceptor — routes queries through `cage interceptor graphify` so
 # each query/path/explain files a token-saving receipt; stdout/exit pass through unchanged.
 # `graphify update .` and any non-query verb pass straight through (nothing to meter).
 # Installed by `cage setup`.
@@ -15,10 +15,14 @@ set -euo pipefail
 # go straight to the real binary. Breaks any residual loop cage's own resolution missed.
 if [ "${CAGE_GRAPHIFY_SHIM:-}" = "1" ]; then _CAGE_GF_REENTRY=1; else _CAGE_GF_REENTRY=0; fi
 
-# An interceptor is any `graphify` that routes through cage or self-identifies as one —
-# matches BOTH the current shim (`cage data graphify`) and a stale pre-rename adopt shim
-# (`cage graphify` / "graphify metering interceptor"), so neither can be picked as REAL.
-_cage_is_interceptor() { grep -Eq 'cage (data )?graphify|graphify metering interceptor' "$1" 2>/dev/null; }
+# An interceptor is any `graphify` that routes through cage or self-identifies as one.
+# The marker set is ADDITIVE and only ever GROWS (ADR-GRAPHIFY B3): it must match the
+# current shim (`cage interceptor graphify`), the SURFACE-CUT-era one (`cage data
+# graphify`), and a stale pre-rename adopt shim (`cage graphify` / "graphify metering
+# interceptor"), so none of them can be picked as REAL. Dropping an old spelling would
+# let a new twin select an OLD twin already installed on a real disk as the real binary,
+# holing the anti-recursion proof for exactly the machines that never get healed.
+_cage_is_interceptor() { grep -Eq 'cage (data |interceptor )?graphify|graphify metering interceptor' "$1" 2>/dev/null; }
 
 REAL=""
 _OIFS=$IFS; IFS=:
@@ -42,8 +46,8 @@ fi
 # Arm 1 is the `cage` command and always wins first, so standard installs are unchanged
 # in both behaviour and latency.
 if [ "$_CAGE_GF_REENTRY" = "0" ]; then
-  if command -v cage >/dev/null 2>&1 && cage data graphify --help >/dev/null 2>&1; then
-    CAGE_GRAPHIFY_SHIM=1 exec cage data graphify -- "$REAL" "$@"
+  if command -v cage >/dev/null 2>&1 && cage interceptor graphify --help >/dev/null 2>&1; then
+    CAGE_GRAPHIFY_SHIM=1 exec cage interceptor graphify -- "$REAL" "$@"
   fi
   # Arm 2 (B5b, GF-LAUNCHER verdict B): "no `cage` COMMAND" is not "no cage". The probe
   # used to ask *is there a cage command*; the question it means is *can cage run*.
@@ -52,8 +56,8 @@ if [ "$_CAGE_GF_REENTRY" = "0" ]; then
   # venv, and any importable-but-not-on-PATH install. Costs one interpreter start
   # (~50 ms warm) and only on the path that was already going to run unmetered.
   if command -v python3 >/dev/null 2>&1 \
-     && python3 -m cage data graphify --help >/dev/null 2>&1; then
-    CAGE_GRAPHIFY_SHIM=1 exec python3 -m cage data graphify -- "$REAL" "$@"
+     && python3 -m cage interceptor graphify --help >/dev/null 2>&1; then
+    CAGE_GRAPHIFY_SHIM=1 exec python3 -m cage interceptor graphify -- "$REAL" "$@"
   fi
 fi
 exec "$REAL" "$@"   # cage unreachable, or re-entry → identical, unmetered behaviour

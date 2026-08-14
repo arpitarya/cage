@@ -262,7 +262,7 @@ REGISTRY: tuple[Explanation, ...] = (
         "the two ways a tool's savings claim reaches the ledger",
         "in-tool shim: the tool itself (e.g. fux) emits a receipt as it runs, so the\n"
         "  claim is first-party. External adapter: cage meters a third-party tool from\n"
-        "  the outside (e.g. `cage data graphify -- graphify query …`) without that tool\n"
+        "  the outside (e.g. `cage interceptor graphify -- graphify query …`) without that tool\n"
         "  knowing cage exists — the receipt is filed by cage's wrapper, not the tool.\n"
         "  Units: a receipt is denominated in its OWN unit (tokens, ms, gco2) and\n"
         "  cage converts nothing between them. Since USAGE-ONLY (ADR 0011) there is\n"
@@ -735,7 +735,8 @@ REGISTRY: tuple[Explanation, ...] = (
         "  existence + PATH + live verbs is not enough if this OS structurally cannot\n"
         "  resolve the file (the F1 lesson, applied to a second OS).\n"
         "  IDENTITY IS CONTENT, NEVER FILENAME: each twin self-identifies via the same\n"
-        "  marker set (`cage data graphify`, its pre-rename bare form with no `data`,\n"
+        "  marker set (`cage interceptor graphify`, the SURFACE-CUT-era `cage data\n"
+        "  graphify`, its pre-rename bare form with no group word,\n"
         "  or the header string \"graphify metering interceptor\") so neither twin can\n"
         "  ever select the OTHER as the real binary — recursion is impossible by four\n"
         "  independent mechanisms (content skip, PATHEXT/extensionless structural\n"

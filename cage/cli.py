@@ -34,6 +34,7 @@ groups (run any group name for its commands):
   authorship  origin · summary · verify · notes-sync
   study       join · start · stop · report · export · id
   policy      diff · sync
+  interceptor graphify
 
 $ cage import                     # pull every agent's usage into the ledger
 $ cage insights chats            # which conversation used the tokens?
@@ -460,6 +461,34 @@ def build_parser() -> argparse.ArgumentParser:
     po_sy.add_argument("--yes", action="append", metavar="SECTION.KEY",
                        help="confirm one non-reconstructable row (repeatable; 'all' "
                             "confirms every one shown)")
+
+    # ── group: interceptor ─────────────────────────────────────────────────────
+    # The machine door a tool interceptor calls. Named `interceptor`, not `graphify`,
+    # on purpose: ADR-GRAPHIFY §2 designates its contract "the template every future
+    # tool interceptor copies", so a second tool lands as a sibling leaf here with no
+    # restructuring. VISIBLE on the front door (PG D3) rather than argparse.SUPPRESS —
+    # `cage data graphify` was deleted by SURFACE-CUT while both twins still probed it,
+    # and every install after that shipped an interceptor that could never meter. A verb
+    # the shims depend on is a contract, and a hidden contract is the F1 class.
+    #
+    # D4: machine doors move in, human-read surfaces stay put. `insights graphify`, the
+    # `query graphify-*` explainers, the doctor graphify checks and
+    # `import --rescan-graphify` deliberately do NOT live here.
+    icp_g = sub.add_parser("interceptor",
+                         help="machine doors a tool interceptor calls: graphify",
+                         epilog="example:\n"
+                                "  cage interceptor graphify -- graphify query \"auth flow\""
+                                "   # runs graphify, files one savings receipt",
+                         formatter_class=argparse.RawDescriptionHelpFormatter)
+    icp_g.set_defaults(fn=lambda _a, _g=icp_g: (_g.print_help(), 0)[1])
+    icp = icp_g.add_subparsers(dest="interceptor_cmd", metavar="<command>", required=False)
+
+    gf = icp.add_parser("graphify", help="meter a third-party graphify call without touching it",
+                        epilog="example:\n  cage interceptor graphify -- graphify query \"auth flow\"   # runs graphify, files one savings receipt",
+                        formatter_class=argparse.RawDescriptionHelpFormatter)
+    gf.add_argument("--task", default="", help="task id to bind the saving to (default: project dir name)")
+    gf.add_argument("argv", nargs=argparse.REMAINDER, help="-- graphify <query|path|explain> …")
+    gf.set_defaults(fn=clicmds.cmd_graphify)
 
     # ── hidden top-level verbs (callable, off the front door) ──────────────────
     # mcp is spawned by wired configs; debug is a diagnostic; demo seeds the §4.4

@@ -47,7 +47,15 @@ def test_no_calls_is_ok_not_warn(tmp_path, monkeypatch):
     assert level == "ok"
 
 
-def test_thin_kiro_capture_warns_and_recommends_the_proxy(tmp_path, monkeypatch):
+def test_thin_kiro_capture_warns_and_states_the_limit(tmp_path, monkeypatch):
+    """A thin log is a WARN that names the agent and the counts — and, since v0.51, says
+    there is **no** higher-fidelity route rather than naming one.
+
+    This test used to assert `cage data meter` / `cage data proxy` were recommended. Both
+    verbs — and `proxy.py`/`metercmd.py` themselves — were deleted by SURFACE-CUT (v0.50),
+    so the assertion went on pinning advice that could not be followed: a test holding a
+    dead command in place. The replacement below binds the detail line to the **live
+    parser** instead, so any future remedy this check prints has to be runnable."""
     root = _isolate(tmp_path, monkeypatch)
     ledger.append(paths.Footprint(root).calls,
                   schema.make_call(route="chat", provider="kiro", model="agent",
@@ -57,7 +65,21 @@ def test_thin_kiro_capture_warns_and_recommends_the_proxy(tmp_path, monkeypatch)
     assert level == "warn"
     assert "kiro" in detail
     assert "198" in detail and "0 output" in detail
-    assert "cage data meter" in detail and "cage data proxy" in detail
+    assert "no higher-fidelity route" in detail
+    _assert_every_cage_command_is_live(detail)
+
+
+def _assert_every_cage_command_is_live(text: str) -> None:
+    """Every `cage …` this check prints must parse. Doctor's whole job is surfacing
+    silent breakage; advice naming a deleted verb is that failure wearing doctor's
+    uniform, and it is what this file previously asserted *for*."""
+    import re
+
+    from cage import wiringscan
+    for m in re.finditer(r"`?cage ([a-z][a-z-]*(?: [a-z][a-z-]*)?)", text):
+        verbs = tuple(m.group(1).split())
+        assert wiringscan.is_live_verb(verbs) or wiringscan.is_live_verb(verbs[:1]), \
+            f"doctor advice names a dead verb: cage {' '.join(verbs)}"
 
 
 def test_healthy_agent_with_real_output_tokens_does_not_warn(tmp_path, monkeypatch):

@@ -166,11 +166,11 @@ def test_both_twins_carry_arm_two_and_the_cmd_twin_declares_d8():
     a macOS dev must not be able to leave the cmd twin behind."""
     sh, cmd = SH.read_text(encoding="utf-8"), \
         (REPO / "cage" / "data" / "shims" / "graphify.cmd").read_text(encoding="utf-8")
-    assert "python3 -m cage data graphify --help" in sh
-    assert "python3 -m cage data graphify --" in sh
+    assert "python3 -m cage interceptor graphify --help" in sh
+    assert "python3 -m cage interceptor graphify --" in sh
     # D8: the cmd twin CANNOT say python3 — it is frequently absent on Windows.
-    assert "py -3 -m cage data graphify --help" in cmd
-    assert "python -m cage data graphify --help" in cmd
+    assert "py -3 -m cage interceptor graphify --help" in cmd
+    assert "python -m cage interceptor graphify --help" in cmd
     # D8 binds the EXECUTABLE lines; the `rem` block above them explains the divergence
     # and necessarily names the POSIX spelling to do so.
     code = [l for l in cmd.splitlines() if not l.strip().lower().startswith("rem")]
@@ -180,11 +180,11 @@ def test_both_twins_carry_arm_two_and_the_cmd_twin_declares_d8():
 
 def test_arm_two_needs_no_new_marker_so_the_twins_still_skip_each_other():
     """B3's three-copy marker set is unchanged, and this asserts WHY that is safe rather
-    than assuming it: the new invocation still contains `cage data graphify`, so a twin
+    than assuming it: the new invocation still contains `cage interceptor graphify`, so a twin
     carrying arm 2 is still recognised as an interceptor by all three copies."""
     from cage import pathshim
-    for line in ("python3 -m cage data graphify -- /x/graphify query q",
-                 "py -3 -m cage data graphify -- C:\\x\\graphify.exe query q"):
+    for line in ("python3 -m cage interceptor graphify -- /x/graphify query q",
+                 "py -3 -m cage interceptor graphify -- C:\\x\\graphify.exe query q"):
         assert pathshim._INTERCEPTOR.search(line), line
     assert pathshim.is_interceptor(SH)
     assert pathshim.is_interceptor(REPO / "cage" / "data" / "shims" / "graphify.cmd")

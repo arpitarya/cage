@@ -2,13 +2,13 @@
 
 **Model:** **Opus.** Two ADR reversals, a deletion with entanglements across four subsystems, and
 four migrations on append-only stores. A wrong call here is expensive and partly irreversible.
-**Progress:** 0% — not started. Eight phases (P0–P7); reaches 100% in the change that archives this pair.
+**Progress:** 0% — not started. Nine phases (**PG**, then P0–P7), all questions decided; reaches 100% in the change that archives this pair.
 
 ---
 
 You are restructuring `cage`'s ledger so **every usage producer owns one directory under
 `ledger/`**, then giving every append-only file a tamper-evident hash chain. The full spec is **`work/ledger-restructure.handoff.md`** — read it first and treat its
-phase gates, **Non-negotiables** and **Open questions** as binding.
+phase gates, **Decisions** table, **Change map** and **Non-negotiables** as binding.
 
 Target shape: `ledger/{claude,copilot,kiro}/` (agent usage) · `ledger/consumer/` (library + proxy) ·
 `ledger/graphify/` (tool savings) · `ledger/provenance/` (authorship). `calls`, `credits`,
@@ -29,6 +29,36 @@ file that *leaves* `ledger/` is `imports.jsonl` — an audit trail, not ledger d
 4. **Every write path here is fail-open by law.** Break one and nothing raises, nothing logs, and no
    test fails unless you write it. That is why each phase has a test, and why "I checked" is not
    evidence.
+
+5. **PG runs before P0 and is not part of the ledger work.** It revives the graphify interceptor
+   under a new verb. Its own rule: **the marker set only ever grows.** Removing `cage data graphify`
+   or `cage graphify` from any of the three marker copies un-holes B3's anti-recursion proof against
+   shims already installed on real machines.
+
+## PG — do this first (before P0), then the P0 gate
+
+`cage data graphify` — the verb both interceptor twins probe — was deleted by SURFACE-CUT
+(`cb4a4a6`) and the twins were left in place. **The interceptor route captures nothing, on every OS,
+for every agent**, `cage setup` still installs the dead twin, and kiro-IDE (whose *only* route is the
+interceptor) now files nothing at all. `cage doctor` correctly FAILs — but its fix hint cannot fix it.
+
+Handoff **§PG** is the spec: PG.0 the measured facts, **PG.1 the seven locked decisions**, PG.2–PG.4
+the build, PG.5–PG.6 the adjacent findings, PG.7 the coupling to P4. The fork is
+`work/compare/graphify-interceptor-verb.compare.md`.
+
+Build `cage interceptor graphify` — **visible** group + single leaf, `--task` + `REMAINDER`,
+handler calls `graphifymeter.run` (which was never deleted). Point both twins at it, **add** the new
+marker to all three copies plus the fourth literal in `doctorcmd.py` ~756, and give
+`verbmap.REMOVED["graphify"]` the tail `"interceptor graphify"`.
+
+**Do NOT move** `insights graphify`, `query graphify-shims`/`graphify-coverage`, the five doctor
+graphify checks, or `import --rescan-graphify` (decision D4 — machine doors move in, human-read
+surfaces stay). **Moving the doctor checks would re-introduce F1 by reorg — they are what caught
+this bug.**
+
+⚠️ **One assumption is UNPROBED and must never be written as measured:** that an IDE-spawned
+terminal inherits the project's `bin/` on PATH. Arpit chose on 2026-08-14 to skip the probe. Nothing
+you write may state IDE interceptor coverage as a measurement.
 
 ## P0 gate — do this first, or stop
 
@@ -67,7 +97,9 @@ The snapshot is the **only** mitigation for a deliberately-overridden freeze
 - **Check `git log` before you start.** A parallel session shipped three commits *during* this
   handoff's authoring. If the repo has moved again, **the code wins over this document.**
 
-## Task — eight phases, in order
+## Task — nine phases, in order
+
+**PG — Graphify interceptor.** See above and handoff §PG. Runs first; independent of P0.
 
 **P0 — Evidence.** Gate. See above.
 
@@ -100,15 +132,18 @@ handling); resolve them explicitly, and measure row-count parity against P0.1.
   row id and **must** read every shard, or it re-pushes or drops rows in `refs/notes`.
 
 **P4 — Graphify savings → `ledger/graphify/`.** `ledger.savings()` reads new per-tool dirs **and**
-the whole legacy `savings/*/` tree. One path helper, never a second literal. **Blocked on OPEN
-QUESTION 10.5** (the `ledger/` namespace collision between agents, consumers and tools) — ask
-before writing. Update `cleanup.py`'s comment and add a `test_cleanup.py` survival twin for the new
-path. **10.6:** whether `fux`/`compress`/`responsecache` move too — ask.
+the whole legacy `savings/*/` tree. One path helper, never a second literal. **10.5 decided:** keep
+the flat namespace and add a **reserved-name list validated at write time** — `agents.SURFACES` ∪
+`{consumer, provenance}` ∪ every savings tool name — refusing a collision with a named error.
+**10.6 decided:** `fux`, `compress` and `responsecache` move too, so one row kind never lives in two
+shapes. Update `cleanup.py`'s comment and add a `test_cleanup.py` survival twin for the new path.
 
-**P5 — Retire the three agents' transcript→`calls` writer.** Delete `transcript.parse_calls`,
-`parse_copilot_calls`, `parse_copilot_vscode_calls`, `parse_kiro_calls` + orphaned helpers; remove
-the `_ingest` legs (~514, ~852, ~946) and `_parse_copilot_any` (~575). **`_PARSERS` (~603) is
-blocked on 10.1.** **Repoint gate 3 and doctor health** — otherwise a healthy install reports all
+**P5 — Retire the three agents' transcript→`calls` writer.** Remove the built-in `_ingest` legs
+(~514, ~852, ~946) and `_parse_copilot_any` (~575). **10.1 decided: `_PARSERS` (~603) and the four
+parsers STAY** — they are the `[sources.<name>] format` custom-source contract, and deleting them
+would break user config silently. They simply become unreachable for the three built-in agents.
+Document in ADR-CONSUMERS that a custom source declaring `format = "claude"` inherits
+CLAUDE-DEDUP/SUBAGENT-KEY. **Do not "fix" them** — ADR-CLAUDE forbids it. **Repoint gate 3 and doctor health** — otherwise a healthy install reports all
 three agents as *never captured*, a silent false negative. Let `taskcorr`/`hookcmd` degrade,
 **stated not silent**; no timestamp-proximity fallback. **Do not "fix" `parse_calls` on the way
 out** — ADR 0003 forbids it; deleting it is what honours the rule.
@@ -132,17 +167,28 @@ guaranteed false "changed" verdict.
   signal, since rows are never rewritten.
 - **Never read by a derived view**; `cleanup.NEVER` must protect it; the chain is a function of file
   bytes, never of a wall clock.
-- **STOP and ask on 10.7 (threat model), 10.8 (which files), 10.9 (where the manifest lives)** before
-  designing.
+- **Scope is decided (10.7/10.8/10.9):** two verdicts reported separately — `altered-history`
+  (a prefix that was already written changed) and `damaged` (truncated/garbled tail). Covers ledger
+  data **and** `state/` files. Manifest at `state/integrity.json`, in `cleanup.NEVER`, **excluded
+  from its own hashing**. ⚠️ `cursors.json` is rewritten wholesale every import and the logs are
+  pruned by design — classify those as **expected**, or the report trains its reader to ignore it.
 
 **P7 — ADRs and docs.** Handoff §P7 lists them. All three reversals **recorded, never deleted**.
 
-## Required workflow
+## Required workflow — RUN STRAIGHT THROUGH, no approval pauses
 
-1. **Explore before writing.** The handoff's line numbers are from v0.50.0 — verify each; do not
-   trust them blind.
-2. **Plan per phase** — lay out the change map and files, and **pause for my confirmation before
-   implementing each phase.** Do not run P0→P6 in one pass.
+**Arpit's call: do not stop for confirmation between phases.** Every open question is decided in the
+handoff's *Decisions* table — there is nothing to ask. Run P0 → P7 in one pass.
+
+Three things replace the approval checkpoints, and they are **not optional**:
+
+1. **One commit per phase**, message naming the phase and its ADR. That is Arpit's review surface —
+   `git log -p` per phase instead of one unreadable diff.
+2. **The suite must be green before the next phase starts.** A red suite stops the run — report and
+   halt; do not carry a failure forward. This is the only thing standing in for a human check.
+3. **Explore before writing.** The handoff's line numbers are from v0.50.0 and are a starting point,
+   not a contract. Verify each. **Where the handoff disagrees with the code, the code wins — say so
+   in the commit message, don't silently adapt.**
 3. **Implement incrementally.** Suite green between phases. An `IMPLEMENTATION.md` entry **per
    phase**, not one at the end.
 4. **Update the owning ADR in the SAME commit as each phase.** **ADR-DISCIPLINE** landed
@@ -178,6 +224,19 @@ guaranteed false "changed" verdict.
   (`grep -rho "docs/[a-z0-9-]*\.md" cage/*.py | sort -u`).
 
 ## Acceptance criteria (self-check before finishing)
+
+- [ ] `cage interceptor graphify -- <REAL> …` meters; `--help` exits 0 (the twins' probe)
+- [ ] Both twins invoke the new verb; **all three marker copies still match the old spellings too**,
+      and the `doctorcmd.py` ~756 arm-2 literal was swept
+- [ ] A freshly scaffolded `bin/graphify` names a verb the live parser accepts — **pinned by a test**
+- [ ] Dead shim → `cage doctor` FAIL → `cage setup --wire-only` → `cage doctor` OK, end to end
+- [ ] `cage graphify` no longer prints "removed, no replacement" — `verbmap` names the new tail
+- [ ] ADR-CLI has the row, the flags **and** an example; headline leaf count 27 → 28
+- [ ] ADR-GRAPHIFY §2 (B3 markers, B5 arms, D8) updated in the **same commit** as the twins
+- [ ] ADR-COVERAGE's interceptor row is true again **and** carries the new graphify table (PG.5)
+- [ ] `docs/FORMULAS.md` §2.7 no longer calls copilot-VSCode "usage-row-only" or kiro
+      "HONEST-LIMIT"; §2.10 no longer cites the deleted `insights verdict graphify`
+- [ ] Nothing states IDE interceptor coverage as measured (the UNPROBED assumption is labelled)
 
 - [ ] P0's snapshot + probes + research doc published **before** any code change
 - [ ] `record_call` dual-writes; a `cage.meter` consumer still works — **proven by a test**
@@ -217,11 +276,12 @@ guaranteed false "changed" verdict.
 
 ## Guardrails
 
-- **STOP and ask** before: resolving any OPEN QUESTION (10.1 `_PARSERS` · 10.3 whether kiro-CLI
-  gains a spine · 10.4 dir name · **10.5 namespace collision, blocks P4** · 10.6 other savings
-  sources · **10.7 integrity threat model · 10.8 which files · 10.9 manifest location, all block P6**) · touching anything in the do-not-modify list · any change that would rewrite, move or
-  delete an existing ledger row or shard · starting a phase before the previous one is green.
-- **10.3 is a spine decision** — kiro currently renders `—` with a stated reason. Changing that
-  changes user-visible output. Never decide it silently.
+- **Nothing is left to ask** — 10.1 through 10.9 are all decided in the handoff's *Decisions* table.
+  Follow them; do not re-litigate and do not "improve" one mid-run.
+- **STOP and report** only for: a red suite · a change that would rewrite, move or delete an existing
+  ledger row or shard · anything in the do-not-modify list · P0 being impossible (no real ledger).
+- **Kiro gains no spine** (10.3) — it keeps rendering `—`. Credits move as *storage* only; the reader
+  stays a separate credits axis. A credits row inside `spend()` would carry zero tokens, which is the
+  exact lie `make_credit` exists to prevent.
 - If the handoff conflicts with what you find in the code, **the code wins — say so, don't silently
   adapt.** The handoff was written from a static read, not from running it.

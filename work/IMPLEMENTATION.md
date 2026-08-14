@@ -8,6 +8,70 @@ Entry format:
 
 ```
 
+## 2026-08-14 — PG (ledger-restructure): the graphify interceptor gets a live verb again
+
+- **Built:** `cage interceptor graphify` — a **visible** group + single leaf (`--task` +
+  `REMAINDER`), handler two lines onto `graphifymeter.run`, which was never deleted. Both
+  twins repointed; the B3 marker set **grown, never replaced**; `verbmap.REMOVED["graphify"]`
+  given the tail `"interceptor graphify"` and pulled out of the `_DATA_REMOVED` sentence.
+- **Why:** SURFACE-CUT (`cb4a4a6`, 2026-08-12) deleted `cage data graphify` with the whole
+  `data` group and left both twins probing it. For two days the interceptor route captured
+  **nothing on any OS for any agent**, every `cage setup` installed a shim that could never
+  meter, and kiro-IDE — whose only savings route is the interceptor — filed nothing at all.
+  `cage doctor` FAILed correctly the whole time; its fix hint named a refresh that
+  reproduced the same dead verb.
+- **Files:** `cage/cli.py` (group + leaf + `_ROOT_HELP`) · `cage/clicmds.py` (`cmd_graphify`)
+  · `cage/data/shims/graphify` + `graphify.cmd` (verbs + markers; **CRLF preserved** on the
+  cmd twin — a `read_text`/`write_text` round-trip silently normalises it) ·
+  `cage/pathshim.py` (`_INTERCEPTOR`, the third marker copy) · `cage/doctorcmd.py` (the
+  **fourth** arm-2 literal at ~756, outside B3's list) · `cage/verbmap.py` ·
+  `cage/{adoptcmd,usagelog,wiringscan,graphifymeter,explain_data}.py` (prose sweep).
+- **Adjacent, and in scope because it is the same failure class in prose:** three sites
+  prescribed `cage data meter` / `cage data proxy` — verbs **and modules** deleted in v0.50 —
+  as remedies. `importcmd.proxy_line`, `doctorcmd._capture_quality` and `cage setup
+  --wire-only`'s closing line now state the absence instead of naming a fix that cannot be
+  run. A test was *pinning* one of them (`test_thin_kiro_capture_warns_and_recommends_the_
+  proxy`); it now asserts the honest limit and greps the detail line against the **live
+  parser**, so any future remedy this check prints has to be runnable.
+- **GFX-DOC-FALSE closed.** ADR-GRAPHIFY (frontmatter, both §1 diagrams, B3, B5, D8, plus a
+  Decision note recording the outage window) · ADR-COVERAGE (the interceptor row is ✅ again
+  with `†` invocation-gated and `‡` **UNPROBED for IDE**, and the dead window is *recorded,
+  not erased*) · `docs/FORMULAS.md` §2.7 (false since **v0.47.0**), §2.10 (cited a deleted
+  command), §2.11 · ADR-CLI (row, flags, example, 27 → 28).
+- **Two-strikes gate taken:** `tests/test_formulas_coverage.py` re-derives FORMULAS §2.7's
+  matrix from `graphifytx.GRAPHIFY_COVERAGE` — surfaces and ✅/❌ only, never the prose
+  reasons. Its own first run parsed **zero rows** (the table is indented inside a bullet, so
+  `^\|` matched nothing) and every assertion passed vacuously; `test_the_parse_is_not_vacuous`
+  is the backstop that caught it. ADR-COVERAGE's own two tables are still review-only —
+  filed as ADR-COVERAGE-GATE, not silently claimed as covered.
+- **New gates:** `tests/test_interceptor_verb.py` — a freshly scaffolded `bin/graphify`
+  must name a verb the **live parser** accepts (the test that would have caught
+  SURFACE-CUT), and dead shim → doctor FAIL → `setup --wire-only` → doctor OK end to end.
+  The last arrow is the half that was broken, and asserting the FAIL alone would have
+  passed throughout the outage.
+- **`heal_tail`'s two-token gap: probed, recorded, unchanged.** It splits a tail on its
+  first token, so an artifact naming `cage data graphify …` yields `parts[0] == "data"`,
+  not a `REMOVED` key. **No config artifact names it** — cage writes only `cage mcp` and
+  `cage hook <event>` into configs, and the shims are healed by `adoptcmd.refresh_shim`,
+  which rewrites the whole file from package data and never goes through `heal_tail`. Adding
+  `"data": "interceptor"` would be wrong (it would rewrite `data cleanup` → `interceptor
+  cleanup`). Changed nothing, as the handoff directed.
+- **UNPROBED, stated: IDE PATH inheritance.** That an IDE-spawned terminal inherits the
+  project's `bin/` was never measured (Arpit skipped the probe, 2026-08-14). Nothing written
+  in this phase states IDE interceptor coverage as measured; ADR-COVERAGE marks it `‡` and
+  it is filed as GFX-IDE-PATH-UNPROBED.
+- **Verified by execution, not by reading:** `cage interceptor graphify -- <fake> query …`
+  files one receipt (`session=""`, D6) and passes stdout/exit through; a bare `graphify`
+  resolved through a real `bin/` shim with **no `cage` on PATH** metered via B5 **arm 2**
+  (`python3 -m cage interceptor graphify`) and preserved a non-zero exit code unchanged.
+- **Tests:** `just test` green — **1395 passed, 11 skipped** (was 1380/15-red). The 15
+  SURFACE-CUT left red are closed; +12 new.
+- **ADRs (ADR-DISCIPLINE):** ADR-GRAPHIFY · ADR-CLI · ADR-COVERAGE, all in this commit. No
+  new `cage/` module, so `docs/adr/README.md`'s ownership table and
+  `tests/test_adr_ownership.py`'s `OWNERS` are unchanged.
+- **Next:** P0 — the cross-check snapshot + two store probes + research doc, against the
+  real `~/.cage`. It gates every later phase.
+
 ## 2026-08-14 — DOC-MOVE: `doc-size-discipline.md` + `restricted-environments.md` → `work/`
 
 - **Built:** both moved out of `docs/` (design/reference) into `work/` (working docs) —

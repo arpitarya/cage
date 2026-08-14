@@ -30,6 +30,14 @@ Naming: `<topic>.compare.md`. Written in short points, not walls of prose.
   only; dropped commits footnoted as *not read*);
   A was rejected on the determinism law — a relative default puts a wall clock in the
   default path — and on the measurement, since 90d cut zero commits here.
+- [graphify-interceptor-verb.compare.md](graphify-interceptor-verb.compare.md) —
+  **SHIM-DEAD-VERB**: SURFACE-CUT deleted `cage data graphify`, the verb both interceptor
+  twins probe, so the interceptor route captures nothing on every OS and `cage setup` still
+  installs the dead twin. Four options (retire the interceptor · restore the verb hidden ·
+  keep it dead but honest · park); **proposed verdict B — restore at the identical spelling
+  as a hidden verb (`mcp`/`demo`/`debug` precedent), 8 lines**, because B3's marker set is
+  already burned into every installed shim, so only B heals machines in the field.
+  Awaiting Arpit's accept or override.
 - [gf-launcher-metering.compare.md](gf-launcher-metering.compare.md) — **GF-LAUNCHER**:
   how the graphify interceptor reaches cage when `--python-launcher` leaves no `cage` on
   PATH. Three options (setup-time twin variants · a runtime interpreter arm · accept the

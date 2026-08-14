@@ -70,7 +70,11 @@ REMOVED: dict[str, str] = {
     "serve": "",
     "proxy": "",
     "meter": "",
-    "graphify": "",
+    # NOT removed: `cage data graphify` went with the `data` group, but the interceptor
+    # door it fronted came back as `cage interceptor graphify` (PG, v0.51). A tail, not a
+    # removal sentence — and `wiringscan.heal_tail` uses it to rewrite an artifact whose
+    # probe still names the dead spelling.
+    "graphify": "interceptor graphify",
     # hook machinery removed (capture is pull-based): no replacement command —
     # an empty tail means "removed outright"; direction() explains, heal never
     # rewrites to it (wiringscan.heal_tail skips empty fixes).
@@ -114,7 +118,7 @@ _BODIES: dict[str, str] = {
     **{v: f"'{v}' {_ROLLUP_REMOVED}" for v in
        ("report", "attrib", "adoption", "compare", "estimate", "calibration")},
     **{v: f"'{v}' {_DATA_REMOVED}" for v in
-       ("export", "cleanup", "watch", "serve", "proxy", "meter", "graphify")},
+       ("export", "cleanup", "watch", "serve", "proxy", "meter")},
     "ledger-sync": ("'ledger-sync' was removed in v0.50 (SURFACE-CUT). It pushed local "
                     "rows into refs/notes/cage-ledger for a team view, and `--team` — "
                     "its only reader — went with `cage report`/`cage insights attrib`, "
