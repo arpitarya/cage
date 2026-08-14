@@ -204,8 +204,8 @@ def summarize(root: Path, pol: dict, since: str | None = None,
     """The one data structure every renderer consumes (the same-numbers-by-
     construction rule) — deterministic, and **untruncated**: ranking/bounding is a
     render-time concern (`--all`) so it can never perturb a numeric cell."""
-    raw_calls = ledger.calls(root)
-    calls = ledger.since(ledger.calls(root, since=since), since) if since else raw_calls
+    raw_calls = ledger.spend(root)
+    calls = ledger.since(ledger.spend(root, since=since), since) if since else raw_calls
     raw_credits = ledger.credits(root)
     credit_rows = (ledger.since(ledger.credits(root, since=since), since)
                   if since else raw_credits)

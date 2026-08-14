@@ -169,7 +169,7 @@ def _agent_half(root: Path, since: str | None) -> dict:
     directly; otherwise a non-empty ``session`` resolves through the calls that share it.
     A row reaching neither is agent-unknown, with the *reason* recorded — never guessed
     at from a timestamp, and never bucketed as "other"."""
-    all_calls = ledger.calls(root)          # unfiltered: an in-window row may link an older call
+    all_calls = ledger.spend(root)          # unfiltered: an in-window row may link an older call
     by_id, by_session, seen = {}, {}, set()
     for c in all_calls:
         surface = _agents.row_surface(c.get("agent")) or ""

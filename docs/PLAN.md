@@ -751,7 +751,13 @@ with the numbers on the SAME line/table (debuglog's `attrs.userRequest`/
 strict field whitelist and never touch the body fields at all, transiently or otherwise
 (the same discipline ADR 0009 established for kiro-CLI's tool-run bodies).
 
-**Capture-only, deliberately.** No derived view reads this kind in its first build — no
+**Capture-only in its FIRST build only — superseded by §3.14.** Since v0.50 this
+kind is the source of derived spend from `constants.SPEND_CUTOVER` onwards
+([ADR 0010](adr/0010-metric-ledgers-are-the-spend-source-forward-only-cutover.md)).
+The paragraph below is the original shipping stance, kept because it explains why the
+kind was built separately from `calls` — but it no longer describes today's reads.
+
+**(historical)** No derived view read this kind in its first build — no
 `report`/`insights chats` cell moves whether the `copilot/` tree exists or is deleted.
 A read surface (a `cage insights copilot` view, or new chats-view columns) is future
 work, parked in `work/OPEN-WORK.md`, not a `# v2:` stub in the code.
@@ -805,7 +811,13 @@ duplicated (`_kiro_cli_conversations` is the one shared read both the credits pa
 and the metrics parser call). The IDE parser SELECTs four explicit columns only, never
 `SELECT *` — an unread extra column can never leak into a row.
 
-**Capture-only, deliberately.** No derived view reads this kind in its first build —
+**Capture-only in its FIRST build only — superseded by §3.14.** Since v0.50 this
+kind is the source of derived spend from `constants.SPEND_CUTOVER` onwards
+([ADR 0010](adr/0010-metric-ledgers-are-the-spend-source-forward-only-cutover.md)).
+The paragraph below is the original shipping stance, kept because it explains why the
+kind was built separately from `calls` — but it no longer describes today's reads.
+
+**(historical)** No derived view read this kind in its first build —
 no `report`/`insights chats` cell moves whether the `kiro/` tree exists or is deleted.
 Cache tokens and per-chat IDE credits stay absent from every row here because no
 on-disk Kiro store persists them at all (only the wire protocol does — proxy capture,
@@ -861,13 +873,49 @@ the newest one, so a `--since` window that skips the early shard still returns i
 read — never `message.content`, `summary` titles, user rows' text, or
 `tool-results/`. `project` is the basename of the last-seen `cwd`, never a path.
 
-**Capture-only, deliberately.** No derived view reads this kind in its first build —
+**Capture-only in its FIRST build only — superseded by §3.14.** Since v0.50 this
+kind is the source of derived spend from `constants.SPEND_CUTOVER` onwards
+([ADR 0010](adr/0010-metric-ledgers-are-the-spend-source-forward-only-cutover.md)).
+The paragraph below is the original shipping stance, kept because it explains why the
+kind was built separately from `calls` — but it no longer describes today's reads.
+
+**(historical)** No derived view read this kind in its first build —
 no `report`/`insights chats` cell moves whether the `claude/` tree exists or is
 deleted. A read surface (chats-view columns, or `cage insights claude`) and
 `--csv claude` are future work, parked in `work/OPEN-WORK.md` — as is the calls-path
 fix for CLAUDE-DEDUP/CLAUDE-SUBAGENT-KEY, which this kind deliberately does not touch.
 
 ---
+
+
+## 3.14 The spend resolver — the metric ledgers become the source (METRICS-PRIMARY)
+
+**Status: built, v0.50 (unreleased), 2026-08-14.** §3.11–3.13's three kinds are no longer
+capture-only: they are the **source of derived spend** from a pinned instant onwards.
+Design of record: [ADR 0010](adr/0010-metric-ledgers-are-the-spend-source-forward-only-cutover.md).
+
+- **`constants.SPEND_CUTOVER = "2026-08-14T00:00:00Z"`** — a **literal**, never `now()`.
+  A computed cutover would make yesterday's report irreproducible tomorrow.
+- **`ledger.spend(root, since)` is the ONE derive resolver.** `ts <` cutover ⇒ the `calls`
+  ledger; `ts >=` ⇒ the metric kinds, normalized to the call-row shape plus a `basis`
+  field. Every derive site reads it; none reads `calls` for spend.
+- **Resolution is by each row's own `ts`**, never by session start — a chat straddling the
+  instant contributes to both sides, once each. No row is ever counted twice.
+- **Scoped to the three agents that have a metric ledger.** `cage.meter` library rows
+  (`agent="lib"`), proxy rows, and `[sources.<name>]` custom tools have no metric ledger
+  and resolve from `calls` forever. An unscoped flip zeroes them silently.
+- **`ledger.SPEND_SOURCES` is a spine, never a sum** — one source per (agent, surface),
+  and it must be **point-in-time, never cumulative**. Copilot's cumulative `cli` store is
+  delta'd at capture into a `cli-delta` twin; kiro's cumulative `cli-conv` needs no twin
+  because kiro-CLI spend is credits-only (§1.7) and never lived in `calls`.
+- **Claude gains a request grain** (`source="request"`, one row per folded
+  `(requestId, message.id)`, from the same fold as the chat grain). This is where
+  **CLAUDE-DEDUP and CLAUDE-SUBAGENT-KEY are closed** — measured 2.01× inflation on
+  43,885 real transcript rows. `parse_calls` is untouched, so recorded history stays as
+  recorded.
+- **`ledger.join_table` resolves a receipt's `call` id** — `spend()` plus the `calls` rows
+  it superseded. A **lookup table, never a sum source**, so the union cannot double-count.
+- Capture stays **dual-write**: the flip is a one-constant rollback, not a data event.
 
 ## 4. The attribution engine (the part that's actually novel)
 

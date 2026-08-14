@@ -66,9 +66,21 @@ def _existing_note(root: Path, anchor: str) -> list[dict]:
 
 
 def _local_rows(root: Path) -> list[dict]:
-    """Every local call + receipt row (across all month shards). Order is stable
-    (calls then receipts) so the merge plan is deterministic."""
-    return [*ledger.calls(root), *ledger.receipts(root)]
+    """Every local call + receipt + per-agent **metric** row (across all month shards).
+    Order is stable (calls, receipts, then the three metric kinds in `agents.SURFACES`
+    order) so the merge plan is deterministic.
+
+    **The metric kinds are here because the team view would otherwise silently lose the
+    new spine** (METRICS-PRIMARY P4). Since the cutover, post-cutover spend for the three
+    agents lives in `ledger/{claude,copilot,kiro}/`, not in `calls` — a `--team` rollup
+    that merged only calls+receipts would show every teammate's spend stopping dead at
+    `constants.SPEND_CUTOVER`, with no error and no empty table to notice. The **raw**
+    readers are used, not the collapsing ones: `refs/notes/cage-ledger` is a union-by-id
+    archive, and collapsing before the merge would drop the very rows another machine's
+    copy needs to resolve its own latest state."""
+    return [*ledger.calls(root), *ledger.receipts(root),
+            *ledger.claude_metrics_raw(root), *ledger.copilot_metrics_raw(root),
+            *ledger.kiro_metrics_raw(root)]
 
 
 def plan(root: Path) -> dict:

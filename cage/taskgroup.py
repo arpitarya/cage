@@ -49,7 +49,7 @@ def _span(rows: list[dict]) -> tuple[str, str] | None:
 
 def join(root: Path) -> dict[str, dict]:
     """``{task_id: {"calls": [...], "receipts": [...]}}`` per the join precedence."""
-    return join_rows(ledger.calls(root), ledger.receipts(root))
+    return join_rows(ledger.spend(root), ledger.receipts(root))
 
 
 def join_rows(calls: list[dict], receipts: list[dict]) -> dict[str, dict]:

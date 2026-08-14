@@ -16,6 +16,233 @@ Entry format:
 
 ---
 
+## 2026-08-14 — METRICS-PRIMARY P4·P5 COMPLETE: the flip lands, suite green
+
+- **P4 — the id-joined family flipped**, plus the receipt-join fix the earlier session
+  reported as a blocker. `attribution` · `report`'s savings join · `freshness` ×2 ·
+  `compare` · `provenance`/`cage why` · `commitview` · `taskgroup` (feeding `commitjoin`/
+  compare/estimate/calibration) · `exportcmd`'s otel render.
+- **`ledger.join_table` — the fix, and why it is safe.** A receipt carries
+  `call=<calls-row id>`; post-cutover the spend row is a metric row with a different id,
+  so a lookup in `spend()` alone orphaned every linked receipt. `join_table` = `spend()`
+  plus the `calls` rows it superseded. It is a **lookup table, never a sum source** —
+  group totals still come from `spend()`, which holds each row exactly once — so the union
+  cannot double-count a token, and resolution stays an **exact id match**, never a
+  timestamp-proximity guess.
+- **The blocker was smaller than reported, and measuring said so.** On real data, **0 of 9**
+  post-cutover receipts carry a `call` id at all: every receipt cage's own shims file is
+  call-less by construction (graphify/fux carry a `task`, and price through the
+  `receiptprice` ladder). The break is real but latent — it bites `cage.meter` callers
+  passing `call=`. Recorded in ADR 0010's *deliberately not taken* with the count as the
+  reopen threshold, rather than shipping a speculative capture change.
+- **`ledgersync` carries the three metric kinds.** Without it `--team` would show every
+  teammate's spend stopping dead at the cutover, with no error and no empty table to
+  notice. Uses the **raw** readers, not the collapsing ones: the note ref is a union-by-id
+  archive, and collapsing before the merge drops rows another machine needs.
+- **R6 — the one golden that moved, and it is a fixture correction.** Its seed is
+  deliberately FUTURE-dated (61 days past the bundled `prices_date`, to fire the
+  prices-age advice), so it is post-cutover by design and the DoD's "all 43 goldens are
+  pre-cutover" premise never held. Reseeded to depict the real dual-write world (calls row
+  + its request-grain metric twin). **Every number is identical**; the only change is
+  `claude` → `claude-code`, which is what `parse_calls` and `make_claude_metric` both
+  actually stamp — the old value was the *surface* name, which no real row carries.
+- **P5 — docs.** [ADR 0010](../docs/adr/0010-metric-ledgers-are-the-spend-source-forward-only-cutover.md)
+  (required, written) · PLAN §3.14 added and §3.11–3.13's "capture-only, no derived view
+  reads this kind" stance corrected on all three · GLOSSARY +4 terms (cutover · spend
+  resolver · spend spine · request grain) · CHANGELOG · `docs/README.md` active-work index ·
+  handoff/prompt pair archived to `work/archive/v0.50-*` with the correction header ·
+  OPEN-WORK reconciled. **`CLAUDE.md` diff is PROPOSED, not applied.**
+- **Queue reconciled, not just ticked:** CLAUDE-DEDUP · CLAUDE-SUBAGENT-KEY closed by this
+  build. The three `*-METRICS-READ` items are **subsumed** — the kinds are now read by
+  every derived view, which is more than a read surface was ever going to be. Two new
+  items carried forward: **KIRO-IDE-METRIC-ROW** (kiro's measured zero, with the contained
+  fix named) and **METRICS-DUAL-WRITE-END** (gated to 2026-09-13 by ADR 0010).
+- **Files:** `cage/{ledger,constants,schema,transcript,report,attribution,freshness,compare,provenance,commitview,taskgroup,exportcmd,ledgersync,chats,matrix,budget,forecast,roi,netsaved,quality,study,adoption,regression,demo}.py`,
+  `docs/{PLAN,GLOSSARY,README}.md`, `docs/adr/0010-*.md`, `CHANGELOG.md`,
+  `tests/{test_spend_resolver,test_claude_request_grain}.py` (new) + 7 fixture files.
+- **Tests:** green — **1842 passed / 11 skipped** (+36). `test_floor` untouched. One golden
+  re-blessed (R6, label only), and the reason is recorded above rather than absorbed.
+- **Next:** KIRO-IDE-METRIC-ROW is the one contained follow-up; nothing else is in flight.
+
+## 2026-08-14 — METRICS-PRIMARY P3: aggregate family flipped; P4 blocked on a real finding
+
+- **Implemented:** 11 aggregate derive sites now read `ledger.spend()` instead of
+  `ledger.calls()` — `report` (×4) · `chats` (×2) · `matrix` · `budget` · `forecast` ·
+  `roi` · `netsaved` · `quality` · `study` · `adoption` · `regression`. Capture-side reads
+  deliberately keep `calls` (importcmd seen-sets, exportcmd's sweep counts and raw-row
+  body, demo seeding, doctor's capture diagnostics): those are about the calls *ledger*,
+  not about spend.
+- **The cutover had to be SCOPED, and this was nearly a silent data-loss bug.** The
+  machine clock crossed `SPEND_CUTOVER` mid-build and 47 tests went red at once. Cause:
+  `cage.meter`'s library rows (`agent="lib"` — the AlphaForge/Anton integration),
+  proxy-metered rows, and every `[sources.<name>]` custom tool write `calls` and have **no
+  metric ledger at all**. An unscoped flip silently zeroes all of them the instant the
+  clock passes the instant. `ledger.spend` now supersedes a post-cutover `calls` row only
+  when that row's own agent has a spine to be superseded by. This is NOT the per-agent
+  fallback rejected for kiro — kiro HAS a spine and correctly reads zero when its store is
+  absent, exactly as decided; this is about sources never in the flip's scope.
+- **`cage demo` was broken by the flip and is fixed.** It seeded at `now()` with
+  `agent="claude-code"`, so post-cutover it printed empty §4.4 tables — breaking a
+  standing CLAUDE.md invariant. It now carries a fixed pre-cutover instant, which a
+  worked example should always have had: §4.4's numbers are fixed, so a seeder stamped
+  with the wall clock was never reproducible in the sense the rest of cage is.
+- **Fixtures pinned, not papered over:** `test_report_cache_split`, `test_views`,
+  `test_universal_capture`, `test_report_savings`, `test_capture_health` seed **recorded
+  history** and now stamp an explicit pre-cutover `ts`. `cage data export --format json`'s
+  summary was a real inconsistency, not a fixture issue — its docstring promises "totals
+  match `cage report`", so it now reads the resolver while the jsonl/csv body stays the
+  raw `calls` dump.
+- **Tests:** **1841 passed / 11 skipped / 1 FAILED.** The one failure is a finding, not
+  noise — see below. Suite left red deliberately rather than re-blessed.
+- **THE FINDING — two handoff premises are false, and P4 needs a decision.**
+  1. *"All 43 golden fixtures are pre-cutover data ⇒ they must not move"* (DoD) is
+     **wrong**. `goldenseed.stale` (spec R6) is deliberately FUTURE-dated — anchored 61
+     days past the bundled `prices_date` to fire the prices-age advice — and no
+     pre-cutover date can be ≥45 days after `prices_date`, so it cannot be moved back.
+  2. **Receipts join to spend rows by CALL ID** (`report._nonhuman_savings`:
+     `by_id = {c.get("id"): c for c in all_calls}`, and `attribution.py` the same). A
+     receipt is written with `call=<calls-row id>`; post-cutover the spend row is a metric
+     row with a `clm_`/`cm_` id, so **every linked receipt orphans**. Measured on R6 by
+     seeding the realistic dual-write: the claude row's `gross tok` fell 80,000 → 0 while
+     TOTAL kept 80,000 — the saving silently left the agent and landed in the
+     unattributed bucket. `cage insights attrib` is the differentiator; this is not a
+     cosmetic break.
+- **Next:** P4 cannot proceed until Arpit chooses how receipts link post-cutover.
+
+## 2026-08-14 — METRICS-PRIMARY P0a·P1·P2: the delta twin, the request grain, the money path
+
+- **P0a — the cumulative gap closed at capture (Arpit chose option 1).**
+  `transcript.parse_copilot_cli_metrics` now emits a `source="cli-delta"` row beside every
+  cumulative `cli` row, reusing `parse_copilot_cli_calls`'s delta arithmetic **and its
+  reset rule** (a counter that goes DOWN means the store reset, so the new value *is* the
+  delta — clamping to 0 discards real spend). Verbatim capture is untouched, which is the
+  kind's reason to exist; only the derived twin is a spine. The twin carries the shutdown
+  **ordinal** in `request`, because `ledger.copilot_metrics` collapses on
+  `(source, session, surface, request, call)` and an empty `request` would have merged
+  every delta of a session into one and discarded all but the largest.
+  **Kiro needed nothing**: its `cli-conv` is cumulative too, but kiro-CLI spend never
+  lived in `calls` — it is credits-only (`ledger.credits`, REPORT-CREDITS), a mechanism
+  the cutover does not touch. Excluding it loses nothing, and `CUMULATIVE_SOURCES` now
+  records *why* each exclusion is not a gap.
+- **P1 — the claude request grain, and two defects closed.**
+  `transcript._fold_claude_records` extracted so the chat grain and the request grain are
+  **two projections of ONE fold**, never two folds that could drift (grep-pinned: the
+  dedup key is built in exactly one place). `_claude_request_rows` emits one
+  `source="request"` row per folded `(requestId, message.id)`, carrying a single `model`
+  — the thing a `model_totals` list structurally cannot give the money path.
+  **CLAUDE-DEDUP and CLAUDE-SUBAGENT-KEY are closed here**, in the new ledger;
+  `parse_calls` is deliberately untouched so pre-cutover history stays as recorded.
+  The drop is **asserted against `parse_calls` on the same fixture**, not stated in the
+  abstract. Second reader `ledger.claude_request_metrics` collapses per
+  `(session, request)`; `claude_metrics` now filters to the chat grain — **a bug my own
+  test caught**: unfiltered, the per-session chat collapse would have kept one request per
+  chat and silently discarded every other.
+- **P2 — the handoff's §5.4 was wrong about the field, and the real blocker was found.**
+  §5.4 said "stamp `est_cost_usd` at capture". That field is only a **last-resort
+  fallback** in `prices.call_usd_match` (for a provider cage cannot tokenize), and the
+  transcript meter deliberately never sets it — so stamping it would have been dead
+  weight, and freezing a price contradicts cage's derive-time pricing law. What actually
+  blocked pricing was **`provider`**: `policy.price_match` keys on `(provider, model)`, so
+  a perfectly-counted metric row priced as `none`, not as cheap. Stamping the provider —
+  the *same* derivation `parse_calls` already makes for these stores — makes a spend row
+  price through the one existing choke point with **no per-view fork**. Verified live: a
+  normalized request-grain row prices `$0.0660`, match `exact`.
+- **Files:** `cage/schema.py` (two new closed enums: `CLAUDE_METRIC_SOURCES`, `cli-delta`;
+  additive `provider`/`request`/`model`), `cage/transcript.py`, `cage/ledger.py`,
+  `tests/test_claude_request_grain.py` (new), `tests/test_spend_resolver.py`,
+  `tests/test_metrics_rescan.py`, `tests/test_claude_metrics.py`,
+  `tests/test_copilot_metrics.py`.
+- **Tests:** green — **1842 passed / 11 skipped**. Zero goldens re-blessed, `test_floor`
+  untouched.
+- **Measured live on this repo's real transcripts:** CLAUDE-DEDUP is **2.01×** — 43,885
+  assistant rows folding to 21,875 actual API responses. The backfill wrote 21,875
+  request-grain rows beside 184 chat-grain ones.
+- **Worth knowing before P3:** the machine's UTC now is 2026-08-13T21:33Z, so
+  `SPEND_CUTOVER` is ~2.5h in the future (midnight UTC tonight). **There is no
+  post-cutover data yet**, so `ledger.spend()` currently returns 53,165 rows all on the
+  `calls` basis with zero duplicate ids. P3's flip will therefore produce byte-identical
+  output today — the safest possible moment to land it, and also the reason it cannot be
+  validated against real metric-basis numbers until tomorrow.
+- **Next:** P3 (flip the aggregate family) then P4 (id-joined family + `ledgersync`).
+
+## 2026-08-14 — METRICS-PRIMARY P0: the cutover constant + `ledger.spend()`, the one resolver
+
+- **Decisions taken (Arpit, this session):** `CUTOVER = 2026-08-14T00:00:00Z` — the day
+  the metric routes and the backfill landed, so all six months of `calls` history stays
+  untouched and every golden is pre-cutover by construction. **No boundary footnote**
+  ("there hasn't been a major release yet so flip") — the ~2× discontinuity needs no
+  user-facing explanation because there are no users on the old basis yet. **Kiro reads
+  zero** post-cutover rather than refusing per-agent.
+- **Implemented:** `constants.SPEND_CUTOVER` (a literal, grep-gated against `now()`);
+  `ledger.spend(root, since=None)`, the single resolver — pre-cutover rows from `calls`,
+  at-or-after from the three metric kinds, normalized by `_spend_row` to the call-row
+  shape plus a `basis` field. `ledger.claude_request_metrics`, a second reader beside
+  `claude_metrics` collapsing per `(session, request)` rather than per session. **No
+  derive site switched** — P0 is the skeleton only.
+- **Found while building, NOT in the handoff — the cumulative-grain rule.** A cutover
+  partitions the time axis by each row's own `ts`. Two metric sources are *cumulative*,
+  not point-in-time: copilot `cli` (per-shutdown running totals) and kiro `cli-conv`
+  (whose collapse keeps the whole conversation's latest state). Post-cutover such a row
+  lands wholly on the metrics side while that same conversation's earlier traffic is
+  still counted on the `calls` side — **a straddling conversation billed twice, and
+  invisibly, because both halves are individually correct**. Caught by the straddling
+  fixture on its first run, not by reading. Both sources are therefore excluded from
+  `SPEND_SOURCES` and named in `ledger.CUMULATIVE_SOURCES` rather than quietly dropped.
+  Consequence, carried to Arpit: **copilot CLI and kiro CLI have no post-cutover spend
+  spine.** The fix is to delta them into point-in-time rows at capture (the shape
+  `transcript.parse_copilot_cli_calls` already uses for `calls`) — deliberately not
+  smuggled into a read-path flip.
+- **Files:** `cage/constants.py`, `cage/ledger.py`, `tests/test_spend_resolver.py` (new).
+- **Tests:** green — **1822 passed / 11 skipped** (+16). Zero goldens moved, as required
+  at P0: nothing reads the resolver yet.
+- **Next:** P1 (claude request-grain rows) is unblocked and independent of the open
+  question. P3 is not — it needs Arpit's call on the two CLI surfaces above.
+
+## 2026-08-14 — METRICS-CURSOR-BLIND: `cage import --rescan-metrics`, the metrics backfill
+
+- **Found by:** running METRICS-PRIMARY's P0 STOP gate. `cage doctor` reported
+  `copilot-metrics` and `kiro-metrics` at zero on every route — the trees did not exist
+  in either root. Probing the real stores with the shipped parsers in-process (no ledger
+  writes) found the data was there all along: **102 copilot rows** (27 CLI events, 75
+  VS Code chatSessions) and **56 kiro rows** (CLI `data.sqlite3`), zero captured. claude
+  had 11 only because its transcripts were still being written.
+- **Root cause:** the three metric legs consume the calls sweep's **cursor-filtered**
+  `files` list ([importcmd.py](../cage/importcmd.py) `import_claude`, `import_copilot`
+  ×2, `_ingest_credits`), so a store already at high-water when those routes shipped
+  (2026-08-14) is dropped by `_scan` as `cursor-unchanged` and its metric rows are never
+  written. Identical class to the graphify-route gap that `--rescan-graphify` exists for
+  — the second occurrence, so it earned its own flag rather than a note.
+- **Implemented:** `importcmd.metrics_scan_set(args, src, pattern, files, agent_cursor)`
+  mirroring `graphify_scan_set`, wired at all four cursor-fed metric sites; a new
+  `cage import --rescan-metrics`. Two design points carry the weight. (a) **The helper
+  returns the cursor too, and under a rescan it is `None`** — handed a store's full match
+  set the metric ingests would stamp the *calls* cursor for files the calls leg has not
+  ingested (a `--since`-filtered file above all), making those calls permanently
+  invisible; a backfill of one kind must never blind another, and idempotency comes from
+  row-id dedupe, not the cursor. `graphify_scan_set` needs no such half — detection
+  touches no cursor. (b) The run **always prints what it added, per kind, including
+  zero**, counted before/after off the ledger rather than accumulated through four ingest
+  sites; a silently-skipped store and an empty one being indistinguishable is the entire
+  defect. Kiro's routed IDE leg is unaffected (never `_scan`-filtered) and the line never
+  claims a row that landed in another sink (ADR 0006).
+- **Files:** `cage/importcmd.py`, `cage/cli.py`, `cage/explain_data.py`,
+  `docs/CLI.md`, `CHANGELOG.md`, `tests/test_metrics_rescan.py` (new).
+- **Tests:** green — **1806 passed / 11 skipped** (+7). Zero goldens re-blessed;
+  `test_floor` untouched. `test_cli_reference`'s bidirectional gate caught the
+  undocumented flag on the first run, as designed. Both load-bearing assertions
+  mutation-checked: reverting the cursor-`None` half reddens the safety test, reverting
+  the rescan itself reddens three.
+- **Verified live:** `cage import --rescan-metrics` on this repo's own ledger recovered
+  **265 rows — claude +173, copilot +84, kiro +8**. `cage doctor` now reports
+  `copilot-metrics: chat 57 / cli 27`, `kiro-metrics: cli-conv 3 / cli-turn 5`,
+  `claude-metrics: 186 raw / 184 chats`. **METRICS-PRIMARY's P0 STOP gate now passes.**
+- **Residual, stated not fixed:** two routes remain genuinely dataless on this machine
+  and are not a capture bug — copilot's `debuglog` store parses to 0 rows (21 files ×
+  264 B, no usage payload) and kiro IDE's `devdata.sqlite` is absent (Kiro IDE not
+  installed). Both already render their own reason in `cage doctor`.
+- **Next:** METRICS-PRIMARY is unblocked at P0 but still needs Arpit's two answers
+  (the `CUTOVER` literal, the report-footnote decision) before P3 can ship.
+
 ## 2026-08-14 — CLAUDE-METRICS: `.cage/ledger/claude/`, the per-chat Claude metrics ledger
 
 - **Implemented:** a new capture-only row kind, deliberately separate from `calls`

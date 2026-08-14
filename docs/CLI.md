@@ -139,6 +139,7 @@ per-agent high-water cursor). Works with no hooks and no project.
 | `--project PROJECT` | restrict to one repo's sessions (Claude only) |
 | `--since WINDOW` | only transcripts modified within a window like `7d` / `24h` / `2w` |
 | `--rescan-graphify` | re-run graphify savings detection over every matched log, ignoring the incremental cursor |
+| `--rescan-metrics` | re-parse every matched log into `ledger/{claude,copilot,kiro}/`, ignoring the incremental cursor |
 
 `--rescan-graphify` is a **backfill**, and it exists because the cursor is right for
 calls and wrong for savings: an unchanged log is skipped, so a graphify route that ships
@@ -146,6 +147,16 @@ calls and wrong for savings: an unchanged log is skipped, so a graphify route th
 re-ingests no call or credit rows — and idempotent by receipt id, so re-running it files
 nothing the second time. Use it once after upgrading into a release that adds a route
 (v0.47 added copilot VS Code and kiro CLI).
+
+`--rescan-metrics` is the same backfill for the **per-agent metric ledgers**, and it
+exists for the same reason one level over: the three metric kinds ride the calls sweep's
+cursor-filtered file list, so every store ingested before those routes shipped is skipped
+forever (METRICS-CURSOR-BLIND). Metrics only — no call or credit re-ingest — idempotent by
+row id, and it deliberately **advances no cursor**, so a backfill of one kind can never
+blind another. Use it once after upgrading into v0.50. It always prints what it added,
+per kind, **including when that is nothing** — a silently-skipped store and an empty one
+are the confusion the flag exists to end; verify with `cage doctor`'s
+`claude-metrics` / `copilot-metrics` / `kiro-metrics` lines.
 
 Kiro's IDE log is a machine fact, not a project fact, so those rows route to `~/.cage`
 even during a project sweep

@@ -48,7 +48,7 @@ def summarize(root: Path, pol: dict | None = None) -> dict:
             pol = {}
     outcomes = _load(root)
     cost_by_task: dict[str, float] = {}
-    for c in ledger.calls(root):
+    for c in ledger.spend(root):
         t = c.get("task")
         if t:
             cost_by_task[t] = cost_by_task.get(t, 0.0) + prices.call_usd(pol, c)

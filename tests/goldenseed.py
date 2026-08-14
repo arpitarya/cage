@@ -131,8 +131,21 @@ def stale(root: Path) -> None:
     stamped = _dt.date.fromisoformat(str(policy.bundled_raw()["meta"]["prices_date"]))
     anchor = stamped + _dt.timedelta(days=61)
     ts = f"{anchor.isoformat()}T09:00:00Z"
+    # METRICS-PRIMARY: this seed is deliberately FUTURE-dated (61 days past the bundled
+    # prices_date, to fire the prices-age advice), so it lands POST-cutover and is the one
+    # golden whose basis genuinely changed. Production dual-writes, so the fixture does
+    # too: `ledger.spend` supersedes the `calls` row with the claude request-grain metric
+    # row below, while `ledger.join_table` still resolves the receipt's `call="c_st1"` so
+    # the saving stays attributed to its agent. `agent="claude-code"` is what
+    # `transcript.parse_calls` and `make_claude_metric` both actually stamp — the old
+    # `"claude"` here was the SURFACE name, which no real row carries.
     _call(root, "c_st1", provider="anthropic", model="claude-sonnet-4-6",
-          agent="claude", tin=912_400, tout=61_200, ts=ts, task="t_r6")
+          agent="claude-code", tin=912_400, tout=61_200, ts=ts, task="t_r6")
+    ledger.append_row(root, "claude", schema.make_claude_metric(
+        source="request", session="s_r6", request="req_r6",
+        model="claude-sonnet-4-6", provider="anthropic",
+        tokens_in=912_400, tokens_out=61_200, requests=1, ts=ts,
+        metric_id="clm_st1"))
     _receipt(root, "r_0601", tool="graphify", raw=100_000, actual=20_000,
              ts=ts, call="c_st1", task="t_r6")
     now = _dt.datetime.now(_dt.timezone.utc)

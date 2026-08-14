@@ -92,7 +92,7 @@ def unpriced_detail(root: Path, pol: dict) -> dict:
     the compare/study UNPRICED warning (an analyst must see the gap before
     publishing a total; the group numbers themselves stay as computed)."""
     detail: dict[str, dict] = {}
-    for c in ledger.calls(root):
+    for c in ledger.spend(root):
         if prices.call_usd_match(pol, c)[1] != "none":
             continue
         u = detail.setdefault(f"{c.get('provider') or '—'}/{c.get('model') or '—'}",

@@ -211,9 +211,12 @@ def test_cli_metrics_parser_cumulative_float_credits_survive(tmp_path):
                                              "cacheReadTokens": 50}}},
         "totalPremiumRequests": 0.33, "totalNanoAiu": 330000000}))
     rows = transcript.parse_copilot_cli_metrics(p, session="sessA")
-    assert len(rows) == 1
-    r = rows[0]
-    assert r["source"] == "cli" and r["surface"] == "cli" and r["session"] == "sessA"
+    # Two rows per shutdown since METRICS-PRIMARY P0a: the verbatim cumulative `cli` row
+    # this test owns, plus its point-in-time `cli-delta` twin (pinned in
+    # tests/test_metrics_rescan.py). The verbatim contract below is unchanged.
+    assert [r["source"] for r in rows] == ["cli", "cli-delta"]
+    r = next(x for x in rows if x["source"] == "cli")
+    assert r["surface"] == "cli" and r["session"] == "sessA"
     assert r["credits"] == 0.33          # never floored by int()
     assert r["nano_aiu"] == 330000000.0
     assert r["model_totals"] == [{"model": "gpt-4", "tokens_in": 500,
@@ -415,10 +418,10 @@ def test_import_copilot_full_sweep_idempotent(proj, monkeypatch):
                           "no_import": False, "rescan_graphify": False})()
     assert clicmds.cmd_import(args) == 0
     first = ledger.copilot_metrics_raw(proj)
-    assert len(first) == 2  # one chat row, one cli row
+    assert len(first) == 3  # one chat row, one verbatim cli row, one cli-delta twin
     assert clicmds.cmd_import(args) == 0
     second = ledger.copilot_metrics_raw(proj)
-    assert len(second) == 2  # idempotent — zero new rows
+    assert len(second) == 3  # idempotent — zero new rows
 
 
 # ── 9 · counts-never-content on the written shard bytes ─────────────────────

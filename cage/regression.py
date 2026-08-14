@@ -23,7 +23,7 @@ def detect(root: Path, since: str = "7d", tolerance: float = 0.2,
             pol = policy.load(paths.Footprint(root).policy)
         except Exception:  # noqa: BLE001 — library default; CLI passes a checked pol
             pol = {}
-    calls = ledger.calls(root)
+    calls = ledger.spend(root)
     cut = ledger.since_cutoff(since)
     recent, base = [], []
     for c in calls:

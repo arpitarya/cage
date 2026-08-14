@@ -18,7 +18,7 @@ def _today_utc() -> str:
 
 def spend(root: Path, pol: dict, session: str | None = None,
           scope: str | None = None) -> dict:
-    calls = ledger.by_scope(ledger.calls(root), scope)
+    calls = ledger.by_scope(ledger.spend(root), scope)
     today = _today_utc()
     day_usd = sum(prices.call_usd(pol, c) for c in calls if (c.get("ts") or "")[:10] == today)
     sess_usd = sum(prices.call_usd(pol, c) for c in calls

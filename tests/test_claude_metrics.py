@@ -28,6 +28,15 @@ import pytest
 
 from cage import cli, doctorcmd, importcmd, ledger, schema, transcript
 
+
+def _chat(rows):
+    """The chat-grain rows only. Since METRICS-PRIMARY P1 the parser emits BOTH grains —
+    one `source="transcript"` row per chat and one `source="request"` row per folded
+    (requestId, message.id). This file owns the chat-grain contract, unchanged; the
+    request grain is pinned in tests/test_claude_request_grain.py."""
+    return [r for r in rows if r.get("source") == "transcript"]
+
+
 PROMPT_BODY_SENTINEL = "please refactor the auth module to use JWT tokens instead"
 
 
@@ -139,7 +148,7 @@ def test_dedup_law_folds_duplicate_rows_last_wins(tmp_path):
                           output_tokens=150),
                 _usage_row(uuid="u3", request_id="req1", message_id="msg1",
                           output_tokens=550))
-    rows = transcript.parse_claude_chat_metrics([main])
+    rows = _chat(transcript.parse_claude_chat_metrics([main]))
     assert len(rows) == 1
     r = rows[0]
     assert r["raw_rows"] == 3
@@ -155,7 +164,7 @@ def test_dedup_law_legacy_rows_without_requestid_key_on_uuid(tmp_path):
     _write_jsonl(main,
                 _usage_row(uuid="u1", request_id="", message_id="", output_tokens=10),
                 _usage_row(uuid="u2", request_id="", message_id="", output_tokens=20))
-    rows = transcript.parse_claude_chat_metrics([main])
+    rows = _chat(transcript.parse_claude_chat_metrics([main]))
     assert len(rows) == 1
     r = rows[0]
     assert r["raw_rows"] == 2
@@ -173,7 +182,7 @@ def test_dedup_law_counts_never_content():
     tmp = Path(tempfile.mkdtemp())
     main = tmp / "sess1.jsonl"
     _write_jsonl(main, row)
-    rows = transcript.parse_claude_chat_metrics([main])
+    rows = _chat(transcript.parse_claude_chat_metrics([main]))
     assert PROMPT_BODY_SENTINEL not in json.dumps(rows)
 
 
@@ -181,7 +190,7 @@ def test_dedup_law_counts_never_content():
 
 def test_subagent_rows_join_parent_chat_via_own_sessionid(tmp_path):
     main, sub = _session_with_subagent(tmp_path)
-    rows = transcript.parse_claude_chat_metrics([main, sub])
+    rows = _chat(transcript.parse_claude_chat_metrics([main, sub]))
     assert len(rows) == 1
     r = rows[0]
     assert r["session"] == "sess1"
@@ -194,7 +203,7 @@ def test_subagent_rows_join_parent_chat_via_own_sessionid(tmp_path):
 def test_non_sidechain_rows_never_add_to_sidechain_totals(tmp_path):
     main = tmp_path / "sess1.jsonl"
     _write_jsonl(main, _usage_row(uuid="u1", is_sidechain=False, output_tokens=42))
-    rows = transcript.parse_claude_chat_metrics([main])
+    rows = _chat(transcript.parse_claude_chat_metrics([main]))
     assert "sidechain_tokens_in" not in rows[0]
     assert "sidechain_tokens_out" not in rows[0]
 
@@ -206,7 +215,7 @@ def test_resume_drift_emits_more_than_one_chat_key(tmp_path):
     _write_jsonl(main,
                 _usage_row(uuid="u1", session="sess1", output_tokens=10),
                 _usage_row(uuid="u2", session="sess2", output_tokens=20))
-    rows = transcript.parse_claude_chat_metrics([main])
+    rows = _chat(transcript.parse_claude_chat_metrics([main]))
     assert {r["session"] for r in rows} == {"sess1", "sess2"}
 
 
@@ -236,7 +245,7 @@ def test_fileset_regroup_orphan_subagent_keeps_fileset_without_missing_main(tmp_
     filesets = importcmd._claude_session_filesets([sub])
     assert len(filesets) == 1
     assert filesets[0] == [sub]
-    rows = transcript.parse_claude_chat_metrics(filesets[0], session_hint="sessX")
+    rows = _chat(transcript.parse_claude_chat_metrics(filesets[0], session_hint="sessX"))
     assert len(rows) == 1 and rows[0]["session"] == "sessX"
 
 
@@ -320,7 +329,7 @@ def test_claude_metrics_since_skips_old_months(proj):
     recent = ledger.claude_metrics(root, since="30d")
     assert {r["id"] for r in recent} == {"clm_new_month"}
     # raw feeds the import seen-set and must never apply a window
-    assert {r["id"] for r in ledger.claude_metrics_raw(root)} == {"clm_old_month", "clm_new_month"}
+    assert {r["id"] for r in _chat(ledger.claude_metrics_raw(root))} == {"clm_old_month", "clm_new_month"}
 
 
 def test_metric_id_folds_values_not_timestamp():
@@ -331,14 +340,14 @@ def test_metric_id_folds_values_not_timestamp():
     tmp = Path(tempfile.mkdtemp())
     main = tmp / "sess1.jsonl"
     _write_jsonl(main, _usage_row(uuid="u1", output_tokens=100))
-    first = transcript.parse_claude_chat_metrics([main])[0]
-    second = transcript.parse_claude_chat_metrics([main])[0]
+    first = _chat(transcript.parse_claude_chat_metrics([main]))[0]
+    second = _chat(transcript.parse_claude_chat_metrics([main]))[0]
     assert first["id"] == second["id"]
 
     _write_jsonl(main, _usage_row(uuid="u1", output_tokens=100),
                 _usage_row(uuid="u2", request_id="req2", message_id="msg2",
                           output_tokens=200))
-    grown = transcript.parse_claude_chat_metrics([main])[0]
+    grown = _chat(transcript.parse_claude_chat_metrics([main]))[0]
     assert grown["id"] != first["id"]
 
 
@@ -349,9 +358,11 @@ def test_ingest_claude_metrics_idempotent(proj):
     main, sub = _session_with_subagent(root)
     first = importcmd._ingest_claude_metrics(root, [sub])  # only subagent "changed"
     second = importcmd._ingest_claude_metrics(root, [sub])
-    assert first == 1
+    # One chat-grain row plus one request-grain row per folded request (P1) — the count
+    # is both grains, and idempotency is what this test is actually about.
+    assert first > 1
     assert second == 0
-    assert len(ledger.claude_metrics_raw(root)) == 1
+    assert len(_chat(ledger.claude_metrics_raw(root))) == 1
 
 
 def test_ingest_claude_metrics_never_touches_call_seen_set(proj):
@@ -366,12 +377,12 @@ def test_ingest_claude_metrics_grown_chat_appends_fresh_row(proj):
     main = root / "sess1.jsonl"
     _write_jsonl(main, _usage_row(uuid="u1", output_tokens=100))
     importcmd._ingest_claude_metrics(root, [main])
-    assert len(ledger.claude_metrics_raw(root)) == 1
+    assert len(_chat(ledger.claude_metrics_raw(root))) == 1
     _write_jsonl(main, _usage_row(uuid="u1", output_tokens=100),
                 _usage_row(uuid="u2", request_id="req2", message_id="msg2",
                           output_tokens=50))
     importcmd._ingest_claude_metrics(root, [main])
-    assert len(ledger.claude_metrics_raw(root)) == 2
+    assert len(_chat(ledger.claude_metrics_raw(root))) == 2
     collapsed = ledger.claude_metrics(root)
     assert len(collapsed) == 1
     assert collapsed[0]["tokens_out"] == 150
@@ -402,11 +413,11 @@ def test_import_claude_full_sweep_idempotent(proj, monkeypatch):
                           "project": None, "ledger": None, "quiet": True,
                           "no_import": False, "rescan_graphify": False})()
     assert clicmds.cmd_import(args) == 0
-    first = ledger.claude_metrics_raw(proj)
+    first = _chat(ledger.claude_metrics_raw(proj))
     assert len(first) == 1
     assert first[0]["requests"] == 2  # main + subagent joined
     assert clicmds.cmd_import(args) == 0
-    second = ledger.claude_metrics_raw(proj)
+    second = _chat(ledger.claude_metrics_raw(proj))
     assert len(second) == 1  # idempotent — zero new rows
 
 
@@ -419,7 +430,7 @@ def test_written_shard_bytes_never_carry_the_prompt_body(proj):
     from cage import paths
     shard_bytes = b"".join(sh.read_bytes() for sh in paths.Footprint(root).claude_shards())
     assert PROMPT_BODY_SENTINEL.encode("utf-8") not in shard_bytes
-    assert len(ledger.claude_metrics_raw(root)) == 1
+    assert len(_chat(ledger.claude_metrics_raw(root))) == 1
 
 
 # ── 10 · byte-identity: no derived view moves ───────────────────────────────

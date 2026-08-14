@@ -21,6 +21,20 @@ _SLICES = [
 _BASE = 2000   # sys+user prompt, always present
 _OUT = 1500    # output held constant
 
+# The worked example is RECORDED HISTORY, so it carries a fixed instant rather than
+# `now()`. Two reasons, and the second is the one that made this a bug:
+#
+#  1. Determinism. §4.4's tables are fixed numbers; a seeder whose rows are stamped with
+#     the wall clock was never reproducible in the sense the rest of cage is.
+#  2. METRICS-PRIMARY. `ledger.spend` supersedes a post-cutover `calls` row for any of the
+#     three metric-ledger agents, and this row is stamped `agent="claude-code"`. Seeded at
+#     `now()` it landed after `constants.SPEND_CUTOVER` and vanished from every derived
+#     view — `cage demo` printed empty tables, breaking the standing invariant that it
+#     must keep reproducing §4.4. A demo has no transcript store to capture from, so no
+#     metric twin can ever exist for it; the fixed pre-cutover instant is what makes it
+#     honest history rather than a row waiting to be superseded by nothing.
+_TS = "2026-06-01T12:00:00Z"
+
 
 def seed(root: Path) -> str:
     # Idempotent: `cage demo` is the "prove the thesis" seeder — re-running it must not
@@ -35,8 +49,9 @@ def seed(root: Path) -> str:
     call_id = metering.record_call(
         route="code-edit", provider="anthropic", model="claude-sonnet-4-6",
         tokens_in=actual_in, tokens_out=_OUT, task=TASK, agent="claude-code",
-        session="demo", root=root)
+        session="demo", root=root, ts=_TS)
     for tool, without, with_, method in _SLICES:
         metering.record_receipt(tool=tool, raw_alternative=without, actual=with_,
-                                call=call_id, task=TASK, method=method, root=root)
+                                call=call_id, task=TASK, method=method, root=root,
+                                ts=_TS)
     return call_id

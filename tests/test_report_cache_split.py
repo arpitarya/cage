@@ -14,6 +14,13 @@ from cage import display, ledger, paths, policy, report, schema
 USD = display.Display(usd=True)
 
 
+# Pre-cutover by construction: this fixture is RECORDED HISTORY, and
+# `ledger.spend` supersedes a post-cutover `calls` row for the three
+# metric-ledger agents (METRICS-PRIMARY). An unstamped row would be
+# stamped `now()` and vanish from every derived view.
+LEDGER_TS = "2026-06-01T12:00:00Z"
+
+
 def _pol():
     return policy.load(None)
 
@@ -23,7 +30,7 @@ def _seed(root, *, tokens_in, tokens_out, cached_in, model="claude-sonnet-4-6"):
                   schema.make_call(route="chat", provider="anthropic", model=model,
                                    agent="claude-code", tokens_in=tokens_in,
                                    tokens_out=tokens_out, cached_in=cached_in,
-                                   session="s"))
+                                   session="s", ts=LEDGER_TS))
 
 
 def test_cache_usd_uses_the_real_price_row_not_a_hardcoded_fraction(proj):
@@ -65,7 +72,7 @@ def test_unpriced_model_reports_no_cache_split(proj):
                   schema.make_call(route="chat", provider="totally-unknown",
                                    model="mystery-model", agent="claude-code",
                                    tokens_in=1000, tokens_out=100, cached_in=500,
-                                   session="s"))
+                                   session="s", ts=LEDGER_TS))
     rep = report.summarize(proj, _pol(), dim="agent")
     assert rep["total"]["cache_usd"] == 0.0
     assert rep["total"]["usd"] == 0.0  # genuinely unpriced

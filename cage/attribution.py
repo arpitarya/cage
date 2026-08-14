@@ -61,7 +61,7 @@ def attribute(root: Path, task: str, pol: dict, scope: str | None = None,
     step's ``priced_via``/``priced_model`` carry the rung, footnoted by the render.
     Receipts with a resolvable call keep the task-model path, byte-identical."""
     from cage import receiptprice
-    all_calls, all_receipts = ledger.calls(root), ledger.receipts(root)
+    all_calls, all_receipts = ledger.join_table(root), ledger.receipts(root)
     if team:
         from cage import ledgersync
         t = ledgersync.read_team(root)

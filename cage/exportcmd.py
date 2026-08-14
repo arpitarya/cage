@@ -77,8 +77,18 @@ def sweep(root: Path, since: str | None) -> tuple[bool, int]:
         return False, 0
 
 
-def _filtered(root: Path, since: str | None, project: str | None, agent: str | None) -> list[dict]:
-    rows = ledger.since(ledger.calls(root, since=since), since)
+def _filtered(root: Path, since: str | None, project: str | None, agent: str | None,
+              *, spend: bool = False) -> list[dict]:
+    """Window+project+agent-filtered rows for an export.
+
+    ``spend=False`` (the default) reads the `calls` ledger VERBATIM — the raw jsonl/csv
+    export is a dump of that kind and must stay exactly what the ledger stores.
+    ``spend=True`` reads `ledger.spend`, the derive resolver, and is used for the JSON
+    **summary**, whose stated contract is that its totals match `cage report`. Post-cutover
+    the two genuinely differ (METRICS-PRIMARY), so the summary would silently disagree with
+    the report it promises to match if it kept reading raw rows."""
+    src = ledger.spend(root, since=since) if spend else ledger.calls(root, since=since)
+    rows = ledger.since(src, since)
     rows = ledger.by_project(rows, project)
     if agent:
         rows = [r for r in rows if r.get("agent") == agent]
@@ -125,12 +135,15 @@ def _summary(rows: list[dict], pol: dict) -> dict:
     return {"total": total, "by_agent": by_agent, "by_model": by_model, "by_project": by_project}
 
 
-def render(rows: list[dict], fmt: str, pol: dict, refresh: dict | None = None) -> str:
+def render(rows: list[dict], fmt: str, pol: dict, refresh: dict | None = None,
+           summary_rows: list[dict] | None = None) -> str:
+    """``rows`` is the raw `calls` export body; ``summary_rows`` (when given) is the
+    resolver's view, used for the JSON summary so its totals match `cage report`."""
     if fmt == "jsonl":
         return _jsonl(rows)
     if fmt == "csv":
         return _csv(rows)
-    summary = _summary(rows, pol)
+    summary = _summary(rows if summary_rows is None else summary_rows, pol)
     if refresh is not None:
         summary = {"refresh": refresh, **summary}
     return json.dumps(summary, ensure_ascii=False, indent=2) + "\n"
@@ -174,7 +187,7 @@ def run(root: Path, args, *, pol: dict) -> int:
         # the pricing ladder needs the *unfiltered* call set to resolve a call-less
         # receipt's task-model rung regardless of what the calls array shows.
         receipts = ledger.since(ledger.receipts(root, since=since), since)
-        out = otelout.render(rows, receipts, ledger.calls(root), pol)
+        out = otelout.render(rows, receipts, ledger.join_table(root), pol)
         unit = "otel document"
         if getattr(args, "output", None):
             try:
@@ -191,7 +204,12 @@ def run(root: Path, args, *, pol: dict) -> int:
         out = _csv(rows, kind)
     else:
         rows = _filtered(root, since, project, agent)
-        out = render(rows, fmt, pol, refresh=refresh if fmt == "json" else None)
+        # The JSON summary promises "totals match `cage report`", so it reads the
+        # resolver; the jsonl/csv body stays the raw `calls` dump (METRICS-PRIMARY).
+        summary_rows = (_filtered(root, since, project, agent, spend=True)
+                        if fmt == "json" else None)
+        out = render(rows, fmt, pol, refresh=refresh if fmt == "json" else None,
+                     summary_rows=summary_rows)
     unit = kind or "call"
     if getattr(args, "output", None):
         try:

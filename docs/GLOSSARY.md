@@ -399,3 +399,30 @@ inside the commit's own second out of it and break the inclusive bound
 **unconfirmable (call)** — a call carrying no `project` stamp. Excluded from a commit
 join as a *distinct* fact from "another project's call": adopting unstamped rows would
 pull every other repo's spend onto this repo's commits.
+
+**cutover (spend cutover)** — `constants.SPEND_CUTOVER`, the pinned UTC **literal** at
+which derived spend stops resolving from the `calls` ledger and starts resolving from the
+three per-agent metric ledgers. Never `now()` and never configurable: a computed cutover
+would make yesterday's report irreproducible tomorrow. Rows resolve by their **own `ts`**,
+so a chat straddling it contributes to both sides — once each. See
+[ADR 0010](adr/0010-metric-ledgers-are-the-spend-source-forward-only-cutover.md).
+
+**spend resolver** — `ledger.spend(root, since)`, the ONE function every derived view asks
+"what was spent". Pre-cutover `calls` rows plus post-cutover metric rows, normalized to
+one shape with a `basis` field naming which ledger the figure came from. Distinct from
+`ledger.join_table`, which is `spend()` *plus* the superseded `calls` rows and exists only
+so a receipt's `call` id still resolves — a **lookup table, never a sum source**.
+
+**spend spine** — the one metric `source` per (agent, surface) allowed to carry money
+(`ledger.SPEND_SOURCES`). Each metric kind deliberately holds several overlapping views of
+the same traffic, so a kind is **never summed**. A spine must be **point-in-time, never
+cumulative**: a cumulative row carries its session's whole life at its latest capture, so
+across a cutover it would be billed twice.
+
+**request grain (claude)** — a `source="request"` metric row, one per folded
+`(requestId, message.id)`, carrying a single `model`. The grain the money path reads, and
+where CLAUDE-DEDUP and CLAUDE-SUBAGENT-KEY are closed. Its sibling `source="transcript"`
+is the chat grain — a whole-life total holding a `model_totals` list, which structurally
+cannot price as one call. Two projections of ONE fold (`transcript._fold_claude_records`),
+never two folds, and never summed together.
+

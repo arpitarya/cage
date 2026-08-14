@@ -27,7 +27,7 @@ def _span_days(calls: list[dict]) -> int:
 
 
 def project(root: Path, pol: dict) -> dict:
-    calls = ledger.calls(root)
+    calls = ledger.spend(root)
     # Derive-time repricing (tokens × policy): the stored est_cost_usd is 0.0 for
     # transcript-sourced calls, which read as "no spend" here before this repriced.
     total = sum(prices.call_usd(pol, c) for c in calls)

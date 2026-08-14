@@ -100,7 +100,8 @@ def test_report_by_agent_attributes_and_dash_bucket(proj):
     pol = _pol()
     call_id = meter.record_call(route="r", provider="anthropic",
                                 model="claude-sonnet-4-6", tokens_in=1000,
-                                tokens_out=0, agent="claude-code", root=proj)
+                                tokens_out=0, agent="claude-code", root=proj,
+                                ts="2026-06-01T12:00:00Z")
     # usd-unit receipts: real dollars regardless of the call (no token pricing needed).
     meter.record_receipt(tool="graphify", raw_alternative=10.0, actual=0.0,
                          unit="usd", call=call_id, root=proj)

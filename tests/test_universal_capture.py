@@ -134,7 +134,8 @@ def test_report_project_filter(tmp_path, monkeypatch):
     for proj, tin in (("alpha", 100), ("beta", 200), ("alpha", 300)):
         ledger.append_row(root, "calls", schema.make_call(
             route="chat", provider="anthropic", model="claude-opus-4-8",
-            tokens_in=tin, tokens_out=10, agent="claude-code", project=proj))
+            tokens_in=tin, tokens_out=10, agent="claude-code", project=proj,
+            ts="2026-06-01T12:00:00Z"))
     rep = report.summarize(root, policy.load(None), dim="project", project="alpha")
     assert set(rep["groups"]) == {"alpha"}
     assert rep["total"]["calls"] == 2 and rep["total"]["tokens_in"] == 400

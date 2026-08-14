@@ -209,7 +209,7 @@ def summarize(root: Path, pol: dict, *, since: str | None = None,
     base["branch"] = commitjoin._git(r, "rev-parse", "--abbrev-ref", "HEAD") or ""
     base["branch"] = base["branch"].strip()
 
-    calls = ledger.calls(root)
+    calls = ledger.spend(root)
     join = commitjoin.join_calls(calls, windows, tasks.read(root),
                                  project=r.name, receipts=ledger.receipts(root))
     # Provenance and task rows are keyed by whatever sha shape was current when they

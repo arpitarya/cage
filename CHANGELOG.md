@@ -94,16 +94,72 @@ Full release notes. The README keeps a one-line summary per version; the detail 
   transcript-retention nudge (Claude Code's own default sweep is 30 days). Capture-only:
   no report/view reads the kind yet, pinned by a byte-identity test.
 
-Suite: 1798 passed / 11 skipped (1655 → 1662 CHATS-CREDITS, → 1679 REPORT-CREDITS —
+- **METRICS-CURSOR-BLIND (fix):** the three metric ledgers above shipped **capturing
+  almost nothing**, and nothing said so. They ride the calls sweep's cursor-filtered file
+  list, so every store already at high-water when those routes shipped was dropped by
+  `_scan` as `cursor-unchanged` and its metric rows were never written — permanently. It
+  is the same class as the graphify-route gap `--rescan-graphify` exists for, one level
+  over. Found by running the METRICS-PRIMARY P0 gate on the maintainer's machine, where
+  `cage doctor` reported the copilot and kiro kinds empty: probing the real stores with
+  the shipped parsers found 102 copilot rows and 56 kiro rows sitting on disk uncaptured,
+  while claude had captured 11 only because its transcripts were still being written.
+  **New `cage import --rescan-metrics`** re-parses every matched log into the three kinds
+  ignoring the cursor — metrics only (no call or credit re-ingest), idempotent by row id,
+  and it deliberately **advances no cursor**: handed a store's full match set it would
+  otherwise stamp the *calls* cursor for files the calls leg has not ingested (a
+  `--since`-filtered file above all), so a backfill of one kind would silently blind
+  another. It always prints what it added, per kind, **including zero** — a
+  silently-skipped store and an empty one being indistinguishable is the whole defect.
+  On this repo's own ledger the backfill recovered 265 rows (claude +173, copilot +84,
+  kiro +8) and the METRICS-PRIMARY P0 gate now passes.
+
+- **METRICS-PRIMARY:** the three metrics ledgers above stop being decorative and become
+  **the source of derived spend**, forward-only from a pinned instant
+  (`constants.SPEND_CUTOVER = 2026-08-14T00:00:00Z`, a literal — never `now()`, or the
+  determinism law ends). `ledger.spend()` is the one resolver every derived view reads:
+  rows before the cutover from `calls`, rows at or after it from
+  `ledger/{claude,copilot,kiro}/`, resolved by each row's **own `ts`** so a chat
+  straddling the instant is counted once on each side and never twice. Capture stays
+  **dual-write**, so the flip is a one-constant rollback rather than a data event.
+  Design of record: **[ADR 0010](docs/adr/0010-metric-ledgers-are-the-spend-source-forward-only-cutover.md)**,
+  plan §3.14.
+  · **CLAUDE-DEDUP and CLAUDE-SUBAGENT-KEY are CLOSED.** Claude gains a **request grain**
+  (one row per folded `(requestId, message.id)`, carrying a single model), emitted from
+  the same fold as the chat grain — never a second fold. Measured on this repo's real
+  transcripts: **2.01× inflation**, 43,885 assistant rows folding to 21,875 actual API
+  responses. `parse_calls` is untouched, so recorded history stays as recorded, and
+  post-cutover claude totals drop ~2× because the overcount is gone.
+  · **A spend spine must be point-in-time, never cumulative.** Copilot's CLI store writes
+  cumulative per-shutdown totals, which across a cutover would bill a straddling session
+  twice; it now emits a **`cli-delta` twin** beside the verbatim row, reusing
+  `parse_copilot_cli_calls`'s delta arithmetic *and* its reset rule. Verbatim capture is
+  untouched — only the derived twin is a spine, and the two are never summed.
+  · **Two near-misses, both caught by tests rather than review.** The cutover had to be
+  **scoped to the three agents that have a metric ledger**: `cage.meter`'s library rows,
+  proxy rows and custom tools have none, and an unscoped flip silently zeroed every one of
+  them the instant the clock crossed the instant. And `cage demo` seeded at `now()`, so it
+  printed empty §4.4 tables — it now carries a fixed pre-cutover instant, which a worked
+  example should always have had.
+  · `ledger.join_table` keeps a receipt's `call` id resolvable across the boundary (a
+  lookup table, never a sum source); `ledgersync` carries the three metric kinds, or
+  `--team` would show every teammate's spend stopping dead at the cutover.
+  · **Known and stated, not hidden: kiro reads zero post-cutover** — its metric route
+  parses `devdata.sqlite` while its calls route parses `tokens_generated.jsonl`, and only
+  the latter exists here (filed as KIRO-IDE-METRIC-ROW). **One golden moved** (`R6`, the
+  deliberately future-dated fixture) and only its agent label — every number identical.
+
+Suite: 1842 passed / 11 skipped (1655 → 1662 CHATS-CREDITS, → 1679 REPORT-CREDITS —
 17 new in `tests/test_report_credits.py`, → 1704 GRAPHIFY-CHATS — 23 new in
 `tests/test_graphifychat.py`, → 1737 COPILOT-METRICS — 33 new in
 `tests/test_copilot_metrics.py`, → 1768 KIRO-METRICS — 31 new in
 `tests/test_kiro_metrics.py`, → 1798 CLAUDE-METRICS — 30 new in
-`tests/test_claude_metrics.py`; briefly 1703/1 while a concurrent session's
+`tests/test_claude_metrics.py`, → 1806 METRICS-CURSOR-BLIND — 7 new in
+`tests/test_metrics_rescan.py`, → 1842 METRICS-PRIMARY — 36 new in
+`tests/test_spend_resolver.py` + `tests/test_claude_request_grain.py`; briefly 1703/1 while a concurrent session's
 `docs/copilot-capture.md` work was still uncommitted in this tree, unrelated and
-since resolved). No golden re-blessed for any of the six — none of their
+since resolved). One golden re-blessed across the eight (`R6` — agent label only, every number identical; its fixture is deliberately future-dated, so the handoff's "all 43 goldens are pre-cutover" premise never held). Otherwise no golden moved for — none of their
 columns/views render for a ledger with no credits/graphify/copilot-metrics/
-kiro-metrics/claude-metrics data.
+kiro-metrics/claude-metrics data, and `--rescan-metrics` renders only under its own flag.
 
 ## v0.49.0 (2026-08-12) — the queue emptied, and the agent lane with it
 

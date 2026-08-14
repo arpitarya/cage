@@ -98,7 +98,7 @@ def _grouping_calls(root: Path, since: str | None, team_calls):
     (`ledger.calls(..., since=...)`); team rows are a plain list filtered by `ledger.since`."""
     if team_calls is not None:
         return ledger.since(team_calls, since)
-    return ledger.since(ledger.calls(root, since=since), since)
+    return ledger.since(ledger.spend(root, since=since), since)
 
 
 def _is_legacy_human(r: dict) -> bool:
@@ -143,7 +143,12 @@ def summarize(root: Path, pol: dict, dim: str = "route", since: str | None = Non
               scope: str | None = None, project: str | None = None,
               team: bool = False) -> dict:
     tc, tr = _team_rows(root, team)
-    raw_calls = tc if tc is not None else ledger.calls(root)
+    # The receipt-JOIN table (`_nonhuman_savings` line ~274 + freshness), never the sum
+    # source — group totals come from `_grouping_calls` below, which reads `spend()` and
+    # holds each row exactly once. `join_table` adds back the `calls` rows the cutover
+    # superseded, so a receipt written with `call=<calls-row id>` still resolves to its
+    # agent instead of silently falling into the unattributed bucket (METRICS-PRIMARY P4).
+    raw_calls = tc if tc is not None else ledger.join_table(root)
     all_calls = ledger.by_project(raw_calls, project)
     windowed_receipts = (ledger.since(tr, since) if tr is not None
                          else ledger.since(read_receipts(root, pol, since=since), since))
@@ -536,7 +541,7 @@ def _unpriced_block(detail: dict, credits: dict | None = None) -> str:
 
 def overview(root: Path, pol: dict, since: str | None = None) -> dict:
     """The bare-`cage` headline: spent / saved / net / tokens over the window (§4)."""
-    calls = ledger.since(ledger.calls(root, since=since), since)
+    calls = ledger.since(ledger.spend(root, since=since), since)
     spent, unpriced_calls, unpriced_tokens = 0.0, 0, 0
     for c in calls:
         usd, match, _ = prices.call_usd_match(pol, c)
@@ -546,7 +551,7 @@ def overview(root: Path, pol: dict, since: str | None = None) -> dict:
             unpriced_tokens += c.get("tokens_in", 0) + c.get("tokens_out", 0)
     tokens = sum(c.get("tokens_in", 0) + c.get("tokens_out", 0) for c in calls)
     rcpts = ledger.since(read_receipts(root, pol, since=since), since)
-    saved = sum(s for _, _, s, _, _ in _nonhuman_savings(ledger.calls(root), rcpts, pol))
+    saved = sum(s for _, _, s, _, _ in _nonhuman_savings(ledger.join_table(root), rcpts, pol))
     return {"since": since, "empty": not calls, "calls": len(calls),
             "spent_usd": spent, "saved_usd": saved, "net_usd": saved - spent,
             "tokens": tokens, "unpriced_calls": unpriced_calls,

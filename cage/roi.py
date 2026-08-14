@@ -27,7 +27,7 @@ from cage.constants import METHOD_TRUST as _TRUST
 
 
 def by_tool(root: Path, pol: dict, since: str | None = None) -> dict:
-    all_calls = ledger.calls(root)
+    all_calls = ledger.spend(root)
     calls = {c["id"]: c for c in all_calls}
     rcpts = ledger.since(ledger.receipts(root, since=since), since)
     idx = receiptprice.build(all_calls, rcpts)  # once per view, never per receipt

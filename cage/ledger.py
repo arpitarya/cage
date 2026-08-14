@@ -11,7 +11,7 @@ import re
 import sys
 from pathlib import Path
 
-from cage import paths
+from cage import constants, paths
 from cage.constants import LEDGER_WARN_BYTES, SINCE_WINDOW_DAYS
 
 _warned_dirs: set[str] = set()  # ledger-size warning fires at most once per dir per process
@@ -383,11 +383,213 @@ def claude_metrics(root: Path, since: str | None = None) -> list[dict]:
         rows.extend(read(sh))
     latest: dict[str, dict] = {}
     for r in rows:
+        # CHAT GRAIN ONLY. Since METRICS-PRIMARY P1 this kind holds two grains, and this
+        # collapse is per SESSION — handed a request-grain row it would keep ONE request
+        # per chat and silently discard every other, while also mixing two different
+        # meanings of "row". `claude_request_metrics` is the reader for that grain.
+        if r.get("source") != "transcript":
+            continue
         sess = r.get("session", "")
         cur = latest.get(sess)
         if cur is None or _claude_metric_score(r) >= _claude_metric_score(cur):
             latest[sess] = r
     return sorted(latest.values(), key=lambda x: x.get("id", ""))
+
+
+def claude_request_metrics(root: Path, since: str | None = None) -> list[dict]:
+    """Claude **request-grain** metric rows (source ``request``, METRICS-PRIMARY P1),
+    collapsed last-write-wins per ``(session, request)``.
+
+    Deliberately a second reader beside `claude_metrics`, not a parameter on it: the two
+    answer different questions and collapse on different keys. `claude_metrics` keeps one
+    whole-life total per chat — correct for a per-chat view, and catastrophic here, since
+    it would discard every request in a chat but one. A request row is a point-in-time
+    fact, so its own identity is the collapse key and a re-capture of the same request
+    simply wins over its earlier copy.
+
+    Winner = max by ``(tokens_in + tokens_out, id)``: the fullest capture of that request
+    wins, ties break on append order. Empty until P1 emits the grain."""
+    foot = paths.Footprint(root)
+    cut = since_cutoff(since)
+    latest: dict[tuple, dict] = {}
+    for sh in foot.claude_shards():
+        if cut is not None and _month_entirely_below(sh.name, cut):
+            continue
+        for r in read(sh):
+            if r.get("source") != "request":
+                continue
+            key = (r.get("session", ""), r.get("request", ""))
+            cur = latest.get(key)
+            score = (r.get("tokens_in", 0) + r.get("tokens_out", 0), r.get("id", ""))
+            if cur is None or score >= (cur.get("tokens_in", 0) + cur.get("tokens_out", 0),
+                                        cur.get("id", "")):
+                latest[key] = r
+    return sorted(latest.values(), key=lambda x: x.get("id", ""))
+
+
+# ── METRICS-PRIMARY: the one spend resolver (ADR 0010, PLAN §3.14) ──────────────
+#
+# Which metric `source` is the SPEND SPINE for each agent. This table is the answer to
+# the one question the metric ledgers pose that `calls` never did: **each kind holds
+# several overlapping views of the same traffic, on purpose.** Copilot's five stores all
+# describe the same requests at three different grains; kiro's `cli-conv` and `cli-turn`
+# are the same conversation counted two ways. Summing a kind is therefore WRONG — it
+# double- or triple-counts — so spend picks exactly one source per (agent, surface) and
+# never adds a second.
+#
+# The choices, and why each is the one that can carry money:
+#   claude   `request`   the P1 request-grain row — one per folded (requestId,
+#                        message.id). The chat-grain row is a whole-life total for the
+#                        SAME traffic, so including it would double every chat.
+#   copilot  `chat`      VS Code, per request, durable and ungated (surface=vscode).
+#                        `sidecar`/`debuglog`/`otel` are finer views of that SAME traffic
+#                        and are opt-in, so a machine that enables one would silently
+#                        double its own spend.
+#            `cli-delta` Copilot CLI, per shutdown — the DELTA twin, not the cumulative
+#                        `cli` row beside it (see below).
+#   kiro     `ide`       per LLM call (surface=ide).
+#
+# **THE SECOND RULE, found while building P0 and not anticipated by the handoff: a spine
+# source must be POINT-IN-TIME, never CUMULATIVE.** A cutover partitions the time axis by
+# each row's own `ts`. A cumulative row carries its session's ENTIRE life in one row
+# stamped at the latest capture, so post-cutover it would land wholly on the metrics side
+# while that same session's earlier traffic is still counted on the `calls` side — a
+# straddling session billed twice, invisibly, because both figures are individually
+# correct. Caught by a straddling fixture, not by reading.
+#
+# Copilot's `cli` store is the only place this bites, and it is fixed at capture:
+# `transcript.parse_copilot_cli_metrics` now emits a `cli-delta` row beside every
+# cumulative `cli` row, reusing `parse_copilot_cli_calls`'s delta arithmetic and its reset
+# rule. Verbatim capture is preserved (`cli` is untouched — it is why the kind exists);
+# only the derived twin is a spine. **Never sum the two.**
+#
+# Kiro's `cli-conv` is cumulative too and is likewise NOT a spine — but that is not a gap
+# and must not be read as one: kiro-CLI spend never lived in `calls` at all. It is
+# credits-only (`schema.make_credit` → `ledger.credits`), folded by `report.summarize` as
+# its own group (REPORT-CREDITS, CLAUDE.md), a mechanism this cutover does not touch and
+# does not need to. Excluding it loses nothing.
+#
+# Adding a store to a kind does NOT add it here. That is the point: capture stays wide,
+# spend stays single-basis and point-in-time.
+SPEND_SOURCES: dict[str, tuple[str, ...]] = {
+    "claude": ("request",),
+    "copilot": ("chat", "cli-delta"),
+    "kiro": ("ide",),
+}
+
+#: Cumulative sources deliberately excluded from `SPEND_SOURCES`, each with the reason —
+#: named rather than silently dropped, so a reader can tell "excluded by design" from
+#: "nobody thought about it". Neither leaves a hole: copilot CLI is covered by its
+#: `cli-delta` twin, kiro CLI by the separate credits mechanism.
+CUMULATIVE_SOURCES: dict[str, tuple[str, str]] = {
+    "copilot": ("cli", "superseded by the cli-delta twin"),
+    "kiro": ("cli-conv", "kiro-CLI spend is credits-only (ledger.credits), never in calls"),
+}
+
+
+def _spend_row(row: dict) -> dict:
+    """One metric row, normalized to the call-row shape every derive site already reads.
+
+    Additive only — a field the metric kind does not carry is simply absent, exactly as
+    it would be on a legacy call row, and is NEVER synthesized. `basis` is the one field
+    that is not on a call row: it names which ledger the figure came from, so a view can
+    state a split instead of blending two bases silently (the `creditprice` precedent)."""
+    out = {k: row[k] for k in ("id", "ts", "agent", "model", "provider", "session",
+                               "task", "surface", "project", "scope", "tokens_in",
+                               "tokens_out", "cached_in", "cache_write_in",
+                               "est_cost_usd", "credits", "billed_with", "latency_ms",
+                               "import_id", "route")
+           if k in row}
+    out.setdefault("route", "chat")
+    out.setdefault("ok", True)
+    out["basis"] = "metrics"
+    return out
+
+
+def spend(root: Path, since: str | None = None) -> list[dict]:
+    """**The single derive resolver** (METRICS-PRIMARY): every view that asks "what was
+    spent" reads this, never `calls()` directly.
+
+    Rows with `ts < constants.SPEND_CUTOVER` resolve from the `calls` ledger; rows at or
+    after it resolve from the three per-agent metric ledgers, normalized by `_spend_row`
+    to the shape `calls` already had. **No row is counted twice**, because the boundary
+    is a partition of the time axis and every row lands on exactly one side of it by its
+    OWN `ts` — never by its session's start, so a chat that began before the cutover and
+    grew after it contributes its early rows to one side and its later rows to the other.
+
+    Why forward-only rather than a migration: six months of recorded `calls` history
+    cannot be rebuilt into metric rows (the vendor fields were never captured then, and
+    fabricating them would violate counts-never-content), and all 43 golden fixtures are
+    pre-cutover — so a golden that moves is a bug in THIS function, never a re-bless.
+
+    Capture stays dual-write on both sides of the boundary, so the flip is a one-constant
+    rollback rather than a data-loss event.
+
+    **A row with no `ts` resolves to the `calls` side**, the conservative default: it is
+    how every pre-cutover row that predates timestamping already behaves, and the metric
+    kinds have carried a `ts` from their first row, so the case cannot arise there."""
+    from cage import agents
+    cut = constants.SPEND_CUTOVER
+    rows = []
+    for r in calls(root, since):
+        # **The cutover is SCOPED to the three agents that have a metric ledger.** A
+        # post-cutover `calls` row is superseded only when its own agent has a spine to be
+        # superseded BY. Everything else — `cage.meter`'s library rows (`agent="lib"`, the
+        # AlphaForge/Anton integration), proxy-metered rows, and every `[sources.<name>]`
+        # custom tool — has no metric ledger and never will under this design, so the
+        # cutover simply does not apply to it and it keeps resolving from `calls` forever.
+        #
+        # Without this scope the flip silently zeroes every library- and proxy-metered
+        # call the moment the clock passes the instant. Found the hard way: the suite went
+        # red across 47 tests when the machine clock crossed `SPEND_CUTOVER` mid-build.
+        # This is NOT the per-agent `calls` fallback rejected earlier for kiro — kiro HAS a
+        # spine (`ide`) and correctly reads zero when its store is absent, exactly as
+        # decided. This is about sources that were never in the flip's scope at all.
+        if (r.get("ts") or "") >= cut and agents.row_surface(r.get("agent")) in SPEND_SOURCES:
+            continue
+        r["basis"] = "calls"
+        rows.append(r)
+    # `claude_metrics` collapses last-write-wins per SESSION — the right reader for a
+    # chat-grain whole-life total and the wrong one here, because it would keep one row
+    # per chat and discard every other request in it. Request-grain rows are point-in-time
+    # facts, so they collapse on their own identity instead (`claude_request_metrics`).
+    readers = ((claude_request_metrics, "claude"), (copilot_metrics, "copilot"),
+               (kiro_metrics, "kiro"))
+    for read_rows, agent in readers:
+        allowed = SPEND_SOURCES[agent]
+        for r in read_rows(root, since):
+            if (r.get("ts") or "") >= cut and r.get("source", "") in allowed:
+                rows.append(_spend_row(r))
+    return rows
+
+
+def join_table(root: Path, since: str | None = None) -> list[dict]:
+    """The row set a **receipt's `call` id** is looked up in — `spend()` plus any `calls`
+    row whose id it superseded (METRICS-PRIMARY P4).
+
+    A receipt is written with `call=<the calls-row id it was filed against>`. Post-cutover
+    the spend row for that same traffic is a *metric* row with a `clm_`/`cm_` id, so a
+    lookup in `spend()` alone would **orphan every linked receipt** — its saving would
+    silently leave its agent and fall into the unattributed bucket. Measured on the R6
+    golden: a claude row's `gross tok` fell 80,000 → 0 while the TOTAL kept 80,000.
+
+    This is a **lookup table, never a sum source** — the distinction is what makes the
+    union safe. `_nonhuman_savings`/`attribution` use it only to answer "which agent and
+    model does this receipt belong to"; spend itself is summed from `spend()`, which
+    contains each row exactly once. Adding the superseded rows back here therefore cannot
+    double-count a token, and the resolution stays **exact** (an id match), never a
+    timestamp-proximity guess.
+
+    Today this is mostly latent: every receipt cage's own shims file is call-LESS by
+    construction (graphify/fux carry a `task` and no `call`, and price through the
+    `receiptprice` ladder). It matters for `cage.meter` callers that pass `call=`."""
+    rows = spend(root, since)
+    seen = {r.get("id") for r in rows}
+    for c in calls(root, since):
+        if c.get("id") not in seen:
+            c.setdefault("basis", "calls")
+            rows.append(c)
+    return rows
 
 
 def receipts(root: Path, since: str | None = None) -> list[dict]:

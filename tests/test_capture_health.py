@@ -16,6 +16,10 @@ from __future__ import annotations
 import json
 from types import SimpleNamespace
 
+# Recorded history: `ledger.spend` supersedes a post-cutover `calls` row for the
+# three metric-ledger agents, so an unstamped (now()) fixture row would vanish.
+LEDGER_TS = "2026-06-01T12:00:00Z"
+
 from cage import (agents, cleanup, importcmd, ledger, paths, policy, report,
                   schema)
 from srcseed import mkcage
@@ -113,7 +117,8 @@ def test_self_silencing_a_prior_row_clears_the_warning(tmp_path, monkeypatch):
     # a copilot row already in the ledger (captured in some earlier run) ⇒ gate 3 fails
     ledger.append(paths.Footprint(root).calls,
                   schema.make_call(route="r", provider="anthropic", model="claude-sonnet-4-6",
-                                   agent="copilot", tokens_in=10, session="s"))
+                                   agent="copilot", tokens_in=10, session="s",
+                                   ts=LEDGER_TS))
     _imp(root)
     assert _health(root)["copilot"]["captured"] is True
     assert report.capture_warnings(_health(root)) == []  # never nags an agent with rows
@@ -266,7 +271,8 @@ def test_render_report_is_pure_of_the_filesystem(tmp_path, monkeypatch):
     ledger.append(paths.Footprint(root).calls,
                   schema.make_call(route="r", provider="anthropic",
                                    model="claude-sonnet-4-6", agent="claude",
-                                   tokens_in=1000, tokens_out=100, session="s"))
+                                   tokens_in=1000, tokens_out=100, session="s",
+                                   ts=LEDGER_TS))
     rep = report.summarize(root, policy.load(None), dim="agent")
     H = {"copilot": _rec()}
     a = report.render_report(rep, health=H)
@@ -285,7 +291,8 @@ def test_table_is_byte_identical_with_and_without_a_warning(tmp_path, monkeypatc
     ledger.append(paths.Footprint(root).calls,
                   schema.make_call(route="r", provider="anthropic",
                                    model="claude-sonnet-4-6", agent="claude",
-                                   tokens_in=1000, tokens_out=100, session="s"))
+                                   tokens_in=1000, tokens_out=100, session="s",
+                                   ts=LEDGER_TS))
     rep = report.summarize(root, policy.load(None), dim="agent")
     without = report.render_report(rep, health=None)
     withw = report.render_report(rep, health={"copilot": _rec()})
@@ -299,7 +306,8 @@ def test_csv_never_carries_the_warning(tmp_path, monkeypatch):
     ledger.append(paths.Footprint(root).calls,
                   schema.make_call(route="r", provider="anthropic",
                                    model="claude-sonnet-4-6", agent="claude",
-                                   tokens_in=1000, tokens_out=100, session="s"))
+                                   tokens_in=1000, tokens_out=100, session="s",
+                                   ts=LEDGER_TS))
     rep = report.summarize(root, policy.load(None), dim="agent")
     csv = report.render_csv(rep)                          # render_csv takes no health
     assert "⚠" not in csv and "capture is off" not in csv

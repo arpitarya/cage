@@ -12,6 +12,77 @@ by milestone) — the worklog is what *happened this session*.
 
 ---
 
+## 2026-08-14 — METRICS-PRIMARY built end-to-end (P0→P5); the flip is live
+
+- **Asked (Arpit):** "flip it — the future is going to be ledger/claude, ledger/copilot,
+  ledger/kiro", then "proceed" through P3/P4/P5.
+- **Decided (Arpit, this session):** `CUTOVER = 2026-08-14T00:00:00Z` · **no** boundary
+  footnote ("there hasn't been a major release yet so flip") · kiro reads zero rather than
+  refusing · the cumulative-source gap fixed by **delta at capture** (option 1).
+- **Done:** all six phases green. `ledger.spend()` is the one resolver; the claude request
+  grain closes CLAUDE-DEDUP (**2.01× measured** on 43,885 real transcript rows) and
+  CLAUDE-SUBAGENT-KEY; copilot's cumulative CLI store gains a `cli-delta` twin;
+  `join_table` keeps receipts resolvable across the boundary; `ledgersync` carries the
+  three kinds. **1842 passed / 11 skipped**, `test_floor` untouched, ADR 0010 written.
+- **Four things the handoff got wrong, all found by building rather than reading:**
+  (a) §5.4's `est_cost_usd` — the real pricing blocker was `provider`; (b) the DoD's "all
+  43 goldens are pre-cutover" — R6 is future-dated by design; (c) §5 never considered
+  cumulative sources; (d) §5 never considered agents with **no** metric ledger, and an
+  unscoped flip silently zeroed every `cage.meter` library row the moment the clock
+  crossed the cutover.
+- **Declined:** wiping `.cage` and re-importing. Measured first: re-imported rows keep
+  their original timestamps, so a wipe moves **nothing** onto the metrics basis (43,962 of
+  44,012 rows stay calls-basis) while permanently destroying **7,417 rows / 1.59B input
+  tokens** whose source transcripts expired past Claude Code's ~30-day sweep. Ran the
+  equivalent experiment in a scratch ledger instead and reported the answer.
+- **Open:** KIRO-IDE-METRIC-ROW (kiro's measured zero — parse the `ide` metric row from
+  `tokens_generated.jsonl`, the file the calls route already reads) · METRICS-DUAL-WRITE-END
+  (gated to 2026-09-13). **`CLAUDE.md` diff proposed, not applied.**
+- **Next step:** Arpit reviews the CLAUDE.md diff; KIRO-IDE-METRIC-ROW is the one
+  contained follow-up.
+- **Cost:** unmeasured at session grain — this repo's ledger has no per-session cut.
+  Today's whole-day figure at the last check was $371.87 / 2,502 calls
+  (`cage report --since 1d --usd`); note that figure is on the **legacy** basis and is
+  itself inflated ~2× by the CLAUDE-DEDUP overcount this build just closed.
+
+## 2026-08-14 — METRICS-PRIMARY P0 gate FAILED → METRICS-CURSOR-BLIND found, fixed, gate now passes
+
+- **Asked (Arpit):** execute `work/metrics-primary.prompt.md` — flip the derive layer
+  off `calls` onto the three per-agent metric ledgers.
+- **Done:** ran the prompt's three pre-checks. Concurrency clean (only the untracked
+  handoff/prompt pair). **P0 STOP gate FAILED:** `cage doctor` reports `copilot-metrics`
+  and `kiro-metrics` at zero on every route; the `ledger/copilot/` and `ledger/kiro/`
+  trees do not exist in either root. Did not build P0 — stopped and diagnosed instead.
+- **Root cause (new defect, filed as METRICS-CURSOR-BLIND):** not missing data —
+  **cursor blindness**. The metric legs consume the cursor-filtered `files` list
+  (`importcmd.py:808-819`, `:915`), so files ingested before the routes shipped
+  (2026-08-14) are never re-read. Probed the real stores with the shipped parsers
+  in-process (no ledger writes): copilot **102** metric rows available (27 CLI events,
+  75 VS Code chatSessions), kiro **56** (CLI `data.sqlite3`), both currently 0 captured.
+  claude captured 11 only because its transcripts were still being written. Two routes
+  are genuinely dataless here and are *not* the blocker: copilot's `debuglog` store
+  parses to 0 rows (21 files × 264 B, no usage payload), and kiro IDE's `devdata.sqlite`
+  is absent (Kiro IDE not installed on this machine).
+- **Then (Arpit: "go for it"):** built the unblock — **`cage import --rescan-metrics`**.
+  `importcmd.metrics_scan_set` mirrors `graphify_scan_set`, wired at all four cursor-fed
+  metric sites. Two things carry the weight: the helper **returns the cursor too, and
+  under a rescan it is `None`** (handed a full match set the metric legs would otherwise
+  stamp the *calls* cursor for files the calls leg hasn't ingested — a `--since`-filtered
+  file above all — so backfilling one kind would silently blind another); and the run
+  **always prints what it added, per kind, including zero**, since a skipped store and an
+  empty one being indistinguishable *is* the defect. 7 new tests, both load-bearing
+  assertions mutation-checked. Suite **1806/11**, zero goldens re-blessed.
+- **Verified live:** the backfill recovered **265 real rows — claude +173, copilot +84,
+  kiro +8**. `cage doctor` now reports all three kinds non-zero. **METRICS-PRIMARY's P0
+  STOP gate passes.**
+- **Decided/open:** METRICS-PRIMARY stays unbuilt at 0% and moves to *Arpit decides* in
+  OPEN-WORK — still blocked on the two §10 answers P3 cannot ship without: the `CUTOVER`
+  literal, and whether `cage report` footnotes the ~2× boundary discontinuity.
+- **Next step:** Arpit answers those two, then METRICS-PRIMARY runs from P0.
+- **Cost:** unmeasured at session grain — this repo's ledger has no per-session cut;
+  today's whole-day figure is $371.87 / 2,502 calls (`cage report --since 1d --usd`,
+  itself inflated ~2–3× by CLAUDE-DEDUP). This diagnostic session is a small fraction of it.
+
 ## 2026-08-13 — WORK-DIR-CONT: doc-registry/research/regression/dogfood/compare/cage-lab/archive moved docs/ → work/
 
 - **Asked (Arpit, Cowork):** move `doc-registry`, `research`, `regression`,

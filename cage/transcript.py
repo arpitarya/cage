@@ -104,6 +104,58 @@ def _claude_chat_key(rec: dict, session_hint: str) -> str:
     return rec.get("sessionId") or session_hint
 
 
+def _fold_claude_records(files: list[Path],
+                         session_hint: str = "") -> tuple[dict[tuple, dict], dict[str, int]]:
+    """THE DEDUP LAW's fold, and the ONE place it happens (METRICS-PRIMARY P1).
+
+    Returns ``(folded, raw_rows)``: the surviving record per
+    ``(chat_key, requestId, message.id)`` — last occurrence wins — and the pre-fold row
+    count per chat, which is the inflation evidence CLAUDE-DEDUP measures.
+
+    Extracted from `_fold_claude_chat` so the **chat grain** and the **request grain**
+    are two projections of one fold rather than two folds. A second fold is the failure
+    this extraction exists to prevent: the two grains would drift, and their totals — the
+    same traffic counted two ways — would silently stop agreeing.
+
+    Reads envelope + `message.usage` only (counts-never-content). Fail-open per file: a
+    missing file is skipped, a bad line is skipped, an unreadable file yields nothing."""
+    if not session_hint and files:
+        f0 = files[0]
+        session_hint = (f0.parent.parent.name if f0.parent.name == "subagents"
+                        else f0.stem)
+    folded: dict[tuple, dict] = {}
+    raw_rows: dict[str, int] = {}
+    for f in files:
+        if not f.exists():
+            continue
+        try:
+            text = f.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        for line in text.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rec = json.loads(line)
+            except ValueError:
+                continue
+            if rec.get("type") != "assistant":
+                continue
+            msg = rec.get("message") or {}
+            usage = msg.get("usage") or {}
+            if not usage:
+                continue
+            chat_key = _claude_chat_key(rec, session_hint)
+            raw_rows[chat_key] = raw_rows.get(chat_key, 0) + 1
+            req_id = rec.get("requestId") or ""
+            msg_id = msg.get("id") or ""
+            fold_key = ((chat_key, req_id, msg_id) if (req_id or msg_id)
+                        else (chat_key, "uuid", rec.get("uuid", "")))
+            folded[fold_key] = rec  # last occurrence wins — full row replaces prior
+    return folded, raw_rows
+
+
 def _fold_claude_chat(files: list[Path], session_hint: str = "") -> dict[str, dict]:
     """THE DEDUP LAW as code (CLAUDE-METRICS handoff §4.4) — one API response writes
     1–5 assistant rows (one per content block), each carrying a distinct `uuid` but the
@@ -144,41 +196,7 @@ def _fold_claude_chat(files: list[Path], session_hint: str = "") -> dict[str, di
     file yields no rows from it (never raises into capture). A fileset that emits >1
     chat_key (resume drift — a row's `sessionId` disagrees with the fileset's own
     intended session) is correct behavior, not a bug."""
-    if not session_hint and files:
-        f0 = files[0]
-        session_hint = (f0.parent.parent.name if f0.parent.name == "subagents"
-                        else f0.stem)
-    folded: dict[tuple, dict] = {}
-    raw_rows: dict[str, int] = {}
-    for f in files:
-        if not f.exists():
-            continue
-        try:
-            text = f.read_text(encoding="utf-8")
-        except OSError:
-            continue
-        for line in text.splitlines():
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                rec = json.loads(line)
-            except ValueError:
-                continue
-            if rec.get("type") != "assistant":
-                continue
-            msg = rec.get("message") or {}
-            usage = msg.get("usage") or {}
-            if not usage:
-                continue
-            chat_key = _claude_chat_key(rec, session_hint)
-            raw_rows[chat_key] = raw_rows.get(chat_key, 0) + 1
-            req_id = rec.get("requestId") or ""
-            msg_id = msg.get("id") or ""
-            fold_key = ((chat_key, req_id, msg_id) if (req_id or msg_id)
-                       else (chat_key, "uuid", rec.get("uuid", "")))
-            folded[fold_key] = rec  # last occurrence wins — full row replaces prior
-
+    folded, raw_rows = _fold_claude_records(files, session_hint)
     chats: dict[str, dict] = {}
     for (chat_key, *_rest), rec in folded.items():
         msg = rec.get("message") or {}
@@ -269,6 +287,76 @@ def parse_claude_chat_metrics(fileset: list[Path], session_hint: str = "") -> li
             sidechain_tokens_in=acc["sidechain_tokens_in"],
             sidechain_tokens_out=acc["sidechain_tokens_out"],
             ts=acc["ts"], metric_id=metric_id))
+    rows.extend(_claude_request_rows(fileset, session_hint))
+    return rows
+
+
+def _claude_request_rows(fileset: list[Path], session_hint: str = "") -> list[dict]:
+    """One `source="request"` row per folded `(requestId, message.id)` — the request grain
+    `ledger.spend` resolves post-cutover (METRICS-PRIMARY P1).
+
+    **This is where CLAUDE-DEDUP and CLAUDE-SUBAGENT-KEY are closed**, in the new ledger
+    rather than in `parse_calls` (which is deliberately untouched, so the pre-cutover
+    history it wrote stays exactly as recorded):
+
+    - **CLAUDE-DEDUP** — one API response writes 1–5 assistant rows sharing a `requestId`
+      + `message.id`, each with a full copy of `usage`. `parse_calls` keys on `uuid` and
+      counts every one, inflating claude spend ~2–3×. Here the fold key IS the grain, so
+      the duplicates collapse by construction and the row count is the request count.
+    - **CLAUDE-SUBAGENT-KEY** — a subagent transcript is session-keyed by filename stem in
+      `parse_calls`, landing its spend in a phantom chat. `_claude_chat_key` reads each
+      record's OWN `sessionId`, so a subagent's requests join their parent chat.
+
+    `model` comes from the record's own `message.model`, so every row carries the single
+    model its cost prices against — the one thing the chat-grain row structurally cannot
+    give (it holds a `model_totals` list). `request` is the fold key's `requestId` when
+    the store wrote one, else the `message.id`, else the `uuid` — the same three-step
+    fallback the fold itself uses, so a row can never end up with an empty grain key while
+    the fold considered it distinct.
+
+    `metric_id` folds the row's own recorded values, so a re-capture of an unchanged
+    request dedupes and a corrected one appends; `ledger.claude_request_metrics` resolves
+    the latest per `(session, request)`."""
+    folded, _raw = _fold_claude_records(fileset, session_hint)
+    rows: list[dict] = []
+    for (chat_key, k1, k2), rec in folded.items():
+        msg = rec.get("message") or {}
+        usage = msg.get("usage") or {}
+        cache_read = int(usage.get("cache_read_input_tokens", 0) or 0)
+        cache_write = int(usage.get("cache_creation_input_tokens", 0) or 0)
+        tin = int(usage.get("input_tokens", 0) or 0) + cache_read + cache_write
+        out = int(usage.get("output_tokens", 0) or 0)
+        request = k1 if k1 and k1 != "uuid" else (k2 or "")
+        cc = usage.get("cache_creation") or {}
+        ttl_5m = int(cc.get("ephemeral_5m_input_tokens", 0) or 0) if isinstance(cc, dict) else 0
+        ttl_1h = int(cc.get("ephemeral_1h_input_tokens", 0) or 0) if isinstance(cc, dict) else 0
+        otd = usage.get("output_tokens_details") or {}
+        thinking = int(otd.get("thinking_tokens", 0) or 0) if isinstance(otd, dict) else 0
+        stu = usage.get("server_tool_use") or {}
+        web_search = int(stu.get("web_search_requests", 0) or 0) if isinstance(stu, dict) else 0
+        web_fetch = int(stu.get("web_fetch_requests", 0) or 0) if isinstance(stu, dict) else 0
+        model = str(msg.get("model", "") or "")
+        cwd = rec.get("cwd") or ""
+        payload = json.dumps({"ti": tin, "to": out, "ci": cache_read, "cw": cache_write,
+                              "t5": ttl_5m, "t1": ttl_1h, "th": thinking,
+                              "ws": web_search, "wf": web_fetch, "m": model},
+                             sort_keys=True, default=str)
+        rows.append(schema.make_claude_metric(
+            source="request", session=chat_key, request=request, model=model,
+            # The same provider `parse_calls` stamps on this store's call rows —
+            # `policy.price_match` keys on (provider, model), so without it a
+            # perfectly-counted row prices as `none`.
+            provider="anthropic" if model else "",
+            project=Path(cwd).name if cwd else "",
+            tokens_in=tin, tokens_out=out, cached_in=cache_read,
+            cache_write_in=cache_write, ttl_5m=ttl_5m, ttl_1h=ttl_1h,
+            thinking=thinking, web_search=web_search, web_fetch=web_fetch,
+            requests=1,
+            sidechain_tokens_in=tin if rec.get("isSidechain") else 0,
+            sidechain_tokens_out=out if rec.get("isSidechain") else 0,
+            ts=rec.get("timestamp"),
+            metric_id="clm_" + hashlib.sha1(
+                f"request|{chat_key}|{request}|{payload}".encode("utf-8")).hexdigest()[:16]))
     return rows
 
 
@@ -1018,6 +1106,9 @@ def parse_copilot_vscode_metrics(chat_session_path: Path, session: str = "") -> 
                              sort_keys=True, default=str)
         rows.append(schema.make_copilot_metric(
             source="chat", session=session, surface="vscode", request=rid, model=model,
+            # METRICS-PRIMARY P2 — the same derivation `parse_copilot_vscode_calls`
+            # stamps; `policy.price_match` keys on (provider, model).
+            provider=_copilot_provider(model) if model else "",
             tokens_in=inp, tokens_out=out, cached_in=cached_in, model_totals=model_totals,
             credits=credits, session_credits=session_credits,
             elapsed_ms=_first_int(req, ("elapsedMs",)),
@@ -1050,11 +1141,27 @@ def parse_copilot_cli_metrics(events_path: Path, session: str = "") -> list[dict
     in `parse_copilot_calls` is a separate, out-of-scope defect) and needs no ordinal
     suffix the way that parser's id scheme does. `metric_id` folds the shutdown's own
     payload, so an unchanged re-shutdown (nothing grew) dedupes and a resumed session
-    (larger cumulative) appends a fresh row."""
+    (larger cumulative) appends a fresh row.
+
+    **Plus one `source="cli-delta"` row per shutdown** (METRICS-PRIMARY P0a) — the same
+    shutdown's per-model **delta**, not its cumulative. It exists because a cumulative row
+    cannot be a spend spine: `ledger.spend` partitions by each row's own `ts`, and a
+    cumulative row carries its session's whole life at the latest capture, so a session
+    straddling the cutover would be counted once in `calls` for its early half and again
+    in full here. The arithmetic is `parse_copilot_cli_calls`'s, reused rather than
+    reinvented — including its **reset rule**: a cumulative counter that goes DOWN means
+    the store reset, so the new value *is* the delta (clamping to 0 would silently discard
+    real spend). The verbatim `cli` row is still written and is untouched; the two describe
+    the same traffic and must never be summed, which is why only `cli-delta` is in
+    `ledger.SPEND_SOURCES`. A shutdown that added nothing emits no delta row at all."""
     if not events_path.exists():
         return []
     session = session or events_path.parent.name
     rows: list[dict] = []
+    prev: dict[str, tuple[int, int, int]] = {}  # model -> cumulative (in, out, cached)
+    prev_cred = 0.0
+    prev_nano = 0.0
+    ordinal = 0
     for line in events_path.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line:
@@ -1085,6 +1192,49 @@ def parse_copilot_cli_metrics(events_path: Path, session: str = "") -> list[dict
             model_totals=model_totals, credits=credits, nano_aiu=nano_aiu, ts=ts,
             metric_id="cm_" + hashlib.sha1(f"cli|{session}|{payload}"
                                            .encode("utf-8")).hexdigest()[:16]))
+        # ── the point-in-time twin ────────────────────────────────────────────
+        d_totals: list[dict] = []
+        for mt in model_totals:
+            model = mt["model"]
+            pin, pout, pcached = prev.get(model, (0, 0, 0))
+            cin, cout, ccached = mt["tokens_in"], mt["tokens_out"], mt.get("cached_in", 0)
+            prev[model] = (cin, cout, ccached)
+            # A DECREASE is a store reset, not a refund — the new value is the delta.
+            din = cin if cin < pin else cin - pin
+            dout = cout if cout < pout else cout - pout
+            dcached = ccached if ccached < pcached else ccached - pcached
+            if din or dout:
+                d_totals.append({"model": model, "tokens_in": din, "tokens_out": dout,
+                                 "cached_in": dcached})
+        d_cred = None
+        if credits is not None:
+            d_cred = credits if credits < prev_cred else credits - prev_cred
+            prev_cred = credits
+        d_nano = None
+        if nano_aiu is not None:
+            d_nano = nano_aiu if nano_aiu < prev_nano else nano_aiu - prev_nano
+            prev_nano = nano_aiu
+        ordinal += 1
+        if d_totals or d_cred or d_nano:
+            d_payload = json.dumps({"mt": d_totals, "cr": d_cred, "na": d_nano,
+                                    "o": ordinal}, sort_keys=True, default=str)
+            rows.append(schema.make_copilot_metric(
+                source="cli-delta", session=session, surface="cli",
+                model=d_totals[0]["model"] if len(d_totals) == 1 else "",
+                provider=_copilot_provider(d_totals[0]["model"]) if len(d_totals) == 1 else "",
+                # The shutdown ORDINAL is the row's grain key. `ledger.copilot_metrics`
+                # collapses on `(source, session, surface, request, call)`, so leaving
+                # `request` empty — as the cumulative `cli` row correctly does, being one
+                # snapshot per session — would collapse every delta of a session into one
+                # and silently discard all but the largest. A delta is per shutdown, so it
+                # says so. Mirrors `parse_copilot_cli_calls`'s `s{ordinal:03d}` id suffix.
+                request=f"s{ordinal - 1:03d}",
+                tokens_in=sum(mt["tokens_in"] for mt in d_totals),
+                tokens_out=sum(mt["tokens_out"] for mt in d_totals),
+                cached_in=sum(mt["cached_in"] for mt in d_totals),
+                model_totals=d_totals, credits=d_cred, nano_aiu=d_nano, ts=ts,
+                metric_id="cm_" + hashlib.sha1(f"cli-delta|{session}|{d_payload}"
+                                               .encode("utf-8")).hexdigest()[:16]))
     return rows
 
 

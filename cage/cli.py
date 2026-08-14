@@ -195,6 +195,11 @@ def build_parser() -> argparse.ArgumentParser:
                     help="re-run graphify savings detection over every matched log, ignoring "
                          "the incremental cursor (backfills sessions ingested before a route "
                          "shipped; detection only — no call/credit re-ingest, idempotent)")
+    im.add_argument("--rescan-metrics", dest="rescan_metrics", action="store_true",
+                    help="re-parse every matched log into the per-agent metrics ledgers "
+                         "(ledger/{claude,copilot,kiro}/), ignoring the incremental cursor "
+                         "(backfills stores ingested before the metric routes shipped; "
+                         "metrics only — no call/credit re-ingest, idempotent)")
     im.set_defaults(fn=clicmds.cmd_import)
 
     st = sub.add_parser("setup", help="make this project (or --global) metered: scaffold .cage/ + MCP wiring + graphify (capture is pull-based — `cage import`)",

@@ -23,7 +23,8 @@ def test_report_recomputes_cost_for_transcript_call(proj):
     # Transcript meter stamps tokens but no est_cost_usd (defaults to 0.0).
     ledger.append(calls_path, schema.make_call(
         route="chat", provider="anthropic", model="claude-sonnet-4-6",
-        tokens_in=1_000_000, tokens_out=0, agent="claude-code"))
+        tokens_in=1_000_000, tokens_out=0, agent="claude-code",
+        ts="2026-06-01T12:00:00Z"))
     # A provider cage can't tokenize, self-reporting its own cost.
     ledger.append(calls_path, schema.make_call(
         route="search", provider="parallel", model="search",

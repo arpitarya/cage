@@ -29,7 +29,7 @@ def _trust_of_off_set(off_tools: list[dict]) -> str:
 
 
 def matrix(root: Path, task: str, pol: dict, scope: str | None = None) -> dict:
-    calls = ledger.by_scope(ledger.calls(root), scope)
+    calls = ledger.by_scope(ledger.spend(root), scope)
     rcpts = [r for r in ledger.by_scope(ledger.by_task(ledger.receipts(root), task), scope)
              if r.get("unit", "tokens") == "tokens" and r.get("tool") != "human"]
     # `tool="human"` is a legacy Tier-1 row (the axis was removed in v0.36); it is a

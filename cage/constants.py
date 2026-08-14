@@ -290,3 +290,22 @@ CHATS_DEFAULT_ROWS = 20
 # `CHATS_DEFAULT_ROWS` precedent: a flag (`--all`), not a policy knob.
 GRAPHIFY_CHATS_DEFAULT_ROWS = 20
 
+
+
+# ── METRICS-PRIMARY: the derive-path cutover (ADR 0010, PLAN §3.14) ──────────
+#
+# The pinned UTC instant at which every derived view stops resolving spend from the
+# `calls` ledger and starts resolving it from the three per-agent metric ledgers
+# (`ledger/{claude,copilot,kiro}/`). Chosen by Arpit on 2026-08-14: the day the metric
+# routes and the METRICS-CURSOR-BLIND backfill landed, so all six months of recorded
+# history stays on the `calls` side untouched and every one of the 43 golden fixtures is
+# pre-cutover by construction.
+#
+# **A LITERAL, never `now()`.** The whole determinism law rests on this: same ledger +
+# same policy ⇒ same tables. A computed cutover would make yesterday's report
+# irreproducible tomorrow, which is the one thing no cage number may ever do.
+#
+# It is compared as a STRING against each row's own `ts`, in the one UTC normal form
+# every ledger row is already written in — the `commitjoin.norm_ts` precedent. A row
+# straddling the boundary resolves by its OWN `ts`, never by its session's start.
+SPEND_CUTOVER = "2026-08-14T00:00:00Z"

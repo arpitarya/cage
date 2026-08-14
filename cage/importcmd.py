@@ -380,6 +380,37 @@ def graphify_scan_set(args, src, pattern, files: list[Path]) -> list[Path]:
     return glob_source(src, pattern)
 
 
+def metrics_scan_set(args, src, pattern, files: list[Path],
+                     agent_cursor: dict | None) -> tuple[list[Path], dict | None]:
+    """The files the **per-agent metrics** legs parse, and the cursor they may advance:
+    normally the ones this sweep ingested (inheriting the incremental cursor), but the
+    source's **full match set** under `cage import --rescan-metrics`.
+
+    Why the flag has to exist — METRICS-CURSOR-BLIND, the exact class
+    `graphify_scan_set` above already documents, in a second place. The three metric
+    kinds (`ledger/{claude,copilot,kiro}/`) ride the calls sweep's cursor-filtered
+    `files` list, so every store file ingested **before those routes shipped**
+    (2026-08-14) is skipped forever: `_scan` drops it as `cursor-unchanged` and the
+    metric parsers never see it. Measured on the maintainer's machine at the
+    METRICS-PRIMARY P0 gate: copilot had 102 metric rows on disk (27 CLI + 75 VS Code)
+    and kiro 56, with **zero** captured — while claude captured 11 only because its
+    transcripts were still being written. A backfill needs the cursor ignored exactly
+    once, and ingest is idempotent by row id, so a rescan is safe to re-run.
+
+    **Returns the cursor too, and under a rescan that cursor is `None` — this is the
+    load-bearing half.** The metric ingests advance the *calls* cursor (a harmless
+    no-op today, since they only ever see files the calls leg just ingested). Handed
+    the full match set they would stamp it for files the calls leg has **not** ingested
+    — a `--since`-filtered file most of all — marking them already-read and making
+    those calls permanently invisible. A backfill of one kind must never blind another,
+    so the rescan path advances nothing; row-id dedupe is the idempotency guarantee,
+    not the cursor. (`graphify_scan_set` needs no such half: detection writes receipts
+    and touches no cursor at all.)"""
+    if not getattr(args, "rescan_metrics", False):
+        return files, agent_cursor
+    return glob_source(src, pattern), None
+
+
 def _claude_session_filesets(files: list[Path]) -> list[list[Path]]:
     """Regroup a sweep's changed claude files into WHOLE session filesets, so a chat's
     CLAUDE-METRICS totals are never computed from a partial view (handoff §4.5, §8):
@@ -485,10 +516,12 @@ def import_claude(root: Path, args, *, pol: dict | None = None, seen: set | None
                                   f, session=f.stem, root=root, pol=pol), surface),
                               pol=pol, seen=seen, agent_cursor=agent_cursor, collect=collect, import_id=import_id)
         # CLAUDE-METRICS: the SAME `files` this sweep just scanned, into the metrics
-        # kind — no rescan. Never folded into `total_rows`/`total_files` below: metrics
-        # rows are not calls, and the printed "imported N call(s)" summary must not
-        # count them (handoff §4.5).
-        _ingest_claude_metrics(root, files, pol=pol)
+        # kind — or the source's full match set under `--rescan-metrics`
+        # (METRICS-CURSOR-BLIND; `metrics_scan_set`). Never folded into
+        # `total_rows`/`total_files` below: metrics rows are not calls, and the printed
+        # "imported N call(s)" summary must not count them (handoff §4.5).
+        mfiles, _ = metrics_scan_set(args, src, pattern, files, agent_cursor)
+        _ingest_claude_metrics(root, mfiles, pol=pol)
         _detect_graphify(root, graphify_scan_set(args, src, pattern, files),
                          gfx_ids, pol)
         # The authorship pass reads the source's FULL match set, not `files`: the call
@@ -584,7 +617,8 @@ def _surface_restamp(parse, surface: str):
 
 def _ingest_credits(root: Path, name: str, src: Path, files: list[Path], *,
                     pol: dict | None = None, agent_cursor: dict | None = None,
-                    graphify_files: list[Path] | None = None) -> int:
+                    graphify_files: list[Path] | None = None,
+                    metrics_files: list[Path] | None = None) -> int:
     """Parse Kiro-CLI SQLite files into *credits* rows and append the ones not already
     recorded. Credits are their own ledger kind (`credits-<month>.jsonl`) with their own
     id namespace (`k_cred…`), so they never touch the call-id `seen` set or any call view.
@@ -616,11 +650,16 @@ def _ingest_credits(root: Path, name: str, src: Path, files: list[Path], *,
         except Exception as e:  # fail-open: an unreadable DB never aborts the sweep
             debuglog.exception(root, "import.credits", e, pol=pol, agent=name, file=str(f))
     # KIRO-METRICS: the SAME `files`/`workspace` this leg just resolved, into the
-    # metrics kind — no rescan, ADR 0006 scoping inherited rather than re-decided.
+    # metrics kind — ADR 0006 scoping inherited rather than re-decided. Under
+    # `--rescan-metrics` the caller passes the store's full match set as
+    # ``metrics_files`` (METRICS-CURSOR-BLIND; the caller owns the resolution because
+    # this function never sees `args`, exactly as ``graphify_files`` above). A rescan
+    # set means the calls cursor is **not** advanced from here — see `metrics_scan_set`.
     # Never folded into `total` above: metrics rows are not credits (handoff §4.5).
-    _ingest_kiro_metrics(root, files,
+    _ingest_kiro_metrics(root, files if metrics_files is None else metrics_files,
                         lambda f: transcript.parse_kiro_cli_metrics(f, workspace=workspace),
-                        src=src, pol=pol, agent_cursor=agent_cursor)
+                        src=src, pol=pol,
+                        agent_cursor=agent_cursor if metrics_files is None else None)
     _detect_graphify_kiro_cli(root, files if graphify_files is None else graphify_files,
                               workspace, pol)
     debuglog.event(root, pol=pol, event="import", agent=name, result="ok", src=str(src),
@@ -747,9 +786,11 @@ def import_custom_tools(root: Path, args, *, pol: dict | None = None,
             files = _scan(root, name, s.path, s.glob, getattr(args, "since", None),
                           pol=pol, agent_cursor=agent_cursor)
             if s.fmt == "kiro-cli":  # SQLite credits store — a distinct row kind, not calls
+                mfiles, _ = metrics_scan_set(args, s.path, s.glob, files, agent_cursor)
                 credit_rows += _ingest_credits(
                     root, name, s.path, files, pol=pol, agent_cursor=agent_cursor,
-                    graphify_files=graphify_scan_set(args, s.path, s.glob, files))
+                    graphify_files=graphify_scan_set(args, s.path, s.glob, files),
+                    metrics_files=None if mfiles is files else mfiles)
                 m += len(files)
                 continue
             base_parse = _PARSERS[s.fmt]
@@ -812,11 +853,13 @@ def import_copilot(root: Path, args, *, pol: dict | None = None, seen: set | Non
                               _surface_restamp(_parse_copilot_any, surface),
                               pol=pol, seen=seen, agent_cursor=agent_cursor, collect=collect, import_id=import_id)
         # COPILOT-METRICS: the SAME `files` this sweep just scanned, into the metrics
-        # kind — no rescan. Never folded into `total_rows`/`total_files` below: metrics
-        # rows are not calls, and the printed "imported N call(s)" summary must not
-        # count them (handoff §4.5).
-        _ingest_copilot_metrics(root, files, _parse_copilot_metrics_any, src=src,
-                                pol=pol, agent_cursor=agent_cursor)
+        # kind — or the source's full match set under `--rescan-metrics`
+        # (METRICS-CURSOR-BLIND; `metrics_scan_set`). Never folded into
+        # `total_rows`/`total_files` below: metrics rows are not calls, and the printed
+        # "imported N call(s)" summary must not count them (handoff §4.5).
+        mfiles, mcur = metrics_scan_set(args, src, pattern, files, agent_cursor)
+        _ingest_copilot_metrics(root, mfiles, _parse_copilot_metrics_any, src=src,
+                                pol=pol, agent_cursor=mcur)
         _detect_graphify_copilot(root, graphify_scan_set(args, src, pattern, files),
                                  gfx_ids, pol)
         total_files += len(files)
@@ -828,8 +871,9 @@ def import_copilot(root: Path, args, *, pol: dict | None = None, seen: set | Non
         gfiles = _scan(root, "copilot", gpath, gglob, getattr(args, "since", None),
                        pol=pol, agent_cursor=agent_cursor, health=health)
         gparse = _COPILOT_METRIC_PARSERS[tag]
+        gfiles, gcur = metrics_scan_set(args, gpath, gglob, gfiles, agent_cursor)
         _ingest_copilot_metrics(root, gfiles, gparse, src=gpath, pol=pol,
-                                agent_cursor=agent_cursor)
+                                agent_cursor=gcur)
     return total_rows, total_files
 
 
@@ -1169,6 +1213,42 @@ def _load_policy(root: Path) -> dict:
         return {}
 
 
+def _metrics_row_count(root: Path, pol: dict | None = None) -> dict[str, int]:
+    """Row counts of the three per-agent metric kinds in **this** ledger — the before/after
+    probe behind `--rescan-metrics`'s summary line. Counts only, never content; read-only.
+    Fail-open per kind (a missing or truncated shard counts 0 rather than aborting the
+    sweep), traced under ``CAGE_DEBUG`` like every other swallow site here."""
+    readers = {"claude": ledger.claude_metrics_raw,
+               "copilot": ledger.copilot_metrics_raw,
+               "kiro": ledger.kiro_metrics_raw}
+    out: dict[str, int] = {}
+    for kind, read in readers.items():
+        try:
+            out[kind] = len(read(root))
+        except Exception as e:  # fail-open: the summary probe never breaks capture
+            debuglog.exception(root, "import.metrics-count", e, pol=pol, kind=kind)
+            out[kind] = 0
+    return out
+
+
+def _rescan_metrics_line(before: dict[str, int], after: dict[str, int]) -> list[str]:
+    """The one line a `--rescan-metrics` run prints: what the backfill actually added,
+    per kind, in **this** ledger.
+
+    Stated even when the answer is zero — the whole reason the flag exists is that a
+    silently-skipped store is indistinguishable from an empty one (METRICS-CURSOR-BLIND),
+    so a rescan that finds nothing must SAY it found nothing rather than look like a
+    no-op that ran. It never claims a row that landed in another sink: kiro's routed IDE
+    leg completes before this sweep's lock and reports itself (ADR 0006), exactly as the
+    call rollup does."""
+    added = {k: after.get(k, 0) - before.get(k, 0) for k in sorted(after)}
+    total = sum(added.values())
+    per = " · ".join(f"{k} +{n:,}" for k, n in added.items())
+    tail = (f"recorded {total:,} new metric row(s) — {per}" if total
+            else f"no new metric rows — every matched store was already recorded ({per})")
+    return [f"✔ rescan-metrics: {tail}"]
+
+
 def run(root: Path, agent: str, args) -> list[str]:
     """Dispatch to one agent or, for ``all`` (the default), every surface in order.
 
@@ -1257,6 +1337,12 @@ def run(root: Path, agent: str, args) -> list[str]:
         # only `provenance.jsonl`, which no money view reads.
         from cage import authorcapture
         authorship = cursors.setdefault(authorcapture.CURSOR_KEY, {})
+        # METRICS-CURSOR-BLIND: a `--rescan-metrics` run reports what it backfilled.
+        # Counted before/after around the whole sweep rather than accumulated through
+        # the four ingest sites — the ledger is the one place all three kinds agree,
+        # and a count read cannot drift from what was actually appended.
+        rescan_metrics = getattr(args, "rescan_metrics", False)
+        m_before = _metrics_row_count(root, pol) if rescan_metrics else {}
         lines = [run_agent(root, a, args, pol=pol, seen=seen,
                            agent_cursor=cursors.setdefault(a, {}), health=health,
                            collect=collected, import_id=import_id, names=names,
@@ -1268,6 +1354,8 @@ def run(root: Path, agent: str, args) -> list[str]:
         if agent == "all":
             lines += import_custom_tools(root, args, pol=pol, seen=seen, cursors=cursors,
                                          collect=collected, import_id=import_id)
+        if rescan_metrics:
+            lines += _rescan_metrics_line(m_before, _metrics_row_count(root, pol))
         # The loud per-agent×surface token/cost rollup (plan §2.2), from this run's
         # appended rows (the per-agent `✔ …` lines above already report file counts).
         lines += _import_rollup(collected, pol, deduped=0)

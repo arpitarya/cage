@@ -1,0 +1,113 @@
+---
+doc: prompt — usage-only: delete the money subsystem, retire the cutover, one basis everywhere
+status: PROPOSED — unbuilt
+pair: [usage-only.handoff.md](usage-only.handoff.md)
+---
+
+# Claude Code prompt: USAGE-ONLY — cage becomes a usage meter
+
+**Model:** Opus — a ~20-module deletion with live entanglements (`receiptprice` feeds
+`attribution`/`freshness`; `policy.price_match` feeds `cage.toml`), plus one destructive
+phase. CLAUDE.md's rubric puts deletions-with-entanglements and substrate changes on Opus.
+Do not run this on Sonnet.
+
+**Progress:** 0% — P0 not started.
+
+You are removing money from cage entirely and making the three per-agent metric ledgers
+the only basis. The full spec is `work/usage-only.handoff.md` — read it first; its
+**Definition of done**, **Scope (out)** and **Non-negotiables** are binding. Where this
+prompt and the handoff disagree, the handoff wins.
+
+## Before anything: three checks
+
+1. **Concurrency.** If another session is working in this repo, STOP.
+2. **P0 is destructive.** Take a full backup of `.cage/` and `~/.cage/`, report its path,
+   and **wait for an explicit go** before deleting anything. This is the only
+   irreversible phase in the build.
+3. **Sandbox.** Manual CLI verification must set the sandbox env vars the pytest suite
+   sets — a prior build polluted the real `~/.cage` by omitting them
+   (`work/IMPLEMENTATION.md`, 2026-08-14). Prefer the suite to a live run.
+
+## Context to load first
+
+1. `CLAUDE.md`, then `work/OPEN-WORK.md` (**note: it is stale — it lists work that
+   `work/archive/v0.50-metrics-primary.*` says is implemented. Reconcile against git, do
+   not trust its markers**).
+2. `work/usage-only.handoff.md` — the spec.
+3. `work/archive/v0.50-metrics-primary.handoff.md` — what the cutover was for.
+4. `cage/ledger.py` (`spend`, `SPEND_SOURCES`, `CUMULATIVE_SOURCES`) · `cage/receiptprice.py`
+   · `cage/creditprice.py` · `cage/policy.py` · `cage/attribution.py` · `cage/freshness.py`.
+5. Contracts that pass untouched: `tests/test_floor.py` · `tests/test_debug_coverage.py` ·
+   `tests/test_queue_honesty.py` · `tests/test_output_spec.py` · `tests/test_cli_reference.py`.
+
+## Build order — suite green after EVERY phase
+
+- **P0 — backup, then retire the cutover.** Delete `constants.SPEND_CUTOVER` and the
+  `calls` branch of `ledger.spend()`; `spend()` now reads the three metric ledgers
+  unconditionally. **Do NOT delete pre-cutover metric rows** — they are the corrected
+  history and become readable again on purpose. Fix `SPEND_SOURCES["kiro"]`: `ide` is a
+  dead pointer (no `devdata.sqlite` exists on a real install), so state kiro's absence
+  from the token spine the way `CUMULATIVE_SOURCES` states its exclusions.
+- **P1 — delete money.** Remove `receiptprice.py`, `creditprice.py`, `pricescmd.py`,
+  `budget.py`, `forecast.py`, `roi.py`, `netsaved.py`, `matrix.py`; the six `--usd` sites;
+  `est_cost_usd` read paths; `policy.price_match` and `cage.toml`'s `[prices]` table.
+  **Keep** `savings/` receipts and attribution — savings are token-denominated and
+  survive; only their pricing dies. **Keep** `make_call`'s `est_cost_usd` field
+  (append-only), read nowhere. `adoption` and `commitjoin` id joins survive and must keep
+  resolving against `ledger.calls()`.
+- **P2 — the unit policy.** Per-agent rendering with **two distinct reason strings**, never
+  a `0`: claude credits → `—` *"Claude Code records no credit unit on disk"*; kiro tokens
+  → `—` *"no IDE token store on this install"*. Reuse the existing idiom (`chats.py:422`).
+  Add a guard that credits are **never summed or ranked across agents** — copilot's is
+  GitHub's tokens×rates figure, kiro's is an AWS credit; they are different units.
+- **P3 — honesty fixes.** Retag kiro credits `estimated` → `measured` (they are AWS's own
+  recorded charge; `estimated` existed only because they proxied for dollars). Split
+  `cage doctor`'s kiro-ide check three ways: **db absent** / **table missing** / **column
+  drift** — today all three render one indistinguishable zero.
+- **P4 — docs and queue**, per handoff §9.5. The ADR is required. `CLAUDE.md`: **propose
+  the diff, do not apply it.**
+
+## Required workflow
+
+1. **Explore** before writing. The handoff's §4 table was measured 2026-08-14 — if the
+   code disagrees with it, STOP and report rather than adapting silently.
+2. **Plan** each phase with the files you'll change. **Pause for confirmation before P0's
+   deletion and before P1** — one is irreversible, the other removes user-facing commands.
+3. **Implement incrementally.** Full suite after every phase.
+4. **Update docs to match** (handoff §9.5). Never mark done while docs contradict code.
+5. **Verify:** full suite green; `test_floor` untouched; goldens re-blessed **only** where
+   a deleted `$` column is the cause, each named in the commit message.
+
+## Constraints (hard)
+
+- **stdlib only** — no new third-party imports.
+- **Do NOT** re-denominate the deleted commands in tokens — they are deleted, not converted.
+- **Do NOT** stop writing `calls` — it is the id namespace receipts reference.
+- **Do NOT** delete pre-cutover metric rows.
+- **Do not modify:** `tests/test_floor.py`; any golden except for a removed `$` column.
+- Fail-open capture; `CAGE_DEBUG` logging on every new swallow site; counts-never-content;
+  None-sentinel credits preserved.
+
+## Acceptance criteria (self-check before finishing)
+
+- [ ] Backup taken and path reported before any deletion
+- [ ] `SPEND_CUTOVER` gone; `spend()` reads metric ledgers unconditionally; one basis
+- [ ] `SPEND_SOURCES["kiro"]` no longer names the dead `ide` source; absence is stated
+- [ ] **Zero `$`/`usd`/price in any output path** — grep-gated by a new test
+- [ ] Per-agent N/A renders with two distinct reasons, never `0`
+- [ ] kiro credits retagged `measured`
+- [ ] doctor's kiro-ide check distinguishes absent / missing-table / column-drift
+- [ ] Credits never summed across agents (guard + test)
+- [ ] `work/OPEN-WORK.md` reconciled against git, not against its own markers
+- [ ] ADR written; PLAN/README/kiro-capture/MACHINE.md/research header updated;
+      `CLAUDE.md` diff proposed not applied
+- [ ] Full suite green; goldens moved only for removed `$` columns, each named
+
+## Guardrails
+
+- Ask before: any ledger deletion, removing a public CLI command, or touching `cage.toml`.
+- If a handoff fact turns out stale, or a requirement conflicts with the code, **STOP and
+  report** — that is diagnosis, not execution.
+- Handoff §10 carries **three unanswered questions** (the cross-agent unit; whether to
+  truncate inflated `calls` history; whether cage keeps its spend-tool positioning). Do
+  not invent answers. P0–P3 can be built without them; P4's README item cannot.

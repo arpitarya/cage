@@ -99,7 +99,7 @@ def unpriced_lines(root: Path, pol: dict, calls: list[dict] | None = None,
     existing helpers byte-for-byte (`report.unpriced_line`,
     `receiptprice.unpriced_receipts_line`) — reused, never re-phrased."""
     from cage import receiptprice, report  # deferred: report imports this module
-    calls = ledger.calls(root) if calls is None else calls
+    calls = ledger.spend(root) if calls is None else calls
     receipt_rows = ledger.receipts(root) if receipts is None else receipts
     out: list[str] = []
     detail: dict[str, dict] = {}
@@ -143,7 +143,7 @@ def freshness(root: Path, pol: dict, *, today: _dt.date | None = None,
     ``include_policy=True`` adds the non-price :func:`policy_line` — the
     post-commit hook opts in; the report footer never does (policy drift
     changes no derived number)."""
-    calls = ledger.calls(root) if rows is None else rows
+    calls = ledger.spend(root) if rows is None else rows
     if today is not None:
         anchor: _dt.date | None = today
     else:

@@ -287,7 +287,19 @@ CREDIT_FIELDS = ("id", "ts", "session", "agent", "model", "unit", "credits",
                  "turns", "context_pct", "method", "surface", "project")
 
 
+# Claude's two grains. `transcript` is the per-chat whole-life total CLAUDE-METRICS
+# shipped; `request` is the per-API-response row METRICS-PRIMARY P1 adds, one per folded
+# `(requestId, message.id)` — the SAME fold, emitted at the grain the money path needs.
+# A closed enum, like `COPILOT_METRIC_SOURCES`. The two describe the same traffic at
+# different grains and must NEVER be summed: only `request` is in `ledger.SPEND_SOURCES`,
+# and `ledger.claude_metrics`/`claude_request_metrics` are separate readers for that
+# reason.
+CLAUDE_METRIC_SOURCES = ("transcript", "request")
+
+
 def make_claude_metric(*, session: str, project: str = "", surface: str = "",
+                       source: str = "transcript", request: str = "", model: str = "",
+                       provider: str = "",
                        model_totals: list[dict] | None = None,
                        tokens_in: int = 0, tokens_out: int = 0, cached_in: int = 0,
                        cache_write_in: int = 0, ttl_5m: int = 0, ttl_1h: int = 0,
@@ -329,8 +341,22 @@ def make_claude_metric(*, session: str, project: str = "", surface: str = "",
     a FRESH row rather than silently overwriting a stale one, and `ledger.claude_metrics`
     resolves the latest per session at read time. ``None`` falls back to a fresh
     random `clm_` id."""
+    if source not in CLAUDE_METRIC_SOURCES:
+        raise ValueError(f"claude-metric source {source!r} not in {CLAUDE_METRIC_SOURCES}")
     row = {"id": metric_id or ids.new_id("clm"), "ts": ts or _now(),
-           "agent": "claude-code", "source": "transcript", "session": str(session)}
+           "agent": "claude-code", "source": source, "session": str(session)}
+    if request:
+        row["request"] = str(request)
+    if model:
+        row["model"] = str(model)
+    # `provider` exists for exactly one reason (METRICS-PRIMARY P2): `policy.price_match`
+    # keys on `(provider, model)`, so a row without it prices as `none` no matter how good
+    # its token counts are. It is NOT a new fact — it is the same derivation
+    # `transcript.parse_calls` already stamps on every call row from this store
+    # (`provider="anthropic"`), moved to the grain the money path now reads. Absent on the
+    # chat grain, which never prices as one call.
+    if provider:
+        row["provider"] = str(provider)
     if surface:
         row["surface"] = str(surface)
     if tokens_in:
@@ -373,6 +399,7 @@ def make_claude_metric(*, session: str, project: str = "", surface: str = "",
 
 
 CLAUDE_METRIC_FIELDS = ("id", "ts", "agent", "source", "session", "surface",
+                        "request", "model", "provider",
                         "tokens_in", "tokens_out", "cached_in", "cache_write_in",
                         "ttl_5m", "ttl_1h", "thinking", "web_search", "web_fetch",
                         "requests", "raw_rows", "sidechain_tokens_in",
@@ -384,11 +411,22 @@ CLAUDE_METRIC_FIELDS = ("id", "ts", "agent", "source", "session", "surface",
 # `chat` (VS Code chatSessions, per-request) · `cli` (Copilot CLI session-state,
 # per-session-cumulative) · `sidecar`/`debuglog`/`otel` (three opt-in, per-model-call
 # stores). A closed enum, like `UNITS`/`METHODS` — `make_copilot_metric` validates it.
-COPILOT_METRIC_SOURCES = ("chat", "cli", "sidecar", "debuglog", "otel")
+# `cli-delta` is the ONE derived source in this otherwise store-verbatim kind, and the
+# exception is deliberate + named (METRICS-PRIMARY P0a). The CLI store writes only
+# CUMULATIVE per-shutdown totals; a cumulative row cannot be a spend spine, because the
+# cutover partitions the time axis by each row's own `ts` and a cumulative row carries
+# its session's whole life at the latest capture — a session straddling the cutover would
+# be billed twice. So `cli` stays exactly as the store wrote it (verbatim, the kind's
+# reason to exist) and `cli-delta` is emitted ALONGSIDE it, carrying the per-shutdown
+# delta, using the same arithmetic and the same reset rule `parse_copilot_cli_calls`
+# already applies for the `calls` kind. Both are written; only `cli-delta` is in
+# `ledger.SPEND_SOURCES`. Never sum the two.
+COPILOT_METRIC_SOURCES = ("chat", "cli", "cli-delta", "sidecar", "debuglog", "otel")
 
 
 def make_copilot_metric(*, source: str, session: str, surface: str = "",
                         request: str = "", call: str = "", model: str = "",
+                        provider: str = "",
                         tokens_in: int = 0, tokens_out: int = 0, cached_in: int = 0,
                         model_totals: list[dict] | None = None,
                         credits: float | None = None,
@@ -440,6 +478,11 @@ def make_copilot_metric(*, source: str, session: str, surface: str = "",
         row["call"] = str(call)
     if model:
         row["model"] = str(model)
+    # METRICS-PRIMARY P2 — `policy.price_match` keys on (provider, model), so a spine row
+    # without it prices as `none`. The same `_copilot_provider(model)` derivation
+    # `parse_copilot_*_calls` already stamps, at the grain the money path reads.
+    if provider:
+        row["provider"] = str(provider)
     if tokens_in:
         row["tokens_in"] = int(tokens_in)
     if tokens_out:

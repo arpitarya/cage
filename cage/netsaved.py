@@ -100,7 +100,7 @@ def by_tool(root: Path, pol: dict, tool: str, since: str | None = None, *,
     coverage: ``complete`` is True only when every one of the tool's in-window receipts
     landed on a covered task — the gate `verdict` uses before it will subtract at all.
     """
-    all_calls = ledger.calls(root) if calls is None else calls
+    all_calls = ledger.spend(root) if calls is None else calls
     all_receipts = ledger.receipts(root) if receipts is None else receipts
     rows = [r for r in ledger.since(all_receipts, since)
             if r.get("tool") == tool and r.get("unit") != "minutes"]

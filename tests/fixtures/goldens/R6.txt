@@ -1,10 +1,10 @@
 $ cage report --by agent
 Ledger by agent
 
-agent   calls   tok in  tok out  gross tok
-------  -----  -------  -------  ---------
-claude      1  912,400   61,200     80,000
-TOTAL       1  912,400   61,200     80,000
+agent        calls   tok in  tok out  gross tok
+-----------  -----  -------  -------  ---------
+claude-code      1  912,400   61,200     80,000
+TOTAL            1  912,400   61,200     80,000
 
 · saved is GROSS — avoided read cost; it excludes the cost of USING the tool
   (the invoking turn, the injected context). `cage query gross-vs-net`

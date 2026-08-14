@@ -1148,7 +1148,14 @@ REGISTRY: tuple[Explanation, ...] = (
         "  and wrong for savings — a route that ships after a session was ingested can\n"
         "  never see it again. `cage import --rescan-graphify` re-runs detection over\n"
         "  every matched log, ignoring the cursor. Detection only (no call/credit\n"
-        "  re-ingest), idempotent by receipt id.",
+        "  re-ingest), idempotent by receipt id.\n"
+        "  THE SAME BLINDNESS BIT THE METRICS LEDGERS (METRICS-CURSOR-BLIND, 2026-08-14):\n"
+        "  the per-agent metric kinds under ledger/ (claude, copilot, kiro) ride the same\n"
+        "  cursor-filtered file list, so every store ingested before those routes shipped\n"
+        "  was skipped forever — measured at\n"
+        "  102 copilot and 56 kiro rows on disk with zero captured. `cage import\n"
+        "  --rescan-metrics` is that backfill: metrics only, idempotent by row id, and it\n"
+        "  advances NO cursor, so backfilling one kind can never blind another.",
         ("cage/graphifytx.py", "cage/importcmd.py", "cage/transcript.py",
          "cage/doctorcmd.py", "docs/adr/0009-kiro-cli-tool-run-bodies-read-transiently-never-persisted.md",
          "work/research/2026-08-07-graphify-store-evidence.md"),

@@ -38,10 +38,16 @@ spec.
 Created when an [OPEN-WORK.md](../work/OPEN-WORK.md) item is picked up; archived on
 implement. COPILOT-METRICS, KIRO-METRICS, and CLAUDE-METRICS — the three per-chat
 metrics-ledger builds, one per agent — were all built and green on 2026-08-14 and
-archived, nothing currently sits in `work/` root:
-[copilot](../work/archive/v0.49-copilot-metrics-ledger.handoff.md) ·
+archived: [copilot](../work/archive/v0.49-copilot-metrics-ledger.handoff.md) ·
 [kiro](../work/archive/v0.49-kiro-metrics-ledger.handoff.md) ·
 [claude](../work/archive/v0.49-claude-metrics-ledger.handoff.md).
+
+**METRICS-PRIMARY** — the flip that made those three ledgers the SOURCE of derived
+spend from a pinned cutover — was built and green on 2026-08-14 and archived:
+[handoff](../work/archive/v0.50-metrics-primary.handoff.md) ·
+[prompt](../work/archive/v0.50-metrics-primary.prompt.md). Its design of record is
+[ADR 0010](adr/0010-metric-ledgers-are-the-spend-source-forward-only-cutover.md).
+**`work/` root now carries no handoff/prompt pair** — nothing is in flight.
 
 **One thing each of the three left open is not a pair and does not live here:** a
 `CLAUDE.md` diff (ledger diagram line + a substrate bullet) is **proposed, awaiting

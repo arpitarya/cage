@@ -214,7 +214,7 @@ def summarize(root: Path, pol: dict) -> dict:
     marks = markers(root)
     timelines = _timelines(marks)
     order = phase_order(marks)
-    calls = ledger.calls(root)
+    calls = ledger.spend(root)
 
     # assign each call to (machine, phase) per that machine's own markers
     per: dict[str, dict[str, dict[str, dict]]] = {}   # machine → phase → day → totals

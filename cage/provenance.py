@@ -7,7 +7,7 @@ from cage import ledger, paths, policy, prices, render
 
 
 def explain(root: Path, call_id: str, pol: dict | None = None) -> dict:
-    call = next((c for c in ledger.calls(root) if c.get("id") == call_id), None)
+    call = next((c for c in ledger.join_table(root) if c.get("id") == call_id), None)
     if pol is None:
         try:
             pol = policy.load(paths.Footprint(root).policy)
