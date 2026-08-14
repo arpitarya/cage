@@ -3,7 +3,9 @@
 Every item sits under its owning ADR ([ownership map](../docs/adr/README.md)) — an item
 with no record is a decision with nothing to hold it. **Needs Arpit:**
 CONTINUOUS-CAPTURE · COVERAGE-STRIKE-2 · two hands-only probes (GFX-IDE-PATH-UNPROBED ·
-COPILOT-JETBRAINS-UNPROBED).
+COPILOT-JETBRAINS-UNPROBED). **Agent-closable now:** DUMMYREPO-STALE-VERBS — GitHub
+Actions CI is red on every OS/Python cell; S13 alone is fixed (unblocks future releases'
+`cage.pyz`), the rest is mechanical per-scenario verb swaps.
 
 ## [ADR-LAWS](../docs/adr/0001_laws.md) — substrate
 
@@ -41,6 +43,30 @@ COPILOT-JETBRAINS-UNPROBED).
   two examples were shipped missing a required positional and would have failed (they
   were `study start`/`study join`, both since removed with the fleet study — the *gap*
   is unchanged). A real parse-check is a separate gate to build, not a docs edit.
+- **DUMMYREPO-STALE-VERBS** — `tools/dummyrepo/run.py`, the CI-only scenario runner
+  (`python -m tools.dummyrepo`, no `pytest` coverage — `just test` never exercises it),
+  is loaded with calls to verbs SURFACE-CUT (v0.50) and the money removal (v0.51) deleted:
+  `report` · `insights compare/estimate/verdict` · `prices *`. **Confirmed on real GitHub
+  Actions 2026-08-15** — the v0.51.0 release push was the first time any post-SURFACE-CUT
+  commit actually ran there (the branch sat 40+ commits ahead of `origin/main`,
+  unpushed). Every `build` matrix cell (3 OS × 4 Python) and the `graphify present` leg
+  went red; the release's `smoke-pyz` chain went red too, so **v0.51.0 shipped to PyPI
+  with no `cage.pyz` asset attached** (S13 alone was fixed same-day, unblocking future
+  releases — commit message names it; this release itself won't retroactively gain the
+  asset, since a tag doesn't move and the pyz is CI-built-only by rule). Failing
+  scenarios and their symptom: **S1/S2** (`imported rows != fixture expectation`, 0 vs
+  4/2 rows — needs its own root-cause, may not be verb-staleness) · **S3**
+  (`StopIteration`) · **S5** (`insights compare` gone) · **S6** (`insights estimate`
+  gone) · **S7** (`insights verdict` gone) · **S8/S17** (`report` gone) · **S11/S14**
+  (`prices` gone) · **S15** (`Invalid isoformat string: 'None'`, seeding bug) · **S16**
+  (policy diff expects a pricing-tables line that no longer exists) · **S18** (setup
+  re-run doesn't refresh a stale graphify interceptor — may be a real regression, not
+  just staleness). The `graphify present` leg's determinism check also calls
+  `cage report --csv`. **Also seen, likely unrelated:** a Windows-only pytest failure,
+  `tests/test_win_graphify_shim.py::test_posix_twin_is_pinned_to_lf_in_the_working_tree`
+  ("the POSIX twin is unpinned: {}") — worth a look but not triaged here. Fix is
+  mechanical per scenario (swap the dead verb for a surviving read view, per the S13
+  pattern) except where noted above as a possible real bug.
 
 ## [ADR-COPILOT](../docs/adr/0004_copilot.md)
 

@@ -712,7 +712,8 @@ def s13_pyz(base: Path) -> str:
     zipapp labels itself, reads bundled data from inside the zip, imports the
     fixture corpus, and derives byte-identically to the repo-module run over the
     SAME ledger. $CAGE_PYZ (CI passes the exact release artifact) beats a local
-    build."""
+    build. Parity is checked via `insights chats` — `report` was removed in v0.50
+    (SURFACE-CUT)."""
     pyz_env = os.environ.get("CAGE_PYZ")
     if pyz_env:
         pyz_path = Path(pyz_env)
@@ -741,16 +742,16 @@ def s13_pyz(base: Path) -> str:
     plant(specs, env)
     if pyz("import").returncode != 0:
         raise Fail("pyz import failed")
-    rep1, rep2 = pyz("report"), pyz("report")
+    rep1, rep2 = pyz("insights", "chats"), pyz("insights", "chats")
     if rep1.returncode != 0 or not rep1.stdout:
-        raise Fail(f"pyz report failed: {rep1.stderr.strip()[:200]}")
+        raise Fail(f"pyz insights chats failed: {rep1.stderr.strip()[:200]}")
     if rep1.stdout != rep2.stdout:
-        raise Fail("pyz report not byte-identical across two runs")
-    module_rep = expect_ok(repo, env, "report")  # repo checkout over the SAME ledger
+        raise Fail("pyz insights chats not byte-identical across two runs")
+    module_rep = expect_ok(repo, env, "insights", "chats")  # repo checkout over the SAME ledger
     if module_rep != rep1.stdout:
-        raise Fail("pyz report differs from the wheel/module report over the same ledger")
+        raise Fail("pyz insights chats differs from the wheel/module output over the same ledger")
     assert_pii_clean(repo)
-    return f"zipapp labelled · demo+import ok · report deterministic · wheel↔pyz parity ({built})"
+    return f"zipapp labelled · demo+import ok · insights chats deterministic · wheel↔pyz parity ({built})"
 
 
 # Seeder for S14 — call-less token receipts against every ladder rung (ADR-GRAPHIFY).

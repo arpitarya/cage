@@ -12,6 +12,35 @@ by milestone) — the worklog is what *happened this session*.
 
 ---
 
+## 2026-08-15 — Claude Code — v0.51.0 shipped; DUMMYREPO-STALE-VERBS found and S13 fixed
+
+- **Asked:** "commit push and publish a new version."
+- **Done:** committed the staged ADR-CONFIG work, ran `just test` (1563 passed, 11
+  skipped), marked v0.51.0 released in CHANGELOG, refreshed the two test-count lines,
+  pushed `main` (42 commits, unpushed since well before v0.50), tagged and pushed
+  `v0.51.0`, `gh release create` fired the publish workflow. **`cage-flux==0.51.0` is
+  live on PyPI**, verified against pypi.org directly.
+- **Found:** that push was the first time v0.50/v0.51's changes ever ran on real GitHub
+  Actions. Every `build` matrix cell went red, and the release's `smoke-pyz` chain went
+  red too — so v0.51.0 shipped **with no `cage.pyz` release asset**. Cause:
+  `tools/dummyrepo/run.py` (CI-only, `pytest` never touches it) still calls verbs
+  SURFACE-CUT/money-removal deleted (`report`, `insights compare/estimate/verdict`,
+  `prices *`) across ~13 scenarios. Filed as **DUMMYREPO-STALE-VERBS** in OPEN-WORK
+  under ADR-CLI.
+- **Decided (Arpit, asked via AskUserQuestion):** fix only the release-blocking piece
+  now (S13, the scenario the release's smoke job runs), file the rest. Done — `s13_pyz`
+  swapped `report` for `insights chats`; passes locally, `just test` still green. The
+  **current** v0.51.0 release keeps no `.pyz` asset (tag doesn't move, pyz is
+  CI-built-only by rule) — the fix unblocks the **next** release only.
+- **Open:** DUMMYREPO-STALE-VERBS' remaining ~12 scenarios (S1–S3, S5–S9, S11, S14–S18),
+  the `graphify present` leg's own `report --csv` call, and an unrelated Windows pytest
+  failure (`test_posix_twin_is_pinned_to_lf_in_the_working_tree`). S1/S2/S15/S18 look
+  like real bugs under the staleness, not just dead verbs — flagged, not diagnosed.
+- **Cost:** unmeasured — the rule's own source (`cage report`) is the exact command this
+  session just confirmed dead in CI. Same UNREAD-FACTS gap every recent session hits.
+- **Next step:** push the S13 fix + these doc updates; a dedicated session for the rest
+  of DUMMYREPO-STALE-VERBS.
+
 ## 2026-08-15 — Cowork — ADR-CONFIG: `cage.toml` gets the record it never had
 
 - **Asked:** "create an adr for cage.toml file — grill me on what needs to go in there."

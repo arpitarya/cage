@@ -8,6 +8,38 @@ Entry format:
 
 ```
 
+## 2026-08-15 — v0.51.0 shipped; DUMMYREPO-STALE-VERBS found and S13 fixed
+
+- **Built:** committed and pushed the staged ADR-CONFIG doc change, then ran the full
+  release flow for v0.51.0 — CHANGELOG entry marked released, README `$0`-section and
+  CLAUDE.md `just test` counts refreshed to 1563, tag `v0.51.0` created and pushed,
+  `gh release create` fired the publish workflow.
+- **Verified:** `cage-flux==0.51.0` is live on PyPI (wheel + sdist, checked against
+  pypi.org's own API — the workflow's own upload log confirms it too).
+- **Found:** pushing 42 commits that had sat unpushed on `main` (v0.50 SURFACE-CUT and
+  v0.51's money removal) was the first time any of that work actually ran on GitHub
+  Actions. Result: every `build` matrix cell red, the `graphify present` leg red, and
+  the release's `smoke-pyz`→`attach` chain red — so **v0.51.0 has no `cage.pyz` asset**.
+  Root cause: `tools/dummyrepo/run.py` (CI-only, no `pytest` coverage) calls verbs
+  deleted by those two releases (`report`, `insights compare/estimate/verdict`,
+  `prices *`) across S1–S3, S5–S9, S11, S13–S18. Filed as **DUMMYREPO-STALE-VERBS** in
+  OPEN-WORK under ADR-CLI, with the failing scenario list and symptoms.
+- **Built (scoped fix, Arpit's call: S13 only, rest filed):** `s13_pyz` in
+  `tools/dummyrepo/run.py` swapped its three `report` calls for `insights chats` (a
+  surviving read view) — this is the scenario the release's `smoke-pyz` job runs, so
+  fixing it unblocks the `.pyz` asset on the **next** release. This release keeps no
+  asset — the tag doesn't move and the pyz is CI-built-only by rule (CLAUDE.md), so
+  there's no rule-compliant way to backfill it.
+- **Files:** `tools/dummyrepo/run.py` · `work/OPEN-WORK.md` · this file ·
+  `work/WORKLOG.md`.
+- **Test status:** `just test` green (1563 passed, 11 skipped) both before and after
+  the S13 fix; `python -m tools.dummyrepo --scenarios S13` passes locally post-fix.
+- **Next step:** the rest of DUMMYREPO-STALE-VERBS (S1–S3, S5–S9, S11, S14–S18, the
+  `graphify present` leg's `report --csv` call, and the unrelated Windows pytest
+  failure `test_posix_twin_is_pinned_to_lf_in_the_working_tree`) — a dedicated session,
+  per-scenario verb swaps mostly mechanical except S1/S2/S15/S18 which read like real
+  bugs, not just staleness, and need their own root-cause first.
+
 ## 2026-08-15 — ADR-CONFIG: the config file gets a record, and the config surface gets a filed gap
 
 - **Built (docs only — no `cage/` code changed):** `docs/adr/0012_config.md`

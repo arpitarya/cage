@@ -1,5 +1,5 @@
 # Cage policy — the only place your project settings live. Versioned, deterministic
-# (plan §3.3). This file holds your DECISIONS — pipeline order, capture switches,
+# (CLAUDE.md). This file holds your DECISIONS — pipeline order, capture switches,
 # import sources, cleanup and authorship settings.
 #
 # There is no price table and no companion prices.toml: cage measures token and credit
@@ -62,11 +62,11 @@ days = 90
 enabled = false
 
 # Canonical pipeline order. Marginal attribution walks this once; each tool's
-# receipt is the delta it produced *given the tools upstream of it* (plan §4.2).
+# receipt is the delta it produced *given the tools upstream of it* (ADR-LAWS).
 [tools]
 order = ["graphify", "fux", "router", "compressor", "cache", "response-cache"]
 
-# Budget ceilings (plan §8.1) — **opt-in, and shipped OFF**. No key ⇒ no ceiling:
+# Budget ceilings (ADR-LAWS Law 5) — **opt-in, and shipped OFF**. No key ⇒ no ceiling:
 # `cage insights budget` renders `—` for the cap, `budget.check` never reports `over`
 # and always returns proceed=True. A cap that nobody asked for is a false alarm, and
 # there is no defensible default spend for someone else's project — so unlike
@@ -78,7 +78,7 @@ order = ["graphify", "fux", "router", "compressor", "cache", "response-cache"]
 # daily_usd = 25.00
 # on_exceed = "warn"
 
-# Ledger-size warning (plan §3.6.4). When the partitioned shards together exceed
+# Ledger-size warning (ADR-LAWS). When the partitioned shards together exceed
 # warn_mb (in MB), `cage` prints ONE hint to stderr (never stdout — stdout is the
 # deterministic table surface) pointing at the remedy (archive old *-YYYY-MM.jsonl
 # shards / `cage authorship ledger-sync` then prune). Warn-only, never blocks a read or write.
@@ -87,7 +87,7 @@ order = ["graphify", "fux", "router", "compressor", "cache", "response-cache"]
 # [ledger]
 # warn_mb = 418
 
-# Cost is only honest paired with outcome (plan §8.2). `task_ok` = task succeeded
+# Cost is only honest paired with outcome (ADR-LAWS Law 5). `task_ok` = task succeeded
 # without a redo; cost-per-*successful*-task is the metric that matters.
 [quality]
 signal = "task_ok"
