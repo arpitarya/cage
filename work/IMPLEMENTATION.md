@@ -8,6 +8,42 @@ Entry format:
 
 ```
 
+## 2026-08-15 — P4 (ledger-restructure): savings lift to `ledger/<tool>/`
+
+- **Built:** `paths.tool_dir` · `savings_shard` retargeted · `savings_shards` unions both
+  trees · `paths.reserve_tool_name` + `_RESERVED_LEDGER_DIRS` + `SAVINGS_TOOLS`. The
+  writer (`savings.record`) needed no change beyond the path helper — **one helper, never
+  a second literal**, which is what made the move a two-line diff at the four push sites.
+- **All four sources moved together (10.6)** — graphify, fux, compress, responsecache.
+  A graphify-only move leaves one row kind in two shapes permanently.
+- **Both trees read forever.** The legacy `ledger/savings/<tool>/` tree is never written,
+  rewritten or deleted; a savings row is **unrecoverable**. Verified against the real
+  ledger: 7 rows / 4,271,019 tokens still read from the legacy tree after the change.
+- **10.5 — the namespace guard, and the design mistake I made first.** `ledger/` is now a
+  flat namespace shared by agents, consumers and tools, so a tool named `claude` would put
+  two row kinds in one directory. `reserve_tool_name` refuses at **write time with a named
+  error** — never a rename or a suffix, because quiet disambiguation buries the mistake
+  while rows keep landing somewhere plausible.
+  **My first implementation read the new tree back from an allowlist of known tool names,
+  and that was wrong**: it made any *third-party* tool's rows **write-only** — on disk,
+  returned by no view, nothing failing. fux's zero-dep shim is a real caller of exactly
+  that shape. Caught by `test_savings.py`'s existing `compressor` case. Corrected to
+  **glob-and-exclude against the same reserved table**, so the write guard and the read
+  filter are ONE table and cannot disagree about what a tool directory is.
+- **Cleanup protection survives because the move stayed inside `ledger/`** — but that is
+  asserted, not assumed: `test_cleanup.py`'s `days=0` survival case now covers **both**
+  paths. The `NEVER` comment naming the old path was rewritten, and it now points at
+  `imports.jsonl` (P3a) as the worked example of a file that *did* leave `ledger/`.
+- **Files:** `cage/{paths,cleanup}.py` · `docs/adr/0007_graphify.md` · `docs/PLAN.md` §3 ·
+  `docs/architecture-flow.mermaid` · `tests/test_savings_rehome.py` (new, 23) ·
+  `tests/test_cleanup.py`.
+- **ADR (ADR-DISCIPLINE):** **ADR-GRAPHIFY** — the storage move, the four sources, the
+  reserved namespace, and the write-only bug and its fix. **ADR-LAWS was deliberately NOT
+  edited**: it owns `savings`/`paths`/`ledger`, but Law 3 (append-only) is *upheld* here,
+  not changed — and a law is proposed, never unilaterally rewritten. No new module.
+- **Tests:** `just test` green — **1487 passed**, 11 skipped (+23).
+- **Next:** P5 — retire the three agents' transcript→`calls` writer (requires P1, green).
+
 ## 2026-08-14 — P3 (ledger-restructure): the two unpartitioned files move, and copilot CLI gets a name
 
 Three asks in one phase because they share one migration shape — *stop writing here, start

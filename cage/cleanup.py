@@ -303,13 +303,19 @@ def run_cli(root: Path, pol: dict, apply: bool = False,
 # The never-list, adjacent to the allowlist it guards. Documentation + tests
 # assert it; `scan` enforces it by construction (it never looks at these).
 #
-# Tool savings (`ledger/savings/<tool>/savings-*.jsonl`) are covered here ONLY because
-# they sit under `ledger/` — there is no dedicated savings entry. That is deliberate:
-# a per-tool cleanup class must NEVER be added. Savings rows are unrecoverable and
-# nothing else reconstructs them (unlike a cursor or a debug-log row); moving the
-# savings tree out from under `ledger/` without adding it back here would silently
-# make it cleanable, with no test failing until `test_cleanup.py`'s
-# `ledger/savings/<tool>/` survival case is the one that catches it.
+# Tool savings are covered here ONLY because they sit under `ledger/` — there is no
+# dedicated savings entry. That is deliberate: **a per-tool cleanup class must NEVER be
+# added.** Savings rows are unrecoverable and nothing else reconstructs them (unlike a
+# cursor or a debug-log row).
+#
+# **P4 (v0.51) moved them, and the protection survives because the move stayed INSIDE
+# `ledger/`:** new rows go to `ledger/<tool>/savings-*.jsonl` and the legacy
+# `ledger/savings/<tool>/` tree is read forever. Both are under the umbrella. The warning
+# this comment carried is unchanged and now has a worked example one directory over —
+# `imports.jsonl` (below) is what happens when a file DOES leave `ledger/`. Moving the
+# savings tree out without adding it back here would silently make it cleanable, with no
+# test failing until `test_cleanup.py`'s survival cases — which cover **both** paths —
+# are the ones that catch it.
 # `imports.jsonl` is the worked example of the hazard above, and it is why the entry
 # below exists. P3a (v0.51) moved the capture manifest from `ledger/imports.jsonl` to
 # `state/imports.jsonl` — correct on its behaviour (it supplies labels, never a number),

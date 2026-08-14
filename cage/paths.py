@@ -322,6 +322,57 @@ def active_ledger_source(start: Path | None = None) -> str:
 # surface that knew about only one twin is precisely how a silently-unmetered
 # interceptor stays invisible (F1).
 
+#: The savings tools cage itself writes, for documentation and tests. **Deliberately NOT
+#: the enumeration the reader walks** — `savings_shards` globs and excludes
+#: `_RESERVED_LEDGER_DIRS` instead, so a THIRD-PARTY tool (fux's zero-dep shim is the
+#: worked example, and any `[sources.<name>]` tool could be another) files rows that are
+#: read back without cage knowing its name in advance. An allowlist here would make every
+#: unknown tool write-only — rows on disk that no view ever returns, with nothing failing.
+SAVINGS_TOOLS = ("graphify", "fux", "compress", "responsecache")
+
+#: Directory names under `ledger/` that a savings tool may NOT take (P4 / decision 10.5).
+#:
+#: After P1 and P4, `ledger/` is a **flat namespace shared by agents, consumers and
+#: tools**. A custom `[sources.<name>]` tool — or a future agent — named the same as a
+#: savings tool would land two different row kinds in one directory, and every reader of
+#: either would silently see the other's rows.
+#:
+#: **Flat + reserved was chosen over `ledger/tools/<tool>/`** because it keeps the
+#: one-dir-per-producer shape the whole program is for, and it makes the collision
+#: *impossible* rather than unlikely — at the cost of one enumeration, checked at write
+#: time. Nesting tools one level deeper would have re-created exactly the asymmetry P4
+#: removes.
+_RESERVED_LEDGER_DIRS = frozenset({
+    # the three agents (kept as literals, not imported: `agents` imports `paths`, and a
+    # cycle here would break the write path this guard protects)
+    "claude", "copilot", "kiro",
+    # non-agent producers
+    "consumer", "provenance", "savings",
+    # non-directory ledger kinds, so a tool can never shadow a shard-name prefix
+    "calls", "credits", "receipts", "tasks", "study", "imports",
+})
+
+
+def reserve_tool_name(tool: str) -> str:
+    """Return ``tool`` if it may be a directory under `ledger/`, else raise.
+
+    **Validated at WRITE time, and refused with a named error** rather than silently
+    renamed or suffixed. A collision is a design mistake in whatever declared the name; a
+    write path that quietly disambiguates would bury it, and the rows would keep landing
+    somewhere plausible-looking forever.
+
+    Raises `ValueError` — and `savings.record` is fail-open, so a refused write is traced
+    under `CAGE_DEBUG` and returns ``""``. It never propagates into the tool being metered:
+    a bad *name* must not break the *tool*."""
+    name = str(tool or "")
+    if name in _RESERVED_LEDGER_DIRS:
+        raise ValueError(
+            f"savings tool {name!r} collides with a reserved ledger directory "
+            f"({', '.join(sorted(_RESERVED_LEDGER_DIRS))}) — two row kinds would share "
+            f"one directory. Rename the tool.")
+    return name
+
+
 GRAPHIFY_SHIMS = ("graphify", "graphify.cmd")
 
 
@@ -1200,29 +1251,63 @@ class Footprint:
 
     @property
     def savings_dir(self) -> Path:
-        """The dedicated per-source savings tree (import-ledger plan §3):
-        ``ledger/savings/<tool>/savings-<month>.jsonl``. A directory, not a shard — one
-        sub-dir per savings source (graphify first; human/other tools later)."""
+        """The **legacy** per-source savings tree, ``ledger/savings/<tool>/`` — read
+        forever, never written since P4 (v0.51), never rewritten or deleted.
+
+        A savings row is **unrecoverable**: nothing reconstructs it the way a cursor or a
+        debug-log row can be reconstructed, which is why `test_cleanup.py` pins its
+        survival at `days=0`. New rows go to `ledger/<tool>/` (`tool_dir`)."""
         return self.ledger / "savings"
+
+    def tool_dir(self, tool: str) -> Path:
+        """A savings tool's own directory: ``ledger/<tool>/savings-<month>.jsonl``.
+
+        P4 (v0.51) lifted the savings tree up one level so every producer owns exactly one
+        directory under `ledger/` — `claude/` `copilot/` `kiro/` `consumer/` `provenance/`
+        `graphify/` `fux/` `compress/` `responsecache/` — rather than tools living one
+        level deeper than everything else.
+
+        **All four savings sources moved together (10.6), not just graphify.** A
+        graphify-only move would have left one row kind in two shapes permanently, which is
+        the inconsistency this program exists to remove.
+
+        ``tool`` is validated by `reserve_tool_name` before it can become a directory."""
+        return self.ledger / reserve_tool_name(tool)
 
     def savings_shard(self, tool: str, ts: str) -> Path:
         """Month-partition path for a savings row of ``tool``, from the row's own ``ts``
-        (`savings/<tool>/savings-2026-07.jsonl`). Same determinism as `shard`: the name
-        comes from the row, never a write-time clock. ``tool`` is a validated path-safe
-        token (`schema.make_savings`), so it is safe as a directory name."""
+        (`<tool>/savings-2026-07.jsonl`). Same determinism as `shard`: the name comes from
+        the row, never a write-time clock. ``tool`` is a validated path-safe token
+        (`schema.make_savings`) **and** a non-reserved one (`reserve_tool_name`)."""
         month = ts[:7] if (ts and len(ts) >= 7 and ts[4] == "-") else ""
         name = f"savings-{month}.jsonl" if month else "savings.jsonl"
-        return self.savings_dir / tool / name
+        return self.tool_dir(tool) / name
 
     def savings_shards(self) -> list[Path]:
-        """Every readable savings shard across the whole tree (`savings/*/savings-*.jsonl`
-        + legacy `savings/*/savings.jsonl`), sorted for a deterministic concatenated
-        read. Only existing files are returned."""
+        """Every readable savings shard across **both** trees, sorted for a deterministic
+        concatenated read: the legacy `savings/<tool>/` tree first (it is strictly older),
+        then the per-tool dirs at `ledger/<tool>/`. Only existing files are returned.
+
+        The new tree is found by **globbing `ledger/*/savings*.jsonl` and excluding
+        `_RESERVED_LEDGER_DIRS`** — the same table `reserve_tool_name` refuses against, so
+        the write guard and the read filter can never disagree about what a tool directory
+        is. An allowlist of known tool names was the first attempt and was wrong: it made
+        any third-party tool's rows **write-only**, landing on disk and never returned by
+        any view, with nothing failing. Excluding the reserved set inverts that safely —
+        an unknown directory is assumed to be a tool's, and a future *kind* must add itself
+        to the reserved set anyway, or it would collide with a tool name."""
+        out: list[Path] = []
         base = self.savings_dir
-        if not base.is_dir():
-            return []
-        legacy = sorted(base.glob("*/savings.jsonl"))
-        return legacy + sorted(base.glob("*/savings-*.jsonl"))
+        if base.is_dir():
+            out.extend(sorted(base.glob("*/savings.jsonl")))
+            out.extend(sorted(base.glob("*/savings-*.jsonl")))
+        if self.ledger.is_dir():
+            for d in sorted(self.ledger.iterdir()):
+                if not d.is_dir() or d.name in _RESERVED_LEDGER_DIRS:
+                    continue
+                out.extend(sorted(d.glob("savings.jsonl")))
+                out.extend(sorted(d.glob("savings-*.jsonl")))
+        return out
 
     @property
     def consumer_dir(self) -> Path:

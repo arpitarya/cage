@@ -22,12 +22,13 @@ flowchart TD
             mkiro["kiro/chats-YYYY-MM.jsonl<br/>(+ credits since P2)"]
             mconsumer["consumer/calls-YYYY-MM.jsonl<br/>(NEW v0.51 — P1)"]
             mprov["provenance/provenance-YYYY-MM.jsonl<br/>(authorship; monthly since P3c)"]
-            msavings["savings/&lt;tool&gt;/savings-YYYY-MM.jsonl"]
+            msavings["&lt;tool&gt;/savings-YYYY-MM.jsonl<br/>(graphify · fux · compress · responsecache)"]
         end
         subgraph hist["written by nothing current, read forever"]
             calls["calls-YYYY-MM.jsonl<br/>(retired agents: codex)"]
             credits["credits-YYYY-MM.jsonl<br/>(kiro CLI — re-homed to kiro/ in P2)"]
             provold["provenance.jsonl<br/>(re-homed in P3c)"]
+            savold["savings/&lt;tool&gt;/<br/>(lifted one level in P4)"]
         end
         receipts["receipts-YYYY-MM.jsonl"]
         tasks["tasks-YYYY-MM.jsonl"]

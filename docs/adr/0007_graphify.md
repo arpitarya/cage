@@ -386,6 +386,36 @@ unbounded scan is the safe side.
 
 Tested in both pairings (`bash + cmd`, `cmd + cmd`) — `tests/test_win_graphify_shim.py`.
 
+> **⟲ Storage note (P4, v0.51) — savings lift to `ledger/<tool>/`.**
+> A graphify saving is now written to `ledger/graphify/savings-<month>.jsonl` rather than
+> `ledger/savings/graphify/savings-<month>.jsonl`, so every producer owns exactly one
+> directory under `ledger/`. **All four savings sources moved together** — `graphify`,
+> `fux`, `compress`, `responsecache` (this record owns the last two) — because a
+> graphify-only move would leave one row kind in two shapes permanently.
+>
+> **Nothing about the receipt changed:** same `schema.make_savings`, same id scheme, same
+> `session=""` invariant for an interceptor-filed row, same cross-route deferral, same
+> GROSS caveat. `ledger.savings` reads **both** trees forever and the legacy tree is never
+> written, rewritten or deleted — a savings row is unrecoverable, and `test_cleanup.py`
+> pins its survival at `days=0` for both paths.
+>
+> **No law changed** ([ADR-LAWS](0001_laws.md) owns `savings`/`paths`/`ledger`): Law 3,
+> append-only, is *upheld* here — nothing on disk was mutated, and the move is
+> stop-writing-here / start-writing-there / read-both.
+>
+> **The one genuinely new rule is a namespace guard** (decision 10.5). `ledger/` is now a
+> flat namespace shared by agents, consumers and tools, so a tool named `claude` would put
+> two row kinds in one directory and every reader of either would silently see the other's
+> rows. `paths.reserve_tool_name` refuses a reserved name at **write time with a named
+> error** — never a rename or a suffix, because a write path that quietly disambiguates
+> buries the mistake while the rows keep landing somewhere plausible-looking.
+>
+> **`paths._RESERVED_LEDGER_DIRS` is ONE table read at both ends** — refused against on
+> write, excluded from the glob on read — so the two can never disagree about what a tool
+> directory is. The first implementation read back an *allowlist of known tool names*
+> instead, which made any **third-party** tool's rows write-only: on disk, returned by no
+> view, nothing failing. fux's zero-dep shim is a real caller of exactly that shape.
+
 ### Consequences
 
 - Per-session graphify attribution is exact. Both acceptance tests pass: same query in two

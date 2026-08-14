@@ -776,7 +776,7 @@ row (§3.1), and for the same reason: a store recording a real `0.0` and a store
 recording nothing are different facts.
 
 **Storage**: `Footprint.copilot_dir` / `copilot_shard(ts)` / `copilot_shards()` route
-through the SAME per-source-tree mechanism `savings/<tool>/` already uses (smallest
+through the SAME per-source-tree mechanism `ledger/<tool>/` (was `savings/<tool>/` before v0.51; both are read) already uses (smallest
 diff, precedent already tested) — `ledger/copilot/chats-<month>.jsonl`, not a
 generalization of the calls `shard()` scheme.
 
@@ -832,7 +832,7 @@ recorded as a chunk *count*, never repurposed as `tokens_out`. The 2026-02-28
 verbatim, never corrected, at capture — a derive-time concern, if it is ever needed.
 
 **Storage**: `Footprint.kiro_dir` / `kiro_metric_shard(ts)` / `kiro_metric_shards()`
-route through the SAME per-source-tree mechanism `copilot/`/`savings/<tool>/` already
+route through the SAME per-source-tree mechanism `copilot/`/`ledger/<tool>/` (was `savings/<tool>/` before v0.51; both are read) already
 use — `ledger/kiro/chats-<month>.jsonl`, not a generalization of the calls `shard()`
 scheme. **Routing is inherited from ADR 0006, never re-decided**: `ide`-source rows
 ride the routed kiro sink (`_kiro_leg`, the machine ledger — `devdata.sqlite` has no
@@ -899,7 +899,7 @@ touched a subagent file would file a partial-total row: correctness against part
 sweeps, not an optimization.
 
 **Storage**: `Footprint.claude_dir` / `claude_shard(ts)` / `claude_shards()` route
-through the SAME per-source-tree mechanism `copilot/`/`kiro/`/`savings/<tool>/`
+through the SAME per-source-tree mechanism `copilot/`/`kiro/`/`ledger/<tool>/` (was `savings/<tool>/` before v0.51; both are read)
 already use — `ledger/claude/chats-<month>.jsonl`, not a generalization of the calls
 `shard()` scheme.
 

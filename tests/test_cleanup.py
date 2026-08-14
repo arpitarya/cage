@@ -82,6 +82,16 @@ def test_never_list_survives_days_zero(root):
     # comment beside `NEVER` warns about, realized one directory over.
     (st / "imports.jsonl").write_text('{"kind":"import","session_name":"n"}\n',
                                       encoding="utf-8")
+    # P4 (v0.51): savings moved from `ledger/savings/<tool>/` to `ledger/<tool>/`. BOTH
+    # are asserted — the move stayed inside `ledger/`, so the umbrella still covers it,
+    # and this is the case that would catch a future move that did not. A savings row is
+    # unrecoverable; a per-tool cleanup class must never exist.
+    from cage import savings as _savings
+    _savings.record(root, tool="graphify", raw_alternative=500, actual=100, ts=OLD_TS)
+    legacy_sav = Footprint(root).savings_dir / "graphify" / "savings-2026-01.jsonl"
+    legacy_sav.parent.mkdir(parents=True, exist_ok=True)
+    legacy_sav.write_text('{"id":"s_legacy","tool":"graphify","saved":1.0}\n',
+                          encoding="utf-8")
     (Footprint(root).ledger / "imports.jsonl").write_text(
         '{"kind":"import","session_name":"legacy"}\n', encoding="utf-8")
     pol_path = Footprint(root).policy
@@ -91,7 +101,8 @@ def test_never_list_survives_days_zero(root):
     keep = {p: p.read_bytes() for p in
             (st / "machine.json", st / "limits.json", pol_path,
              Footprint(root).ledger / "study.jsonl",
-             st / "imports.jsonl", Footprint(root).ledger / "imports.jsonl")}
+             st / "imports.jsonl", Footprint(root).ledger / "imports.jsonl",
+             legacy_sav, *Footprint(root).savings_shards())}
     shards = b"".join(p.read_bytes() for p in Footprint(root).shards("calls"))
     cleanup.prune(root, policy.load(pol_path), days=0)
     for p, content in keep.items():
