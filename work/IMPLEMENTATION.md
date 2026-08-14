@@ -8,6 +8,59 @@ Entry format:
 
 ```
 
+## 2026-08-14 — P0 (ledger-restructure): the evidence gate, taken at the cut
+
+- **Built:** nothing in `cage/`. **`no ADR affected`** — P0 is measurement only; no
+  behaviour changed, no recorded decision moved.
+- **Published (the gate):**
+  [regression/2026-08-14-calls-vs-metric-crosscheck.md](regression/2026-08-14-calls-vs-metric-crosscheck.md)
+  · [research/2026-08-14-chat-title-store-probes.md](research/2026-08-14-chat-title-store-probes.md)
+  · index rows in both READMEs (**`work/research/README.md` did not exist** — eight
+  occupants, no index; written) · DOC-REGISTRY rows bumped.
+- **Why now:** `METRICS-DUAL-WRITE-END` reserved this comparison until 2026-09-13. Arpit
+  lifted the freeze early, so this snapshot is the **entire** mitigation — Claude Code
+  sweeps transcripts at ~30 days, and once P5 lands it can never be taken again.
+- **Method that made the numbers trustworthy:** one `cage import` into an **empty scratch
+  ledger** (`CAGE_BASE`) over the real stores, so both writers ran in the same sweep and
+  coverage is held constant. The live `~/.cage` was measured too but is **confounded for
+  claude** — its metric ledger starts 2026-08-02 while `calls` reaches back to 2026-06-21.
+  Nothing was written to `~/.cage`.
+- **P0.1 findings:**
+  - **claude `calls`/`request` = 1.9790**, not the ≈2.00× expected — recorded as found.
+  - **Row inflation and token inflation differ: 1.979× vs 1.881×** on `tokens_in`. A
+    duplicate assistant row repeats a *cumulative* count, so the two were never going to
+    move together. Anyone quoting one ratio for both is wrong.
+  - `transcript` and `request` rows sum to **byte-identical** token totals — the per-chat
+    row is exactly the fold of its per-request rows; the grains must never be added.
+  - **copilot's two writers already agree row-for-row** (`chat` 57 + `cli-delta` 26 = 83
+    calls), so P5 costs copilot nothing.
+  - **codex: 373 rows**, provider `openai`, 2026-05-10 → 2026-07-11. No metric ledger
+    exists or ever will. `calls`/`ledger.calls` are permanent; P5 stops a writer only.
+  - **Zero consumer rows exist** — P1's read path cannot be regression-proved on a real
+    ledger and must be proved by a test.
+  - `scope` is stamped on **0 of 66,320** rows and `credits` on none: two UNREAD-FACTS are
+    not merely unread but unwritten in practice.
+- **P0.1b — the P2 baseline is exact.** 3 credits rows / 3 `cli-conv` rows, same sessions,
+  **identical `credits`/`context_pct`/`turns`**. And the skip-rule difference the handoff
+  called P2's crux **measures a delta of 0** across all 20 conversations unscoped (all 20
+  carry `usage_info`; all 20 have credits > 0 or context > 0). n = 20, one machine — that
+  bounds the claim and does **not** license deleting the rule. One drift named: the live
+  ledger's 2026-07 rows carry `method="estimated"`, today's parser writes `"measured"`.
+- **P0.2 — the probes changed P3b.** **Copilot CLI does carry a chat name**, in
+  `workspace.yaml`, a sibling of the `events.jsonl` cage reads: 24/32 sessions, every slot
+  present is non-empty, `user_named` false on all 32 (auto-derived, and worth recording as
+  such). Two constraints: it is **YAML and the stdlib has no parser** — every file probed
+  is flat `key: value`, so a minimal fail-closed reader suffices and a YAML subset parser
+  must not be written; and there are 32 `workspace.yaml` files to 24 `events.jsonl`, so
+  neither side may be assumed present. **Kiro CLI carries no title at all** — every
+  title-shaped key belongs to embedded *tool schemas*, and `latest_summary` is NULL on all
+  20 rows. It keeps `""` permanently; `transcript` must never be mined for a name.
+- **Incidental, worth knowing:** a ledger with no `cage.toml` captures **nothing** and says
+  so loudly (Directive A — sources come only from `[sources]`). The scratch run needed the
+  real config copied in.
+- **Tests:** `just test` green — 1395 passed, 11 skipped (unchanged; no code touched).
+- **Next:** P1 — `ledger/consumer/`, dual-write, reversing ADR-CONSUMERS' decision.
+
 ## 2026-08-14 — PG (ledger-restructure): the graphify interceptor gets a live verb again
 
 - **Built:** `cage interceptor graphify` — a **visible** group + single leaf (`--task` +
