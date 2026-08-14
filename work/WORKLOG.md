@@ -12,6 +12,48 @@ by milestone) — the worklog is what *happened this session*.
 
 ---
 
+## 2026-08-14 (Cowork) — v0.50.0 consolidation; SURFACE-CUT + ADR-RESTRUCTURE committed as `cb4a4a6`
+
+- **Asked (Arpit), answering two standing questions:** (1) *"everything would be in version
+  0.50.0 but until i say so hold on to the publish just keep on committing"*; (2) the
+  README's usage-meter framing is **accepted as-is** — *"didnt review but good lets keep it"*.
+- **This closes two of the SURFACE-CUT session's open items** (entry below): *whether this
+  ships as its own version* → **no, everything lands in v0.50.0**; *where the decision
+  record lives under the new per-agent ADR structure* → **not in an ADR.** The four ADRs are
+  per *metered agent*; a surface deletion spanning all of them belongs in
+  [surface-cut.decision.md](surface-cut.decision.md) + the CHANGELOG, which now has the
+  entry it was missing entirely.
+- **Done:** `__version__` `0.49.1` → **`0.50.0`**; the unreleased CHANGELOG heading renamed;
+  README *What's new* replaced with the single v0.50.0 entry (latest-only rule); archived
+  pairs renamed off the v0.50/**v0.51**/**v0.52** sequence onto `v0.50-*` (9 files
+  repointed) — a prefix naming a version that will never exist is a lying doc. CHANGELOG
+  gained the two missing entries: **SURFACE-CUT** and **ADR-RESTRUCTURE**.
+- **NOT tagged, NOT published** — held per the directive, and never from a laptop regardless.
+- **Disclosed, not buried — the commit contains TWO changesets.** SURFACE-CUT was already
+  staged in the index by the parallel session, and `git commit` takes the whole index, so
+  path-scoping the `add` did not scope the commit. Splitting afterwards would have meant
+  unstaging ~150 files this session cannot vouch for. The message names both rather than
+  letting one travel silently.
+- **The commit is knowingly RED.** SHIM-DEAD-VERB's 15 failing tests are Arpit's accepted
+  decision (entry below), not something this session introduced — but the commit does carry
+  them, and that is worth saying out loud rather than discovering on the next run.
+- **Open / carried forward:**
+  1. **The suite was NOT run from here.** The mounted `.venv` is macOS-built and cannot
+     execute in the Cowork Linux VM, and `device_bash` has no network to install pytest. So
+     the README `$0` section and CLAUDE.md's `just test` comment still say **1571** — certainly
+     wrong after 12 test files were deleted and ~30 stripped. **Refresh both from `just test`
+     on the dev machine.** A number this session cannot measure is one it must not author.
+  2. `.git` locks: git in this VM cannot `unlink`, so a failed op strands
+     `index.lock`/`HEAD.lock`. Several were moved into **`.git/_stale/`** — delete that
+     directory; it is litter, not state.
+  3. PLAN §4 still calls `insights attrib` "the attribution engine (the part that's actually
+     novel)". SURFACE-CUT's handoff says that section needs **rewriting, not annotating**.
+- **Next step:** Arpit rules on SHIM-DEAD-VERB; then `just test` and the two counts.
+- **Cost: unmeasured — `cage report` was deleted by the change this session committed.** The
+  rule's own named source no longer exists; see UNREAD-FACTS.
+
+---
+
 ## 2026-08-14 (Claude Code) — SURFACE-CUT executed: 14 modules, 15 handlers, MCP 6→2; shim left red by decision
 
 - **Asked (Arpit):** execute `work/surface-cut.prompt.md` — delete `cage report`, all of
