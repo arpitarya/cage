@@ -6,15 +6,17 @@ update-rule: ANY capture, routing, or unit change for an agent updates that agen
 
 # ADRs — one record per metered agent
 
-**One record per thing cage meters, plus one for what binds them all.**
+**One record per thing cage meters, plus one for what binds them all and one for the surface it is all read through.**
 
 | # | record | covers |
 |---|---|---|
 | 0001 | [**ADR-LAWS**](0001_laws.md) | the five cross-cutting laws — read this first |
-| 0002 | [**ADR-CLAUDE**](0003_claude.md) | Claude Code — transcripts, the dedup law, authorship |
-| 0003 | [**ADR-COPILOT**](0004_copilot.md) | GitHub Copilot — five stores, cumulative→delta, credits |
-| 0004 | [**ADR-KIRO**](0005_kiro.md) | Kiro — the two-store split, machine facts, the absent spine |
-| 0005 | [**ADR-GRAPHIFY**](0007_graphify.md) | graphify — the interceptor twins and the savings receipt |
+| 0002 | [**ADR-CLI**](0002_cli.md) | the command surface: every command, every flag, an example each |
+| 0003 | [**ADR-CLAUDE**](0003_claude.md) | Claude Code — transcripts, the dedup law, authorship |
+| 0004 | [**ADR-COPILOT**](0004_copilot.md) | GitHub Copilot — five stores, cumulative→delta, credits |
+| 0005 | [**ADR-KIRO**](0005_kiro.md) | Kiro — the two-store split, machine facts, the absent spine |
+| 0006 | [**ADR-CONSUMERS**](0006_consumer.md) | the things cage meters that are not agents — library, custom sources, retired agents |
+| 0007 | [**ADR-GRAPHIFY**](0007_graphify.md) | graphify — the interceptor twins and the savings receipt |
 
 Each has **two sections**: **§1 for humans** (one screen, diagrams, no jargon) and
 **§2 for agents** (the binding detail — context, decision, consequences, alternatives,

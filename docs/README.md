@@ -110,8 +110,8 @@ to its real location.
   ADR-GRAPHIFY §2. One document per agent now carries both *what is captured* and *why*,
   so a capture change and its rationale can no longer drift apart. The same
   update-in-the-same-change rule applies, now to the ADR:
-  [ADR-CLAUDE](adr/0003_claude.md) · [ADR-COPILOT](adr/0004_copilot.md) ·
-  [ADR-KIRO](adr/0005_kiro.md) · [ADR-GRAPHIFY](adr/0007_graphify.md).
+  [ADR-CLI](adr/0002_cli.md) · [ADR-CLAUDE](adr/0003_claude.md) · [ADR-COPILOT](adr/0004_copilot.md) ·
+  [ADR-KIRO](adr/0005_kiro.md) · [ADR-CONSUMERS](adr/0006_consumer.md) · [ADR-GRAPHIFY](adr/0007_graphify.md).
 - [FORMULAS.md](FORMULAS.md) — every computed number: formula · code home ·
   method tag · the knobs that move it.
 - [WORKLOG.md](../work/WORKLOG.md) — the running per-session handoff (append every
@@ -131,9 +131,9 @@ to its real location.
 ## Standing records
 
 - **[adr/](adr/README.md) — the durable *why*: [ADR-LAWS](adr/0001_laws.md) plus one
-  record per metered thing** (restructured 2026-08-14): [ADR-CLAUDE](adr/0003_claude.md) ·
+  record per metered thing** (restructured 2026-08-14): [ADR-CLI](adr/0002_cli.md) · [ADR-CLAUDE](adr/0003_claude.md) ·
   [ADR-COPILOT](adr/0004_copilot.md) · [ADR-KIRO](adr/0005_kiro.md) ·
-  [ADR-GRAPHIFY](adr/0007_graphify.md). Each has **§1 for humans** (one screen, Mermaid +
+  [ADR-CONSUMERS](adr/0006_consumer.md) · [ADR-GRAPHIFY](adr/0007_graphify.md). Each has **§1 for humans** (one screen, Mermaid +
   ASCII diagrams) and **§2 for agents** (the binding detail, ending in a veto condition).
   The five laws that bind them all — pull-only · one sink · append-only ·
   counts-never-content · usage-never-cost — live in [ADR-LAWS](adr/0001_laws.md), each

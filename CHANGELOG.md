@@ -63,6 +63,18 @@ Full release notes. The README keeps a one-line summary per version; the detail 
     content* was a table row with no veto attached. A law with no veto is a habit.
   - **Cite by name, never by number.** `ADR 0001` meant *team ledger via `refs/notes`* for
     six weeks; the numbers now belong only to the archive.
+  - **`docs/CLI.md` became [ADR-CLI](docs/adr/0002_cli.md)** — the complete command
+    reference is now a record, because a command surface *is* a series of decisions (what
+    is a daily verb, what hides in a group, what was removed and what its user is told
+    instead) and a reference that drifts from them is worse than none. It gained an
+    **example for every one of the 27 commands**, as inline code spans rather than fenced
+    blocks so the parser gate can see them — and a new test fails the suite if a command
+    ever ships without one.
+  - **[ADR-CONSUMERS](docs/adr/0006_consumer.md)** records the things cage meters that are
+    **not** agents: `cage.meter` library rows (`agent="lib"`), custom `[sources]` tools,
+    and retired agents like `codex`. They have no metric ledger and never will, so they
+    resolve from `calls` **permanently** — the scoped fallback whose deletion was measured
+    at 373 real rows zeroed.
   - **The eleven numeric ADRs are archived** to `work/archive/adr/` — history, never
     current spec — with an old→new map that names the two records now genuinely dead
     (0001's `refs/notes/cage-ledger`, retired by SURFACE-CUT; 0010's `SPEND_CUTOVER`,
