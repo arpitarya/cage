@@ -8,6 +8,59 @@ Entry format:
 
 ```
 
+## 2026-08-14 — CLI-OUTPUT: ADR-CLI carries rendered output, gated
+
+- **Built:** `docs/adr/0002_cli.md` § *What the output looks like* — 15 output blocks
+  covering every printing view · **`tests/test_adr_output_blocks.py`** (new) · OPEN-WORK
+  items ADR-OUTPUT-GOLDENS · DOCTOR-DEAD-VERBS · GOLDENS-ORPHANED · DOGFOOD-SHIM-STALE ·
+  both DOC-REGISTRY rows for this record bumped.
+- **No product code changed.** The output was not invented: 7 blocks are the byte-exact
+  goldens `tests/test_output_spec.py` already asserts, and 8 are captured stdout from
+  seeded runs, marked CAPTURED with an ungated body.
+- **The gate closes a real blind spot.** `test_cli_reference.py` strips fenced blocks
+  before its dead-verb scan, so a fenced output block was the one place in the record a
+  deleted verb could survive indefinitely. The new test resolves every block's
+  `$ cage …` line against `cli.build_parser()` — the same walk, applied to what the other
+  gate skips.
+- **Not run under pytest** (the authoring environment has none); both gates' assertions
+  were executed by hand against the edited file, 0 failures. Fold into the next suite run.
+
+
+
+## 2026-08-15 — KIRO-CALLS-LEG: the last `calls` leg retires, and its store moves to `ledger/kiro/`
+
+- **Built:** `transcript.parse_kiro_ide_log_metrics` (new) · `schema.KIRO_METRIC_SOURCES`
+  gains `ide-log` · `importcmd.import_kiro`'s transcript→`calls` leg deleted and replaced
+  by an `_ingest_kiro_metrics` call · `_MANIFEST_SOURCES["kiro"]` flips `ide` → `ide-log` ·
+  `tests/test_calls_retired.py` §4 rewritten (4 cases) · `test_kiro_routing.py`,
+  `test_fixture_corpus.py`, `test_import_unified.py` re-asserted through the new kind.
+- **The decision Arpit made, and it was a third option.** The queue offered *ratify or
+  reverse*; he answered **"retire it and capture the data in `ledger/kiro`."** Ratifying
+  kept capture at the cost of a permanent exception; reversing satisfied the spec at the
+  cost of real data. Relocating gets both.
+- **No built-in leg writes a `calls` row any more.** `parse_kiro_calls` survives as the
+  `[sources.<name>] format = "kiro"` custom-source contract — unreachable from the
+  built-in path, fully reachable from user config.
+- **Nothing was lost in the move, and it is asserted rather than argued.** The store is the
+  same file with the same four fields; the line-index+content-hash id carried over intact,
+  so re-import still never double-records. The rows never had a real `ts` in either home —
+  the store carries none, so both constructors stamp import time. The fixture corpus proves
+  the totals: the same kiro fixtures, the same 5,478 and 159 tokens, a different kind.
+- **The move is a gain.** As `calls` rows these were spend that every total had to exclude
+  BY NAME (`ABSENT_SPINES["kiro"]`, a maintained exception that fails open). As metrics
+  rows they are capture-only **by kind** — the exclusion became structural.
+- **The gate is a PAIR, deliberately.** Retirement and relocation are asserted in one test,
+  because "no kiro `calls` rows" alone passes just as happily on a leg deleted outright,
+  and nothing else in the suite would have caught that: kiro was already absent from every
+  total, so losing it silently changes no number a user sees.
+- **One new rule, pinned as a rule:** `ide` and `ide-log` are one counter from two stores,
+  so exactly one is manifest-eligible at a time. Both listed would double-count the day
+  `devdata.sqlite` ships — the copilot `cli`/`cli-delta` hazard, one store later.
+- **Suite green** (1555 passed / 14 skipped in a Linux sandbox; the 5 remaining failures
+  are container artefacts — git safe.directory, root-ignores-chmod, `/usr/bin` layout).
+  **Not run in Arpit's venv**: the device VM has neither pytest nor network.
+
+
 ## 2026-08-15 — P6 (ledger-restructure): the integrity chain
 
 - **Built:** `cage/integrity.py` (new) · `state/integrity.json` in `cleanup.NEVER` ·

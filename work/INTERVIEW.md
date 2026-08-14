@@ -35,11 +35,21 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
   `calls-*.jsonl`, `credits-*.jsonl`, `savings/<tool>/`, `ledger/imports.jsonl` and
   `ledger/provenance.jsonl` all still resolve. **`calls` can never be fully retired** —
   retired-agent rows (codex) have no other home.
-- **One deviation is UNRATIFIED and it is the first thing to settle: KIRO-CALLS-LEG.** The
-  spec said retire all three legs; I kept kiro's. For claude and copilot the leg was a
-  duplicate; **kiro IDE has no metric twin**, so retiring it ends that surface's capture
-  rather than de-duplicating it. Recorded in ADR-KIRO, pinned by a test, reversible in five
-  lines. Arpit ratifies or reverses.
+- **KIRO-CALLS-LEG is SETTLED (Arpit, 2026-08-15) — and the way he settled it is the
+  lesson worth inheriting.** The spec said retire all three legs; P5 kept kiro's because
+  kiro IDE has no metric twin, so retiring it would have ended that surface's capture
+  rather than de-duplicating it. Offered ratify-or-reverse, Arpit took **neither**: *"retire
+  it and capture the data in `ledger/kiro`."* The leg is gone — no built-in leg writes a
+  `calls` row now — and `tokens_generated.jsonl` is read into the kiro-metrics ledger as
+  `source="ide-log"` instead.
+  **Inherit the shape of that call, not just its outcome:** the deviation was framed as a
+  binary, and both options were worse than the third. Keeping the leg preserved capture at
+  the cost of a permanent exception; reversing it satisfied the spec at the cost of real
+  data. Relocating satisfied both, and the exception got *better* on the way through — as
+  `calls` rows these were spend every total had to exclude BY NAME (`ABSENT_SPINES`, a rule
+  someone has to keep remembering); as metrics rows they are capture-only **by kind**. When
+  a queue item reads *ratify or reverse*, check whether the thing the deviation was
+  protecting can be protected somewhere better.
 - **The one measurement that can never be retaken.** `METRICS-DUAL-WRITE-END`'s freeze was
   lifted early, so P0's
   [cross-check](regression/2026-08-14-calls-vs-metric-crosscheck.md) is the sole record of
@@ -425,6 +435,34 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
   known debt, not breakage.
 
 ## In flight + the single next step
+
+**Update 2026-08-14 (Cowork, latest) — CLI-OUTPUT: ADR-CLI now shows what the commands
+print, and the fences needed their own gate.** § *What the output looks like* carries 15
+blocks — every printing view. **7 are GATED**: byte-exact bodies of goldens
+`tests/test_output_spec.py` already asserts, so ADR-CLI and that test are now one artifact
+with two readers. **8 are CAPTURED**: real stdout, ungated body, and each says so on the
+page (**ADR-OUTPUT-GOLDENS** in the queue). **Inherit the reason a new gate existed at
+all:** `test_cli_reference.py` calls `_strip_fences` before its dead-verb scan — correctly,
+a diagram is an illustration — which made a fenced output block the one place in the
+record where a deleted verb could live forever unchallenged. `tests/test_adr_output_blocks.py`
+resolves every block's `$ cage …` line against the live parser. **That test has never been
+run under pytest** (the Cowork mount has none); its assertions were executed by hand, 0
+failures, but fold it into the next suite run before trusting it.
+
+**Three defects fell out of pasting real output, and the pattern is worth more than any
+of them: the doc gates read docs, never stdout.** **DOCTOR-DEAD-VERBS** — `cage doctor`
+*prints* two v0.50-deleted verbs as live guidance; `verbmap` catches them when typed and
+nothing catches them when printed. **DOGFOOD-SHIM-STALE** — this repo's committed
+`bin/graphify` still execs the deleted verb, so **cage has not been metering its own
+graphify runs since SURFACE-CUT**; the shipped template is correct, so it is stale
+committed wiring, and it is a live candidate explanation for the 0-real-receipts finding
+that was measured *in this repo*. Run `cage setup --wire-only` before the next audit.
+**GOLDENS-ORPHANED** — 16 of 27 goldens are read by nothing and render removed surfaces,
+and `test_output_spec.py`'s docstring still points at `docs/cli-output-spec.md` and
+`tools/docgen`, **both gone**. Also noticed, unfixed: `work/IMPLEMENTATION.md` opens an
+*Entry format* fence at line 9 that is never closed until line 570, so the entire build
+log renders as one code block.
+
 
 **Update 2026-08-14 (Cowork, latest) — AGENT-SHARE-BACKFILL is ACCEPTED and the ADR set
 is now NINE records.** [ADR-AUTHORSHIP](../docs/adr/0009_authorship.md) was carved out of
@@ -892,6 +930,21 @@ you touch any savings number.**
   new one.
 
 ## Maintainers
+
+- Claude (Opus 5, Cowork) — 2026-08-14 — added ADR-CLI's output section and its gate.
+  **The lesson I'd want inherited: before writing the artifact you were asked for, look
+  for the one that already exists.** The ask was "add CLI output examples"; the repo
+  already held 27 byte-exact goldens, 11 of them still asserted every test run, orphaned
+  when their doc and their regenerator were deleted out from under them. Writing fresh
+  output would have produced a second, weaker source of truth beside a stronger one —
+  the drift the record was built to prevent, introduced by the act of documenting.
+  Second: **when you paste a program's output into a doc, you are importing its bugs at
+  doc strength.** Two dead verbs in `cage doctor`'s stdout and a dead verb in this repo's
+  own graphify shim were invisible until real output sat on the page next to a gate;
+  abridging past a defect and filing it is honest, reproducing it silently is not.
+  Third: **a gate that skips something must say what it skips.** `_strip_fences` is right
+  to skip fences and wrong to be the only word on them — the fix was a second gate reading
+  what the first one drops, not a relaxation of either.
 
 - Claude (Opus 5) — 2026-08-12 (late) — executed the wholesale queue closure on Arpit's
   instruction: 16 docs archived unbuilt, `docs/open/` and `docs/proposals/` removed,

@@ -12,6 +12,159 @@ by milestone) — the worklog is what *happened this session*.
 
 ---
 
+## 2026-08-15 — Claude (Cowork) — KIRO-CALLS-LEG: retired, and the store relocated to `ledger/kiro/`
+
+- **Asked (Arpit):** "KIRO-CALLS-LEG, what is blocked??" — then, offered ratify-or-reverse,
+  he chose **neither**: *"retire it and capture the data in ledger/kiro."*
+- **Reported the blocker first** (standing rule): the item needed one decision from him and
+  nothing else; v0.51.0's release was sitting behind it.
+- **Built — the retirement:** `import_kiro`'s transcript→`calls` leg is deleted. **No
+  built-in leg writes a `calls` row any more.** `transcript.parse_kiro_calls` is kept and
+  still exercised — it is the `[sources.<name>] format = "kiro"` custom-source contract.
+- **Built — the relocation, which is the half the queue item did not price.** The reversal
+  really was five lines; capturing the store instead was a new grain:
+  `schema.KIRO_METRIC_SOURCES` gains **`ide-log`** · new parser
+  `transcript.parse_kiro_ide_log_metrics` (same file, same four fields, same
+  line-index+content-hash dedupe — the id construction carried over intact) · the leg now
+  calls `_ingest_kiro_metrics` and folds its count into `total_rows` exactly as claude's P5
+  leg does · `_MANIFEST_SOURCES["kiro"]` flips `ide` → `ide-log`.
+- **Decided (mine, and it is a rule not a value): `ide` and `ide-log` are ONE counter from
+  two stores, so exactly one is manifest-eligible at a time.** Listing both would double-
+  count an install's IDE traffic the day `devdata.sqlite` finally ships — the copilot
+  `cli`/`cli-delta` hazard, one store later. Pinned as the rule (`test_exactly_one_of_the_
+  two_ide_grains_is_manifest_eligible`) rather than as today's value, so flipping the pair
+  stays legal and adding to it does not.
+- **Nothing was lost, including the thing that looks lost.** These rows never had a real
+  `ts` — the store carries none, so `make_call` stamped import time and `make_kiro_metric`
+  stamps it identically. Proven mechanically rather than argued: the fixture corpus now
+  asserts the same kiro fixtures produce the same token totals (5,478 and 159) through the
+  new kind.
+- **The move is a gain, not a lateral.** As `calls` rows these were spend that every total
+  had to exclude BY NAME (`ABSENT_SPINES["kiro"]` — a maintained exception that fails open:
+  forget it once and kiro's 0-output rows deflate a real average). As metrics rows they are
+  capture-only **by kind**.
+- **The gate, and why it is a pair.** `tests/test_calls_retired.py` §4 now asserts the
+  retirement and the relocation **together**. "No kiro `calls` rows" alone is satisfied just
+  as well by deleting the leg outright — the one outcome the ratification ruled out — and
+  **nothing else in the suite would have noticed**, because kiro was already absent from
+  every total, so silent data loss here changes no number a user ever sees.
+- **Knock-ons carried:** `test_kiro_routing.py` re-asserted through the new kind (the
+  routing decision never depended on the row kind — that is the point, and now it is
+  proven); its idempotency check moved off the `calls` shards, where it had become two
+  empty byte strings agreeing; `taskcorr`/`hookcmd`'s say-in-place comments narrowed again
+  (**no built-in agent is in the task-correlation population now**); ADR-KIRO, CLAUDE.md,
+  CHANGELOG, OPEN-WORK and INTERVIEW updated.
+- **⚠ A concurrent session was writing `work/OPEN-WORK.md`, `work/DOC-REGISTRY.md`,
+  `work/WORKLOG.md` and `docs/adr/0002_cli.md` throughout this one** — OPEN-WORK was
+  rewritten under me mid-session (189 → 77 lines). Every edit here was made read-modify-
+  write against the file as it stood, and the doc edits were left to the end to shrink the
+  window. Worth knowing before reading `git diff HEAD --stat`: it shows both sessions.
+- **Verification:** full suite **green** in a Linux sandbox — 1555 passed, 14 skipped, 5
+  failures that are all container artefacts (3 × `test_doc_links` needed `git config
+  safe.directory` + `graphify-out/`; `test_policysync`'s chmod is a no-op as root;
+  `test_gf_launcher_arm2` depends on `/usr/bin` layout). With those fixed, `test_doc_links`,
+  `test_queue_honesty` and `test_adr_ownership` all pass. **Not run in Arpit's own venv** —
+  the device VM has no pytest and no network, so the sandbox was the only runner.
+- **Open:** nothing new. **KIRO-CALLS-LEG is closed and deleted from OPEN-WORK.**
+- **Next step:** Arpit runs the suite locally (`just test`), then v0.51.0 ships by the
+  release flow (tag → `gh release create` → CI publishes).
+- **Cost: unmeasured — the rule's own source is still dead.** The `Cost:` rule names
+  `cage report`, deleted in v0.50; `cage insights chats` is per-chat and cannot isolate a
+  session. Order of magnitude: one medium session — ~40 tool calls, one code change across
+  6 modules and 5 test files, no exploratory rework.
+
+## 2026-08-14 — Claude (Cowork) — CLI-OUTPUT: ADR-CLI shows what the commands print
+
+- **Asked (Arpit):** add CLI output examples to the CLI ADR.
+- **Scope decided with Arpit:** every view that *prints* — 15 blocks. Marker verbs
+  (`task outcome`/`time`, `authorship verify`, `study id`, `study start`/`stop`) get a
+  one-line result in a table, not a block. He did not answer the rigor question, so I took
+  the recommended path and said so: gate what can be gated, label the rest.
+- **Found first, and it changed the shape of the work:** `tests/fixtures/goldens/` already
+  holds byte-exact CLI output — 27 files, of which **11 are still asserted** by
+  `tests/test_output_spec.py`. Their doc surface (`docs/cli-output-spec.md`) and their
+  regenerator (`tools/docgen`) are both **gone**, so the corpus was tested-but-unread. The
+  ADR is the natural new home; nothing needed inventing.
+- **Done:** ADR-CLI gains **What the output looks like** — 15 blocks, each carrying its
+  provenance class. **7 GATED** (byte-exact from `A1` `A3` `A4` `I10a` `I10c` `P5` `S3`) and
+  **8 CAPTURED** (real stdout, seeded run, body ungated, marked as such). New gate
+  `tests/test_adr_output_blocks.py` (3 assertions + a detector-fires test): a gated block
+  matches its golden byte-for-byte, every block declares a class, and **every block's
+  `$ cage …` line resolves in `cli.build_parser()`**.
+- **Why that third assertion exists:** `test_cli_reference.py` strips fences before its
+  dead-verb scan, so an output block is the one place in this record a removed verb could
+  live forever without turning anything red. The examples above it are inline spans for
+  exactly that reason; the fences needed their own gate rather than an exemption.
+- **Verified without pytest** (the Cowork mount has no pytest): a harness ran both gates'
+  assertions plus the backtick-parity and relative-link checks against the edited file —
+  **0 failures**, 1058 backticks outside fences (even), 0 broken links. The new test file is
+  **unrun by pytest** and should be in the next full-suite run.
+- **Three defects filed, none of them what I was asked to do:** **DOCTOR-DEAD-VERBS** (doctor
+  *prints* two v0.50-deleted verbs as guidance — the doc gate reads docs, not stdout);
+  **DOGFOOD-SHIM-STALE** (this repo's committed `bin/graphify` still execs the deleted verb,
+  so cage's own graphify runs are unmetered — the shipped template is fine, and it is a live
+  candidate explanation for the 0-real-receipts finding measured here);
+  **GOLDENS-ORPHANED** (16 dead goldens; `test_output_spec.py`'s docstring points at two
+  things that no longer exist). Plus **ADR-OUTPUT-GOLDENS** for the 8 ungated bodies.
+- **Open:** whether the 8 CAPTURED blocks earn goldens or stay labelled. `cage doctor` can
+  never be one — it probes the local filesystem, so a byte golden over it asserts a fact
+  about the reader's machine that cage never measured.
+- **Next step:** run the full suite (this session could not) — the new file adds cases, so
+  README's and CLAUDE.md's **1521** test count needs bumping from the real number, not an
+  estimate. Then `cage setup --wire-only` in this repo to heal the dogfood shim before any
+  receipt-count audit.
+- **Mid-session, by another hand:** `bin/graphify` and `bin/graphify.cmd` were healed in the
+  working tree while this session ran — both now match the shipped template byte-for-byte and
+  `cage doctor` reports `✔ wiring`. DOGFOOD-SHIM-STALE is rewritten rather than deleted: the
+  fix is staged-not-committed, and the receipt-count audit it invalidates has not been re-run.
+- **Cost:** unmeasured — no per-session reader ships. Cowork session; one ADR, one new test
+  file, four tracker files. No product code, no release.
+
+---
+
+## 2026-08-14 — Claude (Cowork) — QUEUE-SWEEP: the closed items deleted from OPEN-WORK
+
+- **Asked (Arpit):** find what is closed in `work/OPEN-WORK.md` and remove it — done work
+  does not stay on the list.
+- **Method:** every candidate reconciled against code, `git log`, `IMPLEMENTATION.md` and
+  `CHANGELOG.md` first — the file's own markers were treated as assertions, per rule 3.
+- **Deleted (six), each verified:**
+  **LEDGER-RESTRUCTURE** and **SURFACE-CUT** — both built, outcomes in IMPLEMENTATION.md,
+  pairs archived; the whole *In flight* section went with them. · **The `docs/CLI.md`
+  absorption** (the *Not mine* section) — it **landed**: `docs/adr/0002_cli.md` is the
+  reference, `tests/test_cli_reference.py` points at it, its headline says 28 addressable
+  commands and the live parser walks to exactly 28, so the test the item said was failing
+  now passes; no live doc still links `docs/CLI.md`. · **The SURFACE-CUT CLAUDE.md diff** —
+  applied in `5f4d3fc` and archived with an APPLIED header, not pending. · **Where the
+  SURFACE-CUT decision record lives** — answered, the file exists. · **TEST-COUNT** —
+  README and CLAUDE.md now both read **1521**, matching IMPLEMENTATION.md and WORKLOG.
+- **Corrected rather than deleted (two half-true items):**
+  **PLAN-BACKTICK-IMBALANCE → DOC-BACKTICK-GATE** — `docs/PLAN.md` is **even** (1832,
+  `_strip_fences`-counted, at HEAD and in tree), so the defect it named is gone while the
+  gate it asked for is still unbuilt; nothing is recorded as having fixed the count, which
+  argues for the gate. · **UNREAD-FACTS** — its "`policy.tool_order` now has no consumer at
+  all" is **false**: `explain.payload` emits the order and `cage insights why` renders it.
+  Five unread facts, not six.
+- **Then re-shaped, on Arpit's instruction: terse, and every item filed under its owning
+  ADR rather than standing alone.** Sections are now the records themselves — ADR-LAWS
+  (UNREAD-FACTS · TASK-GRAIN-SPINE) · ADR-CLI (STATE-RETENTION · CONTINUOUS-CAPTURE ·
+  PLAN-4-REWRITE) · ADR-COPILOT · ADR-KIRO · ADR-GRAPHIFY · ADR-COVERAGE ·
+  ADR-AUTHORSHIP — assigned by `docs/adr/README.md`'s ownership map, not by feel, so
+  "update the ADR" has an answer per item. One item has no owner and **says so**
+  (DOC-BACKTICK-GATE — CLAUDE.md doc discipline), which is the standing rule's
+  *say-so-out-loud* clause, not an exemption. A one-line **Needs Arpit** list sits in
+  the header for the stop-rule.
+- **Result:** 195 ⇒ 154 ⇒ **116 lines**, all 15 open items kept, every link resolved.
+  Nothing verified as still-open was dropped.
+- **Not verified, and it should be:** the suite figure. `.venv` is macOS, so no `pytest`
+  runs from Cowork — 1521 is the number the docs and the build log agree on, not one I
+  measured. The stale-doc item is closed; confirming 1521 is still one `just test`.
+- **Next:** the queue is human-gated at the top — **KIRO-CALLS-LEG** (ratify or reverse,
+  five lines) and the three hands-only probes.
+- **Cost:** unmeasured — no per-session reader ships.
+
+---
+
 ## 2026-08-15 — Claude Code — LEDGER-RESTRUCTURE: nine phases, one shape per producer
 
 - **Asked (Arpit):** execute `work/ledger-restructure.{handoff,prompt}.md` straight through

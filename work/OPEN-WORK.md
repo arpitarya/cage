@@ -1,189 +1,113 @@
-# OPEN-WORK — the index of pending work
+# OPEN-WORK — pending work, filed under the record that owns it
 
-## In flight
+Every item sits under its owning ADR ([ownership map](../docs/adr/README.md)) — an item
+with no record is a decision with nothing to hold it. **Needs Arpit:**
+CONTINUOUS-CAPTURE · COVERAGE-STRIKE-2 · three hands-only probes (GFX-IDE-PATH-UNPROBED ·
+GFX-COV-FIELD · COPILOT-JETBRAINS-UNPROBED).
 
-- **LEDGER-RESTRUCTURE is BUILT (2026-08-15)** — all nine phases (PG · P0–P7), suite
-  green at **1521**. One shape per producer under `ledger/`; the claude/copilot
-  transcript→`calls` writer is retired; a tamper-evidence chain ships as
-  [ADR-INTEGRITY](../docs/adr/0010_integrity.md). Nothing on disk moved. Outcome in
-  [IMPLEMENTATION.md](IMPLEMENTATION.md); pair archived as
-  `archive/v0.51-ledger-restructure.{handoff,prompt}.md`. **One deviation needs
-  ratification — see KIRO-CALLS-LEG below.**
-- **SURFACE-CUT is BUILT (2026-08-14), suite green** — 14 modules, 15 handlers, 12 test
-  files and 16 goldens deleted; MCP cut 6 tools → 2. Outcome recorded in
-  [IMPLEMENTATION.md](IMPLEMENTATION.md); decision record in
-  [surface-cut.decision.md](archive/v0.50-surface-cut.decision.md). The 15 shim tests it
-  knowingly left red were closed by PG.
+## [ADR-LAWS](../docs/adr/0001_laws.md) — substrate
 
-## Not mine — a concurrent session owns these
+- **UNREAD-FACTS** — five facts are written and read by nothing: `route_key` reclaim
+  (`savings.record`) · `state/attest.jsonl` (every L1 hook — L1 benefit *(a)*, no consumer) ·
+  `scope` (§3.6.2) · `project` (§3.7) · task `label`/`outcome`. Per fact: earn a read surface
+  (ADR-CLI) or stop writing it. *(`[tools] order` was listed here wrongly — `explain.payload`
+  reads it.)*
+- **TASK-GRAIN-SPINE** — a metric row carries no `task`. Since P5 retired the claude/copilot
+  `calls` writer — and KIRO-CALLS-LEG the kiro one — `taskcorr` and `hookcmd` correlate
+  only consumer/custom rows, and any
+  future task-grained view starts at zero. Both surfaces say so in place; a
+  timestamp-proximity fallback is **forbidden**. Fix is a task grain on the metric kinds —
+  a schema decision. Candidate: derive the window from `tasks.jsonl` (session + ts).
 
-- **`docs/CLI.md` is being absorbed** (Arpit, 2026-08-14). Deleted from `docs/` by the
-  session doing the ADR restructure; **left deleted deliberately** — Arpit is handling the
-  fallout. Until its replacement lands, `tests/test_cli_reference.py::test_the_headline_count_matches_the_parser`
-  fails and five live docs have a dangling link (`CLAUDE.md`, `README.md`,
-  `docs/README.md`, this file's registry sibling, `work/compare/README.md`). The deleted
-  copy was SURFACE-CUT-accurate (27 commands, the removed-verb table) and is recoverable
-  from HEAD if the absorption is abandoned. **Do not "fix" this by re-pointing the
-  citations** — that would pre-empt a decision that is not this queue's.
+## [ADR-CLI](../docs/adr/0002_cli.md) — the surface
 
-## Agent-closable
+- **ADR-OUTPUT-GOLDENS** — ADR-CLI now carries rendered output for all 15 printing views,
+  but only **7 are GATED** (byte-exact against `tests/fixtures/goldens/`). The other 8 —
+  bare `cage`, `import`, `setup --status`, `doctor`, `query`, `insights graphify`,
+  `insights why`, `authorship origin` — are CAPTURED: real stdout with an **ungated body**,
+  so a renderer change rots them silently. Fix is a seed + golden per view in
+  `tests/goldenseed.py`, then flip the block's class marker.
+  **`cage doctor` is the one permanent exception** — it probes the local filesystem, so a
+  byte golden over it would assert a fact about the reader's machine (the same call
+  `test_output_spec.py` already makes for `cage study join`).
+- **DOCTOR-DEAD-VERBS** — `cage doctor`'s `metering` and `timeline` checks print two verbs
+  deleted in v0.50 (the `data` group's export and watch) as live guidance. `verbmap` catches
+  a dead verb when it is *typed*; nothing catches one that cage itself *prints*. The F1 class
+  in a new costume — the reference gate scans docs, not stdout. Found while pasting real
+  doctor output into ADR-CLI (2026-08-14); that block is abridged past the lines rather than
+  documenting a bug as a contract.
+- **GOLDENS-ORPHANED** — 16 of the 27 files in `tests/fixtures/goldens/` are read by nothing
+  and render removed surfaces (`I2.txt` shows `insights verdict graphify` with USD).
+  `tests/test_output_spec.py`'s docstring still points at `docs/cli-output-spec.md` and
+  `python -m tools.docgen --target spec`; **both are gone** — the spec doc was absorbed and
+  `tools/docgen` no longer exists, so half the documented re-bless path is dead
+  (`CAGE_BLESS_GOLDENS=1` still works). Delete the dead goldens and repoint that docstring at
+  ADR-CLI + `tests/test_adr_output_blocks.py`, or restore a docgen that writes the ADR's
+  output blocks from the goldens.
 
-- **GFX-MODEL-ORPHAN** — `graphifymodel` has no reader. `repo_ceiling` (the bounded
-  "worth installing here" band) and `history_band` are reachable only from `tests/` and the
-  explain registry; both consumers — `insights verdict graphify` and `cage report`'s ceiling
-  footer — were deleted. UNREAD-FACTS class, so the same decision applies: earn a read
-  surface or retire the module. Worth noting before retiring it: it is the **only** surface
-  that ever answered *"what would graphify save me here"* with no receipts on hand — the
-  day-one question, currently unanswerable by any command. **PG (2026-08-14) confirmed it
-  blocks nothing** and left the module untouched; `docs/FORMULAS.md` §2.10 now says out
-  loud that nothing reads it, so the orphan is at least no longer described as live.
+- **STATE-RETENTION** — `.cage/state/` has no prune path: SURFACE-CUT deleted the only
+  trigger (`cage data cleanup`). `cleanup.py` is kept and tested (`importcmd` + `doctor`
+  import it) and `maybe_run` now warns that no command prunes. Needs a verb, or a
+  recorded no.
+- **CONTINUOUS-CAPTURE** — **Arpit's call.** `cage import` is manual-only (`watch`/`proxy`
+  gone) and Claude Code sweeps transcripts at ~30 days, so a missed import is permanent
+  loss. This record forbids a scheduler, so the only option on the table is printed
+  guidance cage never installs.
+- **PLAN-4-REWRITE** — PLAN §4 still calls the deleted `insights attrib` *"the attribution
+  engine (the part that's actually novel)"*. Rewrite the section, do not annotate it.
 
-- **ADR-COVERAGE-GATE** — `tests/test_formulas_coverage.py` (v0.51) re-derives
-  `docs/FORMULAS.md` §2.7's graphify matrix from `graphifytx.GRAPHIFY_COVERAGE`, closing
-  ADR-COVERAGE's two-strikes trigger for that table. **It does not cover ADR-COVERAGE's own
-  two graphify tables**, which still rely on review alone — the same drift, one doc over.
-  Extending the same parse there is small; the full generator stays not-taken.
+## [ADR-COPILOT](../docs/adr/0004_copilot.md)
 
-- **GFX-IDE-PATH-UNPROBED** — hands-only, Arpit's machine, and it is the one assumption
-  this program records as an assumption. Interceptor coverage on the three **IDE** surfaces
-  assumes an IDE-spawned terminal inherits the project's `bin/` on PATH; that was never
-  measured (Arpit chose to skip the probe, 2026-08-14). ADR-COVERAGE marks those cells `‡`.
-  One command closes it: run `graphify query …` in a Kiro IDE terminal and see whether a
-  receipt lands. **If it does not, kiro-IDE has no capture route at all** and this
-  program's scope changes. Pair with GFX-COV-FIELD in one sitting.
+- **COPILOT-JETBRAINS-UNPROBED** — hands-only, one command. The JetBrains plugin drives the
+  local CLI, but the `events.jsonl` writer is gated on `getReverseCallHandler() === undefined`
+  — over RPC it may write **no local file**. Run one Copilot agent edit from JetBrains, check
+  `~/.copilot/session-state/*/events.jsonl`; `workspace.yaml`'s `client_name` names the
+  surface. Pair with GFX-IDE-PATH-UNPROBED.
 
-- **GFX-COV-FIELD** — hands-only, Arpit's machine: `cage import --rescan-graphify`, then
-  `cage query graphify-coverage`, then `cage insights graphify`. Expect near-zero (0 real
-  receipts at the 2026-07-22 audit; 0 graphify commands in 1,132 real VS Code terminal runs
-  probed 2026-08-07) — **and the two-day interceptor outage means any figure for
-  2026-08-12 → 08-14 is a known undercount**, not a measurement of adoption.
+## [ADR-KIRO](../docs/adr/0005_kiro.md)
 
-- **UNREAD-FACTS** — SURFACE-CUT left **six recorded-but-unreadable facts**: capture still
-  writes them and no view reads them. `route_key` reclaim (writer `savings.record`) ·
-  `state/attest.jsonl` (every L1 hook — this is L1 benefit *(a)* with no consumer) ·
-  `scope` (§3.6.2) · `project` (§3.7) · task `label`/`outcome` · `[tools] order`
-  (`policy.tool_order` now has no consumer at all). Each is a candidate read surface, not
-  a bug — decide per fact whether it earns a view or the write should stop.
+- **AUTHORSHIP-CODE-CATCHUP** — the record is ratified and says in its own §1 that three of
+  its decisions are unbuilt; honest, but only until this closes. **(a)** `COVERAGE_GAPS` still
+  carries the corrected-away structural claim for copilot and kiro — replace with *"no parser
+  yet"* naming the store, keeping **copilot · cloud** as the one structural entry. **(b)**
+  `coverage_note()` is silent on the ~30-day retention wall bounding the one agent it covers.
+  **(c)** `commitview`'s `declared` column: read the trailer at render time, print agent +
+  model, state the failure in cluster terms — **no provenance row, no `method` rung** (the
+  quarantine is structural; persisting it is the signal it failed). Update this record in the
+  same change. Doc half is done.
+- **AUTHORSHIP-PARSERS** — optional, and the reason the gap strings matter. Four parsers,
+  each moving one `COVERAGE_GAPS` entry, in reach order: **copilot · CLI** (`events.jsonl` →
+  `tool.execution_start.arguments`, already open every sweep) → **kiro · IDE** (largest
+  historical prize, nothing deletes it; scan for JSON containing `"executionId"`, never
+  hardcode the hex dirs) → **kiro · CLI** (`data.sqlite3`, read-only) → **copilot · VS Code**
+  (`chatSessions` first; `chatEditingSessions` self-deletes on stop, so it needs a cadence
+  cage lacks — pairs with CONTINUOUS-CAPTURE). Ratified as an order, not as work.
 
-- **STATE-RETENTION** — `.cage/state/` has no pruning path. `cleanup.py` is kept and
-  fully tested (`importcmd` + `doctor` import it), but the only manual trigger was
-  `cage data cleanup`, deleted by SURFACE-CUT. `maybe_run` still warns with the count and
-  reclaimable size and now says plainly that no command prunes them.
+## [ADR-GRAPHIFY](../docs/adr/0007_graphify.md)
 
-- **CONTINUOUS-CAPTURE** — `cage import` is manual-only: `watch` and `proxy` are gone.
-  Claude Code sweeps transcripts at ~30 days by default, so a missed import is permanent
-  loss. Capture-on-read still fires on every surviving read. Whether cage ships guidance
-  (a cron line it prints but never installs — ADR 0002 forbids a scheduler) is Arpit's.
+- **DOGFOOD-SHIM-STALE** — **healed in the working tree, uncommitted.** `bin/graphify` and
+  `bin/graphify.cmd` had drifted to the SURFACE-CUT-deleted data-group verb (last touched
+  `b30e20e`), so every graphify run inside the cage repo fell through UNMETERED; both files
+  now match `cage/data/shims/graphify{,.cmd}` byte-for-byte and `cage doctor` reports
+  `✔ wiring`. **The shipped template was never wrong** — this was stale committed dogfood
+  wiring. Two residuals keep this item open: the fix is **staged, not committed**, and the
+  metering gap it caused is a live candidate explanation for the 0-real-receipts finding,
+  which was measured *in this repo* — re-run that audit before trusting the old number.
 
-- **TASK-GRAIN-SPINE** — **re-scoped 2026-08-14, no longer a view defect**: SURFACE-CUT
-  deleted all three affected views (`compare`/`estimate`/`calibration`), so nothing
-  currently mis-reports. What survives is the **capture-schema gap** underneath: a metric
-  row carries no `task` field, so any future task-grained view over claude/copilot spend
-  starts from zero. The `taskgroup` window fallback cannot help — it builds windows from
-  task-carrying calls and there are none. Candidate fix, unchanged: derive the window
-  from `tasks.jsonl` (which carries session + ts). Pinned previously in
-  `tests/test_compare.py`'s `_MODEL` comment; that file was deleted, so this line is now
-  the only record of the seam.
-  **Widened 2026-08-15 (P5):** it is no longer only a *future* view's problem. `taskcorr`
-  and `hookcmd` read `ledger.calls` for a `task`, and claude/copilot stopped writing calls
-  rows — so both now correlate only consumer/custom/kiro rows. Both **say so in place**;
-  deliberately **no** timestamp-proximity fallback was added (forbidden by house law). The
-  fix remains a task grain on the metric kinds — a schema decision, not a patch.
+## No ADR — doc discipline (CLAUDE.md)
 
-- **KIRO-CALLS-LEG** — **needs Arpit: ratify or reverse.** P5 retired the transcript→`calls`
-  writer for claude and copilot; **kiro's leg was KEPT**, deviating from the handoff. Reason:
-  kiro IDE has **no metric twin** (`devdata.sqlite` is absent on every install probed), so
-  that leg is the only reader of `tokens_generated.jsonl` — retiring it ends kiro IDE capture
-  rather than de-duplicating it, and takes ADR-KIRO's routing decision's subject matter and
-  the upgrade-watch's baseline with it. The stated reason for removal (the rows are
-  unsummable) is already handled by `ABSENT_SPINES`. Recorded in ADR-KIRO, pinned by
-  `tests/test_calls_retired.py`; reversing it is deleting five lines in `import_kiro`.
-
-- **AUTHORSHIP-CODE-CATCHUP** — [ADR-AUTHORSHIP](../docs/adr/0009_authorship.md) is
-  ratified (Arpit, 2026-08-14) and **three of its decisions are not built**. The record
-  says so in its own status line and §1, so it is honest, not stale — but it stays that way
-  only until this closes. Exactly three changes, each small and independent:
-  **(a)** `authorcapture.COVERAGE_GAPS` still carries the corrected-away structural claim
-  for copilot and kiro — replace with *"no parser yet"* naming the store, and keep
-  **copilot · cloud** as the one genuinely structural entry.
-  **(b)** `coverage_note()` names only the per-agent gaps and is silent on the ~30-day
-  retention wall that bounds the one agent it does cover — add the clause.
-  **(c)** the `declared` column in `commitview`: read the trailer out of the commit message
-  **at render time**, print agent + model string, footer states the failure in cluster
-  terms (never a coverage rate). **Write no provenance row and add no `method` rung** —
-  the quarantine is structural on purpose, and persisting it is the signal it failed.
-  ADR-AUTHORSHIP is updated in the same change as any of the three (its own update-rule).
-  Doc half is DONE: the record exists, ADR-CLAUDE's false sentence is recorded as
-  corrected, ADR-COVERAGE's matrix row is fixed and its veto marked FIRED, ownership moved
-  in `docs/adr/README.md` and `tests/test_adr_ownership.py`.
-
-- **AUTHORSHIP-PARSERS** — the optional half, and the reason the gap strings matter. Four
-  parsers would move an entry out of `COVERAGE_GAPS` each, in this order by reach per unit
-  of work: **copilot · CLI** (`events.jsonl` → `tool.execution_start.arguments`; the file is
-  already open every sweep) → **kiro · IDE** (the largest *historical* prize — nothing
-  deletes it; scan for JSON containing `"executionId"`, do not hardcode the hex dir names)
-  → **kiro · CLI** (`data.sqlite3`, open read-only) → **copilot · VS Code** (`chatSessions`
-  first — `chatEditingSessions` is richer but self-deletes on session stop, so it needs a
-  capture cadence cage does not have; pairs with **CONTINUOUS-CAPTURE**). Each lands in one
-  parser and the gap table, nothing else. **Not started, and not required by the ADR** —
-  the record ratifies the order, not the work.
-
-- **COPILOT-JETBRAINS-UNPROBED** — hands-only, Arpit's machine, one command. Since
-  2026-05 the JetBrains Copilot plugin drives the local CLI, but the CLI's `events.jsonl`
-  writer is gated on `getReverseCallHandler() === undefined` — an IDE driving it over RPC
-  would send events to the host and write **no local file**. Run one Copilot agent edit
-  from JetBrains, then check `~/.copilot/session-state/*/events.jsonl` exists;
-  `workspace.yaml`'s `client_name` distinguishes the surfaces. Same shape as
-  **GFX-IDE-PATH-UNPROBED** — pair them in one sitting.
-
-- **PLAN-BACKTICK-IMBALANCE** — `docs/PLAN.md` carries an **odd** number of backticks
-  outside fenced blocks (1859, unchanged at HEAD — pre-existing, not introduced by the
-  archive sweep). This is the exact failure recorded in CLAUDE.md's doc-gate trap: an
-  unbalanced backtick makes every code-span scan downstream read the file wrong, which is
-  how `_doc_flags` was silently emptied and an assertion passed vacuously. Nothing fails
-  today, which is the problem — it is a gate that has quietly stopped seeing. One-line
-  detector, worth adding to the doc gates: strip fenced blocks, count backticks per file,
-  fail on odd. **Found 2026-08-14 while verifying the archive sweep**; the sweep itself
-  left every touched file even.
-
-## Arpit decides
-
-- **`CLAUDE.md` diff for SURFACE-CUT — proposed, not applied**:
-  [surface-cut.claude-md-diff.md](archive/v0.50-surface-cut.claude-md-diff.md). **24 lines are false**,
-  two of them already stale before this change (the ADR restructure moved
-  `docs/shim-contract.md` and every numeric ADR path). Two are *rules* naming deleted
-  commands: the WORKLOG `Cost:` line and the dogfood snapshot allowlist.
-- **Where does the SURFACE-CUT decision record live?** Written to
-  [surface-cut.decision.md](archive/v0.50-surface-cut.decision.md) beside its archived pair. The ADR set
-  became four per-agent records the same day, and this is cross-cutting, so it fits
-  neither the live shape nor the frozen archive.
-
-- **TEST-COUNT** — README's `$0` section and CLAUDE.md's `just test` comment still say
-  **1571**, stale after SURFACE-CUT deleted 12 test files and stripped ~30. Needs one
-  `just test` on the dev machine; no agent can measure it from Cowork (macOS venv).
-- **PLAN-4-REWRITE** — PLAN §4 still calls `insights attrib` "the attribution engine (the
-  part that's actually novel)" for a deleted command. SURFACE-CUT's handoff says that
-  section needs **rewriting, not annotating**.
-
-- **COVERAGE-STRIKE-2** — [ADR-COVERAGE](../docs/adr/0008_coverage.md)'s *deliberately not
-  taken* generated matrix set its own threshold at *"this record is found stale twice"*.
-  It has now been found stale twice (2026-08-14, both by reading sessions), so the
-  threshold is met — **but the remedy it points at would have caught neither strike.** Both
-  failures were in the prose a generator flattens, and one was a wrong *mark* (⚠️ where
-  nothing worked), which a generator derived from the same wrong belief reproduces
-  faithfully. Two ways out, and it is a call, not a task: **(a)** extend
-  `tests/test_formulas_coverage.py` to this record's two ✅/N/A tables — the mechanical half
-  that *would* have caught STRIKE 1 — and leave the prose to review; or **(b)** accept that
-  this record's failure mode is prose, stop counting strikes toward a generator that cannot
-  address it, and say so in the record so the counter stops reading as a debt. Filed
-  2026-08-14 (COVERAGE-LEGEND).
+- **DOC-BACKTICK-GATE** *(was PLAN-BACKTICK-IMBALANCE)* — the imbalance is gone: PLAN.md is
+  **even** at 1832 backticks outside fences, at HEAD and in tree. Nothing is recorded as
+  fixing it, so the count moved untracked — which argues for the gate. An unbalanced
+  backtick makes every downstream code-span scan misread the file (how `_doc_flags` was
+  silently emptied and an assertion passed vacuously), and nothing fails today. One-line
+  detector: strip fences, count backticks, fail on odd.
 
 ## How this file is maintained
 
-Continuously. A new item is one line here, the moment it's known; detail goes inline
-or into a handoff/prompt pair in `work/` root. A completed item is **deleted, not
-ticked** — legal only once [IMPLEMENTATION.md](IMPLEMENTATION.md) records its outcome
-and any evidence reaches [regression/](../work/regression/), with residual limits
-carried forward as their own lines. **Its own markers are never evidence** — reconcile
-against git. The header's checkable claims are gated by `tests/test_queue_honesty.py`.
-Full law: [`../CLAUDE.md`](../CLAUDE.md) *Documentation discipline*.
+Continuously, in the same change as the work. A completed item is **deleted, not ticked** —
+legal only once [IMPLEMENTATION.md](IMPLEMENTATION.md) records it and evidence reaches
+[regression/](regression/), residuals carried forward as their own lines. **Its own markers
+are never evidence** — reconcile against git and the owning ADR. The header's checkable
+claims are gated by `tests/test_queue_honesty.py`. Full law: [`../CLAUDE.md`](../CLAUDE.md)
+*Documentation discipline*.
