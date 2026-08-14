@@ -34,7 +34,7 @@ posix_only = pytest.mark.skipif(os.name != "posix", reason="sh shim — POSIX ho
     ("cage mcp", True),
     ("cage insights chats", True),
     # dead: renamed in v0.28.0 …
-    # … SURFACE-CUT (v0.52) removed the rollup family and the whole `data` group; both
+    # … SURFACE-CUT (v0.50) removed the rollup family and the whole `data` group; both
     # spellings are still installed on real machines, so both must read as dead.
     ("cage insights attrib", False),
     ("cage report --by agent", False),

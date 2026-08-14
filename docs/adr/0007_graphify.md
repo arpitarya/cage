@@ -57,9 +57,9 @@ flowchart TD
         |
         |-- cage CAN run  --> metered:  cage data graphify -- <REAL> ...
         |                        |
-        |                        `--> receipt filed NOW, session = "" (honest absence)
+        |                        +--> receipt filed NOW, session = "" (honest absence)
         |
-        `-- cage CANNOT run --> real binary, unmetered
+        +-- cage CANNOT run --> real binary, unmetered
                                 (stdout/stderr/exit code identical either way)
 
    LATER, at `cage import`:
@@ -67,7 +67,7 @@ flowchart TD
         copilot CLI + VS Code   >--> detect, then ASK: did the shim already file this?
         kiro CLI tool runs      /            |
                                              |-- yes -> DEFER, file nothing
-                                             `-- no  -> file, with the real session
+                                             +-- no  -> file, with the real session
                                                           |
                         savings ledger -- TOKENS, GROSS ---'
 ```

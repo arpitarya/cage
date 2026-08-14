@@ -61,7 +61,7 @@ def _tool() -> tuple[str, str]:
     from cage import __version__
     if paths.distribution() == "zipapp":
         # A pyz has no `cage` on PATH by design — pull-based capture is the story
-        # (docs/restricted-environments.md); a PATH warn here would always fire.
+        # (work/restricted-environments.md); a PATH warn here would always fire.
         return _OK, (f"cage {__version__} (zipapp) — pull-based capture "
                      "(`cage import`); hooks need an importable install")
     if not shutil.which("cage"):
@@ -424,7 +424,7 @@ def _policy_version(root: Path) -> tuple[str, str]:
 
 def _state_dir(root: Path) -> tuple[str, str]:
     """State-dir size + prune-candidate visibility (bloat should be visible before
-    it's a problem). Informational — since v0.52 no command prunes state/, so this
+    it's a problem). Informational — since v0.50 no command prunes state/, so this
     reports the size and names no fix it cannot honour."""
     foot = paths.Footprint(root)
     if not foot.state.exists():
@@ -440,7 +440,7 @@ def _state_dir(root: Path) -> tuple[str, str]:
                   f"({policy.cleanup_days(pol)}d)")
         if stale:
             return _OK, status + (f" · {len(stale)} prune candidate(s) — "
-                                  "no prune command ships since v0.52")
+                                  "no prune command ships since v0.50")
         return _OK, status + " · nothing stale"
     except Exception as exc:  # noqa: BLE001 — informational check, never blocks doctor
         return _OK, f"state dir present (scan skipped: {exc})"
@@ -540,7 +540,7 @@ def _portability(root: Path) -> tuple[str, str]:
         problems.append("kiro MCP still carries a machine-absolute cage path — it is "
                         "committable now via the path-free form; re-run "
                         "`cage setup --wire-only --kiro`")
-    # Wiring mode (docs/restricted-environments.md): the mode lives in project policy;
+    # Wiring mode (work/restricted-environments.md): the mode lives in project policy;
     # the on-disk shim carries a marker in its launcher variant. Report which is
     # active, and warn on drift (policy flipped but `cage setup` not re-run).
     launcher_pol = policy.python_launcher(policy.load(paths.Footprint(root).policy))
@@ -630,7 +630,7 @@ def _interceptor(root: Path, scan) -> tuple[str, str]:
     script with no extension, and Windows resolves a bare `graphify` only through
     PATHEXT — so a project scaffolded on POSIX and opened on Windows has an interceptor
     file, on PATH, naming live verbs, that **can never run**. Reporting that as ✅ would
-    recreate F1 on a new OS (docs/adr/0004_graphify.md)."""
+    recreate F1 on a new OS (docs/adr/0007_graphify.md)."""
     from cage import paths
     shim = root / "bin" / paths.graphify_shim_name()
     other = next(p for p in paths.graphify_shims(root) if p != shim)
@@ -702,7 +702,7 @@ def _path_interceptor(root: Path) -> tuple[str, str]:
 
 def _launcher_gap(root: Path) -> tuple[str, str]:
     """GF-LAUNCHER: python-launcher mode removes `cage` from PATH entirely, but the
-    graphify interceptor's capability probe (docs/adr/0004_graphify.md B5) needs exactly that — it
+    graphify interceptor's capability probe (docs/adr/0007_graphify.md B5) needs exactly that — it
     runs `cage data graphify --help` before deciding whether to meter. So **neither twin**
     can ever meter a graphify call in this mode; both degrade to correct, unmetered
     passthrough, silently. That combination — launcher mode ON, an interceptor installed
@@ -729,7 +729,7 @@ def _launcher_gap(root: Path) -> tuple[str, str]:
         f"`cage` command nor an importable `{interpreter} -m cage` resolves here, so "
         "graphify runs UNMETERED. Install cage into the interpreter that wins on PATH "
         "(the same silent-start class `kiro-mcp` checks). See "
-        "`cage query graphify-shims` and docs/restricted-environments.md.")
+        "`cage query graphify-shims` and work/restricted-environments.md.")
 
 
 def _arm2_interpreter() -> tuple[str, bool]:

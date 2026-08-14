@@ -1,4 +1,4 @@
-"""docs/CLI.md is the complete CLI reference, and this is the gate that keeps it true.
+"""docs/adr/0002_cli.md is the complete CLI reference, and this is the gate that keeps it true.
 
 A prose doc that names a dead verb is the F1 failure class in documentation form: the
 reader copies it, it exits 1, and nobody learns why. `tests/test_skills_layer.py`
@@ -20,7 +20,7 @@ import pytest
 from cage import cli
 
 REPO = Path(__file__).resolve().parent.parent
-DOC = REPO / "docs" / "CLI.md"
+DOC = REPO / "docs" / "adr" / "0002_cli.md"
 
 # Documented once under "Capture-on-read flags" instead of in every table — they sit on
 # ~20 read views and repeating them would bury the flags that actually differ.
@@ -49,7 +49,7 @@ def _choice_positional(par):
 
 def _group_actions(par):
     """`prices`/`study`/`policy` take their action as a positional choice rather than a
-    subparser (docs/CLI.md § Known gaps), yet `cage --help` presents them as groups
+    subparser (docs/adr/0002_cli.md § Known gaps), yet `cage --help` presents them as groups
     beside `insights`/`task`/`authorship`/`data`. So their actions are addressable
     commands and the reference must cover each one.
 
@@ -90,10 +90,34 @@ ALL_PARSER_FLAGS = {f for flags, _ in SURFACE.values() for f in flags} | UNIVERS
 
 # ── the doc ───────────────────────────────────────────────────────────────────
 
+def _strip_fences(text: str) -> str:
+    """Drop fenced blocks before any backtick-based scan.
+
+    ADR-CLI carries a Mermaid diagram and its ASCII twin in §1, and a fence is three
+    backticks. The code-span regex (`` `([^`]+)` ``) cannot pair across one: it consumes
+    the whole block as a single "span" and every backtick after it pairs one position
+    out. The failure is silent and total — `_doc_flags` returned the empty set, which
+    made `test_every_documented_flag_exists` pass vacuously while
+    `test_every_parser_flag_is_documented` reported the entire surface as undocumented.
+
+    A fenced block is an *illustration*, not a citation — the same call
+    `tests/test_doc_links.py` already makes, and the same reason `_named_paths` skips
+    prose. Stripping here restores both directions of the gate rather than relaxing
+    either."""
+    out, fenced = [], False
+    for line in text.splitlines():
+        if line.lstrip().startswith("```"):
+            fenced = not fenced
+            continue
+        if not fenced:
+            out.append(line)
+    return "\n".join(out)
+
+
 @pytest.fixture(scope="module")
 def doc() -> str:
     assert DOC.exists(), f"{DOC.relative_to(REPO)} is the CLI reference and must exist"
-    return DOC.read_text(encoding="utf-8")
+    return _strip_fences(DOC.read_text(encoding="utf-8"))
 
 
 @pytest.fixture(scope="module")
@@ -132,7 +156,7 @@ def _named_paths(doc: str) -> set[str]:
 @pytest.mark.parametrize("path", LEAVES)
 def test_every_command_appears_in_the_reference(doc, path):
     assert f"cage {path}" in doc, (
-        f"`cage {path}` exists in the parser but docs/CLI.md never names it. "
+        f"`cage {path}` exists in the parser but docs/adr/0002_cli.md never names it. "
         "A silently undocumented command is how a surface grows without a reader.")
 
 
@@ -145,7 +169,7 @@ def test_the_headline_count_matches_the_parser():
     """The doc opens with a count; a count that drifts is worse than no count."""
     body = DOC.read_text(encoding="utf-8")
     assert f"**{len(LEAVES)} addressable commands**" in body, (
-        f"docs/CLI.md's headline count is stale — the parser has {len(LEAVES)} leaves")
+        f"docs/adr/0002_cli.md's headline count is stale — the parser has {len(LEAVES)} leaves")
 
 
 # ── 2. nothing the doc names is dead ──────────────────────────────────────────
@@ -172,7 +196,7 @@ def _resolvable(path: str) -> bool:
 def test_no_command_named_in_the_reference_is_dead(doc):
     dead = sorted(p for p in _named_paths(doc) if not _resolvable(p))
     assert not dead, (
-        "docs/CLI.md names commands that do not parse:\n  " + "\n  ".join(
+        "docs/adr/0002_cli.md names commands that do not parse:\n  " + "\n  ".join(
             f"`cage {d}`" for d in dead))
 
 
@@ -201,13 +225,13 @@ def _doc_flags(doc: str) -> set[str]:
 def test_every_documented_flag_exists(doc):
     invented = sorted(_doc_flags(doc) - ALL_PARSER_FLAGS)
     assert not invented, (
-        "docs/CLI.md documents flags the parser does not have:\n  " + "\n  ".join(invented))
+        "docs/adr/0002_cli.md documents flags the parser does not have:\n  " + "\n  ".join(invented))
 
 
 def test_every_parser_flag_is_documented(doc):
     missing = sorted(ALL_PARSER_FLAGS - _doc_flags(doc) - SHARED_FLAGS)
     assert not missing, (
-        "these flags exist but docs/CLI.md never names them:\n  " + "\n  ".join(missing))
+        "these flags exist but docs/adr/0002_cli.md never names them:\n  " + "\n  ".join(missing))
 
 
 # ── 4. a flag unique to one command is documented in that command's section ───
@@ -233,22 +257,56 @@ def test_a_single_owner_flag_sits_in_its_command_section(sections, flag):
     hosts = [t for t, body in sections.items()
              if f"cage {path}" in body and f"`{flag}" in body]
     assert hosts, (
-        f"`{flag}` belongs only to `cage {path}`, but no docs/CLI.md section documents "
+        f"`{flag}` belongs only to `cage {path}`, but no docs/adr/0002_cli.md section documents "
         "both together")
 
 
 # ── 5. the doc states its own maintenance trigger ─────────────────────────────
 
+# ── 5. every command carries a runnable example ───────────────────────────────
+
+EXAMPLES_HEADING = "## Examples — one per command"
+
+
+def _examples(doc: str) -> set[str]:
+    """Command paths appearing in the Examples section, as `cage <path> [args]` spans.
+
+    Deliberately scoped to that section: a command *mentioned* in prose elsewhere is not
+    an example of how to run it."""
+    start = doc.index(EXAMPLES_HEADING)
+    end = doc.index("## Removed and renamed verbs", start)
+    found = set()
+    for span in _CODE_SPAN.findall(doc[start:end]):
+        m = _WORDS.match(span.strip())
+        if m:
+            found.add(" ".join(m.group(1).split()))
+    return found
+
+
+@pytest.mark.parametrize("path", LEAVES)
+def test_every_command_has_a_runnable_example(doc, path):
+    """Arpit, 2026-08-14: ADR-CLI carries an example for every command available.
+
+    A reference that names a command without showing one invocation of it is a list, not
+    a reference. Examples live in inline code spans rather than fenced blocks precisely
+    so this gate can see them — `_strip_fences` removes fences, so an example inside one
+    would be undetectable here and a dead verb in it would ship (the F1 class)."""
+    examples = _examples(doc)
+    assert any(e == path or e.startswith(path + " ") for e in examples), (
+        f"`cage {path}` has no example in ADR-CLI's \"{EXAMPLES_HEADING}\" section. "
+        "Every command carries one; add it beside its siblings.")
+
+
 def test_the_reference_declares_how_it_is_maintained(doc):
     """Per CLAUDE.md every maintained doc carries a standing owner-trigger. Without it
     the next agent has a reference with no rule attached to it."""
-    assert "## Maintaining this file" in doc
+    assert "## Maintaining this record" in doc
     assert "DOC-REGISTRY.md" in doc
     assert "tests/test_cli_reference.py" in doc
 
 
 def test_the_reference_is_registered_as_maintained():
     reg = (REPO / "work" / "DOC-REGISTRY.md").read_text(encoding="utf-8")
-    assert "CLI.md" in reg, "docs/CLI.md is a maintained doc and needs a DOC-REGISTRY row"
+    assert "0002_cli.md" in reg, "ADR-CLI is a maintained doc and needs a DOC-REGISTRY row"
     readme = (REPO / "README.md").read_text(encoding="utf-8")
-    assert "docs/CLI.md" in readme, "the README must link the CLI reference"
+    assert "docs/adr/0002_cli.md" in readme, "the README must link the CLI reference (ADR-CLI)"

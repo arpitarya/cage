@@ -477,7 +477,7 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   there as a wiring bug, not a lint nit. See the wiring-liveness paragraph above: a
   verb deleted outright (never added to `REMOVED`) is the harder case the live-parser
   detector exists to catch. **It is also a documentation migration:**
-  [docs/CLI.md](docs/CLI.md) is the complete command reference and
+  [docs/adr/0002_cli.md](docs/adr/0002_cli.md) is the complete command reference and
   `tests/test_cli_reference.py` gates it against the live parser, so the rename lands
   in the doc in the same change or the suite goes red.
 - **`paths.py` splits on contact, never wholesale.** The next change that touches one
@@ -767,11 +767,11 @@ fires a trigger updates the doc *and* bumps its row):
   gate/status — so a reader (or an executing agent) sees the whole shape before
   any detail, and a stale plan is spottable at a glance. Existing plans gain the
   index on contact (the fix-on-contact rule), new plans start with it.
-- **[docs/adr/0004_graphify.md](docs/adr/0004_graphify.md)** — the graphify interceptor
+- **[docs/adr/0007_graphify.md](docs/adr/0007_graphify.md)** — the graphify interceptor
   behaviour contract: one spec, two twins. Update in the same change as **any** twin
   edit, marker-set change, or new tool interceptor (every future one implements this
   same shape). Two implementations of an unwritten contract drift.
-- **[docs/CLI.md](docs/CLI.md)** — **the complete CLI reference**: every command,
+- **[docs/adr/0002_cli.md](docs/adr/0002_cli.md)** — **the complete CLI reference**: every command,
   group, action, flag and choice list, the removed-verb migration table, and the
   surface's known gaps. Update it in the *same change* as any CLI surface change — a
   command added/renamed/removed, a flag added/dropped, a choice list changed. It is
@@ -811,7 +811,7 @@ deliberate exception: dense reference prose, packed on purpose.)
 
 **Document size discipline — ⏳ TRIAL, expires 2026-09-01.** Four composing rules on
 every authored doc. Full spec, worked examples and the fix procedure:
-[docs/doc-size-discipline.md](docs/doc-size-discipline.md).
+[work/doc-size-discipline.md](work/doc-size-discipline.md).
 
 1. **Lead with the answer** — first ~5 lines say what's next, what's blocked, what
    changed. A reader who stops there has the useful part.
@@ -1174,7 +1174,7 @@ each agent only needs thin idiomatic wiring (`agents.py` orchestrates):
   `tests/test_mcp_layer.py` grep for this and must stay green. (CLAUDE.md and the
   agent-surface prompt both cited a `tests/test_portable_wiring.py`; **no such file has
   ever existed** — the assertions live in the two files named above.)
-  **Restricted endpoints (docs/restricted-environments.md):** opt-in
+  **Restricted endpoints (work/restricted-environments.md):** opt-in
   python-launcher mode — `cage setup --python-launcher` persists `[wiring]
   python_launcher = true` (project policy, `policy.python_launcher`, written via
   `tomledit.set_wiring`); `agents.install` re-reads it every run and fans it
@@ -1226,7 +1226,7 @@ each agent only needs thin idiomatic wiring (`agents.py` orchestrates):
   fully/partially/not-wired/needs-healing verdict, never forking the liveness logic;
   `cage query wiring-inventory` explains it.
 - **The graphify interceptor is a TWIN PAIR against ONE written contract**
-  ([docs/adr/0004_graphify.md](docs/adr/0004_graphify.md), v0.38.0) — `data/shims/graphify`
+  ([docs/adr/0007_graphify.md](docs/adr/0007_graphify.md), v0.38.0) — `data/shims/graphify`
   (POSIX sh) and `data/shims/graphify.cmd` (Windows). Windows resolves a bare name only
   through `PATHEXT`, which has **no extensionless entry**, so the sh shim alone could
   never be *found* there and the shim capture route was structurally absent. The
@@ -1252,7 +1252,7 @@ each agent only needs thin idiomatic wiring (`agents.py` orchestrates):
   syntax family with an existing one). Known gap, stated not half-fixed: under
   `--python-launcher` there is no `cage` on PATH, so **neither** twin meters (contract
   B5) — `cage doctor`'s `launcher-gap` check names it (GF-LAUNCHER,
-  [docs/restricted-environments.md](docs/restricted-environments.md)); a fix must move
+  [work/restricted-environments.md](work/restricted-environments.md)); a fix must move
   both twins together.
 - **graphify savings file from FOUR of five agent surfaces, and the fifth says why not**
   ([graphifytx.py](cage/graphifytx.py), `cage query graphify-coverage`) — the interceptor

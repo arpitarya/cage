@@ -12,7 +12,7 @@ so.
 **What it is allowed to fix, and what it is not.** The join key is
 `usagelog.args_hash` — the same sha1-of-argv the usage breadcrumb already records — so
 an attested tool row resolved **half A of `cage insights adoption`** — a view deleted
-in SURFACE-CUT (v0.52), so this store is currently **written by every wired hook and
+in SURFACE-CUT (v0.50), so this store is currently **written by every wired hook and
 read by nothing** (work/OPEN-WORK.md, UNREAD-FACTS). Historically it is exact but
 agent-blind, into *which* agent invoked the tool. It does **not** resolve half B: a
 graphify savings row's id folds in an *answer* hash that no attestation can reconstruct,

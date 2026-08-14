@@ -13,7 +13,7 @@ You're running an agent, a graph tool, a rules engine, maybe Copilot. At the end
 
 **Named after *John Cage*.** · Python ≥ 3.11 · stdlib only · MIT · sits beside `fux`, `bach`, `wagner`, `orff`.
 
-**Platforms:** macOS is field-validated (real extension sessions, the full manual capture matrix); Linux and Windows are CI-tested across the whole suite + scenario runner, plus a graphify leg that installs the real binary and meters real queries. The graphify PATH interceptor now ships as a **twin pair** — the bash shim and a `graphify.cmd` — so a bare `graphify` reaches cage on Windows too (Windows PATH lookup goes through `PATHEXT`, which has no extensionless entry, so the bash shim alone could never be found there). Windows is CI-asserted, not yet field-validated. On Windows, run `cage doctor --paths` first — it shows every log location cage probes on your machine and why any missed. Locked-down endpoint (AppLocker/WDAC blocks the exe, or no pip)? `cage setup --python-launcher` wires everything through the interpreter instead, and every release ships a single-file `cage.pyz` — **note that this turns the graphify shim route off too** (there's no `cage` command left on PATH for it to probe), so a launcher-mode project relies on the transcript route for graphify savings; see [restricted-environments.md](docs/restricted-environments.md).
+**Platforms:** macOS is field-validated (real extension sessions, the full manual capture matrix); Linux and Windows are CI-tested across the whole suite + scenario runner, plus a graphify leg that installs the real binary and meters real queries. The graphify PATH interceptor now ships as a **twin pair** — the bash shim and a `graphify.cmd` — so a bare `graphify` reaches cage on Windows too (Windows PATH lookup goes through `PATHEXT`, which has no extensionless entry, so the bash shim alone could never be found there). Windows is CI-asserted, not yet field-validated. On Windows, run `cage doctor --paths` first — it shows every log location cage probes on your machine and why any missed. Locked-down endpoint (AppLocker/WDAC blocks the exe, or no pip)? `cage setup --python-launcher` wires everything through the interpreter instead, and every release ships a single-file `cage.pyz` — **note that this turns the graphify shim route off too** (there's no `cage` command left on PATH for it to probe), so a launcher-mode project relies on the transcript route for graphify savings; see [restricted-environments.md](work/restricted-environments.md).
 
 <p align="center"><em>Measured on itself: <a href="work/dogfood/latest.md">cage's own ledger, real numbers, refreshed periodically</a>.</em></p>
 
@@ -36,18 +36,19 @@ And when cage's own numbers came back saying a session *with* the graph tool use
 ## See it
 
 ```bash
-$ cage insights attrib --task fix-handover-bug
+$ cage insights chats
 ```
 
 ```
-Marginal attribution · task 'fix-handover-bug' · anthropic/claude-opus-4-8
+Chats
 
-tool         unit    gross tok   method
------------  ------  ---------   --------
-graphify     tokens     27,000   modeled
-fux          tokens      6,400   modeled
-compressor   tokens      8,000   measured
-TOTAL        tokens     41,400
+chat  agent   surface  calls  tokens_in  cached_in  cache_write  tokens_out  credits  agent%
+----  ------  -------  -----  ---------  ---------  -----------  ----------  -------  ------
+demo  claude  —            1      8,600          0            0       1,500        —       —
+
+· claude credits: — (Claude Code records no credit unit on disk)
+· 1 chat(s) show agent% `—`: no landed code evidence — not committed yet, committed in
+  another repo, or nothing matchable landed. `—` is never 0%
 
 · saved is GROSS — avoided read cost; it excludes the cost of USING the tool
   (the invoking turn, the injected context). `cage query gross-vs-net`
@@ -67,14 +68,14 @@ cd your-project
 cage setup                      # guided wizard: defaults to all agents, wires MCP + graphify
 # non-interactively: cage setup --all   (or --claude / … for just one)
 cage demo                       # seed the worked example
-cage report --by agent          # tokens and credits, per agent
-cage insights attrib            # per-tool marginal token savings
-cage insights adoption          # do your agents actually invoke the tools?
+cage import                     # pull every agent's usage into the ledger
 cage insights chats             # per-chat detail: tokens + agent%, titled where the store has one
-cage query "how is attribution calculated"  # explain any number — live formula, $0
+cage insights graphify          # per-chat graphify usage and its GROSS token saving
+cage insights commits           # per commit: tokens, hours, and the agent/human line split
+cage query "how is a saving calculated"  # explain any number — live formula, $0
 ```
 
-**Every command, in one page: [docs/CLI.md](docs/CLI.md)** — the 5 daily verbs, the 5
+**Every command, in one page: [docs/adr/0002_cli.md](docs/adr/0002_cli.md)** — the 4 daily verbs, the 5
 groups, the hidden plumbing and every flag. It's checked against the live parser by
 `tests/test_cli_reference.py`, so it can't quietly drift out of date.
 
@@ -193,19 +194,19 @@ You meter at the provider boundary (library adapter, a reverse proxy for clients
 A tool earns rows in `attrib` by filing a **savings receipt**, and there are two ways in, by who owns the tool:
 
 - **In-tool (you own it) — e.g. fux** carries a fail-open `cage_receipt.py` and emits its own `tool="fux"` receipt. Cage stays optional; fux runs unchanged with cage absent.
-- **External adapter (third-party) — e.g. graphify:** `cage data graphify -- graphify query "…"` runs graphify unmodified, passes its output through byte-for-byte, and files a `tool="graphify"` receipt by parsing the cited `source_file`s. graphify is never edited; a metering error never alters its result.
+- **External adapter (third-party) — e.g. graphify:** cage reads graphify's use out of each agent's own session store at `cage import` and files a `tool="graphify"` receipt by parsing the cited `source_file`s. graphify is never edited, and a metering error never alters its result.
 
-The full command surface (30+ subcommands: ledger · attribution · task outcomes · fleet study · ops · agents) is grouped in `cage --help`, which points at `cage query` for any "how is this computed". Every read command takes `--json` for the agent-as-user. Want a chat-by-chat breakdown instead of a rollup? `cage insights chats` groups the ledger by `(agent, surface, session)` and titles each row where the store carries one — labels only, never a number the manifest could move. Its `agent%` column answers the question a spend rollup can't: *did this chat's tokens become code?* — per chat, the share of evidenced lines in files it touched that matched the agent's own proposals, read from the authorship rows rather than re-derived. Where cage has no evidence it prints `—` with the reason, never a `0%`. The doc map — design of record, subsystem docs, operations, archive — starts at [docs/README.md](docs/README.md).
+The command surface (27 subcommands: per-chat and per-commit views · task outcomes · authorship · fleet study · agents) is grouped in `cage --help`, which points at `cage query` for any "how is this computed". Every read command takes `--json` for the agent-as-user. **Cage deliberately ships no ledger rollup** — the views are per *conversation* and per *commit*, the two units you can act on. `cage insights chats` groups the ledger by `(agent, surface, session)` and titles each row where the store carries one — labels only, never a number the manifest could move. Its `agent%` column answers the question a spend rollup can't: *did this chat's tokens become code?* — per chat, the share of evidenced lines in files it touched that matched the agent's own proposals, read from the authorship rows rather than re-derived. Where cage has no evidence it prints `—` with the reason, never a `0%`. The doc map — design of record, subsystem docs, operations, archive — starts at [docs/README.md](docs/README.md).
 
 ## Works with any agent — explicit capture over one global ledger
 
-Cage meters whatever speaks the wire format, so all three agents share **one** ledger contract. Capture is **pull-based and universal**: `cage import` reads each agent's on-disk usage log into the ledger, and `cage data export` refreshes then emits it — they need no hooks, no project, and work the same whether you run a CLI or a VS Code extension.
+Cage meters whatever speaks the wire format, so all three agents share **one** ledger contract. Capture is **pull-based and universal**: `cage import` reads each agent's on-disk usage log into the ledger, and every read view refreshes before it renders — they need no hooks, no project, and work the same whether you run a CLI or a VS Code extension.
 
 ```bash
 cage import                 # capture every agent's spend into the active ledger
-cage data export --format csv    # refresh, then emit (jsonl | csv | json)
-cage report                 # where the spend went
-cage data watch                  # optional: a foreground loop you Ctrl-C (no daemon)
+cage import                      # pull every agent's usage into the ledger
+cage insights chats              # which conversation used the tokens?
+cage study export                # the one-file fleet bundle, for the P5 study
 ```
 
 The ledger resolves **`--ledger`/`CAGE_BASE` → project `.cage/` → global `~/.cage`** — so a user with no project captures into the global ledger (`cage setup --global` to seed it). cage installs **no background job** (no launchd/systemd/cron); automate it, if you like, with your own cron line calling `cage import`.
@@ -219,7 +220,7 @@ Nonstandard install, a network home, or a custom tool that writes a supported fo
 | **Kiro** | `cage import` (token log) | `agentStop` hook (CLI only) | `cage` MCP |
 | **Your code / Orff** | `cage.meter()` library | — | `cage` CLI / MCP |
 
-Hooks are an **optional** real-time add-on — they fire only under a CLI client, never under a VS Code extension — so `cage import`/`cage data export` is the path that always works. `cage report --project <name>` slices the global ledger by working dir (exact for Claude; Copilot/Kiro logs carry no project, so they're excluded from that filter). Committed wired files never embed a machine's absolute cage path — they reference the repo-local shim `.cage/bin/cage-run` (see the Quickstart note).
+Hooks are an **optional** real-time add-on — they fire only under a CLI client, never under a VS Code extension — so `cage import` is the path that always works. Rows carry a `project` stamp (exact for Claude; Copilot/Kiro logs carry no project, so theirs is empty) — recorded today, read by no view since v0.50. Committed wired files never embed a machine's absolute cage path — they reference the repo-local shim `.cage/bin/cage-run` (see the Quickstart note).
 
 **An agent's spend isn't showing up?** `cage doctor` shows the active ledger, each agent's real capture state, and "last import: N ago"; the metadata-only debug log says per agent whether a hook fired or raised (`CAGE_DEBUG=1`).
 
@@ -228,16 +229,16 @@ Hooks are an **optional** real-time add-on — they fire only under a CLI client
 Every read view also renders as CSV for spreadsheets/BI: `--csv` streams to stdout (pipe-friendly), `--csv <path>` writes a file. The same data structure feeds the text table and the CSV, so the numbers can't disagree — and the honesty ships with them: **method tags are columns** (`measured` vs `estimated` survives into the sheet), refusals and the UNPRICED counts stay visible, line endings are LF on every OS (byte-identical, deterministic).
 
 ```bash
-cage report --csv --since 7d > weekly-spend.csv   # last week's spend, flat
-cage insights attrib --csv                                  # per-tool savings, method column kept
-cage data export --csv calls --since 30d -o calls.csv   # raw ledger rows for a pivot table
+cage insights chats --csv --since 7d > weekly-usage.csv  # last week per conversation, flat
+cage insights graphify --csv                             # per-chat savings, method column kept
+cage insights commits --csv --since 30d                  # per-commit rows for a pivot table
 ```
 
-`--csv` works on `report` · `attrib` · `chats` · `adoption` · `compare` · `study report` · `calibration`; raw rows come from `cage data export --csv calls|receipts|tasks`. CSV is one-way reporting — never an import source; the re-importable fleet bundle stays jsonl (`cage data export --study`). The MCP read tools take the same `format: csv`, so an agent wired on any of the three surfaces can fetch a report without shelling out.
+`--csv` works on `chats` · `graphify` · `commits` · `commit` · `authorship summary` · `study report`. CSV is one-way reporting — never an import source; the re-importable fleet bundle stays jsonl (`cage study export`). Every view also takes `--export` to write a stamped artifact to disk.
 
 ## The `$0` guarantee
 
-Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 1571 tests; `cage demo` reproduces the worked attribution example against a real ledger.
+Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 1348 tests; `cage demo` seeds a real ledger you can read with `cage insights chats`.
 
 **Honest limits.** Marginal-by-fixed-order is defensible and `$0`, but it is an *ordering convention*, not a Shapley value (that's a deferred audit mode). And a counterfactual cell is an honest reconstruction, never an invoice — the `method` column says so on every row, on purpose.
 
@@ -245,7 +246,7 @@ Every derived view is parse / arithmetic over the log — **no LLM call, ever, o
 
 Latest release below — full history and detail in [CHANGELOG.md](CHANGELOG.md).
 
-- **v0.50.0 — cage stops measuring money, and the surface narrows to match.** The money subsystem is deleted: fifteen modules, eleven commands, four MCP tools, the `--usd` view and the bundled rate card are gone. Dollars were never measured — they were tokens × a table cage could not verify — so cage now reports only what the vendors record: **tokens and credits**, each with its own absence reason and never summed across agents. The reporting surface narrows with it, and the ADR set becomes **four per-agent records** — one per metered agent, each written for a human and for an agent. ([ADR 0011](work/archive/adr/0011-cage-measures-usage-not-cost.md) · [the ADR set](docs/adr/README.md))
+- **v0.50.0 — cage stops measuring money, and the surface narrows to match.** The money subsystem is deleted: fifteen modules, eleven commands, four MCP tools, the `--usd` view and the bundled rate card are gone. Dollars were never measured — they were tokens × a table cage could not verify — so cage now reports only what the vendors record: **tokens and credits**, each with its own absence reason and never summed across agents. The reporting surface narrows with it — **SURFACE-CUT** deletes the ledger rollup, the whole `cage data` group and the task-comparison family (fourteen more modules, MCP down to two tools), leaving views that are per *conversation* and per *commit*: the two units you can act on. **Capture is untouched** — every row those views read is still recorded. And the ADR set becomes **four per-agent records**, one per metered agent, each written for a human and for an agent. ([ADR 0011](work/archive/adr/0011-cage-measures-usage-not-cost.md) · [the cut](work/surface-cut.decision.md) · [the ADR set](docs/adr/README.md))
 
 ## The name
 

@@ -51,8 +51,8 @@ Full release notes. The README keeps a one-line summary per version; the detail 
 
 - **ADR-RESTRUCTURE — the ADR set becomes one record per metered thing, plus one for what
   binds them all.** `docs/adr/` now holds [ADR-LAWS](docs/adr/0001_laws.md) ·
-  [ADR-CLAUDE](docs/adr/0002_claude.md) · [ADR-COPILOT](docs/adr/0003_copilot.md) ·
-  [ADR-KIRO](docs/adr/0004_kiro.md) · [ADR-GRAPHIFY](docs/adr/0005_graphify.md) — each with
+  [ADR-CLAUDE](docs/adr/0003_claude.md) · [ADR-COPILOT](docs/adr/0004_copilot.md) ·
+  [ADR-KIRO](docs/adr/0005_kiro.md) · [ADR-GRAPHIFY](docs/adr/0007_graphify.md) — each with
   a **§1 for humans** (one screen, a Mermaid diagram and a hand-paired ASCII twin) and a
   **§2 for agents** (context · decision · consequences · alternatives · reference · veto).
   - **ADR-LAWS is the single home of the five cross-cutting laws** — pull-only · one sink ·

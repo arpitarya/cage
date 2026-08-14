@@ -42,7 +42,7 @@ Grouped by what kind of wrong they are.
 
 - **`docs/shim-contract.md`** is cited ~6× as the interceptor's contract. It was
   **absorbed into ADR-GRAPHIFY §2 and removed**. Re-point to
-  [docs/adr/0005_graphify.md](../docs/adr/0005_graphify.md).
+  [docs/adr/0007_graphify.md](../docs/adr/0007_graphify.md).
 - **`docs/adr/0011-cage-measures-usage-not-cost.md`** (and every other numeric ADR path)
   now lives under [work/archive/adr/](archive/adr/README.md). CLAUDE.md cites the old
   `docs/adr/` path in several places, including the ADR-0011 rule near the top.

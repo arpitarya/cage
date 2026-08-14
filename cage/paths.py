@@ -56,7 +56,7 @@ def cage_command_tail(command: str) -> str | None:
     `/abs/path/cage …`, the Windows `…\\cage.exe` forms, quoted), **via the
     committed shim** (`cage-run` in any host's reference form, plan §5), or **via
     the interpreter** (`python3 -m cage …` / `py -3 -m cage …` — python-launcher
-    wiring mode, docs/restricted-environments.md); else None (a foreign hook —
+    wiring mode, work/restricted-environments.md); else None (a foreign hook —
     never touch it). The superset detector wiring/migration use;
     `reresolve_cage_command` deliberately stays binary-only so nothing can ever
     rewrite a portable shim or interpreter reference back into an absolute path."""
@@ -315,7 +315,7 @@ def active_ledger_source(start: Path | None = None) -> str:
 
 # ── the graphify interceptor twins ──────────────────────────────────────────────
 #
-# One behaviour contract (docs/adr/0004_graphify.md), two implementations: the
+# One behaviour contract (docs/adr/0007_graphify.md), two implementations: the
 # extensionless POSIX `graphify` and the Windows `graphify.cmd`. The names live here,
 # with the rest of "where things live", so the writer (`adoptcmd`) and every read
 # surface (`pathshim`, `wiringscan`, `doctorcmd`) share one enumeration — a read

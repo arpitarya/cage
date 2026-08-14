@@ -111,7 +111,7 @@ def test_calculation_entries_unchanged_kind():
     # The money entries (cost/roi/budget/matrix/verdict-composition/pricing-match/
     # unpriced/repricing/receipt-pricing) went with the subsystem they explained
     # (USAGE-ONLY, ADR 0011).
-    # SURFACE-CUT (v0.52) took `marginal-attribution`, `compare-delta`, `estimate-band`
+    # SURFACE-CUT (v0.50) took `marginal-attribution`, `compare-delta`, `estimate-band`
     # and `calibration-hit-rate` — each explained a command that no longer exists.
     calc_ids = {"saved", "gross-vs-net", "token-heuristic",
                 "confidence", "method-tags", "study-pairing", "policy-versioning"}

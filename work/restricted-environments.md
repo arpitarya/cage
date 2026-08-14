@@ -56,7 +56,7 @@ importable ⇒ exit 0 silently, agents keep working, no capture.
 ### GF-LAUNCHER — CLOSED 2026-08-12: the interceptor reaches cage through the interpreter
 
 **Fixed on POSIX, CI-asserted on Windows.** Both twins gained a second capability arm
-(`docs/adr/0005_graphify.md` B5b): when no `cage` command resolves, they probe
+(`docs/adr/0007_graphify.md` B5b): when no `cage` command resolves, they probe
 `python3 -m cage` (POSIX) / `py -3` then `python` (Windows, divergence D8) and meter
 through that. Launcher mode no longer silences the shim route.
 

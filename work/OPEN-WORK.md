@@ -8,6 +8,17 @@
   [surface-cut.decision.md](surface-cut.decision.md). **15 tests remain red, all shim**
   (see SHIM-DEAD-VERB below) — that was Arpit's explicit call, not an oversight.
 
+## Not mine — a concurrent session owns these
+
+- **`docs/CLI.md` is being absorbed** (Arpit, 2026-08-14). Deleted from `docs/` by the
+  session doing the ADR restructure; **left deleted deliberately** — Arpit is handling the
+  fallout. Until its replacement lands, `tests/test_cli_reference.py::test_the_headline_count_matches_the_parser`
+  fails and five live docs have a dangling link (`CLAUDE.md`, `README.md`,
+  `docs/README.md`, this file's registry sibling, `work/compare/README.md`). The deleted
+  copy was SURFACE-CUT-accurate (27 commands, the removed-verb table) and is recoverable
+  from HEAD if the absorption is abandoned. **Do not "fix" this by re-pointing the
+  citations** — that would pre-empt a decision that is not this queue's.
+
 ## Agent-closable
 
 - **SHIM-DEAD-VERB** — `bin/graphify` + `bin/graphify.cmd` probe `cage data graphify`,

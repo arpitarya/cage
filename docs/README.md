@@ -91,7 +91,7 @@ The maintained doc set, governed by the *Documentation discipline* section of
 and `OPEN-WORK.md` above; `MACHINE.md` moved with them. Each bullet below links
 to its real location.
 
-- **[CLI.md](CLI.md) — every `cage` command in one place.** The 5 daily verbs, the 7
+- **[CLI.md](adr/0002_cli.md) — every `cage` command in one place.** The 5 daily verbs, the 7
   groups, the 4 hidden plumbing commands and every flag, plus the removed-verb
   migration table and the surface's known gaps. **Test-gated**: `tests/test_cli_reference.py`
   checks it bidirectionally against `cli.build_parser()`, so a rename that misses this
@@ -110,8 +110,8 @@ to its real location.
   ADR-GRAPHIFY §2. One document per agent now carries both *what is captured* and *why*,
   so a capture change and its rationale can no longer drift apart. The same
   update-in-the-same-change rule applies, now to the ADR:
-  [ADR-CLAUDE](adr/0002_claude.md) · [ADR-COPILOT](adr/0003_copilot.md) ·
-  [ADR-KIRO](adr/0004_kiro.md) · [ADR-GRAPHIFY](adr/0005_graphify.md).
+  [ADR-CLAUDE](adr/0003_claude.md) · [ADR-COPILOT](adr/0004_copilot.md) ·
+  [ADR-KIRO](adr/0005_kiro.md) · [ADR-GRAPHIFY](adr/0007_graphify.md).
 - [FORMULAS.md](FORMULAS.md) — every computed number: formula · code home ·
   method tag · the knobs that move it.
 - [WORKLOG.md](../work/WORKLOG.md) — the running per-session handoff (append every
@@ -131,9 +131,9 @@ to its real location.
 ## Standing records
 
 - **[adr/](adr/README.md) — the durable *why*: [ADR-LAWS](adr/0001_laws.md) plus one
-  record per metered thing** (restructured 2026-08-14): [ADR-CLAUDE](adr/0002_claude.md) ·
-  [ADR-COPILOT](adr/0003_copilot.md) · [ADR-KIRO](adr/0004_kiro.md) ·
-  [ADR-GRAPHIFY](adr/0005_graphify.md). Each has **§1 for humans** (one screen, Mermaid +
+  record per metered thing** (restructured 2026-08-14): [ADR-CLAUDE](adr/0003_claude.md) ·
+  [ADR-COPILOT](adr/0004_copilot.md) · [ADR-KIRO](adr/0005_kiro.md) ·
+  [ADR-GRAPHIFY](adr/0007_graphify.md). Each has **§1 for humans** (one screen, Mermaid +
   ASCII diagrams) and **§2 for agents** (the binding detail, ending in a veto condition).
   The five laws that bind them all — pull-only · one sink · append-only ·
   counts-never-content · usage-never-cost — live in [ADR-LAWS](adr/0001_laws.md), each

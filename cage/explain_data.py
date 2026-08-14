@@ -356,7 +356,7 @@ REGISTRY: tuple[Explanation, ...] = (
         "  concatenate, and --since skips whole below-cutoff months.\n"
         "  scope: calls/receipts carry an optional top-level changed dir (same PII guard\n"
         "  as tasks); report/attrib/budget/matrix --scope <dir> slice one component.\n"
-        "  team: REMOVED in v0.52 (SURFACE-CUT). The ledger-sync verb pushed rows into\n"
+        "  team: REMOVED in v0.50 (SURFACE-CUT). The ledger-sync verb pushed rows into\n"
         "  refs/notes/cage-ledger, and the --team flags that read them went with the\n"
         "  rollup views — a write path with no reader. Provenance notes are unaffected.\n"
         "  rolled up by scope, never per-person. Size warning: one stderr line past\n"
@@ -513,7 +513,7 @@ REGISTRY: tuple[Explanation, ...] = (
         "  added, savings are unrecoverable), cage.toml, the machine id (fleet\n"
         "  pairing breaks without it), study.jsonl, limits.json. Window: [cleanup]\n"
         "  days = {cleanup_days}. Deletion only ever happens via an\n"
-        "  explicit prune. NOTE: the manual verb was deleted in v0.52, so nothing\n"
+        "  explicit prune. NOTE: the manual verb was deleted in v0.50, so nothing\n"
         "  enabled — an explicitly-typed command is always honored. The auto path\n"
         "  (piggybacked on `cage import`/read sweeps, throttled, fail-open — cage\n"
         "  installs no scheduler) only ever WARNS on stderr, silent when nothing is\n"
@@ -570,7 +570,7 @@ REGISTRY: tuple[Explanation, ...] = (
         "the CSV reporting surface: which views, the column law, csv-vs-bundle",
         "`--csv` on report · attrib · roi · compare · study report · calibration\n"
         "  — stdout by default (pipe-friendly),\n"
-        "  `--csv <path>` writes a file. Raw-row export was removed in v0.52; the\n"
+        "  `--csv <path>` writes a file. Raw-row export was removed in v0.50; the\n"
         "  calls|receipts|tasks` (flat ledger rows for pivot tables; the ledger's\n"
         "  own PII surface — counts and ids, never content). MCP mirrors it: a\n"
         "  `format: csv` param on the report/attrib/roi tools.\n"
@@ -722,7 +722,7 @@ REGISTRY: tuple[Explanation, ...] = (
                            "pathext", "cmd-twin", "windows-graphify",
                            "windows-interceptor", "shim-contract", "call-not-exec"),
         "why the graphify interceptor is TWO files, and what each one can't do",
-        "one behaviour contract, two implementations (docs/adr/0004_graphify.md): the\n"
+        "one behaviour contract, two implementations (docs/adr/0007_graphify.md): the\n"
         "  extensionless POSIX `bin/{graphify_shim_posix}` and the Windows\n"
         "  `bin/{graphify_shim_windows}`. Windows resolves a bare `graphify` ONLY\n"
         "  through PATHEXT, which has no extensionless entry — so on Windows only the\n"
@@ -753,7 +753,7 @@ REGISTRY: tuple[Explanation, ...] = (
         "  no `cage` command on PATH for the capability probe to find, so NEITHER twin\n"
         "  meters — correct passthrough, silently unmetered. `cage doctor`'s\n"
         "  launcher-gap check says so when it sees both switches at once. See\n"
-        "  `cage query restricted-env` and docs/restricted-environments.md.",
+        "  `cage query restricted-env` and work/restricted-environments.md.",
         ("cage/paths.py", "cage/adoptcmd.py", "cage/pathshim.py", "cage/wiringscan.py",
          "cage/doctorcmd.py", "cage/data/shims/graphify", "cage/data/shims/graphify.cmd"),
         "n/a — describes a wiring mechanism, not a number.",

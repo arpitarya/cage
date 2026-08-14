@@ -30,8 +30,8 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
   one sink · append-only · counts-never-content · usage-never-cost), each with its
   ratification and a numbered veto, and **every other record assumes them and restates
   none**. A per-agent record that restates a law is a bug, not redundancy.
-  [ADR-CLAUDE](../docs/adr/0002_claude.md) · [ADR-COPILOT](../docs/adr/0003_copilot.md) ·
-  [ADR-KIRO](../docs/adr/0004_kiro.md) · [ADR-GRAPHIFY](../docs/adr/0005_graphify.md).
+  [ADR-CLAUDE](../docs/adr/0003_claude.md) · [ADR-COPILOT](../docs/adr/0004_copilot.md) ·
+  [ADR-KIRO](../docs/adr/0005_kiro.md) · [ADR-GRAPHIFY](../docs/adr/0007_graphify.md).
   **Never write "ADR 0003"** — the numbers belong to the eleven superseded records now in
   [work/archive/adr/](archive/adr/README.md), which are **history and never current spec**.
   Each live record has **§1 for humans** (one screen, a Mermaid diagram and a hand-paired
@@ -97,7 +97,7 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
   Arpit's instruction (Cowork session), continuing the 2026-08-12 WORK-DIR move.
   `docs/` now holds only: `PLAN.md`, `CLI.md`, `FORMULAS.md`, `GLOSSARY.md`,
   `README.md`, the three `*-capture.md` one-pagers, `doc-size-discipline.md`,
-  `../docs/adr/0005_graphify.md`, `restricted-environments.md`, `adr/`, `architecture-flow.mermaid`,
+  `../docs/adr/0007_graphify.md`, `restricted-environments.md`, `adr/`, `architecture-flow.mermaid`,
   `assets/`, `example/`. **New handoff/prompt pairs are now specced directly into
   `work/` root**, not `docs/` root — CLAUDE.md's *Handoff/prompt docs have a
   lifecycle* rule was rewritten for this; see the Standing constraints bullet below.
@@ -531,7 +531,7 @@ single next step: push and read the Windows `graphify` CI job.**
   script; Windows resolves a bare name only through `PATHEXT`, which has no extensionless
   entry, so cage's shim could never be *found* there. It now ships as a **twin pair** —
   `graphify` + `graphify.cmd` — against one written contract,
-  [../docs/adr/0005_graphify.md](../docs/adr/0005_graphify.md).
+  [../docs/adr/0007_graphify.md](../docs/adr/0007_graphify.md).
 - **The one thing I could not do is the one thing that matters most: run it on Windows.**
   10 behaviour tests and the whole CI `present` leg have never executed. Everything on
   this machine is green (979/0, dummyrepo S1–S18, `tools.cigraphify` 7/7 on macOS), and

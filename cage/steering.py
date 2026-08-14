@@ -226,7 +226,7 @@ Closing a task is what turns a pile of metered calls into a comparable unit of w
 The task record carries the outcome, the label and a git snapshot taken at close.
 
 **Be honest about the state of this:** the views that read closed tasks
-(`compare`/`estimate`/`calibration`) were deleted in v0.52, so nothing renders the
+(`compare`/`estimate`/`calibration`) were deleted in v0.50, so nothing renders the
 outcome today. The record is still written, still append-only, and still the only place
 this fact exists — a task closed now is readable by whatever reads it next. Do not
 claim a number from it that no command prints.
@@ -558,7 +558,7 @@ _SKILL_WINDOWS_SHIM = Doc(
     layer="L3",
     body="""
 The interceptor is **two implementations of one contract**
-(`docs/adr/0004_graphify.md`): `data/shims/graphify` (POSIX sh) and `data/shims/graphify.cmd`
+(`docs/adr/0007_graphify.md`): `data/shims/graphify` (POSIX sh) and `data/shims/graphify.cmd`
 (Windows). Windows resolves a bare name only through `PATHEXT`, which has no
 extensionless entry — so the sh shim alone could never be *found* there, and the shim
 capture route was structurally absent on Windows until the twin existed.
@@ -589,7 +589,7 @@ Chiefly: **cmd has no `exec`**, so the real binary runs as a *child* — `call` 
 parse time and reports the wrong exit code. And `<` / `>` inside a `rem` line are shell
 redirections in batch, not text.
 
-## The state of this as of v0.52
+## The state of this as of v0.50
 
 SURFACE-CUT deleted the metering verb the twins probe for, and the shim subsystem was
 deliberately **left untouched** in that change. Because B5 gates metering behind a

@@ -11,10 +11,10 @@ update-rule: ANY capture, routing, or unit change for an agent updates that agen
 | # | record | covers |
 |---|---|---|
 | 0001 | [**ADR-LAWS**](0001_laws.md) | the five cross-cutting laws — read this first |
-| 0002 | [**ADR-CLAUDE**](0002_claude.md) | Claude Code — transcripts, the dedup law, authorship |
-| 0003 | [**ADR-COPILOT**](0003_copilot.md) | GitHub Copilot — five stores, cumulative→delta, credits |
-| 0004 | [**ADR-KIRO**](0004_kiro.md) | Kiro — the two-store split, machine facts, the absent spine |
-| 0005 | [**ADR-GRAPHIFY**](0005_graphify.md) | graphify — the interceptor twins and the savings receipt |
+| 0002 | [**ADR-CLAUDE**](0003_claude.md) | Claude Code — transcripts, the dedup law, authorship |
+| 0003 | [**ADR-COPILOT**](0004_copilot.md) | GitHub Copilot — five stores, cumulative→delta, credits |
+| 0004 | [**ADR-KIRO**](0005_kiro.md) | Kiro — the two-store split, machine facts, the absent spine |
+| 0005 | [**ADR-GRAPHIFY**](0007_graphify.md) | graphify — the interceptor twins and the savings receipt |
 
 Each has **two sections**: **§1 for humans** (one screen, diagrams, no jargon) and
 **§2 for agents** (the binding detail — context, decision, consequences, alternatives,

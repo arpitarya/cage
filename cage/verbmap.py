@@ -23,7 +23,7 @@ REMOVED: dict[str, str] = {
     "import-claude": "import --agent claude",
     # → insights
     "why": "insights why",
-    # SURFACE-CUT (v0.52) removed the ledger rollup and the task-comparison family
+    # SURFACE-CUT (v0.50) removed the ledger rollup and the task-comparison family
     # outright. These four were top-level verbs, then `insights <verb>` for several
     # releases, so BOTH spellings sit in wired artifacts and shell history — each gets an
     # empty tail (removed, no replacement) and a sentence in `_BODIES`.
@@ -57,7 +57,7 @@ REMOVED: dict[str, str] = {
     "origin": "authorship origin",
     "verify": "authorship verify",
     "notes-sync": "authorship notes-sync",
-    # The whole `data` group went in SURFACE-CUT (v0.52), so every one of these now
+    # The whole `data` group went in SURFACE-CUT (v0.50), so every one of these now
     # points at a command that does not exist either. They were top-level verbs before
     # the CLI tiering and `data <verb>` after it — both spellings are still installed
     # somewhere, so both resolve to a removal sentence rather than a dead direction.
@@ -92,18 +92,18 @@ _MONEY_REMOVED = (
     "views: `cage insights chats` (per conversation), `cage insights graphify` "
     "(per-chat gross token savings), `cage insights commits` (per commit)")
 
-# SURFACE-CUT (v0.52): the ledger rollup, the whole `data` group, and the
+# SURFACE-CUT (v0.50): the ledger rollup, the whole `data` group, and the
 # task-comparison family. Each names what it did and where the same question is
 # answerable now — an empty tail with no sentence would print the hook-removal message,
 # which would be simply wrong for these.
 _ROLLUP_REMOVED = (
-    "was removed in v0.52 (SURFACE-CUT). Cage no longer ships a ledger rollup or a "
+    "was removed in v0.50 (SURFACE-CUT). Cage no longer ships a ledger rollup or a "
     "task-comparison family; capture is unchanged and every row is still recorded. "
     "The surviving read surfaces are per chat and per commit: `cage insights chats`, "
     "`cage insights graphify`, `cage insights commits`, `cage insights commit`, "
     "`cage insights why`")
 _DATA_REMOVED = (
-    "was removed in v0.52 (SURFACE-CUT) with the whole `cage data` group — there is no "
+    "was removed in v0.50 (SURFACE-CUT) with the whole `cage data` group — there is no "
     "export, no local server, no proxy and no watcher. Capture still works and is "
     "pull-based: run `cage import`. The fleet bundle moved to `cage study export`")
 
@@ -115,7 +115,7 @@ _BODIES: dict[str, str] = {
        ("report", "attrib", "adoption", "compare", "estimate", "calibration")},
     **{v: f"'{v}' {_DATA_REMOVED}" for v in
        ("export", "cleanup", "watch", "serve", "proxy", "meter", "graphify")},
-    "ledger-sync": ("'ledger-sync' was removed in v0.52 (SURFACE-CUT). It pushed local "
+    "ledger-sync": ("'ledger-sync' was removed in v0.50 (SURFACE-CUT). It pushed local "
                     "rows into refs/notes/cage-ledger for a team view, and `--team` — "
                     "its only reader — went with `cage report`/`cage insights attrib`, "
                     "so the ref could be written and never displayed. Provenance notes "
@@ -123,7 +123,7 @@ _BODIES: dict[str, str] = {
     "quality": ("'quality' was removed in v0.51 — it reported cost per successful "
                 "task, and cage no longer measures cost. The OUTCOME half survives: "
                 "`cage task outcome <task>` still records ok/redo (its readers, "
-                "`compare`/`calibration`, went in v0.52 — the outcome is recorded, and "
+                "`compare`/`calibration`, went in v0.50 — the outcome is recorded, and "
                 "no view reads it yet)"),
     "human": ("'human' was removed in v0.36 — the agent-vs-human cost axis is gone. "
               "Its two non-human subcommands moved: `cage task outcome`, "

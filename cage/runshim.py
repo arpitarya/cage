@@ -27,7 +27,7 @@ UNVERIFIED on a real Windows agent host, same label discipline as the Kiro
 Windows layout in `paths.py`. Execute bit is set at write time, fail-open for
 `core.fileMode=false` repos / filesystems that reject chmod.
 
-Restricted endpoints (docs/restricted-environments.md): `CAGE_RUN_PYTHON=1` makes
+Restricted endpoints (work/restricted-environments.md): `CAGE_RUN_PYTHON=1` makes
 the standard shim skip the exe probe at runtime (straight to `python3 -m cage` /
 `py -3 -m cage`) without rewiring; `[wiring] python_launcher = true` in project
 policy makes `cage setup` write the `_SH_PY`/`_CMD_PY` variant pair instead —

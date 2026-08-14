@@ -301,7 +301,9 @@ def test_empty_no_savings_at_all_diagnoses(root, pol):
     assert "No graphify savings recorded yet." in out
     assert "cage query graphify-coverage" in out
     assert "cage doctor" in out
-    assert "cage insights attrib" in out
+    # `insights attrib` was the pointed-to view until SURFACE-CUT deleted it; the
+    # empty state must name a LIVE next step, never a verb that exits 1.
+    assert "cage insights chats" in out
 
 
 def test_empty_filtered_blames_the_filter_when_savings_exist_elsewhere(root, pol):

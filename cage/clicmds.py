@@ -481,7 +481,7 @@ def cmd_setup(args) -> int:
                 print(f"    · {line}")
         return 0
 
-    # Persist the wiring mode FIRST (docs/restricted-environments.md): the flag is a
+    # Persist the wiring mode FIRST (work/restricted-environments.md): the flag is a
     # project-policy setting (`[wiring] python_launcher`), so it must land before any
     # wiring path below — agents.install re-reads it from policy on every run, which
     # is also why a later plain `cage setup` preserves the mode with no flag repeated.

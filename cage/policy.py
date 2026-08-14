@@ -149,7 +149,7 @@ def _flag(env_name: str, pol: dict, section: str, key: str, default: bool) -> bo
 
 
 def python_launcher(pol: dict) -> bool:
-    """Persisted wiring mode (docs/restricted-environments.md): shims + user-level
+    """Persisted wiring mode (work/restricted-environments.md): shims + user-level
     wiring resolve cage through the interpreter only (`python3 -m cage` /
     `py -3 -m cage`), never probing or executing a `cage`/`cage.exe` binary — for
     endpoints where unknown exes are blocked. Policy ``[wiring] python_launcher``;

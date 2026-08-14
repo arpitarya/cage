@@ -78,7 +78,7 @@ flowchart TD
         |                                                            |
         |                                      cage insights chats | commits | study
         |
-        `-- line-match authorship ....... counts only ------> provenance.jsonl
+        +-- line-match authorship ....... counts only ------> provenance.jsonl
                                           (bodies dropped)
 ```
 </details>

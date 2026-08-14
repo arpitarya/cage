@@ -8,6 +8,36 @@ Entry format:
 
 ```
 
+## 2026-08-14 — DOC-MOVE: `doc-size-discipline.md` + `restricted-environments.md` → `work/`
+
+- **Built:** both moved out of `docs/` (design/reference) into `work/` (working docs) —
+  one is a time-boxed process trial, the other an operations guide; neither is a design
+  record. `git mv`, so history follows.
+- **Citation migration (the reason this is a milestone, not a rename):**
+  `restricted-environments.md` had **11 live source citations** — `cage/{doctorcmd,paths,
+  policy,clicmds,explain_data,runshim}.py`, `tools/buildpyz.py`,
+  `tools/dummyrepo/run.py` — plus `README.md`, `CLAUDE.md`, `docs/adr/0007_graphify.md`,
+  `docs/README.md` and its DOC-REGISTRY row. All swept. **This file has been silently
+  deleted twice before** (v0.36 hookless sweep, then again), which is exactly why its
+  citations are worth sweeping rather than leaving to rot.
+- **Also fixed:** both docs' own relative links (a `docs/` → `work/` move changes every
+  `../` depth) and one LIVE compare doc,
+  `work/compare/gf-launcher-metering.compare.md`, still pointing at the old path.
+- **Deliberately NOT swept:** `CHANGELOG.md`, `IMPLEMENTATION.md`, `WORKLOG.md` and
+  `work/archive/**` keep the old `docs/` paths — those links were true when written, and
+  the doc-links gate exempts history for exactly that reason.
+- **Note:** `CLAUDE.md` was edited here (two path references). That is a mechanical path
+  fix from a move Arpit requested, **not** a content change — the pending content diff
+  stays proposed in `work/surface-cut.claude-md-diff.md`.
+- **Files:** `work/{doc-size-discipline,restricted-environments}.md` (moved) ·
+  6 `cage/*.py` · 2 `tools/` · `README.md` · `CLAUDE.md` · `docs/README.md` ·
+  `docs/adr/0007_graphify.md` · `work/DOC-REGISTRY.md` ·
+  `work/compare/gf-launcher-metering.compare.md`
+- **Tests:** 1333 passing, 15 failing — all 15 the pre-existing SHIM-DEAD-VERB set;
+  `tests/test_doc_links.py` green (it is the gate that proves this move is complete).
+- **Next step:** unchanged — Arpit rules on SHIM-DEAD-VERB.
+
+
 ## 2026-08-14 — SURFACE-CUT COMPLETE (P0→P10): the read surface shrinks; capture untouched
 
 - **Built:** deleted `cage report`, all 8 `cage data` subcommands,
@@ -60,7 +90,7 @@ Entry format:
 
 ## 2026-08-14 — ADR-RESTRUCTURE: 11 numeric ADRs → 4 per-agent ADRs; 4 docs absorbed
 
-- **Built:** `docs/adr/{0002_claude,0003_copilot,0004_kiro,0005_graphify}.md` — one record
+- **Built:** `docs/adr/{0003_claude,0004_copilot,0005_kiro,0007_graphify}.md` — one record
   per metered agent, each with **§1 for humans** (Mermaid + hand-paired ASCII twin) and
   **§2 for agents** (context · decision · consequences · alternatives · reference · veto).
   Plus `docs/adr/README.md` (index, the cite-by-name rule, the five shared laws) and a

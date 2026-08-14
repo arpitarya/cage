@@ -817,7 +817,7 @@ def s12_launcher(base: Path) -> str:
 
 
 def s13_pyz(base: Path) -> str:
-    """S13 — cage.pyz distribution parity (docs/restricted-environments.md): the
+    """S13 — cage.pyz distribution parity (work/restricted-environments.md): the
     zipapp labels itself, reads bundled data from inside the zip, imports the
     fixture corpus, and derives byte-identically to the repo-module run over the
     SAME ledger. $CAGE_PYZ (CI passes the exact release artifact) beats a local

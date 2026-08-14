@@ -1,5 +1,5 @@
 """Task grouping — the shared key-matching core. Its original consumers
-(`cage insights compare/estimate/calibration`) were deleted in SURFACE-CUT (v0.52);
+(`cage insights compare/estimate/calibration`) were deleted in SURFACE-CUT (v0.50);
 **`commitjoin` is now the only caller**, and it uses `join_rows` for the call→commit
 join. Kept because that join must never fork a second implementation. Historically:
 the shared key-matching core under `cage insights compare` (roadmap P2)

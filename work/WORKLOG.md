@@ -54,6 +54,25 @@ by milestone) — the worklog is what *happened this session*.
 
 ---
 
+## 2026-08-14 (Claude Code) — `doc-size-discipline.md` + `restricted-environments.md` moved to `work/`
+
+- **Asked (Arpit):** move both out of `docs/` into `work/`.
+- **Done:** `git mv` both, then swept **every live citation** — 11 in source
+  (`cage/{doctorcmd,paths,policy,clicmds,explain_data,runshim}.py`, `tools/buildpyz.py`,
+  `tools/dummyrepo/run.py`) plus `README.md`, `CLAUDE.md`, `docs/adr/0007_graphify.md`,
+  `docs/README.md`, the two DOC-REGISTRY rows, and one LIVE compare doc. Also fixed both
+  files' own relative links, since a `docs/` → `work/` move changes every `../` depth.
+- **Decided:** history keeps the old paths — `CHANGELOG.md`, `IMPLEMENTATION.md`,
+  `WORKLOG.md` and `work/archive/**` are dated records whose links were true when
+  written, and the doc-links gate exempts them for that reason.
+- **Note:** `CLAUDE.md` was edited (two paths). Mechanical, from a move Arpit asked for —
+  the pending *content* diff is still proposed, not applied.
+- **Next step:** unchanged — Arpit rules on SHIM-DEAD-VERB.
+- **Cost: unmeasured — `cage report` no longer exists** (deleted earlier this session);
+  see the entry below and `work/surface-cut.claude-md-diff.md` §A, which proposes what
+  the `Cost:` rule should say now.
+
+
 ## 2026-08-14 (Claude Code) — SURFACE-CUT executed: 14 modules, 15 handlers, MCP 6→2; shim left red by decision
 
 - **Asked (Arpit):** execute `work/surface-cut.prompt.md` — delete `cage report`, all of
@@ -90,7 +109,7 @@ by milestone) — the worklog is what *happened this session*.
 
 - **Asked (Arpit):** review every ADR + `claude-capture.md` / `copilot-capture.md` /
   `kiro-capture.md` / `shim-contract.md`, then create and maintain four ADRs
-  (`0002_claude` · `0003_copilot` · `0004_kiro` · `0005_graphify`), each with a **human
+  (`0003_claude` · `0004_copilot` · `0005_kiro` · `0007_graphify`), each with a **human
   section** (short, with diagrams) and an **agent section**. Mid-session: *"everything
   mentioned in [those four docs] should be in adr then remove these files."*
 - **Decided (Arpit, in-session):** replace `docs/adr/` **entirely** — the eleven numeric
