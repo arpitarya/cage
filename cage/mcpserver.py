@@ -1,29 +1,28 @@
 """`cage mcp` — expose the Cage ledger to any agent over MCP (stdlib-only, $0).
 
 A minimal Model Context Protocol server on stdio: newline-delimited JSON-RPC 2.0,
-hand-rolled so it adds no dependency. Publishes Cage's read paths — report /
-attrib / adoption / why / **compare** — as MCP
-*tools*, so an agent (Claude Code, Kiro, Copilot) can ask "what did this use, and
-what saved me tokens?" and answer from its own ledger. Every read tool is
-deterministic and never calls an LLM.
+hand-rolled so it adds no dependency. Publishes Cage's read path — **`why`**, full
+provenance for one call id — as an MCP *tool*, so an agent (Claude Code, Kiro,
+Copilot) can trace a call to every receipt filed against it from its own ledger. The
+read tool is deterministic and never calls an LLM.
 
     claude mcp add cage -- cage mcp        # or the equivalent for copilot / kiro
 
-**The refusals are the point (L2 of the agent-surface ladder).** `compare` answers
-*"is this tool worth keeping"* and routinely declines to: the `MIN_COMPARE_N` block
-fires whenever a group is too thin. (`verdict` was the other half of that pair and went
-with the money subsystem — USAGE-ONLY, ADR 0011 — along with `matrix`, `budget` and
-`roi`; four read tools, nine down to five.) Refusal text crosses this boundary
-**verbatim**, because a tool that
-returns silence where the CLI would have explained itself is worse than no tool — an
-agent reads an empty result as *zero*, which is the one thing it never means. Nothing
-here summarizes, thresholds, or re-derives; each tool renders the same string the CLI
-prints, from the same composer.
+**The surface is now two tools, and that is a floor, not a trend.** It was nine, then
+five (USAGE-ONLY took `matrix`/`budget`/`roi`/`verdict` with the money subsystem, ADR
+0011), and SURFACE-CUT took `report`/`attrib`/`adoption`/`compare` with the ledger
+rollup and the task-comparison family. What survives is the one read no other surface
+answers and the one write the whole ladder depends on.
+
+**Whatever a tool returns crosses this boundary verbatim.** A refusal or a caveat is
+relayed unsmoothed, because a tool that returns silence where the CLI would have
+explained itself is worse than no tool — an agent reads an empty result as *zero*,
+which is the one thing it never means. Nothing here summarizes, thresholds, or
+re-derives; each tool renders the same string the CLI prints, from the same composer.
 
 **`cage_task_outcome` is the ONLY write tool in the entire ladder** — L0…L3 included.
-It exists because every starved surface (`compare`, `estimate`, `calibration`, the net
-saving) is starved for one reason: nobody closes tasks. Do **not** add a second write
-tool by analogy with it; the read/write asymmetry here is the design, not an oversight.
+Do **not** add a second write tool by analogy with it; the read/write asymmetry here is
+the design, not an oversight.
 """
 from __future__ import annotations
 
@@ -31,48 +30,15 @@ import json
 import sys
 from pathlib import Path
 
-from cage import (__version__, attribution, paths, policy, provenance, report)
+from cage import __version__, paths, policy, provenance
 
 PROTOCOL = "2024-11-05"
 
-# `format: "csv"` on the view tools returns the same CSV the CLI's --csv emits
-# (one shared data structure per view feeds both renderers), so an extension-hosted
-# agent with no shell can still hand the user a spreadsheet-ready artifact.
-_FORMAT = {"type": "string", "enum": ["text", "csv"], "default": "text",
-           "description": "text = the rendered table · csv = the flat reporting "
-                          "CSV (method tags stay columns)"}
-
 TOOLS = [
-    {"name": "cage_report",
-     "description": "Ledger rollup: LLM spend by route / model / day / agent.",
-     "inputSchema": {"type": "object", "properties": {
-         "by": {"type": "string", "default": "route"}, "since": {"type": "string"},
-         "format": _FORMAT}}},
-    {"name": "cage_attrib",
-     "description": "Per-tool marginal token savings for a task (the attribution table).",
-     "inputSchema": {"type": "object", "properties": {"task": {"type": "string"},
-                                                      "format": _FORMAT}}},
-    {"name": "cage_adoption",
-     "description": "Do the agents actually invoke the wired tools? Invocation counts + "
-                    "outcomes, and per-agent attribution where it is derivable. Counts "
-                    "only — never priced.",
-     "inputSchema": {"type": "object", "properties": {"since": {"type": "string"},
-                                                      "format": _FORMAT}}},
     {"name": "cage_why",
      "description": "Full provenance for one call id: the call + every receipt against it.",
      "inputSchema": {"type": "object", "required": ["call_id"],
                      "properties": {"call_id": {"type": "string"}}}},
-    {"name": "cage_compare",
-     "description": "Observational usage comparison between tool stacks over closed "
-                    "tasks, in tokens. "
-                    "Group totals are measured; the delta is always 'estimated' and "
-                    "carries an observational caveat (the groups were not randomized). "
-                    "A group with too few tasks is BLOCKED with its own n — relay that "
-                    "refusal verbatim rather than comparing the numbers anyway.",
-     "inputSchema": {"type": "object", "properties": {
-         "by": {"type": "string", "default": "stack",
-                "description": "comma-separated: stack, scope, label"},
-         "scope": {"type": "string"}, "label": {"type": "string"}, "format": _FORMAT}}},
     # ── the one write tool in the whole ladder — see the module docstring ──────
     {"name": "cage_task_outcome",
      "description": "Close a task as ok or redo (optionally with a one-token label). "
@@ -105,12 +71,6 @@ def _pol(root: Path) -> dict:
     return policy.load(paths.Footprint(root).policy)
 
 
-def _latest_task(root: Path) -> str | None:
-    from cage import ledger
-    tasks = [c.get("task") for c in ledger.calls(root) if c.get("task")]
-    return tasks[-1] if tasks else None
-
-
 def _call(name: str, args: dict) -> tuple[str, dict | None]:
     root = _root()
     # Capture-on-read (capture-architecture Phase 1): the MCP read tools are the
@@ -120,34 +80,9 @@ def _call(name: str, args: dict) -> tuple[str, dict | None]:
     # JSON-RPC protocol. Throttled + gated + fail-open inside `ensure_captured`.
     from cage import importcmd
     summary = importcmd.ensure_captured(root)
-    as_csv = args.get("format") == "csv"  # same structure feeds both renderers
-    if name == "cage_report":
-        rep = report.summarize(root, _pol(root), dim=args.get("by", "route"),
-                               since=args.get("since"))
-        text = report.render_csv(rep) if as_csv else report.render_report(rep)
-    elif name == "cage_attrib":
-        task = args.get("task") or _latest_task(root)
-        data = attribution.attribute(root, task, _pol(root))
-        text = attribution.render_csv(data) if as_csv else attribution.render_attrib(data)
-    elif name == "cage_adoption":
-        from cage import adoption
-        data = adoption.summarize(root, since=args.get("since"))
-        text = adoption.render_csv(data) if as_csv else adoption.render_adoption(data)
-    elif name == "cage_why":
+    if name == "cage_why":
         cid = args["call_id"]
         text = provenance.render_why(provenance.explain(root, cid), cid)
-    elif name == "cage_compare":
-        from cage import compare
-        by = tuple(k.strip() for k in (args.get("by") or "stack").split(",") if k.strip())
-        bad = [k for k in by if k not in ("stack", "scope", "label")]
-        if bad:
-            raise ValueError(f"unknown by key(s) {bad}; choose from stack, scope, label")
-        data = compare.summarize(root, _pol(root), by=by, scope=args.get("scope"),
-                                 label=args.get("label"))
-        # The MIN_COMPARE_N block is *inside* this structure (per-group `reason`), so it
-        # survives into both renderings — CSV included, where a blocked group keeps its
-        # row rather than vanishing into an apparently-complete table.
-        text = compare.render_csv(data) if as_csv else compare.render_compare(data)
     elif name == "cage_task_outcome":
         # The ONLY write tool cage exposes (module docstring). It goes through the same
         # `clicmds.close_task` the CLI verb uses — same label guard, same append-only

@@ -58,7 +58,7 @@ def test_both_present_warns_once_on_stderr_stdout_unchanged(proj, monkeypatch, c
     (base / "cage.toml").write_text("[budgets]\ndaily_usd = 5.0\n", encoding="utf-8")
     (base / "policy.toml").write_text("[budgets]\ndaily_usd = 9.0\n", encoding="utf-8")
     monkeypatch.chdir(proj)
-    assert cli.main(["report"]) == 0
+    assert cli.main(["insights", "chats"]) == 0
     cap = capsys.readouterr()
     assert "policy.toml is ignored" in cap.err and "cage.toml takes precedence" in cap.err
     assert "policy.toml" not in cap.out  # the warning is stderr-only — stdout stays clean

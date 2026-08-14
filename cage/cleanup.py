@@ -34,7 +34,9 @@ Two paths, and since v0.37 they are no longer symmetric:
   enabled, further by `policy.cleanup_warn` (env `CAGE_CLEANUP_WARN`). Entirely
   fail-open: an error is debug-logged under ``cleanup.prune`` and never blocks
   capture.
-- **manual** (`cage data cleanup`, dry-run print by default, ``--apply`` to execute)
+- **manual** — REMOVED in SURFACE-CUT (v0.52) with the whole `cage data` group.
+  There is no manual pruning verb any more; `run_cli` below is kept as the
+  library entry a future verb would call, and nothing invokes it today.
   is the only path that ever deletes, and runs regardless of `cleanup_enabled` —
   an explicitly-typed command is always honored, never silently ignored because a
   switch happens to be off.
@@ -233,14 +235,15 @@ def _reminder_line(items: list[dict], window: int) -> str:
     total_bytes = sum(i.get("bytes", 0) for i in items)
     return (f"cage: {len(items)} state/ item(s) older than {window}d "
             f"(~{total_bytes / 1024:.0f} KB reclaimable) — "
-            f"`cage data cleanup` to review, `--apply` to prune.")
+            f"no command prunes them since v0.52 — delete by hand if you "
+            f"want the space back.")
 
 
 def maybe_run(root: Path, pol: dict) -> None:
     """The auto path, piggybacked on `cage import`/read sweeps (cage installs no
     scheduler): a cheap staleness check (one stat on the throttle stamp), then —
     since v0.37 — a **warning, never a deletion**. Deletion is unrecoverable; only
-    an explicit `cage data cleanup --apply` performs it. Silent when nothing is
+    an explicit prune performs it (no CLI verb ships one since v0.52). Silent when nothing is
     eligible; keeps reminding every throttle interval while something is. Gated by
     `policy.cleanup_enabled` (auto path off entirely) and, when enabled, by
     `policy.cleanup_warn` (the reminder specifically). Never raises — capture must
@@ -267,7 +270,9 @@ def maybe_run(root: Path, pol: dict) -> None:
 
 def run_cli(root: Path, pol: dict, apply: bool = False,
             days: int | None = None) -> tuple[dict, str]:
-    """`cage data cleanup` — dry-run table by default (house pattern), ``--apply``
+    """The manual-prune renderer. **No CLI verb reaches this since SURFACE-CUT
+    (v0.52)** — it is kept intact, and tested, as the entry point a restored verb would
+    call. Dry-run table by default (house pattern), ``--apply``
     executes. ``(payload, text)`` for the emit helper. Runs regardless of
     `policy.cleanup_enabled` — that switch gates only the *automatic* reminder
     (`maybe_run`); a command the user typed is always honored, never silently
@@ -286,7 +291,7 @@ def run_cli(root: Path, pol: dict, apply: bool = False,
     lines += [f"  {i['cls']:<15} {i['action']:<8} age {i['age_days']:>6.1f}d  "
               f"{Path(i['path']).name}  — {i['detail']}" for i in items]
     if not apply:
-        lines += ["", "dry-run (house pattern) — `cage data cleanup --apply` to execute."]
+        lines += ["", "dry-run (house pattern) — pass apply=True to execute."]
         return payload, "\n".join(lines)
     counts = prune(root, pol, days, items=items)
     payload["applied"] = counts

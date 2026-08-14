@@ -1,4 +1,0 @@
-3,037,823 tokens  ·  gross saved 311,340 tok  ·  6 calls   (all time)
-  drill:  cage report --by agent   ·   cage insights why <call>   ·   cage insights attrib --task <t>
-· saved is GROSS — avoided read cost; it excludes the cost of USING the tool
-  (the invoking turn, the injected context). `cage query gross-vs-net`

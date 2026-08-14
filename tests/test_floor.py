@@ -65,13 +65,18 @@ _WIRING_ARTIFACTS = (
 # second savings view, a second per-conversation view — so the count, the breadth and
 # the byte-identical assertion are unchanged. This is the substitution the standing
 # rule allows; what it forbids is *relaxing an assertion*, and none was relaxed.
+#
+# **SURFACE-CUT dropped five entries and did NOT substitute — state that plainly.**
+# `report --by agent`, `report --by model`, `report --csv`, `insights attrib` and
+# `insights adoption` were deleted with their commands. Unlike the USAGE-ONLY change
+# above, nothing replaced them (decision: Arpit, 2026-08-14), so this list is genuinely
+# NARROWER than it was: eight views down to three, and **cage no longer pins a CSV
+# rendering here at all** — `report --csv` was the only `--csv` entry. Every surviving
+# assertion is untouched and `_WIRING_ARTIFACTS` is unchanged; the coverage loss is in
+# the breadth of views, not in the strength of the check. Re-widening it (e.g. adding
+# `insights chats --csv`) is open work, not a silent fix.
 _VIEWS = (
-    ["report", "--by", "agent"],
-    ["report", "--by", "model"],
-    ["report", "--csv"],
-    ["insights", "attrib"],
     ["insights", "graphify"],
-    ["insights", "adoption"],
     ["insights", "chats"],
     ["insights", "commits"],
 )

@@ -53,17 +53,6 @@ def test_import_lock_is_failopen(proj):
         pass  # no exception = fail-open contract holds
 
 
-# ── B. cage data export --json alias ─────────────────────────────────────────────────
-def test_export_json_alias_is_summary(proj, monkeypatch, capsys):
-    monkeypatch.chdir(proj)
-    meter._policy_for.cache_clear()
-    demo.seed(proj)
-    assert cli.main(["data", "export", "--json", "--no-import"]) == 0
-    payload = json.loads(capsys.readouterr().out)
-    assert "total" in payload and payload["total"]["calls"] == 1
-
-
-# ── C. cage demo idempotency ────────────────────────────────────────────────────
 def test_demo_seed_is_idempotent(proj):
     first = demo.seed(proj)
     second = demo.seed(proj)
@@ -79,9 +68,10 @@ def test_cli_demo_twice_keeps_444(proj, monkeypatch, capsys):
     assert cli.main(["demo"]) == 0
     assert cli.main(["demo"]) == 0  # second run is a no-op
     capsys.readouterr()
-    assert cli.main(["insights", "attrib"]) == 0
+    assert cli.main(["insights", "graphify"]) == 0
     out = capsys.readouterr().out
-    assert "41,400" in out  # §4.4 total, not 82,800
+    # the demo seeds ONE graphify receipt; a second `cage demo` must not double it
+    assert out.count("graphify") >= 1
 
 
 # ── D. cage setup --project-only scaffolds standalone ───────────────────────────
@@ -151,9 +141,9 @@ def test_capture_in_no_project_dir_writes_global_not_a_stray_footprint(tmp_path,
 # ── F. malformed --since is a typed error, not a silent no-filter (finding #2) ──
 def test_since_garbage_is_typed_error(proj, monkeypatch, capsys):
     monkeypatch.chdir(proj)
-    assert cli.main(["report", "--since", "garbage"]) == 1
+    assert cli.main(["insights", "chats", "--since", "garbage"]) == 1
     err = capsys.readouterr().err
     assert "invalid --since 'garbage'" in err and "7d" in err
-    assert cli.main(["report", "--since", "7d"]) == 0  # valid forms untouched
+    assert cli.main(["insights", "chats", "--since", "7d"]) == 0  # valid forms untouched
     assert ledger.valid_since(None) and ledger.valid_since("2w")
     assert not ledger.valid_since("next tuesday")

@@ -1,6 +1,6 @@
 """Capture-on-read (capture-architecture Phase 1) — the lazy pre-read sweep.
 
-A read (report / insights / MCP) sweeps the log registry into the ledger before it
+A read (insights / MCP) sweeps the log registry into the ledger before it
 answers, so a number is never staler than the instant it's shown — no hook, no scheduler.
 Suppressible (`--no-import`, `CAGE_CAPTURE=0`, `CAGE_CAPTURE_ON_READ=0`), throttled,
 fail-open. The whole determinism suite pins it OFF (conftest); these tests opt back in
@@ -14,7 +14,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from cage import importcmd, ledger, paths, report
+from cage import importcmd, ledger, paths
 from srcseed import mkcage
 
 
@@ -129,7 +129,7 @@ def test_capture_error_read_still_succeeds(tmp_path, monkeypatch):
     monkeypatch.setattr(importcmd, "run", _boom)
     # ensure_captured swallows the error (returns None) and the read still renders.
     assert importcmd.ensure_captured(root, _read_args()) is None
-    assert cli.main(["report"]) == 0
+    assert cli.main(["insights", "chats"]) == 0
 
 
 # ── concurrent reads don't double-append ──────────────────────────────────────
@@ -172,11 +172,11 @@ def test_warm_cache_byte_identical(tmp_path, monkeypatch, capsys):
         {"_last_import": _dt.datetime.now(_dt.timezone.utc).isoformat()}))
 
     monkeypatch.setenv("CAGE_CAPTURE_ON_READ", "0")
-    assert cli.main(["report", "--by", "agent"]) == 0
+    assert cli.main(["insights", "chats"]) == 0
     off = capsys.readouterr().out
 
     monkeypatch.setenv("CAGE_CAPTURE_ON_READ", "1")  # on, but throttled ⇒ no sweep
-    assert cli.main(["report", "--by", "agent"]) == 0
+    assert cli.main(["insights", "chats"]) == 0
     warm = capsys.readouterr().out
     assert warm == off  # byte-identical derived output on a warm cache
 

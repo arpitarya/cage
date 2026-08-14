@@ -10,7 +10,7 @@ scheduler by design) · **Surface:** pull-based capture freshness
 ## Status now
 
 OPEN, and by design a user-action item, not a cage defect: cage installs no OS
-scheduler ([ADR 0002](../../docs/adr/0002-universal-capture-global-ledger-explicit-import-export.md)),
+scheduler ([ADR 0002](../archive/adr/0002-universal-capture-global-ledger-explicit-import-export.md)),
 so keeping the ledger fresh is the user's own cron/`schtasks` line or a foreground
 `cage data watch`.
 

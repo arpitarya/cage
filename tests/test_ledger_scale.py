@@ -15,8 +15,7 @@ import contextlib
 
 import pytest
 
-from cage import (attribution, ledger, ledgersync, mergeutil, paths, policy,
-                  report, schema, tasks)
+from cage import (chats, ledger, mergeutil, paths, policy, schema, tasks)
 
 
 def _git_init(root):
@@ -96,19 +95,6 @@ def test_scope_round_trips_and_serializes(proj):
     assert json.loads(json.dumps(row))["scope"] == "billing"
 
 
-def test_scope_filter_and_absent_flag_byte_identity(proj):
-    for sc, tin in (("billing", 100), ("auth", 300), ("", 50)):
-        ledger.append_row(proj, "calls", schema.make_call(route="chat", provider="anthropic",
-            model="claude-sonnet-4-6", tokens_in=tin, tokens_out=1, scope=sc,
-            ts="2026-06-10T00:00:00Z"))
-    pol = _pol(proj)
-    billing = report.summarize(proj, pol, scope="billing")
-    assert billing["total"]["calls"] == 1 and billing["total"]["tokens_in"] == 100
-    # absent flag (None) == today's whole-ledger output, byte-for-byte
-    assert report.render_report(report.summarize(proj, pol)) == \
-           report.render_report(report.summarize(proj, pol, scope=None))
-
-
 def _commit_tracked(root, *rel):
     for r in rel:
         p = root / r
@@ -153,50 +139,6 @@ def test_union_by_id_collision_callback():
 def test_union_by_id_drops_idless_rows():
     assert mergeutil.union_by_id([{"id": "a"}], [{"no": "id"}]) == [{"id": "a"}]
 
-
-def test_ledger_sync_dry_run_does_not_write(proj, monkeypatch):
-    _git_init(proj)
-    ledger.append_row(proj, "calls", _call("2026-06-01T00:00:00Z"))
-    monkeypatch.delenv("CAGE_NOTES_WRITE", raising=False)
-    res = ledgersync.sync(proj)  # default dry-run
-    assert res["wrote"] is False and res["rows"] == 1
-    listed = subprocess.run(("git", "-C", str(proj), "notes", "--ref=refs/notes/cage-ledger", "list"),
-                            capture_output=True, text=True)
-    assert listed.stdout.strip() == ""  # nothing pushed
-
-
-def test_ledger_sync_writes_under_env(proj):
-    _git_init(proj)
-    ledger.append_row(proj, "calls", _call("2026-06-01T00:00:00Z"))
-    ledger.append_row(proj, "receipts", schema.make_receipt(tool="graphify",
-        raw_alternative=1000, actual=200, ts="2026-06-01T00:00:00Z"))
-    res = ledgersync.sync(proj, write=True)
-    assert res["wrote"] is True and res["rows"] == 2
-    team = ledgersync.read_team(proj)
-    assert len(team["calls"]) == 1 and len(team["receipts"]) == 1
-
-
-def test_team_read_falls_back_to_local_when_ref_empty(proj):
-    _git_init(proj)
-    ledger.append_row(proj, "calls", _call("2026-06-01T00:00:00Z", task="T", scope=""))
-    assert ledgersync.read_team(proj) is None  # no ref yet
-    rep = report.summarize(proj, _pol(proj), dim="task", team=True)  # degrades to local
-    assert rep["total"]["calls"] == 1
-
-
-def test_team_read_uses_merged_ref(proj):
-    _git_init(proj)
-    ledger.append_row(proj, "calls", _call("2026-06-01T00:00:00Z", task="T"))
-    ledgersync.sync(proj, write=True)
-    # drop the local shard: --team must still see the row from the ref
-    for p in paths.Footprint(proj).ledger.glob("calls-*.jsonl"):
-        p.unlink()
-    assert report.summarize(proj, _pol(proj), dim="task")["total"]["calls"] == 0
-    assert report.summarize(proj, _pol(proj), dim="task", team=True)["total"]["calls"] == 1
-    assert attribution.attribute(proj, "T", _pol(proj), team=True) is not None
-
-
-# ── (d) ledger-size warning ─────────────────────────────────────────────────────
 
 def _read_capturing(root):
     err, out = io.StringIO(), io.StringIO()
@@ -262,6 +204,18 @@ def test_same_ledger_same_tables(proj):
     for sc, ts in (("billing", "2026-05-01T00:00:00Z"), ("auth", "2026-06-01T00:00:00Z")):
         ledger.append_row(proj, "calls", _call(ts, scope=sc, task="T"))
     pol = _pol(proj)
-    a = report.render_report(report.summarize(proj, pol, dim="task"))
-    b = report.render_report(report.summarize(proj, pol, dim="task"))
-    assert a == b  # same ledger + policy ⇒ byte-identical
+    # `report --by task` was the original subject; SURFACE-CUT deleted it, and `chats`
+    # is a live derived view over the same partitioned ledger. The law under test — same
+    # ledger + same policy ⇒ byte-identical table — is unchanged.
+    a = chats.render_chats(chats.summarize(proj, pol))
+    b = chats.render_chats(chats.summarize(proj, pol))
+    assert a == b
+
+# ── The TEAM half of §3.6 is gone (SURFACE-CUT, 2026-08-14) ──────────────────
+# Four tests pinned `ledgersync`: the dry-run default, the CAGE_NOTES_WRITE=1 push, and
+# the two `read_team` paths. `cage authorship ledger-sync` and `ledgersync.py` were
+# deleted with the `--team` readers (`report --team` / `attrib --team` were the only
+# ones, so the ref could be written and never displayed). **§3.6's other halves survive
+# and are still pinned above**: month-partitioning, `--since` shard skipping, and the
+# `--scope` monorepo filter. `mergeutil.union_by_id` also survives — `notessync`
+# (provenance) still merges by row id through it, which is why its tests stay here.

@@ -15,8 +15,8 @@ import json
 from types import SimpleNamespace
 
 from conftest import metric_twin
-from cage import (clicmds, exportcmd, importcmd, initcmd, ledger, paths, policy,
-                  report, transcript, watchcmd)
+from cage import (chats, clicmds, importcmd, initcmd, ledger, paths, policy,
+                  transcript)
 from srcseed import mkcage
 
 
@@ -66,7 +66,7 @@ def test_ledger_flag_sets_cage_base(tmp_path, monkeypatch):
     from cage import cli
     monkeypatch.delenv("CAGE_BASE", raising=False)
     store = tmp_path / "mystore"
-    cli.main(["--ledger", str(store), "report"])  # read-only; just exercises wiring
+    cli.main(["--ledger", str(store), "insights", "chats"])  # read-only; exercises wiring
     import os
     assert os.environ.get("CAGE_BASE") == str(store)
 
@@ -99,9 +99,13 @@ def test_report_reads_global_ledger_for_no_project_user(tmp_path, monkeypatch, c
     tp.write_text(_claude_line("u1", 100, 50) + "\n", encoding="utf-8")
     clicmds.cmd_import(_imp_args(agent="claude", path=str(tp)))
     capsys.readouterr()
-    assert clicmds.cmd_report(SimpleNamespace(by="agent", since=None, scope=None,
-                                              project=None, team=False, json=False)) == 0
-    assert "claude-code" in capsys.readouterr().out  # the global spend shows up
+    # `cmd_report` was the original reader; SURFACE-CUT deleted it, so this asserts the
+    # same thing through a surviving derived view — a no-project user reads the GLOBAL
+    # ledger, which is the resolution rule under test.
+    assert clicmds.cmd_chats(SimpleNamespace(
+        since=None, agent=None, all=False, json=False, csv=None, no_import=True,
+        export=None, stamp=False, quiet=False, why_ledger=False)) == 0
+    assert "claude" in capsys.readouterr().out  # the global usage shows up
 
 
 # ── the additive `project` field ──────────────────────────────────────────────
@@ -126,25 +130,6 @@ def test_project_absent_for_copilot_and_kiro(tmp_path):
     assert all(r["project"] == "" for r in transcript.parse_copilot_calls(cop, session="x"))
     assert all(r["project"] == "" for r in transcript.parse_kiro_calls(krow))
 
-
-def test_report_project_filter(tmp_path, monkeypatch):
-    root = tmp_path / "proj"
-    (root / ".cage").mkdir(parents=True)
-    monkeypatch.chdir(root)
-    from cage import schema
-    for i, (proj, tin) in enumerate((("alpha", 100), ("beta", 200), ("alpha", 300))):
-        _row = schema.make_call(
-            route="chat", provider="anthropic", model="claude-opus-4-8",
-            tokens_in=tin, tokens_out=10, agent="claude-code", project=proj,
-            session=f"s{i}", ts="2026-06-01T12:00:00Z")
-        ledger.append_row(root, "calls", _row)
-        metric_twin(root, _row)   # claude has a spine; `spend()` reads the twin
-    rep = report.summarize(root, policy.load(None), dim="project", project="alpha")
-    assert set(rep["groups"]) == {"alpha"}
-    assert rep["total"]["calls"] == 2 and rep["total"]["tokens_in"] == 400
-
-
-# ── incremental file-stat cursor ──────────────────────────────────────────────
 
 def test_cursor_skips_unchanged_files(tmp_path, monkeypatch):
     root = mkcage(tmp_path / "proj")  # `--path` needs a materialized `path_globs`
@@ -190,114 +175,6 @@ def _export_args(**kw):
     return SimpleNamespace(**base)
 
 
-def test_export_jsonl_is_valid_and_lossless(tmp_path, monkeypatch, capsys):
-    root = tmp_path / "proj"
-    (root / ".cage").mkdir(parents=True)
-    _seed(root)
-    exportcmd.run(root, _export_args(format="jsonl"), pol=policy.load(None))
-    out = capsys.readouterr().out
-    rows = [json.loads(l) for l in out.splitlines() if l.strip()]
-    assert len(rows) == 2 and all("tokens_in" in r and "project" in r for r in rows)
-
-
-def test_export_csv_has_header_and_rows(tmp_path, capsys):
-    root = tmp_path / "proj"
-    (root / ".cage").mkdir(parents=True)
-    _seed(root)
-    exportcmd.run(root, _export_args(format="csv"), pol=policy.load(None))
-    out = capsys.readouterr().out
-    reader = list(csv.DictReader(io.StringIO(out)))
-    assert len(reader) == 2 and reader[0]["agent"] == "claude-code"
-
-
-def test_export_empty_ledger_is_valid_artifact(tmp_path, capsys):
-    root = tmp_path / "proj"
-    (root / ".cage").mkdir(parents=True)
-    exportcmd.run(root, _export_args(format="csv"), pol=policy.load(None))
-    out = capsys.readouterr().out
-    assert out.splitlines()[0].startswith("id,ts,session")  # header-only, not a crash
-    exportcmd.run(root, _export_args(format="json"), pol=policy.load(None))
-    assert json.loads(capsys.readouterr().out)["total"]["calls"] == 0
-
-
-def test_export_json_summary_totals_match_report(tmp_path, capsys):
-    root = tmp_path / "proj"
-    (root / ".cage").mkdir(parents=True)
-    _seed(root)
-    pol = policy.load(None)
-    exportcmd.run(root, _export_args(format="json"), pol=pol)
-    summary = json.loads(capsys.readouterr().out)
-    rep = report.summarize(root, pol, dim="agent")
-    assert summary["total"]["calls"] == rep["total"]["calls"]
-    assert summary["total"]["tokens_in"] == rep["total"]["tokens_in"]
-    assert summary["total"]["tokens_out"] == rep["total"]["tokens_out"]
-
-
-def test_export_filters(tmp_path, capsys):
-    root = tmp_path / "proj"
-    (root / ".cage").mkdir(parents=True)
-    _seed(root)
-    exportcmd.run(root, _export_args(format="jsonl", agent="copilot"), pol=policy.load(None))
-    rows = [json.loads(l) for l in capsys.readouterr().out.splitlines() if l.strip()]
-    assert len(rows) == 1 and rows[0]["agent"] == "copilot"
-    exportcmd.run(root, _export_args(format="jsonl", project="alpha"), pol=policy.load(None))
-    rows = [json.loads(l) for l in capsys.readouterr().out.splitlines() if l.strip()]
-    assert len(rows) == 1 and rows[0]["project"] == "alpha"
-
-
-def test_export_no_import_leaves_ledger_unchanged(tmp_path, monkeypatch, capsys):
-    root = tmp_path / "proj"
-    (root / ".cage").mkdir(parents=True)
-    _isolate_agent_homes(tmp_path, monkeypatch)
-    _seed(root)
-    before = b"".join(p.read_bytes() for p in paths.Footprint(root).shards("calls"))
-    exportcmd.run(root, _export_args(format="jsonl", do_import=False), pol=policy.load(None))
-    after = b"".join(p.read_bytes() for p in paths.Footprint(root).shards("calls"))
-    assert after == before  # --no-import never refreshes
-
-
-def test_export_default_imports_first_and_announces(tmp_path, monkeypatch, capsys):
-    root = tmp_path / "proj"
-    (root / ".cage").mkdir(parents=True)
-    monkeypatch.chdir(root)
-    _isolate_agent_homes(tmp_path, monkeypatch)  # default import sweeps empty homes → 0 new
-    exportcmd.run(root, _export_args(format="jsonl", do_import=True), pol=policy.load(None))
-    err = capsys.readouterr().err
-    assert "↻ imported" in err  # the refresh side effect is always visible (on stderr)
-
-
-def test_export_to_file(tmp_path, capsys):
-    root = tmp_path / "proj"
-    (root / ".cage").mkdir(parents=True)
-    _seed(root)
-    out = tmp_path / "spend.jsonl"
-    exportcmd.run(root, _export_args(format="jsonl", output=str(out)), pol=policy.load(None))
-    assert out.exists() and len(out.read_text().splitlines()) == 2
-    assert "wrote 2 call(s)" in capsys.readouterr().err  # status to stderr, file to disk
-
-
-# ── cage data watch ────────────────────────────────────────────────────────────────
-
-def test_watch_runs_one_cycle_then_clean_exit(tmp_path, monkeypatch, capsys):
-    root = tmp_path / "proj"
-    (root / ".cage").mkdir(parents=True)
-    cycles = []
-    monkeypatch.setattr(watchcmd.importcmd, "run",
-                        lambda r, a, args: cycles.append(a) or ["✔ stub"])
-
-    def _interrupt(_secs):
-        raise KeyboardInterrupt
-
-    monkeypatch.setattr(watchcmd.time, "sleep", _interrupt)
-    rc = watchcmd.run(root, SimpleNamespace(agent="all", interval=1, since=None))
-    assert rc == 130                       # Ctrl-C → the CLI interrupt code, no traceback
-    assert cycles == ["all"]               # exactly one import cycle before the interrupt
-    out = capsys.readouterr().out
-    assert "stopped" in out and "No OS job" in out
-
-
-# ── malformed policy fail-open on capture ─────────────────────────────────────
-
 def test_capture_failopen_on_malformed_policy(tmp_path, monkeypatch, capsys):
     root = tmp_path / "proj"
     (root / ".cage").mkdir(parents=True)
@@ -318,3 +195,13 @@ def test_capture_failopen_on_malformed_policy(tmp_path, monkeypatch, capsys):
     assert len(ledger.calls(root)) == 0
     assert "no `path_globs` declared for claude" in out
     assert "cage setup --sync-sources" in out
+
+# ── `cage data export` and `--project` lost their surfaces (SURFACE-CUT) ──────
+# Nine export/watch cases and `test_report_project_filter` went with their commands.
+# **The CAPTURE half all of them depended on is untouched and still pinned above**:
+# ledger resolution precedence, the no-project global landing, the file-stat cursor, and
+# the `project` stamping rules (claude from the cwd basename, empty for copilot/kiro).
+# What is gone is every DERIVED reader of `project` — `cage report --project` (plan
+# §3.7) was the only one, so the field is still recorded and no view groups by it.
+# `cage import --project` survives, but that is an import SCOPE, not a view.
+# Filed in work/OPEN-WORK.md.

@@ -13,7 +13,7 @@ import json
 from types import SimpleNamespace
 
 from cage import (agents, importcmd, ledger, paths, pathprobe, policy, policysync,
-                  report)
+                  chats)
 
 
 def _imp_args(agent="all", path=None, project=None, since=None):
@@ -173,9 +173,10 @@ def test_custom_tool_imports_and_stamps_agent_name(monkeypatch, tmp_path):
     assert rows and all(r["agent"] == "myrouter" for r in rows)  # stamped with the tool name
     assert any("myrouter (custom, format=claude)" in ln for ln in lines)
 
-    # reports split by the tool name.
-    rep = report.summarize(root, policy.load(paths.Footprint(root).policy), dim="agent")
-    assert "myrouter" in rep["groups"]
+    # the derived views split by the tool name (`report --by agent` was the original
+    # assertion; it died in SURFACE-CUT, and `chats` groups by agent just as well).
+    data = chats.summarize(root, policy.load(paths.Footprint(root).policy))
+    assert any(r["agent"] == "myrouter" for r in data["rows"])
 
 
 def test_custom_tool_cursor_incremental(monkeypatch, tmp_path):

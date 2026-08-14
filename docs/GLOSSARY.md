@@ -50,7 +50,7 @@ from one phrasing (`savings.GROSS_NOTE`) — **and cage reports no net at all**,
 **cost of use** — the tokens invoking a tool costs, as opposed to what it saves.
 **Cage does not compute it**, which is exactly why every `saved` is labelled GROSS.
 
-**net saved** — **removed in v0.51** ([ADR 0011](adr/0011-cage-measures-usage-not-cost.md)),
+**net saved** — **removed in v0.51** ([ADR 0011](../work/archive/adr/0011-cage-measures-usage-not-cost.md)),
 along with `netsaved.py` and the ±120s attributable-cost window it was built on. Netting
 required pricing every in-window call to a common unit — a dollar computation — and
 per-query netting was never computable at all, because a shim receipt carries a `task`
@@ -150,7 +150,7 @@ Additive/optional, never in an id.
 belong to the *machine* rather than to a project. Distinct from its older role as the
 project-less **fallback** sink: kiro's IDE rows land there even from inside a project,
 because their source has no project dimension to attribute by
-([ADR 0006](adr/0006-kiro-rows-are-machine-facts-not-project-facts.md)).
+([ADR 0006](../work/archive/adr/0006-kiro-rows-are-machine-facts-not-project-facts.md)).
 
 **routed leg** — the one place a single `cage import` sweep writes **two** ledgers: kiro's
 IDE rows to the machine ledger, everything else to the active sink. Fully contained in
@@ -161,12 +161,12 @@ no routing, which is what an explicit `--ledger`/`CAGE_BASE` produces.
 **the ledger notes refs** — `refs/notes/cage-ledger` (team ledger) and
 `refs/notes/cage-provenance` (authorship), each **CI-sole-writer**, merged by row id
 (`mergeutil.union_by_id`). A dev machine's sync defaults to a dry-run print. Why a
-git ref, not an external sink: [ADR 0001](adr/0001-ledger-team-aggregation-notes-not-external-sink.md).
+git ref, not an external sink: [ADR 0001](../work/archive/adr/0001-ledger-team-aggregation-notes-not-external-sink.md).
 
 **UNPRICED** — **gone in v0.51.** It named a call or receipt whose `(provider, model)`
 had no price row. With no price table there is no priced/unpriced distinction left to
 draw: every row reports the same kind of fact, a recorded count
-([ADR 0011](adr/0011-cage-measures-usage-not-cost.md)).
+([ADR 0011](../work/archive/adr/0011-cage-measures-usage-not-cost.md)).
 
 **capture-on-read** — a *read* (`report`/`insights *`/MCP read tools) triggers
 `ensure_captured` before rendering (throttled, fail-open, gated by policy), so a
@@ -213,7 +213,7 @@ Enumerated once in [paths.py](../cage/paths.py) (`GRAPHIFY_SHIMS`) so no read su
 can see only one.
 
 **shim contract** — the written behaviour spec both interceptor twins implement and are
-tested against ([docs/shim-contract.md](shim-contract.md)): behaviours **B1–B8**
+tested against ([docs/adr/0004_graphify.md](adr/0004_graphify.md)): behaviours **B1–B8**
 (binding on every twin) and divergences **D1–D7** (real and permanent — cmd has no
 `exec`, so the real binary runs as a child process). Two implementations of an unwritten
 contract drift; this is the written one, and the first artifact of the
@@ -336,7 +336,7 @@ vendor law, the other a missing file a future release can ship — and **never a
 **agent line** — an added line in a commit that exactly matches (after whitespace
 normalization, above `MIN_MATCH_CHARS`) a line the agent's transcript records it having
 *proposed*. Direct evidence. Read from the provenance row's `agent_lines`, never
-re-matched at render time. See [ADR 0008](adr/0008-line-match-authorship-counts-persisted-content-transient.md).
+re-matched at render time. See [ADR 0008](../work/archive/adr/0008-line-match-authorship-counts-persisted-content-transient.md).
 
 **human~** — an added line in a file **that session did propose** which matched no
 proposal: a real human tweak of agent work. A *residual*, so it is always `estimated`
@@ -394,7 +394,7 @@ pull every other repo's spend onto this repo's commits.
 pinned UTC literal partitioning derived spend by time: `calls` before it, metric ledgers
 after. It existed only to protect unrebuildable `calls` history, and that history is no
 longer wanted, so the boundary is gone with nothing in its place
-([ADR 0011](adr/0011-cage-measures-usage-not-cost.md)). Do not reintroduce a
+([ADR 0011](../work/archive/adr/0011-cage-measures-usage-not-cost.md)). Do not reintroduce a
 time-partitioned basis without reversing that ADR.
 
 **spend resolver** — `ledger.spend(root, since)`, the ONE function every derived view asks

@@ -4,11 +4,10 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from cage import (adoptcmd, agents, attribution, compare, demo, doctorcmd,
-                  explain, exportcmd, graphifymeter, importcmd, initcmd,
-                  ledger, ledgersync, mcpserver, metercmd, metering, notessync,
-                  origin, outcomes, paths, policy, provenance, proxy,
-                  render, report, serve, tasks, verifycmd, watchcmd)
+from cage import (adoptcmd, agents, chats, demo, doctorcmd, explain,
+                  importcmd, initcmd, ledger, mcpserver,
+                  notessync, origin, outcomes, paths, policy, provenance,
+                  render, tasks, verifycmd)
 from cage.cliutil import captured_read_root, csv_dest, emit, ledger_root, root
 from cage.constants import COMMITS_DEFAULT_ROWS
 from cage.errors import CageError
@@ -56,61 +55,6 @@ def _latest_task(r) -> str | None:
     return tasks[-1] if tasks else None
 
 
-def cmd_report(args) -> int:
-    from cage import display, policy
-    r = captured_read_root(args)
-    pol = _policy(r)
-    rep = report.summarize(r, pol, dim=args.by, since=args.since,
-                           scope=getattr(args, "scope", None),
-                           project=_project_filter(args),
-                           team=getattr(args, "team", False))
-
-    def text() -> str:
-        # G4: the graphify day-one repo ceiling (modeled) surfaces in the footer. Read
-        # here (I/O) so render_report stays pure; silent in non-graphify projects. Uses
-        # cwd's graphify-out/, not the ledger root — the graph describes the working
-        # project. **Lazy**: a plain `--csv` run never renders text, so it never pays
-        # for this read — and CSV still never sees the ceiling (G4).
-        from cage import graphifymodel
-        return report.render_report(
-            rep, last_import=importcmd.last_import(r), disp=display.resolve(args, pol),
-            stale_hours=policy.import_stale_hours(pol), health=importcmd.capture_health(r),
-            ceiling=graphifymodel.repo_ceiling(r),
-            kiro_route=report.kiro_routed_line(r, pol))
-
-    return emit(args, rep, text, csv=lambda: report.render_csv(rep), root=r)
-
-
-def cmd_overview(args) -> int:
-    """Bare `cage` — the one-look headline (§4; tokens by default, plan Phase 2.5).
-    No subcommand."""
-    from cage import display
-    r = captured_read_root(args)
-    pol = _policy(r)
-    o = report.overview(r, pol)
-    return emit(args, o, report.render_overview(
-        o, last_import=importcmd.last_import(r), disp=display.resolve(args, pol)))
-
-
-def cmd_attrib(args) -> int:
-    r = captured_read_root(args)
-    task = args.task or _latest_task(r)
-    data = attribution.attribute(r, task, _policy(r), scope=getattr(args, "scope", None),
-                                 team=getattr(args, "team", False))
-    return emit(args, data, attribution.render_attrib(data),
-                csv=lambda: attribution.render_csv(data), root=r)
-
-
-def cmd_adoption(args) -> int:
-    """`cage insights adoption` — counts only; no policy is loaded because nothing in
-    this view prices anything (the diagnostic-only invariant, `adoption.py`'s docstring)."""
-    from cage import adoption
-    r = captured_read_root(args)
-    data = adoption.summarize(r, since=args.since)
-    return emit(args, data, adoption.render_adoption(data),
-                csv=lambda: adoption.render_csv(data), root=r)
-
-
 def cmd_chats(args) -> int:
     """`cage insights chats` — per-chat detail view; local-only by construction (no
     `--team`, `chats.py`'s module docstring)."""
@@ -120,7 +64,7 @@ def cmd_chats(args) -> int:
     data = chats.summarize(r, pol, since=args.since, agent=getattr(args, "agent", None))
     return emit(args, data, chats.render_chats(
         data, disp=display.resolve(args, pol), show_all=getattr(args, "all", False),
-        kiro_route=report.kiro_routed_line(r, pol, verb="insights chats")),
+        kiro_route=chats.kiro_routed_line(r, pol, verb="insights chats")),
         csv=lambda: chats.render_csv(data), root=r)
 
 
@@ -135,7 +79,7 @@ def cmd_graphify_chats(args) -> int:
     return emit(args, data, graphifychat.render_view(
         data, show_all=getattr(args, "all", False),
         all_chats=getattr(args, "all_chats", False),
-        kiro_route=report.kiro_routed_line(r, pol, verb="insights graphify")),
+        kiro_route=chats.kiro_routed_line(r, pol, verb="insights graphify")),
         csv=lambda: graphifychat.render_csv(data), root=r)
 
 
@@ -189,10 +133,6 @@ def cmd_why(args) -> int:
     return emit(args, data, provenance.render_why(data, args.call_id), root=lr)
 
 
-def cmd_serve(args) -> int:
-    return serve.serve(ledger_root(), port=args.port)
-
-
 def cmd_query(args) -> int:
     """Explain how a value is calculated, or how cage itself works — deterministic,
     live numbers, $0 (no LLM)."""
@@ -229,7 +169,7 @@ def cmd_demo(_args) -> int:
     call_id = demo.seed(root)
     verb = "already seeded" if already else "Seeded"
     print(f"✔ {verb} the §4.4 worked example (task {demo.TASK!r}, call {call_id}).")
-    print("  Now run:  cage insights attrib   ·   cage report")
+    print("  Now run:  cage insights chats   ·   cage insights graphify")
     return 0
 
 
@@ -319,46 +259,6 @@ def _newest_task(known: dict) -> str:
     return max(known.items(), key=lambda kv: (kv[1].get("ts", ""), kv[0]))[0]
 
 
-def cmd_compare(args) -> int:
-    r = captured_read_root(args)
-    by = tuple(k.strip() for k in (args.by or "stack").split(",") if k.strip())
-    bad = [k for k in by if k not in ("stack", "scope", "label")]
-    if bad:
-        raise CageError(f"unknown --by key(s) {bad}; choose from stack, scope, label")
-    d = compare.summarize(r, _policy(r), by=by, scope=args.scope, label=args.label)
-    return emit(args, render.envelope("compare", d) if args.json else d,
-                compare.render_compare(d), csv=lambda: compare.render_csv(d), root=r)
-
-
-def cmd_estimate(args) -> int:
-    from cage import estimate
-    r = captured_read_root(args)
-    d = estimate.band(r, _policy(r), scope=args.scope, label=args.label, agent=args.agent)
-    recorded = ""
-    if args.record:
-        if not d["ok"]:
-            raise CageError(f"cannot record: {d['reason']}")
-        if tasks.read(r).get(args.record, {}).get("outcome"):
-            # A retroactive estimate is exactly what calibration must never count.
-            raise CageError(f"task {args.record!r} is already closed — "
-                            "record estimates before the task runs")
-        if not estimate.record(r, args.record, d):  # fail-open write; surface at CLI
-            raise CageError("estimate could not be written (ledger not writable?)")
-        recorded = args.record
-    payload = {**d, **({"recorded": recorded} if recorded else {})}
-    return emit(args, render.envelope("estimate", payload) if args.json else payload,
-                estimate.render_estimate(d, recorded), root=r)
-
-
-def cmd_calibration(args) -> int:
-    from cage import calibration
-    r = captured_read_root(args)
-    d = calibration.summarize(r, _policy(r))
-    return emit(args, render.envelope("calibration", d) if args.json else d,
-                calibration.render_calibration(d),
-                csv=lambda: calibration.render_csv(d), root=r)
-
-
 def cmd_policy(args) -> int:
     """`cage policy <diff|sync>` (plan §3.10) — upgrade the resolved root's
     project policy.toml to the installed bundle; dry-run by default, never
@@ -369,23 +269,57 @@ def cmd_policy(args) -> int:
     return emit(args, render.envelope("policy", payload) if args.json else payload, text)
 
 
-def cmd_cleanup(args) -> int:
-    """`cage data cleanup` — dry-run print by default (house pattern), --apply prunes."""
-    from cage import cleanup
-    r = ledger_root()
-    payload, text = cleanup.run_cli(r, _policy(r), apply=args.apply,
-                                    days=getattr(args, "days", None))
-    return emit(args, render.envelope("cleanup", payload) if args.json else payload, text)
+class _StudyImportArgs:
+    """The minimal arg shape `importcmd.run` reads for the pre-bundle refresh sweep.
+    Always all-agent — a bundle that omits an agent is not a fleet sample."""
+    path = None
+    project = None
+    agent = "all"
+
+    def __init__(self, since: str | None):
+        self.since = since
 
 
-def cmd_migrate_savings(args) -> int:
-    """`cage data migrate-savings` — consolidate historical graphify receipts into the
-    savings tree, precisely (plan §3). Dry-run print by default (house pattern), --apply
-    copies; refuses to apply on a reconciliation conflict."""
-    from cage import migratecmd
-    r = ledger_root()
-    payload, text = migratecmd.run_cli(r, do_apply=args.apply)
-    return emit(args, render.envelope("migrate-savings", payload) if args.json else payload, text)
+def _study_sweep(root: Path, since: str | None) -> tuple[bool, int]:
+    """The all-agent import refresh the bundle runs before writing, so a machine that
+    never ran an explicit `cage import` (capture is pull-based) still ships a complete
+    artifact. **Fail-open**: a failed sweep is warned to stderr and the bundle is written
+    from the pre-sweep ledger — a broken parser must never block a fleet participant from
+    sending their data. (`importcmd.run` honors the capture switch itself: `CAGE_CAPTURE=0`
+    / `[capture] enabled=false` ⇒ the sweep is a no-op.)
+
+    Rehomed from the deleted `exportcmd.sweep` in SURFACE-CUT — the bundle was its only
+    surviving caller."""
+    import sys
+    try:
+        before = len(ledger.calls(root))
+        importcmd.run(root, "all", _StudyImportArgs(since))
+        added = len(ledger.calls(root)) - before
+        print(f"↻ imported {added} new call(s)", file=sys.stderr)
+        return True, added
+    except Exception:  # noqa: BLE001 — fail-open: bundle what the ledger already holds
+        print("cage study export: import refresh failed — bundling the ledger as-is.",
+              file=sys.stderr)
+        return False, 0
+
+
+def _study_export(r, args) -> int:
+    """`cage study export` — the one-file fleet bundle (plan §4.9), rows + phase markers
+    + a counts-only manifest. The bundle stays **jsonl**: it is the one export that is
+    also an *import* source (`cage import bundle*.zip`), which is why it never grew the
+    csv/otel flags that the deleted `cage data export` carried."""
+    from cage import study
+    pol = _policy(r)
+    refresh = {"ran": False, "new_calls": 0}
+    if getattr(args, "do_import", True) and policy.import_before_export(pol):
+        ran, added = _study_sweep(r, getattr(args, "since", None))
+        refresh = {"ran": ran, "new_calls": added}
+    out = study.export_bundle(r, getattr(args, "out", "") or None, refresh=refresh)
+    tag = (f"self-refreshed: +{refresh['new_calls']} call(s)" if refresh["ran"]
+           else "snapshot only (no sweep)")
+    print(f"✔ study bundle written: {out} (rows + phase markers + counts-only "
+          f"manifest · {tag})")
+    return 0
 
 
 def cmd_study(args) -> int:
@@ -413,6 +347,8 @@ def cmd_study(args) -> int:
         study.stop(r)
         print("✔ phase stopped — rows after this marker are unphased until the next start")
         return 0
+    if args.action == "export":
+        return _study_export(r, args)
     if args.action == "report":
         d = study.summarize(r, _policy(r))
         # Through the ONE chokepoint. The hand-rolled `csv_dest` branch this replaced is
@@ -436,18 +372,6 @@ def cmd_study(args) -> int:
     print(f"\n{glyph[res['status']]} doctor: {res['status']} — automate capture with your "
           f"own scheduler line, e.g.:  {render.scheduler_hint()}   (cage installs no scheduler)")
     return 1 if res["status"] == "fail" else 0
-
-
-def cmd_proxy(args) -> int:
-    return proxy.serve(root(), port=args.port, upstream=args.upstream)
-
-
-def cmd_meter(args) -> int:
-    return metercmd.run(root(), args.argv, upstream=args.upstream)
-
-
-def cmd_graphify(args) -> int:
-    return graphifymeter.run(root(), args.argv, task=args.task)
 
 
 def cmd_mcp(_args) -> int:
@@ -505,7 +429,7 @@ def cmd_setup(args) -> int:
         print(f"  policy   → {info['policy']}")
         print(f"  prices   → {info['prices']}")
         print(f"  ledger   → {info['ledger']}/  (append-only)")
-        print("Capture into it from anywhere: `cage import` · read it: `cage report`.")
+        print("Capture into it from anywhere: `cage import` · read it: `cage insights chats`.")
         return 0
 
     # Handle --sync-sources: refresh the cage-managed [sources] block (Directive A) and
@@ -642,7 +566,8 @@ def cmd_setup(args) -> int:
         else:
             for surface, where in agents.install(here, (agent,), hooks=_hooks(args), skills=_skills(args)).items():
                 print(f"  ✔ {surface:<8} → {', '.join(where.values())}")
-    print("\nDone. Verify with `cage doctor`; capture with `cage import`; then `cage report`.")
+    print("\nDone. Verify with `cage doctor`; capture with `cage import`; then "
+          "`cage insights chats`.")
     return 0
 
 
@@ -729,23 +654,6 @@ def cmd_notes_sync(args) -> int:
         print("  Set CAGE_NOTES_WRITE=1 (CI) or pass --write to actually push notes.")
     return 0
 
-
-def cmd_ledger_sync(args) -> int:
-    """Merge the local ledger buffer into refs/notes/cage-ledger (§3.6.3). Dry-run by
-    default — mirrors `cage authorship notes-sync`; CI (`CAGE_NOTES_WRITE=1`) is the sole writer."""
-    res = ledgersync.sync(root(), write=True if args.write else None)
-    if getattr(args, "json", False):
-        import json
-        print(json.dumps(res))
-        return 0
-    if res["wrote"]:
-        print(f"✔ wrote {res['rows']} row(s) to refs/notes/cage-ledger.")
-    else:
-        print(f"· dry-run — {res['rows']} merged call/receipt row(s) ready for the team ref.")
-        print("  Set CAGE_NOTES_WRITE=1 (CI) or pass --write to actually push notes.")
-    return 0
-
-
 def cmd_origin(args) -> int:
     r = root()
     if args.attest:
@@ -805,35 +713,3 @@ def cmd_import_claude(args) -> int:
         print(line)
     print(f"✔ imported {n} Claude call(s) from {m} transcript(s).")
     return 0
-
-
-def cmd_export(args) -> int:
-    """Import-first (unless ``--no-import``) then emit the active ledger as jsonl/csv/json
-    (counts-never-content, deterministic). The universal pull-based export path.
-    ``--study`` writes the one-file fleet bundle instead (plan §4.9)."""
-    r = ledger_root()
-    pol = _policy(r)
-    if getattr(args, "study", None) is not None:
-        if getattr(args, "csv_kind", None) or getattr(args, "format", None) or getattr(args, "otel", False):
-            # Two export kinds, never blurred: the bundle is lossless jsonl by
-            # design; CSV/OTel are one-way reporting formats and never an import source.
-            raise CageError("--study writes the jsonl fleet bundle — it cannot "
-                            "combine with --csv/--format/--otel (`cage query csv-output`)")
-        from cage import study
-        refresh = {"ran": False, "new_calls": 0}
-        if getattr(args, "do_import", True) and policy.import_before_export(pol):
-            ran, added = exportcmd.sweep(r, getattr(args, "since", None))
-            refresh = {"ran": ran, "new_calls": added}
-        out = study.export_bundle(r, args.study or None, refresh=refresh)
-        tag = (f"self-refreshed: +{refresh['new_calls']} call(s)" if refresh["ran"]
-               else "snapshot only (no sweep)")
-        print(f"✔ study bundle written: {out} (rows + phase markers + counts-only "
-              f"manifest · {tag})")
-        return 0
-    args.project = _project_filter(args)
-    return exportcmd.run(r, args, pol=pol)
-
-
-def cmd_watch(args) -> int:
-    """Foreground poll loop — import every interval until Ctrl-C. Registers no OS job."""
-    return watchcmd.run(ledger_root(), args)

@@ -9,7 +9,7 @@ from cage import paths
 
 def root() -> Path:
     """The **project** root (nearest `.cage/`) or the cwd — for scaffold/wiring/git
-    commands (`init`, `setup`, `doctor`, `origin`, `notes-sync`, `verify`, `ledger-sync`)
+    commands (`init`, `setup`, `doctor`, `origin`, `notes-sync`, `verify`)
     that act on *this directory's* project, never the global ledger."""
     return paths.find_project_root() or Path.cwd()
 
@@ -60,7 +60,7 @@ def captured_read_root(args) -> Path:
 
 def _resolve(v):
     """A renderer passed as a string, or as a zero-arg callable so an expensive render
-    is only paid for when it is actually emitted (`cage report`'s footer does I/O)."""
+    is only paid for when it is actually emitted (a view's footer can do I/O)."""
     return v() if callable(v) else v
 
 

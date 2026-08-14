@@ -15,7 +15,7 @@ Three standing laws frame everything below:
   is never rewritten. Change the config, re-read, get new tables.
 - **Counts, never conversions.** Cage records tokens and credits and reports them in
   those units. It ships no rate card, computes no currency, and converts between no two
-  units in either direction ([ADR 0011](adr/0011-cage-measures-usage-not-cost.md)).
+  units in either direction ([ADR 0011](../work/archive/adr/0011-cage-measures-usage-not-cost.md)).
 - **Determinism.** No clocks or randomness in any formula here. Same ledger +
   same policy ⇒ same output, byte for byte.
 
@@ -28,7 +28,7 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
 **Cage computes no money.** The whole of what was §1 (per-call cost, the credit
 pricing ladder, input-only counterfactual cost, budget, forecast, cost drift,
 quality-adjusted cost, the two kiro cost sections) was deleted with the money
-subsystem — USAGE-ONLY, [ADR 0011](adr/0011-cage-measures-usage-not-cost.md). There is
+subsystem — USAGE-ONLY, [ADR 0011](../work/archive/adr/0011-cage-measures-usage-not-cost.md). There is
 no rate card, no price table and no dollar on any surface.
 
 What replaces it is not a formula. It is a **read**:
@@ -176,7 +176,7 @@ actual          = toks(GRAPH_REPORT.md read)
   outcomes to score yet. The footnote says so; the figure is not tuned by intuition.
 - Deduped per `(session, file, graph-mtime bucket)` — one per read, not per line.
 
-### 2.9 graphify receipt id + cross-route dedupe — deterministic ([ADR 0005](adr/0005-graphify-receipt-ids-session-inclusive-cross-route-deferral.md))
+### 2.9 graphify receipt id + cross-route dedupe — deterministic ([ADR 0005](../work/archive/adr/0005-graphify-receipt-ids-session-inclusive-cross-route-deferral.md))
 
 ```
 id = "s_" + sha1(session | op | args_hash | answer_hash)          # graphifymeter.receipt_id
@@ -365,7 +365,7 @@ spec'd elsewhere.
 - **The filter is blamed only when the filter is the reason.** `No chats match agent
   'kiro' — the filter is empty, not the ledger` is true about the filter and misleading
   about kiro-IDE, whose absence is structural (IDE rows routed to the machine ledger,
-  [ADR 0006](adr/0006-kiro-rows-are-machine-facts-not-project-facts.md)). Kiro-CLI used
+  [ADR 0006](../work/archive/adr/0006-kiro-rows-are-machine-facts-not-project-facts.md)). Kiro-CLI used
   to carry a second structural reason (credits rows produced no chat at all); CHATS-
   CREDITS removed it by giving those rows a real chat row, so the only structural
   reason left is the IDE-routing one. The empty view names the reasons it can evidence,
@@ -380,7 +380,7 @@ spec'd elsewhere.
 
 `cage insights commits` / `commit <sha>` / `cage authorship summary`
 ([commitview.py](../cage/commitview.py), [linematch.py](../cage/linematch.py),
-[ADR 0008](adr/0008-line-match-authorship-counts-persisted-content-transient.md)).
+[ADR 0008](../work/archive/adr/0008-line-match-authorship-counts-persisted-content-transient.md)).
 **No USD, no rate, no valuation appears on any of these surfaces** — the standing guard
 from the v0.36 removal, and it is structural: `commitview.py` imports no pricing module
 (asserted in `tests/test_commitview.py`).

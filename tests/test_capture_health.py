@@ -1,12 +1,12 @@
 """Capture health — make silent zero-capture loud (docs/capture-health).
 
-When an agent is installed but its log source matched nothing, `cage report`/`cage
+When an agent is installed but its log source matched nothing, `cage
 doctor` say so instead of printing confident totals from the agents that still work.
 The warning is triple-gated so it can never become a false-positive nag: it fires for
 an agent only when **home exists AND 0 files matched AND the agent has never captured
 a row**. Clause 3 makes it self-silencing.
 
-The gate logic (`report.capture_warnings`) is a pure function of the recorded
+The gate logic (`doctorcmd.capture_warnings`) is a pure function of the recorded
 `_health`, so most gates are asserted directly on it; the recording path
 (`importcmd.run` → `cursors.json["_health"]`) is asserted end-to-end for the traps
 (copilot two-source, kiro file-source, disabled-by-policy, self-heal, cleanup, fail-open).
@@ -21,7 +21,7 @@ from types import SimpleNamespace
 LEDGER_TS = "2026-06-01T12:00:00Z"
 
 from conftest import metric_twin
-from cage import (agents, cleanup, importcmd, ledger, paths, policy, report,
+from cage import (agents, cleanup, doctorcmd, importcmd, ledger, paths, policy,
                   schema)
 from srcseed import mkcage
 
@@ -60,7 +60,7 @@ def _copilot_log(root):
     (d / "events.jsonl").write_text(line + "\n", encoding="utf-8")
 
 
-# ── the triple gate, asserted purely on report.capture_warnings ────────────────
+# ── the triple gate, asserted purely on doctorcmd.capture_warnings ────────────────
 
 def _rec(home=True, files=0, captured=False):
     return {"home": home, "home_path": "~/.copilot", "src": "~/.copilot/session-state",
@@ -68,7 +68,7 @@ def _rec(home=True, files=0, captured=False):
 
 
 def test_all_three_true_yields_exactly_one_warning():
-    warns = report.capture_warnings({"copilot": _rec()})
+    warns = doctorcmd.capture_warnings({"copilot": _rec()})
     assert len(warns) == 1
     assert "⚠ copilot: ~/.copilot exists but ~/.copilot/session-state matched 0 files" in warns[0]
     assert "cage doctor --paths" in warns[0]                         # runnable fix
@@ -76,27 +76,27 @@ def test_all_three_true_yields_exactly_one_warning():
 
 
 def test_gate1_home_absent_suppresses():
-    assert report.capture_warnings({"copilot": _rec(home=False)}) == []
+    assert doctorcmd.capture_warnings({"copilot": _rec(home=False)}) == []
 
 
 def test_gate2_files_found_suppresses():
-    assert report.capture_warnings({"copilot": _rec(files=3)}) == []
+    assert doctorcmd.capture_warnings({"copilot": _rec(files=3)}) == []
 
 
 def test_gate3_captured_suppresses():
-    assert report.capture_warnings({"copilot": _rec(captured=True)}) == []
+    assert doctorcmd.capture_warnings({"copilot": _rec(captured=True)}) == []
 
 
 def test_no_health_record_is_silent():
-    assert report.capture_warnings(None) == []
-    assert report.capture_warnings({}) == []
+    assert doctorcmd.capture_warnings(None) == []
+    assert doctorcmd.capture_warnings({}) == []
 
 
 def test_warnings_are_in_surfaces_order():
     recs = {a: _rec() for a in reversed(agents.SURFACES)}
     for a, r in recs.items():
         r["home_path"], r["src"] = f"~/.{a}", f"~/.{a}/x"
-    warns = report.capture_warnings(recs)
+    warns = doctorcmd.capture_warnings(recs)
     named = [w.split(":")[0].removeprefix("⚠ ").strip() for w in warns]
     assert named == list(agents.SURFACES)  # rendered in SURFACES order regardless of input
 
@@ -109,7 +109,7 @@ def test_installed_but_empty_agent_records_a_gated_record(tmp_path, monkeypatch)
     _imp(root)
     rec = _health(root)["copilot"]
     assert rec["home"] is True and rec["files"] == 0 and rec["captured"] is False
-    assert report.capture_warnings(_health(root))       # → warns
+    assert doctorcmd.capture_warnings(_health(root))       # → warns
 
 
 def test_self_silencing_a_prior_row_clears_the_warning(tmp_path, monkeypatch):
@@ -122,7 +122,7 @@ def test_self_silencing_a_prior_row_clears_the_warning(tmp_path, monkeypatch):
                                    ts=LEDGER_TS))
     _imp(root)
     assert _health(root)["copilot"]["captured"] is True
-    assert report.capture_warnings(_health(root)) == []  # never nags an agent with rows
+    assert doctorcmd.capture_warnings(_health(root)) == []  # never nags an agent with rows
 
 
 def test_first_ever_import_marks_the_agent_captured_same_run(tmp_path, monkeypatch):
@@ -138,18 +138,18 @@ def test_first_ever_import_marks_the_agent_captured_same_run(tmp_path, monkeypat
     _imp(root)                                           # copilot's first-ever capture
     rec = _health(root)["copilot"]
     assert rec["files"] > 0 and rec["captured"] is True  # captured in THIS run, not the next
-    assert report.capture_warnings(_health(root)) == []  # so doctor/report never nag
+    assert doctorcmd.capture_warnings(_health(root)) == []  # so doctor/report never nag
 
 
 def test_self_healing_files_reappear_clears_the_warning(tmp_path, monkeypatch):
     root = _isolate(tmp_path, monkeypatch)
     paths.copilot_home().mkdir(parents=True)
     _imp(root)
-    assert report.capture_warnings(_health(root))        # warns: 0 files
+    assert doctorcmd.capture_warnings(_health(root))        # warns: 0 files
     _copilot_log(root)                                   # fix the path (plant a log)
     _imp(root)
     assert _health(root)["copilot"]["files"] > 0
-    assert report.capture_warnings(_health(root)) == []  # cleared, no other action
+    assert doctorcmd.capture_warnings(_health(root)) == []  # cleared, no other action
 
 
 def test_disabled_by_policy_is_silent(tmp_path, monkeypatch):
@@ -163,7 +163,7 @@ def test_disabled_by_policy_is_silent(tmp_path, monkeypatch):
         encoding="utf-8")
     _imp(root)
     assert "copilot" not in _health(root)                # no source ⇒ never swept ⇒ no warn
-    assert report.capture_warnings(_health(root)) == []
+    assert doctorcmd.capture_warnings(_health(root)) == []
 
 
 def test_copilot_cli_only_with_files_is_silent(tmp_path, monkeypatch):
@@ -177,7 +177,7 @@ def test_copilot_cli_only_with_files_is_silent(tmp_path, monkeypatch):
         encoding="utf-8")
     _imp(root)
     assert _health(root)["copilot"]["files"] > 0         # CLI source matched
-    assert report.capture_warnings(_health(root)) == []  # silent despite no VS Code dir
+    assert doctorcmd.capture_warnings(_health(root)) == []  # silent despite no VS Code dir
 
 
 def test_kiro_present_but_empty_is_silent_not_broken(tmp_path, monkeypatch):
@@ -193,7 +193,7 @@ def test_kiro_present_but_empty_is_silent_not_broken(tmp_path, monkeypatch):
     _imp(root)
     gh = _health(paths.global_home())
     assert gh["kiro"]["files"] == 1                      # the file counts as matched
-    assert report.capture_warnings(gh) == []             # so kiro never warns
+    assert doctorcmd.capture_warnings(gh) == []             # so kiro never warns
 
 
 def test_routed_kiro_leaves_no_health_record_in_the_project(tmp_path, monkeypatch):
@@ -214,7 +214,7 @@ def test_routed_kiro_leaves_no_health_record_in_the_project(tmp_path, monkeypatc
     _imp(root)
     cur = json.loads(foot.cursors.read_text(encoding="utf-8"))
     assert "kiro" not in cur["_health"] and "kiro" not in cur
-    assert report.capture_warnings(_health(root)) == []
+    assert doctorcmd.capture_warnings(_health(root)) == []
 
 
 def test_single_agent_import_does_not_erase_other_agents_health(tmp_path, monkeypatch):
@@ -267,51 +267,10 @@ def test_health_write_failure_does_not_break_import(tmp_path, monkeypatch):
 
 # ── purity, table byte-identity, CSV cleanliness ──────────────────────────────
 
-def test_render_report_is_pure_of_the_filesystem(tmp_path, monkeypatch):
-    root = _isolate(tmp_path, monkeypatch)
-    _row = schema.make_call(route="r", provider="anthropic",
-                            model="claude-sonnet-4-6", agent="claude",
-                            tokens_in=1000, tokens_out=100, session="s",
-                            ts=LEDGER_TS)
-    ledger.append(paths.Footprint(root).calls, _row)
-    metric_twin(root, _row)   # claude has a spine; `spend()` reads the twin (ADR 0011)
-    rep = report.summarize(root, policy.load(None), dim="agent")
-    H = {"copilot": _rec()}
-    a = report.render_report(rep, health=H)
-    # Deleting every home dir must not change the rendered output — render reads only `H`.
-    for env in _HOME_ENVS:
-        d = tmp_path / f"home-{env.lower()}"
-        if d.exists():
-            import shutil
-            shutil.rmtree(d)
-    b = report.render_report(rep, health=H)
-    assert a == b and "⚠ copilot" in a                   # identical, and the warning shows
-
-
-def test_table_is_byte_identical_with_and_without_a_warning(tmp_path, monkeypatch):
-    root = _isolate(tmp_path, monkeypatch)
-    _row = schema.make_call(route="r", provider="anthropic",
-                            model="claude-sonnet-4-6", agent="claude",
-                            tokens_in=1000, tokens_out=100, session="s",
-                            ts=LEDGER_TS)
-    ledger.append(paths.Footprint(root).calls, _row)
-    metric_twin(root, _row)   # claude has a spine; `spend()` reads the twin (ADR 0011)
-    rep = report.summarize(root, policy.load(None), dim="agent")
-    without = report.render_report(rep, health=None)
-    withw = report.render_report(rep, health={"copilot": _rec()})
-    # The title + table block (everything before the footer) is untouched by the warning.
-    assert without.split("\n\n")[:2] == withw.split("\n\n")[:2]
-    assert "⚠ copilot" in withw and "⚠ copilot" not in without
-
-
-def test_csv_never_carries_the_warning(tmp_path, monkeypatch):
-    root = _isolate(tmp_path, monkeypatch)
-    _row = schema.make_call(route="r", provider="anthropic",
-                            model="claude-sonnet-4-6", agent="claude",
-                            tokens_in=1000, tokens_out=100, session="s",
-                            ts=LEDGER_TS)
-    ledger.append(paths.Footprint(root).calls, _row)
-    metric_twin(root, _row)   # claude has a spine; `spend()` reads the twin (ADR 0011)
-    rep = report.summarize(root, policy.load(None), dim="agent")
-    csv = report.render_csv(rep)                          # render_csv takes no health
-    assert "⚠" not in csv and "capture is off" not in csv
+# ── The RENDER-side assertions went with `cage report` (SURFACE-CUT, 2026-08-14) ──
+# Three tests here pinned `report.render_report`: that it is pure of the filesystem,
+# that the table block is byte-identical with and without a warning, and that `--csv`
+# never carries the ⚠. All three were properties of the deleted report renderer.
+# **The gate itself is still fully tested above** — `doctorcmd.capture_warnings` is a
+# pure function of the passed `_health` record, and every clause of the triple gate has
+# its own case. `cage doctor` is now the sole renderer of these warnings.

@@ -6,7 +6,7 @@
 > not, fux vs. not, cache vs. not…), and turns the raw stream into an
 > **attribution ledger** — what each agent used, what each tool saved you, and who
 > wrote which commit. `$0`, stdlib-only, deterministic, and independent of any single
-> AI tool. **Usage, never cost** (v0.51, [ADR 0011](adr/0011-cage-measures-usage-not-cost.md)).
+> AI tool. **Usage, never cost** (v0.51, [ADR 0011](../work/archive/adr/0011-cage-measures-usage-not-cost.md)).
 
 Status: **the design of record — and substantially BUILT.** This document defines the
 category, the substrate, the attribution engine, and the build order. It was written at
@@ -27,7 +27,7 @@ actually built; [OPEN-WORK.md](../work/OPEN-WORK.md) is what is left.
 > describes a subsystem that **no longer exists** — read it as history. The `spend
 > cutover` of §3.14 is retired with it (`ledger.spend` partitions by *agent*, not time).
 > The durable decision, with its alternatives and veto condition, is
-> [ADR 0011](adr/0011-cage-measures-usage-not-cost.md); the sections most affected are
+> [ADR 0011](../work/archive/adr/0011-cage-measures-usage-not-cost.md); the sections most affected are
 > **§3.1, §3.3, §3.14, §4.4, §4.5, §6, §7 and all of §8**.
 
 > **v0.36 note — the hookless rebuild.** Cage's capture is now **pull-based**
@@ -371,7 +371,7 @@ all attestations, methods are in the closed enum) that **always exits 0** — a
 hard constraint, never wired as a CI gate.
 
 **Capture (v2 — the line-match pass).** Provenance is written by the **import
-sweep**, not by a hook ([ADR 0008](adr/0008-line-match-authorship-counts-persisted-content-transient.md)).
+sweep**, not by a hook ([ADR 0008](../work/archive/adr/0008-line-match-authorship-counts-persisted-content-transient.md)).
 The `hooked` method is legacy-only: the hookless rebuild removed the `PostToolUse` /
 `post-commit` / `prepare-commit-msg` machinery, and for a while nothing replaced it —
 `transcript.parse_provenance` and `originrecord.record_transcript` sat with **zero
@@ -763,7 +763,7 @@ strict field whitelist and never touch the body fields at all, transiently or ot
 
 **Capture-only in its FIRST build only — superseded by §3.14.** Since v0.50 this
 kind is the source of derived spend from `constants.SPEND_CUTOVER` onwards
-([ADR 0010](adr/0010-metric-ledgers-are-the-spend-source-forward-only-cutover.md)).
+([ADR 0010](../work/archive/adr/0010-metric-ledgers-are-the-spend-source-forward-only-cutover.md)).
 The paragraph below is the original shipping stance, kept because it explains why the
 kind was built separately from `calls` — but it no longer describes today's reads.
 
@@ -823,7 +823,7 @@ and the metrics parser call). The IDE parser SELECTs four explicit columns only,
 
 **Capture-only in its FIRST build only — superseded by §3.14.** Since v0.50 this
 kind is the source of derived spend from `constants.SPEND_CUTOVER` onwards
-([ADR 0010](adr/0010-metric-ledgers-are-the-spend-source-forward-only-cutover.md)).
+([ADR 0010](../work/archive/adr/0010-metric-ledgers-are-the-spend-source-forward-only-cutover.md)).
 The paragraph below is the original shipping stance, kept because it explains why the
 kind was built separately from `calls` — but it no longer describes today's reads.
 
@@ -885,7 +885,7 @@ read — never `message.content`, `summary` titles, user rows' text, or
 
 **Capture-only in its FIRST build only — superseded by §3.14.** Since v0.50 this
 kind is the source of derived spend from `constants.SPEND_CUTOVER` onwards
-([ADR 0010](adr/0010-metric-ledgers-are-the-spend-source-forward-only-cutover.md)).
+([ADR 0010](../work/archive/adr/0010-metric-ledgers-are-the-spend-source-forward-only-cutover.md)).
 The paragraph below is the original shipping stance, kept because it explains why the
 kind was built separately from `calls` — but it no longer describes today's reads.
 
@@ -902,7 +902,7 @@ fix for CLAUDE-DEDUP/CLAUDE-SUBAGENT-KEY, which this kind deliberately does not 
 
 **Status: built, v0.50 (unreleased), 2026-08-14.** §3.11–3.13's three kinds are no longer
 capture-only: they are the **source of derived spend** from a pinned instant onwards.
-Design of record: [ADR 0010](adr/0010-metric-ledgers-are-the-spend-source-forward-only-cutover.md).
+Design of record: [ADR 0010](../work/archive/adr/0010-metric-ledgers-are-the-spend-source-forward-only-cutover.md).
 
 - **`constants.SPEND_CUTOVER = "2026-08-14T00:00:00Z"`** — a **literal**, never `now()`.
   A computed cutover would make yesterday's report irreproducible tomorrow.
@@ -1169,7 +1169,7 @@ scanning files). Five landed phases (GC0–GC5), one follow-up (GC6/G1):
 - **GC2** — at `cage import`, detect graphify in **claude** transcripts: Bash
   `graphify query|explain` (reuses the shim counterfactual → `modeled`) and Reads of the
   report/wiki (a distinct, weaker `report-read` receipt, footnoted apart). §2.7–2.8 (FORMULAS).
-- **GC3** ([ADR 0005](adr/0005-graphify-receipt-ids-session-inclusive-cross-route-deferral.md))
+- **GC3** ([ADR 0005](../work/archive/adr/0005-graphify-receipt-ids-session-inclusive-cross-route-deferral.md))
   — deterministic session-inclusive ids + a content-key **deferral** so shim+transcript
   converge to one receipt while per-session attribution is preserved.
 - **GC4** — `cage doctor` graph-staleness (`graph.json` mtime vs HEAD).

@@ -73,127 +73,6 @@ def run(proj, monkeypatch, capsys):
 
 # ── §1 · cage report ──────────────────────────────────────────────────────────
 
-def test_R1_report_tokens_default(run):
-    go = run(seed.wmh)
-    seed.set_last_import(go.root, _now())
-    out = go("R1", ["report", "--by", "agent"])
-    assert "$0" not in out and "gross tok" in out  # no dollar figures by default
-    # Same reason as above: kiro contributes no spend rows, so its input-only caveat
-    # has no number to qualify and correctly does not render.
-    assert "kiro: input-only log" not in out
-
-
-
-
-
-
-
-
-def test_R5_report_empty(run):
-    go = run()
-    out = go("R5", ["report"])
-    assert "No calls recorded yet." in out
-    assert "cage import" in out and "cage doctor" in out
-
-
-def test_R6_report_stale_advice(run):
-    """The import-age advice — the one staleness signal that outlived the price file.
-
-    This test also pinned `bundled prices are N days old`; that signal went with the
-    price table (USAGE-ONLY, ADR 0011). What it was really guarding — advice renders
-    ONCE, at the bottom, never inline — is kept and now asserted on the surviving line."""
-    go = run(seed.stale)
-    out = go("R6", ["report", "--by", "agent"])
-    assert "last import: 3d ago" in out
-    assert out.count("last import:") == 1
-
-
-def test_R7_report_capture_health_warning(run):
-    # kiro is installed but its log matched nothing and it has never captured a row —
-    # the triple-gated "capture is off for this agent" ⚠ (docs/capture-health).
-    # spend_only seeds claude/copilot (not kiro), so the table renders and only kiro warns.
-    go = run(seed.spend_only)
-    seed.set_last_import(go.root, _now())
-    seed.set_capture_gap(go.root, "kiro")
-    out = go("R7", ["report", "--by", "agent"])
-    assert "⚠ kiro: ~/.kiro exists but ~/.kiro/sessions matched 0 files" in out
-    assert "[sources.kiro] replace=true, paths=[]" in out  # the runnable opt-out
-    assert "claude" in out and "kiro" not in out.splitlines()[3]  # kiro not a table row
-
-
-# ── §2 · insights surfaces (current verb names — Phase 3 regroups the doors) ──
-
-
-
-
-
-
-
-def test_I5_compare_groups_and_refusal(run):
-    go = run(seed.compare_estimate)
-    out = go("I5", ["insights", "compare", "--label", "docfix"])
-    assert "agent-only" in out and "graphify" in out
-    assert "insufficient data (n=2 < 5)" in out
-    assert "observed difference" in out  # the observational caveat renders
-
-
-def test_I6_estimate_band_and_refusal(run):
-    go = run(seed.compare_estimate)
-    out = go("I6a", ["insights", "estimate", "--label", "docfix"])
-    assert "median" in out and "IQR" in out
-    out = go("I6b", ["insights", "estimate", "--label", "refactor"])
-    assert "insufficient history" in out  # refuses with the gate named, exit 0
-
-
-
-
-
-
-
-
-def test_I9_adoption_both_halves(run):
-    go = run(seed.adoption_mixed)
-    out = go("I9a", ["insights", "adoption"])
-    a, b = out.index("A · invocations"), out.index("B · per-agent attribution")
-    assert a < b                                 # two halves, ordered, never blended
-    assert "claude" not in out[a:b]              # half A is agent-blind, by substrate
-    assert "coverage: 3 of 4 savings rows (75%)" in out
-    assert "cannot" in out and "which agent spawned it" in out
-    # one row is agent-unknown, so the STRONG claim is withheld: it could be theirs
-    assert "no savings row attributed to: copilot, kiro" in out
-    assert "NOT evidence they never invoked the tool" in out
-    assert "no evidence of invocation" not in out
-    assert "$" not in out                        # no currency, ever, in this view
-
-
-def test_I9_adoption_no_evidence(run):
-    # every savings row found an agent, so "no evidence of invocation" IS supportable —
-    # and is still stated as absence of evidence, never as proof of non-use.
-    go = run(seed.adoption_attributed)
-    out = go("I9d", ["insights", "adoption"])
-    assert "coverage: 2 of 2 savings rows (100%)" in out
-    assert "no evidence of invocation: copilot, kiro" in out
-    assert "not proof of non-use" in out
-
-
-def test_I9_adoption_half_b_refusal(run):
-    # every invocation came through the shim ⇒ nothing attributable. The half RENDERS
-    # its refusal rather than vanishing — suppressing it would make "cage cannot
-    # attribute these" read like "cage has no per-agent answer at all".
-    go = run(seed.adoption_shim_only)
-    out = go("I9b", ["insights", "adoption"])
-    assert "B · per-agent attribution" in out
-    assert "per-agent attribution unavailable" in out
-    assert "agent   tool" not in out             # and no empty table in its place
-
-
-def test_I9_adoption_empty(run):
-    go = run()
-    out = go("I9c", ["insights", "adoption"])
-    assert "No tool invocations and no savings receipts recorded yet." in out
-    assert "cage import" in out and "cage doctor" in out
-
-
 def test_I10_chats_titled(run):
     go = run(seed.chats_titled)
     out = go("I10a", ["insights", "chats"])
@@ -297,27 +176,15 @@ def test_P5_policy_diff(run, capsys):
 
 # ── overview (bare cage — handoff §10) ────────────────────────────────────────
 
-def test_O1_overview_tokens_default(run):
-    go = run(seed.wmh)
-    out = go("O1", [])
-    assert "tokens" in out and "spent" not in out
-    assert "$0" not in out  # no dollar figures on the token headline
-
-
-
-
-# ── the named negative-net law (plan Phase 2.2) ───────────────────────────────
-
-
-
-# ── determinism: goldens are stable under a double run ────────────────────────
-
 def test_goldens_deterministic_double_run(run, capsys):
+    """Same ledger + same policy ⇒ same table, twice (the determinism law). Rendered
+    through `insights chats` since SURFACE-CUT deleted `report`; the property under
+    test is the renderer's freedom from clocks/random, not the particular view."""
     go = run(seed.wmh)
     seed.set_last_import(go.root, _now())
-    assert cli.main(["report", "--by", "agent"]) == 0
+    assert cli.main(["insights", "chats"]) == 0
     a = capsys.readouterr().out
-    assert cli.main(["report", "--by", "agent"]) == 0
+    assert cli.main(["insights", "chats"]) == 0
     assert a == capsys.readouterr().out
 
 

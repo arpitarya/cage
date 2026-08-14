@@ -16,7 +16,7 @@ REGISTRY: tuple[Explanation, ...] = (
         "saved = raw_alternative − actual   (in the receipt's own unit — usually tokens)\n"
         "  GROSS: the tokens spent USING the tool — the invoking turn, the context a\n"
         "  hook injected — are NOT subtracted. `cage query gross-vs-net` explains.",
-        ("cage/savings.py", "cage/attribution.py", "cage/schema.py"),
+        ("cage/savings.py", "cage/graphifychat.py", "cage/schema.py"),
         "inherits the receipt's method — measured only if the tool truly measured it."),
     Explanation(
         "gross-vs-net", ("gross", "net", "cost-of-use", "net-saved", "attributable",
@@ -32,53 +32,9 @@ REGISTRY: tuple[Explanation, ...] = (
         "  per-query netting was never possible at all, because a shim receipt carries a\n"
         "  task but no call. Cage reports gross only, and says so, rather than reporting\n"
         "  a net it cannot substantiate.",
-        ("cage/savings.py", "cage/report.py", "cage/attribution.py"),
+        ("cage/savings.py", "cage/graphifychat.py", "cage/graphifytx.py"),
         "gross inherits the receipt's own method — modeled for a counterfactual, and\n"
         "  never upgraded to measured by being printed next to recorded tokens."),
-    Explanation(
-        "marginal-attribution", ("marginal", "attribution", "attribute", "attrib",
-                                 "per-tool", "fixed", "order", "overlap", "credit",
-                                 "pipeline"),
-        "how per-tool savings sum to the total with no double-count",
-        "walk tools in policy order ({order}); each receipt is its marginal saving\n"
-        "  given the tools upstream of it, so Σ(marginals) = total, no overlap.",
-        ("cage/attribution.py", "cage/matrix.py", "cage.toml [tools.order]"),
-        "per-row method = the least-trusted receipt for that tool (honest worst-case)."),
-    Explanation(
-        "compare-delta", ("compare", "comparison", "delta", "group", "grouped",
-                          "median", "iqr", "observational", "a/b", "ab",
-                          "baseline", "agent-only", "cheaper"),
-        "how `cage insights compare` contrasts closed-task groups by observed stack",
-        "group closed tasks by stack signature (joined receipt tools; task-id join,\n"
-        "  session-window fallback); per group report n · median · IQR of measured\n"
-        "  tokens; delta = median(stack) − median(agent-only), same non-stack\n"
-        "  keys. Groups below n = {min_compare_n} render a refusal, never a number.",
-        ("cage/compare.py", "cage/taskgroup.py", "cage/constants.py"),
-        "group totals are measured (recorded tokens); the delta\n"
-        "  is estimated — different tasks, nothing randomized, an observed difference\n"
-        "  and never a causal claim (the caveat renders on every output)."),
-    Explanation(
-        "estimate-band", ("estimate", "estimated-tokens", "band", "predict", "forecast-task",
-                          "pre-task", "upfront", "before", "how-much-will"),
-        "how `cage insights estimate` bands an unrun task's token use",
-        "band = median + IQR of measured totals over closed tasks matching the exact\n"
-        "  keys (scope / label / agent) — no similarity scoring, no ML. Below\n"
-        "  n = {min_estimate_n} matching tasks the command refuses. --record stamps\n"
-        "  est_tokens/est_n + the token band bounds onto the open task row.",
-        ("cage/estimate.py", "cage/taskgroup.py", "cage/constants.py"),
-        "modeled — history applied to a task that hasn't run is a reconstruction,\n"
-        "  never an invoice; its empirical confidence is `cage insights calibration`'s hit-rate."),
-    Explanation(
-        "calibration-hit-rate", ("calibration", "calibrate", "hit-rate", "hit", "landed",
-                                 "accuracy", "ratio", "in-band", "reliable"),
-        "how estimate reliability is measured after the fact",
-        "over closed tasks with recorded estimates: ratio = actual_tokens / est_tokens\n"
-        "  (median + IQR), and hit-rate = share of actuals inside the est band recorded\n"
-        "  at estimate time. Open / zero-actual / band-less tasks are skipped with a\n"
-        "  visible count.",
-        ("cage/calibration.py", "cage/estimate.py", "cage/taskgroup.py"),
-        "measured — an observed frequency of recorded estimates vs recorded actuals;\n"
-        "  this rate *is* the estimator's confidence level (it never self-reports one)."),
     Explanation(
         "study-pairing", ("study", "fleet", "machines", "laptops", "paired", "pairing",
                           "phase", "enrollment", "bundle", "week-over-week"),
@@ -113,7 +69,7 @@ REGISTRY: tuple[Explanation, ...] = (
         "the three provenance tags and their ranking",
         "trust rank: {trust}\n"
         "  measured = an actual invoice/run · modeled = reconstructed · estimated = a guess.",
-        ("cage/constants.py", "cage/schema.py", "cage/matrix.py"),
+        ("cage/constants.py", "cage/schema.py", "cage/savings.py"),
         "method is sacred — a projection never reads as measured (cage's core honesty rule)."),
     Explanation(
         "capture-troubleshooting",
@@ -122,7 +78,7 @@ REGISTRY: tuple[Explanation, ...] = (
          "windows", "location", "log-location"),
         "why is nothing being captured — the three-step diagnosis",
         "0. cage tells you first: when an agent's home exists but its log matched 0\n"
-        "     files and it has never captured a row, `cage report`/`cage doctor` print a\n"
+        "     files and it has never captured a row, `cage doctor` prints a\n"
         "     triple-gated ⚠ 'capture is off for this agent' (self-silencing — one row\n"
         "     and it never fires again; opt out an unused agent with [sources.<agent>]\n"
         "     replace=true, paths=[]). The verdict is recorded at import into\n"
@@ -141,7 +97,7 @@ REGISTRY: tuple[Explanation, ...] = (
         "  4. `cage doctor --bundle` — exports capture.log + debug.log (plus cursors,\n"
         "     versions, policy provenance) as one redacted archive to attach to a bug\n"
         "     report; the home prefix is rendered as `~`, contents are counts-never-content.",
-        ("cage/pathprobe.py", "cage/report.py", "cage/doctorbundle.py", "cage/capturelog.py"),
+        ("cage/pathprobe.py", "cage/doctorcmd.py", "cage/doctorbundle.py", "cage/capturelog.py"),
         "n/a — a diagnostic runbook, not a number.",
         kind="concept", plan_ref="§3.7"),
     Explanation(
@@ -249,7 +205,7 @@ REGISTRY: tuple[Explanation, ...] = (
         "  Fail-open: a capture error is traced, never blocks the read. Determinism holds —\n"
         "  it changes WHEN rows arrive, never how a number is computed; the golden/\n"
         "  determinism suites run with it off against a fixed ledger.",
-        ("cage/importcmd.py", "cage/paths.py", "cage/report.py"),
+        ("cage/importcmd.py", "cage/paths.py", "cage/chats.py"),
         "n/a — describes the capture trigger, not a number.",
         kind="concept", plan_ref="capture-architecture.plan.md §2, §3, §12"),
     Explanation(
@@ -287,30 +243,9 @@ REGISTRY: tuple[Explanation, ...] = (
         "  read) sweep the on-disk session logs — no hooks, so nothing depends on which\n"
         "  client wrote the log; re-imports dedupe by call id.\n"
         "  fail-open: a metering error is swallowed, never raised into the request path.",
-        ("cage/metering.py", "cage/proxy.py", "cage/transcript.py", "cage/mcpserver.py"),
+        ("cage/metering.py", "cage/transcript.py", "cage/importcmd.py", "cage/mcpserver.py"),
         "n/a — describes a mechanism, not a number.",
         kind="concept", plan_ref="§5"),
-    Explanation(
-        "attribution", ("differentiator", "shapley", "fixed-order"),
-        "why per-tool savings sum to the total with no overlap",
-        "tools are walked in one fixed policy order ({order}); each tool's marginal\n"
-        "  saving is computed given only the tools upstream of it, so the marginals\n"
-        "  sum exactly to the total — no double-count, no negotiation between tools.\n"
-        "  Shapley-style fair-division is deferred to an optional audit mode, not the\n"
-        "  default, because fixed-order is $0 and reproducible; Shapley is combinatorial.",
-        ("cage/attribution.py", "cage.toml [tools.order]"),
-        "n/a — describes the attribution mechanism, not a single number.",
-        kind="concept", plan_ref="§4.2"),
-    Explanation(
-        "matrix-concept", ("permutation", "counterfactual", "2^n", "every-cell"),
-        "the 2ⁿ what-would-each-stack-use table, and what's real in it",
-        "every on/off permutation of up to {max_tools} tools is enumerated, but only\n"
-        "  the cell matching what actually ran is method=measured — every other cell\n"
-        "  is a reconstruction (modeled, or estimated if it leans on an estimated\n"
-        "  receipt). A matrix cell is never an invoice.",
-        ("cage/matrix.py", "cage/constants.py"),
-        "n/a — describes the matrix's honesty rule, not a number.",
-        kind="concept", plan_ref="§4.4"),
     Explanation(
         "method-law", ("provenance", "invoice", "sacred", "honesty"),
         "the law behind the three provenance tags",
@@ -336,25 +271,6 @@ REGISTRY: tuple[Explanation, ...] = (
         "n/a — describes two receipt-filing strategies, not a number.",
         kind="concept", plan_ref="§4.5"),
     Explanation(
-        "migrate-savings", ("migrate-savings", "migrate", "migration", "consolidate",
-                            "union", "dedupe", "duplicate", "savings-tree"),
-        "how `cage data migrate-savings` moves graphify savings without changing a number",
-        "graphify savings used to land in the shared receipts.jsonl; they now belong in\n"
-        "  the savings/graphify/ tree. `cage data migrate-savings` (dry-run by default,\n"
-        "  --apply to execute) COPIES each historical tool=\"graphify\" receipt into the\n"
-        "  tree, keeping its ORIGINAL id and sharding by its OWN ts. receipts.jsonl is\n"
-        "  never rewritten (append-only law — the only ledger mutation is append).\n"
-        "  Precision is read-side: `ledger.receipts()` is an id-deduped UNION of both\n"
-        "  stores (tree wins on a duplicate id — ids carry the only entropy, so identity\n"
-        "  dedupe is exact). So a row now present in both stores counts exactly once: a\n"
-        "  re-run is a no-op, a half-completed migration still reads correct totals, and\n"
-        "  attrib/report/roi are byte-identical before and after. --apply refuses when the\n"
-        "  two stores disagree on a shared id's saved value — the totals can't reconcile,\n"
-        "  so it stops rather than guess. graphify only; human/fux stay in receipts.jsonl.",
-        ("cage/migratecmd.py", "cage/ledger.py", "cage/mergeutil.py"),
-        "n/a — describes why the migrated number stays exact, not a number.",
-        kind="concept", plan_ref="§3"),
-    Explanation(
         "kiro-routing", ("kiro", "kiro-ide", "kiro-cli", "machine-ledger", "double-count",
                          "why-no-kiro", "tokens-generated", "conversations-v2",
                          "machine-fact", "adr-0006", "credits-scope"),
@@ -378,7 +294,7 @@ REGISTRY: tuple[Explanation, ...] = (
         "  may ever be reported. Cage can never be more precise than its source.\n"
         "  Already-recorded rows are never rewritten (append-only): a project ledger that\n"
         "  collected duplicated kiro rows before v0.36 keeps them, and gains no new ones.",
-        ("cage/paths.py", "cage/importcmd.py", "cage/transcript.py", "cage/report.py"),
+        ("cage/paths.py", "cage/importcmd.py", "cage/transcript.py", "cage/chats.py"),
         "n/a — describes where rows are stored and what they can't say, not a number.",
         kind="concept", plan_ref="§3.7 · ADR 0006"),
     Explanation(
@@ -394,9 +310,9 @@ REGISTRY: tuple[Explanation, ...] = (
         "  included: calls no longer carry a turn gap, `minutes` is not a unit.\n"
         "  Legacy ledgers still read: a pre-0.36 `tool=\"human\"` receipt (or any\n"
         "  `unit=\"minutes\"` row) is EXCLUDED from every money view and counted in a\n"
-        "  footnote on `cage report` — never silently folded into a total, never\n"
+        "  footnote on `cage insights chats` — never silently folded into a total, never\n"
         "  priced. Rows are append-only and are never rewritten.",
-        ("cage/attribution.py", "cage/matrix.py", "cage/report.py"),
+        ("cage/commitview.py", "cage/origin.py", "cage/chats.py"),
         "n/a — describes the measurement axis, not a number.",
         kind="concept", plan_ref="§4.6"),
     Explanation(
@@ -406,7 +322,7 @@ REGISTRY: tuple[Explanation, ...] = (
         "  and no model call — the only inputs are the ledger rows and the policy file.\n"
         "  Same ledger + same policy ⇒ byte-identical output; ids carry the only entropy,\n"
         "  and only at write time.",
-        ("cage/ledger.py", "cage/attribution.py"),
+        ("cage/ledger.py", "cage/chats.py"),
         "n/a — describes a system invariant, not a number.",
         kind="concept", plan_ref="§1"),
     Explanation(
@@ -440,11 +356,12 @@ REGISTRY: tuple[Explanation, ...] = (
         "  concatenate, and --since skips whole below-cutoff months.\n"
         "  scope: calls/receipts carry an optional top-level changed dir (same PII guard\n"
         "  as tasks); report/attrib/budget/matrix --scope <dir> slice one component.\n"
-        "  team: cage authorship ledger-sync unions local rows into refs/notes/cage-ledger by row\n"
-        "  id (CI-sole-writer, like notes-sync); report/attrib --team read the merge,\n"
+        "  team: REMOVED in v0.52 (SURFACE-CUT). The ledger-sync verb pushed rows into\n"
+        "  refs/notes/cage-ledger, and the --team flags that read them went with the\n"
+        "  rollup views — a write path with no reader. Provenance notes are unaffected.\n"
         "  rolled up by scope, never per-person. Size warning: one stderr line past\n"
         "  ~{warn_mb} MB (policy [ledger] warn_mb overrides) — warn-only, never blocks.",
-        ("cage/ledger.py", "cage/ledgersync.py", "cage/mergeutil.py", "cage/constants.py"),
+        ("cage/ledger.py", "cage/mergeutil.py", "cage/constants.py"),
         "n/a — describes the on-disk layout + aggregation, not a number.",
         kind="concept", plan_ref="§3.6"),
     Explanation(
@@ -586,7 +503,7 @@ REGISTRY: tuple[Explanation, ...] = (
     Explanation(
         "cleanup", ("cleanup", "state-dir", "prune", "stale", "retention", "warn",
                     "debug-log-growth", "cursors", "pending-buffers"),
-        "what `cage data cleanup` may touch — and what it never may",
+        "what state cleanup may touch — and what it never may",
         "a CLOSED allowlist over .cage/state/ only: aged debug.log / capture.log /\n"
         "  hooks-seen.jsonl rows, stale pending-* provenance buffers, cursors whose\n"
         "  source log is gone (safe: the next import re-reads and id-dedupe absorbs\n"
@@ -596,7 +513,7 @@ REGISTRY: tuple[Explanation, ...] = (
         "  added, savings are unrecoverable), cage.toml, the machine id (fleet\n"
         "  pairing breaks without it), study.jsonl, limits.json. Window: [cleanup]\n"
         "  days = {cleanup_days}. Deletion only ever happens via an\n"
-        "  explicit `cage data cleanup --apply`, which runs regardless of [cleanup]\n"
+        "  explicit prune. NOTE: the manual verb was deleted in v0.52, so nothing\n"
         "  enabled — an explicitly-typed command is always honored. The auto path\n"
         "  (piggybacked on `cage import`/read sweeps, throttled, fail-open — cage\n"
         "  installs no scheduler) only ever WARNS on stderr, silent when nothing is\n"
@@ -611,17 +528,17 @@ REGISTRY: tuple[Explanation, ...] = (
     Explanation(
         "import-before-export", ("import-before-export", "export-sweep", "no-import",
                                  "self-refreshing", "snapshot", "bundle-freshness"),
-        "why `cage data export` imports first (and how to get a frozen snapshot)",
+        "why the fleet bundle imports first (and how to get a frozen snapshot)",
         "export runs the all-agent import sweep before emitting/bundling, so a\n"
         "  machine that never ran an explicit `cage import` still ships a complete\n"
-        "  bundle (capture is pull-only) — one `cage data export --study` is enough. Currently\n"
+        "  bundle (capture is pull-only) — one `cage study export` is enough. Currently\n"
         "  {import_before_export}. Precedence: the --no-import flag wins per\n"
         "  invocation > env CAGE_CAPTURE=0 (pauses all capture, sweep included) >\n"
         "  policy [capture] import_before_export. The sweep is fail-open — a broken\n"
         "  parser warns and export proceeds with the pre-sweep ledger — and the\n"
         "  study bundle's manifest records whether it ran and how many rows it added\n"
         "  (counts only), so the analyst can tell self-refreshed from snapshot.",
-        ("cage/exportcmd.py", "cage/study.py", "cage.toml [capture]"),
+        ("cage/clicmds.py", "cage/study.py", "cage.toml [capture]"),
         "n/a — describes capture freshness, not a number.",
         kind="concept", plan_ref="§3.7"),
     Explanation(
@@ -631,7 +548,7 @@ REGISTRY: tuple[Explanation, ...] = (
                     "where-are-dollars"),
         "tokens by default, dollars opt-in, and signal-gated columns",
         "tokens are the measurement; dollars are an interpretation you ask for\n"
-        "  `cage report` and the bare `cage`\n"
+        "  the `cage insights` views\n"
         "  headline render tokens-only until `--usd` asks for currency — or set\n"
         "  `[display] usd = true` for always-on (precedence: flag > env CAGE_USD >\n"
         "  policy). Pricing footnotes and the full ⚠ UNPRICED block belong to the\n"
@@ -643,7 +560,7 @@ REGISTRY: tuple[Explanation, ...] = (
         "  pricing always computes underneath (budget guards, UNPRICED detection),\n"
         "  money-native views (budget/roi/verdict/compare/estimate) always show\n"
         "  dollars, and CSV never gates (full schema, always).",
-        ("cage/display.py", "cage/report.py", "cage/matrix.py", "cage.toml [display]"),
+        ("cage/display.py", "cage/chats.py", "cage/commitview.py", "cage.toml [display]"),
         "n/a — a presentation rule; every dollar that does render keeps its method tag.",
         kind="concept", plan_ref="output-and-simplification.plan.md Phase 2"),
     Explanation(
@@ -653,7 +570,7 @@ REGISTRY: tuple[Explanation, ...] = (
         "the CSV reporting surface: which views, the column law, csv-vs-bundle",
         "`--csv` on report · attrib · roi · compare · study report · calibration\n"
         "  — stdout by default (pipe-friendly),\n"
-        "  `--csv <path>` writes a file. Raw rows: `cage data export --csv\n"
+        "  `--csv <path>` writes a file. Raw-row export was removed in v0.52; the\n"
         "  calls|receipts|tasks` (flat ledger rows for pivot tables; the ledger's\n"
         "  own PII surface — counts and ids, never content). MCP mirrors it: a\n"
         "  `format: csv` param on the report/attrib/roi tools.\n"
@@ -665,9 +582,9 @@ REGISTRY: tuple[Explanation, ...] = (
         "  same ledger + policy ⇒ byte-identical CSV). The column contracts live in\n"
         "  `csvout.py` itself (one render_csv beside each render_*). Two export kinds,\n"
         "  never blurred: CSV is one-way\n"
-        "  REPORTING and never an import source; the fleet bundle (`cage data export\n"
+        "  REPORTING and never an import source; the fleet bundle (`cage study export\n"
         "  --study`) stays jsonl — lossless, merge-by-id, re-importable.",
-        ("cage/csvout.py", "cage/exportcmd.py", "cage/report.py", "cage/mcpserver.py"),
+        ("cage/csvout.py", "cage/chats.py", "cage/commitview.py", "cage/viewexport.py"),
         "n/a — describes an output format; every row still carries its own method tag.",
         kind="concept", plan_ref="§3.9"),
     Explanation(
@@ -675,7 +592,7 @@ REGISTRY: tuple[Explanation, ...] = (
                         "generated-at", "timestamp", "as-of", "run-stamp",
                         "save-report", "write-report"),
         "--export: every report/insight as a dated artifact, and where a clock may live",
-        "`--export` on `cage report` and every `cage insights` view writes the\n"
+        "`--export` on every `cage insights` view writes the\n"
         "  rendered view to disk. Bare ⇒ <ledger>/.cage/output/<view>-<stamp>/ holding\n"
         "  EVERY format that view has (text · csv where it owns a render_csv · json).\n"
         "  A path with a known suffix (.txt/.md/.csv/.json) ⇒ exactly that file in\n"
@@ -686,7 +603,7 @@ REGISTRY: tuple[Explanation, ...] = (
         "  The determinism split, and it is the whole design: every ARTIFACT carries a\n"
         "  generated-at metadata block with no flag to suppress it (a file outlives its\n"
         "  terminal — a number with no as-of is unreadable), while STDOUT stays\n"
-        "  clock-free unless you pass `--stamp`. So `cage report` prints byte-identically\n"
+        "  clock-free unless you pass `--stamp`. So a view prints byte-identically\n"
         "  with and without `--export`, and the golden/floor suites keep pinning a\n"
         "  surface no clock can perturb. The stamp is metadata about the run, NEVER an\n"
         "  input to a cell: delete every stamp and no derived figure moves.\n"
@@ -699,7 +616,7 @@ REGISTRY: tuple[Explanation, ...] = (
         "  `--csv`/`--json` are unchanged on stdout AND to a path: a `--csv PATH` is a\n"
         "  stream redirected to a file, `--export` is an artifact, and only the artifact\n"
         "  grows the block. `.cage/output/` is deliberately NOT `.cage/out/` (that one\n"
-        "  is `cage data serve`'s docroot and is published on the loopback port), and no\n"
+        "  was the deleted local server's docroot — kept separate so a future one is safe), and no\n"
         "  cleanup class prunes it — cage never deletes an artifact it wrote.",
         ("cage/viewexport.py", "cage/runstamp.py", "cage/cliutil.py", "cage/cli.py"),
         "n/a — metadata about a run; it never enters a cell, so no method tag changes.",
@@ -805,7 +722,7 @@ REGISTRY: tuple[Explanation, ...] = (
                            "pathext", "cmd-twin", "windows-graphify",
                            "windows-interceptor", "shim-contract", "call-not-exec"),
         "why the graphify interceptor is TWO files, and what each one can't do",
-        "one behaviour contract, two implementations (docs/shim-contract.md): the\n"
+        "one behaviour contract, two implementations (docs/adr/0004_graphify.md): the\n"
         "  extensionless POSIX `bin/{graphify_shim_posix}` and the Windows\n"
         "  `bin/{graphify_shim_windows}`. Windows resolves a bare `graphify` ONLY\n"
         "  through PATHEXT, which has no extensionless entry — so on Windows only the\n"
@@ -876,7 +793,7 @@ REGISTRY: tuple[Explanation, ...] = (
         "  --rescan-metrics` is that backfill: metrics only, idempotent by row id, and it\n"
         "  advances NO cursor, so backfilling one kind can never blind another.",
         ("cage/graphifytx.py", "cage/importcmd.py", "cage/transcript.py",
-         "cage/doctorcmd.py", "docs/adr/0009-kiro-cli-tool-run-bodies-read-transiently-never-persisted.md",
+         "cage/doctorcmd.py", "work/archive/adr/0009-kiro-cli-tool-run-bodies-read-transiently-never-persisted.md",
          "work/research/2026-08-07-graphify-store-evidence.md"),
         "n/a — describes which routes exist, not a number.",
         kind="concept", plan_ref="§4.5"),
@@ -970,72 +887,6 @@ REGISTRY: tuple[Explanation, ...] = (
         "usage rows carry NO method (diagnostic); receipts + forward model are modeled,\n"
         "  never measured — report-reads visibly weaker than query receipts.",
         kind="concept", plan_ref="archive/v0.36-graphify-capture.plan.md GC0–GC5"),
-    Explanation(
-        "otel-export", ("otel", "opentelemetry", "otel-export", "genai", "gen_ai",
-                        "semconv", "semantic-convention", "langfuse", "helicone",
-                        "otlp", "vendor", "pre-stable"),
-        "`cage data export --otel`: calls as gen_ai.* attributes, savings cage-namespaced",
-        "one-way REPORTING JSON, exactly like --csv (never an import source; --study\n"
-        "  stays jsonl): calls → gen_ai.provider.name / gen_ai.request.model /\n"
-        "  gen_ai.usage.input_tokens / output_tokens, plus\n"
-        "  gen_ai.client.operation.duration (seconds) when latency_ms is known —\n"
-        "  omitted, never zero, when it isn't. Receipts/savings have NO GenAI\n"
-        "  equivalent: cage-namespaced under cage.savings[].cage.* (cage.saved is\n"
-        "  GROSS, cage.saved_usd prices via the same receiptprice ladder every other\n"
-        "  view uses and is omitted — never $0 — on an UNPRICED refusal or a non-money\n"
-        "  unit). No gen_ai.* name is ever invented. **The GenAI conventions are\n"
-        "  PRE-STABLE** ({semconv}, {semconv_status}) — names can still change\n"
-        "  upstream, so cage pins the targeted version in one constant and stamps it\n"
-        "  in every document's cage.meta block; a spec bump is a deliberate,\n"
-        "  changelog'd change, never silent drift.\n"
-        "  WHAT THE PIN NAMES: {semconv} is the LAST release of\n"
-        "  open-telemetry/semantic-conventions that defined gen_ai.* — on 2026-06-12\n"
-        "  they were deprecated there and moved to {semconv_source}, which carries no\n"
-        "  tagged release and is Status: Development throughout. Cage states the repo\n"
-        "  and the maturity rather than inventing a version number for it; the pin\n"
-        "  re-points the moment that repo cuts its first tag.\n"
-        "  gen_ai.system was RENAMED to gen_ai.provider.name in semconv v1.37.0 —\n"
-        "  before the pinned release — so cage emits the new name only. Emitting both\n"
-        "  during a transition was rejected: a consumer that sums rather than\n"
-        "  coalesces would double-count.",
-        ("cage/otelout.py", "cage/exportcmd.py", "cage/constants.py"),
-        "cage.method survives on every savings row — a modeled/estimated figure can\n"
-        "  never arrive at a vendor looking measured; calls are the ledger's own\n"
-        "  ground truth.",
-        kind="concept", plan_ref="archive/v0.39-otel-export.handoff.md"),
-    Explanation(
-        "tool-adoption", ("adoption", "adopt", "invoked", "invocation", "usage",
-                          "breadcrumb", "never-invoked", "agent-unknown", "uptake",
-                          "do-agents-use", "insights-adoption"),
-        "`cage insights adoption`: which agents actually invoke the tools you wired",
-        "TWO HALVES, never blended into one number, because they have different\n"
-        "  precision:\n"
-        "  A · invocations — straight off the usage breadcrumb (state/, diagnostic).\n"
-        "    Exact, no join, and AGENT-BLIND: a usage row is\n"
-        "    `ts · op · args_hash · exit · ms · outcome · route` and carries no agent\n"
-        "    field at all. Outcomes are READ from the recorded `outcome`\n"
-        "    ({outcomes})\n"
-        "    — 'ran and cage filed nothing' is a written verdict, never re-derived\n"
-        "    from the receipts.\n"
-        "  B · per-agent — a savings row joined to a call's agent, by linked `call`\n"
-        "    id first, else by a `session` that exactly one agent's calls carry. A\n"
-        "    shim/native savings row stamps an EMPTY session ON PURPOSE (the\n"
-        "    interceptor is a subprocess; it genuinely cannot know which agent spawned\n"
-        "    it), so those rows are agent-unknown BY CONSTRUCTION — never an 'other'\n"
-        "    bucket, never attributed by timestamp proximity. When nothing is\n"
-        "    attributable the half still renders, as an explicit refusal: suppressing\n"
-        "    it would make 'cage cannot attribute these' read like 'cage has no\n"
-        "    per-agent answer'.\n"
-        "  'Never invoked' is phrased NO EVIDENCE OF INVOCATION — a run cage never saw\n"
-        "  looks identical to one that never happened.\n"
-        "  NO CURRENCY ANYWHERE: usage rows stay diagnostic-only (never priced, never\n"
-        "  read by a money view, pinned byte-identical); this view only counts them.\n"
-        "  Surface is deliberately not a dimension — claude's CLI and VS Code share one\n"
-        "  store, so splitting by it would invent a fact.",
-        ("cage/adoption.py", "cage/usagelog.py", "cage/graphifymeter.py"),
-        "no method tag: these are COUNTS of recorded rows, not an estimate — the only\n"
-        "  claims are 'this many rows exist' and 'this many join to an agent'.",
-        kind="concept", plan_ref="archive/v0.40-insights-adoption.proposal.md"),
     Explanation(
         "chats-view", ("chats", "chat", "per-chat", "conversation", "conversations",
                        "session-title", "titled", "titles", "detail-view",
@@ -1142,7 +993,7 @@ REGISTRY: tuple[Explanation, ...] = (
         "  Tokens-only — no --usd on this view (the v0.36 no-blend law). Top\n"
         "  {graphify_chats_default_rows} rows by saved desc, --all lifts it (footnoted,\n"
         "  never silent); CSV is always untruncated and never filters by receipts.",
-        ("cage/graphifychat.py", "cage/chats.py", "cage/netsaved.py",
+        ("cage/graphifychat.py", "cage/chats.py", "cage/graphifytx.py",
          "cage/graphifytx.py"),
         "modeled throughout — every graphify receipt is modeled or estimated, never\n"
         "  measured; the per-chat aggregate carries the worst case among its receipts.",
@@ -1216,7 +1067,7 @@ REGISTRY: tuple[Explanation, ...] = (
         "  the label says so, and an unmarked `human` is reachable ONLY by attestation.\n"
         "  Tokens are measured; placing a call on a commit is modeled (task-id join\n"
         "  first, commit-window fallback). unknown is shown, never redistributed.",
-        kind="concept", plan_ref="adr/0008-line-match-authorship-counts-persisted-content-transient.md"),
+        kind="concept", plan_ref="../work/archive/adr/0008-line-match-authorship-counts-persisted-content-transient.md"),
     Explanation(
         "agent-layers", ("layers", "ladder", "l0", "l1", "l2", "l3", "opt-in",
                          "hooks-optional", "attestation", "attest", "steering",

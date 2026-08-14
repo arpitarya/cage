@@ -36,7 +36,7 @@ record_call / record_receipt  →  .cage/ledger/{calls,receipts,tasks}-YYYY-MM.j
                                              + --export → .cage/output/<view>-<stamp>/  (stamped artifact)
 ```
 
-**Cage measures token and credit USAGE, never cost** ([ADR 0011](docs/adr/0011-cage-measures-usage-not-cost.md)).
+**Cage measures token and credit USAGE, never cost** ([ADR 0011](work/archive/adr/0011-cage-measures-usage-not-cost.md)).
 There is no price table, no rate card and no currency on any surface. A leftover
 `.cage/prices.toml` from a pre-0.51 project is never read and never deleted — `cage
 doctor` names it. Do not reintroduce pricing without reversing that ADR; its veto
@@ -52,7 +52,7 @@ the row's own `ts`; readers glob + concatenate, legacy single files still read; 
 skips below-cutoff months). provenance.jsonl is a local buffer only — canonical storage
 is refs/notes/cage-provenance, written by CI alone (plan §3.5). The calls/receipts/tasks
 rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team view
-(`--team`, plan §3.6.3; [ADR 0001](docs/adr/0001-ledger-team-aggregation-notes-not-external-sink.md)
+(`--team`, plan §3.6.3; [ADR 0001](work/archive/adr/0001-ledger-team-aggregation-notes-not-external-sink.md)
 — why a git ref, not an external sink).
 
 - **Substrate** ([schema.py](cage/schema.py)) — `make_call` / `make_receipt` stamp
@@ -189,7 +189,7 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   [commitjoin.py](cage/commitjoin.py) windows + call join,
   [authorcapture.py](cage/authorcapture.py) the pass,
   [commitview.py](cage/commitview.py) the views;
-  [ADR 0008](docs/adr/0008-line-match-authorship-counts-persisted-content-transient.md),
+  [ADR 0008](work/archive/adr/0008-line-match-authorship-counts-persisted-content-transient.md),
   FORMULAS §2.14) — the agent-vs-human axis, rebuilt at a unit you can `git show`.
   **Never observe the human; observe the agent precisely and let the human be the
   residual.** A Claude transcript records the exact text an `Edit`/`Write`/
@@ -434,7 +434,7 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   session's spend from `cage report` (this repo's own product; dogfood it). If
   unmeasurable, write `Cost: unmeasured — <why>`. Waste that is priced gets stopped;
   waste that is prose gets repeated.
-- **Cage measures usage, never cost** ([ADR 0011](docs/adr/0011-cage-measures-usage-not-cost.md)).
+- **Cage measures usage, never cost** ([ADR 0011](work/archive/adr/0011-cage-measures-usage-not-cost.md)).
   No price table, no rate card, no currency on any surface, and **no conversion between
   units in either direction** — tokens↔credits↔anything. `tests/test_usage_only.py`
   AST-scans every module for a returning currency identifier or a rendered `$N` and fails
@@ -767,7 +767,7 @@ fires a trigger updates the doc *and* bumps its row):
   gate/status — so a reader (or an executing agent) sees the whole shape before
   any detail, and a stale plan is spottable at a glance. Existing plans gain the
   index on contact (the fix-on-contact rule), new plans start with it.
-- **[docs/shim-contract.md](docs/shim-contract.md)** — the graphify interceptor
+- **[docs/adr/0004_graphify.md](docs/adr/0004_graphify.md)** — the graphify interceptor
   behaviour contract: one spec, two twins. Update in the same change as **any** twin
   edit, marker-set change, or new tool interceptor (every future one implements this
   same shape). Two implementations of an unwritten contract drift.
@@ -841,9 +841,9 @@ Architecturally load-bearing decisions live as numbered ADRs in
 [docs/adr/](docs/adr/), authored from [docs/adr/TEMPLATE.md](docs/adr/TEMPLATE.md)
 — the durable *why* behind a design that a future agent would otherwise "fix" back. They are the standing record; cite them inline in this
 file and in the plan at the rule they explain, the way a `plan §` reference is
-cited. Current set: [0001](docs/adr/0001-ledger-team-aggregation-notes-not-external-sink.md)
+cited. Current set: [0001](work/archive/adr/0001-ledger-team-aggregation-notes-not-external-sink.md)
 (team aggregation via `refs/notes`, not an external sink) ·
-[0002](docs/adr/0002-universal-capture-global-ledger-explicit-import-export.md)
+[0002](work/archive/adr/0002-universal-capture-global-ledger-explicit-import-export.md)
 (universal pull-based capture, global ledger, no OS scheduler). An ADR-worthy
 decision is one where a wrong call is expensive to reverse and the reasoning isn't
 obvious from the code — the substrate contract, the determinism/method law, the
@@ -877,8 +877,8 @@ load-bearing:
   as a `# v2:` half-build.
 
 Author every ADR from [docs/adr/TEMPLATE.md](docs/adr/TEMPLATE.md), which bakes in
-the three veto devices; the two existing records ([0001](docs/adr/0001-ledger-team-aggregation-notes-not-external-sink.md),
-[0002](docs/adr/0002-universal-capture-global-ledger-explicit-import-export.md)) are
+the three veto devices; the two existing records ([0001](work/archive/adr/0001-ledger-team-aggregation-notes-not-external-sink.md),
+[0002](work/archive/adr/0002-universal-capture-global-ledger-explicit-import-export.md)) are
 the worked examples to copy.
 
 ## Dev
@@ -970,7 +970,7 @@ each agent only needs thin idiomatic wiring (`agents.py` orchestrates):
   global** (plan §3.7): `cage import`/`cage data export` over a **resolved** ledger
   (`--ledger`/`CAGE_BASE` → project `.cage/` → global `~/.cage`, via `paths.resolve_root`)
   is the universal path that works with no hooks and no project.
-  **Kiro is the ONE exception to one-sink-per-sweep** ([ADR 0006](docs/adr/0006-kiro-rows-are-machine-facts-not-project-facts.md)):
+  **Kiro is the ONE exception to one-sink-per-sweep** ([ADR 0006](work/archive/adr/0006-kiro-rows-are-machine-facts-not-project-facts.md)):
   its *IDE* log is a single global file with no project/session/ts, so those rows are a
   **machine fact** and route to `~/.cage` — `paths.kiro_routed(root)` is the one predicate
   (`None` ⇒ no routing; an explicit `--ledger`/`CAGE_BASE` or `CAGE_LEDGER` collapses the
@@ -1006,7 +1006,7 @@ each agent only needs thin idiomatic wiring (`agents.py` orchestrates):
   outside any project lands in the global ledger (the resolver prevents stray local
   footprints), and a per-agent high-water cursor (`state/cursors.json`, last-seen
   `(size, mtime)`) keeps re-imports incremental (the shared `seen` set bounds the ledger
-  read to once per run). **cage installs no OS scheduler** ([ADR 0002](docs/adr/0002-universal-capture-global-ledger-explicit-import-export.md)
+  read to once per run). **cage installs no OS scheduler** ([ADR 0002](work/archive/adr/0002-universal-capture-global-ledger-explicit-import-export.md)
   — a product invariant, not volume-gated) — no launchd/systemd/cron/
   schtasks, no `cage scheduler`; hands-off automation is the user's own cron/schtasks
   line calling `cage import` (the hint `render.scheduler_hint()` prints is OS-aware,
@@ -1226,7 +1226,7 @@ each agent only needs thin idiomatic wiring (`agents.py` orchestrates):
   fully/partially/not-wired/needs-healing verdict, never forking the liveness logic;
   `cage query wiring-inventory` explains it.
 - **The graphify interceptor is a TWIN PAIR against ONE written contract**
-  ([docs/shim-contract.md](docs/shim-contract.md), v0.38.0) — `data/shims/graphify`
+  ([docs/adr/0004_graphify.md](docs/adr/0004_graphify.md), v0.38.0) — `data/shims/graphify`
   (POSIX sh) and `data/shims/graphify.cmd` (Windows). Windows resolves a bare name only
   through `PATHEXT`, which has **no extensionless entry**, so the sh shim alone could
   never be *found* there and the shim capture route was structurally absent. The
@@ -1247,7 +1247,7 @@ each agent only needs thin idiomatic wiring (`agents.py` orchestrates):
   `graphify_shims()`, shared by the writer and every read surface so none can see only
   one twin. A root carrying only the twin **this OS cannot resolve** is a doctor
   *failure*, not a green tick: that is F1's lesson applied to a new OS. **Hand-paired,
-  not templated, on purpose** ([ADR 0007](docs/adr/0007-graphify-twin-pair-hand-paired-not-templated.md)
+  not templated, on purpose** ([ADR 0007](work/archive/adr/0007-graphify-twin-pair-hand-paired-not-templated.md)
   — templating stays off the table until a *third* interceptor exists and shares a
   syntax family with an existing one). Known gap, stated not half-fixed: under
   `--python-launcher` there is no `cage` on PATH, so **neither** twin meters (contract
@@ -1259,7 +1259,7 @@ each agent only needs thin idiomatic wiring (`agents.py` orchestrates):
   above is invocation-gated, so every store-side route exists to catch what it misses. One
   counterfactual, one id scheme, one ADR-0005 deferral: claude transcripts · copilot **CLI**
   `events.jsonl` · copilot **VS Code** `chatSessions` (`run_in_terminal` → `commandLine.original`
-  + `cwd.path` + output) · kiro **CLI** `conversations_v2` (`execute_bash`, [ADR 0009](docs/adr/0009-kiro-cli-tool-run-bodies-read-transiently-never-persisted.md)
+  + `cwd.path` + output) · kiro **CLI** `conversations_v2` (`execute_bash`, [ADR 0009](work/archive/adr/0009-kiro-cli-tool-run-bodies-read-transiently-never-persisted.md)
   — bodies read **transiently**, hashes only, the one carve-out on that store's key whitelist).
   **Kiro IDE structurally cannot** (its store persists no assistant output — 26/26 empty
   completions when probed) and that is **named in `cage doctor` + the explainer, never a

@@ -7,7 +7,7 @@ never part of an id; and the read-time reclaim backstop matches on the EXACT key
 """
 from __future__ import annotations
 
-from cage import ledger, metering, paths, policy, report, schema
+from cage import ledger, metering, paths, policy, schema
 
 
 # ── the verify-first test, made permanent: subdir push → repo-root read ────────
@@ -28,7 +28,7 @@ def test_subdir_push_is_seen_by_repo_root_read(tmp_path, monkeypatch):
 
     # … and a repo-root read sees it — the "stranded saving" is a phantom here.
     monkeypatch.chdir(proj)
-    seen = report.read_receipts(proj, policy.load(None))
+    seen = ledger.receipts(proj)
     assert any(r.get("id") == rid for r in seen)
     assert not (deep / ".cage").exists()  # no stray footprint scattered in the subdir
 
@@ -84,28 +84,12 @@ def _stray_global_receipt(route_key: str, saved: int = 100):
     return metering.record_receipt(tool="graphify", unit="tokens", raw_alternative=saved,
                                    actual=0, root=paths.global_home(), route_key=route_key)
 
-
-def test_reclaim_matches_exact_key_only(tmp_path, monkeypatch):
-    proj = tmp_path / "repo"
-    (proj / ".cage").mkdir(parents=True)
-    monkeypatch.delenv("CAGE_BASE", raising=False)
-    pol = policy.load(None)
-
-    mine = _stray_global_receipt(paths.routing_key(proj))     # belongs to this project
-    theirs = _stray_global_receipt("0000000000000000")        # a different project's key
-    assert mine and theirs
-
-    seen_ids = {r.get("id") for r in report.read_receipts(proj, pol)}
-    assert mine in seen_ids       # reclaimed by exact key
-    assert theirs not in seen_ids  # never a blind global→project union
-
-
-def test_reclaim_skipped_when_reading_global_ledger(tmp_path, monkeypatch):
-    # A read that already IS the global ledger has nothing to reclaim into — and must
-    # not double-read itself.
-    monkeypatch.delenv("CAGE_BASE", raising=False)
-    g = paths.global_home()
-    _stray_global_receipt(paths.routing_key(g))
-    local = ledger.receipts(g)
-    reclaimed = report.read_receipts(g, policy.load(None))
-    assert len(reclaimed) == len(local)  # byte-identical count — no self-union
+# ── The route_key RECLAIM backstop is GONE (SURFACE-CUT, 2026-08-14) ──────────
+# `report.read_receipts` folded a global→project reclaim into every read: a saving
+# pushed while the tool ran outside this project's tree was pulled back by EXACT
+# route_key. It was called from nowhere but `report.summarize`/`render_overview`, so it
+# died with `cage report` and no surviving view ever had it. The WRITE half above still
+# stamps `route_key` on every pushed receipt, so the data to reclaim is still being
+# recorded — only the reader is missing. Filed in work/OPEN-WORK.md; do not re-add a
+# blind global→project union in its place (two repos sharing a basename would
+# over-attribute, which is exactly what the exact-key match existed to prevent).

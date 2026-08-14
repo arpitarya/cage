@@ -13,7 +13,8 @@ as true as `ids.new_id`'s entropy** — it was measurably false at 16 bits (~1 i
 200k ids, `work/regression/2026-08-02-finding-call-id-collisions.md`), which is what
 widening the random field to 32 bits fixed. A collision here is a *dropped row*, not a
 conflict to resolve, so the generator is this function's real precondition. Kept here, not in
-`notessync`, so `ledgersync` doesn't have to import the provenance module.
+`notessync`; it was shared with the deleted `ledgersync` (SURFACE-CUT) and is kept
+generic because a future second notes writer would want the same core.
 """
 from __future__ import annotations
 

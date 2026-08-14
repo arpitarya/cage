@@ -8,7 +8,7 @@ conditions that keep the law intact rather than bending it:
 1. **It is never a number.** The stamp is metadata *about the run*, never an input to
    a cell, a total, a price or a method tag. Delete every stamp and no derived figure
    moves — the same standing every `state/` file has.
-2. **stdout stays clock-free by default.** `cage report` prints byte-identically with
+2. **stdout stays clock-free by default.** A view prints byte-identically with
    and without `--export`; the stamp reaches stdout only when the user asks for it
    (`--stamp`). That is what keeps `tests/test_output_spec.py`'s goldens and
    `tests/test_floor.py`'s byte-identical assertions meaningful — they pin the default

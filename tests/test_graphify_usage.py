@@ -5,7 +5,7 @@ Two properties, both load-bearing:
 1. **Every graphify run files a usage row** (shim route here; transcript route is
    covered in the GC2/GC3 tests) with `{op, args_hash, exit, ms, outcome}` — proving
    usage even when no receipt is filed (the F1 blind spot).
-2. **Usage rows never perturb a derived view** — report/attrib are
+2. **Usage rows never perturb a derived view** — the derived views are
    byte-identical whether or not the usage log exists. The row lives in `state/`,
    which no derived view reads; this asserts that invariant rather than trusting it.
 """
@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from cage import graphifymeter, paths, report, usagelog
+from cage import chats, graphifymeter, paths, usagelog
 from cage.policy import load as load_policy
 
 
@@ -91,17 +91,21 @@ def test_usage_rows_do_not_perturb_derived_views(proj):
     graphifymeter.run(proj, [str(shim), "query", "how"], task="t")
     pol = load_policy(paths.Footprint(proj).policy)
 
-    # snapshot the money views WITH the usage log present
-    rep_with = report.render_report(report.summarize(proj, pol))
-    rep_with = report.summarize(proj, pol, "agent")
+    # Snapshot a derived view WITH the usage log present. (`report` was the original
+    # subject here and died in SURFACE-CUT; `chats` is a live derived view over the same
+    # ledger, so the invariant under test is unchanged — a state/ row must not move a
+    # derived number.) The old version assigned `rep_with` twice and threw the rendered
+    # string away; both the data AND the rendering are compared now.
+    data_with = chats.summarize(proj, pol)
+    text_with = chats.render_chats(data_with)
 
     # delete the usage log entirely and re-derive — must be byte-identical
     paths.Footprint(proj).usage_log.unlink()
-    rep_without = report.render_report(report.summarize(proj, pol))
-    rep_without = report.summarize(proj, pol, "agent")
+    data_without = chats.summarize(proj, pol)
+    text_without = chats.render_chats(data_without)
 
-    assert rep_with == rep_without
-    assert rep_with == rep_without
+    assert data_with == data_without
+    assert text_with == text_without
 
 
 def test_summary_counts_match_rows(proj):

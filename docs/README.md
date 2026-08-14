@@ -46,20 +46,24 @@ archived: [copilot](../work/archive/v0.49-copilot-metrics-ledger.handoff.md) ·
 spend from a pinned cutover — was built and green on 2026-08-14 and archived:
 [handoff](../work/archive/v0.50-metrics-primary.handoff.md) ·
 [prompt](../work/archive/v0.50-metrics-primary.prompt.md). Its design of record is
-[ADR 0010](adr/0010-metric-ledgers-are-the-spend-source-forward-only-cutover.md).
+[ADR 0010](../work/archive/adr/0010-metric-ledgers-are-the-spend-source-forward-only-cutover.md).
 
 **USAGE-ONLY** — the deletion of the money subsystem, and the largest removal in the
 project's history — was built and green on 2026-08-14 and archived:
-[handoff](../work/archive/v0.51-usage-only.handoff.md) ·
-[prompt](../work/archive/v0.51-usage-only.prompt.md). Its design of record is
-[ADR 0011](adr/0011-cage-measures-usage-not-cost.md), which also **supersedes the money
+[handoff](../work/archive/v0.50-usage-only.handoff.md) ·
+[prompt](../work/archive/v0.50-usage-only.prompt.md). Its design of record is
+[ADR 0011](../work/archive/adr/0011-cage-measures-usage-not-cost.md), which also **supersedes the money
 half of ADR 0010**: the spend cutover is retired and `ledger.spend()` partitions by
 agent rather than by time.
 
-**In flight: SURFACE-CUT** — [handoff](../work/surface-cut.handoff.md) ·
-[prompt](../work/surface-cut.prompt.md), raised 2026-08-14 after ADR 0011: delete
-`cage data *`, `cage report`, and `insights compare|estimate|calibration`. **PROPOSED,
-unbuilt** — archive the pair to `work/archive/` on implement, per the handoff lifecycle.
+**SURFACE-CUT is BUILT (2026-08-14)** — [handoff](../work/archive/v0.50-surface-cut.handoff.md) ·
+[prompt](../work/archive/v0.50-surface-cut.prompt.md), archived on implement; rationale and
+the six recorded-but-unread facts it leaves behind are in
+[surface-cut.decision.md](../work/surface-cut.decision.md). It deleted `cage report`, all
+of `cage data`, `insights attrib|adoption|compare|estimate|calibration` and
+`authorship ledger-sync`, and cut MCP from 6 tools to 2. **Capture is unchanged** — every
+row those views read is still recorded. One phase was deliberately not executed: the
+graphify shim still probes a deleted verb (SHIM-DEAD-VERB, 15 red tests, Arpit's call).
 
 **One thing each of the three left open is not a pair and does not live here:** a
 `CLAUDE.md` diff (ledger diagram line + a substrate bullet) is **proposed, awaiting
@@ -96,15 +100,15 @@ to its real location.
   four doc-size rules (lead with the answer · one audience · evidence elsewhere ·
   hard budget), the fix procedure, and the retain/remove criteria.
 - [GLOSSARY.md](GLOSSARY.md) — every recurring term, defined once against the code.
-- [copilot-capture.md](copilot-capture.md) — how Copilot numbers are captured,
-  one page, executive-summary section included. **Updated in the same change as
-  any copilot capture change** (its DOC-REGISTRY trigger).
-- [claude-capture.md](claude-capture.md) — how Claude numbers are captured,
-  one page, executive-summary section included. **Updated in the same change as
-  any claude capture change** (its DOC-REGISTRY trigger).
-- [kiro-capture.md](kiro-capture.md) — how Kiro numbers are captured, one page,
-  executive-summary section included. **Updated in the same change as any kiro
-  capture change** (its DOC-REGISTRY trigger).
+- **`claude-capture.md` · `copilot-capture.md` · `kiro-capture.md` · `shim-contract.md`
+  are GONE (2026-08-14).** Each was absorbed **whole** into its ADR — the store→property
+  tables and known gaps into §2, the executive summary into §1, and the entire
+  interceptor behaviour contract (B1–B8, B8a, D1–D8, the anti-recursion proof) into
+  ADR-GRAPHIFY §2. One document per agent now carries both *what is captured* and *why*,
+  so a capture change and its rationale can no longer drift apart. The same
+  update-in-the-same-change rule applies, now to the ADR:
+  [ADR-CLAUDE](adr/0001_claude.md) · [ADR-COPILOT](adr/0002_copilot.md) ·
+  [ADR-KIRO](adr/0003_kiro.md) · [ADR-GRAPHIFY](adr/0004_graphify.md).
 - [FORMULAS.md](FORMULAS.md) — every computed number: formula · code home ·
   method tag · the knobs that move it.
 - [WORKLOG.md](../work/WORKLOG.md) — the running per-session handoff (append every
@@ -123,8 +127,16 @@ to its real location.
 
 ## Standing records
 
-- [adr/](adr/) — architecture decision records (the durable *why*; each ends with a
-  veto condition). Author new ones from [adr/TEMPLATE.md](adr/TEMPLATE.md).
+- **[adr/](adr/README.md) — the durable *why*, now FOUR maintained per-agent records**
+  (restructured 2026-08-14): [ADR-CLAUDE](adr/0001_claude.md) ·
+  [ADR-COPILOT](adr/0002_copilot.md) · [ADR-KIRO](adr/0003_kiro.md) ·
+  [ADR-GRAPHIFY](adr/0004_graphify.md). Each has **§1 for humans** (one screen, Mermaid +
+  ASCII diagrams) and **§2 for agents** (the binding detail, ending in a veto condition).
+  The five laws that bind all four are stated once in [adr/README.md](adr/README.md) and
+  restated in none of them. Author from [adr/TEMPLATE.md](adr/TEMPLATE.md).
+  **Cite by name — `ADR-KIRO`, never "ADR 0003"**: the numeric names belong to the
+  eleven superseded records, now history in
+  [work/archive/adr/](../work/archive/adr/README.md) and never current spec.
 - [compare/](compare/) — decision records for forks (debate + matrix + verdict +
   reopen-trigger). `proposals/` is gone (2026-08-12): all five parked ideas were closed
   unbuilt and are [archive/](archive/)`v0.49-*.proposal.md`; the format contract to copy

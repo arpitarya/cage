@@ -102,7 +102,7 @@ def cage_tail_any(command: str) -> str | None:
 def cage_verb_path(command: str) -> tuple[str, ...]:
     """The verb tokens of a cage command — `()` for a foreign (non-cage) command.
 
-    ``cage insights attrib --csv`` → ``("insights", "attrib")``; ``cage import --agent
+    ``cage insights chats --csv`` → ``("insights", "chats")``; ``cage import --agent
     claude`` → ``("import",)``. Stops at the first flag, and keeps at most two levels
     (cage's parser is two deep: a group verb plus its subcommand)."""
     tail = cage_tail_any(command)
@@ -206,7 +206,7 @@ def canonical_ledger(start: Path | None = None, *, pol: dict | None = None) -> P
     convergence point so no push path calls ``resolve_root`` directly, and every
     resolution logs *which* ledger it picked and *why* under ``CAGE_DEBUG``. That trace is
     the exact diagnostic for the stranded-saving class this design fights (a graphify
-    receipt and a later ``cage report`` resolving different ledgers). Fail-open: the debug
+    receipt and a later read resolving different ledgers). Fail-open: the debug
     log is best-effort and never perturbs resolution."""
     root = resolve_root(start)
     try:
@@ -220,7 +220,7 @@ def canonical_ledger(start: Path | None = None, *, pol: dict | None = None) -> P
 
 
 def kiro_ledger(root: Path) -> Path:
-    """THE sink for kiro **IDE** rows ([ADR 0006](docs/adr/0006-kiro-rows-are-machine-facts-not-project-facts.md)).
+    """THE sink for kiro **IDE** rows ([ADR 0006](work/archive/adr/0006-kiro-rows-are-machine-facts-not-project-facts.md)).
 
     Kiro's IDE log (`dev_data/tokens_generated.jsonl`) is ONE global append-only file
     carrying no project, no session and no timestamp, so every ledger that imports it
@@ -315,7 +315,7 @@ def active_ledger_source(start: Path | None = None) -> str:
 
 # ── the graphify interceptor twins ──────────────────────────────────────────────
 #
-# One behaviour contract (docs/shim-contract.md), two implementations: the
+# One behaviour contract (docs/adr/0004_graphify.md), two implementations: the
 # extensionless POSIX `graphify` and the Windows `graphify.cmd`. The names live here,
 # with the rest of "where things live", so the writer (`adoptcmd`) and every read
 # surface (`pathshim`, `wiringscan`, `doctorcmd`) share one enumeration — a read
@@ -1366,7 +1366,7 @@ class Footprint:
         runs *inside* an agent, so it is the only place cage learns which agent did
         something without guessing. Counts-never-content (a command is hashed, never
         stored) and, like every `state/` file, **never read by a derived money view** —
-        only `cage insights adoption`, which prints no currency at all. Absent unless
+        only the deleted `cage insights adoption`; nothing reads it today. Absent unless
         the opt-in L1 hooks are wired; size-managed by the `attest-log` cleanup class."""
         return Path(os.environ.get("CAGE_ATTEST_LOG", self.state / "attest.jsonl"))
 

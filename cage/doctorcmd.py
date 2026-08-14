@@ -23,13 +23,47 @@ _OK, _WARN, _FAIL = "ok", "warn", "fail"
 _RANK = {_OK: 0, _WARN: 1, _FAIL: 2}
 
 
+def capture_warnings(health: dict | None) -> list[str]:
+    """The triple-gated "installed but capturing nothing" warnings (docs/capture-health):
+    warn for an agent only when its home marker exists **and** it matched 0 files at the
+    last import **and** it has never contributed a row to the ledger. Clause 3 makes the
+    warning self-silencing — one captured row and it can never fire again. **Pure**: reads
+    only the passed-in ``_health`` record (`importcmd.capture_health`), never the
+    filesystem. One ⚠ block per gated agent, in SURFACES order, each carrying a runnable
+    fix (`cage doctor --paths`) and the documented opt-out for an agent you don't use.
+
+    The warning **names the patterns it tried** when the health record carries them
+    (path-globs handoff §5): a "matched 0 files" that hides its glob cannot be acted on —
+    the wrong-glob bug that produced this exact line cost twenty minutes precisely because
+    the message never said what it was looking for. Older records with no ``pattern``
+    render as before.
+
+    Rescued verbatim from the deleted `report.py` in SURFACE-CUT. It was shared by
+    the deleted ledger-rollup command and `cage doctor`; doctor is now the sole reader."""
+    out: list[str] = []
+    for a in agents.SURFACES:
+        rec = (health or {}).get(a)
+        if not isinstance(rec, dict):
+            continue
+        if rec.get("home") and rec.get("files", 0) == 0 and not rec.get("captured"):
+            home_path = rec.get("home_path") or f"~/.{a}"
+            src = rec.get("src") or "its log location"
+            tried = f" (tried: {rec['pattern']})" if rec.get("pattern") else ""
+            out.append(
+                f"⚠ {a}: {home_path} exists but {src} matched 0 files{tried} — capture is off "
+                f"for this agent.\n"
+                f"  cage doctor --paths      (if you don't use {a}: "
+                f"[sources.{a}] replace=true, paths=[] )")
+    return out
+
+
 def _tool() -> tuple[str, str]:
     from cage import __version__
     if paths.distribution() == "zipapp":
         # A pyz has no `cage` on PATH by design — pull-based capture is the story
         # (docs/restricted-environments.md); a PATH warn here would always fire.
         return _OK, (f"cage {__version__} (zipapp) — pull-based capture "
-                     "(`import`/`export`/`report`); hooks need an importable install")
+                     "(`cage import`); hooks need an importable install")
     if not shutil.which("cage"):
         return _WARN, "`cage` not on PATH (running, but not globally callable)"
     return _OK, f"cage {__version__} on PATH"
@@ -86,12 +120,12 @@ def _metering(active: Path) -> tuple[str, str]:
     foot += (f"\n      (automate with your own scheduler line, e.g. `{render.scheduler_hint()}`; "
              "cage installs no scheduler.)")
     # Capture health (docs/capture-health): the triple-gated "installed but capturing
-    # nothing" verdict — the same one `cage report` surfaces, defined once in
-    # report.capture_warnings. Fresh install (never imported ⇒ no `_health`) says so and
-    # does no live probe (a read-only doctor, like the rest of this check).
-    from cage import report
+    # nothing" verdict, defined once in `capture_warnings` below (rescued here from the
+    # deleted report.py in SURFACE-CUT — doctor is now its only reader). Fresh install
+    # (never imported ⇒ no `_health`) says so and does no live probe (a read-only
+    # doctor, like the rest of this check).
     health = importcmd.capture_health(active)
-    warns = report.capture_warnings(health)
+    warns = capture_warnings(health)
     if not health:
         # Under capture-on-read every read sweeps before it renders, so an empty
         # `_health` no longer means "you haven't run `cage import`" — it means capture
@@ -102,11 +136,11 @@ def _metering(active: Path) -> tuple[str, str]:
         from cage import policy as _pol
         if not _pol.capture_enabled(policy.load(paths.Footprint(active).policy)):
             foot += ("\n      capture health: capture disabled ([capture] enabled=false "
-                     "or CAGE_CAPTURE=0) — no sweep runs; `cage report` shows only what's "
+                     "or CAGE_CAPTURE=0) — no sweep runs; a read shows only what's "
                      "already captured")
         else:
             foot += ("\n      capture health: nothing captured yet — run a read "
-                     "(`cage report`) or `cage import`; if it stays empty, `CAGE_DEBUG=1 "
+                     "(`cage insights chats`) or `cage import`; if it stays empty, `CAGE_DEBUG=1 "
                      "cage import` then `cage debug` for the reason")
         level = _OK
     elif warns:
@@ -390,7 +424,8 @@ def _policy_version(root: Path) -> tuple[str, str]:
 
 def _state_dir(root: Path) -> tuple[str, str]:
     """State-dir size + prune-candidate visibility (bloat should be visible before
-    it's a problem). Informational — `cage data cleanup` is the remedy."""
+    it's a problem). Informational — since v0.52 no command prunes state/, so this
+    reports the size and names no fix it cannot honour."""
     foot = paths.Footprint(root)
     if not foot.state.exists():
         return _OK, "no state dir yet"
@@ -405,7 +440,7 @@ def _state_dir(root: Path) -> tuple[str, str]:
                   f"({policy.cleanup_days(pol)}d)")
         if stale:
             return _OK, status + (f" · {len(stale)} prune candidate(s) — "
-                                  "`cage data cleanup` to review")
+                                  "no prune command ships since v0.52")
         return _OK, status + " · nothing stale"
     except Exception as exc:  # noqa: BLE001 — informational check, never blocks doctor
         return _OK, f"state dir present (scan skipped: {exc})"
@@ -595,7 +630,7 @@ def _interceptor(root: Path, scan) -> tuple[str, str]:
     script with no extension, and Windows resolves a bare `graphify` only through
     PATHEXT — so a project scaffolded on POSIX and opened on Windows has an interceptor
     file, on PATH, naming live verbs, that **can never run**. Reporting that as ✅ would
-    recreate F1 on a new OS (docs/shim-contract.md)."""
+    recreate F1 on a new OS (docs/adr/0004_graphify.md)."""
     from cage import paths
     shim = root / "bin" / paths.graphify_shim_name()
     other = next(p for p in paths.graphify_shims(root) if p != shim)
@@ -667,7 +702,7 @@ def _path_interceptor(root: Path) -> tuple[str, str]:
 
 def _launcher_gap(root: Path) -> tuple[str, str]:
     """GF-LAUNCHER: python-launcher mode removes `cage` from PATH entirely, but the
-    graphify interceptor's capability probe (shim-contract.md B5) needs exactly that — it
+    graphify interceptor's capability probe (docs/adr/0004_graphify.md B5) needs exactly that — it
     runs `cage data graphify --help` before deciding whether to meter. So **neither twin**
     can ever meter a graphify call in this mode; both degrade to correct, unmetered
     passthrough, silently. That combination — launcher mode ON, an interceptor installed
@@ -699,7 +734,7 @@ def _launcher_gap(root: Path) -> tuple[str, str]:
 
 def _arm2_interpreter() -> tuple[str, bool]:
     """`(spelling, importable)` for the B5 **arm 2** the twins fall back to when no `cage`
-    command resolves (GF-LAUNCHER verdict B, shim-contract B5b).
+    command resolves (GF-LAUNCHER verdict B, ADR-GRAPHIFY B5b).
 
     The check inverted with that build and the inversion is the point: the old text said
     launcher mode means *unmetered, always*, which stopped being true the moment the

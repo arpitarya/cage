@@ -158,7 +158,7 @@ def _warn_if_large(foot, shards: list[Path]) -> None:
 
     Warn-only and fail-open: never touches stdout (the deterministic table surface),
     never blocks or raises, swallows a `stat` error, and fires at most once per ledger
-    dir per process. The remedy it points at — archive old shards / `ledger-sync` —
+    dir per process. The remedy it points at — archiving old shards —
     acts on total size, matching the metric. A `block` mode is deliberately absent: a
     derive never refuses (flux invariant); see the ADR for the write-path discussion."""
     try:
@@ -170,7 +170,7 @@ def _warn_if_large(foot, shards: list[Path]) -> None:
             _warned_dirs.add(key)
             print(f"cage: ledger is {total / 1_000_000:.0f} MB across {len(shards)} "
                   f"shard(s) — derives stay fast but history is unbounded; archive old "
-                  f"*-YYYY-MM.jsonl shards or run `cage authorship ledger-sync` then prune.",
+                  f"*-YYYY-MM.jsonl shards.",
                   file=sys.stderr)
     except Exception:  # noqa: BLE001 — the warning must never perturb a read
         return

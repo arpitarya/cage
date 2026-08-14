@@ -397,7 +397,7 @@ _NO_REPO = """No commits to report on.
 
 {reason}
 
-next: cage report                 spend by agent / route / model
+next: cage insights chats         usage per conversation
       cage query agent-authorship how the per-commit split is derived"""
 
 

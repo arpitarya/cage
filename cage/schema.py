@@ -84,7 +84,8 @@ def make_call(*, route: str, provider: str, model: str, tokens_in: int = 0,
     `scope` makes a row byte-identical to the pre-§3.6 contract.
 
     `project` is the optional working-dir **basename** the call ran under — a *derived
-    attribution axis* (`cage report --project`, plan §3.7), deliberately separate from
+    attribution axis* (plan §3.7 — its `--project` rollup view was deleted in
+    SURFACE-CUT; the field is still stamped, and no view reads it), deliberately separate from
     `scope` (the monorepo top-level dir). Basename only, never a full path (the same PII
     guard as `scope`/tasks). Only logs that carry the cwd can set it, so an empty
     `project` is the legacy contract. Three routes stamp it: Claude transcripts (a `cwd`

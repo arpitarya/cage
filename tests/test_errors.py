@@ -32,22 +32,22 @@ def _raise(exc):
 # --- cli.main() exit-code contract ----------------------------------------
 
 def test_main_cageerror_exits_1_clean(monkeypatch, capsys):
-    monkeypatch.setattr(clicmds, "cmd_report", _raise(CageError("bad thing")))
-    assert cli.main(["report"]) == 1
+    monkeypatch.setattr(clicmds, "cmd_chats", _raise(CageError("bad thing")))
+    assert cli.main(["insights", "chats"]) == 1
     out = capsys.readouterr()
     assert out.err.strip() == "error: bad thing"
     assert "Traceback" not in out.err
 
 
 def test_main_keyboardinterrupt_exits_130(monkeypatch):
-    monkeypatch.setattr(clicmds, "cmd_report", _raise(KeyboardInterrupt()))
-    assert cli.main(["report"]) == 130
+    monkeypatch.setattr(clicmds, "cmd_chats", _raise(KeyboardInterrupt()))
+    assert cli.main(["insights", "chats"]) == 130
 
 
 def test_main_unexpected_exits_1_no_traceback(monkeypatch, capsys):
     monkeypatch.delenv("CAGE_DEBUG", raising=False)
-    monkeypatch.setattr(clicmds, "cmd_report", _raise(RuntimeError("kaboom")))
-    assert cli.main(["report"]) == 1
+    monkeypatch.setattr(clicmds, "cmd_chats", _raise(RuntimeError("kaboom")))
+    assert cli.main(["insights", "chats"]) == 1
     out = capsys.readouterr()
     assert "error: kaboom" in out.err
     assert "Traceback" not in out.err
@@ -55,8 +55,8 @@ def test_main_unexpected_exits_1_no_traceback(monkeypatch, capsys):
 
 def test_main_unexpected_traceback_under_debug(monkeypatch, capsys):
     monkeypatch.setenv("CAGE_DEBUG", "1")
-    monkeypatch.setattr(clicmds, "cmd_report", _raise(RuntimeError("kaboom")))
-    assert cli.main(["report"]) == 1
+    monkeypatch.setattr(clicmds, "cmd_chats", _raise(RuntimeError("kaboom")))
+    assert cli.main(["insights", "chats"]) == 1
     out = capsys.readouterr()
     assert "error: kaboom" in out.err
     assert "Traceback (most recent call last)" in out.err
@@ -75,7 +75,7 @@ def test_malformed_policy_clean_error(proj, monkeypatch, capsys):
     (proj / ".cage").mkdir()
     (proj / ".cage" / "policy.toml").write_text("this = = not valid toml [[[\n")
     monkeypatch.chdir(proj)
-    assert cli.main(["report"]) == 1
+    assert cli.main(["insights", "chats"]) == 1
     out = capsys.readouterr()
     assert out.err.startswith("error: policy.toml:")
     assert "Traceback" not in out.err

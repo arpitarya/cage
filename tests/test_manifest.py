@@ -108,8 +108,14 @@ def test_names_never_leak_onto_call_rows(tmp_path, monkeypatch):
 
 
 def test_manifest_is_never_read_by_a_derived_view(tmp_path, monkeypatch):
-    # Determinism: the manifest is an audit trail. A report over the same ledger is
-    # byte-identical whether or not a manifest exists.
+    # Determinism: the manifest is an audit trail. A derived view over the same ledger
+    # is byte-identical whether or not a manifest exists.
+    #
+    # Carried on `insights commits` since SURFACE-CUT deleted `insights attrib`.
+    # `commits` is the right substitute precisely BECAUSE it is manifest-free: `chats`
+    # and `graphify` read the manifest for a TITLE (the one documented carve-out, labels
+    # only), so they are pinned by `tests/test_chats.py` on the narrower claim that
+    # deleting the manifest moves zero NUMERIC cells. This test keeps the strong form.
     from cage import cli, demo
     root = _root(tmp_path, monkeypatch)
     demo.seed(root)
@@ -117,7 +123,7 @@ def test_manifest_is_never_read_by_a_derived_view(tmp_path, monkeypatch):
     import contextlib
     buf = io.StringIO()
     with contextlib.redirect_stdout(buf):
-        cli.main(["--ledger", str(root), "insights", "attrib"])
+        cli.main(["--ledger", str(root), "insights", "commits"])
     before = buf.getvalue()
     # write a manifest row directly, then re-render
     manifest.record_import(root, import_id="i_x", agent="claude", surface="", session="s1",
@@ -126,7 +132,7 @@ def test_manifest_is_never_read_by_a_derived_view(tmp_path, monkeypatch):
                            ts="2026-07-01T00:00:00Z")
     buf2 = io.StringIO()
     with contextlib.redirect_stdout(buf2):
-        cli.main(["--ledger", str(root), "insights", "attrib"])
+        cli.main(["--ledger", str(root), "insights", "commits"])
     assert buf2.getvalue() == before  # the manifest changed no number
 
 

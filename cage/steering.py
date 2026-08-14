@@ -192,21 +192,21 @@ model call on the read path.
 
 | question | command |
 |---|---|
-| what has this used? | `cage report --by agent --since 7d` |
-| which tool actually saved anything? | `cage insights attrib` |
-| did the stack with X really use fewer tokens? | `cage insights compare` |
+| what has this used? | `cage insights chats --since 7d` |
 | which conversation used the tokens? | `cage insights chats` |
-| do the agents actually use the tools? | `cage insights adoption` |
-| why is this number what it is? | `cage query "how is attribution calculated"` |
+| what did graphify actually save? | `cage insights graphify` |
+| who wrote the lines in this commit? | `cage insights commits` |
+| where did one call's savings come from? | `cage insights why <call-id>` |
+| why is this number what it is? | `cage query "how is a saving calculated"` |
 
-If MCP is wired, the same views are available as tools (`cage_report`, `cage_attrib`,
-`cage_verdict`, `cage_compare`, …) and return the same text — quote it the same way.
+If MCP is wired, `cage_why` returns the same text as the CLI, byte for byte — quote it
+the same way.
 
 ## Close your tasks
 
-`compare`, `estimate` and `calibration` can say nothing about work nobody closed. When
-a unit of work finishes, close it: `cage task outcome <task>` (or the `cage_task_outcome`
-MCP tool, the only write tool cage exposes). One short label, never a sentence or a path.
+Closing a task is how a pile of metered calls becomes a comparable unit of work:
+`cage task outcome <task>` (or the `cage_task_outcome` MCP tool, the only write tool
+cage exposes). One short label, never a sentence or a path.
 
 ## What cage never has
 
@@ -218,14 +218,18 @@ anyone wrote — and no cage command will produce it for you if asked.
 _SKILL_TASK_CLOSER = Doc(
     id="cage-task-closer",
     title="Close a cage task",
-    trigger=("Use when a unit of work finishes. compare / estimate / calibration can "
-             "say nothing about tasks nobody closed."),
+    trigger=("Use when a unit of work finishes. A task nobody closed is a pile of "
+             "calls, not a comparable unit of work."),
     layer="L3",
     body="""
 Closing a task is what turns a pile of metered calls into a comparable unit of work.
-`cage insights compare`, `cage insights estimate` and `cage insights calibration` all
-read **closed** tasks only — they are not thin because cage is bad at statistics, they
-are thin because nobody closes anything.
+The task record carries the outcome, the label and a git snapshot taken at close.
+
+**Be honest about the state of this:** the views that read closed tasks
+(`compare`/`estimate`/`calibration`) were deleted in v0.52, so nothing renders the
+outcome today. The record is still written, still append-only, and still the only place
+this fact exists — a task closed now is readable by whatever reads it next. Do not
+claim a number from it that no command prints.
 
 ## Do this
 
@@ -241,9 +245,9 @@ cage exposes — if a job seems to need a second one, it does not.
 ## The label rule
 
 One short token: letters, digits, `.`, `_`, `-`, at most 32 characters. It is a
-**grouping key** for `cage insights compare --by label`, not a description. Never a
-sentence, a file path, or a commit message — cage will reject those, and the rejection
-is correct rather than an obstacle to work around.
+**grouping key** recorded on the task row, not a description. Never a sentence, a file
+path, or a commit message — cage will reject those, and the rejection is correct rather
+than an obstacle to work around.
 
 ## What you must not do
 
@@ -276,12 +280,11 @@ calculate on top is an untagged second implementation of the attribution engine.
 
 | the question | the command |
 |---|---|
-| what did we use? | `cage report --by agent --since 7d` (`--by route/model/day`) |
-| what did each tool save? | `cage insights attrib` |
-| did the stack with X really use fewer tokens? | `cage insights compare` |
+| what did we use? | `cage insights chats --since 7d` (per conversation) |
+| what did graphify save, per chat? | `cage insights graphify` |
 | which conversation used the tokens? | `cage insights chats` |
 | how much did graphify save per chat? | `cage insights graphify` |
-| do the agents actually invoke the tools? | `cage insights adoption` |
+
 | where did this one number come from? | `cage insights why <call-id>` |
 | how is this calculated? | `cage query "how is attribution calculated"` |
 
@@ -306,7 +309,7 @@ Add `--csv` to hand over a spreadsheet; the CSV carries the same method tags as 
 - **A blocked comparison means too few closed tasks**, not "no difference between the
   stacks". The block prints its own `n`; quote that.
 - **Do not add cage's numbers together.** Savings across tools are marginal against a
-  fixed pipeline order — summing them double-counts. `cage insights attrib` already did
+  fixed pipeline order — summing them double-counts. The per-chat view already did
   the arithmetic correctly.
 
 ## If a number looks wrong
@@ -321,7 +324,7 @@ do not guess at one, and do not explain one you have not looked up.
 _SKILL_DOCTOR_TRIAGE = Doc(
     id="cage-doctor-triage",
     title="Diagnose why cage captured nothing",
-    trigger=("Use when cage reports no spend, no savings, or a suspiciously empty view "
+    trigger=("Use when cage shows no usage, no savings, or a suspiciously empty view "
              "— capture failures are silent by nature."),
     layer="L3",
     body="""
@@ -359,7 +362,7 @@ silent by design; the second is also silent, which is why doctor exists. Never r
 
 ## Never do
 
-- Do not conclude anything from an empty `cage report` alone. Run `cage doctor` first.
+- Do not conclude anything from an empty view alone. Run `cage doctor` first.
 - Do not fix a capture gap by editing the ledger. The ledger is append-only and every
   view derives from it; a hand-edited row is a fabricated invoice.
 - Do not set `CAGE_DEBUG=1` and then quote the debug log as evidence of spend. It is a
@@ -555,7 +558,7 @@ _SKILL_WINDOWS_SHIM = Doc(
     layer="L3",
     body="""
 The interceptor is **two implementations of one contract**
-(`docs/shim-contract.md`): `data/shims/graphify` (POSIX sh) and `data/shims/graphify.cmd`
+(`docs/adr/0004_graphify.md`): `data/shims/graphify` (POSIX sh) and `data/shims/graphify.cmd`
 (Windows). Windows resolves a bare name only through `PATHEXT`, which has no
 extensionless entry — so the sh shim alone could never be *found* there, and the shim
 capture route was structurally absent on Windows until the twin existed.
@@ -573,7 +576,8 @@ re-enables the stacked-shim recursion — a failure with no error message.
 2. PATH scan that skips **every** interceptor, not just this one.
 3. Self-identification by **content, never filename**.
 4. No real binary ⇒ exit **127**. Never fall back to a bare name.
-5. Meter only if `cage data graphify --help` succeeds.
+5. Meter only if the capability probe succeeds — the shim asks cage whether it can run
+   the metering verb before routing anything through it.
 6. Transparent passthrough of args, stdin, stdout, stderr and exit code.
 7. No leaked state.
 8. A bounded walk.
@@ -584,6 +588,18 @@ Chiefly: **cmd has no `exec`**, so the real binary runs as a *child* — `call` 
 `exit /b` **on its own line**. The one-line `& exit /b %ERRORLEVEL%` form expands at
 parse time and reports the wrong exit code. And `<` / `>` inside a `rem` line are shell
 redirections in batch, not text.
+
+## The state of this as of v0.52
+
+SURFACE-CUT deleted the metering verb the twins probe for, and the shim subsystem was
+deliberately **left untouched** in that change. Because B5 gates metering behind a
+capability probe and B6 requires transparent passthrough, an installed shim now fails
+the probe and `exec`s the real binary unchanged — **no breakage, no metering**. Graphify
+savings still land: the transcript/store routes file them at `cage import`, with no
+shim involved, which is what `cage insights graphify` reads.
+
+Run `cage doctor` to see the shim's live status — it reports the dead verb rather than
+a green tick, which is the wiring-liveness gate working as designed.
 
 ## Do not
 

@@ -99,7 +99,7 @@ def summarize(root: Path, pol: dict, since: str | None = None,
 
 _HINT = ("next: cage query graphify-coverage   which agent surfaces can file a receipt\n"
         "      cage doctor                    check capture is wired and healthy\n"
-        "      cage insights attrib          per-tool gross token savings")
+        "      cage insights chats           which conversation used the tokens")
 
 
 def _render_empty(data: dict, all_chats: bool, kiro_route: str = "") -> str:

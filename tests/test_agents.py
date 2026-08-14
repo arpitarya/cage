@@ -179,10 +179,13 @@ def test_mcp_tools_list_and_call(seeded, monkeypatch):
     monkeypatch.chdir(root)
     listed = mcpserver._handle({"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
     names = {t["name"] for t in listed["result"]["tools"]}
-    assert {"cage_report", "cage_attrib", "cage_why"} <= names
+    assert {"cage_why", "cage_task_outcome"} <= names
+    # `cage_report` was the round-tripped tool until SURFACE-CUT; `cage_why` is the
+    # surviving read. An unknown call id is answered, not errored — the refusal text is
+    # the payload, which is the property this layer exists to preserve.
     called = mcpserver._handle({"jsonrpc": "2.0", "id": 2, "method": "tools/call",
-                                "params": {"name": "cage_report", "arguments": {}}})
-    assert "Ledger by route" in called["result"]["content"][0]["text"]
+                                "params": {"name": "cage_why", "arguments": {"call_id": "c_x"}}})
+    assert "no call" in called["result"]["content"][0]["text"]
 
 
 def test_mcp_unknown_method_errors():

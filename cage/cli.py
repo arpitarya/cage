@@ -12,7 +12,6 @@ import argparse
 
 from cage import __version__, clicmds, errors, hookcmd, verbmap
 from cage.agents import SURFACES
-from cage.report import DIMENSIONS
 
 
 # The verbatim front-door help (plan Phase 3 mock). `_RootParser.format_help` returns
@@ -24,25 +23,21 @@ _ROOT_HELP = """\
 cage — measure what your AI agents use, prove what your tools save
 
 daily:
-  report      where the tokens went (tokens; add $ views via [display])
   import      pull every agent's usage into the ledger
   setup       make this project (or --global) metered — scaffold + wire
   doctor      is capture healthy? (--paths shows every probed location)
   query       ask cage how any number or mechanism works
 
 groups (run any group name for its commands):
-  insights    attrib · adoption · chats · graphify · commits · commit ·
-              compare · estimate · calibration · why
+  insights    chats · graphify · commits · commit · why
   task        outcome · time
-  authorship  origin · summary · verify · notes-sync · ledger-sync
-  study       join · start · stop · report · id
+  authorship  origin · summary · verify · notes-sync
+  study       join · start · stop · report · export · id
   policy      diff · sync
-  data        export · cleanup · migrate-savings · watch · serve ·
-              proxy · meter · graphify
 
-$ cage report --since 7d          # the daily number
+$ cage import                     # pull every agent's usage into the ledger
 $ cage insights chats            # which conversation used the tokens?
-$ cage task outcome t_9f31        # close a task so compare/estimate can see it
+$ cage task outcome t_9f31        # close a task so the authorship views can see it
 $ cage study join baseline        # enroll this laptop in the fleet study
 $ cage insights graphify         # per-chat graphify saving
 """
@@ -51,7 +46,7 @@ $ cage insights graphify         # per-chat graphify saving
 class _RootParser(argparse.ArgumentParser):
     """Top parser only: `cage --help` renders the curated front door verbatim
     (`_ROOT_HELP`), not argparse's auto usage/subcommand dump. Subparsers use the
-    stock class (via `parser_class=` below), so `cage report --help` etc. are normal."""
+    stock class (via `parser_class=` below), so `cage import --help` etc. are normal."""
 
     def format_help(self) -> str:  # noqa: D401 — argparse hook
         return _ROOT_HELP
@@ -75,7 +70,7 @@ def _csv_flag(p: argparse.ArgumentParser) -> None:
 
 
 def _export_flags(p: argparse.ArgumentParser, view: str) -> None:
-    """The artifact surface every report and insight carries (`cage/viewexport.py`).
+    """The artifact surface every insight carries (`cage/viewexport.py`).
 
     ``--export`` writes the view to disk: bare = `<ledger>/.cage/output/<view>-<stamp>/`
     holding every format this view has, a path with a known suffix = exactly that file,
@@ -88,10 +83,10 @@ def _export_flags(p: argparse.ArgumentParser, view: str) -> None:
     the handler so the artifact's name and its `view=` field can never disagree with the
     command that produced it.
 
-    Deliberately **not** on bare `cage` (the overview): a root-level `--export` with an
-    optional value would swallow the following subcommand (`cage --export report` would
-    export to a file named `report`). The headline banner is a terminal surface; `cage
-    report --export` is the artifact of the same ledger."""
+    Deliberately **not** on bare `cage`: a root-level `--export` with an optional value
+    would swallow the following subcommand (`cage --export chats` would export to a file
+    named `chats`). Bare `cage` is a help surface, not a view; the per-view flag is the
+    only artifact route."""
     p.add_argument("--export", nargs="?", const="", metavar="PATH",
                    help="write this view to disk (default "
                         ".cage/output/<view>-<stamp>/, every format it has; "
@@ -149,23 +144,6 @@ def build_parser() -> argparse.ArgumentParser:
                            parser_class=argparse.ArgumentParser)
 
     # ── tier 1: the daily front door ──────────────────────────────────────────
-    rep = sub.add_parser("report", help="ledger: spend by agent / route / model / day")
-    rep.add_argument("--by", choices=DIMENSIONS, default="route", help="group dimension")
-    rep.add_argument("--since", metavar="WINDOW", help="window like 7d / 24h / 2w")
-    rep.add_argument("--scope", metavar="DIR", help="filter to one monorepo top-level dir (§3.6.2)")
-    rep.add_argument("--project", nargs="?", const=".", metavar="NAME",
-                     help="filter to one project (working-dir basename; '.' or bare flag = "
-                          "current dir). Exact for Claude only (§3.7)")
-    rep.add_argument("--team", action="store_true", help="read the merged refs/notes/cage-ledger team view (§3.6.3)")
-    rep.add_argument("--all-columns", action="store_true", dest="all_columns",
-                     help="force the full column grid even without savings signal "
-                          "(scripts wanting fixed shape; CSV never gates)")
-    _json_flag(rep)
-    _csv_flag(rep)
-    _capture_flags(rep)
-    _export_flags(rep, "report")
-    rep.set_defaults(fn=clicmds.cmd_report)
-
     im = sub.add_parser("import", help="capture every agent's on-disk usage into the active ledger (the universal path)",
                         epilog="examples:\n"
                                "  cage import                              # every agent (default --agent all)\n"
@@ -269,31 +247,10 @@ def build_parser() -> argparse.ArgumentParser:
     _json_flag(qy)
     qy.set_defaults(fn=clicmds.cmd_query)
 
-    # ── group: insights (attribution + usage views, the differentiator) ────────
+    # ── group: insights (per-chat & per-commit usage views, the differentiator) ─
     insights = _group(sub, "insights",
-                       "per-tool savings & usage views: attrib · adoption · chats · "
-                       "graphify · commits · commit · compare · estimate · "
-                       "calibration · why")
-
-    at = insights.add_parser("attrib", help="per-tool marginal savings for a task (§4.2)")
-    at.add_argument("--task", help="task id (default: most recent)")
-    at.add_argument("--scope", metavar="DIR", help="filter to one monorepo top-level dir (§3.6.2)")
-    at.add_argument("--team", action="store_true", help="read the merged refs/notes/cage-ledger team view (§3.6.3)")
-    _json_flag(at)
-    _csv_flag(at)
-    _capture_flags(at)
-    _export_flags(at, "insights attrib")
-    at.set_defaults(fn=clicmds.cmd_attrib)
-
-    ad = insights.add_parser("adoption",
-                             help="do your agents actually invoke the tools you wired? "
-                                  "(counts only — nothing here is priced)")
-    ad.add_argument("--since", metavar="WINDOW", help="window like 30d / 2w")
-    _json_flag(ad)
-    _csv_flag(ad)
-    _capture_flags(ad)
-    _export_flags(ad, "insights adoption")
-    ad.set_defaults(fn=clicmds.cmd_adoption)
+                       "per-chat & per-commit usage views: chats · graphify · "
+                       "commits · commit · why")
 
     ch = insights.add_parser("chats",
                              help="per-chat detail view: tokens/cached/cost by "
@@ -354,42 +311,6 @@ def build_parser() -> argparse.ArgumentParser:
     _export_flags(cd, "insights commit")
     cd.set_defaults(fn=clicmds.cmd_commit)
 
-    cp = insights.add_parser("compare",
-                             help="measured comparison of closed tasks grouped by stack "
-                                  "(n · median · IQR; the delta is estimated, observational)")
-    cp.add_argument("--scope", metavar="DIR", help="filter to one monorepo top-level dir")
-    cp.add_argument("--label", metavar="WORD", help="filter to tasks labelled via `cage task outcome --label`")
-    cp.add_argument("--by", default="stack", metavar="KEYS",
-                    help="comma-separated grouping keys from stack,scope,label (stack always included)")
-    _json_flag(cp)
-    _csv_flag(cp)
-    _capture_flags(cp)
-    _export_flags(cp, "insights compare")
-    cp.set_defaults(fn=clicmds.cmd_compare)
-
-    es = insights.add_parser("estimate",
-                             help="pre-task cost band (median + IQR) from matching closed "
-                                  "tasks — modeled, refuses thin history")
-    es.add_argument("--scope", metavar="DIR", help="match tasks in one monorepo top-level dir")
-    es.add_argument("--label", metavar="WORD", help="match tasks labelled via `cage task outcome --label`")
-    es.add_argument("--agent", metavar="NAME", help="match tasks a given agent worked")
-    es.add_argument("--record", metavar="TASK",
-                    help="stamp the band onto this OPEN task row (est_tokens/est_usd/est_n "
-                         "+ band bounds) so `cage insights calibration` can score it at close")
-    _json_flag(es)
-    _capture_flags(es)
-    _export_flags(es, "insights estimate")
-    es.set_defaults(fn=clicmds.cmd_estimate)
-
-    cb = insights.add_parser("calibration",
-                             help="measured hit-rate of recorded estimates vs actuals — the "
-                                  "estimator's empirical confidence level")
-    _json_flag(cb)
-    _csv_flag(cb)
-    _capture_flags(cb)
-    _export_flags(cb, "insights calibration")
-    cb.set_defaults(fn=clicmds.cmd_calibration)
-
     wy = insights.add_parser("why", help="full provenance: a call + every receipt against it")
     wy.add_argument("call_id")
     _json_flag(wy)
@@ -408,8 +329,8 @@ def build_parser() -> argparse.ArgumentParser:
     oc.add_argument("task")
     oc.add_argument("--redo", action="store_true", help="mark the task as needing a redo")
     oc.add_argument("--label", metavar="WORD",
-                    help="tag the task with one short token (letters/digits/._-, ≤32 chars) "
-                         "for `cage insights compare --by label` grouping — never a path or free text")
+                    help="tag the task with one short token (letters/digits/._-, ≤32 chars); "
+                         "recorded on the task row — never a path or free text")
     oc.set_defaults(fn=clicmds.cmd_outcome)
 
     tt = task.add_parser("time",
@@ -429,7 +350,7 @@ def build_parser() -> argparse.ArgumentParser:
     # ── group: authorship (who wrote which files + its git-notes distribution) ──
     authorship = _group(sub, "authorship",
                         "who wrote which files + its distribution: origin · summary · "
-                        "verify · notes-sync · ledger-sync (§3.5, §3.6.3)")
+                        "verify · notes-sync (§3.5)")
 
     og = authorship.add_parser("origin", help="authorship attribution for a commit (§3.5)",
                                epilog="examples:\n"
@@ -464,15 +385,6 @@ def build_parser() -> argparse.ArgumentParser:
     _json_flag(ns)
     ns.set_defaults(fn=clicmds.cmd_notes_sync)
 
-    ls = authorship.add_parser("ledger-sync", help="merge local call/receipt rows into refs/notes/cage-ledger for a team view (§3.6.3)",
-                               epilog="example:\n"
-                                      "  cage authorship ledger-sync                # dry-run: print the merge plan\n"
-                                      "  CAGE_NOTES_WRITE=1 cage authorship ledger-sync  # actually push the team ledger (CI only)\n"
-                                      "  cage report --team              # read the merged team view",
-                               formatter_class=argparse.RawDescriptionHelpFormatter)
-    ls.add_argument("--write", action="store_true", help="push to refs/notes (default: dry-run unless CAGE_NOTES_WRITE=1)")
-    _json_flag(ls)
-    ls.set_defaults(fn=clicmds.cmd_ledger_sync)
 
 
     # ── group: study ───────────────────────────────────────────────────────────
@@ -483,7 +395,7 @@ def build_parser() -> argparse.ArgumentParser:
                                 "  cage study join baseline      # enroll this machine: wire + start + doctor\n"
                                 "  cage study start plugin       # switch phase (opaque machine id, no hostname)\n"
                                 "  cage study stop               # end the current phase\n"
-                                "  cage data export --study      # one bundle for the analyst\n"
+                                "  cage study export             # one bundle for the analyst\n"
                                 "  cage import bundle*.zip       # analyst: merge bundles (idempotent)\n"
                                 "  cage study report             # coverage first, then the paired delta",
                          formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -502,6 +414,15 @@ def build_parser() -> argparse.ArgumentParser:
     st_start.add_argument("phase", help="phase label (one short token)")
     _study("stop", "end the current phase")
     _study("id", "print the opaque machine id")
+    # The fleet bundle's only route. It lived on `cage data export --study` until
+    # SURFACE-CUT deleted that group; the bundle is a study artifact, not a ledger
+    # export, so it belongs on this group and never carried the csv/otel flags anyway
+    # (they were a runtime refusal there — two export kinds, never blurred).
+    st_exp = _study("export", "write the one-file fleet bundle for the analyst")
+    st_exp.add_argument("out", nargs="?", default="",
+                        metavar="PATH", help="bundle path (default: a stamped name in the ledger)")
+    st_exp.add_argument("--since", metavar="WINDOW", help="window like 30d / 2w for the refresh sweep")
+    _capture_flags(st_exp)
     st_rep = _study("report", "coverage first, then the paired-by-machine delta")
     # `report` is the ONLY study verb that is a rendered VIEW, so it is the only one
     # that carries the artifact/CSV surface. Before CLI-GAPS(b) these sat on the group
@@ -539,116 +460,6 @@ def build_parser() -> argparse.ArgumentParser:
     po_sy.add_argument("--yes", action="append", metavar="SECTION.KEY",
                        help="confirm one non-reconstructable row (repeatable; 'all' "
                             "confirms every one shown)")
-
-    # ── group: data (capture, export, and local adapters) ──────────────────────
-    data = _group(sub, "data",
-                  "capture, export & local adapters: export · cleanup · "
-                  "watch · serve · proxy · meter")
-
-    ex = data.add_parser("export", help="import (refresh) then emit the ledger as jsonl/csv/json/otel",
-                         epilog="examples:\n"
-                                "  cage data export                         # refresh, then raw jsonl to stdout\n"
-                                "  cage data export --csv calls -o spend.csv # flat call rows for a spreadsheet\n"
-                                "  cage data export --csv receipts --since 30d # flat receipt rows (method column kept)\n"
-                                "  cage data export --format json --since 30d  # structured summary (matches `cage report`)\n"
-                                "  cage data export --no-import --format jsonl # emit the ledger as-is, no refresh\n"
-                                "  cage data export --project . --agent claude # one project's Claude rows\n"
-                                "  cage data export --otel -o calls.otel.json  # GenAI-conformant JSON (PRE-STABLE spec)\n"
-                                "Two export kinds, never blurred: the fleet bundle (--study, jsonl) is lossless,\n"
-                                "merge-by-id, and re-importable; CSV/otel are one-way REPORTING formats —\n"
-                                "never an import source (`cage query csv-output`, `cage query otel-export`).",
-                         formatter_class=argparse.RawDescriptionHelpFormatter)
-    ex.add_argument("--format", choices=["jsonl", "csv", "json"], default=None,
-                    help="jsonl=raw rows (re-ingestable) · csv=flat call rows (same as "
-                         "--csv calls) · json=summary (default: jsonl)")
-    ex.add_argument("--csv", choices=["calls", "receipts", "tasks"], dest="csv_kind",
-                    metavar="KIND",
-                    help="flat one-way CSV of raw ledger rows for pivot-table analysis "
-                         "(calls | receipts | tasks); same PII surface as the ledger — "
-                         "counts and ids, never content")
-    ex.add_argument("--json", action="store_const", dest="format", const="json",
-                    help="alias for --format json (the structured summary)")
-    ex.add_argument("--otel", action="store_true",
-                    help="one-way OpenTelemetry GenAI-conformant JSON (calls as "
-                         "gen_ai.* attributes, receipts as cage-namespaced cage.* "
-                         "data); PRE-STABLE spec — semconv version pinned + stamped "
-                         "in the output (`cage query otel-export`)")
-    ex.add_argument("--since", metavar="WINDOW", help="window like 7d / 24h / 2w")
-    ex.add_argument("--project", nargs="?", const=".", metavar="NAME",
-                    help="filter to one project (basename; '.' = current dir). Claude-exact (§3.7)")
-    ex.add_argument("--agent", choices=[*SURFACES], help="filter to one agent")
-    ex.add_argument("--no-import", dest="do_import", action="store_false",
-                    help="skip the import-first refresh; emit the ledger exactly as-is")
-    ex.add_argument("-o", "--output", metavar="FILE", help="write to FILE (default: stdout)")
-    ex.add_argument("--study", nargs="?", const="", metavar="PATH", dest="study",
-                    help="write one fleet-study bundle instead (rows + phase markers + "
-                         "counts-only manifest; default name cage-study-<machine>.zip)")
-    ex.set_defaults(fn=clicmds.cmd_export)
-
-    cu = data.add_parser("cleanup", help="prune aged .cage/state/ files (closed allowlist; dry-run by default)",
-                         epilog="examples:\n"
-                                "  cage data cleanup           # dry-run: list what would go (file · class · age)\n"
-                                "  cage data cleanup --apply   # actually prune\n"
-                                "  cage data cleanup --days 7  # tighter window for this run only\n"
-                                "Cleanable (allowlist, by construction): aged debug.log/hooks-seen.jsonl rows,\n"
-                                "stale pending-* provenance buffers, cursors whose source log is gone, *.tmp.\n"
-                                "Never: ledger/ (tool savings included), policy.toml, machine.json, study.jsonl,\n"
-                                "limits.json. State files are never read by derived views — cleanup cannot\n"
-                                "change a reported number. The auto sweep (piggybacked on `cage import`) only\n"
-                                "ever warns on stderr — this command's --apply is the only path that deletes.",
-                         formatter_class=argparse.RawDescriptionHelpFormatter)
-    cu.add_argument("--apply", action="store_true", help="execute (default: dry-run print)")
-    cu.add_argument("--days", type=int, metavar="N",
-                    help="retention window for this run (default: [cleanup] days, else 90)")
-    _json_flag(cu)
-    cu.set_defaults(fn=clicmds.cmd_cleanup)
-
-    ms = data.add_parser("migrate-savings",
-                         help="consolidate historical graphify receipts into savings/graphify/ (dry-run by default)",
-                         epilog="examples:\n"
-                                "  cage data migrate-savings          # dry-run: per-store row count + Σ saved + what would copy\n"
-                                "  cage data migrate-savings --apply  # copy graphify rows into savings/graphify/ (original ids, own-ts shard)\n"
-                                "receipts.jsonl is NEVER rewritten (append-only). `ledger.receipts()` id-dedupes the\n"
-                                "union of both stores, so a row in both counts exactly once — re-runs are no-ops, a\n"
-                                "half-done migration still reads correct totals, and attrib/report/roi stay byte-identical.\n"
-                                "Refuses --apply if the stores disagree on a shared id's saved value. graphify only\n"
-                                "(human/fux rows stay in receipts.jsonl until their sources get tree dirs).",
-                         formatter_class=argparse.RawDescriptionHelpFormatter)
-    ms.add_argument("--apply", action="store_true", help="execute the copy (default: dry-run print)")
-    _json_flag(ms)
-    ms.set_defaults(fn=clicmds.cmd_migrate_savings)
-
-    wt = data.add_parser("watch", help="foreground poll loop: import every interval until Ctrl-C (no OS job)",
-                         epilog="example:\n"
-                                "  cage data watch             # import all agents every 60s\n"
-                                "  cage data watch --interval 300   # every 5 minutes\n"
-                                "Registers nothing and stops with the terminal — cage installs no scheduler.",
-                         formatter_class=argparse.RawDescriptionHelpFormatter)
-    wt.add_argument("--agent", choices=[*SURFACES, "all"], default="all", help="which agent to meter (default: all)")
-    wt.add_argument("--interval", type=int, default=60, metavar="SECONDS", help="seconds between imports (default: 60)")
-    wt.add_argument("--since", metavar="WINDOW", help="only transcripts modified within a window like 7d / 24h / 2w")
-    wt.set_defaults(fn=clicmds.cmd_watch)
-
-    sv = data.add_parser("serve", help="local dashboard over the ledger ($0)")
-    sv.add_argument("--port", type=int, default=8788)
-    sv.set_defaults(fn=clicmds.cmd_serve)
-
-    px = data.add_parser("proxy", help="metering reverse-proxy for clients you can't edit")
-    px.add_argument("--port", type=int, default=8788)
-    px.add_argument("--upstream", default="https://api.anthropic.com", help="real API base URL")
-    px.set_defaults(fn=clicmds.cmd_proxy)
-
-    mt = data.add_parser("meter", help="run a command under the metering proxy: cage data meter -- <cmd>")
-    mt.add_argument("--upstream", default="https://api.anthropic.com")
-    mt.add_argument("argv", nargs=argparse.REMAINDER, help="-- <command> [args…]")
-    mt.set_defaults(fn=clicmds.cmd_meter)
-
-    gf = data.add_parser("graphify", help="meter a third-party graphify call without touching it",
-                         epilog="example:\n  cage data graphify -- graphify query \"auth flow\"   # runs graphify, files one savings receipt",
-                         formatter_class=argparse.RawDescriptionHelpFormatter)
-    gf.add_argument("--task", default="", help="task id to bind the saving to (default: project dir name)")
-    gf.add_argument("argv", nargs=argparse.REMAINDER, help="-- graphify <query|path|explain> …")
-    gf.set_defaults(fn=clicmds.cmd_graphify)
 
     # ── hidden top-level verbs (callable, off the front door) ──────────────────
     # mcp is spawned by wired configs; debug is a diagnostic; demo seeds the §4.4
@@ -784,8 +595,12 @@ def main(argv: list[str] | None = None) -> int:
         if since and not _ledger.valid_since(since):
             raise errors.CageError(
                 f"invalid --since {since!r} — use a window like 7d, 24h, or 2w")
-        if getattr(args, "fn", None) is None:  # no subcommand → the bare-`cage` headline (§4)
-            return clicmds.cmd_overview(args)
+        # No subcommand → the curated front door. The one-look headline died with
+        # `report` in SURFACE-CUT: the overview was a rendered ledger view, and cage
+        # no longer ships one. `cage --help` and bare `cage` are now the same surface.
+        if getattr(args, "fn", None) is None:
+            build_parser().print_help()
+            return 0
         return args.fn(args)
     except KeyboardInterrupt:  # Ctrl-C (e.g. aborting the `cage setup` wizard) — exit clean, no traceback
         print("\naborted.")

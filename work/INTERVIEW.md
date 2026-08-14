@@ -25,13 +25,35 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
 
 ## State of play (2026-08-14 — pick up here on a model switch)
 
+- **The ADR set is FOUR per-agent records, and you cite them BY NAME.**
+  [ADR-CLAUDE](../docs/adr/0001_claude.md) · [ADR-COPILOT](../docs/adr/0002_copilot.md) ·
+  [ADR-KIRO](../docs/adr/0003_kiro.md) · [ADR-GRAPHIFY](../docs/adr/0004_graphify.md).
+  **Never write "ADR 0003"** — the numbers belong to the eleven superseded records now in
+  [work/archive/adr/](archive/adr/README.md), which are **history and never current spec**.
+  Each live record has **§1 for humans** (one screen, a Mermaid diagram and a hand-paired
+  ASCII twin) and **§2 for agents**. The five laws that bind all four — pull-only · one
+  sink · append-only · counts-never-content · usage-never-cost — are stated **once** in
+  [docs/adr/README.md](../docs/adr/README.md); do not restate them in a record, and do not
+  quietly drift from them either.
+- **`docs/shim-contract.md`, `claude-capture.md`, `copilot-capture.md` and
+  `kiro-capture.md` are GONE (2026-08-14), absorbed whole.** The interceptor behaviour
+  contract — B1–B8, B8a, D1–D8, the anti-recursion proof — is **ADR-GRAPHIFY §2** and
+  nowhere else. A capture change now updates one document, not two; that was the point.
+  The originals sit in `work/archive/_removed-2026-08-14/` only because the Cowork bridge
+  cannot delete files.
+- **⚠ If `git status` looks like two changesets interleaved, it is.** On 2026-08-14 a
+  second session relocated this session's new `docs/adr/archive/` and `git add`-ed its
+  deletions into the SURFACE-CUT staged set, then left `.git/index.lock` held. The
+  concurrent-session hazard is not theoretical in this repo: **check `git status` and
+  `.git/index.lock` before you start**, and re-stage before you commit anything.
+
 - **Cage no longer measures money, and this is the biggest thing to internalise before
   you touch anything.** USAGE-ONLY deleted the whole money subsystem: 15 modules
   (~2,457 lines), 11 CLI commands, 4 MCP read tools, the `--usd` view, the bundled rate
   card, and the `[prices]`/`[credits]`/`[billing]`/`[alias]` config sections. Cage
   reports **tokens and credits** — the units the vendors themselves record — and
   converts between nothing. Read
-  [ADR 0011](../docs/adr/0011-cage-measures-usage-not-cost.md) before proposing anything
+  [ADR 0011](archive/adr/0011-cage-measures-usage-not-cost.md) before proposing anything
   that produces a currency figure; it has a numbered veto condition, and "a user could
   configure their own rate" is already in *deliberately not taken*.
 - **The spend cutover is retired.** `ledger.spend()` partitions by **agent**, not time.
@@ -74,7 +96,7 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
   Arpit's instruction (Cowork session), continuing the 2026-08-12 WORK-DIR move.
   `docs/` now holds only: `PLAN.md`, `CLI.md`, `FORMULAS.md`, `GLOSSARY.md`,
   `README.md`, the three `*-capture.md` one-pagers, `doc-size-discipline.md`,
-  `shim-contract.md`, `restricted-environments.md`, `adr/`, `architecture-flow.mermaid`,
+  `../docs/adr/0004_graphify.md`, `restricted-environments.md`, `adr/`, `architecture-flow.mermaid`,
   `assets/`, `example/`. **New handoff/prompt pairs are now specced directly into
   `work/` root**, not `docs/` root — CLAUDE.md's *Handoff/prompt docs have a
   lifecycle* rule was rewritten for this; see the Standing constraints bullet below.
@@ -291,7 +313,7 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
   kiro **IDE** is a named gap in doctor + `cage query graphify-coverage`. Pair archived
   (`work/archive/v0.47-*`), evidence in
   [research/2026-08-07-graphify-store-evidence.md](../work/research/2026-08-07-graphify-store-evidence.md),
-  carve-out in [ADR 0009](../docs/adr/0009-kiro-cli-tool-run-bodies-read-transiently-never-persisted.md).
+  carve-out in [ADR 0009](archive/adr/0009-kiro-cli-tool-run-bodies-read-transiently-never-persisted.md).
 - **The one thing to internalise about it: the blocking P0 gate paid for itself on the
   first phase.** The pair's central premise - "F2: copilot's chatSessions carries the
   command but no tool result" - was **false**, and had been for as long as the skip
@@ -376,14 +398,26 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
 
 ## In flight + the single next step
 
-**Update 2026-08-14 (latest) — USAGE-ONLY is built, green and committed. In flight:
-SURFACE-CUT** ([handoff](surface-cut.handoff.md) · [prompt](surface-cut.prompt.md)),
-raised by Arpit straight after ADR 0011 — delete `cage data *`, `cage report`, and
-`insights compare|estimate|calibration`. **Read that pair before starting anything
-else.** Note it partly overlaps TASK-GRAIN-SPINE: two of the three views it deletes
-(`compare`, `estimate`, `calibration`) are exactly the ones that gap affects, so if
-SURFACE-CUT ships, TASK-GRAIN-SPINE may close itself — check before spending on it.
-Also outstanding for Arpit: read the repositioned README, decide the version question.**
+**Update 2026-08-14 (latest) — SURFACE-CUT is BUILT.** 14 modules, 15 handlers, MCP
+6 tools → 2; the pair is archived at
+[v0.50-surface-cut.handoff.md](archive/v0.50-surface-cut.handoff.md) ·
+[prompt](archive/v0.50-surface-cut.prompt.md) and the reasoning is in
+[surface-cut.decision.md](surface-cut.decision.md). **Read the decision record before
+touching any read surface.** TASK-GRAIN-SPINE did partly close itself, as predicted — the
+three affected views are gone — but the *capture-schema* half survives and is re-scoped in
+OPEN-WORK.
+
+**The single next step is Arpit's: SHIM-DEAD-VERB.** 15 tests are red and every one is the
+graphify interceptor probing `cage data graphify`, a verb this change deleted. Leaving it
+was Arpit's explicit decision, not an oversight, and it is safe (contract B5/B6 make an
+installed shim fail its probe and pass straight through, unmetered). Closing it means
+either removing the interceptor — a 9-module cascade plus both twins and ADR-GRAPHIFY §2 —
+or giving it a live verb to probe. **Do not "fix" the tests instead.**
+
+Also outstanding for Arpit: where the decision record belongs under the new per-agent ADR
+structure, whether this ships as its own version, and the `CLAUDE.md` diff (proposed, not
+applied). And read the six **recorded-but-unread facts** in the decision record — the cut
+removed readers without removing writers, and each one is a standing choice.
 
 **Update 2026-08-12 — historical. Nothing was in flight and there was no queue left. The
 single next step is Arpit's: unjam git (`rm -f .git/index.lock`), delete the emptied
@@ -496,7 +530,7 @@ single next step: push and read the Windows `graphify` CI job.**
   script; Windows resolves a bare name only through `PATHEXT`, which has no extensionless
   entry, so cage's shim could never be *found* there. It now ships as a **twin pair** —
   `graphify` + `graphify.cmd` — against one written contract,
-  [shim-contract.md](../docs/shim-contract.md).
+  [../docs/adr/0004_graphify.md](../docs/adr/0004_graphify.md).
 - **The one thing I could not do is the one thing that matters most: run it on Windows.**
   10 behaviour tests and the whole CI `present` leg have never executed. Everything on
   this machine is green (979/0, dummyrepo S1–S18, `tools.cigraphify` 7/7 on macOS), and
@@ -551,7 +585,7 @@ you touch any savings number.**
 
 - Kiro's **IDE** rows now go to the machine ledger; its **CLI** credits are scoped to the
   project tree. Two stores, two *opposite* fixes — getting them backwards destroys real
-  attribution. [ADR 0006](../docs/adr/0006-kiro-rows-are-machine-facts-not-project-facts.md) ·
+  attribution. [ADR 0006](archive/adr/0006-kiro-rows-are-machine-facts-not-project-facts.md) ·
   [archived pair](../work/archive/v0.36-kiro-routing.handoff.md).
 - **The invariant that changed:** `importcmd.run`'s "one active sink per run — never a
   double-write" now has exactly ONE exception, and it is contained in `_kiro_leg`. If you

@@ -1,7 +1,0 @@
-$ cage insights estimate --label docfix
-Estimate · label=docfix
-
-  n = 12 matching closed tasks
-  tokens: median 7,800 · IQR 6,150–13,525
-  method: modeled — history applied to an unrun task, never a record
-  confidence: none self-reported — `cage insights calibration` measures the hit-rate

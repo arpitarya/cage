@@ -1,5 +1,0 @@
-$ cage insights adoption
-No tool invocations and no savings receipts recorded yet.
-
-next: cage import        pull every agent's usage into the ledger
-      cage doctor        check the graphify interceptor is wired and live

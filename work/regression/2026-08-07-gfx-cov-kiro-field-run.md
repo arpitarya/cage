@@ -10,7 +10,7 @@ still open and needs a real Copilot chat — see *What this does not cover*.
 - Ships with: v0.47.0 (GFX-COV), uncommitted in tree at the time of the run.
 - Store probed: `~/Library/Application Support/kiro-cli/data.sqlite3`, kiro-cli 2.16.0.
 - Shapes and the truncation marker: [research/2026-08-07-graphify-store-evidence.md](../research/2026-08-07-graphify-store-evidence.md).
-- Carve-out: [ADR 0009](../../docs/adr/0009-kiro-cli-tool-run-bodies-read-transiently-never-persisted.md).
+- Carve-out: [ADR 0009](../archive/adr/0009-kiro-cli-tool-run-bodies-read-transiently-never-persisted.md).
 
 ## Method
 
@@ -25,7 +25,7 @@ code path.
   last written 2026-08-03.
 - Detection ran with `workspace=""` — the machine-ledger scope. A *project*-scoped sweep
   from the sandbox correctly filed nothing, because the real conversations are keyed to
-  `~/my_programs/cage` and not to the sandbox tree ([ADR 0006](../../docs/adr/0006-kiro-rows-are-machine-facts-not-project-facts.md)
+  `~/my_programs/cage` and not to the sandbox tree ([ADR 0006](../archive/adr/0006-kiro-rows-are-machine-facts-not-project-facts.md)
   scoping, observed working rather than asserted).
 
 ## Result

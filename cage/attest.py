@@ -11,7 +11,9 @@ so.
 
 **What it is allowed to fix, and what it is not.** The join key is
 `usagelog.args_hash` — the same sha1-of-argv the usage breadcrumb already records — so
-an attested tool row resolves **half A of `cage insights adoption`**, which is exact but
+an attested tool row resolved **half A of `cage insights adoption`** — a view deleted
+in SURFACE-CUT (v0.52), so this store is currently **written by every wired hook and
+read by nothing** (work/OPEN-WORK.md, UNREAD-FACTS). Historically it is exact but
 agent-blind, into *which* agent invoked the tool. It does **not** resolve half B: a
 graphify savings row's id folds in an *answer* hash that no attestation can reconstruct,
 so `NO_LINK` stays structurally true and is not quietly narrowed. Overstating this would
@@ -30,7 +32,7 @@ re-blend the two unknowns that view exists to separate.
 Counts-never-content: a command line is **hashed** (it can contain a query, a path, a
 prompt), never stored. Fail-open: a write error is swallowed and traced under
 `CAGE_DEBUG`, never raised into an agent's turn. Lives in `state/`, so like every other
-`state/` file it cannot move a reported number — `cage insights adoption` prints no
+`state/` file it cannot move a reported number — its former reader prints no
 currency, and no money view reads this at all.
 """
 from __future__ import annotations

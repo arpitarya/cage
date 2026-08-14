@@ -86,7 +86,7 @@ command -v cage
 
 **This proves the POSIX twin only.** `command -v` is a POSIX shell builtin; it
 resolves the extensionless `bin/graphify`, never `bin/graphify.cmd` (Windows'
-twin — `docs/shim-contract.md`, ADR 0007). cage-lab has never run on Windows, so it
+twin — `docs/adr/0004_graphify.md`, ADR 0007). cage-lab has never run on Windows, so it
 has never proven — and cannot, as written, prove — that the `.cmd` twin resolves
 the way `graphify.exe %*` at a cmd prompt would. That coverage is CI-GF's job
 (`tools/cigraphify.py`, the `graphify (windows-latest)` CI job), not the lab's.

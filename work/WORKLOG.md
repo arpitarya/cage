@@ -12,6 +12,90 @@ by milestone) — the worklog is what *happened this session*.
 
 ---
 
+## 2026-08-14 (Claude Code) — SURFACE-CUT executed: 14 modules, 15 handlers, MCP 6→2; shim left red by decision
+
+- **Asked (Arpit):** execute `work/surface-cut.prompt.md` — delete `cage report`, all of
+  `cage data`, and `insights attrib|adoption|compare|estimate|calibration`.
+- **Done:** P0→P10 apart from P6. 14 modules deleted, 15 handlers, 7 parser ranges, MCP
+  cut to 2 tools, 12 test files deleted and ~30 stripped, 16 goldens removed, `docs/CLI.md`
+  green against the live parser, `verbmap.REMOVED` migrated, explainer registry pruned.
+  Outcome in [IMPLEMENTATION.md](IMPLEMENTATION.md); rationale in
+  [surface-cut.decision.md](surface-cut.decision.md).
+- **Decided (Arpit, in-session):** keep `cleanup.py`, delete only its verb · delete
+  `metercmd` with `proxy` · let the overview die with `report` · **add `cage study
+  export`** so the fleet study can still produce a bundle · **delete `ledger-sync` and
+  the team write path** · narrow `test_floor._VIEWS` without substituting ·
+  **leave the graphify shim subsystem untouched**, accepting 15 red tests.
+- **Found (not in the prompt):** the prompt's "only caller" claims were wrong three more
+  times — `cleanup` (also `doctorcmd` + `importcmd`), `proxy` (also `metercmd`), `report`
+  (also `cli.py`'s `DIMENSIONS` import). `just demo` had been **broken since USAGE-ONLY**
+  (`cage insights matrix`). `test_cli_tiering._GROUPED` whitelisted `cage data …`, hiding
+  every dead verb in that group from the stale-verb gate. And the cut leaves **six
+  recorded-but-unread facts** (UNREAD-FACTS in OPEN-WORK).
+- **Open:** SHIM-DEAD-VERB (15 red tests, Arpit's call) · where the decision record lives
+  under the new per-agent ADR structure · whether this ships as its own version ·
+  `CLAUDE.md` diff is **proposed, not applied**.
+- **Next step:** Arpit rules on SHIM-DEAD-VERB, then the CLAUDE.md diff lands.
+- **Cost: unmeasured — this session deleted `cage report`, the command the rule names.**
+  `cage insights chats` is the surviving reader and is per-*chat*, not per-session, so it
+  cannot isolate this session's spend. Nearest figure: this repo's largest claude chat row
+  reads 236,890,215 `tokens_in` / 318,334 `tokens_out` all-time, which is the repo, not
+  this session. Filed under UNREAD-FACTS — the WORKLOG rule now names a dead command and
+  needs a new source.
+
+
+## 2026-08-14 (Cowork) — ADR set restructured: 11 numeric records → 4 per-agent records; four docs absorbed and removed
+
+- **Asked (Arpit):** review every ADR + `claude-capture.md` / `copilot-capture.md` /
+  `kiro-capture.md` / `shim-contract.md`, then create and maintain four ADRs
+  (`0001_claude` · `0002_copilot` · `0003_kiro` · `0004_graphify`), each with a **human
+  section** (short, with diagrams) and an **agent section**. Mid-session: *"everything
+  mentioned in [those four docs] should be in adr then remove these files."*
+- **Decided (Arpit, in-session):** replace `docs/adr/` **entirely** — the eleven numeric
+  records are history, not spec, and move to `work/archive/adr/` (flattened). Diagrams are
+  **both** Mermaid and an ASCII twin. Continue despite a live concurrent session.
+- **Decided (executor, reported):** cite the live records **by name** — `ADR-CLAUDE`,
+  `ADR-COPILOT`, `ADR-KIRO`, `ADR-GRAPHIFY` — never by number. "ADR 0001" meant *team
+  ledger via refs/notes* for six weeks and has ~90 live references; the numbers now belong
+  to the archive only. The five cross-cutting laws (pull-only · one sink · append-only ·
+  counts-never-content · usage-never-cost) are stated **once** in `docs/adr/README.md` and
+  restated in none of the four.
+- **Done:** 4 ADRs + `README.md` + a two-section `TEMPLATE.md` written; 11 records + the
+  old template archived with their internal links repaired; **~46 files repointed**
+  repo-wide; `docs/README.md`, `DOC-REGISTRY.md`, `architecture-flow.mermaid`, `CLI.md`
+  and 12 code/test/tool citations updated. `shim-contract.md` absorbed **whole** into
+  ADR-GRAPHIFY §2 (B1–B8, B8a, D1–D8, the fail-open last resort, shared warts, Windows
+  facts, the test-harness corollary, the four-mechanism anti-recursion proof); the three
+  capture docs absorbed into their ADRs (store→property tables + known gaps into §2,
+  executive summary into §1). **Verified:** `test_doc_links` logic replicated green
+  (1,560 links, **0 live-broken**, simulated against the post-removal tree); all 5 Mermaid
+  blocks render under `mmdc`; a token-level completeness diff of the four absorbed docs
+  shows **0 unexplained gaps**.
+- **Written against the tree as it actually is:** SURFACE-CUT is **built and staged**, so
+  the ADRs describe a world with no `cage report`, no `cage data *`, no `attrib`/`compare`/
+  `estimate`/`calibration`, and no `ledgersync` — its handoff still says `PROPOSED — unbuilt`.
+- **Open / blocked on Arpit:**
+  1. **`.git/index.lock` has been held since 15:04 UTC** by the other session — `git rm`
+     and `git add` both fail, so **git state is not updated**. The four absorbed docs could
+     not be deleted (the bridge blocks `rm`); they are **moved** to
+     `work/archive/_removed-2026-08-14/`. Finish with: `rm -f .git/index.lock && git add -A`,
+     then delete that folder if the move is not wanted as a record.
+  2. A **second session relocated `docs/adr/archive/` to `work/archive/adr/archive/` and
+     deleted `docs/adr/` mid-edit** (14:45–14:47 UTC), and `git add`-ed my deletions into
+     its own staged set. Nothing was lost; the two changesets are now interleaved in the
+     index.
+  3. `CLAUDE.md` was **mechanically** repointed (paths only, no claim touched) rather than
+     proposed as a diff — two ADR links would otherwise be dead. Flagged for review.
+  4. **Pre-existing, not mine:** `docs/README.md` still links `archive/`, `regression/`,
+     `compare/` as if they were under `docs/` (stale since the 2026-08-12 WORK-DIR move),
+     and `chats.py`'s module docstring still says it reads `ledger.calls` when the code
+     reads `ledger.spend()`.
+- **Next step:** Arpit clears the git lock and reviews the four ADRs' §1 sections — the
+  human half is the part that has to earn its place.
+- **Cost:** documentation-only session, no code path changed; not separately metered.
+
+---
+
 ## 2026-08-14 — USAGE-ONLY: cage stops measuring money (P0→P4, suite green)
 
 - **Asked (Arpit):** execute `work/usage-only.prompt.md`. Mid-build decisions: `quality.py`
@@ -342,9 +426,9 @@ by milestone) — the worklog is what *happened this session*.
 - **Cost:** unmeasured — `cage report` is cumulative over the whole `~/.cage` ledger
   (51,460 calls / 12.4B tokens in), not per-session.
 
-## 2026-08-13 — Cowork — kiro-capture.md: the standing kiro-numbers one-pager
+## 2026-08-13 — Cowork — ../docs/kiro-capture.md: the standing kiro-numbers one-pager
 
-- **Asked:** the kiro analog of copilot-capture.md — to the point, with an
+- **Asked:** the kiro analog of ../docs/copilot-capture.md — to the point, with an
   executive-meeting section, updated whenever anything changes for kiro numbers.
 - **Done:** `docs/kiro-capture.md` — captured-today table (store → prop → row,
   incl. the ADR 0006 machine-ledger routing and the CLI workspace scoping) ·
@@ -360,7 +444,7 @@ by milestone) — the worklog is what *happened this session*.
 - **Open:** nothing.
 - **Cost:** unmeasured — `cage` not runnable from the Cowork cloud session.
 
-## 2026-08-13 — Cowork — claude-capture.md: the standing claude-numbers one-pager
+## 2026-08-13 — Cowork — ../docs/claude-capture.md: the standing claude-numbers one-pager
 
 - **Asked:** a to-the-point doc on how claude numbers are captured, with an
   executive-meeting section, updated whenever anything changes for claude capture.
@@ -426,7 +510,7 @@ by milestone) — the worklog is what *happened this session*.
   Progress: 0%); KIRO-METRICS line added to OPEN-WORK.
 - **Open:** read surface, CSV export, the proxy capture of
   `metadataEvent.tokenUsage`+`meteringEvent` (only path to cache/IDE credits), a
-  `kiro-capture.md` one-pager, and the two real-store probes (devdata schema;
+  `../docs/kiro-capture.md` one-pager, and the two real-store probes (devdata schema;
   session-JSON usage props) — scope-out lines to be filed on implement.
 - **Cost:** unmeasured — `cage` not runnable from the Cowork cloud session.
 
@@ -537,7 +621,7 @@ by milestone) — the worklog is what *happened this session*.
   once GRAPHIFY-CHATS lands.
 - **Cost:** unmeasured — `cage` not runnable from the Cowork cloud session.
 
-## 2026-08-13 — Cowork — copilot-capture.md: the standing copilot-numbers one-pager
+## 2026-08-13 — Cowork — ../docs/copilot-capture.md: the standing copilot-numbers one-pager
 
 - **Asked:** a to-the-point doc on how copilot numbers are captured, with an
   executive-meeting section, updated whenever copilot capture changes.
@@ -1194,7 +1278,7 @@ by milestone) — the worklog is what *happened this session*.
 - **Asked:** execute the GFX-COV pair (Opus). P0 was a blocking real-store evidence gate.
 - **Done:** P0 probes + [research doc](../work/research/2026-08-07-graphify-store-evidence.md) ->
   STOP -> Arpit's four verdicts -> P1 copilot-VSCode route - P2 kiro-CLI route +
-  [ADR 0009](../docs/adr/0009-kiro-cli-tool-run-bodies-read-transiently-never-persisted.md) -
+  [ADR 0009](archive/adr/0009-kiro-cli-tool-run-bodies-read-transiently-never-persisted.md) -
   P3 `--rescan-graphify` + the coverage gap surfaces - P4 tests + the full docs pass.
   Pair archived to `work/archive/v0.47-*`.
 - **The premise the pair was built on was false, and the gate is what caught it.** F2 said
@@ -2038,7 +2122,7 @@ by milestone) — the worklog is what *happened this session*.
 - **Gate:** PASSED on cage's own repo — 69 rows over 25 commits from 81 real
   transcripts, **68.7% verbatim match inside proposed files**, re-run writes 0.
   `MIN_MATCH_CHARS` frozen at **4** with a measured sweep.
-  [regression doc](../work/regression/2026-08-02-p1-authorship-dogfood.md) · [ADR 0008](../docs/adr/0008-line-match-authorship-counts-persisted-content-transient.md).
+  [regression doc](../work/regression/2026-08-02-p1-authorship-dogfood.md) · [ADR 0008](archive/adr/0008-line-match-authorship-counts-persisted-content-transient.md).
 - **Amended the handoff's §5.4 mock (flagged, not silent):** a single `human` bucket
   printed **76.6%** for this repo, 89% of it one commit of generated JSON. The residual
   now splits `human~` (files the session proposed — a real human tweak) vs
@@ -2842,7 +2926,7 @@ by milestone) — the worklog is what *happened this session*.
   "companion to portable-wiring.md" reference, dropped the removed Codex row, added a
   GF-LAUNCHER subsection). README Platforms line + `cage doctor`'s new `launcher-gap`
   check + the restored doc all state the same gap now. New `cage query graphify-shims`
-  concept entry, live-interpolated. `docs/adr/0007-graphify-twin-pair-hand-paired-not-templated.md`
+  concept entry, live-interpolated. `work/archive/adr/0007-graphify-twin-pair-hand-paired-not-templated.md`
   filed. `work/cage-lab/{01-setup,03-verify}.md` updated. The corpus-sizing rule is
   written into `tools/cigraphify.py`'s docstring **and** enforced — 4 new tests in
   `tests/test_cigraphify.py` prove `check_bare_graphify_is_intercepted` cannot pass on
@@ -3360,7 +3444,7 @@ by milestone) — the worklog is what *happened this session*.
   was already `status: implemented` but still sitting in the directory — the exact bug
   the rule now forbids. Archived to
   `archive/v0.38-windows-graphify-interceptor.proposal.md` with a header naming the
-  version **and where the living spec now lives** (`shim-contract.md`), plus an archive
+  version **and where the living spec now lives** (`../docs/shim-contract.md`), plus an archive
   index row and a **Graduated** section in `proposals/README.md`.
 - **CLAUDE.md gained the rule**, mirroring the handoff/prompt lifecycle it sits beside.
   Four states — **proposed → picked up → implemented → archived** — with the

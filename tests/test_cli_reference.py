@@ -178,7 +178,7 @@ def test_no_command_named_in_the_reference_is_dead(doc):
 
 def test_the_dead_command_detector_actually_detects():
     """A gate is only worth having if it fires. Pin both regimes."""
-    assert _resolvable("insights attrib") and _resolvable("study report")
+    assert _resolvable("insights chats") and _resolvable("study report")
     assert _resolvable("hook tool") and _resolvable("query gross-vs-net")
     assert not _resolvable("rep")            # no argparse abbreviation
     assert not _resolvable("insights attribute")

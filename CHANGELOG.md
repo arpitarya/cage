@@ -2,7 +2,53 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
-## v0.49.1 (2026-08-12, gains a second, third and fourth change 2026-08-13, a fifth through eighth 2026-08-14) — cage stops measuring money, session-tracking docs move to root work/, kiro-CLI conversations get a chat row, `cage report` gains a credits column, a new per-chat graphify view, and new per-chat Copilot, Kiro, and Claude metrics ledgers
+## v0.50.0 (2026-08-14, unreleased) — cage stops measuring money, and the surface narrows to match: the money subsystem, the reporting surface and the numeric ADR set are all gone
+
+- **SURFACE-CUT — the reporting surface narrows to match what cage now claims.** With
+  money gone (USAGE-ONLY, below), what remained was disproportionate to a usage meter: an
+  894-line `report.py`, an eight-command `data` group, a dashboard, a proxy, and three
+  task-grain views that returned zero for claude and copilot. **Fourteen modules and
+  twenty-eight test/golden files are deleted.**
+  - **Gone:** `cage data` (all eight subcommands) · `cage report` ·
+    `cage insights compare|estimate|calibration|attrib|adoption`, and with them
+    `report` · `attribution` · `adoption` · `compare` · `estimate` · `calibration` ·
+    `exportcmd` · `ledgersync` · `metercmd` · `migratecmd` · `otelout` · `proxy` ·
+    `serve` · `watchcmd`.
+  - **Survives in `cage insights`:** `chats` · `graphify` · `commits` · `commit` · `why`.
+    **Survives overall:** `import` · `setup` · `doctor` · `query` · `insights` (those
+    five) · `task` · `authorship` · `policy` · `study` · `mcp`.
+  - **`cage insights attrib` is what PLAN §4 called "the attribution engine (the part
+    that's actually novel)".** Removing it narrows what cage *is*, deliberately and with
+    that stated plainly rather than annotated away.
+  - **Residual limits, named not buried:** capture becomes `cage import`-only; ledger
+    retention loses its only pruning path; the kiro proxy — the one path to all five of
+    kiro's wire values — closes permanently; and `--team` goes with `ledgersync`, which
+    retires the live half of [ADR 0001](work/archive/adr/0001-ledger-team-aggregation-notes-not-external-sink.md).
+
+- **ADR-RESTRUCTURE — the ADR set becomes FOUR per-agent records.** `docs/adr/` now holds
+  one record per metered agent — [ADR-CLAUDE](docs/adr/0001_claude.md) ·
+  [ADR-COPILOT](docs/adr/0002_copilot.md) · [ADR-KIRO](docs/adr/0003_kiro.md) ·
+  [ADR-GRAPHIFY](docs/adr/0004_graphify.md) — each with a **§1 for humans** (one screen, a
+  Mermaid diagram and a hand-paired ASCII twin) and a **§2 for agents** (context ·
+  decision · consequences · alternatives · reference · veto condition).
+  - **Cite by name, never by number.** `ADR 0001` meant *team ledger via `refs/notes`* for
+    six weeks; the numbers now belong only to the archive.
+  - **The eleven numeric ADRs are archived** to `work/archive/adr/` — history, never
+    current spec — with an old→new map that names the two records now genuinely dead
+    (0001's `refs/notes/cage-ledger`, retired by SURFACE-CUT; 0010's `SPEND_CUTOVER`,
+    retired by 0011).
+  - **The five cross-cutting laws** — pull-only · one sink · append-only ·
+    counts-never-content · usage-never-cost — are stated **once** in
+    [docs/adr/README.md](docs/adr/README.md) and restated in no record.
+  - **Four docs absorbed WHOLE and removed:** `docs/shim-contract.md` → ADR-GRAPHIFY §2
+    (B1–B8, B8a, D1–D8, the fail-open last resort, the shared warts, the Windows facts and
+    the four-mechanism anti-recursion proof); `claude-capture.md`/`copilot-capture.md`/
+    `kiro-capture.md` → their ADRs (store→property tables and known gaps into §2, the
+    executive summary into §1). An update-rule spanning two files is one a change can
+    half-satisfy — now there is one document per agent.
+  - ~46 files repointed repo-wide, plus 12 code/test/tool citations. Verified: 0
+    live-broken links (the `test_doc_links` corpus), every Mermaid block renders, and a
+    token-level completeness diff of the four absorbed docs shows no unexplained gaps.
 
 - **USAGE-ONLY — cage measures token and credit USAGE, never cost.** The largest
   removal in the project's history and a deliberate narrowing of what it claims:
@@ -11,7 +57,7 @@ Full release notes. The README keeps a one-line summary per version; the detail 
   measured — they were recorded tokens × a hand-researched table cage is forbidden to
   fetch and cannot check against an invoice — so they are no longer printed at all.
   Full rationale, alternatives and veto condition:
-  [ADR 0011](docs/adr/0011-cage-measures-usage-not-cost.md).
+  [ADR 0011](work/archive/adr/0011-cage-measures-usage-not-cost.md).
   - **Deleted:** `prices` · `creditprice` · `receiptprice` · `convert` · `roi` ·
     `netsaved` · `matrix` · `verdict` · `budget` · `forecast` · `regression` ·
     `recommend` · `quality` · `pricescmd` · `pricestoml`, plus `data/prices.toml` and
@@ -53,8 +99,8 @@ Full release notes. The README keeps a one-line summary per version; the detail 
     `estimate` / `calibration` currently see zero for claude and copilot
     (**TASK-GRAIN-SPINE** in `work/OPEN-WORK.md`). `report --by route` likewise
     collapses to `chat` for those agents.
-  - Built from: [usage-only.handoff.md](work/archive/v0.51-usage-only.handoff.md) ·
-    [usage-only.prompt.md](work/archive/v0.51-usage-only.prompt.md).
+  - Built from: [usage-only.handoff.md](work/archive/v0.50-usage-only.handoff.md) ·
+    [usage-only.prompt.md](work/archive/v0.50-usage-only.prompt.md).
 
 - **WORK-DIR:** `IMPLEMENTATION.md`, `INTERVIEW.md`, `MACHINE.md`, `OPEN-WORK.md`, and
   `WORKLOG.md` moved from `docs/` to a new root `work/` directory, on Arpit's explicit
@@ -173,7 +219,7 @@ Full release notes. The README keeps a one-line summary per version; the detail 
   `ledger/{claude,copilot,kiro}/`, resolved by each row's **own `ts`** so a chat
   straddling the instant is counted once on each side and never twice. Capture stays
   **dual-write**, so the flip is a one-constant rollback rather than a data event.
-  Design of record: **[ADR 0010](docs/adr/0010-metric-ledgers-are-the-spend-source-forward-only-cutover.md)**,
+  Design of record: **[ADR 0010](work/archive/adr/0010-metric-ledgers-are-the-spend-source-forward-only-cutover.md)**,
   plan §3.14.
   · **CLAUDE-DEDUP and CLAUDE-SUBAGENT-KEY are CLOSED.** Claude gains a **request grain**
   (one row per folded `(requestId, message.id)`, carrying a single model), emitted from
@@ -428,7 +474,7 @@ un-exportable. Wire the new command in — never relax the set.
 about the filter and a **misleading one about kiro**, whose absence has two structural
 causes cage already knows: its CLI conversations are recorded as **credits** (a row shape
 with no tokens and no call, so no chat row can exist for them) and its IDE rows are a
-machine fact routed to `~/.cage` ([ADR 0006](docs/adr/0006-kiro-rows-are-machine-facts-not-project-facts.md)).
+machine fact routed to `~/.cage` ([ADR 0006](work/archive/adr/0006-kiro-rows-are-machine-facts-not-project-facts.md)).
 Saying *filter* when the answer is *architecture* sends a reader to check their typing
 instead of the ledger they actually want — the same class of failure as an agent showing
 no rows because capture silently broke.
@@ -552,9 +598,9 @@ evidence, the exact keys, and the versions probed are in
   graphify-coverage`** — which surfaces file receipts and, for the one that cannot, the
   measured reason. Both read one table (`graphifytx.GRAPHIFY_COVERAGE`), so a gap can
   never be worded two ways.
-- **[ADR 0009](docs/adr/0009-kiro-cli-tool-run-bodies-read-transiently-never-persisted.md)**
+- **[ADR 0009](work/archive/adr/0009-kiro-cli-tool-run-bodies-read-transiently-never-persisted.md)**
   — kiro-CLI tool-run bodies are read **transiently**; nothing but hashes and counts
-  persists. It does not re-argue the principle ([ADR 0008](docs/adr/0008-line-match-authorship-counts-persisted-content-transient.md)
+  persists. It does not re-argue the principle ([ADR 0008](work/archive/adr/0008-line-match-authorship-counts-persisted-content-transient.md)
   ratified that already, and more strictly); it records where the boundary falls in the
   one store whose law is a written key whitelist.
 
@@ -946,7 +992,7 @@ three-rung ladder at the single pricing choke point.
 Built from: [proposal](work/archive/v0.43-agent-vs-human-v2.proposal.md) ·
 [handoff](work/archive/v0.43-agent-vs-human-v2.handoff.md) +
 [prompt](work/archive/v0.43-agent-vs-human-v2.prompt.md) ·
-[ADR 0008](docs/adr/0008-line-match-authorship-counts-persisted-content-transient.md) ·
+[ADR 0008](work/archive/adr/0008-line-match-authorship-counts-persisted-content-transient.md) ·
 [dogfood evidence](work/regression/2026-08-02-p1-authorship-dogfood.md).
 
 The Tier-1 human axis was removed in v0.36 for inventing precision — a turn-gap
@@ -1362,7 +1408,7 @@ Built from: [handoff](work/archive/v0.38-win-graphify-shim.handoff.md) ·
 - **GF-DEBT, same change:** restored the deleted `docs/restricted-environments.md` (8
   citing files), stated the python-launcher/graphify-metering conflict (GF-LAUNCHER) in
   the README, that doc, and a new `cage doctor` `launcher-gap` check, added the
-  `cage query graphify-shims` explainer, filed [ADR 0007](docs/adr/0007-graphify-twin-pair-hand-paired-not-templated.md)
+  `cage query graphify-shims` explainer, filed [ADR 0007](work/archive/adr/0007-graphify-twin-pair-hand-paired-not-templated.md)
   for the hand-paired-twin decisions, updated cage-lab to state POSIX-twin-only
   coverage, and wrote + regression-tested the CI-corpus sizing rule (a too-small corpus
   makes every query honestly `unmeasurable`, which had let an early draft of the
@@ -1680,7 +1726,7 @@ never *what a person would have cost*. It shares a word and nothing else.
 ### Kiro capture routing — two stores, two opposite fixes (2026-08-01) ⚠ BEHAVIOUR CHANGE
 
 Kiro is a paid tool and its cost was being counted more than once. Decision + veto
-condition: [ADR 0006](docs/adr/0006-kiro-rows-are-machine-facts-not-project-facts.md).
+condition: [ADR 0006](work/archive/adr/0006-kiro-rows-are-machine-facts-not-project-facts.md).
 Built from: [work/archive/v0.36-kiro-routing.handoff.md](work/archive/v0.36-kiro-routing.handoff.md)
 + [work/archive/v0.36-kiro-routing.prompt.md](work/archive/v0.36-kiro-routing.prompt.md).
 Evidence: [the double-count finding](work/regression/2026-08-01-finding-kiro-rows-double-count-across-ledgers.md).

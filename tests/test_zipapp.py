@@ -94,7 +94,7 @@ def test_doctor_reports_zipapp_and_priced_policy(pyz, tmp_path):
 def test_derived_view_is_deterministic_under_the_zip(pyz, tmp_path):
     assert _run(pyz, "setup", "--project-only", "--no-graphify", cwd=tmp_path).returncode == 0
     assert _run(pyz, "demo", cwd=tmp_path).returncode == 0
-    first = _run(pyz, "report", cwd=tmp_path)
-    second = _run(pyz, "report", cwd=tmp_path)
+    first = _run(pyz, "insights", "chats", cwd=tmp_path)
+    second = _run(pyz, "insights", "chats", cwd=tmp_path)
     assert first.returncode == 0, first.stderr
     assert first.stdout and first.stdout == second.stdout

@@ -79,7 +79,7 @@ def _live(pol: dict) -> dict:
                                       or "unknown (pre-0.25)"),
         # configurable import paths (plan Phase 4) — the live resolved candidate list
         "sources_live": _sources_live(pol),
-        # the graphify interceptor twin pair (shim-contract.md) — live from the one
+        # the graphify interceptor twin pair (docs/adr/0004_graphify.md) — live from the one
         # enumeration `paths.py` owns, never a hard-coded "bin/graphify" literal
         "graphify_shim_posix": next(n for n in paths.GRAPHIFY_SHIMS if n == "graphify"),
         "graphify_shim_windows": next(n for n in paths.GRAPHIFY_SHIMS if n.endswith(".cmd")),

@@ -9,7 +9,7 @@ def cmd(tail: str) -> str:
     runtime hint that names a cage subcommand routes through here (plan Phase 3 §5),
     so the CLI verb map has one indirection point instead of scattered string
     literals — and the `cage <old-verb>` grep gate stays meaningful. ``tail`` is the
-    post-`cage ` invocation, e.g. ``cmd("insights attrib")`` → ``"cage insights attrib"``."""
+    post-`cage ` invocation, e.g. ``cmd("insights chats")`` → ``"cage insights chats"``."""
     return f"cage {tail}"
 
 

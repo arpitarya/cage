@@ -1,13 +1,13 @@
 # CLI
 
-**Every `cage` command in one place.** 14 top-level entries — 5 daily verbs, 5 groups,
-4 hidden plumbing commands — resolving to **41 addressable commands**. The front door
-(`cage --help`) shows only the curated five plus the group names; this file is the
+**Every `cage` command in one place.** 13 top-level entries — 4 daily verbs, 5 groups,
+4 hidden plumbing commands — resolving to **27 addressable commands**. The front door
+(`cage --help`) shows only the curated four plus the group names; this file is the
 whole surface.
 
-Fast path: `cage report` (the daily number) · `cage import` (pull usage in) ·
-`cage setup` (wire a project) · `cage doctor` (is capture healthy?) ·
-`cage query` (how is any number computed?).
+Fast path: `cage import` (pull usage in) · `cage insights chats` (which conversation
+used the tokens?) · `cage setup` (wire a project) · `cage doctor` (is capture
+healthy?) · `cage query` (how is any number computed?).
 
 This file is **checked against the live parser** by
 [`tests/test_cli_reference.py`](../tests/test_cli_reference.py) — every command and
@@ -47,14 +47,13 @@ repeated in each table:
 | `--quiet` | silence capture confirmations (or set `CAGE_QUIET=1`) |
 | `--why-ledger` | print which ledger resolved and why (to stderr) |
 
-They are global too, so `cage --no-import report` works. The one exception is
-**`cage data export --no-import`**, which is a *different* flag with a different
-meaning — it skips the export's own import-first refresh and emits the ledger exactly
-as-is.
+They are global too, so `cage --no-import insights chats` works. `cage study export`
+carries `--no-import` with a *different* meaning — it skips the bundle's own
+import-first refresh and bundles the ledger exactly as-is.
 
 ### Export flags
 
-`cage report`, every `cage insights` view, and the three other report-shaped views —
+Every `cage insights` view plus the two other report-shaped views —
 `cage authorship summary` and `cage study report` — take these two, so
 they are documented once here rather than repeated in each table
 ([`cage/viewexport.py`](../cage/viewexport.py), `cage query view-export`):
@@ -79,8 +78,9 @@ Three rules make this safe to rely on:
 A format the view cannot produce (`--export x.csv` on a view with no CSV renderer) is
 a refusal, not an empty file. Bare `cage` (the headline) has **no** `--export`: a
 root-level optional-value flag would swallow the following subcommand. `.cage/output/`
-is not `.cage/out/` (that one is `cage data serve`'s docroot), and no cleanup class
-prunes it — cage never deletes an artifact it wrote.
+is deliberately not `.cage/out/` (which was the deleted local server's docroot — the
+separation is kept so a future server could not publish exported artifacts), and no
+cleanup class prunes it: cage never deletes an artifact it wrote.
 
 ---
 
@@ -103,28 +103,6 @@ Ledger resolution order: `--ledger` / `CAGE_BASE` → project `.cage/` → globa
 
 ## Daily verbs
 
-### `cage report`
-
-Where the spend went. Tokens are the default view; dollars are opt-in.
-
-| Flag | Meaning |
-|---|---|
-| `--by {route,agent,model,provider,day,task}` | group dimension |
-| `--since WINDOW` | window like `7d` / `24h` / `2w` |
-| `--scope DIR` | filter to one monorepo top-level dir (plan §3.6.2) |
-| `--project [NAME]` | filter to one project (working-dir basename; `.` or the bare flag = current dir). Exact for Claude only (plan §3.7) |
-| `--team` | read the merged `refs/notes/cage-ledger` team view (plan §3.6.3) |
-| `--all-columns` | force the full column grid even without savings signal (for scripts wanting a fixed shape; CSV never gates) |
-| `--json` | machine-readable output |
-| `--csv [PATH]` | emit as CSV (stdout, or to `PATH`) |
-
-Plus the [export two](#export-flags) (`--export [PATH]` · `--stamp`) and the
-[capture-on-read three](#capture-on-read-flags).
-
-Savings printed here are **GROSS** — `raw_alternative − actual`, excluding the cost of
-*using* the tool. The word `gross` appears on every surface that prints the number;
-`cage query gross-vs-net` explains why.
-
 ### `cage import`
 
 Pull every agent's usage into the resolved ledger. Idempotent and incremental (a
@@ -132,7 +110,7 @@ per-agent high-water cursor). Works with no hooks and no project.
 
 | Argument / flag | Meaning |
 |---|---|
-| `BUNDLE …` | study bundle zip(s) from `cage data export --study` — merged by row identity, idempotent (plan §4.9) |
+| `BUNDLE …` | study bundle zip(s) from `cage study export` — merged by row identity, idempotent (plan §4.9) |
 | `--agent {claude,copilot,kiro,all}` | which agent to meter (default: `all`) |
 | `--path PATH` | a transcript file or dir to scan (log-bearing agents only) |
 | `--project PROJECT` | restrict to one repo's sessions (Claude only) |
@@ -159,7 +137,7 @@ are the confusion the flag exists to end; verify with `cage doctor`'s
 
 Kiro's IDE log is a machine fact, not a project fact, so those rows route to `~/.cage`
 even during a project sweep
-([ADR 0006](adr/0006-kiro-rows-are-machine-facts-not-project-facts.md)); the summary
+([ADR 0006](../work/archive/adr/0006-kiro-rows-are-machine-facts-not-project-facts.md)); the summary
 line names the sink, and a total never includes a row that landed elsewhere.
 
 ### `cage setup`
@@ -214,19 +192,15 @@ rather than guessing.
 
 ---
 
-## `cage insights` — 17 derived views
+## `cage insights` — 5 derived views
 
 | Command | What it answers |
 |---|---|
-| `cage insights attrib` | per-tool marginal savings for a task (plan §4.2) |
-| `cage insights adoption` | do your agents actually invoke the tools you wired? (counts only — nothing here is priced) |
-| `cage insights chats` | per-chat detail: tokens/cached/cost by `(agent, surface, session)`, titled where the store has a title (local-only — no `--team`) |
+| `cage insights chats` | per-chat detail: tokens/credits by `(agent, surface, session)`, titled where the store has a title (local-only by construction — no team view) |
+| `cage insights graphify` | per-chat graphify usage & GROSS saving: recorded tokens · the without-graphify counterfactual · `saved%` (tokens only) |
 | `cage insights commits` | one row per commit: tokens, human hours, and the `agent / human~ / unattr / unkn` line split. **No USD on this surface, by design** (the v1 veto, kept) |
 | `cage insights commit SHA` | one commit in detail: tokens · origin + confidence · the four line buckets · suggested-vs-kept counts · per-file table · wall/agent/human time |
-| `cage insights compare` | **measured** comparison of closed tasks grouped by stack (n · median · IQR; the delta is `estimated` + observational) |
-| `cage insights estimate` | pre-task cost band (median + IQR) from matching closed tasks — `modeled`, refuses thin history |
-| `cage insights calibration` | **measured** hit-rate of recorded estimates vs actuals — the estimator's only confidence source |
-| `cage insights why` | full provenance: a call + every receipt against it |
+| `cage insights why CALL_ID` | full provenance: a call + every receipt against it |
 
 Flags, beyond the [capture-on-read three](#capture-on-read-flags) and the
 [export two](#export-flags) — **every view in this group takes `--export`/`--stamp`**
@@ -235,18 +209,15 @@ new insight cannot ship un-exportable):
 
 | Command | Flags |
 |---|---|
-| `cage insights attrib` | `--task ID` (default: most recent) · `--scope DIR` · `--team` · `--json` · `--csv [PATH]` |
-| `cage insights adoption` | `--since WINDOW` · `--json` · `--csv [PATH]` |
+| `cage insights chats` | `--since WINDOW` · `--agent {claude,copilot,kiro,all}` · `--all` (every chat; default is top 20 by `tokens_in`) · `--json` · `--csv [PATH]` |
 | `cage insights graphify` | `--since WINDOW` · `--agent {claude,copilot,kiro,all}` · `--all` (every receipt-bearing chat; default is top 20 by `saved`) · `--all-chats` (include chats with no graphify receipts too) · `--json` · `--csv [PATH]` |
 | `cage insights commits` | `--since WINDOW` · `--all` (every commit; default is the 20 newest) · `--json` · `--csv [PATH]` |
 | `cage insights commit SHA` | positional `SHA` (short or full) · `--files` (every file; default is the 8 largest) · `--json` · `--csv [PATH]` |
-| `cage insights compare` | `--scope DIR` · `--label WORD` · `--by KEYS` (comma-separated from `stack,scope,label`; `stack` always included) · `--json` · `--csv [PATH]` |
-| `cage insights estimate` | `--scope DIR` · `--label WORD` · `--agent NAME` · `--record TASK` (stamp the band onto that **open** task row so calibration can score it at close) · `--json` |
-| `cage insights calibration` | `--json` · `--csv [PATH]` |
 | `cage insights why CALL_ID` | positional `CALL_ID` · `--json` |
 
-`compare`, `estimate` and `calibration` are gated by `MIN_COMPARE_N` /
-`MIN_ESTIMATE_N` in `constants.py` — below the gate they **explain, never number**.
+Savings printed here are **GROSS** — `raw_alternative − actual`, excluding the cost of
+*using* the tool. The word `gross` appears on every surface that prints the number;
+`cage query gross-vs-net` explains why.
 
 `commits` / `commit` carry **no dollar figure at all** — not gated, absent. They are
 the rebuilt agent-vs-human axis (v1 died pricing an inferred gap), so tokens and hours
@@ -254,13 +225,19 @@ are the whole vocabulary; valuation stays in your spreadsheet. A commit with no
 joinable call renders `—`, never `0`: *nothing joined here* and *this cost nothing* are
 different claims. See `cage query agent-authorship`.
 
+**Twelve views were removed in v0.52 (SURFACE-CUT)** — `attrib`, `adoption`, `compare`,
+`estimate`, `calibration` here, plus the top-level report verb and the whole `data`
+group. See
+[Removed and renamed verbs](#removed-and-renamed-verbs). Capture is unchanged: every
+row those views read is still recorded.
+
 ---
 
 ## `cage task` — 3 commands
 
 | Command | What it does | Flags |
 |---|---|---|
-| `cage task outcome TASK` | close a task with its outcome (`ok` by default) | `--redo` (mark as needing a redo) · `--label WORD` (one short token: letters/digits/`._-`, ≤32 chars, for `cage insights compare` grouping — never a path or free text) |
+| `cage task outcome TASK` | close a task with its outcome (`ok` by default) | `--redo` (mark as needing a redo) · `--label WORD` (one short token: letters/digits/`._-`, ≤32 chars, recorded on the task row; its readers went in v0.52 — never a path or free text) |
 | `cage task time DURATION` | attest how long **you** spent on a task — `45m` · `2h` · `1h30m` · a bare number of minutes. Written as `human_minutes` + `human_minutes_method = "attested"` | `--task ID` (default: the most recent) |
 
 `cage task time` is the **only** unmarked human number cage will ever print: it always
@@ -289,12 +266,11 @@ agent-autonomous, unknown}`.
 | `cage authorship summary` | how much of this repo's history cage can speak to at all — **unknown-rate first**, then the recorded rows by agent/method and the suggested-vs-kept counts | `--since WINDOW` · `--json` · `--csv [PATH]` |
 | `cage authorship verify` | report-only consistency check over the provenance ledger — **never fails the build, always exits 0** | — |
 | `cage authorship notes-sync` | merge the buffered provenance into `refs/notes/cage-provenance` | `--write` (push; default is dry-run unless `CAGE_NOTES_WRITE=1`) · `--json` |
-| `cage authorship ledger-sync` | merge local call/receipt rows into `refs/notes/cage-ledger` for the team view (plan §3.6.3) | `--write` · `--json` |
 
 `origin = "human"` is reachable **only** via explicit attestation, and is always paired
 with `method = "heuristic"` (enforced at construction). `unknown` is a read-time
 default, never a written row. Automated rows are written by the **import sweep**
-(`cage/authorcapture.py`, [ADR 0008](adr/0008-line-match-authorship-counts-persisted-content-transient.md)),
+(`cage/authorcapture.py`, [ADR 0008](../work/archive/adr/0008-line-match-authorship-counts-persisted-content-transient.md)),
 gated by its own consent switch `[authorship] capture` / `CAGE_AUTHORSHIP` — this is
 the one path that reads your diffs, and that is a different permission from metering
 spend. Both sync commands are **CI-sole-writer**: a dev machine
@@ -302,7 +278,7 @@ defaults to a dry-run print.
 
 ---
 
-## `cage study` — 5 actions
+## `cage study` — 6 actions
 
 The P5 fleet study (plan §4.9). Opaque random machine id, **opt-in by enrollment** — an
 unenrolled ledger stamps nothing and stays byte-identical to legacy.
@@ -313,10 +289,12 @@ unenrolled ledger stamps nothing and stays byte-identical to legacy.
 | `cage study start PHASE` | switch phase (one short token) |
 | `cage study stop` | end the current phase |
 | `cage study report` | coverage first, then the paired delta — the **only** study action that is a rendered view, and so the only one carrying `--csv`/`--export`/`--stamp`. A marker verb does not have those flags at all (argparse usage error, exit 2); it used to reach them from the group and refuse at runtime |
+| `cage study export [PATH]` | write the one-file fleet bundle (rows + phase markers + a counts-only manifest) for the analyst. **The bundle's only route since v0.52** — it lived on the deleted data-export verb's study flag. Stays jsonl: it is the one export that is also an *import* source (`cage import bundle*.zip`), which is why it carries no CSV or OTel form |
 | `cage study id` | print the opaque machine id (never a hostname) |
 
 Flags: `--json` on every action; `--csv [PATH]` · `--export [PATH]` · `--stamp` on
-`report` only. Bare `cage study` prints the action list. The sample unit is the
+`report` only; `--since WINDOW` and the [capture-on-read three](#capture-on-read-flags)
+on `export` (its `--no-import` skips the bundle's own import-first refresh). Bare `cage study` prints the action list. The sample unit is the
 **machine-day**; the paired
 delta is `estimated` with a work-mix caveat, gated on `MIN_COMPARE_N`
 machines-with-both-phases.
@@ -341,47 +319,6 @@ auto-applies this** — hints recommend, humans run.
 
 ---
 
-## `cage data` — 8 commands
-
-### `cage data export`
-
-`cage data export` imports (refreshes) first, then emits. `--agent` filters the
-*output* only — the sweep is always all-agent.
-
-| Flag | Meaning |
-|---|---|
-| `--format {jsonl,csv,json}` | `jsonl` = raw rows, re-ingestable (default) · `csv` = flat call rows · `json` = summary |
-| `--csv {calls,receipts,tasks}` | flat one-way CSV of raw ledger rows for a pivot table; same PII surface as the ledger — counts and ids, never content |
-| `--json` | alias for `--format json` |
-| `--otel` | one-way OpenTelemetry GenAI-conformant JSON (calls as `gen_ai.*`, receipts cage-namespaced as `cage.*`). **Pre-stable spec** — the semconv version is pinned and stamped in the output (`cage query otel-export`) |
-| `--since WINDOW` | window like `7d` / `24h` / `2w` |
-| `--project NAME` | filter to one project (basename; `.` = current dir). Claude-exact (plan §3.7) |
-| `--agent {claude,copilot,kiro}` | filter to one agent |
-| `--no-import` | skip the import-first refresh; emit the ledger exactly as-is |
-| `--output FILE` (`-o`) | write to `FILE` (default: stdout) |
-| `--study [PATH]` | write one fleet-study bundle instead (rows + phase markers + counts-only manifest; default name `cage-study-<machine>.zip`) |
-
-CSV and OTel are **one-way reporting formats — never an import source**. The
-re-importable fleet bundle stays jsonl.
-
-### The other seven
-
-| Command | What it does | Flags |
-|---|---|---|
-| `cage data cleanup` | prune aged `.cage/state/` files (closed allowlist; dry-run by default). **Deletion only ever happens here, with `--apply`** — the automatic path only warns | `--apply` · `--days N` (default: `[cleanup] days`, else 90) · `--json` |
-| `cage data migrate-savings` | consolidate historical graphify receipts into `savings/graphify/` | `--apply` (default: dry-run print) · `--json` |
-| `cage data watch` | foreground poll loop: import every interval until Ctrl-C (**no OS job** — cage installs no scheduler) | `--agent {claude,copilot,kiro,all}` · `--interval SECONDS` (default 60) · `--since WINDOW` |
-| `cage data serve` | local dashboard over the ledger (`$0`) | `--port N` |
-| `cage data proxy` | metering reverse-proxy for clients you can't edit | `--port N` · `--upstream URL` |
-| `cage data meter` | run a command under the metering proxy | `--upstream URL` · then `--` and the command |
-| `cage data graphify` | meter a third-party graphify call without touching it | `--task ID` (default: project dir name) · then `--` and the graphify invocation |
-
-`cage data cleanup` never touches `ledger/` (tool savings included),
-`cage.toml`/`policy.toml`, `prices.toml`, `machine.json`, `study.jsonl` or
-`limits.json` — by construction.
-
----
-
 ## Hidden plumbing
 
 Callable but deliberately absent from `cage --help`.
@@ -389,7 +326,7 @@ Callable but deliberately absent from `cage --help`.
 | Command | What it does | Flags |
 |---|---|---|
 | `cage mcp` | run the MCP server over stdio — 9 read tools + exactly one write tool (`cage_task_outcome`). Wired automatically by `cage setup` | — |
-| `cage demo` | seed the plan §4.4 worked example and print the attribution and matrix tables | — |
+| `cage demo` | seed the plan §4.4 worked example into the ledger | — |
 | `cage debug` | tail the metadata-only debug log (`CAGE_DEBUG=1` to populate) | `--tail N` (default 20) · `--json` (one JSON event per line) |
 | `cage hook EVENT` | the opt-in **L1** lifecycle entry point, invoked by wired agents, not by hand | positional `EVENT ∈ {session-start, session-end, tool}` · `--agent NAME` (required — stamped, never inferred) · `--session ID` · `--command CMD` (hashed for attestation, never stored) |
 
@@ -420,12 +357,13 @@ entry to `verbmap`, update this file, then sweep every wire module, `install.sh`
 |---|---|
 | `init` | `cage setup` |
 | `import-claude` | `cage import` with `--agent claude` |
-| `attrib` · `matrix` · `roi` · `verdict` · `budget` | the same name under `cage insights` |
-| `compare` · `estimate` · `calibration` · `why` | the same name under `cage insights` |
-| `forecast` · `regression` · `recommend` | the same name under `cage insights` |
+| `why` | the same name under `cage insights` |
+| `report` · `attrib` · `adoption` · `compare` · `estimate` · `calibration` | **removed outright in v0.52** (SURFACE-CUT) — the ledger rollup and the task-comparison family. Capture is unchanged; the surviving reads are per chat and per commit |
+| `matrix` · `roi` · `verdict` · `budget` · `forecast` · `regression` · `recommend` · `prices` · `quality` | **removed outright in v0.51** with the money subsystem ([ADR 0011](../work/archive/adr/0011-cage-measures-usage-not-cost.md)) |
 | `outcome` · `quality` | the same name under `cage task` |
-| `origin` · `verify` · `notes-sync` · `ledger-sync` | the same name under `cage authorship` |
-| `export` · `cleanup` · `watch` · `serve` · `proxy` · `meter` · `graphify` | the same name under `cage data` |
+| `origin` · `verify` · `notes-sync` | the same name under `cage authorship` |
+| `ledger-sync` | **removed outright in v0.52** — the team-view flag it fed was its only reader, so the ref could be written and never displayed |
+| `export` · `cleanup` · `watch` · `serve` · `proxy` · `meter` · `graphify` | **removed outright in v0.52** — the whole `data` group. Capture is pull-based: use `cage import`. The fleet bundle moved to `cage study export` |
 | `human` · `human-record` · `trend` | **removed outright** — the Tier-1 human axis was amputated in v0.36 and does not return without a proposal doc |
 | `hook-session-start` · `hook-stop` · `hook-session-end` · `hook-post-tool-use` · `hook-post-commit` · `hook-prepare-commit-msg` | **removed outright** — replaced by the single `cage hook EVENT` |
 
@@ -437,9 +375,10 @@ Recorded here rather than quietly worked around; tracked in [OPEN-WORK.md](../wo
 
 **None open.** Both entries that stood here are closed:
 
-1. ~~`cage data migrate-savings` missing from the front door~~ — fixed 2026-08-03
-   (CLI-GAPS(a)); `cage --help` now lists all eight of `data`'s commands, and the front
-   door is gated bidirectionally against the live parser.
+1. ~~`data migrate-savings` missing from the front door~~ — fixed 2026-08-03
+   (CLI-GAPS(a)) by listing the whole group; the group itself was deleted in v0.52. The
+   front door stays gated bidirectionally against the live parser, which is what makes
+   a deletion this size safe.
 2. ~~`prices`/`study`/`policy` take their action as a positional choice~~ — converted to
    real subparsers 2026-08-11 (CLI-GAPS(b)). Each action now owns its `--help` and its
    own flags, so an inapplicable flag is an argparse usage error (exit 2) instead of a

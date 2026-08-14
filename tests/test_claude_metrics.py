@@ -447,11 +447,11 @@ def test_report_and_chats_byte_identical_with_claude_tree_present_or_absent(proj
         session="demo-sess", tokens_in=999, tokens_out=999, requests=5,
         ts="2026-08-13T00:00:00Z", metric_id="clm_present"))
     before = {" ".join(v): _render(v, capsys)
-             for v in (["report", "--by", "agent"], ["insights", "chats"])}
+             for v in (["insights", "chats"], ["insights", "chats"])}
     for sh in paths.Footprint(proj).claude_shards():
         sh.unlink()
     after = {" ".join(v): _render(v, capsys)
-            for v in (["report", "--by", "agent"], ["insights", "chats"])}
+            for v in (["insights", "chats"], ["insights", "chats"])}
     assert before == after
 
 

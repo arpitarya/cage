@@ -9,7 +9,7 @@
 
 You're running an agent, a graph tool, a rules engine, maybe Copilot. At the end of the month someone asks *"is any of this worth it?"* — and the honest answer is a shrug and a Slack thread. Cage meters every LLM call, collects a **savings receipt** from each tool in the stack, and turns the raw stream into an **attribution ledger**: what each agent used, what each tool saved you, which conversation burned the tokens, who wrote which commit, and which tools your agents actually *adopt* when offered. **`$0`, deterministic, zero dependencies, no model in the maintenance path.**
 
-**Cage does not price anything, on purpose.** It ships no rate card and computes no dollars — it reports the units the providers themselves record: **tokens** and **credits**. A dollar figure built from a rate card cage cannot check against your invoice is a reconstruction wearing a currency symbol, and this project would rather show you a number it can stand behind. ([ADR 0011.](docs/adr/0011-cage-measures-usage-not-cost.md))
+**Cage does not price anything, on purpose.** It ships no rate card and computes no dollars — it reports the units the providers themselves record: **tokens** and **credits**. A dollar figure built from a rate card cage cannot check against your invoice is a reconstruction wearing a currency symbol, and this project would rather show you a number it can stand behind. ([ADR 0011.](work/archive/adr/0011-cage-measures-usage-not-cost.md))
 
 **Named after *John Cage*.** · Python ≥ 3.11 · stdlib only · MIT · sits beside `fux`, `bach`, `wagner`, `orff`.
 
@@ -29,7 +29,7 @@ And the kicker — you built half of it. So when finance points at you and says 
 
 **Cage is the thing that ruins the fog.** It's the itemized receipt nobody asks for and everybody needs: the graph tool saved 27,000 tokens here, fux saved 6,400 there, this conversation burned 400,000 and that one burned 900 — each number stamped so you know which ones were counted and which ones are some computer's best guess. It doesn't do synergy. It does arithmetic.
 
-**And here's the part that'll annoy you: cage used to print dollars, and it stopped.** Not because dollars don't matter — because cage was *making them up*. Multiply real tokens by a rate card some maintainer typed in by hand, and you get a confident-looking figure nobody can check against an actual invoice. That's the fog again, in a nicer font. So the rate card went in the bin, eleven commands went with it, and what's left is what the vendors themselves wrote down. A meter you can't catch lying is worth more than a dashboard you can. ([Why.](docs/adr/0011-cage-measures-usage-not-cost.md))
+**And here's the part that'll annoy you: cage used to print dollars, and it stopped.** Not because dollars don't matter — because cage was *making them up*. Multiply real tokens by a rate card some maintainer typed in by hand, and you get a confident-looking figure nobody can check against an actual invoice. That's the fog again, in a nicer font. So the rate card went in the bin, eleven commands went with it, and what's left is what the vendors themselves wrote down. A meter you can't catch lying is worth more than a dashboard you can. ([Why.](work/archive/adr/0011-cage-measures-usage-not-cost.md))
 
 And when cage's own numbers came back saying a session *with* the graph tool used **more** tokens than one without? It printed that too, labelled, instead of burying it. ([The finding.](work/regression/2026-08-01-finding-saved-is-gross.md))
 
@@ -245,7 +245,7 @@ Every derived view is parse / arithmetic over the log — **no LLM call, ever, o
 
 Latest release below — full history and detail in [CHANGELOG.md](CHANGELOG.md).
 
-- **v0.49.1 — cage stops measuring money.** The money subsystem is deleted: fifteen modules, eleven commands, four MCP tools, the `--usd` view and the bundled rate card are gone. Dollars were never measured — they were tokens × a table cage could not verify — so cage now reports only what the vendors record: **tokens and credits**, each with its own absence reason and never summed across agents. The spend cutover is retired with it. ([ADR 0011](docs/adr/0011-cage-measures-usage-not-cost.md))
+- **v0.50.0 — cage stops measuring money, and the surface narrows to match.** The money subsystem is deleted: fifteen modules, eleven commands, four MCP tools, the `--usd` view and the bundled rate card are gone. Dollars were never measured — they were tokens × a table cage could not verify — so cage now reports only what the vendors record: **tokens and credits**, each with its own absence reason and never summed across agents. The reporting surface narrows with it, and the ADR set becomes **four per-agent records** — one per metered agent, each written for a human and for an agent. ([ADR 0011](work/archive/adr/0011-cage-measures-usage-not-cost.md) · [the ADR set](docs/adr/README.md))
 
 ## The name
 

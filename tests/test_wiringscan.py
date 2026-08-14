@@ -32,9 +32,13 @@ posix_only = pytest.mark.skipif(os.name != "posix", reason="sh shim — POSIX ho
     # live: every verb cage actually emits into a wiring artifact today
     ("cage import --agent claude --project .", True),
     ("cage mcp", True),
-    ("cage data graphify --help", True),
-    ("cage insights attrib", True),
+    ("cage insights chats", True),
     # dead: renamed in v0.28.0 …
+    # … SURFACE-CUT (v0.52) removed the rollup family and the whole `data` group; both
+    # spellings are still installed on real machines, so both must read as dead.
+    ("cage insights attrib", False),
+    ("cage report --by agent", False),
+    ("cage data export --json", False),
     ("cage import-claude --project .", False),
     ("cage graphify --help", False),
     ("cage export --json", False),
@@ -93,8 +97,12 @@ def test_removed_keys_are_all_actually_dead():
 def test_heal_tail_rewrites_dead_verbs_only():
     assert wiringscan.heal_tail("import-claude --project .") == \
         "import --agent claude --project ."
-    assert wiringscan.heal_tail("export --json") == "data export --json"
-    assert wiringscan.heal_tail("attrib") == "insights attrib"
+    # `export`/`attrib` map to an EMPTY tail since SURFACE-CUT (removed, no
+    # replacement), and `heal_tail` never rewrites to an empty fix — it returns the tail
+    # untouched and the scan reports it as dead-with-no-remediation instead. Inventing a
+    # replacement for a deleted command is the one thing heal must never do.
+    assert wiringscan.heal_tail("export --json") == "export --json"
+    assert wiringscan.heal_tail("attrib") == "attrib"
     # live verbs and unmappable dead ones are returned untouched — heal never guesses
     assert wiringscan.heal_tail("hook-stop") == "hook-stop"
     assert wiringscan.heal_tail("import --agent claude") == "import --agent claude"
@@ -217,7 +225,9 @@ def test_scan_reports_remediation_only_when_one_exists(homes):
     _plant_everything(homes)
     by_verb = {d.command: d for d in wiringscan.run(homes, assets=False).dead}
     assert by_verb["import-claude"].fix == "import --agent claude"
-    assert by_verb["graphify"].fix == "data graphify"
+    # `graphify` (the top-level spelling) now maps to an empty tail — the `data` group
+    # is gone, so there is no replacement to point at.
+    assert by_verb["graphify"].fix == ""
     # `adopt` was removed outright, never renamed (and is absent from verbmap.REMOVED —
     # the reason detection uses the parser). No replacement may ever be invented for it.
     assert wiringscan.remediation(("adopt",)) == ""
@@ -347,10 +357,10 @@ def test_derived_views_are_byte_identical(proj, capsys):
     render byte-for-byte the same before and after a scan runs over the same project."""
     from cage import cli, demo
     demo.seed(proj)
-    assert cli.main(["--ledger", str(proj), "insights", "attrib"]) == 0
+    assert cli.main(["--ledger", str(proj), "insights", "chats"]) == 0
     before = capsys.readouterr().out
     wiringscan.run(proj)
-    assert cli.main(["--ledger", str(proj), "insights", "attrib"]) == 0
+    assert cli.main(["--ledger", str(proj), "insights", "chats"]) == 0
     assert capsys.readouterr().out == before
 
 

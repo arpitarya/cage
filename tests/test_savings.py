@@ -76,17 +76,6 @@ def test_receipts_unions_tree_with_legacy_receipts(tmp_path):
     assert sum(r["saved"] for r in union) == 80 + 400
 
 
-def test_savings_surface_through_attribution(tmp_path):
-    # A savings-tree row is receipt-compatible → `cage insights attrib` reads it unchanged.
-    from cage import attribution, policy
-    root = _root(tmp_path)
-    savings.record(root, tool="graphify", raw_alternative=1000, actual=200,
-                   task="t", ts="2026-07-01T00:00:00Z")
-    data = attribution.attribute(root, "t", policy.load(None))
-    assert "graphify" in {s["tool"] for s in data["steps"]}
-    assert data["total_saved_tokens"] == 800  # the tree row flowed through unchanged
-
-
 def test_cleanup_never_touches_the_savings_tree(tmp_path):
     # savings/ is ledger data (under ledger/), not state/ — the cleanup allowlist is
     # state-only by construction, so a saving can never be pruned. days=0 is the
@@ -99,3 +88,11 @@ def test_cleanup_never_touches_the_savings_tree(tmp_path):
     before = ledger.savings(root)
     cleanup.prune(root, policy.load(None), days=0)
     assert ledger.savings(root) == before                # untouched
+
+# ── the savings tree's derived reader changed (SURFACE-CUT, 2026-08-14) ───────
+# `test_savings_surface_through_attribution` proved a savings-tree row is
+# receipt-compatible by reading it back through `cage insights attrib`. That command is
+# deleted. **`savings.py` itself is untouched and still load-bearing** — its surviving
+# readers are `graphifychat` (→ `cage insights graphify`), `graphifymeter` and
+# `graphifytx`, all of which read the same rows through `ledger.savings`. Every other
+# test in this file (the union, the dedup, the cleanup guard) is unchanged.

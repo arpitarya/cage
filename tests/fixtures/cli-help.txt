@@ -1,24 +1,20 @@
 cage — measure what your AI agents use, prove what your tools save
 
 daily:
-  report      where the tokens went (tokens; add $ views via [display])
   import      pull every agent's usage into the ledger
   setup       make this project (or --global) metered — scaffold + wire
   doctor      is capture healthy? (--paths shows every probed location)
   query       ask cage how any number or mechanism works
 
 groups (run any group name for its commands):
-  insights    attrib · adoption · chats · graphify · commits · commit ·
-              compare · estimate · calibration · why
+  insights    chats · graphify · commits · commit · why
   task        outcome · time
-  authorship  origin · summary · verify · notes-sync · ledger-sync
-  study       join · start · stop · report · id
+  authorship  origin · summary · verify · notes-sync
+  study       join · start · stop · report · export · id
   policy      diff · sync
-  data        export · cleanup · migrate-savings · watch · serve ·
-              proxy · meter · graphify
 
-$ cage report --since 7d          # the daily number
+$ cage import                     # pull every agent's usage into the ledger
 $ cage insights chats            # which conversation used the tokens?
-$ cage task outcome t_9f31        # close a task so compare/estimate can see it
+$ cage task outcome t_9f31        # close a task so the authorship views can see it
 $ cage study join baseline        # enroll this laptop in the fleet study
 $ cage insights graphify         # per-chat graphify saving

@@ -22,11 +22,17 @@ REMOVED: dict[str, str] = {
     "init": "setup",
     "import-claude": "import --agent claude",
     # → insights
-    "attrib": "insights attrib",
-    "compare": "insights compare",
-    "estimate": "insights estimate",
-    "calibration": "insights calibration",
     "why": "insights why",
+    # SURFACE-CUT (v0.52) removed the ledger rollup and the task-comparison family
+    # outright. These four were top-level verbs, then `insights <verb>` for several
+    # releases, so BOTH spellings sit in wired artifacts and shell history — each gets an
+    # empty tail (removed, no replacement) and a sentence in `_BODIES`.
+    "report": "",
+    "attrib": "",
+    "adoption": "",
+    "compare": "",
+    "estimate": "",
+    "calibration": "",
     # The money subsystem, removed outright in USAGE-ONLY (ADR 0011) — cage measures
     # usage, not cost. An empty tail means "removed, no replacement": `direction()`
     # explains from `_BODIES` below and `wiringscan.heal_tail` never rewrites to it.
@@ -51,15 +57,20 @@ REMOVED: dict[str, str] = {
     "origin": "authorship origin",
     "verify": "authorship verify",
     "notes-sync": "authorship notes-sync",
-    "ledger-sync": "authorship ledger-sync",
-    # → data
-    "export": "data export",
-    "cleanup": "data cleanup",
-    "watch": "data watch",
-    "serve": "data serve",
-    "proxy": "data proxy",
-    "meter": "data meter",
-    "graphify": "data graphify",
+    # The whole `data` group went in SURFACE-CUT (v0.52), so every one of these now
+    # points at a command that does not exist either. They were top-level verbs before
+    # the CLI tiering and `data <verb>` after it — both spellings are still installed
+    # somewhere, so both resolve to a removal sentence rather than a dead direction.
+    # `ledger-sync` went the same way: its only readers were `report --team`/`attrib
+    # --team`, so the team ref could be written and never displayed.
+    "ledger-sync": "",
+    "export": "",
+    "cleanup": "",
+    "watch": "",
+    "serve": "",
+    "proxy": "",
+    "meter": "",
+    "graphify": "",
     # hook machinery removed (capture is pull-based): no replacement command —
     # an empty tail means "removed outright"; direction() explains, heal never
     # rewrites to it (wiringscan.heal_tail skips empty fixes).
@@ -78,17 +89,42 @@ _MONEY_REMOVED = (
     "was removed in v0.51 with the whole money subsystem — cage measures token and "
     "credit USAGE, not cost. There is no replacement command: no price table, no "
     "budget, no ROI, no dollar anywhere (`cage query gross-vs-net`). Nearest usable "
-    "views: `cage report` (tokens/credits by any dimension), `cage insights attrib` "
-    "(per-tool gross token savings), `cage insights chats` (per conversation)")
+    "views: `cage insights chats` (per conversation), `cage insights graphify` "
+    "(per-chat gross token savings), `cage insights commits` (per commit)")
+
+# SURFACE-CUT (v0.52): the ledger rollup, the whole `data` group, and the
+# task-comparison family. Each names what it did and where the same question is
+# answerable now — an empty tail with no sentence would print the hook-removal message,
+# which would be simply wrong for these.
+_ROLLUP_REMOVED = (
+    "was removed in v0.52 (SURFACE-CUT). Cage no longer ships a ledger rollup or a "
+    "task-comparison family; capture is unchanged and every row is still recorded. "
+    "The surviving read surfaces are per chat and per commit: `cage insights chats`, "
+    "`cage insights graphify`, `cage insights commits`, `cage insights commit`, "
+    "`cage insights why`")
+_DATA_REMOVED = (
+    "was removed in v0.52 (SURFACE-CUT) with the whole `cage data` group — there is no "
+    "export, no local server, no proxy and no watcher. Capture still works and is "
+    "pull-based: run `cage import`. The fleet bundle moved to `cage study export`")
 
 _BODIES: dict[str, str] = {
     **{v: f"'{v}' {_MONEY_REMOVED}" for v in
        ("matrix", "roi", "verdict", "budget", "forecast", "regression", "recommend",
         "prices")},
+    **{v: f"'{v}' {_ROLLUP_REMOVED}" for v in
+       ("report", "attrib", "adoption", "compare", "estimate", "calibration")},
+    **{v: f"'{v}' {_DATA_REMOVED}" for v in
+       ("export", "cleanup", "watch", "serve", "proxy", "meter", "graphify")},
+    "ledger-sync": ("'ledger-sync' was removed in v0.52 (SURFACE-CUT). It pushed local "
+                    "rows into refs/notes/cage-ledger for a team view, and `--team` — "
+                    "its only reader — went with `cage report`/`cage insights attrib`, "
+                    "so the ref could be written and never displayed. Provenance notes "
+                    "are unaffected: `cage authorship notes-sync` still works"),
     "quality": ("'quality' was removed in v0.51 — it reported cost per successful "
                 "task, and cage no longer measures cost. The OUTCOME half survives: "
-                "`cage task outcome <task>` still records ok/redo, and "
-                "`cage insights compare` / `calibration` still read it"),
+                "`cage task outcome <task>` still records ok/redo (its readers, "
+                "`compare`/`calibration`, went in v0.52 — the outcome is recorded, and "
+                "no view reads it yet)"),
     "human": ("'human' was removed in v0.36 — the agent-vs-human cost axis is gone. "
               "Its two non-human subcommands moved: `cage task outcome`, "
               "`cage task quality` (`cage query savings-axis`)"),

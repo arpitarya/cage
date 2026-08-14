@@ -96,7 +96,7 @@ def test_no_confirmation_text_in_csv(tmp_path, monkeypatch, capsys):
          "message": {"model": "claude-opus-4-8",
                      "usage": {"input_tokens": 100, "output_tokens": 50}}}) + "\n",
         encoding="utf-8")
-    assert cli.main(["report", "--by", "agent", "--csv"]) == 0
+    assert cli.main(["insights", "chats", "--csv"]) == 0
     cap = capsys.readouterr()
     assert "· captured" not in cap.out          # the CSV stream is pure data
     assert "route" in cap.out or "agent" in cap.out.splitlines()[0]
@@ -111,7 +111,7 @@ def test_mcp_no_stray_stdout(seeded, monkeypatch, capsys):
     for env in ("CLAUDE_CONFIG_DIR", "COPILOT_HOME", "KIRO_DATA_DIR"):
         monkeypatch.setenv(env, str(root / f"home-{env.lower()}"))
     req = json.dumps({"jsonrpc": "2.0", "id": 7, "method": "tools/call",
-                      "params": {"name": "cage_report", "arguments": {}}}) + "\n"
+                      "params": {"name": "cage_why", "arguments": {"call_id": "c_x"}}}) + "\n"
     out = StringIO()
     mcpserver.serve(stdin=StringIO(req), stdout=out)
     # Every line the server emitted is a valid JSON-RPC object — no capture-on-read line
@@ -139,7 +139,7 @@ def test_mcp_capture_summary_is_a_structured_field(seeded, monkeypatch):
                      "usage": {"input_tokens": 10, "output_tokens": 5}}}) + "\n",
         encoding="utf-8")
     reply = mcpserver._handle({"jsonrpc": "2.0", "id": 1, "method": "tools/call",
-                               "params": {"name": "cage_report", "arguments": {}}})
+                               "params": {"name": "cage_why", "arguments": {"call_id": "c_x"}}})
     # The capture proof rides as structuredContent, never in the rendered text.
     sc = reply["result"].get("structuredContent")
     assert sc is not None and "capture" in sc and "calls" in sc["capture"]

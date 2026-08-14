@@ -19,7 +19,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from cage import (agents, cfgio, clicmds, compare, ledger, mcpserver, outcomes,
+from cage import (agents, cfgio, clicmds, ledger, mcpserver, outcomes,
                   policy, schema, tasks)
 from cage.constants import MIN_COMPARE_N
 
@@ -107,51 +107,20 @@ def _close(root, tid, ts="2026-06-10T10:00:00Z", label=""):
 
 # ── the refusals cross the boundary VERBATIM ──────────────────────────────────
 
-def test_compare_min_n_block_reaches_the_agent_verbatim(mcp):
-    """A group below MIN_COMPARE_N is BLOCKED and says its own n. An agent that got
-    the numbers without the block would compare two medians drawn from one task each."""
-    for i in range(2):                                  # 2 < MIN_COMPARE_N
-        cid = _call(mcp, f"g-{i}", f"2026-06-1{i}T10:00:00Z")
-        _receipt(mcp, "graphify", 5_000, f"2026-06-1{i}T10:00:00Z", task=f"g-{i}", call=cid)
-        _close(mcp, f"g-{i}", f"2026-06-1{i}T11:00:00Z")
-    d = compare.summarize(mcp, policy.load(None), by=("stack",))
-    blocked = [g for g in d["groups"] if g.get("reason")]
-    assert blocked and all(str(MIN_COMPARE_N) in g["reason"] for g in blocked)
-    text = _text("cage_compare")
-    assert text == compare.render_compare(d)
-    assert str(MIN_COMPARE_N) in text and "insufficient data" in text
-
-
-def test_compare_csv_keeps_the_blocked_group_as_a_row(mcp):
-    """CSV never gates: a blocked group keeps its row (with its reason) rather than
-    vanishing into a table that reads complete."""
-    for i in range(2):
-        cid = _call(mcp, f"g-{i}", f"2026-06-1{i}T10:00:00Z")
-        _receipt(mcp, "graphify", 5_000, f"2026-06-1{i}T10:00:00Z", task=f"g-{i}", call=cid)
-        _close(mcp, f"g-{i}", f"2026-06-1{i}T11:00:00Z")
-    csv_text = _text("cage_compare", {"format": "csv"})
-    assert csv_text == compare.render_csv(compare.summarize(mcp, policy.load(None),
-                                                            by=("stack",)))
-    assert "insufficient data" in csv_text
-
-
-def test_compare_rejects_an_unknown_by_key_with_the_choices(mcp):
-    reply = mcpserver._handle({"jsonrpc": "2.0", "id": 3, "method": "tools/call",
-                               "params": {"name": "cage_compare",
-                                          "arguments": {"by": "author"}}})
-    assert reply["result"]["isError"] is True
-    assert "stack, scope, label" in reply["result"]["content"][0]["text"]
-
-
 def test_mcp_output_is_byte_identical_to_the_cli(mcp, capsys):
     """One composer, one renderer, two transports. If these ever diverge, one surface
-    is summarizing — the failure this layer exists to prevent."""
-    _seed_gross_only(mcp)
-    _close(mcp, "t-0")
+    is summarizing — the failure this layer exists to prevent.
 
-    assert clicmds.cmd_compare(SimpleNamespace(
-        by="stack", scope=None, label=None, json=False, csv=None, no_import=True)) == 0
-    assert capsys.readouterr().out.rstrip("\n") == _text("cage_compare").rstrip("\n")
+    Carried on `cage_why` since SURFACE-CUT deleted `cage_compare` (which was the
+    original subject). The assertion is unchanged: the MCP text must equal the CLI's
+    stdout byte for byte, not merely contain it."""
+    cid = _call(mcp, "t-0", "2026-06-10T10:00:00Z")
+    _receipt(mcp, "graphify", 10_000, "2026-06-10T10:00:30Z", task="t-0", call=cid)
+
+    assert clicmds.cmd_why(SimpleNamespace(
+        call_id=cid, json=False, no_import=True, export=None, stamp=False)) == 0
+    assert capsys.readouterr().out.rstrip("\n") == \
+        _text("cage_why", {"call_id": cid}).rstrip("\n")
 
 
 # ── the one write tool ────────────────────────────────────────────────────────
@@ -272,3 +241,12 @@ def test_kiro_mcp_doctor_check_probes_the_resolved_interpreter(proj):
     assert rows["kiro-mcp"]["level"] in {"ok", "warn", "fail"}
     # Whatever the verdict, it names the interpreter — never a bare pass/fail.
     assert "python3" in detail or "py" in detail
+
+# ── The refusal-crossing tests lost their subject (SURFACE-CUT, 2026-08-14) ──
+# Two tests pinned the most important property of this layer: `compare`'s MIN_COMPARE_N
+# block reaching the agent VERBATIM (text and CSV alike), because an agent reads an
+# empty result as *zero* — the one thing a refusal never means. `cage_compare` is gone
+# and **no surviving MCP tool refuses**, so the property is currently untestable here
+# rather than merely untested. `cage_why` still crosses byte-identically with the CLI,
+# which is the same discipline applied to a non-refusing tool. If a refusing read tool
+# is ever added back, restore an equivalent of these two cases WITH it.

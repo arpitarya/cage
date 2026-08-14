@@ -2,7 +2,7 @@
 %% Maintained: update when a stage, sink, or read surface changes (see DOC-REGISTRY.md).
 %% Mirrors the Architecture section of CLAUDE.md and docs/cage-plan.md §3–§5.
 flowchart TD
-    subgraph capture["Capture — pull-based & global (ADR 0002)"]
+    subgraph capture["Capture — pull-based & global (adr/README.md: one sink, pull-only)"]
         agents["Agent logs<br/>Claude Code · Copilot · Kiro"]
         meter["meter() / proxy / transcript<br/>(fail-open, best-effort)"]
         imp["cage import / export<br/>(resolved ledger, incremental cursors)"]
@@ -18,7 +18,7 @@ flowchart TD
         prov["provenance.jsonl<br/>(local buffer)"]
     end
 
-    machine["Machine ledger — ~/.cage<br/>kiro IDE rows only (ADR 0006)<br/>one copy per machine"]
+    machine["Machine ledger — ~/.cage<br/>kiro IDE rows only (ADR-KIRO)<br/>one copy per machine"]
 
     meter --> calls
     meter --> receipts
@@ -51,7 +51,7 @@ flowchart TD
     derive --> read
 
     subgraph ci["CI-sole-writer aggregation (union-by-id)"]
-        nledger["refs/notes/cage-ledger — team view (ADR 0001)"]
+        nledger["refs/notes/cage-ledger — REMOVED by SURFACE-CUT 2026-08-14"]
         nprov["refs/notes/cage-provenance — authorship"]
     end
 

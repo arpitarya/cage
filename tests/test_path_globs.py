@@ -194,7 +194,7 @@ def test_absent_path_globs_scans_nothing_and_says_so(tmp_path, monkeypatch):
 def test_the_zero_match_warning_names_the_patterns_it_tried(proj, tmp_path, monkeypatch):
     """The other half of the fix. "matched 0 files" with the glob hidden is unanswerable —
     that omission is why the copilot bug cost twenty minutes to find."""
-    from cage import report
+    from cage import doctorcmd
     # A home marker must exist for the triple gate to fire (installed but capturing nothing).
     (tmp_path / "home-copilot_home").mkdir(parents=True, exist_ok=True)
     monkeypatch.setattr(importcmd, "_home_markers",
@@ -203,7 +203,7 @@ def test_the_zero_match_warning_names_the_patterns_it_tried(proj, tmp_path, monk
     empty.mkdir()
     importcmd.run(proj, "copilot", _args(path=str(empty)))
 
-    warns = report.capture_warnings(importcmd.capture_health(proj))
+    warns = doctorcmd.capture_warnings(importcmd.capture_health(proj))
     assert warns, "an installed agent that matched nothing must warn"
     assert "matched 0 files (tried: " in warns[0]
     assert "**/events.jsonl" in warns[0] and "**/chatSessions/*.jsonl" in warns[0]

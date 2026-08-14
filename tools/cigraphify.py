@@ -11,7 +11,7 @@ proves capture and derivation, the lab proves agent adoption.** Anything needing
 agent turn is paid, and stays cage-lab's job.
 
 **Cross-platform by construction.** The interception check must resolve `graphify` the
-way a *shell* does, which is the whole point on Windows (PATHEXT, docs/shim-contract.md)
+way a *shell* does, which is the whole point on Windows (PATHEXT, docs/adr/0004_graphify.md)
 — so every invocation goes through `shell=True` rather than an argv list. Python's own
 `CreateProcess` appends only `.exe` and would never find `graphify.cmd`, i.e. it would
 fail the Windows leg for a reason that has nothing to do with cage.
@@ -139,7 +139,7 @@ def _env(sandbox: Path, project: Path, *, on_path: Path | None = None) -> dict:
 
 def _sh(cmdline: str, *, cwd: Path, env: dict, check: bool = True) -> subprocess.CompletedProcess:
     """Run ``cmdline`` through the platform shell — the only faithful way to test PATH
-    resolution of a bare name (D2/PATHEXT in docs/shim-contract.md)."""
+    resolution of a bare name (D2/PATHEXT in docs/adr/0004_graphify.md)."""
     r = subprocess.run(cmdline, shell=True, cwd=str(cwd), env=env,
                        capture_output=True, text=True, timeout=600)
     if check and r.returncode != 0:

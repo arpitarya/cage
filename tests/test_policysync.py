@@ -79,8 +79,8 @@ def test_borrowed_example_table_still_in_bundle():
 def test_neutrality_apply_keeps_every_derived_view_byte_identical(v016, seeded, capsys):
     """Zero-customization project: --apply must not change one byte of any
     derived view — adds only pin defaults `policy.load` was already using."""
-    views = [["report"], ["report", "--by", "model"], ["insights", "attrib"],
-             ["insights", "chats"], ["insights", "attrib"],
+    views = [["insights", "chats"], ["insights", "commits"], ["insights", "graphify"],
+             ["insights", "chats"], ["insights", "graphify"],
              ["insights", "chats"]]
 
     def snap():
@@ -378,7 +378,7 @@ def test_freshness_policy_line_is_opt_in_report_footer_stays_clean(v016, seeded,
     composed = freshness.freshness(v016, pol, include_policy=True)
     assert line in composed
     assert line not in freshness.freshness(v016, pol)  # default: excluded
-    assert cli.main(["report"]) == 0
+    assert cli.main(["insights", "chats"]) == 0
     assert "cage policy sync" not in capsys.readouterr().out
 
 

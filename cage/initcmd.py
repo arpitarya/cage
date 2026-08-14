@@ -18,7 +18,7 @@ _POINTER = f"""{POINTER_START}
 
 This project meters LLM traffic into `.cage/` (a *flux*: $0, deterministic).
 
-- Usage so far: `cage report` · per-tool savings: `cage insights attrib` · per chat: `cage insights chats`
+- Per chat: `cage insights chats` · graphify savings: `cage insights graphify` · per commit: `cage insights commits`
 - Tokens and credits are recorded as *counts* — cage measures usage, never cost.
 - The ledger carries token counts, never prompt text — PII-safe by construction.
 - Edit pipeline order / capture switches in `.cage/cage.toml`.

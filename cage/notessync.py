@@ -59,7 +59,7 @@ def _method_rank_winner(prior: dict, row: dict) -> dict:
 def merge_rows(existing: list[dict], incoming: list[dict]) -> list[dict]:
     """Union provenance fragments by row `id` (the shared `mergeutil.union_by_id` core),
     breaking a repeated id by `method` rank. Ledger sync reuses the same core with no
-    tie-break (plain first-by-id) — see `ledgersync`."""
+    tie-break (plain first-by-id)."""
     return mergeutil.union_by_id(existing, incoming, on_collision=_method_rank_winner)
 
 

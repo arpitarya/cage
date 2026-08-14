@@ -102,7 +102,7 @@ def _now_iso() -> str:
 
 def last_import(root: Path) -> str | None:
     """ISO timestamp of the last `cage import` run over this ledger, or ``None`` if it has
-    never run. Capture is pull-based (no daemon), so `cage doctor`/`cage report` surface
+    never run. Capture is pull-based (no daemon), so `cage doctor` and the read views surface
     this as "last import: N ago" and nudge when stale (plan §3.7)."""
     return _load_cursors(paths.Footprint(root)).get("_last_import")
 
@@ -770,7 +770,7 @@ def import_custom_tools(root: Path, args, *, pol: dict | None = None,
                         collect: list | None = None, import_id: str = "") -> list[str]:
     """Meter every `[sources.<name>]` custom tool (a name that is not one of the four
     agents, plan Phase 4). Each reuses its declared-format parser and stamps
-    ``agent = <name>`` on the rows, so `cage report`/`attrib` split it out naturally.
+    ``agent = <name>`` on the rows, so the per-agent views split it out naturally.
     Same `_scan`/`_ingest`/cursor/dedupe/fail-open path as the built-ins; a custom
     tool gets its own cursor bucket (keyed on the resolved file path, like every
     other source). Returns one summary line per tool that imported anything."""
@@ -1233,7 +1233,7 @@ def run(root: Path, agent: str, args) -> list[str]:
     lands in the one resolved ledger and never scatters a stray local footprint.
 
     **One exception, by decision:** kiro's *IDE* rows are a machine fact, not a project
-    fact, so they route to the machine ledger ([ADR 0006](docs/adr/0006-kiro-rows-are-machine-facts-not-project-facts.md))
+    fact, so they route to the machine ledger ([ADR 0006](work/archive/adr/0006-kiro-rows-are-machine-facts-not-project-facts.md))
     — the one place this sweep writes two ledgers. That leg is fully contained in
     `_kiro_leg` (own lock, `seen`, cursors, health, manifest), runs to completion before
     this function's own lock is taken, and its counts never enter this sweep's rollup or
@@ -1358,7 +1358,7 @@ def _parse_iso(ts: str):
 
 class _SweepArgs:
     """The minimal arg shape `run` reads for a capture-on-read sweep — deliberately a
-    FRESH namespace, never the read command's own args: a `cage report --project foo`
+    FRESH namespace, never the read command's own args: a read command's own `--project`
     must not have its output-filter `project` (a basename) misread by `import_claude` as
     a Claude project *slug* restriction, and its `--since` must not narrow capture. A
     capture-on-read sweep is always the full all-agent incremental scan (cursors keep a

@@ -23,7 +23,7 @@ Fixes for what golden-set Phase 1 found, plus two standing directives. Baseline 
   the shutdown ordinal (**ord 0 byte-identical** to the legacy id → history self-heals);
   `totalPremiumRequests` (also cumulative — verified 0.33→0.66 on real V3 `8073abba`)
   gets the same delta treatment. Append-only; no row mutated. See
-  [ADR 0004](../../docs/adr/0004-append-only-delta-rows-and-separate-by-schema.md).
+  [ADR 0004](../archive/adr/0004-append-only-delta-rows-and-separate-by-schema.md).
 - **Self-heal proof (real session `8073abba`, executed):** legacy row 70,071 →
   re-import fixed parser → **107,581 exact** (+37,510, the exact undercount) → third
   import **+0**. V3 would go **8/8**, tokens_in **227,298**.

@@ -18,7 +18,7 @@ import json
 import sqlite3
 from types import SimpleNamespace
 
-from cage import importcmd, ledger, paths, report, transcript
+from cage import chats, importcmd, ledger, paths, transcript
 from srcseed import mkcage
 
 _HOME_ENVS = ("CLAUDE_CONFIG_DIR", "COPILOT_HOME", "KIRO_HOME",
@@ -231,7 +231,7 @@ def test_project_report_explains_kiros_absence(tmp_path, monkeypatch):
     from cage import policy
     root = _isolate(tmp_path, monkeypatch)
     pol = policy.load(paths.Footprint(root).policy)
-    line = report.kiro_routed_line(root, pol)
+    line = chats.kiro_routed_line(root, pol)
     assert str(paths.Footprint(paths.global_home()).base) in line
     assert "cage query kiro-routing" in line
 
@@ -240,7 +240,7 @@ def test_machine_ledger_report_has_nothing_to_explain(tmp_path, monkeypatch):
     from cage import policy
     monkeypatch.chdir(tmp_path)
     g = paths.global_home()
-    assert report.kiro_routed_line(g, policy.load(None)) == ""
+    assert chats.kiro_routed_line(g, policy.load(None)) == ""
 
 
 # ── K3/K4: the two HONEST-LIMITs, pinned so they can't regress silently ───────
@@ -249,47 +249,6 @@ def _rep(**kw):
     base = {"dim": "agent", "since": None, "groups": {}, "kiro_rows": 0}
     base.update(kw)
     return base
-
-
-def test_k3_kiro_limit_states_no_time_session_or_project():
-    """K3 (finding: kiro rows carry no time/session/project). Fires on ANY kiro row —
-    a wider gate than the input-only caveat, because the limit holds even if kiro one
-    day reports output tokens."""
-    line = report._kiro_limits_caveat(_rep(kiro_rows=3))
-    assert "no per-turn time, session or project" in line
-    assert report._kiro_limits_caveat(_rep(kiro_rows=0)) == ""
-
-
-def test_k3_composes_with_the_input_only_caveat_without_repeating_it():
-    both = report._kiro_limits_caveat(_rep(kiro_rows=3, kiro_input_only=True))
-    assert "input-only log — tok out not recorded" in both and "also carry" in both
-    assert both.count("kiro:") == 1
-
-
-def test_k3_names_the_since_window_as_the_reading_that_would_be_wrong():
-    """The `ts` is stamped at IMPORT, so a window includes/excludes kiro rows by when
-    the import ran — not coarse, *wrong*. It gets its own ⚠."""
-    windowed = report._kiro_limits_caveat(_rep(kiro_rows=3, since="7d"))
-    assert "timestamped at IMPORT" in windowed
-    assert "IMPORT" not in report._kiro_limits_caveat(_rep(kiro_rows=3))
-
-
-def test_k4_blank_surface_reads_as_the_source_does_not_say():
-    """K4 (finding: per-surface attribution is agent-dependent). Claude's CLI and VS Code
-    share one store with no marker, so a blank cell must never be read as "cli"."""
-    # `claude-code` is what a claude row's `agent` field actually holds — the caveat must
-    # match the real stamp, not the SURFACES name.
-    groups = {"—": {"calls": 2, "agents": ["claude-code"]}}
-    line = report._surface_caveat(_rep(dim="surface", groups=groups))
-    assert "the source does not say" in line and 'never "cli"' in line
-
-
-def test_k4_is_silent_off_the_surface_view_and_without_claude_rows():
-    groups = {"—": {"calls": 2, "agents": ["claude-code"]}}
-    assert report._surface_caveat(_rep(dim="agent", groups=groups)) == ""
-    assert report._surface_caveat(_rep(dim="surface",
-                                       groups={"vscode": {"calls": 1,
-                                                          "agents": ["copilot"]}})) == ""
 
 
 # ── kiro CLI: the OPPOSITE fix ────────────────────────────────────────────────
@@ -366,3 +325,18 @@ def test_cli_credits_import_is_scoped_and_stamped(tmp_path, monkeypatch):
     credits = ledger.read_kind(root, "credits")
     assert [c["session"] for c in credits] == ["mine"]   # the other cwd is not this project
     assert credits[0]["project"] == root.name
+
+# ── K3 and K4's report-footer cases went with `cage report` (SURFACE-CUT) ────────
+# Three tests pinned `report._kiro_limits_caveat` — the footer stating that kiro rows
+# carry no time, session or project, that it composes with the input-only caveat, and
+# that it names the `--since` window as the reading that would be wrong. It was a
+# report-footer helper with no other caller and is gone. **ADR 0006's other half is
+# still pinned above**: `chats.kiro_routed_line` (rescued from report.py) still proves
+# a project view says WHY kiro is absent rather than showing nothing.
+
+# K4's two cases pinned `report._surface_caveat` — a blank `surface` cell must read as
+# "the source does not say", never as "cli". That caveat only ever rendered on
+# `cage report --by surface`, and `--by` died with the command, so there is no longer a
+# surface-dimension view for it to appear on. The FINDING it encoded (claude's CLI and
+# VS Code share one store with no marker) is unchanged and still true of the data;
+# `cage insights chats` shows the same blank cell and is pinned by its own goldens.

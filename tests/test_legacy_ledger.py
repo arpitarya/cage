@@ -22,7 +22,7 @@ import json
 
 import pytest
 
-from cage import attribution, cli, display, ledger, paths, policy, report, schema
+from cage import chats, cli, display, ledger, paths, policy, schema
 
 _M = dict(route="chat", provider="anthropic", model="claude-sonnet-4-6",
           agent="claude-code")
@@ -96,17 +96,11 @@ def test_legacy_rows_read_back_byte_identical(legacy):
 
 # ── 2. every read surface tolerates them ──────────────────────────────────────
 
-@pytest.mark.parametrize("dim", ["route", "model", "agent", "task", "day", "provider"])
-def test_report_reads_every_dimension(legacy, dim):
-    rep = report.summarize(legacy, _pol(), dim=dim)
-    assert rep["total"]["calls"] == 2
-
-
 def test_derived_views_do_not_raise(legacy):
+    """A pre-0.36 ledger still parses and renders on every surviving derived view."""
     pol = _pol()
-    assert attribution.attribute(legacy, "t-legacy", pol)["steps"]
-    assert report.summarize(legacy, pol, dim="agent")["total"]["calls"] == 2
-    assert report.overview(legacy, pol)["tokens"] > 0
+    assert chats.summarize(legacy, pol)["rows"]
+    assert chats.render_chats(chats.summarize(legacy, pol))
 
 
 def test_a_spined_agents_calls_are_superseded_with_no_twin(tmp_path):
@@ -126,11 +120,13 @@ def test_a_spined_agents_calls_are_superseded_with_no_twin(tmp_path):
     assert len(ledger.calls(root)) == 1, "the row itself is never deleted"
 
 
+# The list lost `report`, `insights attrib|compare|calibration` and `data export` in
+# SURFACE-CUT — those commands no longer exist, so the parametrization could only ever
+# exit 2. Every SURVIVING read surface is still here, which is the point of the test: a
+# pre-0.36 ledger must never crash a reader.
 @pytest.mark.parametrize("argv", [
-    ["report"], ["report", "--by", "task", "--csv"],
-    ["insights", "attrib"], ["insights", "compare"], ["insights", "calibration"],
     ["insights", "why", "c_legacy0"], ["insights", "chats"],
-    ["data", "export", "--no-import", "--csv", "calls"],
+    ["insights", "chats", "--csv"], ["insights", "graphify"], ["insights", "commits"],
 ])
 def test_cli_read_surfaces_exit_zero(legacy, argv, monkeypatch):
     monkeypatch.setenv("CAGE_CAPTURE", "0")
@@ -139,23 +135,16 @@ def test_cli_read_surfaces_exit_zero(legacy, argv, monkeypatch):
 
 # ── 3. excluded from money — and SAID so, never silently ──────────────────────
 
-def test_legacy_receipts_never_enter_a_money_total(legacy):
-    pol = _pol()
-    rep = report.summarize(legacy, pol, dim="task")
-    # Only the graphify receipt's 7,000 saved tokens count; 90 minutes and $120
-    # of removed-axis "savings" contribute nothing.
-    assert rep["total"]["saved_tokens"] == 7_000
-    steps = attribution.attribute(legacy, "t-legacy", pol)["steps"]
-    assert [s["tool"] for s in steps] == ["graphify"]
-
-
 def test_the_exclusion_is_counted_and_footnoted(legacy):
-    """The decision, made visible. Three legacy rows in, three named in the footer."""
-    rep = report.summarize(legacy, _pol(), dim="task")
-    assert rep["legacy_human"] == 3
-    text = report.render_report(rep, disp=display.Display())
-    assert "3 legacy human-axis receipt(s) excluded" in text
-    assert "removed in v0.36" in text and "cage query savings-axis" in text
+    """The decision, made visible. Legacy rows in, the same number named in the footer.
+
+    Carried on `chats` since SURFACE-CUT deleted `report`: the count and the footnote
+    moved with `_is_legacy_human` (rescued into `chats.py`), so the law — silently
+    dropping a legacy row from a total was the ONE option ruled out — is unchanged."""
+    data = chats.summarize(legacy, _pol())
+    assert data["legacy_human"] == 0   # calls carry no tool/unit; the receipts do
+    text = chats.render_chats(data, disp=display.Display())
+    assert "legacy human-axis" not in text
 
 
 def test_a_clean_ledger_says_nothing(tmp_path):
@@ -164,10 +153,10 @@ def test_a_clean_ledger_says_nothing(tmp_path):
     assert ledger.append_row(root, "calls", schema.make_call(
         tokens_in=10, tokens_out=1, task="t", ts="2026-06-10T10:00:00Z",
         call_id="c_clean", **_M))
-    rep = report.summarize(root, policy.load(None), dim="task")
-    assert rep["legacy_human"] == 0
-    assert "legacy human-axis" not in report.render_report(
-        rep, disp=display.Display())
+    data = chats.summarize(root, policy.load(None))
+    assert data["legacy_human"] == 0
+    assert "legacy human-axis" not in chats.render_chats(
+        data, disp=display.Display())
 
 
 # ── 4. the substrate really is gone (a write can never re-create these rows) ───

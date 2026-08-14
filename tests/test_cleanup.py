@@ -88,41 +88,14 @@ def test_never_list_survives_days_zero(root):
     assert b"".join(p.read_bytes() for p in Footprint(root).shards("calls")) == shards
 
 
-def test_dry_run_touches_nothing(root, capsys):
-    st = _seed_state(root)
-    before = {p.name: p.read_bytes() for p in st.iterdir() if p.is_file()}
-    assert cli.main(["data", "cleanup"]) == 0
-    out = capsys.readouterr().out
-    assert "dry-run" in out and "--apply" in out
-    after = {p.name: p.read_bytes() for p in st.iterdir() if p.is_file()}
-    assert after == before
-
-
-def test_apply_ignores_cleanup_enabled_env(root, capsys, monkeypatch):
-    """--apply is an explicit command — since v0.37 it always executes, regardless
-    of [cleanup] enabled / CAGE_CLEANUP (which now gates only the *automatic*
-    reminder, `maybe_run`). An explicitly-typed command is never silently ignored."""
-    _seed_state(root)
-    monkeypatch.setenv("CAGE_CLEANUP", "0")
-    assert cli.main(["data", "cleanup", "--apply"]) == 0
-    out = capsys.readouterr().out
-    assert "auto-reminder off" in out
-    assert "✔ applied" in out
-    assert not (Footprint(root).state / "junk.tmp").exists()
-
-
-def test_dry_run_also_ignores_cleanup_enabled_env(root, capsys, monkeypatch):
-    _seed_state(root)
-    monkeypatch.setenv("CAGE_CLEANUP", "0")
-    assert cli.main(["data", "cleanup"]) == 0
-    out = capsys.readouterr().out
-    assert "auto-reminder off" in out and "dry-run" in out
-    assert (Footprint(root).state / "junk.tmp").exists()  # dry-run: nothing touched
-
-
 def test_maybe_run_warns_but_never_deletes(root, monkeypatch, capsys):
     """The auto path (v0.37): a reminder on stderr, never a deletion. The reminder
-    names the count, the reclaimable size, and the exact runnable fix."""
+    names the count and the reclaimable size.
+
+    It used to name a runnable fix too (`cage data cleanup --apply`). SURFACE-CUT
+    deleted that verb, so the reminder now says plainly that no command prunes these —
+    naming a fix cage cannot honour would be worse than naming none, and is exactly the
+    dead-verb failure the wiring-liveness gate exists to catch."""
     _seed_state(root)
     pol = policy.load(None)
     cleanup.maybe_run(root, pol)
@@ -132,7 +105,8 @@ def test_maybe_run_warns_but_never_deletes(root, monkeypatch, capsys):
     out, err = capsys.readouterr()
     assert out == ""                                        # never stdout
     assert "state/ item(s)" in err and "KB reclaimable" in err
-    assert "cage data cleanup" in err and "--apply" in err
+    assert "no command prunes them" in err
+    assert "cage data cleanup" not in err   # never advertise a verb that is gone
     # within the throttle window: a second call must not re-scan or re-print
     calls = []
     monkeypatch.setattr(cleanup, "scan", lambda *a, **k: calls.append(1) or [])
@@ -201,10 +175,24 @@ def test_derived_views_identical_before_and_after_cleanup(root, capsys):
         call_id="c_det"))
     def views():
         out = []
-        for argv in (["report", "--by", "model"], ["insights", "compare"], []):
+        for argv in (["insights", "chats"], ["insights", "graphify"],
+                     ["insights", "commits"]):
             assert cli.main(argv) == 0
             out.append(capsys.readouterr().out)
         return out
     before = views()
     cleanup.prune(root, policy.load(None))
     assert views() == before
+
+# ── `cage data cleanup` (the VERB) is gone; the module is not (SURFACE-CUT) ───
+# Three tests here drove the CLI: the dry-run default, `--apply` executing regardless of
+# `[cleanup] enabled`, and the dry-run honouring the same rule. The verb went with the
+# whole `data` group. **`cleanup.py` itself was deliberately KEPT** (decision: Arpit,
+# 2026-08-14) because `importcmd.run` and `cage doctor` both import it — every library
+# test above still runs, including the allowlist ageing, the NEVER list at `days=0`, and
+# the auto path's warn-but-never-delete contract.
+#
+# **The consequence is a real gap, and it is filed in work/OPEN-WORK.md:** deletion was
+# manual-only by design, and the only manual trigger has been removed. `maybe_run` still
+# WARNS with a runnable fix, and that fix now names a command that does not exist. Nothing
+# prunes `.cage/state/` any more.

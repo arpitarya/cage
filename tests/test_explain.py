@@ -22,28 +22,32 @@ def test_query_makes_no_network_call(proj, monkeypatch, capsys):
     monkeypatch.setattr(socket, "socket", _boom)
     monkeypatch.chdir(proj)
     metering._policy_for.cache_clear()
-    assert cli.main(["query", "how is marginal attribution calculated"]) == 0
-    assert "marginal-attribution" in capsys.readouterr().out
+    assert cli.main(["query", "saved"]) == 0
+    assert "saved" in capsys.readouterr().out
 
 
 # ── live numbers: the printed pipeline order IS policy's, proving interpolation ──
 def test_printed_order_tracks_policy(proj, monkeypatch, capsys):
+    """A printed value is the LIVE policy value, not a frozen literal.
+
+    Carried on the cleanup retention window since SURFACE-CUT deleted every entry that
+    interpolated `{order}` — `[tools] order` drove marginal attribution, and with
+    `attribution.py` gone `policy.tool_order` has no consumer left at all."""
     monkeypatch.chdir(proj)
     metering._policy_for.cache_clear()
-    assert cli.main(["query", "marginal-attribution"]) == 0
+    assert cli.main(["query", "cleanup"]) == 0
     out = capsys.readouterr().out
-    pol = policy.load(None)
-    assert " → ".join(policy.tool_order(pol)) in out
+    assert str(policy.cleanup_days(policy.load(None))) in out
 
 
 def test_live_order_in_payload():
-    """A formula interpolates the LIVE policy value, never a frozen literal —
-    change the policy, the printed formula changes with it."""
+    """A body interpolates the LIVE policy value, never a frozen literal —
+    change the policy, the printed text changes with it."""
     pol = policy.load(None)
-    e = explain._BY_ID["marginal-attribution"]
-    assert " → ".join(policy.tool_order(pol)) in explain.payload(e, pol)["formula"]
-    edited = {**pol, "tools": {**pol.get("tools", {}), "order": ["zeta", "alpha"]}}
-    assert "zeta → alpha" in explain.payload(e, edited)["formula"]
+    e = explain._BY_ID["cleanup"]
+    assert str(policy.cleanup_days(pol)) in explain.payload(e, pol)["formula"]
+    edited = {**pol, "cleanup": {**pol.get("cleanup", {}), "days": 4242}}
+    assert "4242" in explain.payload(e, edited)["formula"]
 
 
 # ── --json carries the same content as the text render ─────────────────────────
@@ -86,7 +90,6 @@ def test_unmatched_suggests_not_guesses(proj, monkeypatch, capsys):
     ("saved", "saved"),
     ("savings-axis", "savings-axis"),
     ("what happened to the human axis", "savings-axis"),
-    ("counterfactual permutation table", "matrix-concept"),
     ("what are the method tags", "method-tags"),
     ("how does cage work", "overview"),
 ])
@@ -108,9 +111,10 @@ def test_calculation_entries_unchanged_kind():
     # The money entries (cost/roi/budget/matrix/verdict-composition/pricing-match/
     # unpriced/repricing/receipt-pricing) went with the subsystem they explained
     # (USAGE-ONLY, ADR 0011).
-    calc_ids = {"saved", "gross-vs-net", "marginal-attribution", "token-heuristic",
-                "confidence", "method-tags", "compare-delta", "estimate-band",
-                "calibration-hit-rate", "study-pairing", "policy-versioning"}
+    # SURFACE-CUT (v0.52) took `marginal-attribution`, `compare-delta`, `estimate-band`
+    # and `calibration-hit-rate` — each explained a command that no longer exists.
+    calc_ids = {"saved", "gross-vs-net", "token-heuristic",
+                "confidence", "method-tags", "study-pairing", "policy-versioning"}
     for e in explain.REGISTRY:
         if e.id in calc_ids:
             assert e.kind == "calculation"
@@ -166,9 +170,12 @@ def test_attribution_order_is_live_to_policy(proj, monkeypatch, capsys):
     )
     monkeypatch.chdir(proj)
     metering._policy_for.cache_clear()
-    assert cli.main(["query", "attribution"]) == 0
-    out = capsys.readouterr().out
-    assert "cache → fux → graphify" in out
+    # `[tools] order` no longer reaches any surface — `attribution.py` was its only
+    # consumer and SURFACE-CUT deleted it, so there is nothing left to interpolate the
+    # pipeline into. The setting is still parsed and still recorded in cage.toml;
+    # work/OPEN-WORK.md carries the gap. Assert the absence rather than delete the test.
+    assert not [e for e in explain.REGISTRY
+               if "{order}" in ((e.formula or "") + (e.summary or ""))]
 
 
 def test_list_groups_by_kind(proj, monkeypatch, capsys):

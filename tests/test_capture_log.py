@@ -172,17 +172,16 @@ def test_write_failure_is_fail_open_and_logged(tmp_path, monkeypatch):
 # ── determinism: never read by any derived view ────────────────────────────────
 
 def test_derived_views_byte_identical_with_and_without_the_breadcrumb(tmp_path, monkeypatch):
-    from cage import demo, ledger, policy, report
+    from cage import chats, demo, ledger, policy
     root = _isolate(tmp_path, monkeypatch)
     demo.seed(root)
     pol = policy.load(None)
-    rep = report.summarize(root, pol, dim="agent")
-    before = report.render_report(rep)
+    before = chats.render_chats(chats.summarize(root, pol))
     foot = paths.Footprint(root)
     assert not foot.capture_log.exists()  # no import has run yet — nothing written
     capturelog.record(root, "claude", files_seen=9, rows_new=3, rows_total=12, src="~/x")
     assert foot.capture_log.exists()
-    after = report.render_report(report.summarize(root, pol, dim="agent"))
+    after = chats.render_chats(chats.summarize(root, pol))
     assert before == after  # the breadcrumb existing/growing never changes a rendered table
 
 

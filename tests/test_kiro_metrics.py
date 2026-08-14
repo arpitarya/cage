@@ -425,11 +425,11 @@ def test_report_and_chats_byte_identical_with_kiro_tree_present_or_absent(proj, 
         source="ide", session="kiro", surface="ide", tokens_in=999, tokens_out=999,
         row_ref="1", ts="2026-08-13T00:00:00Z", metric_id="km_present"))
     before = {" ".join(v): _render(v, capsys)
-             for v in (["report", "--by", "agent"], ["insights", "chats"])}
+             for v in (["insights", "chats"], ["insights", "chats"])}
     for sh in paths.Footprint(proj).kiro_metric_shards():
         sh.unlink()
     after = {" ".join(v): _render(v, capsys)
-            for v in (["report", "--by", "agent"], ["insights", "chats"])}
+            for v in (["insights", "chats"], ["insights", "chats"])}
     assert before == after
 
 

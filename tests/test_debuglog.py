@@ -116,8 +116,8 @@ def test_event_still_refused_in_a_bare_cwd_with_no_cage_and_no_override(tmp_path
 
 def test_derived_view_byte_identical_with_debug_under_cage_base_on_vs_off(tmp_path, monkeypatch):
     """Opening the guard is observability only: it can never move a reported number.
-    Same ledger + same policy ⇒ byte-identical `cage report`, debug on or off."""
-    from cage import demo, policy, report
+    Same ledger + same policy ⇒ a byte-identical derived view, debug on or off."""
+    from cage import chats, demo, policy
 
     def rendered(base, debug: bool) -> str:
         monkeypatch.setenv("CAGE_BASE", str(base))
@@ -128,7 +128,7 @@ def test_derived_view_byte_identical_with_debug_under_cage_base_on_vs_off(tmp_pa
         cwd.mkdir()
         demo.seed(cwd)
         debuglog.event(cwd, event="receipt", tool="graphify", produced=True)
-        return report.render_report(report.summarize(cwd, policy.load(None), dim="agent"))
+        return chats.render_chats(chats.summarize(cwd, policy.load(None)))
 
     off = rendered(tmp_path / "off", debug=False)
     on = rendered(tmp_path / "on", debug=True)
@@ -322,6 +322,6 @@ def test_main_exits_cleanly_on_ctrl_c(monkeypatch, capsys):
     def interrupt(_args):
         raise KeyboardInterrupt
 
-    monkeypatch.setattr(clicmds, "cmd_overview", interrupt)
-    assert cli.main([]) == 130
+    monkeypatch.setattr(clicmds, "cmd_chats", interrupt)
+    assert cli.main(["insights", "chats"]) == 130
     assert "aborted" in capsys.readouterr().out

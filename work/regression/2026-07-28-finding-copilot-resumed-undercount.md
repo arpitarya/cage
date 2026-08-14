@@ -6,7 +6,7 @@
 |---|---|
 | Observed in | [run-002](2026-07-28-validation-run-002.md) (pre-fix — V3/V4 check 5 red) |
 | Verified fixed in | [run-003](2026-07-28-validation-run-003.md) (V3/V4 8/8, self-heal proven) |
-| Fix shipped | [capture-precision-fixes §HIGH](2026-07-28-capture-precision-fixes.md) · [ADR 0004](../../docs/adr/0004-append-only-delta-rows-and-separate-by-schema.md) |
+| Fix shipped | [capture-precision-fixes §HIGH](2026-07-28-capture-precision-fixes.md) · [ADR 0004](../archive/adr/0004-append-only-delta-rows-and-separate-by-schema.md) |
 
 ## Status history
 

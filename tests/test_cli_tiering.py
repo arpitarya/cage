@@ -32,16 +32,18 @@ def test_help_matches_the_plan_mock_verbatim():
     # structural anchors: five daily verbs, the group names, no usage/options noise.
     assert got.startswith("cage — measure what your AI agents use")
     assert "usage:" not in got and "positional arguments" not in got
-    for line in ("  report ", "  import ", "  setup ", "  doctor ", "  query "):
+    for line in ("  import ", "  setup ", "  doctor ", "  query "):
         assert line in got
-    for grp in ("insights", "task", "authorship", "study", "policy", "data"):
+    for grp in ("insights", "task", "authorship", "study", "policy"):
         assert f"  {grp} " in got or f"  {grp}  " in got
 
 
 def test_help_hides_plumbing_and_moved_verbs():
     got = _run(["--help"]).stdout
-    for hidden in ("mcp", "demo", "debug", "hook-", "graphify"):
-        # none advertised on the front door (graphify stays a hidden `data` subcommand)
+    for hidden in ("mcp", "demo", "debug", "hook-"):
+        # none advertised on the front door. `graphify` is no longer in this list: it is
+        # a live `insights` leaf since SURFACE-CUT deleted the `data` group that used to
+        # own the hidden `cage data graphify` verb.
         assert f"\n  {hidden}" not in got
 
 
@@ -74,7 +76,7 @@ def test_removed_map_never_shadows_a_live_top_level_verb():
     assert not (set(verbmap.REMOVED) & live)
     for old in verbmap.REMOVED:
         assert old not in {"mcp", "debug", "demo"}
-    for group in ("insights", "task", "authorship", "data"):
+    for group in ("insights", "task", "authorship", "study", "policy"):
         assert group in live
 
 
@@ -100,7 +102,10 @@ def test_subcommand_abbreviation_is_disabled(prefix):
 _MOVED = "|".join(re.escape(v) for v in sorted(verbmap.REMOVED))
 # an old verb immediately after `cage `, not already grouped
 _STALE = re.compile(rf"cage ({_MOVED})(?![\w-])")
-_GROUPED = re.compile(r"cage (insights|task|authorship|data) ")
+# `data` is NOT in this list any more — SURFACE-CUT deleted the whole group, so
+# `cage data <x>` is a dead spelling, not a grouped one. Leaving it whitelisted
+# would be the F1 class inside the detector itself.
+_GROUPED = re.compile(r"cage (insights|task|authorship|study|policy) ")
 
 
 def _scan(paths, exts):

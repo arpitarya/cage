@@ -10,8 +10,8 @@ fields (plan §3.1) — so this is pure derive, no substrate change.
 
 **Mechanism (the proposal's five steps, binding):**
 
-1. Read the ledger's calls (`ledger.calls`, `--since` month-partition skip like
-   `report`), dropping legacy-human rows (`report._is_legacy_human` — counted,
+1. Read the ledger's calls (`ledger.calls`, with the `--since` month-partition skip),
+   dropping legacy-human rows (`_is_legacy_human` — counted,
    footnoted; calls never actually carry `tool`/`unit`, so this only fires against a
    hand-crafted legacy row, but the predicate is applied uniformly with every other
    view rather than assumed absent).
@@ -80,10 +80,56 @@ from __future__ import annotations
 from pathlib import Path
 
 from cage import agents as _agents
-from cage import authorcapture, ledger, manifest, report, units
+from cage import authorcapture, ledger, manifest, units
 from cage.constants import CHATS_DEFAULT_ROWS
 
 KIRO_IDE_LABEL = "kiro (no session identity)"
+
+
+def _is_legacy_human(r: dict) -> bool:
+    """A pre-0.36 Tier-1 row: the removed human axis's tool, or its removed unit.
+
+    Rescued verbatim from the deleted `report.py` in SURFACE-CUT — it was the ONE
+    predicate every money view shared, and this is now its only home."""
+    return r.get("tool") == "human" or r.get("unit") == "minutes"
+
+
+def kiro_routed_line(root: Path, pol: dict | None = None,
+                     verb: str = "insights chats") -> str:
+    """The footer line explaining why a **project** view shows no kiro (ADR 0006): its
+    IDE rows are a machine fact and live in the machine ledger. ``""`` when kiro is not
+    routed away (the machine ledger's own view, or an explicit ``--ledger``), or when
+    kiro isn't a configured source here — nothing to explain in either case.
+
+    Silence would be the one unacceptable outcome: an agent that shows no rows is
+    indistinguishable from an agent whose capture is broken, which is the failure cage
+    exists to prevent. Impure (it resolves paths), so it is read at the CLI boundary and
+    passed into the pure renderers, like `health` and `ceiling`. Deliberately does
+    **not** read the machine ledger to count rows: a per-view cross-ledger read to
+    decorate a footnote is not worth it, and the line is true either way.
+
+    ``verb`` is the command the runnable fix should name, so the *one* phrasing can be
+    reused by any view that shows no kiro (`cage insights graphify` passes its own). It
+    varies the fix line only — the explanation itself is never re-worded per view, the
+    `savings.GROSS_NOTE` discipline.
+
+    Rescued verbatim from the deleted `report.py` in SURFACE-CUT; its two surviving
+    callers are `cage insights chats` and `cage insights graphify`."""
+    from cage import paths
+    sink = paths.kiro_routed(root)
+    if sink is None:
+        return ""
+    try:
+        if not any(s.agent == "kiro" for s in paths.resolve_log_sources(pol).sources):
+            return ""
+    except Exception:  # noqa: BLE001 — a broken [sources] table is reported elsewhere
+        return ""
+    return (f"· kiro is not counted here — its IDE log carries no project, so its rows "
+            f"are a machine fact and live in {paths.Footprint(sink).base}\n"
+            f"  (`cage query kiro-routing`; read them with "
+            f"`cage --ledger {paths.Footprint(sink).base} {verb}`)")
+
+
 _NO_SESSION = "(no session)"
 
 # Why an `agent%` cell refuses. Each is a DIFFERENT fact with a different fix, so they
@@ -217,7 +263,7 @@ def summarize(root: Path, pol: dict, since: str | None = None,
     buckets: dict[tuple[str, str, str, bool], dict] = {}
     legacy_human = 0
     for c in calls:
-        if report._is_legacy_human(c):
+        if _is_legacy_human(c):
             legacy_human += 1
             continue
         b = buckets.setdefault(_bucket_key(c), _new_bucket())
@@ -332,7 +378,7 @@ def _render_empty(data: dict, kiro_route: str = "") -> str:
                 if filters else "No chats to show — the ledger has usage cage cannot "
                                 "render as a chat:")
         return (f"{head}\n\n" + "\n".join(reasons) + "\n\n"
-                "next: cage report                         where that usage IS counted")
+                "next: cage insights graphify              per-chat graphify saving")
     if data.get("any_calls") and filters:
         return (f"No chats match {label} — the filter is empty, "
                 "not the ledger.\n\n"
@@ -433,8 +479,8 @@ def _authorship_footer(foot, shown: list[dict]) -> None:
 def render_chats(data: dict, disp=None, show_all: bool = False,
                  kiro_route: str = "") -> str:
     """The text table (tokens and credits — the two units cage records). ``kiro_route`` is
-    the already-computed `report.kiro_routed_line` (read at the CLI boundary, like
-    `report.render_report`) — why a project view shows no kiro-IDE rows (ADR 0006)."""
+    the already-computed `kiro_routed_line` (read at the CLI boundary, so this renderer
+    stays pure) — why a project view shows no kiro-IDE rows (ADR 0006)."""
     from cage import display as _d
     from cage import render
     disp = disp or _d.DEFAULT

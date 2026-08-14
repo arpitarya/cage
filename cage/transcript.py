@@ -1535,7 +1535,7 @@ def _kiro_devdata_ts(value) -> str | None:
 # hardest here because content and metadata share the row (capture-precision §3.3).
 #
 # ONE scoped carve-out, ratified 2026-08-07:
-# [ADR 0009](docs/adr/0009-kiro-cli-tool-run-bodies-read-transiently-never-persisted.md).
+# [ADR 0009](work/archive/adr/0009-kiro-cli-tool-run-bodies-read-transiently-never-persisted.md).
 # `parse_kiro_cli_tool_runs` below reads `history[].assistant.ToolUse` and
 # `history[].user.content.ToolUseResults` — tool **commands and their stdout** — so the
 # graphify savings route can size a counterfactual on kiro like it does on claude. The

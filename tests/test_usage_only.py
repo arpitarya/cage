@@ -24,7 +24,7 @@ import sqlite3
 
 import pytest
 
-from cage import chats, ledger, report, schema, transcript, units
+from cage import chats, ledger, schema, transcript, units
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
 
@@ -182,7 +182,7 @@ def test_report_footer_states_each_absence_with_its_reason(proj):
     _call(proj, "c_1", agent="claude-code")
     ledger.append_row(proj, "claude", schema.make_claude_metric(
         session="s1", source="request", request="r1", tokens_in=5, tokens_out=1))
-    out = report.render_report(report.summarize(proj, {}, "agent"))
+    out = chats.render_chats(chats.summarize(proj, {}))
     assert units.ABSENT["claude"][units.CREDITS] in out
     assert " 0.00" not in out, "an absent credit rendered as a zero"
 
@@ -208,10 +208,9 @@ def test_report_refuses_a_cross_agent_credit_total(proj):
         session="k1", credits=4.0, agent="kiro"))
     ledger.append_row(proj, "credits", schema.make_credit(
         session="c1", credits=9.0, agent="copilot"))
-    rep = report.summarize(proj, {}, "agent")
-    assert rep["total"]["credits_summable"] is False
-    assert rep["total"]["credits"] is None
-    out = report.render_report(rep)
+    data = chats.summarize(proj, {})
+    assert not units.summable(units.CREDITS, data["agents_present"])
+    out = chats.render_chats(data)
     assert "NOT summed across agents" in out
 
 
@@ -220,9 +219,9 @@ def test_report_totals_credits_for_a_single_agent(proj):
         session="k1", credits=4.0, agent="kiro"))
     ledger.append_row(proj, "credits", schema.make_credit(
         session="k2", credits=2.5, agent="kiro"))
-    rep = report.summarize(proj, {}, "agent")
-    assert rep["total"]["credits_summable"] is True
-    assert rep["total"]["credits"] == pytest.approx(6.5)
+    data = chats.summarize(proj, {})
+    assert units.summable(units.CREDITS, data["agents_present"])
+    assert sum(r["credits"] or 0 for r in data["rows"]) == pytest.approx(6.5)
 
 
 # ── §5 · capture invariants that outlived their pricing ──────────────────────────

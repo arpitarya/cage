@@ -30,17 +30,21 @@ from cage import cli, runstamp, viewexport
 STAMP = "2026-08-10T08:42:40+05:30"
 SLUG = "20260810-084240"
 
-# Every view that must be exportable: `cage report` plus every `insights` leaf. Bare
-# `cage` (the overview) is deliberately absent — a root-level `--export` with an
-# optional value would swallow the following subcommand (`cage --export report`), and
-# `cage report --export` is the artifact of the same ledger (cli._export_flags).
+# Every view that must be exportable: every `insights` leaf plus the two report-shaped
+# views outside that group. Bare `cage` is deliberately absent — a root-level
+# `--export` with an optional value would swallow the following subcommand
+# (`cage --export chats`), and bare `cage` is a help surface, not a view.
+#
+# **SURFACE-CUT (2026-08-14) removed six entries** — `report`, `insights attrib`,
+# `insights adoption`, `insights compare`, `insights estimate`, `insights calibration` —
+# because the commands themselves are gone. The GATE below is unchanged and still
+# bidirectional: every name here must own `--export`, and every `--export`-bearing leaf
+# the live parser knows must appear here. Adding a view still means adding a row, never
+# relaxing the set.
 EXPECTED_VIEWS = {
-    "report",
-    "insights attrib", "insights adoption",
     "insights chats", "insights graphify", "insights commits", "insights commit",
-    "insights compare", "insights estimate",
-    "insights calibration", "insights why",
-    # EXPORT-SCOPE (2026-08-11): three report-shaped views v0.48.0's scope line missed.
+    "insights why",
+    # EXPORT-SCOPE (2026-08-11): report-shaped views v0.48.0's scope line missed.
     # Keyed by PARSER LEAF PATH, which is what `_leaves()` walks. `study report` is a
     # real leaf since CLI-GAPS(b) converted the group to subparsers — before that the
     # action was a positional, `--export` sat on the group where every marker verb could
@@ -81,10 +85,9 @@ def _outdir(root: Path, view: str) -> Path:
 # ── 1. the determinism split ──────────────────────────────────────────────────
 
 @pytest.mark.parametrize("argv", [
-    ["report", "--by", "agent"],
-    ["report", "--by", "model"],
-    ["insights", "attrib"],
     ["insights", "chats"],
+    ["insights", "graphify"],
+    ["insights", "commits"],
 ])
 def test_export_never_changes_stdout(go, argv):
     """The whole design rests here. `--export` writes files; it does not touch the
@@ -98,19 +101,19 @@ def test_export_never_changes_stdout(go, argv):
 
 
 def test_stdout_carries_no_clock_by_default(go):
-    out, _ = go(["report"])
+    out, _ = go(["insights", "chats"])
     assert STAMP not in out and "generated_at" not in out
 
 
 def test_stamp_is_the_opt_in_half(go):
-    out, _ = go(["report", "--stamp"])
-    assert out.startswith(f"# cage: view=report\n# cage: generated_at={STAMP}\n")
+    out, _ = go(["insights", "chats", "--stamp"])
+    assert out.startswith(f"# cage: view=insights chats\n# cage: generated_at={STAMP}\n")
     assert "# cage: cage_version=" in out
 
 
 def test_stamp_on_csv_is_a_comment_preamble_and_leaves_the_columns_alone(go):
-    plain, _ = go(["report", "--csv"])
-    stamped, _ = go(["report", "--csv", "--stamp"])
+    plain, _ = go(["insights", "chats", "--csv"])
+    stamped, _ = go(["insights", "chats", "--csv", "--stamp"])
     body = "".join(ln for ln in stamped.splitlines(keepends=True)
                    if not ln.startswith("# cage: "))
     assert body == plain                      # the pinned column contract is untouched
@@ -118,39 +121,43 @@ def test_stamp_on_csv_is_a_comment_preamble_and_leaves_the_columns_alone(go):
 
 
 def test_stamp_on_json_wraps_rather_than_merges(go):
-    out, _ = go(["insights", "attrib", "--json", "--stamp"])
+    out, _ = go(["insights", "chats", "--json", "--stamp"])
     doc = json.loads(out)
     assert doc["cage"]["generated_at"] == STAMP
-    assert doc["data"] == json.loads(go(["insights", "attrib", "--json"])[0])
+    assert doc["data"] == json.loads(go(["insights", "chats", "--json"])[0])
 
 
 # ── 2. what an artifact is ────────────────────────────────────────────────────
 
 def test_bare_export_writes_every_format_this_view_has(go):
-    _, err = go(["report", "--by", "agent", "--export"])
-    d = _outdir(go.root, "report")
-    assert sorted(p.name for p in d.iterdir()) == ["report.csv", "report.json",
-                                                   "report.txt"]
+    _, err = go(["insights", "chats", "--export"])
+    d = _outdir(go.root, "insights chats")
+    assert sorted(p.name for p in d.iterdir()) == ["insights-chats.csv", "insights-chats.json",
+                                                   "insights-chats.txt"]
     assert str(d) in err
 
 def test_a_view_with_no_csv_renderer_exports_the_formats_it_has(go):
-    go(["insights", "estimate", "--export"])
-    d = _outdir(go.root, "insights estimate")
-    assert sorted(p.name for p in d.iterdir()) == ["insights-estimate.json",
-                                                   "insights-estimate.txt"]
+    """`insights estimate` was the csv-less example until SURFACE-CUT; `insights why`
+    is now the view that owns no `render_csv`, and the rule is unchanged — a bare
+    `--export` writes every format the view HAS, and never an empty one it doesn't."""
+    go(["insights", "why", "c_1", "--export"])
+    d = _outdir(go.root, "insights why")
+    assert sorted(p.name for p in d.iterdir()) == ["insights-why.json",
+                                                   "insights-why.txt"]
 
 
-@pytest.mark.parametrize("name", ["report.txt", "report.csv", "report.json"])
+@pytest.mark.parametrize("name", ["insights-chats.txt", "insights-chats.csv",
+                                  "insights-chats.json"])
 def test_every_artifact_carries_the_block(go, name):
     """Mandatory in a file, with no flag to suppress it — an exported table whose
     as-of is gone is a number no one can safely re-read."""
-    go(["report", "--by", "agent", "--export"])
-    text = (_outdir(go.root, "report") / name).read_text(encoding="utf-8")
+    go(["insights", "chats", "--export"])
+    text = (_outdir(go.root, "insights chats") / name).read_text(encoding="utf-8")
     if name.endswith(".json"):
         block = json.loads(text)["cage"]
-        assert block["view"] == "report" and block["generated_at"] == STAMP
+        assert block["view"] == "insights chats" and block["generated_at"] == STAMP
     else:
-        assert text.startswith(f"# cage: view=report\n"
+        assert text.startswith(f"# cage: view=insights chats\n"
                                f"# cage: generated_at={STAMP}\n")
 
 
@@ -165,19 +172,21 @@ def test_the_artifact_body_is_the_same_bytes_the_terminal_showed(go):
 
 def test_the_block_names_the_filters_and_not_the_presentation_switches(go):
     """The block names the DATA filters only. `--usd` was the presentation switch this
-    guarded against; it is gone (USAGE-ONLY, ADR 0011), so `--all-columns` — the one
-    presentation switch left — takes its place. The rule is unchanged: a switch that
-    cannot change what a number MEANS must never appear in the as-of block."""
-    go(["report", "--by", "agent", "--since", "30d", "--all-columns", "--export"])
-    txt = (_outdir(go.root, "report") / "report.txt").read_text(encoding="utf-8")
+    guarded against; it went in USAGE-ONLY (ADR 0011), and `--all-columns` went with
+    `report` in SURFACE-CUT. `--all` — the truncation switch on `insights chats` — takes
+    its place. The rule is unchanged: a switch that cannot change what a number MEANS
+    must never appear in the as-of block (`runstamp.FILTER_ARGS`)."""
+    go(["insights", "chats", "--since", "30d", "--agent", "claude", "--all", "--export"])
+    txt = (_outdir(go.root, "insights chats")
+           / "insights-chats.txt").read_text(encoding="utf-8")
     line = next(ln for ln in txt.splitlines() if ln.startswith("# cage: filters="))
-    assert "by=agent" in line and "since=30d" in line
-    assert "all-columns" not in line and "all_columns" not in line
+    assert "since=30d" in line and "agent=claude" in line
+    assert "all" not in line.replace("claude", "")   # the presentation switch stays out
 
 
 def test_the_block_names_the_ledger_it_read(go):
-    go(["insights", "attrib", "--export"])
-    txt = (_outdir(go.root, "insights attrib") / "insights-attrib.txt").read_text()
+    go(["insights", "chats", "--export"])
+    txt = (_outdir(go.root, "insights chats") / "insights-chats.txt").read_text()
     assert f"# cage: ledger={go.root / '.cage'}\n" in txt
 
 
@@ -185,42 +194,44 @@ def test_the_block_names_the_ledger_it_read(go):
 
 def test_a_named_file_writes_exactly_that_file_in_exactly_that_format(go, tmp_path):
     dest = tmp_path / "sub" / "spend.csv"
-    _, err = go(["report", "--by", "agent", "--export", str(dest)])
+    _, err = go(["insights", "chats", "--export", str(dest)])
     assert dest.exists() and not (tmp_path / "sub").joinpath("spend.txt").exists()
-    assert dest.read_text(encoding="utf-8").startswith("# cage: view=report\n")
+    assert dest.read_text(encoding="utf-8").startswith("# cage: view=insights chats\n")
     assert f"✔ wrote {dest}" in err
 
 
 def test_md_and_txt_are_the_same_renderer(go, tmp_path):
-    go(["report", "--export", str(tmp_path / "a.md")])
-    go(["report", "--export", str(tmp_path / "b.txt")])
+    go(["insights", "chats", "--export", str(tmp_path / "a.md")])
+    go(["insights", "chats", "--export", str(tmp_path / "b.txt")])
     assert (tmp_path / "a.md").read_text() == (tmp_path / "b.txt").read_text()
 
 
 def test_a_named_directory_still_gets_a_per_run_folder(go, tmp_path):
     """Two runs of one view must never silently clobber each other — an artifact whose
     job is to be the as-of record is worthless once the previous as-of is gone."""
-    go(["insights", "attrib", "--export", str(tmp_path / "reports")])
-    assert (tmp_path / "reports" / f"insights-attrib-{SLUG}" / "insights-attrib.csv").exists()
+    go(["insights", "chats", "--export", str(tmp_path / "reports")])
+    assert (tmp_path / "reports" / f"insights-chats-{SLUG}" / "insights-chats.csv").exists()
 
 
 def test_two_runs_at_different_times_do_not_clobber(go, monkeypatch, tmp_path):
-    go(["insights", "attrib", "--export", str(tmp_path / "r")])
+    go(["insights", "chats", "--export", str(tmp_path / "r")])
     monkeypatch.setenv("CAGE_RUN_STAMP", "2026-08-11T09:00:00+05:30")
-    go(["insights", "attrib", "--export", str(tmp_path / "r")])
+    go(["insights", "chats", "--export", str(tmp_path / "r")])
     assert len(list((tmp_path / "r").iterdir())) == 2
 
 
 def test_the_default_home_is_the_active_ledgers_output_dir(go):
-    go(["report", "--export"])
-    assert _outdir(go.root, "report").is_dir()
+    go(["insights", "chats", "--export"])
+    assert _outdir(go.root, "insights chats").is_dir()
 
 
 def test_the_artifact_dir_is_not_the_dashboard_docroot(go):
-    """`.cage/out/` is `cage data serve`'s docroot — a stdlib http.server is pointed
-    straight at it. Exported artifacts must never land there, or starting the dashboard
-    would quietly publish every report anyone ever exported."""
-    go(["report", "--export"])
+    """`.cage/out/` WAS `cage data serve`'s docroot — a stdlib http.server was pointed
+    straight at it, so an artifact landing there would have been published on the
+    loopback port. `serve` went in SURFACE-CUT, but the separation is kept deliberately:
+    the reason a future server could be added safely is that artifacts never went there.
+    Re-pointing `--export` at `.cage/out/` would silently re-create the hazard."""
+    go(["insights", "chats", "--export"])
     assert not (go.root / ".cage" / "out").exists()
 
 
@@ -229,14 +240,14 @@ def test_the_artifact_dir_is_not_the_dashboard_docroot(go):
 def test_an_unknown_suffix_is_a_typed_refusal_naming_what_cage_writes(go, tmp_path):
     """A `CageError` at the read boundary — `error: <msg>` + exit 1, never a traceback
     and never a silently-skipped write."""
-    _, err = go(["report", "--export", str(tmp_path / "x.pdf")], expect_exit=1)
+    _, err = go(["insights", "chats", "--export", str(tmp_path / "x.pdf")], expect_exit=1)
     assert ".pdf" in err and ".csv" in err and ".json" in err
 
 
 def test_a_format_the_view_cannot_produce_refuses_instead_of_writing_an_empty_file(
         go, tmp_path):
-    dest = tmp_path / "estimate.csv"
-    _, err = go(["insights", "estimate", "--export", str(dest)], expect_exit=1)
+    dest = tmp_path / "why.csv"
+    _, err = go(["insights", "why", "c_1", "--export", str(dest)], expect_exit=1)
     assert "no csv renderer" in err
     assert not dest.exists()   # an empty CSV would read as "this view has no rows"
 
@@ -338,10 +349,10 @@ def test_study_report_exports_all_three_formats(go):
 def test_a_csv_less_leaf_exports_only_the_formats_it_has(go):
     """A view that owns no CSV renderer writes text + JSON and
     refuses CSV rather than writing an empty one (an empty CSV reads as *no rows*)."""
-    go(["insights", "estimate", "--export"])
-    d = _outdir(go.root, "insights estimate")
-    assert sorted(p.name for p in d.iterdir()) == ["insights-estimate.json",
-                                                   "insights-estimate.txt"]
+    go(["insights", "why", "c_1", "--export"])
+    d = _outdir(go.root, "insights why")
+    assert sorted(p.name for p in d.iterdir()) == ["insights-why.json",
+                                                   "insights-why.txt"]
 
 
 def test_a_study_marker_verb_cannot_EVEN_ASK_for_an_export(go, capsys):

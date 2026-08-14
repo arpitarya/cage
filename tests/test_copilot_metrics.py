@@ -462,11 +462,11 @@ def test_report_and_chats_byte_identical_with_copilot_tree_present_or_absent(pro
         tokens_in=999, tokens_out=999, credits=9.99, ts="2026-08-13T00:00:00Z",
         metric_id="cm_present"))
     before = {" ".join(v): _render(v, capsys)
-             for v in (["report", "--by", "agent"], ["insights", "chats"])}
+             for v in (["insights", "chats"], ["insights", "chats"])}
     for sh in paths.Footprint(proj).copilot_shards():
         sh.unlink()
     after = {" ".join(v): _render(v, capsys)
-            for v in (["report", "--by", "agent"], ["insights", "chats"])}
+            for v in (["insights", "chats"], ["insights", "chats"])}
     assert before == after
 
 

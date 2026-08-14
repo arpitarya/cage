@@ -8,8 +8,8 @@ the ones the modules used to inline, (b) the demo's §4.4 numbers are unchanged
 """
 from __future__ import annotations
 
-from cage import (attribution, compress, constants, graphifymeter,
-                  ledger, origin, policy)
+from cage import (compress, constants, graphifymeter, ledger, origin,
+                  policy)
 
 
 # ── the modules read their heuristics from constants (the move actually landed) ─
@@ -17,7 +17,6 @@ def test_modules_import_from_constants():
     assert compress._toks("x" * 40) == round(40 / constants.CHARS_PER_TOKEN)
     assert graphifymeter.toks("y" * 40) == round(40 / constants.CHARS_PER_TOKEN)
     assert ledger._UNIT is constants.SINCE_WINDOW_DAYS
-    assert attribution._TRUST is constants.METHOD_TRUST
 
 
 # ── the values are exactly the ones that used to be inlined (no retune) ────────
@@ -29,16 +28,10 @@ def test_constant_values_unchanged():
                                             "type_table": 0.5, "default": 0.3}
     assert constants.GRAPHIFY_RECEIPT_CONFIDENCE == 0.6
     assert constants.SINCE_WINDOW_DAYS == {"h": 1 / 24, "d": 1, "w": 7}
-
-
-# ── the §4.4 demo numbers are byte-identical (behaviour is a no-op) ────────────
-def test_demo_attribution_matches_plan(seeded):
-    root, _ = seeded
-    pol = policy.load(None)
-    data = attribution.attribute(root, "fix-handover-bug", pol)
-    by_tool = {s["tool"]: s for s in data["steps"]}
-    assert by_tool["graphify"]["saved_tokens"] == 27000
-    assert data["total_saved_tokens"] == 41400
+    # METHOD_TRUST keeps its value even though `attribution` (its last in-tree reader)
+    # went in SURFACE-CUT: `constants` is the audit layer, and a constant is not retuned
+    # because a consumer left. `PROVENANCE_METHOD_TRUST` is the parallel ladder still in
+    # use by the authorship surfaces.
 
 
 def test_default_confidence_ladder_is_the_one_source():

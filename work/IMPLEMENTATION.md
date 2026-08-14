@@ -7,6 +7,90 @@ where it disagrees with `CLAUDE.md` or the plans in `docs/`, those win.
 Entry format:
 
 ```
+
+## 2026-08-14 — SURFACE-CUT COMPLETE (P0→P10): the read surface shrinks; capture untouched
+
+- **Built:** deleted `cage report`, all 8 `cage data` subcommands,
+  `insights attrib|adoption|compare|estimate|calibration`, `authorship ledger-sync`, and
+  the bare-`cage` overview. **14 modules** gone (`report` `attribution` `adoption`
+  `compare` `estimate` `calibration` `exportcmd` `otelout` `migratecmd` `watchcmd`
+  `serve` `proxy` `metercmd` `ledgersync`), 15 CLI handlers, 7 parser ranges. MCP cut
+  **6 tools → 2** (`cage_why`, `cage_task_outcome`), list and dispatch together.
+- **Rescued before deleting `report.py`, and PROVEN byte-identical:** `_is_legacy_human`
+  + `kiro_routed_line` → `chats.py`, `capture_warnings` → `doctorcmd.py`. Both code
+  versions were run against **one identical ledger** (a copy of the real `.cage`,
+  capture-on-read off, PYTHONPATH-selected baseline): `insights chats`,
+  `insights graphify` and `doctor` all byte-identical, with the kiro footer firing on
+  both insight surfaces and doctor reaching the capture-health gate — evidence the
+  rescued code ran, not a vacuous match.
+- **Added (scope decision, Arpit):** `cage study export` — `study.export_bundle`'s only
+  caller was the deleted `cage data export --study`, which would have left the fleet
+  study able to import bundles it could not produce. `exportcmd.sweep` rehomed as
+  `clicmds._study_sweep`, fail-open semantics verbatim. Smoke-tested: real 19 MB bundle.
+- **Kept (scope decision, Arpit):** `cleanup.py` — `importcmd.run` and `doctor` both
+  import it, so deleting it would have broken `cage import`. Only the verb went.
+- **Also swept (not in the prompt, required by CLAUDE.md):** `verbmap.REMOVED` migrated
+  for all 14 removed verbs with three new `_BODIES` sentences; `_MONEY_REMOVED` rewritten
+  (it pointed users at `cage report`/`insights attrib`, both now deleted); `install.sh`;
+  and `justfile`'s `demo` recipe, **which had been broken since USAGE-ONLY** — it still
+  called `cage insights matrix`.
+- **Explainer registry pruned:** 9 entries whose subject is deleted; every dangling
+  `code_refs` repaired, including two that were **already stale before this change**
+  (`cage/matrix.py`, `cage/netsaved.py`, both dead since USAGE-ONLY).
+- **Files:** `cage/{cli,clicmds,chats,doctorcmd,mcpserver,cleanup,verbmap,explain_data,
+  steering,schema,paths,ledger,importcmd,runstamp,cliutil,initcmd,commitview,
+  mergeutil,notessync}.py` · `docs/CLI.md` · `install.sh` · `justfile` ·
+  `work/{OPEN-WORK,surface-cut.decision}.md` · 12 test files deleted, ~30 stripped,
+  16 goldens removed.
+- **Tests:** **1333 passing, 15 failing — every failure is the graphify shim**
+  (`test_pathshim` ×8, `test_win_graphify_shim` ×5, `test_wiringscan` ×1,
+  `test_gf_launcher_arm2` ×1). Arpit chose to leave the shim subsystem untouched this
+  build; the twins probe `cage data graphify`, which is gone. **No user breakage** —
+  contract B5/B6 make an installed shim fail its probe and pass through unmetered.
+- **Finding — six recorded-but-unread facts:** the cut removed readers without removing
+  writers. `route_key` reclaim · `state/attest.jsonl` (L1 benefit *(a)*) · `scope` ·
+  `project` · task `label`/`outcome` · `[tools] order`. Filed as UNREAD-FACTS.
+- **Gate fixed:** `test_cli_tiering._GROUPED` whitelisted `cage data …` as a "grouped
+  spelling"; with the group deleted that made every dead `cage data <x>` invisible to the
+  stale-verb gate — the F1 class inside the detector itself.
+- **Next step:** Arpit decides SHIM-DEAD-VERB (remove the interceptor vs. give it a live
+  verb), where the decision record belongs under the new ADR structure, and whether this
+  ships as its own version. `CLAUDE.md` diff is **proposed, not applied**.
+
+
+## 2026-08-14 — ADR-RESTRUCTURE: 11 numeric ADRs → 4 per-agent ADRs; 4 docs absorbed
+
+- **Built:** `docs/adr/{0001_claude,0002_copilot,0003_kiro,0004_graphify}.md` — one record
+  per metered agent, each with **§1 for humans** (Mermaid + hand-paired ASCII twin) and
+  **§2 for agents** (context · decision · consequences · alternatives · reference · veto).
+  Plus `docs/adr/README.md` (index, the cite-by-name rule, the five shared laws) and a
+  two-section `docs/adr/TEMPLATE.md`.
+- **Archived:** the eleven numeric ADRs + the old template → `work/archive/adr/` with
+  `README.md` carrying the old→new map and naming the two records that are **genuinely
+  dead** (0001's `refs/notes/cage-ledger`, retired by SURFACE-CUT; 0010's `SPEND_CUTOVER`,
+  retired by 0011).
+- **Absorbed and removed:** `docs/shim-contract.md` → ADR-GRAPHIFY §2 *(B1–B8, B8a, D1–D8,
+  fail-open last resort, shared warts, Windows facts, test-harness corollary, the
+  four-mechanism anti-recursion proof)*; `claude-capture.md` / `copilot-capture.md` /
+  `kiro-capture.md` → their ADRs *(store→property tables + known gaps into §2, executive
+  summary into §1)*. Moved to `work/archive/_removed-2026-08-14/` — the Cowork bridge
+  cannot `rm`.
+- **Repointed:** ~46 files repo-wide (`CLAUDE.md`, `docs/{README,PLAN,CLI,GLOSSARY,FORMULAS,
+  restricted-environments}.md`, `architecture-flow.mermaid`, `work/DOC-REGISTRY.md`,
+  `work/INTERVIEW.md`, cage-lab, compare) and 12 code/test/tool citations
+  (`doctorcmd`, `paths`, `steering`, `adoptcmd`, `explain`, `explain_data`, `pathshim`,
+  `test_bundled_data`, `test_win_graphify_shim`, `cigraphify`). **History files
+  (`CHANGELOG.md`, `WORKLOG.md`, `IMPLEMENTATION.md`) keep their original doc names** —
+  only `docs/adr/NNNN` → `work/archive/adr/NNNN` paths were adjusted, so a dated record
+  still reads true.
+- **Verified:** `test_doc_links` logic replicated against `git ls-files` — 1,560 links,
+  **0 live-broken**, simulated on the post-removal tree (history dangles 182, exempt and
+  counted). All 5 Mermaid blocks render under `mmdc`. Token-level completeness diff of the
+  four absorbed docs: **0 unexplained gaps**.
+- **NOT done — blocked:** `.git/index.lock` held by a concurrent session since 15:04 UTC,
+  so `git rm`/`git add` both failed. **Git state is not updated.** Clear with
+  `rm -f .git/index.lock && git add -A`.
+
 ## YYYY-MM-DD — <milestone>
 - Implemented: <what, concretely>
 - Files: <touched paths>
@@ -24,7 +108,7 @@ Entry format:
   `pricescmd` · `pricestoml`, plus `data/prices.toml` and the
   `[prices]`/`[credits]`/`[billing]`/`[alias]` config sections. Eleven CLI commands and
   four MCP read tools removed (nine read tools → five). Durable decision:
-  [ADR 0011](../docs/adr/0011-cage-measures-usage-not-cost.md).
+  [ADR 0011](archive/adr/0011-cage-measures-usage-not-cost.md).
   - **P0 — cutover retired.** `constants.SPEND_CUTOVER` gone; `ledger.spend()` partitions
     by **agent**, not time. `SPEND_SOURCES["kiro"]` emptied and its reason stated in a new
     `ledger.ABSENT_SPINES` (it named `devdata.sqlite`, absent on every real install).
@@ -42,7 +126,7 @@ Entry format:
   - **P4 — docs:** ADR 0011, README repositioned, PLAN money sections *marked* (its
     numbering is a live addressing scheme), FORMULAS §1 rewritten + §2.1a/§2.2/§2.4–2.6
     removed, GLOSSARY reworked, CLI.md/kiro-capture/MACHINE/research header updated,
-    17 DOC-REGISTRY rows stamped, handoff+prompt archived as `v0.51-usage-only.*`.
+    17 DOC-REGISTRY rows stamped, handoff+prompt archived as `v0.50-usage-only.*`.
 - **Four things found by building, not reading** (each corrected in the ADR):
   (a) `spend()` = metric ledgers only would have **silently zeroed 373 codex rows** plus
   all library/proxy traffic — the `calls` fallback is scoped, not deletable;
@@ -93,7 +177,7 @@ Entry format:
   + its request-grain metric twin). **Every number is identical**; the only change is
   `claude` → `claude-code`, which is what `parse_calls` and `make_claude_metric` both
   actually stamp — the old value was the *surface* name, which no real row carries.
-- **P5 — docs.** [ADR 0010](../docs/adr/0010-metric-ledgers-are-the-spend-source-forward-only-cutover.md)
+- **P5 — docs.** [ADR 0010](archive/adr/0010-metric-ledgers-are-the-spend-source-forward-only-cutover.md)
   (required, written) · PLAN §3.14 added and §3.11–3.13's "capture-only, no derived view
   reads this kind" stance corrected on all three · GLOSSARY +4 terms (cutover · spend
   resolver · spend spine · request grain) · CHANGELOG · `docs/README.md` active-work index ·
@@ -105,7 +189,7 @@ Entry format:
   items carried forward: **KIRO-IDE-METRIC-ROW** (kiro's measured zero, with the contained
   fix named) and **METRICS-DUAL-WRITE-END** (gated to 2026-09-13 by ADR 0010).
 - **Files:** `cage/{ledger,constants,schema,transcript,report,attribution,freshness,compare,provenance,commitview,taskgroup,exportcmd,ledgersync,chats,matrix,budget,forecast,roi,netsaved,quality,study,adoption,regression,demo}.py`,
-  `docs/{PLAN,GLOSSARY,README}.md`, `docs/adr/0010-*.md`, `CHANGELOG.md`,
+  `docs/{PLAN,GLOSSARY,README}.md`, `work/archive/adr/0010-*.md`, `CHANGELOG.md`,
   `tests/{test_spend_resolver,test_claude_request_grain}.py` (new) + 7 fixture files.
 - **Tests:** green — **1842 passed / 11 skipped** (+36). `test_floor` untouched. One golden
   re-blessed (R6, label only), and the reason is recorded above rather than absorbed.
@@ -1300,7 +1384,7 @@ commit**, so the record of *why* matters more than the diff.
   parser. `graphifytx.detect_and_file_kiro_cli` detects `execute_bash` graphify runs and
   `fs_read` report-reads and files through the shared `_file_query`/`_file_report_read`.
 - **ADR 0009 authored in the same change** —
-  `docs/adr/0009-kiro-cli-tool-run-bodies-read-transiently-never-persisted.md`. It does
+  `work/archive/adr/0009-kiro-cli-tool-run-bodies-read-transiently-never-persisted.md`. It does
   **not** re-argue *counts persisted, content transient* (ADR **0008** already ratified
   that for line-match authorship, and more strictly — it forbids even a line hash); it
   records **where the boundary falls in this store**, which is the part 0008 could not
@@ -1316,7 +1400,7 @@ commit**, so the record of *why* matters more than the diff.
   (`_ingest_credits`) deliberately — that leg has already resolved sink and tree
   (ADR 0006), so the route never adds a second resolver. Scoping is pinned by test.
 - Files: `cage/transcript.py` · `cage/graphifytx.py` · `cage/importcmd.py` ·
-  `docs/adr/0009-*.md` (new) · `tests/test_graphify_kiro.py` (new, 16 tests) ·
+  `work/archive/adr/0009-*.md` (new) · `tests/test_graphify_kiro.py` (new, 16 tests) ·
   fixtures under `tests/fixtures/transcripts/graphify/kiro-cli/`.
 - Tests: **green, 1493 passed / 11 skipped** (1477 → 1493).
 - Next: P3 — `cage import --rescan-graphify` + the loud-gap surfaces (doctor + explainer).
@@ -1974,7 +2058,7 @@ commit**, so the record of *why* matters more than the diff.
 - **Files:** `cage/{commitjoin,linematch,authorcapture}.py` (new) ·
   `cage/{transcript,schema,originrecord,policy,importcmd,constants}.py` ·
   `cage/data/cage.toml` · `tests/{test_authorship_capture.py (new),conftest.py}` ·
-  `docs/adr/0008-line-match-authorship-counts-persisted-content-transient.md` (new) ·
+  `work/archive/adr/0008-line-match-authorship-counts-persisted-content-transient.md` (new) ·
   `work/regression/2026-08-02-p1-authorship-dogfood.md` (new)
 - **Tests:** green — **1270 pass / 0 fail / 10 skipped** (+25 new). Includes the
   plant-string PII test: runs the pass under `CAGE_DEBUG=1` and greps every written
@@ -2501,7 +2585,7 @@ commit**, so the record of *why* matters more than the diff.
     `paths.GRAPHIFY_SHIMS`/`graphify_shim_name()`). Covers: why two twins · PATHEXT has
     no extensionless entry · `.EXE` precedes `.CMD` (directory-major/extension-minor
     resolution) · content-based identity · D1 (`call` not `exec`) · the GF-LAUNCHER gap.
-  - **ADR 0007** (`docs/adr/0007-graphify-twin-pair-hand-paired-not-templated.md`) —
+  - **ADR 0007** (`work/archive/adr/0007-graphify-twin-pair-hand-paired-not-templated.md`) —
     records three decisions as load-bearing: both twins install on every OS,
     hand-paired not templated, contract lives in `docs/` not package data. Veto
     condition: templating reopens only on a **third** interceptor sharing a syntax
@@ -2528,7 +2612,7 @@ commit**, so the record of *why* matters more than the diff.
     since `graphify` is in `verbmap.REMOVED`. Reworded to describe the marker without
     spelling the two words adjacently, rather than weakening the gate.
 - **Files:** `docs/restricted-environments.md` (restored) ·
-  `docs/adr/0007-graphify-twin-pair-hand-paired-not-templated.md` (new) ·
+  `work/archive/adr/0007-graphify-twin-pair-hand-paired-not-templated.md` (new) ·
   `tests/test_cigraphify.py` (new) · `cage/doctorcmd.py` (`_launcher_gap` + wiring) ·
   `cage/explain.py` (+3 `_live()` values) · `cage/explain_data.py` (`graphify-shims`
   entry) · `tools/cigraphify.py` (docstring) · `docs/shim-contract.md` (cross-links) ·
@@ -2928,7 +3012,7 @@ land · `cage query kiro-routing`.
 
 - **Milestone:** closes OPEN-WORK **K2** and **K3/K4**. Found in the working tree during
   a Cowork reconciliation — built by the executing session, not yet logged here.
-- **K2 — kiro capture routing** (per [ADR 0006](../docs/adr/0006-kiro-rows-are-machine-facts-not-project-facts.md)):
+- **K2 — kiro capture routing** (per [ADR 0006](archive/adr/0006-kiro-rows-are-machine-facts-not-project-facts.md)):
   - `paths.kiro_routed(root)` — returns the kiro-IDE sink only when it **differs** from
     `root`'s ledger, else `None`. The single predicate the sweep branches on. Compared on
     the resolved **ledger dir**, not the root, which collapses both `CAGE_BASE` and
@@ -3155,7 +3239,7 @@ land · `cage query kiro-routing`.
     double-summing: kiro's log has no project/session/ts, so importing into a *new*
     project pulls its whole global history — per-project kiro cost has never been
     correct. Decision recorded as
-    [ADR 0006](../docs/adr/0006-kiro-rows-are-machine-facts-not-project-facts.md): kiro rows go
+    [ADR 0006](archive/adr/0006-kiro-rows-are-machine-facts-not-project-facts.md): kiro rows go
     to the **global ledger only**, explicit `--ledger`/`CAGE_BASE` still winning.
     Also established that kiro ids are stable across ledgers, so every id-merging path
     was already safe.
@@ -3164,7 +3248,7 @@ land · `cage query kiro-routing`.
 - **Sequencing:** HUMAN first — `compare`/`verdict`/`matrix` carry human total-cost
   lines that NET and K would otherwise edit twice.
 - **Files:** `docs/human-removal.handoff.md` (new) · `docs/human-removal.prompt.md`
-  (new) · `docs/adr/0006-*.md` (new) · `docs/OPEN-WORK.md` · `docs/README.md` ·
+  (new) · `work/archive/adr/0006-*.md` (new) · `docs/OPEN-WORK.md` · `docs/README.md` ·
   `work/DOC-REGISTRY.md` · `docs/WORKLOG.md`
 - **Tests:** none — documentation only. Suite last green at 833.
 - **Next step:** run `human-removal.prompt.md` (Opus).
@@ -3543,7 +3627,7 @@ land · `cage query kiro-routing`.
   (skipped by the detector).
 - Files: `cage/constants.py`, `cage/graphifytx.py`, `cage/graphifymodel.py`,
   `cage/report.py`, `cage/clicmds.py`, `cage/importcmd.py`, `cage/explain_data.py`,
-  `docs/adr/0005-*.md`, `docs/FORMULAS.md`, `docs/GLOSSARY.md`, `docs/OPEN-WORK.md`;
+  `work/archive/adr/0005-*.md`, `docs/FORMULAS.md`, `docs/GLOSSARY.md`, `docs/OPEN-WORK.md`;
   tests: `test_report_savings.py` (+3), `test_graphify_forward.py` (updated),
   `test_graphify_transcript.py` (+UNVALIDATED assert), `test_graphify_copilot.py` (new, 5).
 - Tests: `just test` green — **889 passed** (was 881). 0 goldens re-blessed (ceiling silent
@@ -3595,7 +3679,7 @@ land · `cage query kiro-routing`.
     `modeled` receipt reusing the shim counterfactual; Reads of `GRAPH_REPORT.md`/`wiki/**`
     → distinct `report-read` receipt (conf 0.3, footnoted apart). Corpus computation shared
     with GC5b (`repoceiling.py`).
-  - **GC3** ([ADR 0005](../docs/adr/0005-graphify-receipt-ids-session-inclusive-cross-route-deferral.md))
+  - **GC3** ([ADR 0005](archive/adr/0005-graphify-receipt-ids-session-inclusive-cross-route-deferral.md))
     — deterministic session-inclusive ids (`graphifymeter.receipt_id`) + content-key
     deferral; shim stamps `session=""` (root-cause fix). Both acceptance tests pass: same
     query/two sessions ⇒ two receipts; shim+transcript/one session ⇒ one receipt. Added
@@ -3609,7 +3693,7 @@ land · `cage query kiro-routing`.
 - Files: NEW `cage/usagelog.py`, `cage/graphifytx.py`, `cage/repoceiling.py`,
   `cage/graphifymodel.py`; edited `graphifymeter.py`, `schema.py`, `savings.py`,
   `constants.py`, `importcmd.py`, `paths.py`, `cleanup.py`, `doctorcmd.py`, `verdict.py`;
-  NEW `docs/adr/0005-*.md`; docs (FORMULAS/GLOSSARY/explain_data/PLAN/DOC-REGISTRY);
+  NEW `work/archive/adr/0005-*.md`; docs (FORMULAS/GLOSSARY/explain_data/PLAN/DOC-REGISTRY);
   tests `test_graphify_usage.py`, `test_graphify_transcript.py`, `test_graphify_forward.py`,
   `test_doctor.py` (check-set). Re-blessed goldens: **I2, I3** (`insights verdict graphify`
   gains the forward block; I4/`verdict fux` unchanged).
@@ -4452,14 +4536,14 @@ land · `cage query kiro-routing`.
   end-to-end on the **real** session `8073abba` — legacy row 70,071 → re-import →
   **107,581 exact** (+37,510, the exact V3 undercount) → third import **+0**. Proves V3
   goes 8/8 → **227,298** without spending on the paid re-run.
-- **Records:** [ADR 0004](../docs/adr/0004-append-only-delta-rows-and-separate-by-schema.md)
+- **Records:** [ADR 0004](archive/adr/0004-append-only-delta-rows-and-separate-by-schema.md)
   (append-only delta rows + separate-by-schema, with veto condition);
   `work/regression/2026-07-28-capture-precision-fixes.md`; proposed CLAUDE.md edits parked
   in `docs/proposals/claude-md-sources-authority.md` (**propose, don't apply**).
 - **Paid re-run (Step 6):** deterministic proofs done (846 green + self-heal). The paid
   6-cell re-run needs `cage-lab/golden/drive.py` updated for Directive A + Kiro credit
   checks and real agent calls — gated on Arpit's go-ahead.
-- Files (cage): `docs/adr/0004-*.md`, `work/regression/2026-07-28-*.md`,
+- Files (cage): `work/archive/adr/0004-*.md`, `work/regression/2026-07-28-*.md`,
   `docs/proposals/*.md`, `work/regression/README.md`. Files (cage-lab):
   `golden/publish_report.py`, `golden/findings/VALIDATION-REPORT.md(.sha256)`.
 - Tests: **846 passing**.
