@@ -151,8 +151,23 @@ row; FORMULAS §4.4 is now a tombstone.
 - `docs/architecture-flow.mermaid` rewritten (it still drew commands deleted two releases
   ago), `docs/FORMULAS.md` §2.7 corrected (false since **v0.47.0**), and a new gate
   re-derives that matrix from `graphifytx.GRAPHIFY_COVERAGE`.
+- **The bundled `[sources]` block was wrong, and now has a gate** (DOCGEN-DEAD-REF).
+  `cage/data/cage.toml` documents every built-in log source cage imports from. Its
+  generator (`tools/docgen --target policy`) was removed in the hookless rebuild, but its
+  input — `paths.builtin_source_docs()` and the `_SOURCE_DOC_PATHS` descriptor — survived
+  three releases **uncalled**. That descriptor's whole job was to raise when it and the
+  registry disagreed on a source count; nothing called it, so it never fired, and the
+  shipped block listed **2 copilot sources against the registry's 4** (the
+  `emptyWindowChatSessions` / `transferredChatSessions` roots added in v0.50 were never
+  written into it). The dead code is gone; the block is corrected and now lists all seven
+  seed entries, including the `kirocli` SQLite store it had never named. `docgen --check`
+  is replaced by two tests in `tests/test_sources.py` — per-agent source **count** and
+  every **glob/path_glob** must match `paths.sources_seed()`. Both are OS-independent;
+  the path prose stays macOS-primary and is deliberately not machine-checked. **No
+  behaviour change** — the active table a project uses has always been generated at
+  `cage setup` time from the registry, and still is.
 
-**Tests:** 1521 passing (+10 Windows-only skips, +1 opt-in dogfood-age skip).
+**Tests:** 1563 passing (+10 Windows-only skips, +1 opt-in dogfood-age skip).
 
 ## v0.50.0 (2026-08-14, unreleased) — cage stops measuring money, and the surface narrows to match: the money subsystem, the reporting surface and the numeric ADR set are all gone
 

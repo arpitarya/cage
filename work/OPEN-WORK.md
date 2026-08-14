@@ -31,17 +31,6 @@ COPILOT-JETBRAINS-UNPROBED).
 
 ## [ADR-CLI](../docs/adr/0002_cli.md) — the surface
 
-- **DOCGEN-DEAD-REF** — `cage/paths.py`'s `builtin_source_docs()` (and the comment above
-  `_SOURCE_DOC_PATHS`) still call out `python -m tools.docgen --target policy` as the
-  regeneration command for the bundled `[sources]` comment block — but `tools/docgen` no
-  longer exists (absorbed into ADR-CLI in the hookless rebuild, GOLDENS-ORPHANED). Worse:
-  `builtin_source_docs()` itself has no caller anywhere in `cage/` or `tests/` — it may be
-  fully dead code, or the bundled-policy regeneration step it served may need a live
-  replacement. Found sweeping `tools/docgen` citations while closing GOLDENS-ORPHANED
-  (2026-08-15). Fix is either: confirm it's dead and delete it + the stale comment, or find/
-  restore whatever now regenerates `data/cage.toml`'s `[sources]` block and repoint the
-  comment at it.
-
 - **CONTINUOUS-CAPTURE** — **Arpit's call.** `cage import` is manual-only (`watch`/`proxy`
   gone) and Claude Code sweeps transcripts at ~30 days, so a missed import is permanent
   loss. This record forbids a scheduler, so the only option on the table is printed

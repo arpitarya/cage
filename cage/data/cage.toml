@@ -19,10 +19,11 @@ policy_version = "0.27.0"
 # Auto-capture switch. Each agent's hook runs `cage import --agent <itself>` to meter
 # its own on-disk usage log; set enabled=false to pause that without unwiring any hooks
 # (the hooks still fire, the import is a no-op). Env CAGE_CAPTURE (0/1) overrides.
-# import_before_export: `cage data export` (plain and --study) runs the all-agent import
-# sweep first, so a capture-only machine (hooks don't fire under a VS Code extension)
-# still ships a complete bundle. Set false for as-is snapshots; the `--no-import`
-# flag wins per invocation (precedence: flag > env CAGE_CAPTURE > policy).
+# import_before_export: RECORDED BUT READ BY NOTHING since v0.51. It made an export run
+# the all-agent import sweep first, so a capture-only machine still shipped a complete
+# artifact; its last surface was the fleet study's bundle export, and the whole study
+# was removed (STUDY-CUT). The key stays rather than becoming an orphan in every
+# scaffolded project — a reader may be deleted, the setting it read is its own decision.
 [capture]
 enabled = true
 import_before_export = true
@@ -35,8 +36,9 @@ import_before_export = true
 # State-dir maintenance (.cage/state/ only — a CLOSED allowlist: aged debug.log and
 # hooks-seen.jsonl rows, stale pending-* provenance buffers, cursors whose source log
 # is gone, *.tmp). Never touches ledger/ (tool savings included — a per-tool cleanup
-# class must never be added), cage.toml, machine.json, study.jsonl, or
-# limits.json — fleet pairing and the audit trail are not cleanup's to lose.
+# class must never be added), cage.toml, limits.json, or the fleet study's two
+# leftovers (machine.json, study.jsonl) — unwritten since v0.51, and still never
+# cleanup's to delete: the audit trail is not cleanup's to lose.
 # Deletion only ever happens via an explicit `cage data cleanup --apply`: the auto
 # path (piggybacked on `cage import`, throttled, fail-open; cage installs no
 # scheduler) only ever WARNS on stderr, silent when nothing is eligible — never
@@ -119,7 +121,7 @@ signal = "task_ok"
 # the active table — there is no built-in runtime fallback and env home vars are not
 # consulted. An empty/absent [sources] captures NOTHING (loudly — `cage doctor`).
 # Refresh after a cage upgrade with `cage setup --sync-sources` (preserves your entries);
-# `cage doctor` reports drift vs the current defaults. Full contract: docs/sources.md.
+# `cage doctor` reports drift vs the current defaults. Full contract: `cage query sources`.
 #
 # Schema:
 #   [sources.<agent>]    paths = ["~/dir", ...]   add locations (built-ins kept)
@@ -148,28 +150,57 @@ signal = "task_ok"
 #   their path_globs union (in declaration order, deduped). Overlapping patterns never
 #   scan a file twice. A custom tool has no path_globs: `--path` never reaches one.
 #
-# claude   (redirect home: CLAUDE_CONFIG_DIR)
+# THE BUILT-IN DEFAULTS — the seed `cage setup` materializes into the active table.
+# Shown ~-relative, macOS first; the per-OS roots are stated ONCE per agent below.
+# HAND-MAINTAINED: the generator (`tools/docgen --target policy`) was removed in the
+# hookless rebuild, so `tests/test_sources.py` gates this block instead — the per-agent
+# source COUNT and every glob/path_glob (all OS-independent) must match
+# `paths.sources_seed()`. The path text itself is NOT machine-checked; the live twins
+# are `cage query sources` (this machine, resolved) and `cage doctor --paths` (probed).
+#
+# claude   (redirect home: CLAUDE_CONFIG_DIR)   — 1 source
 #   ~/.claude/projects
 #     glob **/*.jsonl   — every session transcript under the tree, recursively
 #     path_globs **/*.jsonl
 #
-# copilot   (redirect home: COPILOT_HOME, CAGE_VSCODE_USER)
+# copilot   (redirect homes: COPILOT_HOME, CAGE_VSCODE_USER)   — 4 sources
 #   ~/.copilot/session-state
 #     glob */events.jsonl   — Copilot CLI usage events (one dir per session)
 #     path_globs **/events.jsonl
-#   ~/Library/Application Support/Code/User/workspaceStorage
-#     glob */chatSessions/*.jsonl   — VS Code Copilot chat sessions (macOS location shown; other OS below)
-#     path_globs **/chatSessions/*.jsonl   — both copilot shapes are named EXPLICITLY
-#       rather than a blanket **/*.jsonl, so only copilot-shaped files can ever match
-#     other OS:
-#       Linux VS Code:   ~/.config/Code/User/workspaceStorage
-#       Windows VS Code: %APPDATA%\Code\User\workspaceStorage
+#   <vscode-user>/workspaceStorage
+#     glob */chatSessions/*.jsonl   — VS Code Copilot chat sessions, per workspace
+#     path_globs **/chatSessions/*.jsonl
+#   <vscode-user>/globalStorage/emptyWindowChatSessions
+#     glob *.jsonl   — chats started in a window with no folder open
+#     path_globs **/emptyWindowChatSessions/*.jsonl
+#   <vscode-user>/globalStorage/transferredChatSessions
+#     glob *.jsonl   — chats moved between windows
+#     path_globs **/transferredChatSessions/*.jsonl
+#   The two globalStorage roots are INVISIBLE to the workspaceStorage glob above, so
+#   they are separate sources rather than a wider pattern (research 2026-08-13 §Deltas).
+#   `no-workspace/chatSessions/` is already matched and is NOT a fifth entry. Every
+#   copilot shape is named EXPLICITLY rather than a blanket **/*.jsonl, so only
+#   copilot-shaped files can ever match — safe by construction, not by the accident of
+#   a foreign file parsing to zero rows.
+#   <vscode-user> =  macOS   ~/Library/Application Support/Code/User
+#                    Linux   ~/.config/Code/User
+#                    Windows %APPDATA%\Code\User
 #
-# kiro   (redirect home: KIRO_HOME, KIRO_DATA_DIR)
-#   ~/Library/Application Support/Kiro/User/globalStorage/kiro.kiroagent/dev_data/tokens_generated.jsonl
-#     glob *   — per-call token log — a FILE source, so the glob is ignored (macOS shown)
+# kiro   (redirect homes: KIRO_HOME, KIRO_DATA_DIR)   — 1 source (the IDE token log)
+#   <kiro-storage>/dev_data/tokens_generated.jsonl
+#     glob *   — per-call token log; a FILE source, so the glob is ignored
 #     path_globs *
-#     other OS:
-#       Linux:   ~/.config/Kiro/User/globalStorage/kiro.kiroagent/dev_data/tokens_generated.jsonl
-#       Windows: %APPDATA%\Kiro\User\globalStorage\kiro.kiroagent\...\tokens_generated.jsonl  (UNVERIFIED-LAYOUT — inferred from VS Code-family, not pinned on a real Windows Kiro)
+#   <kiro-storage> = macOS   ~/Library/Application Support/Kiro/User/globalStorage/kiro.kiroagent
+#                    Linux   ~/.config/Kiro/User/globalStorage/kiro.kiroagent
+#                    Windows %APPDATA%\Kiro\User\globalStorage\kiro.kiroagent
+#                    (Windows UNVERIFIED-LAYOUT — inferred from Kiro being VS Code-family,
+#                     not pinned against a real Windows Kiro install)
+#
+# kirocli   (redirect: CAGE_KIRO_CLI_DB)   — 1 source, format = "kiro-cli"
+#   <kiro-cli-store>   glob *   — the CLI's per-directory conversation SQLite DB,
+#   distinct from the IDE globalStorage above; read read-only, keyed by cwd.
+#   <kiro-cli-store> = macOS   ~/Library/Application Support/kiro-cli/data.sqlite3
+#                      Linux   ~/.local/share/kiro-cli/data.sqlite3
+#                      Windows %APPDATA%\kiro-cli\data.sqlite3
+#                      (Linux + Windows UNVERIFIED-LAYOUT — inferred from the macOS layout)
 # cage:sources-end

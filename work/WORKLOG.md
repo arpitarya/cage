@@ -12,6 +12,38 @@ by milestone) — the worklog is what *happened this session*.
 
 ---
 
+## 2026-08-15 — Claude Code — DOCGEN-DEAD-REF: docgen's last remnant removed, its block corrected and gated
+
+- **Asked:** "remove doc gen sub system." Then, seeing the diff: "i want to keep the
+  source paths add them back", and "all default sources path should be generated at setup
+  time and added into the cage.toml file".
+- **Done:** deleted `_SOURCE_DOC_PATHS` / `_SOURCE_DOC_OTHER_OS` / `builtin_source_docs()`
+  from `paths.py` (docgen's input, uncalled for three releases). Restored the `[sources]`
+  listing in the bundled `cage/data/cage.toml` — **corrected to all seven seed entries**,
+  incl. the two copilot globalStorage roots it had never named and the `kirocli` store it
+  had never mentioned. Added two gates in `tests/test_sources.py` (count + globs vs
+  `paths.sources_seed()`) to replace the lost `docgen --check`. Swept the dangling
+  `docs/sources.md` citation and three stale claims in `docs/example/toml-config.md`.
+- **Decided:** the block stays hand-maintained rather than regenerated — Arpit's call to
+  keep the paths visible in the shipped template. The drift risk that call carries is
+  paid for by the new gate, not by prose.
+- **Verified, not built:** setup-time generation of the active table already exists
+  (`cage setup` → `initcmd.sync_sources` → `paths.materialize_sources`); proved it by
+  running `cage setup --all` in a scratch repo and reading back all seven materialized
+  `[[sources.*]]` entries. The bundle's comment block is the pre-setup reference; the
+  generated table replaces it in a real project.
+- **My error, recorded so it isn't repeated:** `git stash push -- <two files>` to A/B the
+  suite stashed the entire tree; the `pop` conflicted and silently reverted ~23 files of
+  uncommitted work, making a clean edit look like it broke two tests. I stopped and handed
+  recovery to Arpit rather than running `reset --hard` (the permission layer blocked it
+  too, correctly). He resolved it by committing the stashed state as 3678c68. **Rule for
+  the next session: never `git stash` to isolate a change in a dirty tree.**
+- **Open:** nothing from this item.
+- **ADR:** no ADR affected — stated explicitly, per the standing rule.
+- **Cost:** unmeasured — `cage report` was deleted in v0.50 and the surviving reader
+  (`cage insights chats`) is per-chat, so no per-session figure exists (UNREAD-FACTS).
+- **Next step:** none — DOCGEN-DEAD-REF removed from OPEN-WORK.
+
 ## 2026-08-15 — Claude Code — STUDY-CUT: the fleet study removed whole
 
 - **Asked:** "remove cage study from cli."

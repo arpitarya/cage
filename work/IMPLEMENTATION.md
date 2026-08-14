@@ -8,6 +8,56 @@ Entry format:
 
 ```
 
+## 2026-08-15 — DOCGEN-DEAD-REF: the last of the doc-generator removed, its output corrected and gated
+
+- **Asked:** "remove doc gen sub system" — then, after seeing the result, "i want to keep
+  the source paths add them back" and "all default sources path should be generated at
+  setup time and added into the cage.toml file".
+- **Found:** `tools/docgen` went in the hookless rebuild, but its *input* survived in
+  `cage/paths.py` — `_SOURCE_DOC_PATHS`, `_SOURCE_DOC_OTHER_OS` and
+  `builtin_source_docs()`, uncalled anywhere in `cage/` or `tests/` for three releases —
+  and so did its *output*, the frozen `[sources]` enumeration in the bundled
+  `cage/data/cage.toml`. The descriptor existed precisely to raise when it and the
+  registry disagreed on a source count; nothing called it, so it never fired, and **by
+  2026-08-15 the block was wrong**: it documented 2 copilot sources against the
+  registry's 4 (`emptyWindowChatSessions` and `transferredChatSessions`, added
+  2026-08-13, were never written into it).
+- **Built (removed):** the three dead objects in `paths.py`, replaced by a note recording
+  why no frozen copy should return. `_AGENT_ENV` stays — `pathprobe` reads it.
+- **Built (restored + corrected):** the `[sources]` block in the bundle now lists **all
+  seven seed entries** — claude ×1, copilot ×4, kiro ×1, kirocli ×1 (the CLI SQLite
+  store, which the old block never mentioned at all) — with the per-OS roots stated once
+  per agent instead of repeated per path, and the Windows/Linux layouts still labelled
+  UNVERIFIED-LAYOUT.
+- **Built (new gate):** `tests/test_sources.py` gains two tests replacing `docgen
+  --check` — per-agent source **count** and every **glob/path_glob** must match
+  `paths.sources_seed()`. Both are OS-independent by construction; the path *prose* is
+  deliberately not machine-checked (it is macOS-primary and would fail on Linux CI) and
+  the docstring says so rather than implying coverage it lacks. Drift detection verified
+  by simulating a 5th copilot source — both gates fire.
+- **Confirmed, not changed:** setup-time generation already works. `cage setup --all` in
+  a scratch repo materializes all seven entries into `.cage/cage.toml` between the
+  `# cage:sources-start/end` sentinels via `initcmd.sync_sources` →
+  `paths.materialize_sources`. No code needed for that ask.
+- **Swept on contact:** the bundle's dangling `docs/sources.md` citation (deleted doc) →
+  `cage query sources`. `docs/example/toml-config.md`'s copilot "**both** store shapes"
+  (now four), its "generated" claim for the block (now hand-maintained + gated), and its
+  pre-ADR-0011 "Edit prices in `prices.toml`" paragraph naming the dead
+  `cage query prices-cli`.
+- **Files:** `cage/paths.py` · `cage/data/cage.toml` · `tests/test_sources.py` ·
+  `docs/example/toml-config.md` · `work/OPEN-WORK.md` (item removed).
+- **Tests:** `just test` green — 1563 passed, 11 skipped (was 1561 + 2 new gates).
+- **ADR:** **no ADR affected.** No record describes the bundled comment block; ADR-CLI's
+  `--sync-sources` row and ADR-CONSUMERS' `[sources]` resolution are both unchanged, and
+  nothing about capture behaviour moved.
+- **Process note (mine, worth inheriting):** mid-task I ran `git stash push -- <two
+  files>` to A/B the suite. It snapshotted the **whole tree**, and the follow-up `pop`
+  conflicted and reverted ~23 files of Arpit's uncommitted work — which read as "my edit
+  broke 2 tests" when it had broken none. **Never stash to isolate a change in a repo
+  with uncommitted work**; copy the file aside and diff, or commit first. Recovery came
+  from Arpit committing the stashed state as 3678c68.
+- **Next step:** none — item closed.
+
 ## 2026-08-15 — STUDY-CUT: the P5 fleet study removed whole (subsystem, not just the verbs)
 
 - **Asked:** "remove cage study from cli". Scope confirmed with Arpit as the **whole

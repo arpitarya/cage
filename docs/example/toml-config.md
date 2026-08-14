@@ -108,13 +108,18 @@ path_globs = ["**/*.jsonl"]      # root-agnostic; `cage import --path` only (bel
   same table, same entries, same semantics. Without it, extra entries are additive and
   their `path_globs` union in declaration order.
 - Overlapping patterns never hand the same file over twice.
-- Copilot's seed names **both** store shapes explicitly (`**/events.jsonl`,
-  `**/chatSessions/*.jsonl`) rather than a blanket `**/*.jsonl`, so a foreign `.jsonl`
-  under your `--path` is never matched — safe by construction, not by the accident of
-  it parsing to zero rows.
+- Copilot's seed names **all four** store shapes explicitly (`**/events.jsonl`,
+  `**/chatSessions/*.jsonl`, `**/emptyWindowChatSessions/*.jsonl`,
+  `**/transferredChatSessions/*.jsonl`) rather than a blanket `**/*.jsonl`, so a foreign
+  `.jsonl` under your `--path` is never matched — safe by construction, not by the
+  accident of it parsing to zero rows.
 - A custom tool (`[sources.<tool>]`) has no `path_globs`: `--path` never reaches one.
 
-Edit prices in `prices.toml`, budgets/order/routing in `cage.toml`; repricing
-is derive-time and retroactive, so fixing a price re-prices every historical row.
-Full field list: `cage query prices-cli` / `cage query prices-file` and the bundled
-policy's generated `[sources]` comment block.
+Edit pipeline order, capture switches and routing in `cage.toml`. There is no price
+table and no currency on any surface — cage measures usage, never cost
+([ADR-LAWS](../adr/0001_laws.md) Law 5; `cage query numbers-layers` explains the three
+layers numbers live in). A leftover `.cage/prices.toml` from a pre-0.51 project is
+never read and `cage doctor` names it. Full field list: `cage query config-file` /
+`cage query sources`, and the bundled policy's `[sources]` comment block — which is
+**hand-maintained**, its `tools/docgen` generator having been removed in the hookless
+rebuild; `tests/test_sources.py` gates it against `paths.sources_seed()`.

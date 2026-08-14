@@ -10,6 +10,7 @@ portability warn/no-warn guard, and `policy sync` ownership.
 from __future__ import annotations
 
 import json
+import re
 from types import SimpleNamespace
 
 from cage import (agents, importcmd, ledger, paths, pathprobe, policy, policysync,
@@ -502,3 +503,56 @@ def test_no_test_writes_a_raw_path_into_a_toml_basic_string():
     assert not bad, (
         "TOML path(s) written without `.as_posix()` — these break on Windows:\n  "
         + "\n  ".join(bad))
+
+
+# ── the bundled `[sources]` documentation block (DOCGEN-DEAD-REF, 2026-08-15) ────────
+# `cage/data/cage.toml` ships a comment block describing every built-in default. It had
+# a generator once (`tools/docgen --target policy`, fed by a `paths.builtin_source_docs()`
+# descriptor); docgen went in the hookless rebuild, the descriptor outlived it uncalled
+# for three releases, and by then the block was WRONG — it named two copilot sources
+# against the registry's four. The block is hand-maintained now, so this is the gate that
+# replaces `docgen --check`.
+#
+# WHAT IT CHECKS, precisely: the per-agent source COUNT and every `glob`/`path_globs`
+# string. Those are the OS-independent half of `paths.sources_seed()` — the *paths*
+# resolve differently per platform (macOS/Linux/Windows roots), so asserting the path
+# text would fail on CI the moment it ran anywhere but a Mac. The path prose is
+# therefore NOT machine-checked and this gate does not pretend otherwise; what it does
+# guarantee is that a new or removed built-in source cannot ship without this block
+# being edited, which is the failure that actually happened.
+
+_SEED_HEADING = re.compile(r"^# (\w+)\s+\(.*?\)\s+— (\d+) sources?")
+
+
+def _bundled_sources_block() -> str:
+    text = (paths.bundled_data() / "cage.toml").read_text(encoding="utf-8")
+    return text.split(paths.SOURCES_START)[1].split(paths.SOURCES_END)[0]
+
+
+def test_bundled_block_documents_every_builtin_source_count():
+    """Per-agent counts in the shipped block == `paths.sources_seed()`. This is the
+    assertion the drifted block would have failed (copilot: documented 2, seeded 4)."""
+    block = _bundled_sources_block()
+    documented = {m.group(1): int(m.group(2))
+                  for m in (_SEED_HEADING.match(l) for l in block.splitlines()) if m}
+    seeded: dict[str, int] = {}
+    for e in paths.sources_seed():
+        seeded[e["name"]] = seeded.get(e["name"], 0) + 1
+    assert documented == seeded, (
+        "cage/data/cage.toml's [sources] block disagrees with paths.sources_seed():\n"
+        f"  documented: {documented}\n  seeded:     {seeded}\n"
+        "Edit the block (it is hand-maintained — docgen is gone).")
+
+
+def test_bundled_block_names_every_glob_and_path_glob():
+    """Every glob the seed carries is named in the block. Globs are OS-independent, so
+    this is safe on every platform — unlike the paths, which are not checked (see above)."""
+    block = _bundled_sources_block()
+    missing = []
+    for e in paths.sources_seed():
+        for g in [e.get("glob")] + list(e.get("path_globs") or []):
+            if g and g not in block:
+                missing.append(f"{e['name']}: {g}")
+    assert not missing, (
+        "glob(s) in paths.sources_seed() that the bundled [sources] block never "
+        "names:\n  " + "\n  ".join(missing))
