@@ -1,61 +1,80 @@
 %% cage — the one-way data flow (capture → append-only ledger → deterministic derive → read/export)
-%% Maintained: update when a stage, sink, or read surface changes (see DOC-REGISTRY.md).
-%% Mirrors the Architecture section of CLAUDE.md and docs/cage-plan.md §3–§5.
+%% Maintained: update when a stage, sink, or read surface changes (see work/DOC-REGISTRY.md).
+%% Mirrors the Architecture section of CLAUDE.md and docs/PLAN.md §3–§5.
+%%
+%% Rewritten 2026-08-14 (v0.51, P1). It had gone stale across two releases: it still drew
+%% report/attrib/matrix/budget/roi and compare/verdict (deleted by SURFACE-CUT, v0.50),
+%% prices.toml and `--team` (deleted with the money subsystem, ADR 0011). A diagram that
+%% names deleted commands is worse than none — it is the F1 class, drawn.
 flowchart TD
-    subgraph capture["Capture — pull-based & global (adr/README.md: one sink, pull-only)"]
+    subgraph capture["Capture — pull-based & global (ADR-LAWS: one sink, pull-only)"]
         agents["Agent logs<br/>Claude Code · Copilot · Kiro"]
-        meter["meter() / proxy / transcript<br/>(fail-open, best-effort)"]
-        imp["cage import / export<br/>(resolved ledger, incremental cursors)"]
-        agents --> meter
+        yours["Your code<br/>cage.meter() / record_call<br/>(fail-open, in a request path)"]
+        gfx["graphify interceptor<br/>bin/graphify → cage interceptor graphify"]
+        imp["cage import + capture-on-read<br/>(resolved ledger, incremental cursors)"]
         agents --> imp
     end
 
-    subgraph ledger["Append-only ledger — .cage/ (month-partitioned JSONL; counts, never prompt text)"]
-        calls["calls-YYYY-MM.jsonl"]
+    subgraph ledger["Append-only ledger — .cage/ledger/ (month-partitioned JSONL; counts, never prompt text)"]
+        subgraph producers["one directory per producer"]
+            mclaude["claude/chats-YYYY-MM.jsonl"]
+            mcopilot["copilot/chats-YYYY-MM.jsonl"]
+            mkiro["kiro/chats-YYYY-MM.jsonl"]
+            mconsumer["consumer/calls-YYYY-MM.jsonl<br/>(NEW v0.51 — P1)"]
+            msavings["savings/&lt;tool&gt;/savings-YYYY-MM.jsonl"]
+        end
+        subgraph hist["written by nothing current, read forever"]
+            calls["calls-YYYY-MM.jsonl<br/>(retired agents: codex)"]
+            credits["credits-YYYY-MM.jsonl<br/>(kiro CLI)"]
+        end
         receipts["receipts-YYYY-MM.jsonl"]
         tasks["tasks-YYYY-MM.jsonl"]
-        credits["credits-YYYY-MM.jsonl<br/>(kiro CLI — cwd-scoped)"]
         prov["provenance.jsonl<br/>(local buffer)"]
     end
 
     machine["Machine ledger — ~/.cage<br/>kiro IDE rows only (ADR-KIRO)<br/>one copy per machine"]
 
-    meter --> calls
-    meter --> receipts
+    imp --> mclaude
+    imp --> mcopilot
+    imp --> mkiro
     imp --> calls
-    imp --> receipts
-    imp --> tasks
     imp --> credits
+    imp --> tasks
+    imp --> prov
+    yours --> mconsumer
+    yours -. "dual write — the calls row is the rollback<br/>and join_table's lookup key" .-> calls
+    yours --> receipts
+    gfx --> msavings
     imp -. "kiro IDE: no project in the source<br/>(unless --ledger names a sink)" .-> machine
 
-    policy["cage.toml<br/>order · budgets · routing<br/>+ prices.toml"]
+    policy["cage.toml<br/>[tools] order · [capture] · [sources] · [authorship]"]
 
-    subgraph derive["Derive — $0, deterministic, no model, no network"]
-        d1["report · attrib · matrix · budget · roi"]
-        d2["compare · verdict · why · origin"]
-        d3["--scope · --project · --team · compare · verdict"]
+    subgraph derive["Derive — $0, deterministic, no model, no network, no currency"]
+        spend["ledger.spend() — the ONE resolver<br/>per-producer basis, never blended"]
+        d1["insights chats · graphify · commits · commit · why"]
+        d2["authorship origin · summary · verify"]
+        d3["study report · doctor · query"]
+        spend --> d1
     end
 
-    calls --> derive
+    producers --> spend
+    hist --> spend
     receipts --> derive
     tasks --> derive
+    prov --> derive
     policy --> derive
 
     subgraph read["Read / export surfaces"]
         cli["CLI (typed errors, exit 1)"]
-        mcp["MCP server (every agent)"]
-        csv["--csv / data export"]
+        mcp["MCP server — 5 read tools + 1 write"]
+        csv["--csv (one-way reporting)"]
         art["--export → .cage/output/&lt;view&gt;-&lt;stamp&gt;/<br/>(text · csv · json; stamped artifact)"]
     end
 
     derive --> read
 
     subgraph ci["CI-sole-writer aggregation (union-by-id)"]
-        nledger["refs/notes/cage-ledger — REMOVED by SURFACE-CUT 2026-08-14"]
         nprov["refs/notes/cage-provenance — authorship"]
     end
 
-    calls -. ledger-sync (CI only) .-> nledger
-    receipts -. ledger-sync (CI only) .-> nledger
-    prov -. notes-sync (CI only) .-> nprov
-    nledger -. --team .-> derive
+    prov -. "notes-sync (CAGE_NOTES_WRITE=1, CI only;<br/>a dev machine dry-runs)" .-> nprov

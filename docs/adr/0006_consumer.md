@@ -1,8 +1,8 @@
 ---
 adr: consumers
-status: current as of 2026-08-14 · library · custom `[sources]` · retired agents — all resolve from `calls`, permanently
+status: current as of 2026-08-14 · **REVERSED IN PART (v0.51)** — consumers now own `ledger/consumer/` and dual-write; retired agents and custom `[sources]` still resolve from `calls`, permanently
 audience: §1 humans (skim) · §2 agents (build)
-update-rule: ANY change to `cage.meter`, the `[sources]` resolution, or the `calls` fallback in `ledger.spend()` updates this record in the same change, and bumps its DOC-REGISTRY row
+update-rule: ANY change to `cage.meter`, the `[sources]` resolution, the consumer ledger, or the `calls` fallback in `ledger.spend()` updates this record in the same change, and bumps its DOC-REGISTRY row
 ---
 
 # ADR-CONSUMERS — the things cage meters that are not agents
@@ -23,9 +23,15 @@ request. **A custom tool** you pointed cage at through config. **An agent cage u
 support** — Codex was removed in v0.33.0, but its rows are still in real ledgers and are
 still counted.
 
-None of them has a per-agent metric ledger, and none ever will under this design. That
-sounds like second-class treatment. It is the opposite: it is why they are the one group
-whose whole history still reads.
+**Two of the three still have no ledger of their own, and never will.** A custom
+`[sources]` tool and a retired agent resolve from `calls`, permanently — which is why they
+are the one group whose whole history still reads.
+
+**Your application got one in v0.51**, at `ledger/consumer/`. That is a **partial reversal
+of this record**, taken so that every producer owns one directory under `ledger/` and
+`calls` can stop being *written* by anything current. The facts recorded did not get
+richer — see the Decision below, which says so plainly. Nothing was migrated: every row
+already on disk stays exactly where it is, and keeps resolving.
 
 ### Where they sit
 
@@ -111,8 +117,49 @@ missing row is always possible.
 
 ### Decision
 
+> ## ⟲ PARTIAL REVERSAL — 2026-08-14 (v0.51, P1 of the ledger restructure)
+>
+> **The library consumer now has a metric ledger: `ledger/consumer/calls-<month>.jsonl`,
+> written by `record_call` as a DUAL WRITE beside the `calls` row.** The clause below —
+> *"are never given a metric ledger"* — no longer holds for that one population. It still
+> holds for custom `[sources]` tools and retired agents, and **every other clause of this
+> decision survives untouched**, including the two invariants.
+>
+> **The original objection was right, and is not being pretended away.** *Alternatives
+> rejected* says a metric ledger for consumers would be *"a rename of `calls` with a longer
+> path"*, because there is no vendor store behind a library caller. That is still true:
+> `schema.make_consumer_metric` carries **no field a call row could not**, and its
+> docstring says so. **The reversal is about shape, not richness.** With consumers homed
+> in their own directory, every producer owns one — `claude/` `copilot/` `kiro/`
+> `consumer/` `graphify/` `provenance/` — and `calls` can stop being written by anything
+> current, which is what retiring the three agents' transcript→`calls` writer (P5) needs.
+> A cost paid in one near-duplicate kind to make a whole-tree property true.
+>
+> **What makes the reversal safe — and it is a NARROWING of one invariant, stated here
+> rather than smuggled.** This record's third invariant is *"the `calls` fallback is
+> scoped by `SPEND_SOURCES` membership, never by `agents.SURFACES`."* `SPEND_SOURCES`
+> gains a `"consumer"` key, **but that key is deliberately NOT the suppression test.**
+> Suppression of a consumer's `calls` twin is by **id** (`ledger.consumer_twin_calls`):
+> `spend()` drops exactly the rows a consumer metric row claims, and nothing else.
+>
+> An agent-name test would have been the obvious implementation and would have zeroed
+> every *historical* `lib`/proxy row — rows written before this kind existed, whose twin
+> does not and cannot exist. That is this record's own measured failure (373 codex rows)
+> pointed at a different population. The id match cannot make it, and
+> `tests/test_consumer_ledger.py` pins the property directly.
+>
+> **Dual-write is the rollback, not caution.** The `calls` row is unchanged and still
+> carries the whole fact; `ledger.join_table` still resolves a receipt's `call=` against
+> it. Withdrawing this reversal is deleting one call site, not a migration.
+>
+> **Two things the reversal did NOT do:** it did not migrate a single existing row, and it
+> did not give consumers a per-agent *surface*. They remain invisible to per-chat views,
+> `agent%` and the metric-ledger doctor checks — still a consequence of having no chat and
+> no vendor store, not a gap to fill.
+
 **Non-agent consumers resolve from `calls` permanently, are never given a metric ledger,
-and their write path is fail-open by construction.**
+and their write path is fail-open by construction.** *(The metric-ledger clause is
+partially reversed — see the block above. The rest stands.)*
 
 - **The `calls` fallback in `ledger.spend()` is scoped and permanent.** A row is
   superseded **only when its own agent has a spine to be superseded by** —
@@ -161,6 +208,11 @@ and their write path is fail-open by construction.**
 - **Give consumers a metric ledger of their own.** Rejected: a metric kind exists to hold
   *vendor-native facts a caller could not supply*. For a library caller there is no vendor
   store — the kind would be a rename of `calls` with a longer path.
+  **⟲ ACCEPTED 2026-08-14 (v0.51) for the library consumer only** — and on the reasoning
+  *above*, not against it. The kind IS a near-rename of `calls`; it was taken anyway
+  because a uniform per-producer shape is what lets `calls` stop being written. See the
+  reversal block in *Decision*. The rejection still stands for custom `[sources]` tools
+  and retired agents.
 - **Delete a retired agent's rows when its parser goes.** Rejected on append-only: the
   rows were true when written, and a ledger that silently shrinks when a tool is removed
   cannot be reconciled against anything.
@@ -191,10 +243,20 @@ and their write path is fail-open by construction.**
 
 **1 · Falsifiable triggers, numbered.**
 
-1. **A consumer earns a metric ledger only when a vendor-native store appears behind it** —
-   i.e. a `[sources.<name>]` tool that persists per-call facts `calls` structurally cannot
-   hold, on a real install. Name the store and the fields. A richer *argument* to
-   `cage.meter` is **not** this trigger: a caller-supplied field belongs on the call row.
+1. ~~**A consumer earns a metric ledger only when a vendor-native store appears behind
+   it**~~ — **SUPERSEDED 2026-08-14, and the record of how matters more than the outcome.**
+   This trigger never fired: no vendor store appeared, and none is claimed. The library
+   consumer was given `ledger/consumer/` for a reason this trigger did not anticipate — a
+   **whole-tree shape** property (one directory per producer, so `calls` can stop being
+   written), which is not a fact about consumers at all.
+   **The lesson, kept because it is the reusable part:** a veto condition phrased as *"X
+   happens only when evidence E appears"* is blind to a change motivated by structure
+   rather than by evidence about X. It was still doing its job — it stopped a richer
+   `cage.meter` argument from becoming a new kind, and that clause stands:
+   **a caller-supplied field belongs on the call row, not in a new kind.**
+   The trigger that now governs is the one below (3), plus this: **no OTHER consumer
+   population gets a directory without a vendor-native store behind it.** Custom
+   `[sources]` tools and retired agents resolve from `calls`, and that is invariant.
 2. **The `calls` fallback narrows only with a measured zero** — a census showing **0 rows**
    in the non-superseded population across real ledgers. It was 373 for `codex` alone when
    this was written. Below that, narrowing deletes data.
@@ -213,7 +275,12 @@ and their write path is fail-open by construction.**
   - **A retired agent's rows are never deleted, rewritten, or re-attributed.**
   - **The `calls` fallback is scoped by `SPEND_SOURCES` membership**, never by
     `agents.SURFACES` — the two look interchangeable and are not, and kiro's empty tuple
-    is the case that proves it.
+    is the case that proves it. **Narrowed, not broken, in v0.51:** `SPEND_SOURCES` now
+    holds a non-agent key (`consumer`), and that key is **not** a suppression test. The
+    only thing that suppresses a consumer's `calls` twin is an **exact id match**
+    (`ledger.consumer_twin_calls`), so no untwinned row can ever be dropped by it. The
+    invariant's purpose — *a row is never suppressed unless something specific replaces
+    it* — is strengthened by the id test, not weakened.
   - **Config never defines schema.** A `[sources]` entry may name a log; it may not create
     a row kind.
 

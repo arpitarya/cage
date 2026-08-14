@@ -109,14 +109,44 @@ def test_no_row_is_ever_counted_twice(proj):
 
 # ── 3 · SPEND_SOURCES is a spine, never a sum ────────────────────────────────
 
+#: Producers in `SPEND_SOURCES` that are **not** agents. Enumerated here rather than
+#: waived, so adding one stays a deliberate act: an agent that fell out of
+#: `agents.SURFACES` would otherwise hide in the same gap.
+NON_AGENT_PRODUCERS = {"consumer"}
+
+
 def test_every_agent_has_a_declared_spine_or_a_stated_absence():
     from cage import agents
-    assert set(ledger.SPEND_SOURCES) == set(agents.SURFACES)
+    # Every agent must be in the table — that half is unchanged, and it is the half that
+    # catches an agent shipped with no declared spine.
+    assert set(agents.SURFACES) <= set(ledger.SPEND_SOURCES)
+    # The other half was `==` until P1 (v0.51) gave consumers their own ledger. It is
+    # deliberately NOT relaxed to "anything may be a key": a non-agent producer has to be
+    # named above, so the assertion still fails on an accident.
+    assert set(ledger.SPEND_SOURCES) - set(agents.SURFACES) == NON_AGENT_PRODUCERS
     # An agent listed with an EMPTY spine must say why — a bare `()` reads as an
     # oversight, and kiro's used to name a store that does not exist.
     for agent, sources in ledger.SPEND_SOURCES.items():
         if not sources:
             assert ledger.ABSENT_SPINES.get(agent), f"{agent} has no spine and no reason"
+
+
+def test_a_non_agent_producer_is_never_the_suppression_test(proj):
+    """**The P1 safety property, and the one that could silently zero real rows.**
+
+    `spend()` suppresses a `calls` row for the three agents by testing its agent name
+    against `SPEND_SOURCES`. If consumers were suppressed the same way, every *historical*
+    `lib`/proxy row — written before `ledger/consumer/` existed, with no twin to replace
+    it — would vanish from spend with nothing taking its place. That is the failure
+    ADR-CONSUMERS measured at 373 codex rows, aimed at a different population.
+
+    So: a pre-P1 `lib` row, with no consumer twin anywhere, must still resolve."""
+    ledger.append_row(proj, "calls", schema.make_call(
+        route="chat", provider="anthropic", model="m", agent="lib",
+        tokens_in=100, tokens_out=10, ts=LATE))
+    rows = ledger.spend(proj)
+    assert len(rows) == 1
+    assert rows[0]["agent"] == "lib" and rows[0]["basis"] == "calls"
 
 
 def test_a_non_spine_source_never_carries_money(proj):

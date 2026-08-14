@@ -39,10 +39,16 @@ What replaces it is not a formula. It is a **read**:
     `ledger.spend()` returns.
 
 - **Code:** `cage/ledger.py` (`spend`, `SPEND_SOURCES`) · `cage/report.py`.
-- **Basis, and it is per AGENT, not per instant:** an agent with a metric ledger
-  resolves from it for all of history; an agent without one (`lib`, the proxy, the
-  retired `codex`, custom `[sources.*]` tools) resolves from `calls`. There is no time
-  cutover — `SPEND_CUTOVER` was retired with the money subsystem.
+- **Basis, and it is per PRODUCER, not per instant:** a producer with its own ledger
+  resolves from it for all of history; one without (the retired `codex`, custom
+  `[sources.*]` tools, and any pre-v0.51 `lib`/proxy row) resolves from `calls`. There is
+  no time cutover — `SPEND_CUTOVER` was retired with the money subsystem.
+- **The library consumer joined the first group in v0.51** (`ledger/consumer/`, P1 —
+  ADR-CONSUMERS' partial reversal). It is the one producer whose `calls` twin is
+  suppressed by an **exact id match** rather than by its agent name
+  (`ledger.consumer_twin_calls`): an agent-name test would also suppress every
+  *pre-v0.51* `lib` row, which has no twin to replace it. Both halves are counted once,
+  and nothing untwinned is ever dropped.
 - **`measured`** throughout: every figure is a recorded count read back verbatim.
 
 ### 1.2 Credits — `measured`

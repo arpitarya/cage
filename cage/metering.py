@@ -61,7 +61,58 @@ def record_call(*, route: str, provider: str, model: str, tokens_in: int = 0,
                            cached_in=cached_in,
                            est_cost_usd=0.0 if est_cost_usd is None else est_cost_usd,
                            scope=scope, **fields)
-    return row["id"] if ledger.append_row(r, "calls", row) else ""
+    ok = ledger.append_row(r, "calls", row)
+    _record_consumer_twin(r, row, route=route, provider=provider, model=model,
+                          tokens_in=tokens_in, tokens_out=tokens_out,
+                          cached_in=cached_in, scope=scope, call_ok=ok, **fields)
+    return row["id"] if ok else ""
+
+
+def _record_consumer_twin(root: Path, call_row: dict, *, route: str, provider: str,
+                          model: str, tokens_in: int, tokens_out: int, cached_in: int,
+                          scope: str, call_ok: bool, **fields) -> None:
+    """The consumer half of `record_call`'s **dual write** (P1, v0.51).
+
+    Every producer now owns one directory under `ledger/`, and this is the consumer's:
+    `ledger/consumer/calls-<month>.jsonl`. It reverses
+    [ADR-CONSUMERS](../docs/adr/0006_consumer.md)'s *"never given a metric ledger"*, which
+    is recorded there rather than contradicted quietly.
+
+    **Dual-write, never a cutover, and that is not caution — it is the rollback.** The
+    `calls` row is still written unchanged: it is what `ledger.join_table` resolves a
+    receipt's `call=` against, and it is what remains if this kind is ever withdrawn.
+    Reverting P1 is deleting one call site, not a migration.
+
+    **The twin carries the call row's id**, which is what lets `ledger.spend()` suppress
+    exactly the dual-written rows rather than every row whose agent looks like a
+    consumer's — see `ledger.consumer_twin_calls` for why that distinction is the whole
+    safety argument.
+
+    **A failed `calls` write still writes the twin, with no `call` link.** The usage
+    happened either way and a metering path never discards a measured fact to keep two
+    stores tidy; an unlinked twin simply suppresses nothing.
+
+    Fail-open **absolutely** — this runs inside a caller's request path, and
+    ADR-CONSUMERS makes never-raising-into-a-request an *invariant*, not a policy. Any
+    failure is swallowed and traced under `CAGE_DEBUG` (fail-open but never silent)."""
+    try:
+        twin = schema.make_consumer_metric(
+            route=route, provider=provider, model=model,
+            call=call_row.get("id", "") if call_ok else "",
+            agent=fields.get("agent", "lib") or "lib",
+            session=fields.get("session", ""), task=fields.get("task", ""),
+            project=fields.get("project", ""), scope=scope,
+            tokens_in=tokens_in, tokens_out=tokens_out, cached_in=cached_in,
+            cache_write_in=fields.get("cache_write_in", 0),
+            latency_ms=fields.get("latency_ms", 0), ok=fields.get("ok", True),
+            retries=fields.get("retries", 0), import_id=fields.get("import_id", ""),
+            machine=fields.get("machine", ""), ts=call_row.get("ts"))
+        if not ledger.append_row(root, "consumer", twin):
+            debuglog.event(root, event="consumer-metric", produced=False,
+                           skip_reason="append-failed", call=call_row.get("id", ""))
+    except Exception as exc:  # noqa: BLE001 — metering never raises into a request path
+        debuglog.event(root, event="consumer-metric", produced=False,
+                       skip_reason=f"{type(exc).__name__}: {exc}")
 
 
 def record_receipt(*, tool: str, raw_alternative: float, actual: float,

@@ -297,6 +297,104 @@ CREDIT_FIELDS = ("id", "ts", "session", "agent", "model", "unit", "credits",
                  "turns", "context_pct", "method", "surface", "project")
 
 
+# ── consumer metrics (P1, v0.51) ────────────────────────────────────────────────────
+#
+# One grain and one source, deliberately. A consumer meters at the provider boundary and
+# hands cage one response at a time, so `call` is the only grain that exists here; the
+# enum is closed and single-valued so a future second grain is a decision rather than a
+# string.
+CONSUMER_METRIC_SOURCES = ("call",)
+
+CONSUMER_METRIC_FIELDS = ("id", "ts", "agent", "source", "call", "route", "provider",
+                          "model", "session", "task", "project", "scope",
+                          "tokens_in", "tokens_out", "cached_in", "cache_write_in",
+                          "latency_ms", "ok", "retries", "import_id", "machine")
+
+
+def make_consumer_metric(*, route: str, provider: str = "", model: str = "",
+                         call: str = "", agent: str = "lib", session: str = "",
+                         task: str = "", project: str = "", scope: str = "",
+                         source: str = "call",
+                         tokens_in: int = 0, tokens_out: int = 0, cached_in: int = 0,
+                         cache_write_in: int = 0, latency_ms: int = 0, ok: bool = True,
+                         retries: int = 0, import_id: str = "", machine: str = "",
+                         ts: str | None = None, metric_id: str | None = None) -> dict:
+    """One **consumer metrics** row — a library/proxy call, in the same per-producer
+    directory shape every other producer now owns (`ledger/consumer/`).
+
+    **This kind is an honest near-duplicate of `calls`, and that was the objection.**
+    [ADR-CONSUMERS](../docs/adr/0006_consumer.md) rejected giving consumers a metric
+    ledger precisely because *"a metric kind exists to hold vendor-native facts a caller
+    could not supply. For a library caller there is no vendor store — the kind would be a
+    rename of `calls` with a longer path."* That reasoning is still correct **about the
+    facts**, and this kind does not pretend otherwise: it carries no field a call row
+    could not. The reversal is about **shape**, not richness — with consumers homed here,
+    every producer owns one directory under `ledger/` and `calls` can stop being written
+    by anything current, which is what P5 needs. The reversal is recorded in that record,
+    not smuggled past it.
+
+    **`call` is the load-bearing field.** It is the id of the `calls` row written in the
+    same `record_call` (the dual-write), and it is what lets `ledger.spend()` suppress
+    **exactly the twinned rows by id** instead of by agent name. That distinction is the
+    whole safety argument: an agent-name test would suppress every *historical* `lib` row
+    too — rows written before this kind existed, with no twin to replace them — which is
+    the silent-zeroing failure ADR-CONSUMERS measured at 373 codex rows. An id match
+    cannot do that. A consumer row written without a `call` suppresses nothing.
+
+    **Counts are omit-at-zero** (the house idiom). **There is no currency field and no
+    `est_cost_usd`** — cage measures usage, never cost (ADR 0011). The `calls` twin keeps
+    its own legacy `est_cost_usd` untouched under the append-only law; a *new* schema does
+    not get one. **No `credits` field either**, and unlike `make_call` that is not a
+    sentinel decision: a credit is a vendor's own billing computation and there is no
+    vendor here, so there is nothing an absent-vs-zero distinction could ever mean.
+
+    `metric_id` may be supplied for an idempotent caller; ``None`` mints a fresh `csm_`
+    id. Unlike the three agent kinds there is no growth-fold: a consumer row is a
+    point-in-time fact about one response and is never re-captured, so there is no later
+    version of it to win a last-write-wins collapse."""
+    if source not in CONSUMER_METRIC_SOURCES:
+        raise ValueError(
+            f"consumer-metric source {source!r} not in {CONSUMER_METRIC_SOURCES}")
+    row = {"id": metric_id or ids.new_id("csm"), "ts": ts or _now(),
+           "agent": str(agent or "lib"), "source": source, "route": str(route)}
+    if call:
+        row["call"] = str(call)
+    if provider:
+        row["provider"] = str(provider)
+    if model:
+        row["model"] = str(model)
+    if session:
+        row["session"] = str(session)
+    if task:
+        row["task"] = str(task)
+    if project:
+        row["project"] = str(project)
+    if scope:
+        row["scope"] = str(scope)
+    if tokens_in:
+        row["tokens_in"] = int(tokens_in)
+    if tokens_out:
+        row["tokens_out"] = int(tokens_out)
+    if cached_in:
+        row["cached_in"] = int(cached_in)
+    if cache_write_in:
+        row["cache_write_in"] = int(cache_write_in)
+    if latency_ms:
+        row["latency_ms"] = int(latency_ms)
+    # `ok` is written whenever FALSE — the omit-at-zero idiom inverted, because the
+    # default is True. A failed call is the interesting one and must never be omitted
+    # into looking like a success.
+    if not ok:
+        row["ok"] = False
+    if retries:
+        row["retries"] = int(retries)
+    if import_id:
+        row["import_id"] = str(import_id)
+    if machine:
+        row["machine"] = str(machine)
+    return row
+
+
 # Claude's two grains. `transcript` is the per-chat whole-life total CLAUDE-METRICS
 # shipped; `request` is the per-API-response row METRICS-PRIMARY P1 adds, one per folded
 # `(requestId, message.id)` — the SAME fold, emitted at the grain the money path needs.

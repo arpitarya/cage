@@ -234,6 +234,59 @@ def savings(root: Path, since: str | None = None) -> list[dict]:
     return rows
 
 
+def consumer_metrics_raw(root: Path) -> list[dict]:
+    """Every consumer-metrics row, unfiltered (`consumer/calls-*.jsonl`) — mirrors
+    `copilot_metrics_raw()`. Feeds any seen-set that must see every id ever written
+    regardless of a reporting window."""
+    foot = paths.Footprint(root)
+    rows: list[dict] = []
+    for sh in foot.consumer_shards():
+        rows.extend(read(sh))
+    return rows
+
+
+def consumer_metrics(root: Path, since: str | None = None) -> list[dict]:
+    """Consumer-metrics rows (P1, v0.51), in append order.
+
+    **No last-write-wins collapse, deliberately.** The three agent kinds collapse because
+    a chat GROWS and is re-captured, so a later row supersedes an earlier one. A consumer
+    row is a point-in-time fact about one provider response, written once at the moment it
+    happened by a caller that will never re-capture it — there is no later version to win.
+    Adding a collapse here would be machinery guarding an event that cannot occur, and the
+    obvious key to collapse on (`session`) would silently keep one call per session.
+
+    Dedupe is by id, exactly as everywhere else: ids carry the only entropy, and
+    `mergeutil.union_by_id` handles a re-imported bundle without help from this reader.
+
+    ``since`` drops dated shards whose whole month predates the cutoff (same partition win
+    as `read_kind`). An empty ledger with no `consumer/` tree returns []."""
+    foot = paths.Footprint(root)
+    cut = since_cutoff(since)
+    rows: list[dict] = []
+    for sh in foot.consumer_shards():
+        if cut is not None and _month_entirely_below(sh.name, cut):
+            continue
+        rows.extend(read(sh))
+    return rows
+
+
+def consumer_twin_calls(root: Path, since: str | None = None) -> set[str]:
+    """The set of `calls`-row ids that a consumer-metric row claims as its twin.
+
+    This is `spend()`'s **exact** suppression key, and the reason P1 could reverse
+    ADR-CONSUMERS without losing a row. The alternative — testing a `calls` row's agent
+    name against `SPEND_SOURCES` the way the three agents are tested — would suppress
+    every *historical* `lib`/proxy row too: rows written before this kind existed, whose
+    twin does not and cannot exist, silently zeroed. That is the exact failure that
+    record measured at 373 codex rows, pointed at a different population.
+
+    An id match cannot make that mistake. A consumer row with no `call` (a caller that
+    minted one directly, or a dual-write whose `calls` half failed) contributes nothing
+    here, so its `calls` twin — if any — keeps resolving. Fail-open in the direction of
+    keeping data."""
+    return {c for r in consumer_metrics(root, since) if (c := r.get("call", ""))}
+
+
 def copilot_metrics_raw(root: Path) -> list[dict]:
     """Every copilot-metrics row, unfiltered (`copilot/chats-*.jsonl`, mirrors
     `savings()` minus the ``since`` filter) — feeds the import sweep's seen-set, which
@@ -476,6 +529,12 @@ SPEND_SOURCES: dict[str, tuple[str, ...]] = {
     "claude": ("request",),
     "copilot": ("chat", "cli-delta"),
     "kiro": (),
+    # P1 (v0.51). **Read here, but NOT used as the suppression test** — the three above
+    # are keyed by `agents.row_surface(row["agent"])`, and a consumer row's agent is
+    # whatever its caller stamped (`lib` by default, but a proxy or a named application
+    # too). Suppression of the `calls` twin is by **id** (`consumer_twin_calls`), which
+    # is what keeps a pre-P1 `lib` row resolving. See `spend()`.
+    "consumer": ("call",),
 }
 
 #: Agents with **no token spine at all**, each with the reason — stated here rather than
@@ -554,6 +613,9 @@ def spend(root: Path, since: str | None = None) -> list[dict]:
     all of them; measured at 373 codex rows in one real ledger alone."""
     from cage import agents
     rows = []
+    # P1: the ids of `calls` rows that a consumer-metric row already carries. Computed
+    # ONCE, outside the loop — it is a full read of the consumer shards.
+    twins = consumer_twin_calls(root, since)
     for r in calls(root, since):
         # Superseded only when this row's own agent HAS a spine to be superseded by.
         # `SPEND_SOURCES` is the membership test, never `agents.SURFACES`: kiro is in the
@@ -563,6 +625,14 @@ def spend(root: Path, since: str | None = None) -> list[dict]:
         # to remove.
         if agents.row_surface(r.get("agent")) in SPEND_SOURCES:
             continue
+        # …and, since P1, superseded when THIS EXACT ROW has a consumer twin. Note what
+        # this test is not: it is not `row_surface(agent) == "consumer"`. A consumer's
+        # agent name is caller-supplied, and an agent-name test would suppress every
+        # pre-P1 `lib`/proxy row — rows whose twin does not exist and never will — which
+        # zeroes them silently. The id match suppresses exactly the rows that were
+        # dual-written and nothing else.
+        if r.get("id") in twins:
+            continue
         r["basis"] = "calls"
         rows.append(r)
     # `claude_metrics` collapses last-write-wins per SESSION — the right reader for a
@@ -570,7 +640,7 @@ def spend(root: Path, since: str | None = None) -> list[dict]:
     # per chat and discard every other request in it. Request-grain rows are point-in-time
     # facts, so they collapse on their own identity instead (`claude_request_metrics`).
     readers = ((claude_request_metrics, "claude"), (copilot_metrics, "copilot"),
-               (kiro_metrics, "kiro"))
+               (kiro_metrics, "kiro"), (consumer_metrics, "consumer"))
     for read_rows, agent in readers:
         allowed = SPEND_SOURCES[agent]
         if not allowed:

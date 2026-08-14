@@ -8,6 +8,59 @@ Entry format:
 
 ```
 
+## 2026-08-14 — P1 (ledger-restructure): consumers get `ledger/consumer/`, dual-written
+
+- **Built:** `schema.make_consumer_metric` + `CONSUMER_METRIC_SOURCES`/`_FIELDS` (id
+  namespace `csm_`, grain `call`, closed single-valued source enum) ·
+  `paths.consumer_dir`/`consumer_shard`/`consumer_shards` + `"consumer"` routed through
+  `shard()` · `ledger.consumer_metrics`/`_raw`/`consumer_twin_calls` ·
+  `SPEND_SOURCES["consumer"] = ("call",)` · `metering.record_call` **dual-writes**.
+- **The design decision that is the phase**, and it is not what the handoff sketched:
+  **`spend()` suppresses a consumer's `calls` twin by ID, never by agent name.** The
+  obvious implementation — map `lib → consumer` in `agents.row_surface` and let the
+  existing `SPEND_SOURCES` membership test do the work — **silently zeroes every pre-P1
+  `lib`/proxy row**, because those rows have no twin to replace them. That is precisely
+  the failure ADR-CONSUMERS measured at 373 codex rows, aimed at a different population.
+  The dual-write makes the id available, so the twin link is the suppression key and
+  nothing untwinned can ever be dropped. Pinned by
+  `test_a_pre_p1_consumer_row_with_no_twin_still_resolves` and by
+  `test_a_non_agent_producer_is_never_the_suppression_test`.
+- **Honest about what the kind is.** It carries **no field a call row could not**, which
+  is exactly the objection ADR-CONSUMERS raised when it rejected this. The reversal is
+  about **shape** — one directory per producer, so `calls` can stop being written by
+  anything current (what P5 needs) — not about richer facts, and both the schema docstring
+  and the ADR say so rather than dressing it up.
+- **No currency, no credits.** ADR 0011 — the new kind has no `est_cost_usd` (the `calls`
+  twin keeps its legacy one under append-only) and no `credits` field: a credit is a
+  vendor's own computation and there is no vendor behind a library caller, so
+  absent-vs-zero could never mean anything. `ok` inverts the omit-at-zero idiom — written
+  whenever **false**, because omitting at the default would render a failed call as a
+  success.
+- **No last-write-wins collapse, deliberately** — the agent kinds collapse because a chat
+  grows and is re-captured; a consumer row is a point-in-time fact about one response,
+  never re-captured. The obvious key (`session`) would have kept one call per session.
+- **Fail-open absolutely.** ADR-CONSUMERS makes never-raising-into-a-request an
+  *invariant*; the twin is new code on that path and gets the same guarantee, traced under
+  `CAGE_DEBUG`. A failed `calls` write still writes the twin (unlinked) — the usage
+  happened either way, and an unlinked twin suppresses nothing.
+- **Files:** `cage/{schema,paths,ledger,metering}.py` · `docs/adr/0006_consumer.md` ·
+  `docs/FORMULAS.md` §1.1 · `docs/architecture-flow.mermaid` (**rewritten** — it had gone
+  stale across two releases, still drawing `report`/`attrib`/`matrix`/`budget`/`roi`,
+  `compare`/`verdict`, `prices.toml` and `--team`; a diagram naming deleted commands is
+  the F1 class, drawn) · `tests/test_consumer_ledger.py` (new, 21 cases) ·
+  `tests/test_spend_resolver.py`.
+- **ADR (ADR-DISCIPLINE):** **ADR-CONSUMERS, partial reversal recorded, not deleted** —
+  frontmatter, §1, a reversal block above the original Decision (which is kept verbatim
+  and annotated), the *Alternatives rejected* entry marked ⟲ ACCEPTED **on its own
+  reasoning rather than against it**, veto trigger 1 struck with the lesson kept (a veto
+  phrased as *"X only when evidence E appears"* is blind to a change motivated by
+  structure), and invariant 3 recorded as **narrowed, not broken**. No new module, so
+  `docs/adr/README.md`'s ownership table and `OWNERS` are unchanged.
+- **Evidence:** P0 found **zero** consumer rows in the real `~/.cage`, so there is nothing
+  to regress against — every claim here is asserted by test, and the test file says so.
+- **Tests:** `just test` green — **1417 passed**, 11 skipped (+22).
+- **Next:** P2 — fold kiro's `credits` into `ledger/kiro/`, against P0's exact 1:1 baseline.
+
 ## 2026-08-14 — P0 (ledger-restructure): the evidence gate, taken at the cut
 
 - **Built:** nothing in `cage/`. **`no ADR affected`** — P0 is measurement only; no

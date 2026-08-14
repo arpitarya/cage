@@ -1137,6 +1137,39 @@ class Footprint:
         return legacy + sorted(base.glob("*/savings-*.jsonl"))
 
     @property
+    def consumer_dir(self) -> Path:
+        """The consumer-metrics ledger sub-dir (P1, v0.51):
+        ``ledger/consumer/calls-<month>.jsonl``. A directory via the `savings_dir`
+        mechanism — the same precedent `copilot_dir` names, for the same reason (smallest
+        diff, already tested), and NOT a generalization of `shard()`.
+
+        Named `consumer/` to match [ADR-CONSUMERS](../docs/adr/0006_consumer.md)'s own
+        vocabulary rather than `lib/`: the *default* agent name is `lib`, but a caller may
+        stamp any name (a proxy row, a named application), and the directory is the
+        producer's home, not one agent's."""
+        return self.ledger / "consumer"
+
+    def consumer_shard(self, ts: str) -> Path:
+        """Month-partition path for a consumer-metrics row, from the row's own ``ts``
+        (`consumer/calls-2026-08.jsonl`) — mirrors `copilot_shard`.
+
+        The basename is `calls-` rather than `chats-` on purpose: the three agent kinds
+        are chat-grained and this one is call-grained, and a shard name that says `chats`
+        over per-call rows would be a small lie a reader has to un-learn."""
+        month = ts[:7] if (ts and len(ts) >= 7 and ts[4] == "-") else ""
+        name = f"calls-{month}.jsonl" if month else "calls.jsonl"
+        return self.consumer_dir / name
+
+    def consumer_shards(self) -> list[Path]:
+        """Every readable consumer-metrics shard (`consumer/calls-*.jsonl`), sorted for a
+        deterministic concatenated read. Names match `ledger._SHARD_MONTH`, so ``--since``
+        month-skipping is free. Only existing files are returned."""
+        base = self.consumer_dir
+        if not base.is_dir():
+            return []
+        return sorted(base.glob("calls*.jsonl"))
+
+    @property
     def copilot_dir(self) -> Path:
         """The Copilot-metrics ledger sub-dir (COPILOT-METRICS handoff §4.2):
         ``ledger/copilot/chats-<month>.jsonl``. A directory via the `savings_dir`
@@ -1219,12 +1252,14 @@ class Footprint:
 
         ``kind`` may be a ``("savings", tool)`` tuple, which routes into the per-source
         savings tree via `savings_shard` (import-ledger plan §3). The plain strings
-        ``"copilot"``/``"kiro"``/``"claude"`` route into their own per-source metrics
-        trees via `copilot_shard`/`kiro_metric_shard`/`claude_shard` (COPILOT-METRICS
-        handoff §4.2, KIRO-METRICS handoff §4.2, CLAUDE-METRICS handoff §4.2), the same
-        mechanism."""
+        ``"copilot"``/``"kiro"``/``"claude"``/``"consumer"`` route into their own
+        per-producer trees via `copilot_shard`/`kiro_metric_shard`/`claude_shard`/
+        `consumer_shard` (COPILOT-METRICS handoff §4.2, KIRO-METRICS handoff §4.2,
+        CLAUDE-METRICS handoff §4.2, P1 of the ledger restructure), the same mechanism."""
         if isinstance(kind, tuple) and kind and kind[0] == "savings":
             return self.savings_shard(kind[1], ts)
+        if kind == "consumer":
+            return self.consumer_shard(ts)
         if kind == "copilot":
             return self.copilot_shard(ts)
         if kind == "kiro":
