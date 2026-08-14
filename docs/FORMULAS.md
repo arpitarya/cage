@@ -117,17 +117,14 @@ readable rather than misleading.
 The §2.2 call-less receipt **pricing ladder** (`price_at` → dominant task model →
 UNPRICED) went with it — there is nothing left to price into.
 
-### 2.3 Marginal attribution — per-row method = least-trusted receipt for that tool
+### 2.3 Marginal attribution — **removed in v0.50 (SURFACE-CUT)**
 
-```
-walk tools in policy order (cage.toml [tools.order])
-each receipt's credit = its marginal saving given the tools upstream of it
-⇒ Σ(marginals) = total saving, no double-count
-```
-
-Code: [attribution.py](../cage/attribution.py). Marginal-by-fixed-order is
-deliberate: Shapley is fairer but combinatorial, and cage is `$0`
-([PLAN.md](PLAN.md) §4, §10).
+`cage insights attrib` and `attribution.py` are deleted, so cage computes no marginal
+per-tool split. Receipts are still recorded with their own `saved` and `method`; what is
+gone is the walk that made Σ(marginals) = total under a fixed pipeline order.
+`[tools] order` is still parsed and now has **no consumer at all**
+(`work/OPEN-WORK.md`, UNREAD-FACTS). The GROSS rule in §2.1 is unchanged and still
+governs every saving cage prints.
 
 ### 2.7 graphify transcript receipt — `modeled` (graphify-capture GC2)
 
@@ -172,7 +169,7 @@ actual          = toks(GRAPH_REPORT.md read)
   footnoted apart** (`graphifytx.report_read_footnote`), never conflated with a query.
 - **⚠️ The 0.3 is UNVALIDATED** (raised 2026-07-29 as OPEN-WORK §G.1, a section the
   2026-08-11 restructure removed; **this bullet is now the standing note**): a placeholder, never scored against
-  measured outcomes — `insights calibration` has no report-read receipts with recorded
+  measured outcomes — calibration was deleted in v0.50 and never scored these receipts with recorded
   outcomes to score yet. The footnote says so; the figure is not tuned by intuition.
 - Deduped per `(session, file, graph-mtime bucket)` — one per read, not per line.
 
@@ -226,64 +223,20 @@ outcome}`, [usagelog](../cage/usagelog.py)). **Never priced, never read by a mon
 `args_hash` is a hash, never the query text (counts-never-content).
 
 **It is `sha1(argv[1:])` — the tail, `argv[0]` excluded — on every route.** The shim
-invokes the meter as `cage data graphify -- "$REAL" "$@"`, so `argv[0]` is an absolute,
+invoked the meter as `cage data graphify -- "$REAL" "$@"` (that verb was deleted in
+v0.50; the twins now fail their probe and pass through), so `argv[0]` is an absolute,
 machine-specific path; folding it in makes a key nothing else can reproduce. This is the
 same exclusion `graphifymeter.content_signature` documents (§2.10), and the reason the
 §2.12 attestation join read zero for nine days
 ([finding](../work/regression/2026-08-12-l1-attest-args-hash-mismatch.md)).
 
-### 2.12 Adoption — **no method**: counts of recorded rows, never an estimate
+### 2.12 Adoption — **removed in v0.50 (SURFACE-CUT)**
 
-`cage insights adoption` ([adoption.py](../cage/adoption.py)) makes no claim that needs a
-method tag. Its only two assertions are *this many rows exist* and *this many join to an
-agent*. Two halves, never blended — they have different precision:
-
-| half | source | precision | agent? |
-|---|---|---|---|
-| **A · invocations** | usage rows (§2.11) | exact, no join | only with an **L1 attestation** (below) — otherwise none |
-| **B · per-agent** | savings rows → `calls.agent` | exact where a link resolves | only where it resolves |
-
-- **Half A's agent split needs the opt-in L1 hooks, and says nothing without them.**
-  A usage row has no `agent` field, so half A was agent-blind by construction. A hook
-  runs *inside* the agent, so `cage hook tool --agent X` records an attestation
-  ([attest.py](../cage/attest.py), `state/attest.jsonl`) keyed by the **same
-  `args_hash`** the usage row already carries (§2.11 — the **tail**, on both sides; one
-  producer disagreed until 2026-08-12 and the join could not fire at
-  all) — an exact join, never proximity. With no
-  attestations the block is **absent entirely**, not empty: `by_agent.present = False`
-  and the renderer emits nothing, so a hookless project's output is byte-identical to
-  before L1 existed. An `args_hash` **two agents attested resolves to unknown**, never a
-  pick. Every attested number carries `attest.LIMIT` — hooks are CLI-only, so a VS Code
-  run is a real invocation that leaves no attestation and must never read as *no agent*.
-- **Attestation does NOT fix half B.** A graphify savings row's id folds in an *answer*
-  hash no attestation can reconstruct, so `no-link` stays structurally true. The two
-  halves are still never blended.
-
-- **Outcomes are read, never re-derived.** The per-outcome tally reads each row's
-  recorded `outcome` (`usagelog.OUTCOMES`); re-deriving "did a receipt land?" from the
-  receipts would produce a second, disagreeing answer.
-- **Half B's join, in order:** linked `call` id → that call's agent · else a `session`
-  exactly one agent's calls carry. A session shared by two agents stays **unknown** —
-  picking one would invent a fact.
-- **Agent-unknown has two reasons, kept apart:** `no-link` (no call, no session) is the
-  interceptor's *structural* limit — a subprocess cannot know which agent spawned it, so
-  it stamps an empty session on purpose ([graphifymeter](../cage/graphifymeter.py));
-  `unjoined` (a link nothing matches) is a *capture gap*. Never an "other" bucket, never
-  attributed by timestamp proximity.
-- **"Never invoked" has two strengths, and the weaker one is the default when anything
-  is unattributed.** *No evidence of invocation* is sound only when **every** savings row
-  found an agent; otherwise an unattributed row could belong to any agent, so the claim
-  drops to *no savings row attributed to them*. Neither is ever stated as proof of
-  non-use.
-- **No currency anywhere** — and since ADR 0011 that is true of every view, not just
-  this one. §2.11's
-  diagnostic-only invariant holds unchanged, asserted from this new caller in
-  `tests/test_adoption.py`.
-- CSV column contract: `section` · `dimension` · `key` · `agent` · `tool` · `rows` ·
-  `joined_via` · `reason` · one column per outcome. An inapplicable cell is **empty**,
-  never `0`. The attested split adds `usage,agent,<name>` rows with `joined_via=attest`
-  plus a `usage,agent-unattested` row carrying its reason — CSV never gates a caveat
-  away. Explained by `cage query tool-adoption` and `cage query agent-layers`.
+`cage insights adoption` and `adoption.py` are deleted. The usage breadcrumb it read
+(`state/`, `usagelog.py`) is still written and still diagnostic-only, and the L1
+attestation store (`state/attest.jsonl`) is still written by every wired hook — both now
+have no reader (`work/OPEN-WORK.md`, UNREAD-FACTS). The invariant they existed to prove
+is unchanged and still tested: a `state/` row can never move a derived number.
 
 ### 2.13 Chats view — no new math, one column per ledger field
 
@@ -605,7 +558,7 @@ The one rule that outlives them, because pre-0.36 ledgers still hold the rows:
 - A legacy `tool="human"` / `unit="minutes"` receipt is worth **`$0` in
   any unit conversion** and is **excluded from every derived total** by
   [`report._is_legacy_human`](../cage/report.py) — there is no rate left to price it
-  at. The exclusion is **counted and footnoted** on `cage report`
+  at. The exclusion is **counted and footnoted** on `cage insights chats`
   (`· N legacy human-axis receipt(s) excluded …`), never applied silently.
   Explained by `cage query savings-axis`; pinned by `tests/test_legacy_ledger.py`.
 
@@ -619,41 +572,13 @@ guarded, `~`-marked estimate whose method is printed beside it.
 
 ## 4. Prediction & calibration
 
-### 4.1 Estimate band — `modeled`
+### 4.1–4.3 Estimate, calibration, group compare — **removed in v0.50 (SURFACE-CUT)**
 
-```
-band = median + IQR of measured totals over closed tasks matching the EXACT keys
-       (scope / label / agent)          — no similarity scoring, no ML
-refuses below MIN_ESTIMATE_N = 5 matching tasks
-```
-
-Code: [estimate.py](../cage/estimate.py). `--record` stamps
-`est_tokens`/`est_usd`/`est_n` **plus the band bounds** onto the open task row,
-so calibration can later score against the band *as recorded*.
-
-### 4.2 Calibration — `measured`
-
-```
-ratio    = actual_tokens / est_tokens          (median + IQR)
-hit_rate = share of actuals inside the band recorded at estimate time
-```
-
-Code: [calibration.py](../cage/calibration.py). This observed frequency **is**
-the estimator's confidence — the estimator never self-reports one. Open,
-zero-actual, and band-less tasks are skipped with a visible count.
-
-### 4.3 Group compare — `measured` groups, `estimated` delta
-
-```
-group closed tasks by stack signature (task-id join; session-window fallback)
-per group: n · median · IQR of measured tokens + USD
-delta = median(stack) − median(agent-only), same non-stack keys
-refuses below MIN_COMPARE_N = 5
-```
-
-Code: [compare.py](../cage/compare.py), [taskgroup.py](../cage/taskgroup.py).
-The delta ships with a standing observational caveat: different tasks, nothing
-randomized — an observed difference, never a causal claim.
+`cage insights estimate` / `calibration` / `compare` and their three modules are deleted,
+so cage predicts nothing and scores nothing. `tasks.jsonl` still records outcomes, labels
+and any previously-stamped `est_*` fields — a closed task is still a closed task, and
+`MIN_COMPARE_N` / `MIN_ESTIMATE_N` remain in `constants.py` unread. **§4.4 below is
+unaffected**: the fleet study has its own pairing math in `study.py` and survives whole.
 
 ### 4.4 Fleet study pairing — `measured` per machine-day, `estimated` delta
 
@@ -719,7 +644,7 @@ Not formulas, but they decide which rows the formulas see:
 - **`ledger.receipts()` is an id-deduped union** of `receipts.jsonl` with the
   `savings/<tool>/` tree ([mergeutil.union_by_id](../cage/mergeutil.py), tree
   wins on a duplicate id; id-less rows preserved). A row present in both stores
-  counts **exactly once** — the guarantee behind `cage data migrate-savings`
+  counts **exactly once** — the guarantee behind the deleted `migrate-savings` verb
   being idempotent and half-migration-safe.
 - **Month partitioning:** writers append to the shard chosen from the row's own
   `ts`; readers glob + concatenate; `--since` skips whole below-cutoff months.

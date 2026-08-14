@@ -55,6 +55,16 @@
 
 ## Arpit decides
 
+- **`CLAUDE.md` diff for SURFACE-CUT — proposed, not applied**:
+  [surface-cut.claude-md-diff.md](surface-cut.claude-md-diff.md). **24 lines are false**,
+  two of them already stale before this change (the ADR restructure moved
+  `docs/shim-contract.md` and every numeric ADR path). Two are *rules* naming deleted
+  commands: the WORKLOG `Cost:` line and the dogfood snapshot allowlist.
+- **Where does the SURFACE-CUT decision record live?** Written to
+  [surface-cut.decision.md](surface-cut.decision.md) beside its archived pair. The ADR set
+  became four per-agent records the same day, and this is cross-cutting, so it fits
+  neither the live shape nor the frozen archive.
+
 - **TEST-COUNT** — README's `$0` section and CLAUDE.md's `just test` comment still say
   **1571**, stale after SURFACE-CUT deleted 12 test files and stripped ~30. Needs one
   `just test` on the dev machine; no agent can measure it from Cowork (macOS venv).

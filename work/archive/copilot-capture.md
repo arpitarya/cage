@@ -6,7 +6,7 @@ update-rule: ANY change to copilot capture (parser · source · schema field · 
 
 # Copilot capture — how the numbers are made
 
-**Design of record: [ADR-COPILOT](adr/0002_copilot.md).** This doc is the *field* reference —
+**Design of record: [ADR-COPILOT](adr/0003_copilot.md).** This doc is the *field* reference —
 what is captured today. The ADR is the *why*, and wins where the two disagree.
 
 One page: what cage records for Copilot, from where, and what it means.

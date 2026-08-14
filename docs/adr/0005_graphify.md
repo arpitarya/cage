@@ -7,6 +7,9 @@ update-rule: ANY change to graphify capture (route · shim twin · receipt id ·
 
 # ADR-GRAPHIFY — four routes, one receipt, and a shim that provably cannot recurse
 
+> The five laws in [ADR-LAWS](0001_laws.md) bind this record already and are **not**
+> restated here. Cite this record in prose as its NAME, never by number.
+
 ---
 
 ## §1 · For humans
@@ -246,7 +249,7 @@ interpreter start (~50 ms warm), only on the path that was already going to run 
 *What arm 2 does NOT claim:* verified end to end on POSIX; **CI-asserted on Windows**. The
 honest statement is *"fixed on POSIX, CI-asserted on Windows"*, never *"fixed"*. It also
 does nothing for the non-shim routes (copilot VS Code, kiro) — see
-[restricted-environments.md](../restricted-environments.md).
+[restricted-environments.md](../../work/restricted-environments.md).
 
 **B6 — Transparent passthrough.** stdout, stderr and exit code are identical to invoking
 the real binary directly, metered or not. Arguments are forwarded verbatim, including

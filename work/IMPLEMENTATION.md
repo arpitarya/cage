@@ -60,7 +60,7 @@ Entry format:
 
 ## 2026-08-14 — ADR-RESTRUCTURE: 11 numeric ADRs → 4 per-agent ADRs; 4 docs absorbed
 
-- **Built:** `docs/adr/{0001_claude,0002_copilot,0003_kiro,0004_graphify}.md` — one record
+- **Built:** `docs/adr/{0002_claude,0003_copilot,0004_kiro,0005_graphify}.md` — one record
   per metered agent, each with **§1 for humans** (Mermaid + hand-paired ASCII twin) and
   **§2 for agents** (context · decision · consequences · alternatives · reference · veto).
   Plus `docs/adr/README.md` (index, the cite-by-name rule, the five shared laws) and a

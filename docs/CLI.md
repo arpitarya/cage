@@ -225,7 +225,7 @@ are the whole vocabulary; valuation stays in your spreadsheet. A commit with no
 joinable call renders `—`, never `0`: *nothing joined here* and *this cost nothing* are
 different claims. See `cage query agent-authorship`.
 
-**Twelve views were removed in v0.52 (SURFACE-CUT)** — `attrib`, `adoption`, `compare`,
+**Twelve views were removed in v0.50 (SURFACE-CUT)** — `attrib`, `adoption`, `compare`,
 `estimate`, `calibration` here, plus the top-level report verb and the whole `data`
 group. See
 [Removed and renamed verbs](#removed-and-renamed-verbs). Capture is unchanged: every
@@ -237,7 +237,7 @@ row those views read is still recorded.
 
 | Command | What it does | Flags |
 |---|---|---|
-| `cage task outcome TASK` | close a task with its outcome (`ok` by default) | `--redo` (mark as needing a redo) · `--label WORD` (one short token: letters/digits/`._-`, ≤32 chars, recorded on the task row; its readers went in v0.52 — never a path or free text) |
+| `cage task outcome TASK` | close a task with its outcome (`ok` by default) | `--redo` (mark as needing a redo) · `--label WORD` (one short token: letters/digits/`._-`, ≤32 chars, recorded on the task row; its readers went in v0.50 — never a path or free text) |
 | `cage task time DURATION` | attest how long **you** spent on a task — `45m` · `2h` · `1h30m` · a bare number of minutes. Written as `human_minutes` + `human_minutes_method = "attested"` | `--task ID` (default: the most recent) |
 
 `cage task time` is the **only** unmarked human number cage will ever print: it always
@@ -289,7 +289,7 @@ unenrolled ledger stamps nothing and stays byte-identical to legacy.
 | `cage study start PHASE` | switch phase (one short token) |
 | `cage study stop` | end the current phase |
 | `cage study report` | coverage first, then the paired delta — the **only** study action that is a rendered view, and so the only one carrying `--csv`/`--export`/`--stamp`. A marker verb does not have those flags at all (argparse usage error, exit 2); it used to reach them from the group and refuse at runtime |
-| `cage study export [PATH]` | write the one-file fleet bundle (rows + phase markers + a counts-only manifest) for the analyst. **The bundle's only route since v0.52** — it lived on the deleted data-export verb's study flag. Stays jsonl: it is the one export that is also an *import* source (`cage import bundle*.zip`), which is why it carries no CSV or OTel form |
+| `cage study export [PATH]` | write the one-file fleet bundle (rows + phase markers + a counts-only manifest) for the analyst. **The bundle's only route since v0.50** — it lived on the deleted data-export verb's study flag. Stays jsonl: it is the one export that is also an *import* source (`cage import bundle*.zip`), which is why it carries no CSV or OTel form |
 | `cage study id` | print the opaque machine id (never a hostname) |
 
 Flags: `--json` on every action; `--csv [PATH]` · `--export [PATH]` · `--stamp` on
@@ -358,12 +358,12 @@ entry to `verbmap`, update this file, then sweep every wire module, `install.sh`
 | `init` | `cage setup` |
 | `import-claude` | `cage import` with `--agent claude` |
 | `why` | the same name under `cage insights` |
-| `report` · `attrib` · `adoption` · `compare` · `estimate` · `calibration` | **removed outright in v0.52** (SURFACE-CUT) — the ledger rollup and the task-comparison family. Capture is unchanged; the surviving reads are per chat and per commit |
+| `report` · `attrib` · `adoption` · `compare` · `estimate` · `calibration` | **removed outright in v0.50** (SURFACE-CUT) — the ledger rollup and the task-comparison family. Capture is unchanged; the surviving reads are per chat and per commit |
 | `matrix` · `roi` · `verdict` · `budget` · `forecast` · `regression` · `recommend` · `prices` · `quality` | **removed outright in v0.51** with the money subsystem ([ADR 0011](../work/archive/adr/0011-cage-measures-usage-not-cost.md)) |
 | `outcome` · `quality` | the same name under `cage task` |
 | `origin` · `verify` · `notes-sync` | the same name under `cage authorship` |
-| `ledger-sync` | **removed outright in v0.52** — the team-view flag it fed was its only reader, so the ref could be written and never displayed |
-| `export` · `cleanup` · `watch` · `serve` · `proxy` · `meter` · `graphify` | **removed outright in v0.52** — the whole `data` group. Capture is pull-based: use `cage import`. The fleet bundle moved to `cage study export` |
+| `ledger-sync` | **removed outright in v0.50** — the team-view flag it fed was its only reader, so the ref could be written and never displayed |
+| `export` · `cleanup` · `watch` · `serve` · `proxy` · `meter` · `graphify` | **removed outright in v0.50** — the whole `data` group. Capture is pull-based: use `cage import`. The fleet bundle moved to `cage study export` |
 | `human` · `human-record` · `trend` | **removed outright** — the Tier-1 human axis was amputated in v0.36 and does not return without a proposal doc |
 | `hook-session-start` · `hook-stop` · `hook-session-end` · `hook-post-tool-use` · `hook-post-commit` · `hook-prepare-commit-msg` | **removed outright** — replaced by the single `cage hook EVENT` |
 
@@ -376,7 +376,7 @@ Recorded here rather than quietly worked around; tracked in [OPEN-WORK.md](../wo
 **None open.** Both entries that stood here are closed:
 
 1. ~~`data migrate-savings` missing from the front door~~ — fixed 2026-08-03
-   (CLI-GAPS(a)) by listing the whole group; the group itself was deleted in v0.52. The
+   (CLI-GAPS(a)) by listing the whole group; the group itself was deleted in v0.50. The
    front door stays gated bidirectionally against the live parser, which is what makes
    a deletion this size safe.
 2. ~~`prices`/`study`/`policy` take their action as a positional choice~~ — converted to

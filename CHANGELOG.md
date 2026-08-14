@@ -24,22 +24,49 @@ Full release notes. The README keeps a one-line summary per version; the detail 
     retention loses its only pruning path; the kiro proxy — the one path to all five of
     kiro's wire values — closes permanently; and `--team` goes with `ledgersync`, which
     retires the live half of [ADR 0001](work/archive/adr/0001-ledger-team-aggregation-notes-not-external-sink.md).
+  - **As built (2026-08-14) — five decisions taken during execution.** `cleanup.py` is
+    **kept** (its verb deleted): `importcmd.run` and `cage doctor` both import it, so
+    removing it would have broken `cage import`. `metercmd` is deleted **with** `proxy`.
+    The bare-`cage` overview died with `report`, so `cage` now prints the front door.
+    **`cage study export` is NEW** — `study.export_bundle`'s only caller was
+    `cage data export --study`, which would have left the fleet study able to import
+    bundles it could not produce. And the **MCP surface drops 6 tools → 2**
+    (`cage_why`, `cage_task_outcome`).
+  - **Six recorded-but-unread facts.** The cut removed readers without removing writers:
+    the `route_key` reclaim, `state/attest.jsonl` (L1's agent-identity benefit),
+    `scope`, `project`, task `label`/`outcome`, and `[tools] order` are all still
+    written and read by nothing. Each is a standing choice, filed as UNREAD-FACTS.
+  - **The graphify interceptor was deliberately NOT touched**, so `bin/graphify` still
+    probes a deleted verb and **15 tests are red**. No user breakage: the twins gate
+    metering behind a capability probe and pass through transparently when it fails, and
+    graphify receipts still land via the transcript/store routes at `cage import`.
+    Tracked as SHIM-DEAD-VERB.
+  - **Two stale gates found and fixed:** `just demo` had been broken since USAGE-ONLY
+    (it called `cage insights matrix`), and `test_cli_tiering`'s stale-verb detector
+    whitelisted every `cage data <x>` spelling — the dead-verb blind spot inside the
+    detector itself.
+  - Built from: [v0.50-surface-cut.handoff.md](work/archive/v0.50-surface-cut.handoff.md)
+    · [v0.50-surface-cut.prompt.md](work/archive/v0.50-surface-cut.prompt.md) ·
+    decision record: [surface-cut.decision.md](work/surface-cut.decision.md).
 
-- **ADR-RESTRUCTURE — the ADR set becomes FOUR per-agent records.** `docs/adr/` now holds
-  one record per metered agent — [ADR-CLAUDE](docs/adr/0001_claude.md) ·
-  [ADR-COPILOT](docs/adr/0002_copilot.md) · [ADR-KIRO](docs/adr/0003_kiro.md) ·
-  [ADR-GRAPHIFY](docs/adr/0004_graphify.md) — each with a **§1 for humans** (one screen, a
-  Mermaid diagram and a hand-paired ASCII twin) and a **§2 for agents** (context ·
-  decision · consequences · alternatives · reference · veto condition).
+- **ADR-RESTRUCTURE — the ADR set becomes one record per metered thing, plus one for what
+  binds them all.** `docs/adr/` now holds [ADR-LAWS](docs/adr/0001_laws.md) ·
+  [ADR-CLAUDE](docs/adr/0002_claude.md) · [ADR-COPILOT](docs/adr/0003_copilot.md) ·
+  [ADR-KIRO](docs/adr/0004_kiro.md) · [ADR-GRAPHIFY](docs/adr/0005_graphify.md) — each with
+  a **§1 for humans** (one screen, a Mermaid diagram and a hand-paired ASCII twin) and a
+  **§2 for agents** (context · decision · consequences · alternatives · reference · veto).
+  - **ADR-LAWS is the single home of the five cross-cutting laws** — pull-only · one sink ·
+    append-only · counts-never-content · usage-never-cost — each with the archived record
+    that ratified it and its own numbered veto. It exists because archiving the eleven
+    numeric ADRs left those laws' reasoning **only** in a tree headed *never cite as
+    current spec*: for a few hours the sole current-spec statement of *counts, never
+    content* was a table row with no veto attached. A law with no veto is a habit.
   - **Cite by name, never by number.** `ADR 0001` meant *team ledger via `refs/notes`* for
     six weeks; the numbers now belong only to the archive.
   - **The eleven numeric ADRs are archived** to `work/archive/adr/` — history, never
     current spec — with an old→new map that names the two records now genuinely dead
     (0001's `refs/notes/cage-ledger`, retired by SURFACE-CUT; 0010's `SPEND_CUTOVER`,
     retired by 0011).
-  - **The five cross-cutting laws** — pull-only · one sink · append-only ·
-    counts-never-content · usage-never-cost — are stated **once** in
-    [docs/adr/README.md](docs/adr/README.md) and restated in no record.
   - **Four docs absorbed WHOLE and removed:** `docs/shim-contract.md` → ADR-GRAPHIFY §2
     (B1–B8, B8a, D1–D8, the fail-open last resort, the shared warts, the Windows facts and
     the four-mechanism anti-recursion proof); `claude-capture.md`/`copilot-capture.md`/

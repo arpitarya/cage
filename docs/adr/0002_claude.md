@@ -7,6 +7,9 @@ update-rule: ANY change to claude capture (parser · store · schema field · un
 
 # ADR-CLAUDE — Claude Code is metered from its own transcripts, folded once per request
 
+> The five laws in [ADR-LAWS](0001_laws.md) bind this record already and are **not**
+> restated here. Cite this record in prose as its NAME, never by number.
+
 ---
 
 ## §1 · For humans

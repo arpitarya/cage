@@ -6,7 +6,7 @@ update-rule: ANY change to claude capture (parser · source · schema field · p
 
 # Claude capture — how the numbers are made
 
-**Design of record: [ADR-CLAUDE](adr/0001_claude.md).** This doc is the *field* reference —
+**Design of record: [ADR-CLAUDE](adr/0002_claude.md).** This doc is the *field* reference —
 what is captured today. The ADR is the *why*, and wins where the two disagree.
 
 One page: what cage records for Claude Code, from where, and what it means.

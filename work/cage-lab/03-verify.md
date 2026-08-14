@@ -99,7 +99,7 @@ you put the log lines, the ledger row, and the arithmetic side by side.
 
 ## 6. A green lab run is not Windows coverage
 
-The interceptor is a **twin pair** since v0.38.0 (`docs/adr/0004_graphify.md`, ADR 0007) —
+The interceptor is a **twin pair** since v0.38.0 (`docs/adr/0005_graphify.md`, ADR 0007) —
 the POSIX `bin/graphify` and the Windows `bin/graphify.cmd`. **cage-lab has run on
 macOS only**, and its PATH-proof (`command -v graphify`, §01-setup.md) resolves the
 POSIX twin exclusively — a POSIX shell builtin can never invoke, and therefore can

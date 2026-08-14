@@ -25,16 +25,17 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
 
 ## State of play (2026-08-14 — pick up here on a model switch)
 
-- **The ADR set is FOUR per-agent records, and you cite them BY NAME.**
-  [ADR-CLAUDE](../docs/adr/0001_claude.md) · [ADR-COPILOT](../docs/adr/0002_copilot.md) ·
-  [ADR-KIRO](../docs/adr/0003_kiro.md) · [ADR-GRAPHIFY](../docs/adr/0004_graphify.md).
+- **The ADR set is ONE RECORD PER METERED THING PLUS [ADR-LAWS](../docs/adr/0001_laws.md),
+  and you cite them BY NAME.** Read ADR-LAWS §1 first — it holds the five laws (pull-only ·
+  one sink · append-only · counts-never-content · usage-never-cost), each with its
+  ratification and a numbered veto, and **every other record assumes them and restates
+  none**. A per-agent record that restates a law is a bug, not redundancy.
+  [ADR-CLAUDE](../docs/adr/0002_claude.md) · [ADR-COPILOT](../docs/adr/0003_copilot.md) ·
+  [ADR-KIRO](../docs/adr/0004_kiro.md) · [ADR-GRAPHIFY](../docs/adr/0005_graphify.md).
   **Never write "ADR 0003"** — the numbers belong to the eleven superseded records now in
   [work/archive/adr/](archive/adr/README.md), which are **history and never current spec**.
   Each live record has **§1 for humans** (one screen, a Mermaid diagram and a hand-paired
-  ASCII twin) and **§2 for agents**. The five laws that bind all four — pull-only · one
-  sink · append-only · counts-never-content · usage-never-cost — are stated **once** in
-  [docs/adr/README.md](../docs/adr/README.md); do not restate them in a record, and do not
-  quietly drift from them either.
+  ASCII twin) and **§2 for agents**.
 - **`docs/shim-contract.md`, `claude-capture.md`, `copilot-capture.md` and
   `kiro-capture.md` are GONE (2026-08-14), absorbed whole.** The interceptor behaviour
   contract — B1–B8, B8a, D1–D8, the anti-recursion proof — is **ADR-GRAPHIFY §2** and
@@ -96,7 +97,7 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
   Arpit's instruction (Cowork session), continuing the 2026-08-12 WORK-DIR move.
   `docs/` now holds only: `PLAN.md`, `CLI.md`, `FORMULAS.md`, `GLOSSARY.md`,
   `README.md`, the three `*-capture.md` one-pagers, `doc-size-discipline.md`,
-  `../docs/adr/0004_graphify.md`, `restricted-environments.md`, `adr/`, `architecture-flow.mermaid`,
+  `../docs/adr/0005_graphify.md`, `restricted-environments.md`, `adr/`, `architecture-flow.mermaid`,
   `assets/`, `example/`. **New handoff/prompt pairs are now specced directly into
   `work/` root**, not `docs/` root — CLAUDE.md's *Handoff/prompt docs have a
   lifecycle* rule was rewritten for this; see the Standing constraints bullet below.
@@ -530,7 +531,7 @@ single next step: push and read the Windows `graphify` CI job.**
   script; Windows resolves a bare name only through `PATHEXT`, which has no extensionless
   entry, so cage's shim could never be *found* there. It now ships as a **twin pair** —
   `graphify` + `graphify.cmd` — against one written contract,
-  [../docs/adr/0004_graphify.md](../docs/adr/0004_graphify.md).
+  [../docs/adr/0005_graphify.md](../docs/adr/0005_graphify.md).
 - **The one thing I could not do is the one thing that matters most: run it on Windows.**
   10 behaviour tests and the whole CI `present` leg have never executed. Everything on
   this machine is green (979/0, dummyrepo S1–S18, `tools.cigraphify` 7/7 on macOS), and

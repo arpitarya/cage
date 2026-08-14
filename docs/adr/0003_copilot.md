@@ -7,6 +7,9 @@ update-rule: ANY change to copilot capture (parser · store · schema field · r
 
 # ADR-COPILOT — five stores, one spine, and the credit is the vendor's own arithmetic
 
+> The five laws in [ADR-LAWS](0001_laws.md) bind this record already and are **not**
+> restated here. Cite this record in prose as its NAME, never by number.
+
 ---
 
 ## §1 · For humans

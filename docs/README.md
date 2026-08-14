@@ -96,9 +96,12 @@ to its real location.
   migration table and the surface's known gaps. **Test-gated**: `tests/test_cli_reference.py`
   checks it bidirectionally against `cli.build_parser()`, so a rename that misses this
   file turns the suite red rather than leaving a dead verb in prose.
-- [doc-size-discipline.md](doc-size-discipline.md) — ⏳ **TRIAL to 2026-09-01**: the
-  four doc-size rules (lead with the answer · one audience · evidence elsewhere ·
-  hard budget), the fix procedure, and the retain/remove criteria.
+- **`doc-size-discipline.md` and `restricted-environments.md` moved to `work/`**
+  (2026-08-14). Both are working docs rather than design/reference: one is a
+  time-boxed process trial, the other an operations guide. They keep their owner
+  triggers and their DOC-REGISTRY rows —
+  [doc-size-discipline](../work/doc-size-discipline.md) ·
+  [restricted-environments](../work/restricted-environments.md).
 - [GLOSSARY.md](GLOSSARY.md) — every recurring term, defined once against the code.
 - **`claude-capture.md` · `copilot-capture.md` · `kiro-capture.md` · `shim-contract.md`
   are GONE (2026-08-14).** Each was absorbed **whole** into its ADR — the store→property
@@ -107,8 +110,8 @@ to its real location.
   ADR-GRAPHIFY §2. One document per agent now carries both *what is captured* and *why*,
   so a capture change and its rationale can no longer drift apart. The same
   update-in-the-same-change rule applies, now to the ADR:
-  [ADR-CLAUDE](adr/0001_claude.md) · [ADR-COPILOT](adr/0002_copilot.md) ·
-  [ADR-KIRO](adr/0003_kiro.md) · [ADR-GRAPHIFY](adr/0004_graphify.md).
+  [ADR-CLAUDE](adr/0002_claude.md) · [ADR-COPILOT](adr/0003_copilot.md) ·
+  [ADR-KIRO](adr/0004_kiro.md) · [ADR-GRAPHIFY](adr/0005_graphify.md).
 - [FORMULAS.md](FORMULAS.md) — every computed number: formula · code home ·
   method tag · the knobs that move it.
 - [WORKLOG.md](../work/WORKLOG.md) — the running per-session handoff (append every
@@ -127,13 +130,14 @@ to its real location.
 
 ## Standing records
 
-- **[adr/](adr/README.md) — the durable *why*, now FOUR maintained per-agent records**
-  (restructured 2026-08-14): [ADR-CLAUDE](adr/0001_claude.md) ·
-  [ADR-COPILOT](adr/0002_copilot.md) · [ADR-KIRO](adr/0003_kiro.md) ·
-  [ADR-GRAPHIFY](adr/0004_graphify.md). Each has **§1 for humans** (one screen, Mermaid +
+- **[adr/](adr/README.md) — the durable *why*: [ADR-LAWS](adr/0001_laws.md) plus one
+  record per metered thing** (restructured 2026-08-14): [ADR-CLAUDE](adr/0002_claude.md) ·
+  [ADR-COPILOT](adr/0003_copilot.md) · [ADR-KIRO](adr/0004_kiro.md) ·
+  [ADR-GRAPHIFY](adr/0005_graphify.md). Each has **§1 for humans** (one screen, Mermaid +
   ASCII diagrams) and **§2 for agents** (the binding detail, ending in a veto condition).
-  The five laws that bind all four are stated once in [adr/README.md](adr/README.md) and
-  restated in none of them. Author from [adr/TEMPLATE.md](adr/TEMPLATE.md).
+  The five laws that bind them all — pull-only · one sink · append-only ·
+  counts-never-content · usage-never-cost — live in [ADR-LAWS](adr/0001_laws.md), each
+  with its ratification and veto, and are restated in no other record. Author from [adr/TEMPLATE.md](adr/TEMPLATE.md).
   **Cite by name — `ADR-KIRO`, never "ADR 0003"**: the numeric names belong to the
   eleven superseded records, now history in
   [work/archive/adr/](../work/archive/adr/README.md) and never current spec.

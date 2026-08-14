@@ -6,7 +6,7 @@ update-rule: ANY change to kiro capture (parser · source · schema field · rou
 
 # Kiro capture — how the numbers are made
 
-**Design of record: [ADR-KIRO](adr/0003_kiro.md).** This doc is the *field* reference —
+**Design of record: [ADR-KIRO](adr/0004_kiro.md).** This doc is the *field* reference —
 what is captured today. The ADR is the *why*, and wins where the two disagree.
 
 One page: what cage records for Kiro, from where, and what it means.

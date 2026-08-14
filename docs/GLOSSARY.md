@@ -120,7 +120,7 @@ lived in that command group. See PLAN §4.6, `cage query savings-axis`.
 **legacy human row** — a `tool="human"` or `unit="minutes"` receipt written before
 v0.36. Ledgers are append-only, so these persist. Every money view excludes them
 ([`report._is_legacy_human`](../cage/report.py)) because no rate remains to price
-them, and `cage report` **counts the exclusion in a footnote** — the removal was
+them, and `cage insights chats` **counts the exclusion in a footnote** — the removal was
 never allowed to make a total quietly smaller.
 
 **scope vs. project** — two different monorepo axes. `scope` = the top-level changed
@@ -175,11 +175,13 @@ only, so determinism holds.
 
 **state-dir cleanup** — the closed `.cage/state/` allowlist (`cage/cleanup.py`),
 never the ledger. Since v0.37 deletion only ever happens via an explicit
-`cage data cleanup --apply`; the auto path (piggybacked on `cage import`) only
+an explicit prune; the auto path (piggybacked on `cage import`) only
 ever **warns** on stderr, silent when nothing is eligible, and never deletes.
 `[cleanup] enabled` gates the auto path outright (no reminder at all when off);
 `[cleanup] warn` silences just the reminder text. Neither switch is consulted by
-a manually-typed command — an explicit `cage data cleanup`/`--apply` always runs.
+a manually-typed command. **Since v0.50 there is no such command** — the verb went with
+the `cage data` group and `cleanup.py` is kept only for the auto warn path and doctor
+(`work/OPEN-WORK.md`, STATE-RETENTION).
 Tool savings (`ledger/savings/<tool>/`) can never be cleaned: they sit under
 `ledger/`, which is on the never-list, and a per-tool cleanup class must never be
 added (savings are unrecoverable, unlike a cursor or a debug-log row).
@@ -213,7 +215,7 @@ Enumerated once in [paths.py](../cage/paths.py) (`GRAPHIFY_SHIMS`) so no read su
 can see only one.
 
 **shim contract** — the written behaviour spec both interceptor twins implement and are
-tested against ([docs/adr/0004_graphify.md](adr/0004_graphify.md)): behaviours **B1–B8**
+tested against ([docs/adr/0005_graphify.md](adr/0005_graphify.md)): behaviours **B1–B8**
 (binding on every twin) and divergences **D1–D7** (real and permanent — cmd has no
 `exec`, so the real binary runs as a child process). Two implementations of an unwritten
 contract drift; this is the written one, and the first artifact of the

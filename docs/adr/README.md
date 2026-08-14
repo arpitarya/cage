@@ -6,14 +6,15 @@ update-rule: ANY capture, routing, or unit change for an agent updates that agen
 
 # ADRs — one record per metered agent
 
-**The set is four, and it stays four.** One record per thing cage meters:
+**One record per thing cage meters, plus one for what binds them all.**
 
 | # | record | covers |
 |---|---|---|
-| 0001 | [**ADR-CLAUDE**](0001_claude.md) | Claude Code — transcripts, the dedup law, authorship |
-| 0002 | [**ADR-COPILOT**](0002_copilot.md) | GitHub Copilot — five stores, cumulative→delta, credits |
-| 0003 | [**ADR-KIRO**](0003_kiro.md) | Kiro — the two-store split, machine facts, the absent spine |
-| 0004 | [**ADR-GRAPHIFY**](0004_graphify.md) | graphify — the interceptor twins and the savings receipt |
+| 0001 | [**ADR-LAWS**](0001_laws.md) | the five cross-cutting laws — read this first |
+| 0002 | [**ADR-CLAUDE**](0002_claude.md) | Claude Code — transcripts, the dedup law, authorship |
+| 0003 | [**ADR-COPILOT**](0003_copilot.md) | GitHub Copilot — five stores, cumulative→delta, credits |
+| 0004 | [**ADR-KIRO**](0004_kiro.md) | Kiro — the two-store split, machine facts, the absent spine |
+| 0005 | [**ADR-GRAPHIFY**](0005_graphify.md) | graphify — the interceptor twins and the savings receipt |
 
 Each has **two sections**: **§1 for humans** (one screen, diagrams, no jargon) and
 **§2 for agents** (the binding detail — context, decision, consequences, alternatives,
@@ -28,27 +29,23 @@ for six weeks and there are ~90 live references to the numeric names. The number
 only as filename ordering. **"ADR 0001–0011" always means an
 [archived](../../work/archive/adr/README.md) record; a named ADR always means a live one.**
 
-## The five laws that bind all four
+## The five laws
 
-Stated once here so no ADR restates them and none can quietly drift from them. Each is
-ratified in an [archived](../../work/archive/adr/README.md) record; the citation is the
-proof, not decoration.
+They live in **[ADR-LAWS](0001_laws.md)**, in full, each with its ratification and its
+veto condition: **pull-only · one sink · append-only · counts-never-content ·
+usage-never-cost**. They are stated **there and nowhere else** — a per-agent record that
+restates a law creates a second copy that can drift, and drift here is invisible until it
+produces a wrong number.
 
-| law | means | ratified in |
-|---|---|---|
-| **Pull-only** | Capture is `cage import` + capture-on-read. No hook, no OS scheduler, no network, `$0`. MCP is the only surface cage wires. | [0003](../../work/archive/adr/0003-hookless-capture-pull-only-mcp-only-wiring.md) |
-| **One sink** | `--ledger`/`CAGE_BASE` → nearest project `.cage/` → global `~/.cage`. Never a double-write. `project` is a derived view, never a capture scope. | [0002](../../work/archive/adr/0002-universal-capture-global-ledger-explicit-import-export.md) |
-| **Append-only** | No ledger row is ever mutated. A cumulative source is reconciled with delta rows; a different *shape* of number gets its own row kind. | [0004](../../work/archive/adr/0004-append-only-delta-rows-and-separate-by-schema.md) |
-| **Counts, never content** | Prompts, responses, diffs and command output may be read **transiently**; only counts, hashes and ids persist. Not even a line hash. | [0008](../../work/archive/adr/0008-line-match-authorship-counts-persisted-content-transient.md) · [0009](../../work/archive/adr/0009-kiro-cli-tool-run-bodies-read-transiently-never-persisted.md) |
-| **Usage, never cost** | Two units — tokens and credits — both **recorded counts**. No rate card, no price table, and **no conversion between units in any direction**. | [0011](../../work/archive/adr/0011-cage-measures-usage-not-cost.md) |
-
-And the governing principle underneath all five:
+The principle underneath them all:
 
 > **Cage can never be more precise than its source.** Where a source has no dimension,
 > cage renders `—` **with the reason**, never a `0`, and never invents the split.
 
 ## Reading order
 
-Start at **§1** of the agent you care about. Read **§2** only when changing that agent's
-capture. If you are adding a *fifth* agent, read this file and
-[TEMPLATE.md](TEMPLATE.md) first — the five laws above bind it before you write a line.
+**[ADR-LAWS](0001_laws.md) §1 first** — five minutes, and every other record assumes it.
+Then **§1** of the agent you care about. Read a **§2** only when changing that agent's
+capture. Adding a new metered thing? Check it against ADR-LAWS §2 *before* writing its
+record — several plausible designs are ruled out at that gate rather than after
+implementation.

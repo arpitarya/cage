@@ -451,6 +451,10 @@ lives in the third audit layer — reviewable, not user-config.
 
 ### 3.6.2 The `scope` dimension (additive contract change)
 
+> **STATUS — SURFACE-CUT (v0.50, 2026-08-14): the WRITE half stands; every reader is gone.** `schema.make_call`/`make_receipt` still
+> stamp `scope`, but `report --scope` / `attrib --scope` were the only consumers, so no
+> command filters by it today (`work/OPEN-WORK.md`, UNREAD-FACTS)**
+
 Calls and receipts gain one optional field, `scope` — the **top-level changed dir** of
 the work, reusing `tasks.jsonl`'s "top-level-dirs-only, never full paths" PII guard
 (§3.4). `schema.make_call`/`make_receipt` gain `scope: str = ""` (appended to
@@ -463,6 +467,11 @@ fail-open, no new git path; the meter resolves it best-effort and cached
 byte-identical to today (the §3.5 no-flag invariant).
 
 ### 3.6.3 Team aggregation via `refs/notes`, not a backend
+
+> **STATUS — SURFACE-CUT (v0.50, 2026-08-14): REMOVED.** `cage authorship ledger-sync` and `ledgersync.py` are deleted; `--team` had no
+> reader left, so the ref could be written and never displayed. Archived ADR 0001 records
+> the original reasoning and its own retirement. **Provenance notes are unaffected** —
+> `cage authorship notes-sync` and `mergeutil.union_by_id` survive**
 
 The ledger stays gitignored and machine-local (committing per-dev per-task cost into
 permanent shared git history is a surveillance surface even counts-only). The team view
@@ -523,6 +532,11 @@ is sacred (aggregation is a row union, not a re-derivation); no-flag byte-identi
 (`--scope`/`--team`/partitioning all default off ⇒ output identical to pre-amendment).
 
 ## 3.7 Universal capture — global ledger + explicit import/export
+
+> **STATUS — SURFACE-CUT (v0.50, 2026-08-14): capture stands; `export` is gone.** `cage import` and capture-on-read are unchanged and
+> remain the universal path. `cage data export` (and the whole `data` group) is deleted;
+> the fleet bundle moved to `cage study export`. `project` is still stamped and, like
+> `scope`, now has no reader — its `report --project` view went with the rollup**
 
 cage is a package any user installs, often using **only** Copilot, only Kiro,
 or any mix, in a CLI **or a VS Code extension**. Field-proven: hooks are client-specific
@@ -653,6 +667,12 @@ the ledger (a state file + an on-read derive), never a row; fail-open capture; f
 always (only Codex reports quota locally today; the others show "—").
 
 ## 3.9 CSV output — a one-way reporting surface (spreadsheets, not sync)
+
+> **STATUS — SURFACE-CUT (v0.50, 2026-08-14): narrowed, not removed.** `--csv` still works on `chats` · `graphify` · `commits` ·
+> `commit` · `authorship summary` · `study report`, from the same one-structure-per-view
+> rule. What went: `report`/`attrib`/`adoption`/`compare`/`calibration` `--csv`, the raw-row
+> `data export --csv`, and the OTel document form (`otelout.py` deleted with its only
+> consumer). CSV is still never an import source**
 
 Two export kinds, never blurred: the fleet bundle (`cage data export --study`) stays
 **jsonl** — lossless, merge-by-id, re-importable — while **CSV is a REPORTING
@@ -929,6 +949,12 @@ Design of record: [ADR 0010](../work/archive/adr/0010-metric-ledgers-are-the-spe
 
 ## 4. The attribution engine (the part that's actually novel)
 
+> **STATUS — SURFACE-CUT (v0.50, 2026-08-14): the engine is deleted.** §4.2's marginal attribution, §4.7's compare and §4.8's
+> estimate/calibration no longer ship. **What survives is the evidence, not the rollup**:
+> per-chat savings (`cage insights graphify`, FORMULAS §2.15) and per-commit authorship
+> (`cage insights commits`, §2.14). Sections below are the design record — history where
+> marked, live where not. Rationale: `work/surface-cut.decision.md`**
+
 The question Cage answers is not "what did I spend" (any meter does that). It's
 **"what did each tool save me, and what would any other stack have cost?"** —
 across the full permutation of {Claude vs. not, graphify vs. not, fux vs. not,
@@ -948,6 +974,11 @@ Every cell in a Cage table is tagged `measured` / `modeled` / `estimated`. You
 always know which numbers are invoices and which are projections.
 
 ### 4.2 Marginal attribution by fixed pipeline order
+
+> **STATUS — SURFACE-CUT (v0.50, 2026-08-14): REMOVED.** `attribution.py` and `cage insights attrib` are deleted, so cage computes no
+> marginal split and `[tools] order` has no consumer at all. Receipts still record their own
+> `saved` and `method`; the GROSS law (§2.1 of FORMULAS) is unchanged. **This section is the
+> design record of a capability cage no longer ships** — read it as history**
 
 Savings interact — compression after fux-trimming saves fewer tokens than
 compression on raw context. To avoid double-counting, each receipt reports its
@@ -1057,6 +1088,10 @@ ledgers written before v0.36 still hold its rows.
 
 ### 4.7 Measured stack comparison — `cage insights compare` (roadmap P2)
 
+> **STATUS — SURFACE-CUT (v0.50, 2026-08-14): REMOVED.** `compare.py` deleted. `tasks.jsonl` still records outcomes and labels;
+> `MIN_COMPARE_N` remains in `constants.py`, unread. `taskgroup.py` survives for
+> `commitjoin`'s call→commit join only**
+
 §4.2–§4.4 model counterfactuals from receipts; `cage insights compare` answers the *other*
 half of "is this tool reducing my cost": **did tasks that ran with the tool
 measurably cost less than tasks that didn't** — observed group totals, not modeled
@@ -1083,6 +1118,9 @@ reconstruction. Derive-time only, no schema change beyond the optional task `lab
   it never numbers.
 
 ### 4.8 Pre-task estimation + calibration — `cage insights estimate` / `cage insights calibration` (roadmap P3)
+
+> **STATUS — SURFACE-CUT (v0.50, 2026-08-14): REMOVED.** `estimate.py` and `calibration.py` deleted. Previously-stamped `est_*` fields on
+> task rows are still recorded and never rewritten; nothing scores them**
 
 Estimate **before**, measure **after**, and let the measured gap be the confidence
 level. Distinct from `forecast.py` (monthly projection) — this is per-task.

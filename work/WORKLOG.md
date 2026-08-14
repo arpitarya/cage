@@ -90,7 +90,7 @@ by milestone) — the worklog is what *happened this session*.
 
 - **Asked (Arpit):** review every ADR + `claude-capture.md` / `copilot-capture.md` /
   `kiro-capture.md` / `shim-contract.md`, then create and maintain four ADRs
-  (`0001_claude` · `0002_copilot` · `0003_kiro` · `0004_graphify`), each with a **human
+  (`0002_claude` · `0003_copilot` · `0004_kiro` · `0005_graphify`), each with a **human
   section** (short, with diagrams) and an **agent section**. Mid-session: *"everything
   mentioned in [those four docs] should be in adr then remove these files."*
 - **Decided (Arpit, in-session):** replace `docs/adr/` **entirely** — the eleven numeric
