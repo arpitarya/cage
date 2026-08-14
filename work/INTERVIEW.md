@@ -25,6 +25,20 @@ Entry-point tracker: ALL-CAPS, no frontmatter.
 
 ## State of play (2026-08-15 — pick up here on a model switch)
 
+- **ADR-CONFIG exists and nothing it decides is built (2026-08-15).** `cage.toml` had run
+  since the `policy.toml` rename with **no owning record**, and its five modules sat on
+  `test_adr_ownership.py`'s `NO_RECORD` list — where placement is an explicit claim that a
+  module encodes no decision. A drift census falsified that claim in three ways at once:
+  three live knobs ship in no file, three shipped sections have no reader, and two surfaces
+  still teach deleted config. **The lesson is the structural one, not the list**: none of it
+  failed and no test could have seen it, because `test_cli_reference` gates commands and a
+  config key is not a command. The whole config surface is ungated — CONFIG-GATE in
+  OPEN-WORK is the item that matters most; the other seven are its consequences.
+  **Read [ADR-CONFIG](../docs/adr/0012_config.md) as a target, never as a description of
+  today's file.** The sharpest ratified call is `[tools] order` demoted to a constant: it
+  is the one place cage learned an ordering it cannot observe, and it carries the record's
+  only UNMEASURED veto — one real project with a non-default pipeline order reopens it.
+
 - **`docs/PLAN.md` is gone (2026-08-14/15, Arpit's instruction) — the ADR set is the
   design of record now.** Its `plan §X` addressing scheme, which ~60 source files cited,
   was repointed record by record; three anchors with no live successor were stripped

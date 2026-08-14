@@ -60,6 +60,11 @@ OWNERS: dict[str, str] = {
     "responsecache": "0007_graphify",
     # ADR-CLEANUP — what .cage/state/ debris may ever be deleted
     "cleanup": "0011_cleanup",
+    # ADR-CONFIG — the config file itself: resolution, precedence, the knob boundary,
+    # and the write discipline. Never a key's MEANING, which stays with its own record.
+    "policy": "0012_config", "policysync": "0012_config",
+    "tomledit": "0012_config", "cfgio": "0012_config",
+    "initcmd": "0012_config",
 }
 
 #: Claimed by MORE than one record, on purpose. `transcript.py` is one file holding three
@@ -80,7 +85,6 @@ NO_RECORD: dict[str, str] = {
     "__main__": "`python -m cage` entry point",
     "attest": "L1 attestation store — behaviour is stated in CLAUDE.md's agent-surface ladder",
     "capturelog": "always-on capture breadcrumb; counts only, read by no view",
-    "cfgio": "TOML/JSON read helpers",
     "debuglog": "the CAGE_DEBUG sink",
     "demo": "seeds the worked example",
     "doctorbundle": "redacted diagnostics archive",
@@ -88,19 +92,15 @@ NO_RECORD: dict[str, str] = {
     "freshness": "import-staleness advice line",
     "hookbypass": "L1 re-entry guard",
     "hookcmd": "L1 hook entry point — the ladder is CLAUDE.md's",
-    "initcmd": "scaffolds .cage/",
     "lockutil": "the one fail-open cross-process lock helper",
     "mcpserver": "L2 surface — the tool list is CLAUDE.md's",
     "outcomes": "the task-outcome store",
     "pathprobe": "read-only path probe for doctor",
-    "policy": "policy resolution",
-    "policysync": "policy sync writer",
     "repoceiling": "repo-root resolution",
     "steering": "L1/L3 document rendering",
     "taskcorr": "task correlation helper",
     "taskgroup": "the one closed-task join",
     "tasks": "the task record",
-    "tomledit": "the one comment-preserving TOML writer",
     "wiringscan": "wiring liveness detector",
 }
 

@@ -111,7 +111,7 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   **this** row's billing when the provider computed one figure over a *group* of calls
   (REV-CREDITS defect 2). `billed_with` is a recorded structural fact, never a derived
   number, and is empty for every row that bills for itself.
-- **Config file** ([paths.py](cage/paths.py) `Footprint.policy`) — the project config
+- **Config file** ([paths.py](cage/paths.py) `Footprint.policy`, [ADR-CONFIG](docs/adr/0012_config.md)) — the project config
   is `.cage/cage.toml` (the policy layer). It was `policy.toml` through v0.35; the
   rename is **non-breaking** — `policy.toml` is still read as a fallback and migrated
   to `cage.toml` on `cage setup` (idempotent, non-destructive), and with both present
@@ -948,16 +948,17 @@ don't restate them, apply them.
 
 ## Decision records (ADRs)
 
-**The set is ELEVEN records — one per thing cage meters, plus one for what binds them all,
+**The set is TWELVE records — one per thing cage meters, plus one for what binds them all,
 one for the surface it is all read through, one for the map of what each surface can and
 cannot yield, one for the cross-agent question of who wrote which lines, one for
-proving nothing already recorded has changed, and one for what may ever be deleted** —
+proving nothing already recorded has changed, one for what may ever be deleted, and one
+for the file that holds every decision you get to make** —
 [ADR-LAWS](docs/adr/0001_laws.md) · [ADR-CLI](docs/adr/0002_cli.md) ·
 [ADR-CLAUDE](docs/adr/0003_claude.md) · [ADR-COPILOT](docs/adr/0004_copilot.md) ·
 [ADR-KIRO](docs/adr/0005_kiro.md) · [ADR-CONSUMERS](docs/adr/0006_consumer.md) ·
 [ADR-GRAPHIFY](docs/adr/0007_graphify.md) · [ADR-COVERAGE](docs/adr/0008_coverage.md) ·
 [ADR-AUTHORSHIP](docs/adr/0009_authorship.md) · [ADR-INTEGRITY](docs/adr/0010_integrity.md) ·
-[ADR-CLEANUP](docs/adr/0011_cleanup.md).
+[ADR-CLEANUP](docs/adr/0011_cleanup.md) · [ADR-CONFIG](docs/adr/0012_config.md).
 Index, the ownership table and the standing rule: [docs/adr/README.md](docs/adr/README.md).
 Author new ones from [docs/adr/TEMPLATE.md](docs/adr/TEMPLATE.md).
 

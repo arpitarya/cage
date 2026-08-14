@@ -12,6 +12,42 @@ by milestone) — the worklog is what *happened this session*.
 
 ---
 
+## 2026-08-15 — Cowork — ADR-CONFIG: `cage.toml` gets the record it never had
+
+- **Asked:** "create an adr for cage.toml file — grill me on what needs to go in there."
+- **Done:** grilled first, drafted second. The grill was grounded in a drift census over
+  `cage/`, not in generic config questions, and the census is what produced the record's
+  Reference section. New [ADR-CONFIG](../docs/adr/0012_config.md) (0012); the set is now
+  **TWELVE**. `policy` · `policysync` · `tomledit` · `cfgio` · `initcmd` moved out of
+  `test_adr_ownership.py`'s `NO_RECORD` into `OWNERS` — that list's docstring makes
+  placement there an explicit claim that a module *encodes no decision*, and the census
+  falsified it. README ownership table + `OWNERS` dict edited together (they drift with no
+  test catching it). Eight build items filed under a new ADR-CONFIG section in OPEN-WORK.
+- **The census (all live code, all re-greppable):** three knobs with real readers and env
+  overrides ship in **no** file — `[capture] on_read`, `[capture] read_throttle_secs`,
+  `[wiring] python_launcher`. Three sections ship with **zero** readers — `[budgets]`
+  (USD keys, Law 5), `[quality]`, `[display]`. Two surfaces still teach deleted config —
+  `explain_data`'s `[display] usd` entry and `doctorcmd`'s `bundled prices
+  {prices_version}` footer. Six `constants.py` members are defaults in two places at once.
+  **Nothing failed and no test could have seen any of it**: the config surface has no gate,
+  because `test_cli_reference` stops at the CLI boundary and a config key is not a command.
+- **Decided (Arpit, this session):** a setting may change what cage **does**, never what a
+  number **means** (generalizing the `MIN_MATCH_CHARS` refusal) · no defaults anywhere, the
+  policy-preferred fallback family is abolished · a missing key errors at read, with
+  `setup`/`policy sync` backfilling so upgrades stay non-breaking · an env override for
+  **every** key, tables included and replace-only · `[meta]` is the one exempt section (a
+  stamp, not a knob) · `[tools] order` **demoted to a constant** · unknown keys warned and
+  removed on sync · `[budgets]`/`[quality]`/`[display]` deleted.
+- **Open — the cost of the sharpest call, stated not buried:** with `[tools] order` a
+  constant, a project whose real pipeline differs can no longer say so, and cage asserts an
+  ordering it cannot observe. It carries the record's only UNMEASURED veto: **one** real
+  project with a non-default order reopens it.
+- **Next step:** CONFIG-HIDDEN-KNOBS and CONFIG-DEAD-SECTIONS (the inventory half) before
+  CONFIG-STRICT-READ — a strict read against an incomplete shipped file is a trap.
+- **Cost:** unmeasured — the rule names `cage report`, deleted in v0.50 (SURFACE-CUT); the
+  surviving reader `cage insights chats` is per-chat and cannot isolate a session. Tracked
+  as UNREAD-FACTS.
+
 ## 2026-08-15 — Claude Code — DOCGEN-DEAD-REF: docgen's last remnant removed, its block corrected and gated
 
 - **Asked:** "remove doc gen sub system." Then, seeing the diff: "i want to keep the

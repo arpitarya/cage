@@ -103,6 +103,41 @@ COPILOT-JETBRAINS-UNPROBED).
   real receipts file now that the metering gap is closed — the old zero is no longer trustworthy
   either way.
 
+## [ADR-CONFIG](../docs/adr/0012_config.md) — `cage.toml`
+
+Ratified 2026-08-15, **none of it built**. Order matters: a strict read against an
+incomplete shipped file is a trap, so the inventory items land before the strictness ones.
+
+- **CONFIG-HIDDEN-KNOBS** — three live knobs with readers and env overrides appear nowhere
+  in `data/cage.toml`: `[capture] on_read` (`policy.capture_on_read_enabled`),
+  `[capture] read_throttle_secs`, `[wiring] python_launcher`. Ship all three. Blocks
+  CONFIG-STRICT-READ.
+- **CONFIG-DEAD-SECTIONS** — `[budgets]` (USD keys; `policy.budgets`'s only call site is one
+  assertion in `tests/test_substrate.py`), `[quality]` and `[display]` ship with zero
+  readers. Delete block + reader + `policy._SECTIONS` entry. Two surfaces still teach them:
+  `explain_data`'s `[display] usd` entry and `doctorcmd`'s `· bundled prices
+  {prices_version}` footer.
+- **CONFIG-NO-DEFAULTS** — abolish the *"DEFAULT_CONFIDENCE policy-preferred fallback"*
+  family in `constants.py` (six live members). One number, one home; a constant that exists
+  to be overridden is a default in disguise. Blocks CONFIG-STRICT-READ.
+- **CONFIG-STRICT-READ** — a missing key raises `CageError` at the read chokepoint;
+  `cage setup` / `cage policy sync` backfill any key the running version knows and the file
+  lacks. Errors only when backfill is impossible. Keeps upgrades non-breaking.
+- **CONFIG-ENV-EVERY-KEY** — `CAGE_<SECTION>_<KEY>` for every key, tables included and
+  **replace-only, never merged**; an alias map grandfathers the five ad-hoc names
+  (`CAGE_CAPTURE`, `CAGE_DEBUG`, `CAGE_CLEANUP`, `CAGE_CLEANUP_WARN`,
+  `CAGE_AUTHORSHIP_ESTIMATE`). `[meta]` is the one exempt section.
+- **CONFIG-TOOLS-ORDER-CONST** — demote `[tools] order` to `constants`. `explain.payload`
+  reads it live, so the pipeline explainer must interpolate the constant instead of the
+  policy value. Carries ADR-CONFIG's only UNMEASURED veto: one real project with a
+  non-default pipeline order reopens it.
+- **CONFIG-GATE** — the config surface has no detector, which is why all of the above went
+  unseen. Build one: every shipped section is read by `policy` · every key with a reader is
+  shipped · every documented env var is consulted · every key names a section in
+  ADR-CONFIG's pointer table. Without it the record is prose and the census repeats.
+- **CONFIG-STALE-COMMENTS** — three `constants.py` comments still name the pre-rename
+  `policy.toml` and the deleted `[prices] stale_days`.
+
 ## How this file is maintained
 
 Continuously, in the same change as the work. A completed item is **deleted, not ticked** —

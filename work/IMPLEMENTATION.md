@@ -8,6 +8,40 @@ Entry format:
 
 ```
 
+## 2026-08-15 — ADR-CONFIG: the config file gets a record, and the config surface gets a filed gap
+
+- **Built (docs only — no `cage/` code changed):** `docs/adr/0012_config.md`
+  (ADR-CONFIG), authored from `TEMPLATE.md` — §1 with a Mermaid resolution diagram and its
+  hand-paired ASCII twin, §2 with the decision, its costs, five rejected alternatives, a
+  re-greppable Reference census and a three-part veto.
+- **Built (ownership):** `tests/test_adr_ownership.py` — `policy` · `policysync` ·
+  `tomledit` · `cfgio` · `initcmd` moved `NO_RECORD` → `OWNERS` under `0012_config`;
+  `docs/adr/README.md` gained the matching record row and ownership row, and its stale
+  *"the seven records"* self-description was corrected to twelve on contact.
+- **Built (sweep):** `CLAUDE.md` ELEVEN → TWELVE with ADR-CONFIG in the list and on the
+  *Config file* architecture bullet (the archived-eleven sentence deliberately untouched —
+  the superseded numeric set is still eleven); `work/DOC-REGISTRY.md` gained an ADR-CONFIG
+  row and a bumped adr/README row; `work/OPEN-WORK.md` gained an ADR-CONFIG section with
+  eight items, ordered so the inventory items precede the strictness ones.
+- **Files:** `docs/adr/0012_config.md` (new, 301 lines) · `docs/adr/README.md` ·
+  `CLAUDE.md` · `tests/test_adr_ownership.py` · `work/DOC-REGISTRY.md` ·
+  `work/OPEN-WORK.md` · `work/WORKLOG.md` · this file.
+- **Test status:** the suite could not be run from this session — `.venv/bin/python`
+  symlinks outside the mounted folder, so `pytest` is unreachable here. The three gates
+  this change can turn red were instead **replayed directly in stdlib Python against the
+  working tree** and all pass: `test_adr_ownership`'s four assertions (no unclaimed
+  module, no ghost claim, every named record exists, every owning record appears in the
+  README table); `test_doc_links`' live-corpus walk (448 links, 0 dangling, resolved
+  against `git ls-files` case-sensitively); and the backtick-parity pre-flight on all five
+  touched markdown files. **`docs/adr/0012_config.md` was `git add -N`'d** so the link
+  gate can see it — it is intent-to-add, not staged content. Run `just test` before
+  committing.
+- **Not built:** every decision the record states. It is ratified, not shipped, and says
+  so in its frontmatter, in a status warning above §1, and in OPEN-WORK — the
+  ADR-AUTHORSHIP pattern.
+- **Next step:** CONFIG-HIDDEN-KNOBS + CONFIG-DEAD-SECTIONS, then CONFIG-GATE; strictness
+  last.
+
 ## 2026-08-15 — DOCGEN-DEAD-REF: the last of the doc-generator removed, its output corrected and gated
 
 - **Asked:** "remove doc gen sub system" — then, after seeing the result, "i want to keep

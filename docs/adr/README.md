@@ -1,6 +1,6 @@
 ---
-doc: the ADR set — eleven maintained records, and the rule that keeps them true
-status: current as of 2026-08-15 · replaces the numeric ADRs 0001–0011 · ADR-AUTHORSHIP carved out of ADR-CLAUDE 2026-08-14 · ADR-INTEGRITY added 2026-08-15 · ADR-CLEANUP added 2026-08-15
+doc: the ADR set — twelve maintained records, and the rule that keeps them true
+status: current as of 2026-08-15 · ADR-CONFIG added 2026-08-15 (ratified, not yet built) · replaces the numeric ADRs 0001–0011 · ADR-AUTHORSHIP carved out of ADR-CLAUDE 2026-08-14 · ADR-INTEGRITY added 2026-08-15 · ADR-CLEANUP added 2026-08-15
 update-rule: NO behaviour change lands without its owning ADR updated in the same change (see "The standing rule"). A change touching no recorded decision says "no ADR affected" out loud
 ---
 
@@ -9,7 +9,8 @@ update-rule: NO behaviour change lands without its owning ADR updated in the sam
 **One record per thing cage meters, plus one for what binds them all, one for the surface it is
 all read through, one for the map of what each surface can and cannot yield, one for the
 cross-agent question of who wrote which lines, one for proving nothing already recorded
-has changed, and one for what may ever be deleted.**
+has changed, one for what may ever be deleted, and one for the file that holds every
+decision you get to make.**
 
 | # | record | covers |
 |---|---|---|
@@ -24,6 +25,7 @@ has changed, and one for what may ever be deleted.**
 | 0009 | [**ADR-AUTHORSHIP**](0009_authorship.md) | who wrote which lines of a commit — the agent is measured, the human is the residual |
 | 0010 | [**ADR-INTEGRITY**](0010_integrity.md) | proving nothing that was already written has changed — a hash chain, report-only |
 | 0011 | [**ADR-CLEANUP**](0011_cleanup.md) | what `.cage/state/` debris may ever be deleted, and why only a typed command does it |
+| 0012 | [**ADR-CONFIG**](0012_config.md) | `cage.toml` — resolution, precedence, and the rule for what may be a setting at all |
 
 Each has **two sections**: **§1 for humans** (one screen, diagrams, no jargon) and
 **§2 for agents** (the binding detail — context, decision, consequences, alternatives,
@@ -71,6 +73,7 @@ record to hold it.
 | [ADR-COVERAGE](0008_coverage.md) | no module — it owns the cross-cutting *rule* the five gap tables obey (`ABSENT_SPINES` · `units.ABSENT` · `COVERAGE_GAPS` · `GRAPHIFY_COVERAGE` · `HOOK_EVENTS`/`HOOK_GAPS`), each of which stays owned by its own record |
 | [ADR-AUTHORSHIP](0009_authorship.md) | the authorship half of `transcript` and `importcmd` · `authorcapture` · `linematch` · `commitjoin` · `provenance` · `origin*` · `notessync` · `verifycmd` — and the **contents** of `COVERAGE_GAPS`, whose cross-cutting rule stays ADR-COVERAGE's |
 | [ADR-CLEANUP](0011_cleanup.md) | `cleanup` |
+| [ADR-CONFIG](0012_config.md) | `policy` · `policysync` · `tomledit` · `cfgio` · `initcmd` — the config **file**; every section's *meaning* stays with the record that owns the behaviour (ADR-CONFIG carries the pointer table) |
 
 **Shared and infrastructure modules are claimed explicitly, never by silence** — the
 ownership test carries the list and the reason for each. `transcript.py` is deliberately
@@ -80,7 +83,7 @@ and pretending otherwise would send a copilot change to the wrong reviewer.
 ## Cite them by name, never by number
 
 In prose write **ADR-LAWS · ADR-CLI · ADR-CLAUDE · ADR-COPILOT · ADR-KIRO · ADR-CONSUMERS ·
-ADR-GRAPHIFY · ADR-COVERAGE · ADR-AUTHORSHIP · ADR-INTEGRITY · ADR-CLEANUP**.
+ADR-GRAPHIFY · ADR-COVERAGE · ADR-AUTHORSHIP · ADR-INTEGRITY · ADR-CLEANUP · ADR-CONFIG**.
 
 A bare "ADR 0001" is now ambiguous — it meant *team ledger aggregation via `refs/notes`*
 for six weeks and there are ~90 live references to the numeric names. The numbers survive
