@@ -12,6 +12,83 @@ by milestone) — the worklog is what *happened this session*.
 
 ---
 
+## 2026-08-14 (Cowork) — CALLS-RETIREMENT specced; the 2026-09-13 freeze lifted early
+
+- **Asked (Arpit):** what is `calls-YYYY-MM.jsonl` for → what is *not* in the `ledger/claude`
+  files → same for copilot and kiro → *"i dont believe we need calls files any more create a
+  handoff and prompt to remove them and update the adr's"*.
+- **Blocked first, then unblocked.** Three blockers were reported before any work:
+  (1) `ledger.spend()`'s calls loop is still the **sole** basis for four row classes —
+  `record_call`/`cage.meter` consumers, retired `codex` (373 rows measured in one real ledger),
+  proxy rows, and `[sources.<name>]` custom tools; (2) OPEN-WORK's **METRICS-DUAL-WRITE-END**
+  read *"Do not touch before 2026-09-13"*; (3) ADR 0003 already **rejected** "Stop writing
+  `calls`". Arpit chose *override the freeze — build it now*.
+- **Decided — the premise was 70% right, and the scope moved because of it.** "Remove the calls
+  files" cannot mean removing the `calls` **kind**; it means retiring the three agents'
+  **transcript→calls ingest legs**. The substrate (`ledger.calls`, `join_table`, `make_call`,
+  `metering.record_call`) and every existing shard stay. That distinction is the loudest
+  constraint in both docs, because metering is fail-open by law — breaking it raises nothing.
+- **Decided — §0 is the price of the override.** The freeze protected one retention window of
+  `calls`-vs-metric cross-check. A mandatory pre-flight snapshot to `work/regression/` converts
+  that from *unmeasurable forever* to *measured once, at the moment of the cut*. If no real
+  ledger is present, the executor stops.
+- **Decided — kiro's leg goes too**, justified by the 2026-08-14 field probe (28 rows,
+  1,576 in / **0 out**, model `"agent"` on every row, a repeated byte-identical 6-row block):
+  the rows are unsummable. Flagged in the handoff as Arpit-overridable in two lines.
+- **Found while specc'ing (new work, filed):** `importcmd`'s gate-3 `captured` set and
+  `doctorcmd`'s capture health both derive from `ledger.calls` — and the kiro leg has its **own
+  twin** of that build. Left unrepointed, a healthy install would report all three agents as
+  *never captured*: a silent false negative, the F1 class this repo has paid for twice.
+- **Open:** OPEN QUESTION 10.1 — `_PARSERS` is the `[sources.<name>] format` custom-source
+  contract, not dead code. It blocks only its own deletion. Recommendation (a), reversible.
+- **ADRs were deliberately NOT pre-edited.** Until the removal lands, editing 0003/0004/0005 to
+  say `calls` is retired would make them lie. The edits are spec'd line-level in handoff §9.5,
+  including converting 0003's rejected alternative into a **recorded reversal** rather than
+  deleting it — a silently-vanished rejected alternative is how a future agent re-litigates.
+- **Next step:** Arpit rules on 10.1 (or delegates it), then run
+  `work/calls-retirement.prompt.md` on **Opus**. §0 before any deletion.
+- **Cost: unmeasured** — `cage report` was deleted by SURFACE-CUT, so this repo currently has
+  no spend surface to dogfood. Worth noting the rule now has no instrument.
+
+---
+
+## 2026-08-14 (Cowork) — ADR-DISCIPLINE: no behaviour change without its ADR, and a gate under it
+
+- **Asked (Arpit):** *"are should always be kept upto date and no change should be made in
+  the code without adr update"* — a standing rule, not a task.
+- **Encoded** as the **first** Must-Know Rule in `CLAUDE.md`, in `docs/adr/README.md`
+  (*The standing rule*), and in the DOC-REGISTRY trigger.
+- **Made precise on purpose, and this is the judgement call worth reviewing.** Taken
+  literally the rule would demand an ADR edit for a typo. So the trigger names what
+  counts — behaviour a record describes, a decision made/reversed/narrowed **including one
+  taken by deletion**, or an invalidated veto/gap/*deliberately-not-taken* — and a change
+  touching no recorded decision **says `no ADR affected` out loud**. That stated escape is
+  the rule working: a rule demanding an edit per keystroke decays into ritual edits, and
+  this repo already watched exactly that happen to the OPEN-WORK header seven times.
+- **Made answerable.** "Update the ADR" is unusable unless "which ADR?" has an answer, so
+  `docs/adr/README.md` gains a **module→record ownership table** and
+  `tests/test_adr_ownership.py` carries the executable copy. It fails when a `cage/`
+  module is claimed by no record (a new decision with nothing to hold it), when a record
+  claims a module that no longer exists (a doc describing deleted code), and when
+  ownership names a renamed-away record. **79 modules · 49 owned · 3 shared · 27
+  explicitly exempt** — infrastructure is claimed *explicitly with its reason*, never by
+  silence, so the exempt list is itself reviewable. `transcript.py` is deliberately
+  claimed by **three** records: one file, three vendors' parsers.
+- **Deliberately NOT tested, and the test says so in its own docstring:** whether an ADR
+  was edited *in the same commit*. A test sees a snapshot, not a diff — claiming that
+  coverage would be a green check asserting nothing, the exact failure
+  `test_cli_reference`'s fence-blind scan turned out to be earlier today. That half is
+  carried by review.
+- **The gate earned its place immediately** — it caught a phantom module in its own first
+  draft (`importcmd_shim`, which I had invented).
+- **Verified:** 5/5 ownership assertions pass; 0 live-broken links across 1,647.
+- **Open:** unchanged — TEST-COUNT · PLAN-4-REWRITE · ADR-SURFACE (still the one suggested
+  record unwritten, and the one PLAN §4 will otherwise keep contradicting).
+- **Next step:** `just test` on the dev machine, then ADR-SURFACE.
+- **Cost: unmeasured — `cage report` no longer exists.** See UNREAD-FACTS.
+
+---
+
 ## 2026-08-14 (Cowork) — ADR-LAWS, ADR-CLI (+ an example per command), ADR-CONSUMERS; the set is seven
 
 - **Asked (Arpit), in three steps:** suggest further ADRs → create ADR-LAWS as `0001_laws`
