@@ -224,8 +224,8 @@ def test_copilot_import_counts_and_idempotent(tmp_path, monkeypatch, capsys):
 def test_kiro_import_counts_and_idempotent(tmp_path, monkeypatch, capsys):
     # Kiro's coarse usage log: one JSON object per call (prompt tokens reliable,
     # output often 0, generic provider/model). Imported best-effort, deduped by content.
-    # From inside a project the rows land in the MACHINE ledger (ADR 0006) — the log is
-    # one global file with no project dimension, so a per-project kiro cost is fiction.
+    # Since ADR-LEDGER (2026-08-15) the rows land in THIS run's own active ledger —
+    # never a separate machine sink — the reversal of the former ADR-KIRO routing rule.
     root = _init_root(tmp_path, monkeypatch)
     log = tmp_path / "tokens_generated.jsonl"
     log.write_text(
@@ -234,28 +234,26 @@ def test_kiro_import_counts_and_idempotent(tmp_path, monkeypatch, capsys):
         + json.dumps({"model": "agent", "provider": "kiro", "promptTokens": 13,
                       "generatedTokens": 0}) + "\n", encoding="utf-8")
     clicmds.cmd_import(_args(agent="kiro", path=str(log)))
-    assert ledger.calls(root) == []                     # not in the project ledger
-    machine = paths.global_home()
     # `ledger.kiro_metrics`, not `calls` and not `spend()`. KIRO-CALLS-LEG retired the
     # `calls` writer and relocated this store to `ledger/kiro/` as `source="ide-log"`.
     # Both halves are asserted together on purpose: "no calls rows" alone would pass just
     # as happily on a kiro leg that had been deleted outright, which is the failure the
     # ratification was conditional on NOT happening.
-    assert ledger.calls(machine) == [], "the retired writer must stay retired"
-    rows = ledger.kiro_metrics(machine)
+    assert ledger.calls(root) == [], "the retired writer must stay retired"
+    rows = ledger.kiro_metrics(root)
     assert len(rows) == 2 and {r["agent"] for r in rows} == {"kiro"}
     assert {r["source"] for r in rows} == {"ide-log"}
     assert {r["tokens_in"] for r in rows} == {1200, 13}  # the 0-output line still counts
     out = capsys.readouterr().out
-    assert "✔ kiro: imported 2 call(s) from 1 file(s) →" in out
-    # the line names the sink — tilde-relative when under the real home (importcmd._tilde,
-    # "machine-portable in tests"), which the sandboxed tmp_path IS on a Windows runner
-    assert importcmd._tilde(paths.Footprint(machine).base) in out
-    # Idempotency asserted on the shards the rows actually live in now — asserting the
+    # No sink note since ADR-LEDGER — the plain per-agent summary line, no arrow, no
+    # named sink, exactly like claude's or copilot's.
+    assert "✔ kiro: imported 2 call(s) from 1 file(s)." in out
+    assert "→" not in out.split("✔ kiro")[1].split("\n")[0]
+    # Idempotency asserted on the shards the rows actually live in — asserting the
     # `calls` shards would compare two empty byte strings and prove nothing.
     def _kiro_shards():
         return b"".join(p.read_bytes()
-                        for p in paths.Footprint(machine).kiro_metric_shards())
+                        for p in paths.Footprint(root).kiro_metric_shards())
     before = _kiro_shards()
     assert before, "the idempotency check must have rows to be idempotent about"
     clicmds.cmd_import(_args(agent="kiro", path=str(log)))  # re-import → idempotent

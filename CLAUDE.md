@@ -948,19 +948,25 @@ don't restate them, apply them.
 
 ## Decision records (ADRs)
 
-**The set is THIRTEEN records — one per thing cage meters, plus one for what binds them all,
+**The set is FIFTEEN records — one per thing cage meters, plus one for what binds them all,
 one for the map of what each surface can and cannot yield, one for the surface it is all
 read through, one for the cross-agent question of who wrote which lines, one for
 proving nothing already recorded has changed, one for what may ever be deleted, one
-for the file that holds every decision you get to make, and one for the layers an
-agent reaches all of it through** —
+for the file that holds every decision you get to make, one for the layers an
+agent reaches all of it through, one for how measured tool combinations compare
+without ever faking the one that has no receipts yet, and one for which ledger a run's
+captured rows land in** —
 [ADR-LAWS](docs/adr/0001_laws.md) · [ADR-COVERAGE](docs/adr/0002_coverage.md) ·
 [ADR-CLI](docs/adr/0003_cli.md) · [ADR-CLAUDE](docs/adr/0004_claude.md) ·
 [ADR-COPILOT](docs/adr/0005_copilot.md) · [ADR-KIRO](docs/adr/0006_kiro.md) ·
 [ADR-CONSUMERS](docs/adr/0007_consumer.md) · [ADR-GRAPHIFY](docs/adr/0008_graphify.md) ·
 [ADR-AUTHORSHIP](docs/adr/0009_authorship.md) · [ADR-INTEGRITY](docs/adr/0010_integrity.md) ·
 [ADR-CLEANUP](docs/adr/0011_cleanup.md) · [ADR-CONFIG](docs/adr/0012_config.md) ·
-[ADR-LADDER](docs/adr/0013_ladder.md).
+[ADR-LADDER](docs/adr/0013_ladder.md) · [ADR-MATRIX](docs/adr/0014_matrix.md) ·
+[ADR-LEDGER](docs/adr/0015_ledger.md) —
+ADR-MATRIX ratified 2026-08-15, **nothing built yet** (`cage/matrixview.py` does not
+exist); ADR-LEDGER ratified **and shipped** 2026-08-15 (reverses ADR-KIRO's Kiro-IDE
+machine-ledger routing — see that record for the accepted cost).
 Index, the ownership table and the standing rule: [docs/adr/README.md](docs/adr/README.md).
 Author new ones from [docs/adr/TEMPLATE.md](docs/adr/TEMPLATE.md).
 
@@ -1127,25 +1133,33 @@ each agent only needs thin idiomatic wiring (`agents.py` orchestrates):
   global** (ADR-LAWS Law 2): `cage import` over a **resolved** ledger
   (`--ledger`/`CAGE_BASE` → project `.cage/` → global `~/.cage`, via `paths.resolve_root`)
   is the universal path that works with no hooks and no project.
-  **Kiro is the ONE exception to one-sink-per-sweep** ([ADR 0006](work/archive/adr/0006-kiro-rows-are-machine-facts-not-project-facts.md)):
-  its *IDE* log is a single global file with no project/session/ts, so those rows are a
-  **machine fact** and route to `~/.cage` — `paths.kiro_routed(root)` is the one predicate
-  (`None` ⇒ no routing; an explicit `--ledger`/`CAGE_BASE` or `CAGE_LEDGER` collapses the
-  two sinks, so the override wins for free). The leg (`importcmd._kiro_leg`) rebuilds every
-  per-root object against the sink — own `seen`, cursors, lock, health, capture-log,
-  manifest, `import_id` — and **completes before the sweep's own lock is taken**, so no
-  process ever holds two import locks; it deliberately does *not* write the sink's
-  `_last_import` (a partial leg is not a sweep, and it would throttle a later global
-  capture-on-read) and does not run cleanup there. Capture switches compose as **AND**
-  (project's *and* sink's). The summary line names the sink and the rollup counts only
-  local rows — a total never includes a row that landed elsewhere. Kiro's *CLI* store gets
-  the **opposite** fix: `conversations_v2` is keyed by cwd, so it is read scoped to the
-  project **tree** (`paths.kiro_cli_workspace`, prefix-matched on a separator boundary,
-  symlink-resolved — the real store keys `/tmp/x` as `/private/tmp/x`) and stamps the
-  additive-optional `project` on the credit row. Pre-existing duplicated rows are never
-  rewritten (append-only); the read side says why kiro is absent
-  (`report.kiro_routed_line`, doctor's timeline, `--paths`, `cage query kiro-routing`)
-  rather than showing nothing. Hooks are an optional
+  **Kiro was the ONE exception to one-sink-per-sweep, from 2026-08-01 to 2026-08-15 —
+  reversed by [ADR-LEDGER](docs/adr/0015_ledger.md).** Its *IDE* log is a single global
+  file with no project/session/ts; through 2026-08-15 those rows were a **machine fact**
+  routed unconditionally to `~/.cage` (`paths.kiro_routed(root)` returning the machine
+  ledger). **ADR-LEDGER made Law 2 exceptionless**: `paths.kiro_ledger(root)` now always
+  returns `root` itself, `paths.kiro_routed(root)` now always returns `None`, and
+  `importcmd._kiro_leg`/`_drop_routed_kiro_state` — the routed leg's own lock/cursors/
+  health/manifest/`import_id` machinery — are deleted, not just unreachable. Kiro's IDE
+  rows now capture through the same `run_agent(root, "kiro", ...)` path as claude and
+  copilot, into this run's one resolved ledger. **The accepted cost, named rather than
+  hidden**: the same underlying turn, imported from two different projects, is now
+  stored as a separate row in each ledger — ADR-LEDGER's Reference section carries the
+  field-probe measurement (22 of 28 rows in one workspace were actually another
+  workspace's turns) that this cost is weighed against. **`_import_rollup` excludes
+  kiro's collected rows unconditionally** (a fix that shipped in the same change): kiro's
+  metrics rows now reach the sweep's shared `collected` list like every other agent's,
+  and without that exclusion the rollup's `total` line would silently sum kiro's
+  not-summable IDE tokens into every project's report — a live regression this reversal
+  would otherwise have introduced, caught by `tests/test_kiro_routing.py` before it
+  shipped. Kiro's *CLI* store keeps the **opposite** fix, unaffected by this reversal:
+  `conversations_v2` is keyed by cwd, so it is read scoped to the project **tree**
+  (`paths.kiro_cli_workspace`, prefix-matched on a separator boundary, symlink-resolved —
+  the real store keys `/tmp/x` as `/private/tmp/x`) and stamps the additive-optional
+  `project` on the credit row. Pre-existing duplicated rows are never rewritten
+  (append-only); `chats.kiro_routed_line` now always returns `""` (there is nothing left
+  to explain — kiro rows are simply in the ledger you're looking at) but is kept as a
+  stable call site rather than deleted. Hooks are an optional
   CLI-only real-time add-on (they don't fire under a VS Code extension). **Capture-on-read**
   (capture-architecture Phase 1) makes a *read* the primary trigger: `report`/`insights *`/
   the MCP read tools call `importcmd.ensure_captured` before rendering (throttled on

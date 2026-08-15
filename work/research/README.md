@@ -13,6 +13,8 @@ Research is the sourced-findings twin of [`regression/`](../regression/), which 
 
 | doc | probed | finding |
 |---|---|---|
+| [AI cost/ROI measurement industry refs](2026-08-15-ai-cost-roi-measurement-refs.md) | 2026-08-15 | how enterprises measure AI cost/benefit and ROI in practice: 29% of execs can measure it confidently (IBM), 95% of GenAI pilots miss measurable P&L (MIT NANDA); Deloitte/BCG/Gartner/IBM ROI frameworks; FinOps token-unit cost tracking; DX Core 4 and "token cost per merged PR" as the closest coding-agent analogs. General reference, not tied to a fork |
+| [tool cost matrix ecosystem refs](2026-08-15-tool-cost-matrix-ecosystem-refs.md) | 2026-08-15 | external precedent for a "cost cell per tool-combination" view (Aider leaderboard, Langfuse/Helicone/LangSmith tag-segmented cost) and for cage's own gross-vs-net / measured-vs-modeled split (LLMLingua, Anthropic prompt caching); OTel GenAI semconv as the nearest token-attribution standard. Grounds the `MATRIX-REVIVAL` fork |
 | [chat-title store probes](2026-08-14-chat-title-store-probes.md) | 2026-08-14 | copilot CLI **does** carry a chat name — in `workspace.yaml`, a sibling of the `events.jsonl` cage reads (24/32 sessions). kiro CLI carries **none**: no title field at any depth, `latest_summary` NULL on all 20 rows. P0.2 of the ledger restructure |
 | [claude per-chat usage fetch spec](2026-08-13-claude-per-chat-usage-fetch-spec.md) | 2026-08-13 | what a per-chat usage read needs from the Claude Code store |
 | [copilot per-chat usage fetch spec](2026-08-13-copilot-per-chat-usage-fetch-spec.md) | 2026-08-13 | the same question for Copilot's two stores |

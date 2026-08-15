@@ -49,15 +49,14 @@ def _copilot_log(root):
 # ── one line per swept agent per real run ──────────────────────────────────────
 
 def test_real_import_appends_one_line_per_swept_agent(tmp_path, monkeypatch):
-    # One breadcrumb per agent, in the ledger that agent actually captured INTO: kiro's
-    # rows route to the machine ledger (ADR 0006), so its proof-of-capture lives there.
-    # A kiro line in the project's capture.log would claim a capture that didn't happen.
+    # One breadcrumb per agent, in the ledger that agent actually captured INTO. Since
+    # ADR-LEDGER (2026-08-15) that is THIS run's one active ledger for every agent,
+    # kiro included — no separate machine ledger to split the breadcrumbs across.
     root = _isolate(tmp_path, monkeypatch)
     _imp(root, "all")
     rows = _rows(root)
-    assert {r["agent"] for r in rows} == set(agents.SURFACES) - {"kiro"}
-    assert {r["agent"] for r in _rows(paths.global_home())} == {"kiro"}
-    for r in rows + _rows(paths.global_home()):
+    assert {r["agent"] for r in rows} == set(agents.SURFACES)
+    for r in rows:
         assert set(r) >= {"ts", "agent", "files_seen", "rows_new", "rows_total", "src"}
 
 
@@ -115,7 +114,8 @@ def test_no_op_throttled_read_appends_nothing(tmp_path, monkeypatch):
     pol = policy.load(None)
     importcmd.ensure_captured(root, args, pol=pol)  # first sweep — real, appends
     n_after_first = len(_rows(root))
-    assert n_after_first == len(agents.SURFACES) - 1  # kiro's breadcrumb is in ~/.cage
+    # Since ADR-LEDGER (2026-08-15) kiro's breadcrumb is HERE too — no separate ledger.
+    assert n_after_first == len(agents.SURFACES)
     summary = importcmd.ensure_captured(root, args, pol=pol)  # throttled — no sweep at all
     assert summary is None
     assert len(_rows(root)) == n_after_first  # not a single new line

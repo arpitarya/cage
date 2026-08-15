@@ -1088,10 +1088,10 @@ def import_kiro(root: Path, args, *, pol: dict | None = None, seen: set | None =
         #   1. `tokens_generated.jsonl` still has a reader — the same four fields, the
         #      same line-index+hash dedupe, the same import-time `ts` the `calls` rows
         #      had (`make_call` stamped `_now()` too). Nothing is lost in the move.
-        #   2. **ADR-KIRO's routing decision still has rows to route.** These land
-        #      machine-side unchanged: `import_kiro` already runs against the ROUTED SINK
-        #      as `root` when kiro routes away (`_kiro_leg` calls `run_agent(sink, ...)`,
-        #      ADR 0006), so the sink resolution below is the same one the leg used.
+        #   2. **These rows land in `root` — since 2026-08-15 that is just this sweep's
+        #      one resolved ledger, no different from claude/copilot** (ADR-LEDGER
+        #      retired the old machine-only routing; see that record for the accepted
+        #      cost of doing so).
         #   3. **The upgrade-watch keeps its baseline** — arriving `ide-log` rows are
         #      exactly what the day-devdata-ships `ide` rows get compared against, and
         #      doctor now counts the pair side by side.
@@ -1112,10 +1112,10 @@ def import_kiro(root: Path, args, *, pol: dict | None = None, seen: set | None =
         total_files += len(files)
     # KIRO-METRICS IDE leg (handoff §4.5): a single fixed file, not a glob — resolved
     # directly rather than through `_scan`/`agent_log_sources` (`paths.kiro_devdata_db`
-    # is deliberately not a registered source; see its docstring). `import_kiro` already
-    # runs against the ROUTED SINK as `root` when kiro routes away (`_kiro_leg` calls
-    # `run_agent(sink, "kiro", ...)`, ADR 0006), so these rows land machine-side with
-    # zero new routing code. Its return folds into `total_rows` like the `ide-log` leg
+    # is deliberately not a registered source; see its docstring). Since ADR-LEDGER
+    # (2026-08-15) `root` here is just this sweep's one resolved ledger — same as
+    # every other leg, no special-casing left. Its return folds into `total_rows` like
+    # the `ide-log` leg
     # above, and is 0 while `ide` is the unlisted half of the manifest pair — so the two
     # IDE stores can never both be counted into one reported number.
     devdata = paths.kiro_devdata_db()
@@ -1147,9 +1147,12 @@ def run_agent(root: Path, agent: str, args, *, pol: dict | None = None,
               import_id: str = "", names: dict | None = None,
               sink_note: str = "", authorship_cursor: dict | None = None) -> str:
     """Import one agent into ``root``. ``sink_note`` replaces the summary line's trailing
-    period when the rows landed in a ledger **other** than the sweep's own (the routed
-    kiro leg, ADR 0006) — the summary must never read as "into this project" for rows
-    that went elsewhere. Empty (the default) keeps the line byte-identical.
+    period when rows land in a ledger **other** than the sweep's own. Since ADR-LEDGER
+    (2026-08-15) retired the one leg that ever passed a non-empty value (the routed kiro
+    leg, formerly ADR 0006), every agent's rows now land in ``root`` itself — no caller
+    passes ``sink_note`` anymore and it is always the default. Kept in the signature as a
+    stable extension point rather than removed, should a future genuinely-routed capture
+    path need it again. Empty (the default) keeps the summary line byte-identical.
 
     ``authorship_cursor`` reaches **claude only**, and deliberately isn't accepted-and-
     ignored by the other two the way ``names`` is: copilot and kiro persist no edit
@@ -1178,7 +1181,24 @@ def _import_rollup(collected: list[dict], pol: dict, deduped: int) -> list[str]:
     actually appended (``collected`` — no second ledger read). Tokens only since
     USAGE-ONLY (ADR 0011): there is no price table left, so there is no priced/unpriced
     distinction to report. Returns [] when nothing was appended (an empty import stays
-    quiet)."""
+    quiet).
+
+    **Kiro's collected rows are excluded here, unconditionally** (ADR-KIRO: "Kiro
+    contributes no tokens to any total. That is the decision, stated, not a bug to
+    fix."). `collected` is shared with `_write_manifest` — a per-session audit trail
+    where recording kiro's rows is fine — but this function renders the one place cage
+    sums tokens *across* an import, and kiro's IDE/CLI metric grains are explicitly not
+    summable (coarse counters, sometimes cumulative, `ABSENT_SPINES["kiro"]`). Before
+    ADR-LEDGER (2026-08-15) this filter was never exercised in practice: kiro's rows
+    reached `collected` only when the sweep's own root happened to already be the
+    machine ledger, since every project sweep routed them through a separate leg with
+    its own `collected` list that never touched this function. Since ADR-LEDGER, every
+    project sweep's `collected` can carry kiro rows, so the filter is now load-bearing
+    on every real install with kiro configured — not just the previously-rare
+    no-project case."""
+    if not collected:
+        return []
+    collected = [r for r in collected if r.get("agent") != "kiro"]
     if not collected:
         return []
     # bucket key: (surface-name display, surface) — e.g. ("claude", ""), ("copilot", "cli")
@@ -1258,89 +1278,10 @@ def _write_manifest(root: Path, import_id: str, collected: list[dict], health: d
         debuglog.exception(root, "import.manifest", e, pol=pol)
 
 
-def _kiro_leg(root: Path, sink: Path, args, pol: dict) -> list[str]:
-    """The **routed kiro-IDE leg** (ADR 0006): capture kiro into ``sink`` (the machine
-    ledger) while the rest of the sweep captures into ``root``.
-
-    `run` is built on "one active sink per run — never a double-write", and this
-    deliberately breaks that for one agent. It is a *contained* leg, not a rewrite: every
-    per-root object `run` builds is rebuilt here against ``sink`` — its own `seen` set (or
-    kiro would dedupe against the wrong ledger and re-append every run), its own cursors
-    (the high-water skip must be relative to the sink), its own lock, health, capture-log
-    breadcrumb, manifest and `import_id`. Nothing crosses between the legs, so the sweep's
-    own counts can never include a row that landed here.
-
-    **Locking.** The leg's lock is taken and released entirely inside this function,
-    *before* `run` takes the project's — no process ever holds two import locks, so the
-    hold-and-wait edge a deadlock needs never exists (two projects importing at once
-    simply serialize on the machine ledger). The same-process double-lock case is excluded
-    upstream: when the two ledger dirs coincide, `paths.kiro_routed` returns ``None`` and
-    there is no second leg at all.
-
-    **Which policy governs what.** Sources come from ``pol`` (the sweep's own config) —
-    routing changes where rows *land*, never which file cage *reads*. The sink's own
-    policy governs the sink's economics: its capture switch and its prices (the manifest's
-    recorded cost). The capture switches **compose as AND** — the most restrictive wins,
-    the only composition that honours both stated intents: a project that paused metering
-    meant "not for this work", and a machine ledger that paused it meant "not to my
-    machine ledger", and neither may be overridden by the other.
-
-    Two things `run` does that this leg deliberately does **not**: it never writes the
-    sink's ``_last_import`` (a kiro-only leg is not a full sweep — claiming one would both
-    lie to `doctor` and throttle a later global capture-on-read out of sweeping claude/
-    copilot), and it never runs cleanup there (the sink gets that when it is the active
-    sink). Fail-open throughout, like every other capture path."""
-    foot = paths.Footprint(sink)
-    gpol = _load_policy(sink)
-    on_here, on_sink = policy.capture_enabled(pol), policy.capture_enabled(gpol)
-    # One routing event in the SWEEP's debug log (not just the sink's): the leg's own
-    # `_scan`/`_ingest` traces land in `sink`, so without this a `CAGE_DEBUG=1 cage import`
-    # run from a project would show kiro simply vanishing — the exact silent-routing
-    # failure this design otherwise fixes.
-    debuglog.event(root, pol=pol, event="import", agent="kiro", route="sink",
-                   sink=str(foot.base), capture_here=on_here, capture_at_sink=on_sink)
-    where = _tilde(str(foot.base))
-    if not on_sink:
-        debuglog.event(root, pol=pol, event="import", agent="kiro", route="sink",
-                       skip="capture-disabled-at-sink", sink=str(foot.base))
-        return [f"· kiro → {where}: capture is disabled at the machine ledger "
-                f"([capture] enabled=false / CAGE_CAPTURE=0) — not imported"]
-    with _import_lock(foot, pol):
-        cursors = _load_cursors(foot)
-        all_rows = ledger.calls(sink)
-        seen = {c.get("id") for c in all_rows}
-        captured = ledger.captured_surfaces(sink)   # the twin of gate 3 above (P5)
-        health: dict = {}
-        collected: list[dict] = []
-        from cage import manifest
-        # Its own import_id: each ledger's manifest must be internally consistent, and one
-        # id spanning two ledgers would claim the two row sets were one.
-        import_id = manifest.new_import_id()
-        note = (f" → {where} (machine ledger; kiro's log carries no project "
-                f"— `cage query kiro-routing`).")
-        line = run_agent(sink, "kiro", args, pol=pol, seen=seen,
-                         agent_cursor=cursors.setdefault("kiro", {}), health=health,
-                         collect=collected, import_id=import_id, sink_note=note)
-        _write_manifest(sink, import_id, collected, health, gpol, _now_iso())
-        # `pol`, not `gpol`: "is kiro a configured source?" is a question about the sweep's
-        # own registry — the one this leg actually read from.
-        _record_health(sink, cursors, health, captured, ("kiro",), pol)
-        _record_capture_log(sink, health, ledger.spend(sink) + all_rows, ("kiro",))
-        _save_cursors(foot, cursors)  # NB: `_last_import` deliberately untouched
-    return [line]
-
-
-def _drop_routed_kiro_state(cursors: dict) -> None:
-    """Drop the sweep-root cursor/health entries kiro leaves behind once its rows route to
-    the machine ledger (ADR 0006). Both would otherwise **lie**: a stale ``_health["kiro"]``
-    re-fires report/doctor's "installed but capturing nothing" ⚠ forever (kiro is capturing
-    fine — elsewhere), and a stale file-signature high-water mark records a skip against a
-    sink that no longer receives the rows. Idempotent; the read side explains kiro's
-    absence in its place (`report.kiro_routed_line`)."""
-    cursors.pop("kiro", None)
-    hb = cursors.get("_health")
-    if isinstance(hb, dict):
-        hb.pop("kiro", None)
+# NOTE (ADR-LEDGER, 2026-08-15): `_kiro_leg` and `_drop_routed_kiro_state` — the routed
+# machine-ledger capture leg and its sweep-root cleanup — were retired here. Kiro's IDE
+# rows now capture through the same `run_agent(root, "kiro", ...)` path as every other
+# agent, into whichever ledger is active for the run. See docs/adr/0015_ledger.md.
 
 
 def _load_policy(root: Path) -> dict:
@@ -1379,9 +1320,9 @@ def _rescan_metrics_line(before: dict[str, int], after: dict[str, int]) -> list[
     Stated even when the answer is zero — the whole reason the flag exists is that a
     silently-skipped store is indistinguishable from an empty one (METRICS-CURSOR-BLIND),
     so a rescan that finds nothing must SAY it found nothing rather than look like a
-    no-op that ran. It never claims a row that landed in another sink: kiro's routed IDE
-    leg completes before this sweep's lock and reports itself (ADR 0006), exactly as the
-    call rollup does."""
+    no-op that ran. Since ADR-LEDGER (2026-08-15) every agent's rows, kiro's IDE included,
+    land in this same ``root`` — there is no other sink a row could have landed in
+    instead, so this line's before/after counts are already the whole picture."""
     added = {k: after.get(k, 0) - before.get(k, 0) for k in sorted(after)}
     total = sum(added.values())
     per = " · ".join(f"{k} +{n:,}" for k, n in added.items())
@@ -1398,13 +1339,12 @@ def run(root: Path, agent: str, args) -> list[str]:
     fired anywhere — including a user-level Copilot hook in a repo with no ``.cage/`` —
     lands in the one resolved ledger and never scatters a stray local footprint.
 
-    **One exception, by decision:** kiro's *IDE* rows are a machine fact, not a project
-    fact, so they route to the machine ledger ([ADR 0006](work/archive/adr/0006-kiro-rows-are-machine-facts-not-project-facts.md))
-    — the one place this sweep writes two ledgers. That leg is fully contained in
-    `_kiro_leg` (own lock, `seen`, cursors, health, manifest), runs to completion before
-    this function's own lock is taken, and its counts never enter this sweep's rollup or
-    manifest: a summary line here can never claim a row that landed elsewhere. Everything
-    below is otherwise per-``root`` exactly as before. Honors the
+    **No exceptions, since [ADR-LEDGER](../docs/adr/0015_ledger.md) (2026-08-15).** Kiro's
+    IDE leg used to route to the machine ledger unconditionally (the former ADR-KIRO
+    *machine-fact* rule, `docs/adr/0006_kiro.md`) — the one place this sweep ever wrote
+    two ledgers in one run. ADR-LEDGER retired that as the sole exception to Law 2:
+    every agent, kiro's IDE leg included, now writes into exactly the one ``root`` this
+    function resolved, via the same `run_agent` loop below. Honors the
     consumer's capture switch (`[capture] enabled` / `CAGE_CAPTURE`): when off, hooks still
     fire but this no-ops, pausing metering without unwiring anything. The ledger ``seen``
     set and the per-agent cursors are built once and shared across every agent (one ledger
@@ -1444,23 +1384,11 @@ def run(root: Path, agent: str, args) -> list[str]:
     for line in nopg:
         debuglog.event(root, pol=pol, event="import", agent=agent, skip="no-path-globs",
                        detail=line)
-    # ── the routed kiro leg (ADR 0006) ───────────────────────────────────────────
-    # Kiro's IDE log is one global file with no project dimension, so its rows are a
-    # machine fact and land in the machine ledger. The leg runs to completion HERE —
-    # its lock is released before the project's is taken, so no process ever holds two
-    # (see `_kiro_leg`). Its summary line is rendered below with the other agents', but
-    # its counts never enter this sweep's `collected`/rollup/manifest/health.
-    kiro_sink = paths.kiro_routed(root) if "kiro" in targets else None
-    routed: list[str] = []
-    if kiro_sink is not None:
-        routed = _kiro_leg(root, kiro_sink, args, pol)
-        targets = tuple(t for t in targets if t != "kiro")
-    if not targets:  # a kiro-only import that routed away — nothing left to do here
-        return nosrc + nopg + routed
+    # Kiro's IDE leg no longer routes anywhere (ADR-LEDGER, 2026-08-15) — it is just
+    # another member of `targets`, captured by the same `run_agent` loop below into
+    # this run's one resolved `root`, exactly like claude and copilot.
     with _import_lock(foot, pol):
         cursors = _load_cursors(foot)
-        if kiro_sink is not None:  # kiro captures elsewhere now — its state here would lie
-            _drop_routed_kiro_state(cursors)
         # One shared read: `calls` for the id-dedupe `seen` set (call ids only ever
         # existed there), and the spend basis for the counts the breadcrumb reports.
         all_rows = ledger.calls(root)
@@ -1495,7 +1423,6 @@ def run(root: Path, agent: str, args) -> list[str]:
                            collect=collected, import_id=import_id, names=names,
                            authorship_cursor=authorship)
                  for a in targets]
-        lines += routed  # kiro's line, in SURFACES order, naming the ledger it landed in
         # Custom tools ([sources.<name>], plan Phase 4) sweep on the umbrella `all`
         # import — the global capture path that grabs the whole stack.
         if agent == "all":

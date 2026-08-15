@@ -3,7 +3,11 @@ adr: authorship
 status: RATIFIED 2026-08-14 (Arpit) · **decisions accepted, three of them NOT YET BUILT** —
   the `COVERAGE_GAPS` strings still assert the corrected-away structural claim, `coverage_note()`
   does not name the retention wall, and the `declared` column does not exist. What IS built —
-  the claude line-match path, the four buckets, the provenance buffer and notes distribution
+  the claude line-match path, the four buckets, the provenance buffer and notes distribution ·
+  **2026-08-15 — the shape the four missing parsers should take is now specified (§2), on
+  Arpit's explicit instruction to design ahead of building — still NOT built** · **2026-08-15
+  — §1's flow diagram (+ ASCII twin) redrawn to a three-lane fan-in (claude built · copilot
+  and kiro designed, not built) instead of one collapsed "agent stores" box**
 audience: §1 humans (skim) · §2 agents (build)
 update-rule: ANY change to authorship — a new agent parser, the matcher, the min-content gate, a provenance field, a rendered bucket, or a `COVERAGE_GAPS` entry — updates this doc in the same change, and bumps its DOC-REGISTRY row
 ---
@@ -47,37 +51,49 @@ absences, never one rounded to zero.
   "this looks AI-written". The measured accuracy of that whole family is at or below
   guessing on exactly the kind of code a commit contains — the numbers are in §2.
 - **Today only Claude Code has a parser. That is a gap, not a law.** Copilot's and Kiro's
-  stores *do* carry the text of a proposed edit; nobody has written the reader yet.
+  stores *do* carry the text of a proposed edit; nobody has written the reader yet. The
+  shape each of the four missing readers should take is specified below (§2, 2026-08-15) —
+  still unbuilt.
 
 ### The flow
 
 ```mermaid
 flowchart LR
-    S["agent stores<br/>3 agents x cli/ide"] --> P["parse_edits<br/>claude parser only, today"]
-    P --> M["linematch<br/>bodies live in memory<br/>for one import"]
+    subgraph built["Built"]
+        C["claude · cli + ide<br/>~/.claude/projects<br/>native line blocks"]
+    end
+    subgraph designed["Designed 2026-08-15, NOT built<br/>— signal exists, no reader yet"]
+        CP["copilot · cli + vscode<br/>events.jsonl · chatSessions"]
+        K["kiro · ide + cli<br/>globalStorage · data.sqlite3"]
+    end
+    C --> N
+    CP --> N
+    K --> N
+    N["parse_edits / diff normalizer<br/>→ one shape: {file, ts, lines, context}"] --> M["linematch<br/>bodies live in memory<br/>for one import"]
     G["git · the commit's<br/>added lines"] --> M
     M --> R["provenance.jsonl<br/>five counts, no bodies,<br/>no hashes"]
     R --> V["commitview<br/>agent · human~ ·<br/>unattributed · unknown"]
     T["git · the commit message"] -.->|"read at render<br/>never stored"| V
-    S -.->|"no parser yet<br/>NOT no signal"| X["copilot · kiro"]
 ```
 
 <details><summary>Same diagram, ASCII</summary>
 
 ```text
-  agent stores  ---->  parse_edits  ---->  linematch  ---->  provenance.jsonl
-  (3 agents x          (claude parser      (bodies in        (five counts,
-   cli/ide)             only, today)        memory for        no bodies,
-      |                                     one import)       no hashes)
-      |                                         ^                  |
-      |                                         |                  v
-      |                            git . the commit's         commitview
-      |                              added lines             agent | human~ |
-      |                                                   unattributed | unknown
-      |                                                            ^
-      +-- no parser yet ----> copilot . kiro                       |
-          (NOT no signal)                     git . the commit message
-                                              read at render, never stored
+  BUILT
+    claude . cli+ide (~/.claude/projects, native lines)  --+
+                                                             \
+  DESIGNED 2026-08-15, NOT built -- signal exists              parse_edits /        linematch          provenance.jsonl
+    copilot . cli+vscode (events.jsonl, chatSessions)    ---+->diff normalizer --> (bodies in   -----> (five counts,
+    kiro . ide+cli (globalStorage, data.sqlite3)          --+  -> one shape:        memory for          no bodies,
+                                                                {file,ts,lines,      one import)         no hashes)
+                                                                 context}               ^                    |
+                                                                                         |                    v
+                                                                            git . the commit's          commitview
+                                                                              added lines               agent | human~ |
+                                                                                                      unattributed | unknown
+                                                                                                                ^
+                                                                                          git . the commit message
+                                                                                          read at render, never stored
 ```
 </details>
 
@@ -209,6 +225,80 @@ inferred from the code. Where a parser is merely unbuilt, the gap says so.**
 > **`agent%` reads counts rather than re-deriving them, so it surfaces as a different
 > percentage**, which is why each reader has its own test.
 
+> **⟲ Parser design (2026-08-15, ratified — NOT built) — the shape the four missing
+> readers should take.** The build order (copilot · CLI → kiro · IDE → kiro · CLI →
+> copilot · VS Code) was already decided; this fixes *how* each one works, so a future
+> session builds against a design rather than inventing one per parser.
+>
+> **The pipeline downstream of the parser is unchanged.** `authorcapture._bucket_edits`/
+> `_uncovered`, `linematch.match_commit` and `originrecord.record_transcript` already
+> consume one shape — `{session, file, ts, cwd, lines, context}`, exactly what
+> `transcript.parse_edits` produces — and know nothing about claude specifically. A new
+> source is a new function returning that same shape; `authorcapture.py`'s hard-coded
+> `AGENT = "claude-code"` becomes a short `(agent, source_fn)` list, one entry per store,
+> each removing itself from `COVERAGE_GAPS` on landing.
+>
+> **Two shapes of source data, one normalizer.** Claude's `Edit`/`MultiEdit` blocks
+> already carry `new_string`/`old_string` as native line lists — today's `lines`/
+> `context` read straight off them (`_proposed_lines`/`_context_lines`). None of the
+> four missing stores work that way: kiro IDE's `actions[type=replace]`
+> (`input.originalContent` → `input.modifiedContent`), kiro CLI's `fs_write`
+> (`file_text` for a whole-file write, or `old_str`→`new_str` for a patch) and copilot
+> VS Code's `chatEditingSessions` blob pair (`contents/<originalHash>` →
+> `contents/<currentHash>`) are all **whole-file or whole-block before/after pairs**,
+> with no native "lines proposed" list. Their `lines`/`context` are derived by a line
+> diff (`difflib`) computed **transiently, inside the parser, and discarded the moment
+> counts are produced** — one shared normalizer, not one per parser, on the same
+> "normalization is ONE function applied to both sides" rule `linematch.normalize`
+> already states for matching. Copilot CLI is the open question: whether it needs this
+> normalizer or already carries a native line list is undecided until the first live
+> capture of its write-tool event (still unconfirmed — see Reference).
+>
+> **Copilot CLI** — a sibling reader to `graphifytx.detect_and_file_copilot`, same store
+> (`~/.copilot/session-state/<id>/events.jsonl`), same mechanics: `tool.execution_start`/
+> `tool.execution_complete` paired by `data.toolCallId`, cwd from `session.start`'s
+> `data.context.cwd` — field names verified live on Copilot CLI 1.0.65 for the `bash`
+> tool, reused here filtered on the write tool instead. `ts` is the event's own
+> timestamp, never import time, matching the rule `parse_edits` already states for
+> placing an edit inside a commit's window.
+>
+> **Kiro IDE** — scan `globalStorage/kiro.kiroagent/**/*` for JSON containing
+> `"executionId"`; never hard-code the hex directory names, which are per-install. Read
+> `actions[]` where `actionType=="replace"`, diff `input.originalContent` →
+> `input.modifiedContent`. No retention policy is the reach prize and the risk in the
+> same fact — real installs report 8.2–38GB of accumulation — so the reader must stream
+> one action at a time and discard each body immediately after diffing, never buffer a
+> directory's contents, and needs its own cursor entry keyed **per blob file**
+> (mirroring `_authorship`'s `[size, mtime, covered]` shape), not per top-level hex
+> directory, since the files inside those directories are what change.
+>
+> **Kiro CLI** — a sibling to `transcript._kiro_cli_tool_runs`, **not a reuse of it**:
+> the same read-only `sqlite3.connect(...mode=ro&immutable=1...)` access and the same
+> `_under(key, workspace)` cwd-tree scoping `parse_kiro_cli_credits`/
+> `parse_kiro_cli_tool_runs` already establish against `conversations_v2`, but filtered
+> on `fs_write`-shaped `ToolUse` entries instead of `execute_bash` ones, reading
+> `path`/`file_text` (a whole-file write) or `old_str`/`new_str` (a patch) into the same
+> diff normalizer as kiro IDE. The store is already open every sweep for credits; this
+> read is additive, not a new connection.
+>
+> **Copilot VS Code** — read `chatSessions/*.jsonl`'s `IChatTextEditGroup.edits` /
+> `toolInvocationSerialized.toolSpecificData.rawInput` for the per-turn signal, but the
+> before/after bodies live in `chatEditingSessions/state.json` →
+> `contents/<originalHash|currentHash>`, and that store **self-deletes on
+> `clearState()` at session stop**. This is the one surface where the existing cursor
+> strategy — leave a file "uncovered" until its edits land in a commit, re-read next
+> sweep — does not hold: by the time a commit lands, the source may already be gone.
+> Correctness here depends on capture cadence, not just on the parser existing, which is
+> why this item already pairs with **CONTINUOUS-CAPTURE** (`work/OPEN-WORK.md`,
+> ADR-CLI). A parser that is technically correct but reads too late silently
+> under-counts the same way an unmatched commit does today, with no signal it happened.
+>
+> **What this does not change.** `[authorship] capture` / `CAGE_AUTHORSHIP` gates all
+> four readers identically to the claude one — reading a diff is reading code, the same
+> permission question regardless of which store holds it. The matcher, the min-content
+> gate, the four buckets, the counts and the fail-open discipline are untouched; only the
+> parser layer grows.
+
 ### Alternatives rejected
 
 - **Infer the share from the diff** (classifier, blame shape, whitespace stylometry). The
@@ -263,6 +353,19 @@ VS Code's before/after blob store confirmed at source; copilot CLI confirmed fro
 schema shipped in its own package but **not yet from a live file**; kiro from two
 independent third-party parsers, never from AWS.
 
+The 2026-08-15 parser design grounds each store's read mechanics in code already
+shipped for a different question, not invented fresh: `graphifytx.
+detect_and_file_copilot` (copilot CLI's `tool.execution_start`/`_complete` pairing by
+`toolCallId`, verified against a live Copilot CLI 1.0.65 store) and `transcript.
+_kiro_cli_tool_runs`/`parse_kiro_cli_credits` (kiro CLI's read-only `conversations_v2`
+access and `_under`-based cwd-tree scoping, ratified as the tool-run carve-out) are the
+existing precedent for *how to read the store*; only the tool-call filter and the
+extracted fields differ for authorship. An external pass the same day (git-ai's
+`git_ai_standard_v3.0.0` spec, `refs/notes/ai`) independently converged on the same
+substrate choice (git notes, per-commit truth) while storing line *ranges* rather than
+cage's counts-only shape — one rung less conservative than this record's own
+counts-never-content law permits.
+
 ### Veto condition (when to revisit)
 
 **1 — Falsifiable triggers, numbered, each landing somewhere named.**
@@ -283,12 +386,21 @@ independent third-party parsers, never from AWS.
    other spelling. Trigger: any commit here carrying the new spelling.
 6. **A gap entry returns to structural** only with a probe cited. It never reverts to an
    unsourced claim — the failure this record was written to correct.
+7. **The diff-to-edit normalizer** (kiro IDE, kiro CLI, copilot VS Code) reopens only if
+   a vendor is confirmed to expose a native line-list block instead of a whole-file
+   before/after pair — that source then skips the normalizer entirely, exactly as claude
+   does today. A store must be read live to fire this; an argument does not.
+8. **Copilot CLI's parser shape** (native lines vs. the shared diff normalizer) stays
+   undecided until the first live capture of `events.jsonl`'s write-tool event — still
+   unconfirmed per this record's own Reference section, and unchanged by the 2026-08-15
+   external research pass. Reopens on that one capture, not before.
 
 **2 — Contingent vs. invariant.**
 
 - **Contingent (auto-revisits on evidence):** every `COVERAGE_GAPS` entry; the build
   order; the matcher and its `MIN_MATCH_CHARS` gate (both still triggered from ADR-CLAUDE,
-  and both landing in `linematch.match_file` alone).
+  and both landing in `linematch.match_file` alone); the diff-to-edit normalizer's
+  applicability per store; copilot CLI's exact parser shape (trigger 8).
 - **Invariant (moves only by ratified reversal of this record):** the human is never
   measured, only residual · unknown is never redistributed · no line body and no line hash
   is ever persisted · a declaration is never placed on the measurement ladder.
@@ -305,3 +417,9 @@ independent third-party parsers, never from AWS.
 - **Recomputing ADR-COVERAGE's matrix from the code tables.** Nothing does, so drift
   between that record and `COVERAGE_GAPS` is caught by review alone. That was how the
   defect above survived; naming it here is the interim mitigation, not a fix.
+- **A per-store `AUTHORSHIP_PARSERS` registry object, built now.** One live source
+  (claude) plus a hard-coded second does not yet prove the right abstraction boundary —
+  the same reasoning ADR-GRAPHIFY gives for its own hand-paired twin pair ("templating
+  stays off the table until a third interceptor exists and shares a syntax family with
+  an existing one"). Decide the registry shape when copilot · CLI, the second source,
+  actually lands — not before. Threshold: two live sources.

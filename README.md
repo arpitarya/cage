@@ -246,7 +246,7 @@ Every derived view is parse / arithmetic over the log — **no LLM call, ever, o
 
 Latest release below — full history and detail in [CHANGELOG.md](CHANGELOG.md).
 
-- **v0.51.1 — the CI-only test tooling had gone stale, and nothing local could see it.** No cage behaviour changed; this ships so the **`cage.pyz` release asset** is attached again. `main` had sat 42 commits unpushed across all of v0.50 and v0.51, so the release push was the first time any of it ran on CI — and both broken tools (`tools/dummyrepo`, `tools/cigraphify`) are CI-only, so `just test` stayed green throughout. ([CHANGELOG](CHANGELOG.md))
+- **v0.52.0 — ADR-LEDGER: Kiro's IDE token rows stop routing to the machine ledger.** Every source now captures into the one ledger a `cage import` run resolves — Claude, Copilot, Kiro CLI and Kiro IDE alike — reversing the one exception ADR-KIRO carved into "one sink per run." The accepted cost: the same Kiro IDE turn can now land as a separate row in more than one project's ledger. Also ships ADR-MATRIX, the ratified (not yet built) design for a token-cost view across tool combinations. ([CHANGELOG](CHANGELOG.md))
 
 ## The name
 

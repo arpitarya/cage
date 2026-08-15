@@ -88,3 +88,16 @@ Naming: `<topic>.compare.md`. Written in short points, not walls of prose.
   prose/missing-registry drift no table-diff generator reaches), **with B shippable
   separately on its own merits** since it is cheap and would have caught STRIKE 1 outright.
   Awaiting Arpit's accept or override.
+- [tool-combination-matrix.compare.md](tool-combination-matrix.compare.md) —
+  **MATRIX-REVIVAL**: Arpit asked for a token-cost matrix across tool combinations
+  (vanilla agent / +graphify / +graphify+caveman — caveman a proposed, unbuilt Tier-2
+  compressor). That view, `cage insights matrix`/`compare`, was deleted in SURFACE-CUT
+  (v0.50.0) — but its join engine (`taskgroup.py`, stack-signature grouping) survived,
+  still fed by live data. Four options (leave it cut · revive as a new narrow tokens-only
+  view · fold into `insights commits` as a flag · park until caveman is designed).
+  **DECIDED — B accepted by Arpit 2026-08-15, ratified as
+  [ADR-MATRIX](../../docs/adr/0014_matrix.md)**: a new `cage/matrixview.py` on
+  `taskgroup.join`, measured rows only, a caveman row that's honestly `0 tasks` until it
+  files receipts, never money-coupled like the deleted `compare.py` was. **Not built** —
+  tracked in [OPEN-WORK.md](../OPEN-WORK.md) under ADR-MATRIX. Also named doc-drift:
+  `docs/example/cli.md` still lists `cage insights matrix` as live.

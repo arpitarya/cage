@@ -96,38 +96,17 @@ def _is_legacy_human(r: dict) -> bool:
 
 def kiro_routed_line(root: Path, pol: dict | None = None,
                      verb: str = "insights chats") -> str:
-    """The footer line explaining why a **project** view shows no kiro (ADR 0006): its
-    IDE rows are a machine fact and live in the machine ledger. ``""`` when kiro is not
-    routed away (the machine ledger's own view, or an explicit ``--ledger``), or when
-    kiro isn't a configured source here — nothing to explain in either case.
+    """Always ``""`` since ADR-LEDGER (2026-08-15): kiro's IDE rows now capture into
+    this run's one active ledger, the same as every other agent, so there is never a
+    separate machine sink to explain away. Formerly (ADR 0006, superseded) this was the
+    footer line telling a **project** view why it showed no kiro — its IDE rows were a
+    machine fact routed to `~/.cage`. Kept as a stable call site: `paths.kiro_routed`
+    is itself now an always-``None`` stub, so this degrades automatically.
 
-    Silence would be the one unacceptable outcome: an agent that shows no rows is
-    indistinguishable from an agent whose capture is broken, which is the failure cage
-    exists to prevent. Impure (it resolves paths), so it is read at the CLI boundary and
-    passed into the pure renderers, like `health` and `ceiling`. Deliberately does
-    **not** read the machine ledger to count rows: a per-view cross-ledger read to
-    decorate a footnote is not worth it, and the line is true either way.
-
-    ``verb`` is the command the runnable fix should name, so the *one* phrasing can be
-    reused by any view that shows no kiro (`cage insights graphify` passes its own). It
-    varies the fix line only — the explanation itself is never re-worded per view, the
-    `savings.GROSS_NOTE` discipline.
-
-    Rescued verbatim from the deleted `report.py` in SURFACE-CUT; its two surviving
-    callers are `cage insights chats` and `cage insights graphify`."""
-    from cage import paths
-    sink = paths.kiro_routed(root)
-    if sink is None:
-        return ""
-    try:
-        if not any(s.agent == "kiro" for s in paths.resolve_log_sources(pol).sources):
-            return ""
-    except Exception:  # noqa: BLE001 — a broken [sources] table is reported elsewhere
-        return ""
-    return (f"· kiro is not counted here — its IDE log carries no project, so its rows "
-            f"are a machine fact and live in {paths.Footprint(sink).base}\n"
-            f"  (`cage query kiro-routing`; read them with "
-            f"`cage --ledger {paths.Footprint(sink).base} {verb}`)")
+    Its two surviving callers are `cage insights chats` and `cage insights graphify`;
+    ``verb`` is preserved in the signature for source compatibility, though it is
+    currently unused."""
+    return ""
 
 
 _NO_SESSION = "(no session)"

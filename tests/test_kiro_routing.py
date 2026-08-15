@@ -1,20 +1,25 @@
-"""Kiro capture routing — two stores, two opposite fixes (ADR 0006).
+"""Kiro capture routing — two stores, ADR-LEDGER unified the fix (2026-08-15).
 
-- **IDE** (`tokens_generated.jsonl`): one global file with no project/session/timestamp,
-  so its rows are a *machine* fact and route to the machine ledger. One copy per machine
-  ⇒ double-counting is impossible by construction. Since KIRO-CALLS-LEG (ratified
-  2026-08-15) those rows land as kiro-METRICS rows (`ledger/kiro/`, `source="ide-log"`)
-  rather than `calls` rows — **the routing decision this file pins is unchanged**, which
-  is the point: the sink resolution never depended on the row kind, and asserting it
-  through the new kind is what proves that.
+- **IDE** (`tokens_generated.jsonl`): one global file with no project/session/timestamp.
+  From 2026-08-01 to 2026-08-15 (ADR-KIRO, since reversed) these rows were a *machine*
+  fact routed unconditionally to `~/.cage`. **ADR-LEDGER reversed that**: IDE rows now
+  capture into whichever ledger is active for the run, exactly like every other agent —
+  no separate sink, no special-casing. The accepted cost is the mirror image of the old
+  guarantee: the SAME underlying turn, imported from two different projects, is now
+  stored as a separate row in each one. Since KIRO-CALLS-LEG (ratified 2026-08-15) those
+  rows land as kiro-METRICS rows (`ledger/kiro/`, `source="ide-log"`) rather than `calls`
+  rows — that relocation is orthogonal to this file's routing tests and unaffected by
+  ADR-LEDGER.
 - **CLI** (`conversations_v2` SQLite): keyed by the cwd it ran in, with a real
-  conversation id — genuinely project-attributable, so it gets the opposite treatment:
-  scoped to the project tree and stamped with `project`.
+  conversation id — genuinely project-attributable, so it always got (and still gets)
+  the opposite treatment: scoped to the project tree and stamped with `project`. **This
+  half is completely unaffected by ADR-LEDGER** and its tests are unchanged below.
 
-The load-bearing risk this file exists to pin is the *collateral*: `importcmd.run` was
-built on "one active sink per run", and the IDE half deliberately breaks it. So the
-claude/copilot legs are asserted **byte-identical**, and the sweep summary is asserted
-never to count a row that landed in another ledger.
+The load-bearing risk this file exists to pin, post-reversal, is that IDE rows land in
+the SAME ledger as claude/copilot with no collateral: no second lock, no second policy
+file, no leftover branch that still tries to route somewhere else. So the claude/copilot
+legs are asserted **byte-identical** whether or not a kiro log is present, and the sweep
+summary is asserted to count kiro's rows exactly like every other agent's.
 """
 from __future__ import annotations
 
@@ -79,30 +84,36 @@ def _shards(root):
 
 # ── the resolver: one place the rule lives ────────────────────────────────────
 
-def test_kiro_sink_is_the_machine_ledger_from_inside_a_project(tmp_path, monkeypatch):
+def test_kiro_sink_is_always_the_runs_own_active_ledger(tmp_path, monkeypatch):
     root = _isolate(tmp_path, monkeypatch)
-    assert paths.kiro_ledger(root) == paths.global_home()
-    assert paths.kiro_routed(root) == paths.global_home()
+    assert paths.kiro_ledger(root) == root      # ADR-LEDGER: never a separate sink
+    assert paths.kiro_routed(root) is None       # nothing to route, ever
 
 
-def test_no_routing_when_the_machine_ledger_is_already_the_active_sink(tmp_path, monkeypatch):
-    # No project ⇒ the sweep root IS the machine ledger ⇒ nothing to route, and (the
-    # reason this matters) no second lock on a file this process already holds.
+def test_kiro_sink_is_the_active_ledger_with_no_project_too(tmp_path, monkeypatch):
+    # No project ⇒ the sweep root IS the machine ledger, same as before — but now that's
+    # true because it's just `resolve_root`'s normal answer, not because of any kiro-
+    # specific fallback.
     monkeypatch.chdir(tmp_path)
     g = paths.global_home()
+    assert paths.kiro_ledger(g) == g
     assert paths.kiro_routed(g) is None
 
 
-def test_explicit_ledger_override_always_wins(tmp_path, monkeypatch):
+def test_explicit_ledger_override_still_wins_trivially(tmp_path, monkeypatch):
+    # Kept post-reversal: `kiro_ledger` must still answer with the run's OWN root under
+    # an override, not silently ignore it — even though there is no longer a second sink
+    # for the override to out-rank.
     root = _isolate(tmp_path, monkeypatch)
     monkeypatch.setenv("CAGE_BASE", str(tmp_path / "lab" / ".cage"))
-    assert paths.kiro_routed(root) is None      # cage never routes around a named sink
+    assert paths.kiro_routed(root) is None
     assert paths.kiro_ledger(root) == root
 
 
-def test_cage_ledger_dir_override_also_collapses_the_legs(tmp_path, monkeypatch):
-    # CAGE_LEDGER re-points the ledger dir alone: both "sinks" are then the same files,
-    # so there is nothing to route (compared on the resolved ledger dir, not the root).
+def test_cage_ledger_dir_override_changes_nothing_about_routing(tmp_path, monkeypatch):
+    # CAGE_LEDGER re-points the ledger dir alone; `kiro_routed` is a constant now, so this
+    # exercises no special interaction — it is pinned so a future re-introduction of a
+    # routing branch is caught immediately by this case too.
     root = _isolate(tmp_path, monkeypatch)
     monkeypatch.setenv("CAGE_LEDGER", str(tmp_path / "shared-ledger"))
     assert paths.kiro_routed(root) is None
@@ -110,40 +121,47 @@ def test_cage_ledger_dir_override_also_collapses_the_legs(tmp_path, monkeypatch)
 
 # ── the routing itself ────────────────────────────────────────────────────────
 
-def test_ide_rows_land_in_the_machine_ledger_not_the_project(tmp_path, monkeypatch):
+def test_ide_rows_land_in_the_project_ledger_not_a_machine_sink(tmp_path, monkeypatch):
     root = _isolate(tmp_path, monkeypatch)
     _kiro_log(2)
     importcmd.run(root, "all", _args())
-    assert _kiro_rows(root) == [] and ledger.calls(root) == []
-    assert len(_kiro_rows(paths.global_home())) == 2
+    assert len(_kiro_rows(root)) == 2 and ledger.calls(root) == []
+    # No separate machine ledger was ever touched by this sweep.
+    assert not (paths.global_home() / ".cage" / "ledger").exists()
 
 
-def test_two_projects_one_machine_records_the_turn_exactly_once(tmp_path, monkeypatch):
-    """The whole point of ADR 0006. Kiro's log is one global file, so before this the
-    same turn landed in every ledger that ever imported it."""
+def test_two_projects_one_machine_each_get_their_own_copy(tmp_path, monkeypatch):
+    """The accepted cost, pinned rather than left implicit. Kiro's log is one global
+    file with no project field, so importing it from two different projects now stores
+    the SAME underlying turns twice — once per ledger. ADR-LEDGER names this cost and
+    accepts it in exchange for "everything in the active ledger, always"."""
     a = _isolate(tmp_path, monkeypatch, "a")
     _kiro_log(3)
     importcmd.run(a, "all", _args())
     b = _isolate(tmp_path, monkeypatch, "b")
     importcmd.run(b, "all", _args())
-    machine = _kiro_rows(paths.global_home())
-    assert len(machine) == 3 and len({c["id"] for c in machine}) == 3
-    assert _kiro_rows(a) == [] and _kiro_rows(b) == []
+    rows_a, rows_b = _kiro_rows(a), _kiro_rows(b)
+    assert len(rows_a) == 3 and len(rows_b) == 3
+    # Same underlying rows, stored independently — ids match across the two ledgers.
+    assert {r["id"] for r in rows_a} == {r["id"] for r in rows_b}
 
 
-def test_reimport_is_idempotent_against_the_machine_ledger(tmp_path, monkeypatch):
+def test_reimport_is_idempotent_against_the_project_ledger(tmp_path, monkeypatch):
     root = _isolate(tmp_path, monkeypatch)
     _kiro_log(2)
     importcmd.run(root, "all", _args())
-    before = _shards(paths.global_home())
+    before = _shards(root)
     assert before, "byte-identical must be asserted about rows that exist"
     lines = importcmd.run(root, "all", _args())
-    assert _shards(paths.global_home()) == before          # 0 new, byte-identical
+    assert _shards(root) == before                          # 0 new, byte-identical
     assert any("imported 0 call(s)" in l for l in lines if "kiro" in l)
 
 
 def test_ledger_override_keeps_kiro_in_the_named_ledger(tmp_path, monkeypatch):
-    # cage-lab's isolation depends on this: under --ledger, kiro does NOT escape.
+    # cage-lab's isolation depends on this: under --ledger, kiro captures into exactly
+    # the named sink — same guarantee as before ADR-LEDGER, now for the ordinary reason
+    # every agent gets it (there's only ever one root to capture into) rather than a
+    # kiro-specific override check.
     root = _isolate(tmp_path, monkeypatch)
     base = tmp_path / "lab" / ".cage"                      # the lab's own named store
     base.mkdir(parents=True)
@@ -163,10 +181,13 @@ def test_ledger_override_keeps_kiro_in_the_named_ledger(tmp_path, monkeypatch):
 
 def test_claude_and_copilot_capture_is_byte_identical(tmp_path, monkeypatch):
     """Asserted, not reasoned about. The same claude sweep is run twice — once with a
-    kiro log present (so the routed leg fires) and once without — and the project
-    ledger's rows must be identical either way. `import_id` is the per-sweep manifest FK
-    (a fresh id per run, non-deterministic by nature, like `ts`) and is stripped, exactly
-    as the fixture corpus does."""
+    kiro log present and once without — and the project ledger's claude rows must be
+    identical either way. Before ADR-LEDGER this pinned that the (now-retired) routed
+    leg never perturbed claude's own capture; post-reversal it pins the same guarantee
+    for the ordinary reason every agent needs it — one agent's presence in `[sources]`
+    must never change another agent's rows. `import_id` is the per-sweep manifest FK (a
+    fresh id per run, non-deterministic by nature, like `ts`) and is stripped, exactly as
+    the fixture corpus does."""
     def sweep(name, with_kiro):
         root = _isolate(tmp_path, monkeypatch, name)
         _claude_log()
@@ -180,85 +201,74 @@ def test_claude_and_copilot_capture_is_byte_identical(tmp_path, monkeypatch):
     assert sweep("no-kiro", False) == sweep("with-kiro", True)
 
 
-def test_the_project_ledger_never_gains_a_kiro_row(tmp_path, monkeypatch):
+def test_the_project_ledger_now_gains_kiro_metrics_rows_but_never_a_calls_row(tmp_path, monkeypatch):
+    """Since ADR-LEDGER, kiro's IDE rows DO land in this project's ledger — the reversal
+    this file exists to pin. What's still true, unchanged by the reversal: kiro never
+    produces a `calls` row (KIRO-CALLS-LEG relocated that capture to `ledger/kiro/`
+    metrics rows, orthogonal to routing), so `spend()` — which reads `calls` — still
+    shows claude only, and kiro contributes no tokens to any total."""
     root = _isolate(tmp_path, monkeypatch)
     _claude_log()
     _kiro_log(4)
     importcmd.run(root, "all", _args())
-    # P5: claude resolves from `ledger/claude/`, so the project ledger's usage is read
-    # through `spend`. The half this test is named for — no KIRO row here — is asserted
-    # on both kinds: `ledger/kiro/` is where a mis-routed row would land today, and
-    # `calls` is where one would land if the retired writer ever came back.
     assert {c["agent"] for c in ledger.spend(root)} == {"claude-code"}
-    assert _kiro_rows(root) == []
+    assert len(_kiro_rows(root)) == 4                       # the reversal: now present
     assert [c for c in ledger.calls(root) if c.get("agent") == "kiro"] == []
 
 
-# ── the summary line never counts cross-ledger rows ───────────────────────────
+# ── the summary line counts kiro like every other agent ───────────────────────
 
-def test_summary_never_counts_rows_that_landed_elsewhere(tmp_path, monkeypatch):
-    """Two guarantees in one: the per-agent kiro line NAMES its sink, and the rollup
-    table (which reads this sweep's appended rows) totals only the local ones."""
+def test_summary_reports_kiro_like_any_other_agent_no_sink_note(tmp_path, monkeypatch):
+    """Since ADR-LEDGER there is no second sink to name: the per-agent kiro line reads
+    exactly like claude's or copilot's (no `sink_note`), and the rollup table still never
+    totals kiro's tokens — unchanged, because kiro is a metrics-only capture (never a
+    `calls`/spend row) regardless of which ledger it lands in."""
     root = _isolate(tmp_path, monkeypatch)
     _claude_log(tin=100, tout=20)
-    _kiro_log(2, start=1000)                # 1000 + 1001 tokens, all routed away
+    _kiro_log(2, start=1000)
     lines = importcmd.run(root, "all", _args())
     text = "\n".join(lines)
     kiro_line = next(l for l in lines if l.startswith("✔ kiro"))
-    # tilde-relative when under the real home (importcmd._tilde, "machine-portable in
-    # tests") — the sandboxed tmp_path IS on a Windows runner (%TEMP% sits under %HOME%)
-    assert importcmd._tilde(paths.Footprint(paths.global_home()).base) in kiro_line
-    assert "machine ledger" in kiro_line
+    assert kiro_line.endswith("file(s).")                   # plain full stop, no sink_note
+    assert "machine ledger" not in kiro_line and "~/.cage" not in kiro_line
     total = next(l for l in lines if l.strip().startswith("total"))
     assert "100" in total and "1,000" not in total and "2,001" not in total
     assert "kiro" not in text.split("agent    surface")[-1]  # not a rollup bucket either
 
 
-def test_capture_on_read_summary_counts_only_local_rows(tmp_path, monkeypatch):
-    # The read-side twin: `· captured N new` must not announce rows a project report
-    # will never show.
+def test_capture_on_read_never_announces_kiro_metrics_rows(tmp_path, monkeypatch):
+    """`ensure_captured`'s before/after diff reads `spend() + calls()` — kiro's IDE rows
+    are neither, so a kiro-only import stays silent (`None`) whether or not the rows now
+    land locally. Unaffected by ADR-LEDGER; what changed is only WHERE the rows this
+    silent sweep captured actually are."""
     root = _isolate(tmp_path, monkeypatch)
     monkeypatch.setenv("CAGE_CAPTURE_ON_READ", "1")
     _kiro_log(3)
     summary = importcmd.ensure_captured(root, _args(no_import=False))
-    assert summary is None                                  # nothing landed HERE
-    assert len(_kiro_rows(paths.global_home())) == 3         # but kiro was captured
-
-
-# ── the capture switches compose as AND ───────────────────────────────────────
-
-def test_machine_ledger_capture_switch_can_veto_the_routed_leg(tmp_path, monkeypatch):
-    root = _isolate(tmp_path, monkeypatch)
-    g = paths.Footprint(paths.global_home())
-    g.base.mkdir(parents=True, exist_ok=True)
-    g.policy.write_text("[capture]\nenabled = false\n", encoding="utf-8")
-    _kiro_log(2)
-    lines = importcmd.run(root, "all", _args())
-    assert _kiro_rows(paths.global_home()) == []
-    assert any("disabled at the machine ledger" in l for l in lines)  # never silent
+    assert summary is None                                  # kiro never trips this diff
+    assert len(_kiro_rows(root)) == 3                        # but it was captured, HERE
 
 
 def test_project_capture_switch_still_pauses_everything(tmp_path, monkeypatch):
+    # The one capture switch left standing: since there's no separate machine-sink policy
+    # to compose with anymore, this project's own `[capture] enabled` is the whole story.
     root = _isolate(tmp_path, monkeypatch)
     monkeypatch.setenv("CAGE_CAPTURE", "0")
     _kiro_log(2)
     importcmd.run(root, "all", _args())
-    assert _kiro_rows(paths.global_home()) == []
+    assert _kiro_rows(root) == []
 
 
-# ── the read side explains the absence ────────────────────────────────────────
+# ── the read side no longer has anything to explain ───────────────────────────
 
-def test_project_report_explains_kiros_absence(tmp_path, monkeypatch):
+def test_kiro_routed_line_is_always_empty_since_the_reversal(tmp_path, monkeypatch):
+    """`chats.kiro_routed_line` used to explain why a project view showed no kiro
+    (ADR-KIRO). Since ADR-LEDGER there is nothing to explain — kiro rows are simply in
+    the ledger you're looking at — so this now always returns `""`, everywhere."""
     from cage import policy
     root = _isolate(tmp_path, monkeypatch)
     pol = policy.load(paths.Footprint(root).policy)
-    line = chats.kiro_routed_line(root, pol)
-    assert str(paths.Footprint(paths.global_home()).base) in line
-    assert "cage query kiro-routing" in line
-
-
-def test_machine_ledger_report_has_nothing_to_explain(tmp_path, monkeypatch):
-    from cage import policy
+    assert chats.kiro_routed_line(root, pol) == ""
     monkeypatch.chdir(tmp_path)
     g = paths.global_home()
     assert chats.kiro_routed_line(g, policy.load(None)) == ""

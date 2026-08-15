@@ -1,6 +1,6 @@
 ---
-doc: the ADR set — thirteen maintained records, and the rule that keeps them true
-status: current as of 2026-08-15 · ADR-LADDER added 2026-08-15 (the agent-surface ladder, built 2026-08-02 for v0.41, not previously recorded as its own ADR) · ADR-COVERAGE renumbered to 0002 2026-08-15 (adjacent to ADR-LAWS; the rest of 0002–0008 shifted down by one) · ADR-CONFIG added 2026-08-15 (ratified, not yet built) · replaces the numeric ADRs 0001–0011 · ADR-AUTHORSHIP carved out of ADR-CLAUDE 2026-08-14 · ADR-INTEGRITY added 2026-08-15 · ADR-CLEANUP added 2026-08-15
+doc: the ADR set — fifteen maintained records, and the rule that keeps them true
+status: current as of 2026-08-15 · ADR-LEDGER added 2026-08-15 (ratified and shipped same day, reverses ADR-KIRO's routed-exception carve-out) · ADR-MATRIX added 2026-08-15 (ratified, graduated from work/compare/tool-combination-matrix.compare.md — MATRIX-REVIVAL — not yet built) · ADR-LADDER added 2026-08-15 (the agent-surface ladder, built 2026-08-02 for v0.41, not previously recorded as its own ADR) · ADR-COVERAGE renumbered to 0002 2026-08-15 (adjacent to ADR-LAWS; the rest of 0002–0008 shifted down by one) · ADR-CONFIG added 2026-08-15 (ratified, not yet built) · replaces the numeric ADRs 0001–0011 · ADR-AUTHORSHIP carved out of ADR-CLAUDE 2026-08-14 · ADR-INTEGRITY added 2026-08-15 · ADR-CLEANUP added 2026-08-15
 update-rule: NO behaviour change lands without its owning ADR updated in the same change (see "The standing rule"). A change touching no recorded decision says "no ADR affected" out loud
 ---
 
@@ -10,7 +10,9 @@ update-rule: NO behaviour change lands without its owning ADR updated in the sam
 what each surface can and cannot yield, one for the surface it is all read through, one
 for the cross-agent question of who wrote which lines, one for proving nothing already
 recorded has changed, one for what may ever be deleted, one for the file that holds every
-decision you get to make, and one for the layers an agent reaches all of it through.**
+decision you get to make, one for the layers an agent reaches all of it through, one for
+how measured tool combinations compare without ever faking the one that has no receipts
+yet, and one for which ledger a run's captured rows land in.**
 
 | # | record | covers |
 |---|---|---|
@@ -27,6 +29,8 @@ decision you get to make, and one for the layers an agent reaches all of it thro
 | 0011 | [**ADR-CLEANUP**](0011_cleanup.md) | what `.cage/state/` debris may ever be deleted, and why only a typed command does it |
 | 0012 | [**ADR-CONFIG**](0012_config.md) | `cage.toml` — resolution, precedence, and the rule for what may be a setting at all |
 | 0013 | [**ADR-LADDER**](0013_ladder.md) | the agent-surface ladder — L0 hookless (mandatory) → L1 hooks+steering → L2 MCP → L3 skills |
+| 0014 | [**ADR-MATRIX**](0014_matrix.md) | token cost/savings across tool combinations, per closed task — a tool with no receipts yet renders honestly empty, never a faked zero |
+| 0015 | [**ADR-LEDGER**](0015_ledger.md) | one active ledger per run, no per-agent routing exceptions — reverses ADR-KIRO's Kiro-IDE machine-ledger carve-out |
 
 Each has **two sections**: **§1 for humans** (one screen, diagrams, no jargon) and
 **§2 for agents** (the binding detail — context, decision, consequences, alternatives,
@@ -76,6 +80,8 @@ record to hold it.
 | [ADR-CLEANUP](0011_cleanup.md) | `cleanup` |
 | [ADR-CONFIG](0012_config.md) | `policy` · `policysync` · `tomledit` · `cfgio` · `initcmd` — the config **file**; every section's *meaning* stays with the record that owns the behaviour (ADR-CONFIG carries the pointer table) |
 | [ADR-LADDER](0013_ladder.md) | `mcpserver` · `hookcmd` · `attest` · `steering` · `wiringscan` — the four layers above L0 and the floor gate that proves none of them may become a dependency of a lower one |
+| [ADR-MATRIX](0014_matrix.md) | `matrixview` — not yet built; the name is reserved here so the module lands under this record on day one rather than needing an ownership-test fixup |
+| [ADR-LEDGER](0015_ledger.md) | no module — it owns the cross-cutting *rule* that every source captures into the run's one resolved ledger. The mechanism itself (`paths.resolve_root`, `paths.kiro_ledger`, `paths.kiro_routed`) stays owned by [ADR-LAWS](0001_laws.md) alongside the rest of `paths`; this record owns the *decision*, the same split ADR-COVERAGE has with the gap tables it doesn't store |
 
 **Shared and infrastructure modules are claimed explicitly, never by silence** — the
 ownership test carries the list and the reason for each. `transcript.py` is deliberately
@@ -86,7 +92,7 @@ and pretending otherwise would send a copilot change to the wrong reviewer.
 
 In prose write **ADR-LAWS · ADR-COVERAGE · ADR-CLI · ADR-CLAUDE · ADR-COPILOT · ADR-KIRO ·
 ADR-CONSUMERS · ADR-GRAPHIFY · ADR-AUTHORSHIP · ADR-INTEGRITY · ADR-CLEANUP · ADR-CONFIG ·
-ADR-LADDER**.
+ADR-LADDER · ADR-MATRIX · ADR-LEDGER**.
 
 A bare "ADR 0001" is now ambiguous — it meant *team ledger aggregation via `refs/notes`*
 for six weeks and there are ~90 live references to the numeric names. The numbers survive

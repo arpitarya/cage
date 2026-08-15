@@ -220,43 +220,37 @@ def canonical_ledger(start: Path | None = None, *, pol: dict | None = None) -> P
 
 
 def kiro_ledger(root: Path) -> Path:
-    """THE sink for kiro **IDE** rows ([ADR 0006](work/archive/adr/0006-kiro-rows-are-machine-facts-not-project-facts.md)).
+    """**RETIRED as a routing decision — [ADR-LEDGER](../docs/adr/0015_ledger.md),
+    ratified 2026-08-15.** Kiro's IDE log used to be routed to the global ledger
+    unconditionally (the former [ADR-KIRO](../docs/adr/0006_kiro.md) *machine-fact*
+    rule); ADR-LEDGER retired that as the one exception to ADR-LAWS Law 2 ("one sink
+    per run"), so Law 2 is now exceptionless. Kept as a function (not deleted) only so
+    :func:`kiro_routed` — and anything still importing it — has a single stable call
+    site to change if this is ever revisited; it now always returns ``root`` itself.
 
-    Kiro's IDE log (`dev_data/tokens_generated.jsonl`) is ONE global append-only file
-    carrying no project, no session and no timestamp, so every ledger that imports it
-    reads the same turns — a per-project kiro cost was never a fact. Kiro-IDE rows
-    therefore belong to the **machine**: they land in the global ledger (`~/.cage`), so
-    one copy exists per machine and double-counting is impossible by construction rather
-    than by warning.
+    Kiro's IDE log (`dev_data/tokens_generated.jsonl`) is still ONE global append-only
+    file with no project, no session and no timestamp, and that fact hasn't changed —
+    what changed is which cost Arpit chose to accept for it. See ADR-LEDGER §2 for the
+    named tradeoff (rows can duplicate across every project ledger you import from) and
+    the veto condition that would reopen this.
 
-    The ONE exception is an explicit ``--ledger``/``CAGE_BASE`` override: the user named a
-    sink, and cage never routes around an explicit instruction (cage-lab's isolation
-    depends on it). This is the only place the rule lives — callers ask
-    :func:`kiro_routed`, they never re-derive it.
-
-    Scope: the **IDE** store only. Kiro's *CLI* store (`conversations_v2`) is keyed by cwd
-    and carries a real conversation id and timestamp, so it is genuinely
-    project-attributable and gets the opposite treatment (scoped by cwd, `project`
-    stamped) — see `transcript.parse_kiro_cli_credits`."""
-    if os.environ.get("CAGE_BASE"):
-        return root  # explicit override wins (ADR 0006, "Decision")
-    return global_home()
+    Scope: the **IDE** store only. Kiro's *CLI* store (`conversations_v2`) was never
+    part of this — it is keyed by cwd and carries a real conversation id and timestamp,
+    so it was always genuinely project-attributable (scoped by cwd, `project` stamped)
+    — see `transcript.parse_kiro_cli_credits`. ADR-LEDGER does not touch it."""
+    return root
 
 
 def kiro_routed(root: Path) -> Path | None:
-    """The kiro-IDE sink when it **differs** from ``root``'s ledger, else ``None`` (kiro is
-    just part of the normal sweep). The one predicate the import sweep branches on, so the
-    "does kiro route elsewhere?" question is answered in exactly one place.
-
-    Compared on the resolved **ledger dir**, not the root: that collapses both overrides
-    for free — ``CAGE_BASE`` re-bases the whole footprint and ``CAGE_LEDGER`` re-points the
-    ledger dir alone, and under either the two sinks are the same files, so there is
-    nothing to route and no second lock to take (which is also what keeps a same-process
-    double-lock impossible)."""
-    sink = kiro_ledger(root)
-    if Footprint(sink).ledger.resolve() == Footprint(root).ledger.resolve():
-        return None
-    return sink
+    """**Always ``None`` since [ADR-LEDGER](../docs/adr/0015_ledger.md), 2026-08-15.**
+    Kiro's IDE leg no longer routes anywhere — it is part of the normal sweep into
+    ``root``, identically to claude and copilot. Kept (rather than deleted, and rather
+    than deleting every caller) as the single predicate every reader used to branch on
+    ("does kiro route elsewhere?"); it still answers that question in one place, the
+    answer is just now a constant. `chats.kiro_routed_line` and `doctorcmd`'s capture
+    timeline both call this and both go correctly inert as a result — no caller needed
+    its own edit."""
+    return None
 
 
 def kiro_cli_workspace(root: Path) -> str:

@@ -12,6 +12,236 @@ by milestone) — the worklog is what *happened this session*.
 
 ---
 
+## 2026-08-15 — Cowork — corrected: kiro has no token spine, ever — ADR-MATRIX's kiro table was wrong
+
+- **Asked:** "claude has tokens, kiro and copilot have credits double check on that so
+  what is being presented as cli output might not work"
+- **Done:** staged and read `ledger.py` in full around `spend()`. Confirmed the
+  suspicion, precisely: `SPEND_SOURCES = {"claude": ("request",), "copilot": ("chat",
+  "cli-delta"), "kiro": ()}` — kiro's tuple is EMPTY. `ledger.ABSENT_SPINES = {"kiro":
+  "no IDE token store on this install"}` explains why: kiro's only candidate token
+  store (`devdata.sqlite`) doesn't exist on a real install, and the fallback file
+  (`tokens_generated.jsonl`) was field-probed 2026-08-14 and found non-summable (28
+  rows, 0 out-tokens, a repeated identical block) — cage refuses to build a spine from
+  it. So `taskgroup.join` (built on `ledger.spend()`) can **never** contain a kiro call,
+  ever — not a TASK-GRAIN-SPINE-contingent gap like claude/copilot's, a **permanent,
+  structural** one. Copilot, by contrast, genuinely has both: real tokens (the actual
+  `spend()` basis, via `chat`/`cli-delta`) AND a separate, additional `credits` field
+  (COPILOT-CREDITS) that isn't this view's basis — so copilot's table in my prior
+  mock-up was fine; only kiro's was fabricated (I'd invented plausible-looking token
+  numbers for a table that can never populate). Also found the agent-bucketing rule
+  I'd written (derive from joined calls only) meant a kiro task — even a genuinely
+  productive one with receipts — would ALWAYS fall into `unattributed`, indistinguishable
+  from real join failures, since it never has a joined call to derive from; designed a
+  fix (fall back to `tasks.jsonl`'s `agents` field, but ONLY on zero-call tasks) and
+  tied it to the already-filed TASK-AGENTS-FIELD-DEAD, upgrading that item from
+  "additive, no urgency" to "the one path for kiro to ever be correctly labeled here."
+  Rewrote `docs/adr/0014_matrix.md`: kiro's CLI-mockup section replaced with a fixed,
+  unconditional no-data notice (never a token table); new Context finding (verbatim
+  `SPEND_SOURCES`/`ABSENT_SPINES` citations); Decision's agent-bucket rule gained the
+  zero-call fallback; two new Alternatives-rejected entries (building a spine from
+  `tokens_generated.jsonl` anyway; converting credits↔tokens by an invented rate); a
+  5th veto item (a credits-basis companion table, named but deliberately not designed).
+  Updated `OPEN-WORK.md`: corrected TASK-GRAIN-SPINE's note (was wrongly "claude,
+  copilot and kiro alike" — fixed to claude/copilot only, kiro's gap named separately),
+  rewrote MATRIX-BUILD to match, upgraded TASK-AGENTS-FIELD-DEAD's urgency note. Added a
+  second same-day correction line to `work/compare/tool-combination-matrix.compare.md`.
+  All three pushed and confirmed via `git status` (`AM`/`MM`, staged cleanly).
+- **Decided/open:** kiro's token-table absence is now ratified as permanent, not a
+  to-be-fixed gap — only a real Kiro token store shipping, or a separate future
+  credits-basis view (explicitly out of scope, named in Veto §5), would change it.
+  Still nothing built. The zero-call → `tasks.jsonl`-agents-field fallback is designed
+  but depends on TASK-AGENTS-FIELD-DEAD being fixed to ever activate.
+- **Next:** MATRIX-BUILD itself, still blocked on TASK-GRAIN-SPINE for claude/copilot's
+  day-one usefulness. If TASK-AGENTS-FIELD-DEAD gets picked up first, kiro tasks start
+  getting correctly labeled (still tokenless) instead of diluting `unattributed`. Real
+  `pytest` pass remains an open recommendation, not runnable from this sandbox.
+- **Cost:** unmeasured — `cage report` (the command this rule names) was deleted in
+  v0.50; `cage insights chats` is per-chat and can't isolate this session (CLAUDE.md
+  `Cost:` rule).
+
+---
+
+## 2026-08-15 — Cowork — ADR-AUTHORSHIP's §1 flow diagram redrawn per-agent (claude/copilot/kiro)
+
+- **Asked:** "update the diagrams for claude, copilot and kiro on how the provenance file
+  will be create and updated will be built later" — a follow-up to the same-day
+  parser-design amendment.
+- **Done:** checked house style first rather than guessing shape — grepped every ADR for
+  `\`\`\`mermaid` occurrences and confirmed **every one of the eight checked carries
+  exactly one diagram**, in §1 "The flow" (ADR-COPILOT's, with five stores, uses
+  `subgraph` blocks to group "always present" vs "gated" sources rather than multiple
+  diagrams — the precedent this edit follows). So "diagrams for claude, copilot and
+  kiro" was built as **one redrawn diagram with three lanes**, not three new diagrams:
+  a `built` subgraph (claude only) and a `designed` subgraph (copilot + kiro, both
+  labelled "signal exists — no reader yet," preserving the record's own "NOT no signal"
+  correction per-agent instead of lumped as before) fan into the shared `parse_edits /
+  diff normalizer` node, then the unchanged linematch → provenance.jsonl → commitview
+  chain. Hand-paired the ASCII twin in the same edit, per the record's own template rule.
+  Bumped `DOC-REGISTRY.md`'s ADR-AUTHORSHIP row and the ADR's own status line.
+- **Decided/open:** kept the diagram to one screen by grouping at agent grain (not
+  agent×surface — six source nodes would have crowded it) and pushing surface detail
+  (cli vs ide/vscode store paths) into each node's second line instead. Still nothing
+  built.
+- **Next:** unchanged from the prior entry — AUTHORSHIP-PARSERS itself, copilot · CLI
+  first.
+- **Cost:** unmeasured — `cage report` (the command this rule names) was deleted in
+  v0.50; `cage insights chats` is per-chat and can't isolate this session (CLAUDE.md
+  `Cost:` rule).
+
+---
+
+## 2026-08-15 — Cowork — ADR-AUTHORSHIP gains the four-missing-parser design (ratified, not built)
+
+- **Asked:** research how the provenance file should work for claude/copilot/kiro across
+  CLI and IDE, then "create an adr on how it should work ideally we will build it later."
+- **Done:** staged and read `authorcapture.py`, `linematch.py`, `originrecord.py`,
+  `provenance.py`, `commitjoin.py`, `schema.py`, `constants.py`, `transcript.py` and
+  `graphifytx.py` from the real repo to ground the design in code already shipped rather
+  than invent one. Web research pass (git-ai's `git_ai_standard_v3.0.0` spec, a 4-layer
+  AI-attribution taxonomy, a signed-attestation/SLSA framing) found nothing that changes
+  the build order, but grounded the deferred signing veto trigger and confirmed cage's
+  counts-only shape is one rung more conservative than the closest external analogue
+  (git-ai stores line ranges; cage stores five counts). Recognized the request as
+  ADR-AUTHORSHIP's own domain, not a new numbered record — its own update-rule already
+  names "a new agent parser" as an in-record trigger, and `docs/adr/README.md`'s
+  ownership table already claims every module this touches. Added a new §2 design note
+  (2026-08-15, ratified — NOT built): the shared `{session, file, ts, cwd, lines,
+  context}` parser output shape the existing pipeline already consumes; a diff-to-edit
+  normalizer for the three whole-file before/after stores (kiro IDE, kiro CLI, copilot
+  VS Code) vs. claude's native line-list blocks; per-surface read mechanics for each of
+  the four missing parsers, each grounded in a real function already shipped for a
+  different question (`graphifytx.detect_and_file_copilot`'s verified `toolCallId`
+  pairing; `transcript._kiro_cli_tool_runs`'s read-only `conversations_v2` access and
+  `_under`-based cwd scoping — explicitly a **sibling** reader, not a reuse, since it
+  reads `execute_bash` bodies today and would need `fs_write` ones); two new veto
+  triggers (normalizer applicability per store, copilot CLI's still-unconfirmed shape);
+  one new deliberately-not-taken item (a parser-registry object, on the same
+  two-instances-before-abstracting reasoning ADR-GRAPHIFY already uses for its shim
+  twins). Bumped `DOC-REGISTRY.md`'s ADR-AUTHORSHIP row. Fixed a misfiling found on
+  contact in `OPEN-WORK.md`: AUTHORSHIP-CODE-CATCHUP and AUTHORSHIP-PARSERS sat under an
+  `## [ADR-KIRO]` heading, which owns neither of them — moved to a new `## [ADR-AUTHORSHIP]`
+  heading with a one-line note explaining the move; AUTHORSHIP-PARSERS' text updated from
+  "ratified as an order" to "ratified as an order AND a design." Also filed a new project
+  memory note, `cage-provenance-external-landscape-2026-08-15.md`, for the web-research
+  half (not repo content, kept out of the ADR itself).
+- **Decided/open:** amend the existing record rather than mint a fifteenth ADR — the
+  repo's own ownership table and update-rule already answer that question; asking would
+  have re-litigated a settled convention. Nothing built: no parser code, no test. All
+  four edited files (`docs/adr/0009_authorship.md`, `work/DOC-REGISTRY.md`,
+  `work/OPEN-WORK.md`, this entry) staged for `device_commit_files` back to the user's
+  machine — not yet confirmed written or committed to git by the user.
+- **Next:** AUTHORSHIP-PARSERS itself — build copilot · CLI first (reach order, already
+  the file cage opens every sweep), verifying its write-tool event shape live before
+  deciding whether it needs the diff normalizer (veto trigger 8). Real `pytest` pass on
+  the ADR frontmatter/ownership/queue-honesty tests remains an open recommendation (not
+  runnable from this sandbox) before treating this change as verified-safe.
+- **Cost:** unmeasured — `cage report` (the command this rule names) was deleted in
+  v0.50; `cage insights chats` is per-chat and can't isolate this session (CLAUDE.md
+  `Cost:` rule).
+
+---
+
+## 2026-08-15 — Cowork — matrix's tool-combination rows split per agent (claude/copilot/kiro), never blended
+
+- **Asked:** "matrix should work with claude, kiro, copilot independently combination of
+  2 or 3 research and update the adr"
+- **Done:** staged and read `taskgroup.py`, `tasks.py`, `hookcmd.py`, `clicmds.py`,
+  `schema.py`, `agents.py`, `commitview.py` from the real repo to ground the design.
+  Found `tasks.jsonl`'s own `agents` field (`taskgroup.stats()` already reads it) has
+  **no live writer** — all three real `tasks.record()` call sites (`hookcmd._session_end`,
+  `clicmds.close_task`, `clicmds.cmd_task_time`) omit `agents=`, so it's always `[]`
+  today. Filed as **TASK-AGENTS-FIELD-DEAD** (`OPEN-WORK.md`), routed around rather than
+  fixed: agent attribution instead derives live from a task's joined calls' own `agent`
+  field via `agents.row_surface`, unanimous-only — the same pattern `commitview.py`
+  line 285 already uses for authorship, never a stored/asserted field. Rewrote
+  `docs/adr/0014_matrix.md`: three independent per-agent tables (claude/copilot/kiro)
+  plus an `unattributed` bucket in the CLI mock-up, updated flow diagram, new Context/
+  Decision/Consequences/Alternatives-rejected/Reference entries, a 4th veto trigger
+  (`unattributed` outgrowing the named tables). Updated `OPEN-WORK.md`'s MATRIX-BUILD
+  entry to match and added the new TASK-AGENTS-FIELD-DEAD item. Added a same-day
+  amendment note to `work/compare/tool-combination-matrix.compare.md` (narrows verdict
+  B's shape, doesn't reopen the fork). All three files pushed and confirmed via `git
+  status` (`AM`/`MM`, staged cleanly).
+- **Decided/open:** per-agent split confirmed as part of the ratified shape, not a
+  follow-up. Still nothing built (`cage/matrixview.py` doesn't exist) — MATRIX-BUILD
+  stays blocked-in-practice by TASK-GRAIN-SPINE regardless of the agent split.
+  TASK-AGENTS-FIELD-DEAD is filed but not scheduled — additive fix, no current reader
+  needs it.
+- **Next:** MATRIX-BUILD itself (write `cage/matrixview.py`, register the CLI leaf) —
+  still blocked on TASK-GRAIN-SPINE for a meaningful day-one result. Real `pytest` pass
+  on ADR/frontmatter/ownership tests remains an open recommendation (not runnable from
+  this sandbox).
+- **Cost:** unmeasured — `cage report` (the command this rule names) was deleted in
+  v0.50; `cage insights chats` is per-chat and can't isolate this session (CLAUDE.md
+  `Cost:` rule).
+
+---
+
+## 2026-08-15 — Cowork — TASK-GRAIN-SPINE named as a real MATRIX-BUILD dependency
+
+- **Asked:** "how will it work for kiro and copilot??"
+- **Done:** traced `ledger.spend()`, `taskcorr.py`, `hookcmd._open_tasks`, and
+  `graphifytx.GRAPHIFY_COVERAGE`/`agents.HOOK_GAPS` directly. Finding: TASK-GRAIN-SPINE
+  is universal, not kiro/copilot-specific — since P5/KIRO-CALLS-LEG, claude, copilot AND
+  kiro all carry no `task` on a call row, so `taskgroup.join` (which matrixview would
+  reuse) currently joins almost nothing for any agent — already visible in `insights
+  commits`' own golden fixture (every tok column `—`). On top of that universal gap,
+  real per-agent divergence once it's fixed: claude auto-closes tasks via hooks,
+  copilot/kiro need manual `cage task outcome`; kiro-IDE can never show `+graphify`
+  (0/26 assistant outputs persisted, structural). Recorded all of it in
+  `docs/adr/0014_matrix.md` (new Context bullet, a "day-one" CLI mock-up, three new §1
+  caveats, two Consequences bullets, four new Reference citations) and in
+  `work/OPEN-WORK.md` (TASK-GRAIN-SPINE now names MATRIX-BUILD as a second consumer;
+  MATRIX-BUILD names the blocking dependency and the post-fix agent skew).
+- **Next step:** MATRIX-BUILD is still the next code milestone, now scoped honestly —
+  it ships correct-but-empty until TASK-GRAIN-SPINE closes.
+
+## 2026-08-15 — Cowork — CLI mock-up added to ADR-MATRIX and cross-referenced from ADR-CLI
+
+- **Asked:** show the `cage insights matrix` CLI output and put it in both the matrix ADR
+  and the CLI ADR.
+- **Done:** added a "What it will look like" block to `docs/adr/0014_matrix.md`,
+  explicitly marked PROPOSED (not GATED/CAPTURED — no golden fixture exists). In
+  `docs/adr/0003_cli.md` added a note after the removed-verbs table and a status-line
+  addendum, **deliberately avoiding** the mechanically-gated §2 reference tables and the
+  "What the output looks like" gallery — both are checked against `cli.build_parser()`
+  by `tests/test_cli_reference.py`/`test_adr_output_blocks.py`, and naming an unparseable
+  `insights matrix` invocation there would redden the suite for the wrong reason.
+- **Next step:** MATRIX-BUILD (`cage/matrixview.py` + CLI leaf) is the only way this
+  mock-up graduates from PROPOSED to GATED.
+
+## 2026-08-15 — Cowork — MATRIX-REVIVAL: the deleted tool-combination cost view, ratified as ADR-MATRIX
+
+- **Asked:** a matrix comparing token cost across tool combinations (vanilla agent /
+  +graphify / +graphify+caveman, caveman a proposed unbuilt Tier-2 compressor); then
+  "put the document in repo"; then "create a new adr for matrix".
+- **Done:** research found `cage insights matrix`/`compare` already existed and was
+  deleted by SURFACE-CUT (v0.50.0, 2026-08-14) — one day before the ask — while its join
+  engine (`taskgroup.py`) survived, still fed by live data. Filed
+  [work/compare/tool-combination-matrix.compare.md](compare/tool-combination-matrix.compare.md)
+  (MATRIX-REVIVAL) and
+  [work/research/2026-08-15-tool-cost-matrix-ecosystem-refs.md](research/2026-08-15-tool-cost-matrix-ecosystem-refs.md)
+  first. Asked whether this belonged inside ADR-CLI (the chats/commits precedent) or as
+  its own record — Arpit chose standalone. Wrote
+  [docs/adr/0014_matrix.md](../docs/adr/0014_matrix.md) (ADR-MATRIX), updated
+  `docs/adr/README.md` (14 records, ownership table, cite-by-name list) and `CLAUDE.md`'s
+  ADR section to match. Compare doc marked **DECIDED**, ratified as ADR-MATRIX.
+- **Decided/open:** verdict **B** — a new `cage/matrixview.py` on `taskgroup.join`,
+  tokens-only, a caveman row that's honestly `0 tasks` until it files receipts, never
+  money-coupled like the deleted `compare.py`. **Nothing built** — tracked as
+  MATRIX-BUILD / MATRIX-DOC-DRIFT under the new ADR-MATRIX section in `OPEN-WORK.md`.
+  Could not run `tests/test_adr_frontmatter.py` / `test_adr_ownership.py` from this
+  session (the device-bridge sandbox's `.venv` shebangs point at the Mac, not this Linux
+  VM) — frontmatter bare-colon rule and relative-link paths were checked by hand instead;
+  worth a real `pytest` pass on the Mac before this is trusted as green.
+- **Next step:** build MATRIX-BUILD (`cage/matrixview.py` + `insights matrix` CLI leaf +
+  tests), or run the ADR test suite for real first.
+
+Cost: unmeasured — no `cage` session-isolating command survives SURFACE-CUT to isolate
+this session's own spend (named, not silently skipped, per the WORKLOG `Cost:` rule).
+
+
 ## 2026-08-15 — Claude Code — v0.51.1: the CI-only tooling caught up with three releases
 
 - **Asked:** "cicd failed fix it and yes publish a patch version."

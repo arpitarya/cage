@@ -16,6 +16,6 @@ Public library API (the protocol-targeted adapter, ADR-CONSUMERS):
 from cage.metering import (Recorder, meter, record_call,
                            record_receipt)
 
-__version__ = "0.51.1"
+__version__ = "0.52.0"
 __all__ = ["meter", "record_call", "record_receipt", "Recorder",
            "__version__"]

@@ -2,6 +2,47 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
+## v0.52.0 (2026-08-16) — ADR-LEDGER: Kiro's IDE rows stop routing to the machine ledger
+
+**Behaviour change.** From 2026-08-01 to 2026-08-15, Kiro's IDE token log
+(`tokens_generated.jsonl`) was the one deliberate exception to "one sink per `cage
+import` run": because that log carries no project field, its rows always landed in the
+global `~/.cage` ledger, never in whichever project ledger was actually active
+(ADR-KIRO). [ADR-LEDGER](docs/adr/0015_ledger.md) reverses that. **Every source now
+captures into the one ledger the run resolved — Claude, Copilot, Kiro CLI, and Kiro IDE
+alike.** Law 2 in [ADR-LAWS](docs/adr/0001_laws.md) ("one sink per run") is now
+exceptionless.
+
+- `paths.kiro_ledger` and `paths.kiro_routed` are retired as routing decisions — kept as
+  stable call sites, `kiro_ledger` always returns `root` and `kiro_routed` always
+  returns `None`.
+- `importcmd._kiro_leg` and `_drop_routed_kiro_state` — the routed leg's own lock,
+  cursors, health, manifest and `import_id` machinery — are deleted outright, not just
+  unreachable.
+- `_import_rollup` now unconditionally excludes Kiro's collected rows from any summed
+  total (ADR-KIRO's "Kiro contributes no tokens to any total" holds regardless of which
+  ledger the rows land in) — this filter was rarely exercised before this change and is
+  now load-bearing on every install with Kiro configured.
+- **The accepted cost, named rather than hidden:** the same Kiro IDE turn, imported from
+  two different project directories, is now stored as a separate row in each ledger.
+  ADR-LEDGER's Reference section carries the measurement this cost was weighed
+  against — a fresh workspace's ledger picking up 22 of 28 rows that belonged to a
+  *different* workspace under the old routed scheme.
+
+**Also in this release:**
+
+- [ADR-MATRIX](docs/adr/0014_matrix.md) ratified — design of record for a token-cost
+  view across tool combinations (`agent-only` / `agent + graphify` / …), computed
+  independently per agent, Kiro excluded from any token table by design. Nothing built
+  yet; tracked in `work/OPEN-WORK.md`.
+- ADR-AUTHORSHIP, ADR-KIRO(archived)/ADR-LAWS/ADR-CLI and `docs/adr/README.md` updated
+  to reflect the ledger-routing reversal and the two new records; the ADR set is now
+  fifteen.
+- `cage doctor`, `cage query`/`explain_data`, and `cage insights chats`
+  (`chats.kiro_routed_line`) go correctly inert now that Kiro never routes
+  elsewhere — no caller needed its own behaviour change, they read the same retired
+  predicates.
+
 ## v0.51.1 (2026-08-15) — the CI-only test tooling had gone stale against three releases, and nothing local could see it
 
 **No cage behaviour changed.** Every fix here is in build-time tooling

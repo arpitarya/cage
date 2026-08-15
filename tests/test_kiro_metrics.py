@@ -373,8 +373,13 @@ def test_kiro_metrics_since_skips_old_months(proj):
 
 # ── 9 · routing (ADR 0006, inherited never re-decided) ──────────────────────
 
-def test_kiro_metrics_ide_rows_route_to_sink_cli_rows_stay_workspace_scoped(
+def test_kiro_metrics_ide_and_cli_rows_both_land_in_the_active_ledger(
         tmp_path, monkeypatch):
+    """Since ADR-LEDGER (2026-08-15) the IDE and CLI grains land in the same place:
+    this run's one active ledger. Before that, IDE rows routed to a separate machine
+    sink while CLI rows stayed workspace-scoped to the project — two different sinks
+    for the same import. That split is gone; what's unchanged is CLI's workspace
+    scoping itself (still keyed by cwd, still real attribution)."""
     root = _isolate(tmp_path, monkeypatch)
     devdata = paths.kiro_devdata_db()
     _devdata_db(devdata, [(1, 100, 20, "2026-08-13T10:00:00Z")])
@@ -388,29 +393,25 @@ def test_kiro_metrics_ide_rows_route_to_sink_cli_rows_stay_workspace_scoped(
           'format = "kiro-cli"\n', encoding="utf-8")
     importcmd.run(root, "all", _args())
 
-    # IDE rows: sink (machine ledger) only, never the project.
-    assert [r for r in ledger.kiro_metrics_raw(root) if r["source"] == "ide"] == []
-    sink_ide = [r for r in ledger.kiro_metrics_raw(paths.global_home())
-               if r["source"] == "ide"]
-    assert len(sink_ide) == 1
+    # IDE rows: this run's own active ledger — no separate machine sink anymore.
+    project_ide = [r for r in ledger.kiro_metrics_raw(root) if r["source"] == "ide"]
+    assert len(project_ide) == 1
+    assert not (paths.global_home() / ".cage" / "ledger").exists()
 
-    # CLI rows: workspace-scoped to the project, never the sink.
+    # CLI rows: still workspace-scoped to the project — unaffected by the reversal.
     project_cli = [r for r in ledger.kiro_metrics_raw(root)
                   if r["source"] in ("cli-conv", "cli-turn")]
     assert len(project_cli) == 2
-    sink_cli = [r for r in ledger.kiro_metrics_raw(paths.global_home())
-              if r["source"] in ("cli-conv", "cli-turn")]
-    assert sink_cli == []
 
 
-def test_kiro_metrics_reimport_is_idempotent_against_the_routed_sink(tmp_path, monkeypatch):
+def test_kiro_metrics_reimport_is_idempotent_against_the_active_ledger(tmp_path, monkeypatch):
     root = _isolate(tmp_path, monkeypatch)
     devdata = paths.kiro_devdata_db()
     _devdata_db(devdata, [(1, 100, 20, "2026-08-13T10:00:00Z")])
     importcmd.run(root, "all", _args())
-    first = len(ledger.kiro_metrics_raw(paths.global_home()))
+    first = len(ledger.kiro_metrics_raw(root))
     importcmd.run(root, "all", _args())
-    second = len(ledger.kiro_metrics_raw(paths.global_home()))
+    second = len(ledger.kiro_metrics_raw(root))
     assert first == second == 1
 
 

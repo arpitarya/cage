@@ -195,20 +195,13 @@ def _capture_timeline(active: Path) -> tuple[str, str]:
         ts = r.get("ts", "")
         if ts > push_ts.get(tool, ""):
             push_ts[tool] = ts
-    # ADR 0006: kiro's IDE rows route to the machine ledger, so on a project ledger its
-    # row here is legitimately empty. Naming the sink is the difference between "kiro
-    # captures elsewhere" and "kiro capture is broken" — which is the whole job of this
-    # check. Cheap and read-only: a path resolution, never a second ledger read.
-    kiro_sink = paths.kiro_routed(active)
+    # ADR-LEDGER (2026-08-15): kiro's IDE rows capture into this run's one active ledger
+    # like every other agent — `paths.kiro_routed` is retired to an always-``None`` stub
+    # kept only as a stable call site, so there is no longer a separate sink to name here.
     rows = []
     for a in agents.SURFACES:
         seen = render.ago(pull_ts[a]) if pull_ts[a] else "never"
         cnt = f"{pull_n[a]:,} rows" if pull_n[a] else "—"
-        if a == "kiro" and kiro_sink is not None:
-            rows.append(f"\n      · {a:<9} pull   {'→ ' + str(paths.Footprint(kiro_sink).base)}"
-                        f"\n        (IDE rows are a machine fact — ADR 0006; "
-                        f"`cage query kiro-routing`)")
-            continue
         rows.append(f"\n      · {a:<9} pull   {seen:<10} {cnt}")
     for tool in ("graphify", "fux", *sorted(t for t in push_n if t not in ("graphify", "fux"))):
         seen = render.ago(push_ts.get(tool, "")) if push_ts.get(tool) else "never"

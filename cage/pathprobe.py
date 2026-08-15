@@ -125,10 +125,10 @@ def probe(root: Path, pol: dict | None = None) -> dict:
     resolver's ``problems``/``disabled``, cross-agent path overlaps, and — for a
     committed *project* policy — machine-absolute source paths that break clones."""
     cursors = _cursor_map(root)
-    # kiro's IDE rows — and therefore its import cursor — live in the machine ledger
-    # (ADR 0006). Reading its cursor from `root` would report "not yet imported" forever
-    # for a file cage imports on every run: a diagnostic that lies about the thing it
-    # exists to diagnose.
+    # Since ADR-LEDGER (2026-08-15) kiro's IDE rows — and its import cursor — live in
+    # THIS run's own active ledger, same as every other agent. `paths.kiro_routed`
+    # always returns `None` now, so `kiro_cursors` always falls back to `cursors` here
+    # without this call site needing its own edit — kept for exactly that reason.
     kiro_sink = paths.kiro_routed(root)
     kiro_cursors = _cursor_map(kiro_sink) if kiro_sink is not None else cursors
     if pol is None:  # Directive A: sources live in cage.toml — load the project's policy

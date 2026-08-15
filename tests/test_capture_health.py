@@ -184,28 +184,30 @@ def test_kiro_present_but_empty_is_silent_not_broken(tmp_path, monkeypatch):
     # Kiro is a FILE source: `_scan` takes raw=[src] when the file exists, so len(raw)=1
     # even for an empty log. Gate 2 means "no data location", not "no rows" — a
     # present-but-empty kiro log is normal (coarse by design), never a "broken" nag.
-    # Kiro's health now rides the MACHINE ledger, because that is where its rows land
-    # (ADR 0006) — health must be recorded against the sink it actually captured into.
+    # Since ADR-LEDGER (2026-08-15) kiro's health rides THIS run's own active ledger,
+    # like every other agent — no separate machine sink to record it against.
     root = _isolate(tmp_path, monkeypatch)
     log = paths.kiro_token_log()
     log.parent.mkdir(parents=True)
     log.write_text("", encoding="utf-8")                # the file exists but is empty
     _imp(root)
-    gh = _health(paths.global_home())
+    gh = _health(root)
     assert gh["kiro"]["files"] == 1                      # the file counts as matched
     assert doctorcmd.capture_warnings(gh) == []             # so kiro never warns
 
 
-def test_routed_kiro_leaves_no_health_record_in_the_project(tmp_path, monkeypatch):
-    # The false-⚠ trap: with kiro routed away, a project-root health record for kiro
-    # would say "installed but matched 0 files" forever — kiro is capturing fine, just
-    # elsewhere. So it must be ABSENT here (and a stale pre-0.36 one is dropped), with
-    # the report footer explaining the absence in its place.
+def test_stale_pre_reversal_kiro_health_is_refreshed_not_left_dangling(tmp_path, monkeypatch):
+    # Before ADR-LEDGER, a routed-away kiro left no health record in the project (it
+    # captured elsewhere) — a stale record from that era, if present, had to be dropped
+    # or it would nag "installed but matched 0 files" forever. Since ADR-LEDGER, kiro
+    # captures HERE every run, so a stale record is simply overwritten with a fresh,
+    # accurate one — the same as any other agent's health always was.
     root = _isolate(tmp_path, monkeypatch)
     log = paths.kiro_token_log()
     log.parent.mkdir(parents=True)
     log.write_text("", encoding="utf-8")
-    # a stale record from before the routing change
+    # a stale record from before ADR-LEDGER (kiro was routed away, so this project
+    # never saw a real capture and the record was left saying so)
     foot = paths.Footprint(root)
     foot.state.mkdir(parents=True, exist_ok=True)
     foot.cursors.write_text(json.dumps({"_health": {"kiro": {"home": True, "files": 0,
@@ -213,7 +215,7 @@ def test_routed_kiro_leaves_no_health_record_in_the_project(tmp_path, monkeypatc
                                         "kiro": {"/some/log": [1, 2.0]}}), encoding="utf-8")
     _imp(root)
     cur = json.loads(foot.cursors.read_text(encoding="utf-8"))
-    assert "kiro" not in cur["_health"] and "kiro" not in cur
+    assert cur["_health"]["kiro"]["files"] == 1           # refreshed by THIS run's real scan
     assert doctorcmd.capture_warnings(_health(root)) == []
 
 

@@ -259,30 +259,31 @@ REGISTRY: tuple[Explanation, ...] = (
     Explanation(
         "kiro-routing", ("kiro", "kiro-ide", "kiro-cli", "machine-ledger", "double-count",
                          "why-no-kiro", "tokens-generated", "conversations-v2",
-                         "machine-fact", "adr-0006", "credits-scope"),
-        "why kiro's rows land in the machine ledger, and what they can't tell you",
-        "kiro has TWO stores with OPPOSITE properties, so they get opposite treatment:\n"
+                         "machine-fact", "adr-ledger", "adr-0006", "credits-scope"),
+        "where kiro's rows land, and what they can't tell you",
+        "kiro has TWO stores; since ADR-LEDGER (2026-08-15) both capture into this\n"
+        "  run's ONE active ledger, the same as claude and copilot — there is no longer\n"
+        "  a separate machine-wide sink:\n"
         "  · IDE (tokens_generated.jsonl) — ONE global append-only file with no project,\n"
-        "    no session and no per-turn timestamp. Every ledger that imported it read the\n"
-        "    same turns, so a per-project kiro cost was never a fact. These rows are a\n"
-        "    MACHINE fact and are written to the global ledger only ({global_base}), so\n"
-        "    one copy exists per machine and double-counting is impossible by\n"
-        "    construction. A project report says so rather than showing nothing.\n"
+        "    no session and no per-turn timestamp. Every ledger that imports it reads the\n"
+        "    same turns, so importing it from more than one project's ledger duplicates\n"
+        "    the same underlying rows across those ledgers (a cost this design accepts —\n"
+        "    see docs/adr/0015_ledger.md for the field-probe measurement behind it).\n"
         "  · CLI (conversations_v2, SQLite) — keyed by the cwd it ran in, with a real\n"
-        "    conversation id and timestamp. That IS project-attributable, so it gets the\n"
-        "    opposite fix: scoped to the project's directory tree and stamped with\n"
-        "    `project`. Routing it to the machine ledger would destroy real attribution.\n"
-        "  An explicit --ledger/CAGE_BASE always wins for both — cage never routes around\n"
-        "  a sink you named.\n"
+        "    conversation id and timestamp, so it was always project-attributable and is\n"
+        "    unaffected by this change: scoped to the project's directory tree and\n"
+        "    stamped with `project`.\n"
+        "  An explicit --ledger/CAGE_BASE always wins for both, as it does for every\n"
+        "  agent — cage never routes around a sink you named.\n"
         "  THE LIMITS, stated plainly: an IDE row's `ts` is stamped at IMPORT, `session` is\n"
         "  the constant \"kiro\", `project` is absent and `tokens_out` is usually 0. So kiro\n"
         "  rows cannot be ordered, windowed or attributed, and no kiro ON/OFF token delta\n"
         "  may ever be reported. Cage can never be more precise than its source.\n"
-        "  Already-recorded rows are never rewritten (append-only): a project ledger that\n"
-        "  collected duplicated kiro rows before v0.36 keeps them, and gains no new ones.",
+        "  Already-recorded rows are never rewritten (append-only): a ledger that\n"
+        "  collected kiro IDE rows under the former machine-ledger routing keeps them.",
         ("cage/paths.py", "cage/importcmd.py", "cage/transcript.py", "cage/chats.py"),
         "n/a — describes where rows are stored and what they can't say, not a number.",
-        kind="concept", plan_ref="§3.7 · ADR 0006"),
+        kind="concept", plan_ref="§3.7 · ADR-LEDGER"),
     Explanation(
         "savings-axis", ("tier-1", "tier-2", "agent-vs-human", "human", "human-axis",
                          "tool-vs-tool", "whole-task", "attested", "derived-attention",
@@ -436,9 +437,10 @@ REGISTRY: tuple[Explanation, ...] = (
         "              probed so far (the upgrade-watch: filled only when non-NULL,\n"
         "              never estimated — chars÷4/cumulative/chunk-count are BANNED as\n"
         "              token facts; `chunks` stays a chunk count, never `tokens_out`)\n"
-        "  Routing inherits ADR 0006, never re-decided: `ide` rows ride the routed kiro\n"
-        "  sink (`_kiro_leg`, machine ledger); `cli-conv`/`cli-turn` rows ride the same\n"
-        "  workspace scoping the `credits` leg already resolves.\n"
+        "  Routing since ADR-LEDGER (2026-08-15): `ide` rows capture into this run's one\n"
+        "  active ledger like every other agent, no separate machine sink; `cli-conv`/\n"
+        "  `cli-turn` rows ride the same workspace scoping the `credits` leg already\n"
+        "  resolves (unaffected by that change).\n"
         "  `ledger.kiro_metrics()` collapses last-write-wins per key, winner = max\n"
         "  (turns, tokens_in+tokens_out, id) — a grown CLI conversation appends a FRESH\n"
         "  row (id folds the row's own values), the reader resolves the latest state.\n"

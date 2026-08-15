@@ -155,13 +155,13 @@ def test_doctor_paths_counts_rows_and_cursor_state(tmp_path, monkeypatch):
     from cage import clicmds
     assert clicmds.cmd_import(SimpleNamespace(agent="kiro", path=None, project=None,
                                               since=None)) == 0
-    # kiro's cursor rides its rows into the machine ledger (ADR 0006) — the probe reads
-    # it from there, or it would report "not yet imported" for a file it imports every run.
-    sink = paths.Footprint(paths.global_home())
+    # Since ADR-LEDGER (2026-08-15) kiro's cursor rides its rows into THIS run's own
+    # active ledger, like every other agent — the probe reads it from `root` directly.
+    sink = paths.Footprint(root)
     before = sink.cursors.read_bytes()
     out2 = pathprobe.run(root)
     assert "cursor: already imported" in out2
-    assert str(sink.base) in out2                                 # and names the sink
+    assert str(root) in out2                                      # and names the sink
     assert sink.cursors.read_bytes() == before                    # read-only
     assert not paths.Footprint(root).debug_log.exists()           # no debug writes
 

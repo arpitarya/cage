@@ -88,11 +88,10 @@ def test_kiro_manifest_name_is_honest_empty(tmp_path, monkeypatch):
                                 "promptTokens": 500, "generatedTokens": 0}) + "\n",
                     encoding="utf-8")
     importcmd.run(root, "kiro", SimpleNamespace(agent="kiro", path=str(klog), project=None, since=None))
-    # The manifest rides with the rows: kiro's land in the machine ledger (ADR 0006), and
-    # a manifest row in the project pointing at rows that aren't there would be a dangling FK.
-    rows = [r for r in manifest.read(paths.global_home()) if r["kind"] == "import"]
+    # The manifest rides with the rows. Since ADR-LEDGER (2026-08-15) kiro's rows land
+    # HERE, in this run's own active ledger — so the manifest row does too.
+    rows = [r for r in manifest.read(root) if r["kind"] == "import"]
     assert rows and all("session_name" not in r for r in rows)  # honest empty, omitted
-    assert [r for r in manifest.read(root) if r["kind"] == "import"] == []
 
 
 def test_names_never_leak_onto_call_rows(tmp_path, monkeypatch):
