@@ -699,7 +699,7 @@ REGISTRY: tuple[Explanation, ...] = (
                            "pathext", "cmd-twin", "windows-graphify",
                            "windows-interceptor", "shim-contract", "call-not-exec"),
         "why the graphify interceptor is TWO files, and what each one can't do",
-        "one behaviour contract, two implementations (docs/adr/0007_graphify.md): the\n"
+        "one behaviour contract, two implementations (docs/adr/0008_graphify.md): the\n"
         "  extensionless POSIX `bin/{graphify_shim_posix}` and the Windows\n"
         "  `bin/{graphify_shim_windows}`. Windows resolves a bare `graphify` ONLY\n"
         "  through PATHEXT, which has no extensionless entry — so on Windows only the\n"

@@ -1,4 +1,4 @@
-"""docs/adr/0002_cli.md is the complete CLI reference, and this is the gate that keeps it true.
+"""docs/adr/0003_cli.md is the complete CLI reference, and this is the gate that keeps it true.
 
 A prose doc that names a dead verb is the F1 failure class in documentation form: the
 reader copies it, it exits 1, and nobody learns why. `tests/test_skills_layer.py`
@@ -20,7 +20,7 @@ import pytest
 from cage import cli
 
 REPO = Path(__file__).resolve().parent.parent
-DOC = REPO / "docs" / "adr" / "0002_cli.md"
+DOC = REPO / "docs" / "adr" / "0003_cli.md"
 
 # Documented once under "Capture-on-read flags" instead of in every table — they sit on
 # ~20 read views and repeating them would bury the flags that actually differ.
@@ -49,7 +49,7 @@ def _choice_positional(par):
 
 def _group_actions(par):
     """`policy` takes its action as a positional choice rather than a
-    subparser (docs/adr/0002_cli.md § Known gaps), yet `cage --help` presents it as a group
+    subparser (docs/adr/0003_cli.md § Known gaps), yet `cage --help` presents it as a group
     beside `insights`/`task`/`authorship`. So its actions are addressable
     commands and the reference must cover each one.
 
@@ -156,7 +156,7 @@ def _named_paths(doc: str) -> set[str]:
 @pytest.mark.parametrize("path", LEAVES)
 def test_every_command_appears_in_the_reference(doc, path):
     assert f"cage {path}" in doc, (
-        f"`cage {path}` exists in the parser but docs/adr/0002_cli.md never names it. "
+        f"`cage {path}` exists in the parser but docs/adr/0003_cli.md never names it. "
         "A silently undocumented command is how a surface grows without a reader.")
 
 
@@ -169,7 +169,7 @@ def test_the_headline_count_matches_the_parser():
     """The doc opens with a count; a count that drifts is worse than no count."""
     body = DOC.read_text(encoding="utf-8")
     assert f"**{len(LEAVES)} addressable commands**" in body, (
-        f"docs/adr/0002_cli.md's headline count is stale — the parser has {len(LEAVES)} leaves")
+        f"docs/adr/0003_cli.md's headline count is stale — the parser has {len(LEAVES)} leaves")
 
 
 # ── 2. nothing the doc names is dead ──────────────────────────────────────────
@@ -196,7 +196,7 @@ def _resolvable(path: str) -> bool:
 def test_no_command_named_in_the_reference_is_dead(doc):
     dead = sorted(p for p in _named_paths(doc) if not _resolvable(p))
     assert not dead, (
-        "docs/adr/0002_cli.md names commands that do not parse:\n  " + "\n  ".join(
+        "docs/adr/0003_cli.md names commands that do not parse:\n  " + "\n  ".join(
             f"`cage {d}`" for d in dead))
 
 
@@ -227,13 +227,13 @@ def _doc_flags(doc: str) -> set[str]:
 def test_every_documented_flag_exists(doc):
     invented = sorted(_doc_flags(doc) - ALL_PARSER_FLAGS)
     assert not invented, (
-        "docs/adr/0002_cli.md documents flags the parser does not have:\n  " + "\n  ".join(invented))
+        "docs/adr/0003_cli.md documents flags the parser does not have:\n  " + "\n  ".join(invented))
 
 
 def test_every_parser_flag_is_documented(doc):
     missing = sorted(ALL_PARSER_FLAGS - _doc_flags(doc) - SHARED_FLAGS)
     assert not missing, (
-        "these flags exist but docs/adr/0002_cli.md never names them:\n  " + "\n  ".join(missing))
+        "these flags exist but docs/adr/0003_cli.md never names them:\n  " + "\n  ".join(missing))
 
 
 # ── 4. a flag unique to one command is documented in that command's section ───
@@ -259,7 +259,7 @@ def test_a_single_owner_flag_sits_in_its_command_section(sections, flag):
     hosts = [t for t, body in sections.items()
              if f"cage {path}" in body and f"`{flag}" in body]
     assert hosts, (
-        f"`{flag}` belongs only to `cage {path}`, but no docs/adr/0002_cli.md section documents "
+        f"`{flag}` belongs only to `cage {path}`, but no docs/adr/0003_cli.md section documents "
         "both together")
 
 
@@ -309,6 +309,6 @@ def test_the_reference_declares_how_it_is_maintained(doc):
 
 def test_the_reference_is_registered_as_maintained():
     reg = (REPO / "work" / "DOC-REGISTRY.md").read_text(encoding="utf-8")
-    assert "0002_cli.md" in reg, "ADR-CLI is a maintained doc and needs a DOC-REGISTRY row"
+    assert "0003_cli.md" in reg, "ADR-CLI is a maintained doc and needs a DOC-REGISTRY row"
     readme = (REPO / "README.md").read_text(encoding="utf-8")
-    assert "docs/adr/0002_cli.md" in readme, "the README must link the CLI reference (ADR-CLI)"
+    assert "docs/adr/0003_cli.md" in readme, "the README must link the CLI reference (ADR-CLI)"

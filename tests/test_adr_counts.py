@@ -28,11 +28,11 @@ REPO = Path(__file__).resolve().parent.parent
 ADR_DIR = REPO / "docs" / "adr"
 README = ADR_DIR / "README.md"
 CLAUDE_MD = REPO / "CLAUDE.md"
-ADR_CLI = ADR_DIR / "0002_cli.md"
+ADR_CLI = ADR_DIR / "0003_cli.md"
 
 _WORDS = {
     "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7,
-    "eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12,
+    "eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12, "thirteen": 13,
 }
 
 
@@ -122,30 +122,30 @@ def test_adr_cli_per_group_headings_match_the_parser():
     body = ADR_CLI.read_text(encoding="utf-8")
     headings = re.findall(
         r"^## `cage (\S+)` — (\d+) (?:commands?|actions?|derived views?)$", body, re.M)
-    assert headings, ("docs/adr/0002_cli.md has no '## `cage <group>` — N ...' "
+    assert headings, ("docs/adr/0003_cli.md has no '## `cage <group>` — N ...' "
                        "headings — update this test's pattern")
     seen = set()
     for group, count_str in headings:
         seen.add(group)
         assert group in _GROUPS, (
-            f"docs/adr/0002_cli.md documents a heading for `cage {group}`, "
+            f"docs/adr/0003_cli.md documents a heading for `cage {group}`, "
             f"which is not a live parser group ({sorted(_GROUPS)})")
         true_count = _group_leaf_count(group)
         assert int(count_str) == true_count, (
-            f"docs/adr/0002_cli.md says `cage {group}` has {count_str} commands, "
+            f"docs/adr/0003_cli.md says `cage {group}` has {count_str} commands, "
             f"but the parser has {true_count}")
     missing = set(_GROUPS) - seen
-    assert not missing, f"docs/adr/0002_cli.md has no per-group heading for: {sorted(missing)}"
+    assert not missing, f"docs/adr/0003_cli.md has no per-group heading for: {sorted(missing)}"
 
 
 def test_adr_cli_total_command_count():
     body = ADR_CLI.read_text(encoding="utf-8")
     frontmatter = body.split("---", 2)[1]
     assert f"{_TOTAL_LEAVES} addressable commands" in frontmatter, (
-        f"docs/adr/0002_cli.md's frontmatter total-command count is stale — "
+        f"docs/adr/0003_cli.md's frontmatter total-command count is stale — "
         f"the parser has {_TOTAL_LEAVES} leaves")
     assert f"**{_TOTAL_LEAVES} addressable commands**" in body, (
-        f"docs/adr/0002_cli.md's total-command count is stale — "
+        f"docs/adr/0003_cli.md's total-command count is stale — "
         f"the parser has {_TOTAL_LEAVES} leaves")
 
 
@@ -153,7 +153,7 @@ def test_adr_cli_top_level_entry_count():
     body = ADR_CLI.read_text(encoding="utf-8")
     frontmatter = body.split("---", 2)[1]
     assert f"{_TOTAL_TOP_LEVEL} top-level entries" in frontmatter, (
-        f"docs/adr/0002_cli.md's frontmatter top-level-entry count is stale — "
+        f"docs/adr/0003_cli.md's frontmatter top-level-entry count is stale — "
         f"the parser has {_TOTAL_TOP_LEVEL} top-level entries")
 
 
@@ -167,10 +167,10 @@ def test_mcp_read_tool_count_in_adr_cli():
     true_count = _true_read_tool_count()
     body = ADR_CLI.read_text(encoding="utf-8")
     m = re.search(r"(\d+) read tools? \+ exactly one write tool", body)
-    assert m, ("docs/adr/0002_cli.md no longer reads 'N read tool(s) + exactly one "
+    assert m, ("docs/adr/0003_cli.md no longer reads 'N read tool(s) + exactly one "
                "write tool' — update this test's pattern")
     assert int(m.group(1)) == true_count, (
-        f"docs/adr/0002_cli.md's `cage mcp` row says {m.group(1)} read tools, but "
+        f"docs/adr/0003_cli.md's `cage mcp` row says {m.group(1)} read tools, but "
         f"len(mcpserver.TOOLS) - len(mcpserver.WRITE_TOOLS) = {true_count}")
 
 

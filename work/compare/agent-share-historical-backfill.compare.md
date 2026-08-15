@@ -20,7 +20,7 @@ and carries the only interesting reopen-trigger in this doc.
 **The fork:** cage's forward path already works. `authorcapture.capture` matched
 **40,470 of 47,819 added lines (84.6%)** across **66 commits** on its first real sweep.
 But those 66 stop dead at **2026-07-16** — the vendor's ~30-day transcript deletion
-boundary, named in [ADR-CLAUDE](../../docs/adr/0003_claude.md) §1. The other **100 of
+boundary, named in [ADR-CLAUDE](../../docs/adr/0004_claude.md) §1. The other **100 of
 166 commits** in this repo can never be line-matched, by any future code. That is not a
 backlog to work through; it is the permanent shape of every repo cage is ever pointed
 at after the fact.
@@ -218,7 +218,7 @@ answer a question it can.
 - `copilot` — *"its stores record usage and prompts, not the text of an edit"*
 - `kiro` — *"its usage log records token counts only, with no tool-input payload"*
 
-And [ADR-CLAUDE](../../docs/adr/0003_claude.md) §2 Context: *"Claude is the **only**
+And [ADR-CLAUDE](../../docs/adr/0004_claude.md) §2 Context: *"Claude is the **only**
 agent whose store carries the text of a proposed edit, so it is the only agent with an
 authorship route at all."*
 

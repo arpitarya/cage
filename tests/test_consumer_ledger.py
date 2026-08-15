@@ -1,6 +1,6 @@
 """`ledger/consumer/` — the consumer's own directory, and the dual-write that fills it.
 
-P1 of the ledger restructure. It **reverses** [ADR-CONSUMERS](../docs/adr/0006_consumer.md)'s
+P1 of the ledger restructure. It **reverses** [ADR-CONSUMERS](../docs/adr/0007_consumer.md)'s
 *"consumers … are never given a metric ledger"*, and the reversal is recorded there.
 
 Why this file has to exist rather than leaning on a real-ledger check: the P0 cross-check

@@ -3,7 +3,7 @@
 **Status:** design of record. The v0.22 restricted-env handoff is archived and therefore
 **named, not cited** — this file is the design, not a summary of that one.
 Companion to the committed-shim design of record — `cage query portable-wiring` and
-[ADR-GRAPHIFY](../docs/adr/0007_graphify.md) (the standalone `portable-wiring.md` doc was folded into those
+[ADR-GRAPHIFY](../docs/adr/0008_graphify.md) (the standalone `portable-wiring.md` doc was folded into those
 two during the v0.36 hookless doc sweep; this file was dropped in the same sweep and is
 restored here because eight source files still cite it by path).
 
@@ -57,7 +57,7 @@ importable ⇒ exit 0 silently, agents keep working, no capture.
 ### GF-LAUNCHER — CLOSED 2026-08-12: the interceptor reaches cage through the interpreter
 
 **Fixed on POSIX, CI-asserted on Windows.** Both twins gained a second capability arm
-(`docs/adr/0007_graphify.md` B5b): when no `cage` command resolves, they probe
+(`docs/adr/0008_graphify.md` B5b): when no `cage` command resolves, they probe
 `python3 -m cage` (POSIX) / `py -3` then `python` (Windows, divergence D8) and meter
 through that. Launcher mode no longer silences the shim route.
 

@@ -133,7 +133,7 @@ any part of the deleted `data` group.**
 - No change to the allowlist, the never-list, or the auto-vs-manual split — this is a
   wiring restoration, not a new deletion class or a new retention policy.
 - ADR-CLI's command surface grows by one leaf; its counts and examples are updated in the
-  same change ([docs/adr/0002_cli.md](0002_cli.md)).
+  same change ([docs/adr/0003_cli.md](0003_cli.md)).
 
 ### Alternatives rejected
 

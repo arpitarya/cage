@@ -6,7 +6,7 @@ decides: OPEN-WORK **COVERAGE-STRIKE-2**
 
 # coverage-strike-gate.compare.md — does two-strikes actually point at a generator?
 
-**Fork:** [ADR-COVERAGE](../../docs/adr/0008_coverage.md) §3 parked a full generated coverage
+**Fork:** [ADR-COVERAGE](../../docs/adr/0002_coverage.md) §3 parked a full generated coverage
 matrix, reopened on "found stale twice." STRIKE 1 (2026-08-14, interceptor row) and STRIKE 2
 (2026-08-14, legend + authorship marks) hit that threshold, and the ADR's own text logs a
 "Decision needed": extend `tests/test_formulas_coverage.py`'s pattern to ADR-COVERAGE's two

@@ -177,7 +177,7 @@ saved           = raw_alternative − actual        (filed only when > 0; else n
   | kiro ide | N/A | the store persists no assistant output at all (26/26 empty completions, probed 2026-08-07). The PATH interceptor is the only route here |
 
   The mark is **N/A**, not ❌, and the two are not interchangeable: per
-  [ADR-COVERAGE](adr/0008_coverage.md)'s legend a ❌ means *the signal is in a store cage already
+  [ADR-COVERAGE](adr/0002_coverage.md)'s legend a ❌ means *the signal is in a store cage already
   reads and no code reads it yet* — cage's own backlog. Nothing here is buildable; the store has
   no output to detect. `graphifytx.GRAPHIFY_COVERAGE` records this as `False` either way, which is
   why the gate below asserts the verdict and not the mark's spelling.
@@ -204,7 +204,7 @@ actual          = toks(GRAPH_REPORT.md read)
   outcomes to score yet. The footnote says so; the figure is not tuned by intuition.
 - Deduped per `(session, file, graph-mtime bucket)` — one per read, not per line.
 
-### 2.9 graphify receipt id + cross-route dedupe — deterministic ([ADR-GRAPHIFY](adr/0007_graphify.md))
+### 2.9 graphify receipt id + cross-route dedupe — deterministic ([ADR-GRAPHIFY](adr/0008_graphify.md))
 
 ```
 id = "s_" + sha1(session | op | args_hash | answer_hash)          # graphifymeter.receipt_id
@@ -355,7 +355,7 @@ spec'd elsewhere.
 - **The filter is blamed only when the filter is the reason.** `No chats match agent
   'kiro' — the filter is empty, not the ledger` is true about the filter and misleading
   about kiro-IDE, whose absence is structural (IDE rows routed to the machine ledger,
-  [ADR-KIRO](adr/0005_kiro.md)). Kiro-CLI used
+  [ADR-KIRO](adr/0006_kiro.md)). Kiro-CLI used
   to carry a second structural reason (credits rows produced no chat at all); CHATS-
   CREDITS removed it by giving those rows a real chat row, so the only structural
   reason left is the IDE-routing one. The empty view names the reasons it can evidence,
@@ -616,7 +616,7 @@ so cage predicts nothing and scores nothing. `tasks.jsonl` still records outcome
 and any previously-stamped `est_*` fields — a closed task is still a closed task, and
 `MIN_COMPARE_N` / `MIN_ESTIMATE_N` remain in `constants.py`. `MIN_ESTIMATE_N` still
 gates `graphifymodel`'s history band; `MIN_COMPARE_N` is read by nothing and stays only
-because [ADR-GRAPHIFY](adr/0007_graphify.md)'s veto condition cites the number.
+because [ADR-GRAPHIFY](adr/0008_graphify.md)'s veto condition cites the number.
 
 ### 4.4 Fleet study pairing — **removed in v0.51 (STUDY-CUT)**
 

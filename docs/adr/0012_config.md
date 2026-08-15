@@ -129,11 +129,11 @@ at read time.**
 
   | section | its meaning is owned by |
   |---|---|
-  | `[capture]` · `[sources]` | the agent records — [ADR-CLAUDE](0003_claude.md) · [ADR-COPILOT](0004_copilot.md) · [ADR-KIRO](0005_kiro.md) · [ADR-CONSUMERS](0006_consumer.md) |
+  | `[capture]` · `[sources]` | the agent records — [ADR-CLAUDE](0004_claude.md) · [ADR-COPILOT](0005_copilot.md) · [ADR-KIRO](0006_kiro.md) · [ADR-CONSUMERS](0007_consumer.md) |
   | `[cleanup]` | [ADR-CLEANUP](0011_cleanup.md) |
   | `[authorship]` | [ADR-AUTHORSHIP](0009_authorship.md) |
   | `[ledger]` | [ADR-LAWS](0001_laws.md) |
-  | `[wiring]` | [ADR-GRAPHIFY](0007_graphify.md) (the shim it selects) |
+  | `[wiring]` | [ADR-GRAPHIFY](0008_graphify.md) (the shim it selects) |
   | `[debug]` | [CLAUDE.md](../../CLAUDE.md), fail-open-but-never-silent |
   | `[meta]` | this record — it is the file's own bookkeeping |
 
@@ -215,7 +215,7 @@ at read time.**
   with one: every section shipped in `data/cage.toml` is read by `policy`, every key with a
   reader is shipped, every documented env var is consulted, and every key names a section in
   the pointer table. Without it this record is prose and the census below repeats.
-- **[ADR-CLI](0002_cli.md) is unaffected.** No command or flag changes; `cage query` gains
+- **[ADR-CLI](0003_cli.md) is unaffected.** No command or flag changes; `cage query` gains
   config entries and loses the `[display] usd` one.
 
 ### Alternatives rejected

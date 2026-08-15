@@ -16,7 +16,7 @@ The interceptor ships as bundled package data — a **twin pair**, `data/shims/g
 on every OS, mirroring `runshim.write`: the inactive twin is inert (never resolved, never
 executed), and a `bin/` that is byte-identical on every machine is what lets a project
 set up on macOS keep working when it is opened on Windows or under Git Bash. Their one
-shared behaviour spec is docs/adr/0007_graphify.md. Every step is idempotent. Returns a dict
+shared behaviour spec is docs/adr/0008_graphify.md. Every step is idempotent. Returns a dict
 of what was done (for --json).
 """
 from __future__ import annotations

@@ -1,31 +1,32 @@
 ---
-doc: the ADR set — twelve maintained records, and the rule that keeps them true
-status: current as of 2026-08-15 · ADR-CONFIG added 2026-08-15 (ratified, not yet built) · replaces the numeric ADRs 0001–0011 · ADR-AUTHORSHIP carved out of ADR-CLAUDE 2026-08-14 · ADR-INTEGRITY added 2026-08-15 · ADR-CLEANUP added 2026-08-15
+doc: the ADR set — thirteen maintained records, and the rule that keeps them true
+status: current as of 2026-08-15 · ADR-LADDER added 2026-08-15 (the agent-surface ladder, built 2026-08-02 for v0.41, not previously recorded as its own ADR) · ADR-COVERAGE renumbered to 0002 2026-08-15 (adjacent to ADR-LAWS; the rest of 0002–0008 shifted down by one) · ADR-CONFIG added 2026-08-15 (ratified, not yet built) · replaces the numeric ADRs 0001–0011 · ADR-AUTHORSHIP carved out of ADR-CLAUDE 2026-08-14 · ADR-INTEGRITY added 2026-08-15 · ADR-CLEANUP added 2026-08-15
 update-rule: NO behaviour change lands without its owning ADR updated in the same change (see "The standing rule"). A change touching no recorded decision says "no ADR affected" out loud
 ---
 
 # ADRs — the durable *why*, and the rule that keeps it true
 
-**One record per thing cage meters, plus one for what binds them all, one for the surface it is
-all read through, one for the map of what each surface can and cannot yield, one for the
-cross-agent question of who wrote which lines, one for proving nothing already recorded
-has changed, one for what may ever be deleted, and one for the file that holds every
-decision you get to make.**
+**One record per thing cage meters, plus one for what binds them all, one for the map of
+what each surface can and cannot yield, one for the surface it is all read through, one
+for the cross-agent question of who wrote which lines, one for proving nothing already
+recorded has changed, one for what may ever be deleted, one for the file that holds every
+decision you get to make, and one for the layers an agent reaches all of it through.**
 
 | # | record | covers |
 |---|---|---|
 | 0001 | [**ADR-LAWS**](0001_laws.md) | the five cross-cutting laws — read this first |
-| 0002 | [**ADR-CLI**](0002_cli.md) | the command surface: every command, every flag, an example each |
-| 0003 | [**ADR-CLAUDE**](0003_claude.md) | Claude Code — transcripts, the dedup law, authorship |
-| 0004 | [**ADR-COPILOT**](0004_copilot.md) | GitHub Copilot — five stores, cumulative→delta, credits |
-| 0005 | [**ADR-KIRO**](0005_kiro.md) | Kiro — the two-store split, machine facts, the absent spine |
-| 0006 | [**ADR-CONSUMERS**](0006_consumer.md) | the things cage meters that are not agents — library, custom sources, retired agents |
-| 0007 | [**ADR-GRAPHIFY**](0007_graphify.md) | graphify — the interceptor twins and the savings receipt |
-| 0008 | [**ADR-COVERAGE**](0008_coverage.md) | what cage can and cannot say, per agent × surface — and why an absence is never a zero |
+| 0002 | [**ADR-COVERAGE**](0002_coverage.md) | what cage can and cannot say, per agent × surface — and why an absence is never a zero |
+| 0003 | [**ADR-CLI**](0003_cli.md) | the command surface: every command, every flag, an example each |
+| 0004 | [**ADR-CLAUDE**](0004_claude.md) | Claude Code — transcripts, the dedup law, authorship |
+| 0005 | [**ADR-COPILOT**](0005_copilot.md) | GitHub Copilot — five stores, cumulative→delta, credits |
+| 0006 | [**ADR-KIRO**](0006_kiro.md) | Kiro — the two-store split, machine facts, the absent spine |
+| 0007 | [**ADR-CONSUMERS**](0007_consumer.md) | the things cage meters that are not agents — library, custom sources, retired agents |
+| 0008 | [**ADR-GRAPHIFY**](0008_graphify.md) | graphify — the interceptor twins and the savings receipt |
 | 0009 | [**ADR-AUTHORSHIP**](0009_authorship.md) | who wrote which lines of a commit — the agent is measured, the human is the residual |
 | 0010 | [**ADR-INTEGRITY**](0010_integrity.md) | proving nothing that was already written has changed — a hash chain, report-only |
 | 0011 | [**ADR-CLEANUP**](0011_cleanup.md) | what `.cage/state/` debris may ever be deleted, and why only a typed command does it |
 | 0012 | [**ADR-CONFIG**](0012_config.md) | `cage.toml` — resolution, precedence, and the rule for what may be a setting at all |
+| 0013 | [**ADR-LADDER**](0013_ladder.md) | the agent-surface ladder — L0 hookless (mandatory) → L1 hooks+steering → L2 MCP → L3 skills |
 
 Each has **two sections**: **§1 for humans** (one screen, diagrams, no jargon) and
 **§2 for agents** (the binding detail — context, decision, consequences, alternatives,
@@ -64,16 +65,17 @@ record to hold it.
 |---|---|
 | [ADR-LAWS](0001_laws.md) | `ledger` · `schema` · `savings` · `units` · `paths` · `constants` · `errors` · `mergeutil` · `ids` |
 | [ADR-INTEGRITY](0010_integrity.md) | `integrity` |
-| [ADR-CLI](0002_cli.md) | `cli` · `clicmds` · `cliutil` · `verbmap` · `render` · `display` · `csvout` · `viewexport` · `runstamp` · `explain*` · `chats` · `commitview` |
-| [ADR-CLAUDE](0003_claude.md) | the claude half of `transcript` · `claudewire` |
-| [ADR-COPILOT](0004_copilot.md) | the copilot half of `transcript` · `copilotwire` |
-| [ADR-KIRO](0005_kiro.md) | the kiro half of `transcript` · `kirowire` |
-| [ADR-CONSUMERS](0006_consumer.md) | `metering` · `usageparse` · `usagelog` · `manifest` |
-| [ADR-GRAPHIFY](0007_graphify.md) | `graphify*` · `pathshim` · `runshim` · `adoptcmd` · `compress` · `responsecache` |
-| [ADR-COVERAGE](0008_coverage.md) | no module — it owns the cross-cutting *rule* the five gap tables obey (`ABSENT_SPINES` · `units.ABSENT` · `COVERAGE_GAPS` · `GRAPHIFY_COVERAGE` · `HOOK_EVENTS`/`HOOK_GAPS`), each of which stays owned by its own record |
+| [ADR-CLI](0003_cli.md) | `cli` · `clicmds` · `cliutil` · `verbmap` · `render` · `display` · `csvout` · `viewexport` · `runstamp` · `explain*` · `chats` · `commitview` |
+| [ADR-CLAUDE](0004_claude.md) | the claude half of `transcript` · `claudewire` |
+| [ADR-COPILOT](0005_copilot.md) | the copilot half of `transcript` · `copilotwire` |
+| [ADR-KIRO](0006_kiro.md) | the kiro half of `transcript` · `kirowire` |
+| [ADR-CONSUMERS](0007_consumer.md) | `metering` · `usageparse` · `usagelog` · `manifest` |
+| [ADR-GRAPHIFY](0008_graphify.md) | `graphify*` · `pathshim` · `runshim` · `adoptcmd` · `compress` · `responsecache` |
+| [ADR-COVERAGE](0002_coverage.md) | no module — it owns the cross-cutting *rule* the five gap tables obey (`ABSENT_SPINES` · `units.ABSENT` · `COVERAGE_GAPS` · `GRAPHIFY_COVERAGE` · `HOOK_EVENTS`/`HOOK_GAPS`), each of which stays owned by its own record |
 | [ADR-AUTHORSHIP](0009_authorship.md) | the authorship half of `transcript` and `importcmd` · `authorcapture` · `linematch` · `commitjoin` · `provenance` · `origin*` · `notessync` · `verifycmd` — and the **contents** of `COVERAGE_GAPS`, whose cross-cutting rule stays ADR-COVERAGE's |
 | [ADR-CLEANUP](0011_cleanup.md) | `cleanup` |
 | [ADR-CONFIG](0012_config.md) | `policy` · `policysync` · `tomledit` · `cfgio` · `initcmd` — the config **file**; every section's *meaning* stays with the record that owns the behaviour (ADR-CONFIG carries the pointer table) |
+| [ADR-LADDER](0013_ladder.md) | `mcpserver` · `hookcmd` · `attest` · `steering` · `wiringscan` — the four layers above L0 and the floor gate that proves none of them may become a dependency of a lower one |
 
 **Shared and infrastructure modules are claimed explicitly, never by silence** — the
 ownership test carries the list and the reason for each. `transcript.py` is deliberately
@@ -82,8 +84,9 @@ and pretending otherwise would send a copilot change to the wrong reviewer.
 
 ## Cite them by name, never by number
 
-In prose write **ADR-LAWS · ADR-CLI · ADR-CLAUDE · ADR-COPILOT · ADR-KIRO · ADR-CONSUMERS ·
-ADR-GRAPHIFY · ADR-COVERAGE · ADR-AUTHORSHIP · ADR-INTEGRITY · ADR-CLEANUP · ADR-CONFIG**.
+In prose write **ADR-LAWS · ADR-COVERAGE · ADR-CLI · ADR-CLAUDE · ADR-COPILOT · ADR-KIRO ·
+ADR-CONSUMERS · ADR-GRAPHIFY · ADR-AUTHORSHIP · ADR-INTEGRITY · ADR-CLEANUP · ADR-CONFIG ·
+ADR-LADDER**.
 
 A bare "ADR 0001" is now ambiguous — it meant *team ledger aggregation via `refs/notes`*
 for six weeks and there are ~90 live references to the numeric names. The numbers survive

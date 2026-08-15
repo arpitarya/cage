@@ -2,7 +2,7 @@
 adr: authorship
 status: RATIFIED 2026-08-14 (Arpit) · **decisions accepted, three of them NOT YET BUILT** —
   the `COVERAGE_GAPS` strings still assert the corrected-away structural claim, `coverage_note()`
-  does not name the retention wall, and the `declared` column does not exist. What IS built:
+  does not name the retention wall, and the `declared` column does not exist. What IS built —
   the claude line-match path, the four buckets, the provenance buffer and notes distribution
 audience: §1 humans (skim) · §2 agents (build)
 update-rule: ANY change to authorship — a new agent parser, the matcher, the min-content gate, a provenance field, a rendered bucket, or a `COVERAGE_GAPS` entry — updates this doc in the same change, and bumps its DOC-REGISTRY row
@@ -13,7 +13,7 @@ update-rule: ANY change to authorship — a new agent parser, the matcher, the m
 > The five laws in [ADR-LAWS](0001_laws.md) bind this record already and are **not**
 > restated here. Cite this record in prose as its NAME, never by number.
 >
-> **This record was carved out of [ADR-CLAUDE](0003_claude.md) on 2026-08-14** and is the
+> **This record was carved out of [ADR-CLAUDE](0004_claude.md) on 2026-08-14** and is the
 > reason: authorship is cross-agent, and holding its decisions inside one agent's record
 > encoded the very claim this record exists to correct.
 
@@ -118,7 +118,7 @@ flowchart LR
   exclusions, and ADR-CLAUDE §2 said *"Claude is the only agent whose store carries the
   text of a proposed edit."* All three were false. Two of the contradicting stores are
   files `importcmd` **already opens every sweep** for tokens and credits.
-- **[ADR-COVERAGE](0008_coverage.md)'s own numbered veto had already fired** — *"a vendor
+- **[ADR-COVERAGE](0002_coverage.md)'s own numbered veto had already fired** — *"a vendor
   exposes edit text for copilot or kiro ⇒ `COVERAGE_GAPS` loses that entry"* — and nobody
   noticed, because the trigger was written as a future vendor event when the text had been
   there all along. A veto phrased as *"when they ship it"* cannot fire on *"they already did."*

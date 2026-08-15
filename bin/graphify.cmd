@@ -5,7 +5,7 @@ rem stdout/stderr/exit pass through unchanged. `graphify update .` and any non-q
 rem verb pass straight through (nothing to meter). Installed by `cage setup`.
 rem
 rem Behaviour contract B1-B8 and the cmd-vs-sh divergences D1-D7 live in
-rem docs/adr/0007_graphify.md §2. The POSIX twin is the extensionless `graphify` beside this
+rem docs/adr/0008_graphify.md §2. The POSIX twin is the extensionless `graphify` beside this
 rem file; the two are hand-paired against that one contract rather than generated from
 rem a shared template - batch and sh have no common syntax subset, the same reason
 rem runshim.py hand-pairs its own twins.

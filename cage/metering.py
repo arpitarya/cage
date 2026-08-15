@@ -75,7 +75,7 @@ def _record_consumer_twin(root: Path, call_row: dict, *, route: str, provider: s
 
     Every producer now owns one directory under `ledger/`, and this is the consumer's:
     `ledger/consumer/calls-<month>.jsonl`. It reverses
-    [ADR-CONSUMERS](../docs/adr/0006_consumer.md)'s *"never given a metric ledger"*, which
+    [ADR-CONSUMERS](../docs/adr/0007_consumer.md)'s *"never given a metric ledger"*, which
     is recorded there rather than contradicted quietly.
 
     **Dual-write, never a cutover, and that is not caution — it is the rollback.** The

@@ -202,7 +202,7 @@ partially reversed — see the block above. The rest stands.)*
 >
 > What that means for the author: a source declaring `format = "claude"` gets the parser
 > **as it is**, including
-> [ADR-CLAUDE](0003_claude.md)'s two named calls-path defects — **CLAUDE-DEDUP** (rows
+> [ADR-CLAUDE](0004_claude.md)'s two named calls-path defects — **CLAUDE-DEDUP** (rows
 > inflated, measured at **1.979× on rows / 1.881× on tokens** against the same traffic
 > folded correctly) and **CLAUDE-SUBAGENT-KEY** (subagent spend mis-keyed). Those rows
 > resolve through the `calls` fallback this record's Decision describes, so they are
@@ -367,6 +367,6 @@ partially reversed — see the block above. The rest stands.)*
   once one ledger holds several applications, a grouping view has something to group.
 - **Reviving the proxy** (deleted by SURFACE-CUT) as a consumer-facing capture path. Left
   open, not rejected: it was the only route to Kiro's five wire-only values
-  ([ADR-KIRO](0005_kiro.md)). **Threshold:** a named need for wire-level capture that no
+  ([ADR-KIRO](0006_kiro.md)). **Threshold:** a named need for wire-level capture that no
   on-disk store can satisfy — and it returns as a new surface with its own record, never
   as a restored module.

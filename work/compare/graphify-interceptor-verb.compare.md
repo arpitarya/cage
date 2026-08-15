@@ -6,9 +6,9 @@ SURFACE-CUT (v0.50.0, `cb4a4a6`). The twins were left untouched, deliberately (A
 make the dead state honest.**
 
 **Status:** proposed verdict **B**, awaiting Arpit's accept or override.
-**Relates:** [ADR-GRAPHIFY](../../docs/adr/0007_graphify.md) §2 B5/B3 ·
-[ADR-COVERAGE](../../docs/adr/0008_coverage.md) §1 *Derived surfaces* ·
-[ADR-CLI](../../docs/adr/0002_cli.md) · OPEN-WORK **SHIM-DEAD-VERB**
+**Relates:** [ADR-GRAPHIFY](../../docs/adr/0008_graphify.md) §2 B5/B3 ·
+[ADR-COVERAGE](../../docs/adr/0002_coverage.md) §1 *Derived surfaces* ·
+[ADR-CLI](../../docs/adr/0003_cli.md) · OPEN-WORK **SHIM-DEAD-VERB**
 
 ---
 

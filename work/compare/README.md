@@ -57,7 +57,7 @@ Naming: `<topic>.compare.md`. Written in short points, not walls of prose.
   artifact surface: where a generated-at stamp may live, whether a read command writes a
   file, and what bare `--export` produces. **DECIDED 2026-08-10 · IMPLEMENTED v0.48 · RELEASED** (v0.48.0, PyPI
   2026-08-10; corrected 2026-08-11 — this line said "unreleased" the day after it shipped): an artifact-only metadata block, `--export` as a capability not a side
-  effect, all available formats per run. Living spec: [CLI.md](../../docs/adr/0002_cli.md) §Export flags ·
+  effect, all available formats per run. Living spec: [CLI.md](../../docs/adr/0003_cli.md) §Export flags ·
   `cage query view-export`.
 - [agent-share-historical-backfill.compare.md](agent-share-historical-backfill.compare.md) —
   **AGENT-SHARE-BACKFILL**: line-match reaches 66 of this repo's 166 commits and stops at

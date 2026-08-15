@@ -1,12 +1,15 @@
 ---
 adr: coverage
-status: current as of 2026-08-14 · six surfaces mapped · five gap tables, one owner each · kiro-IDE is the floor ·
+status: current as of 2026-08-15 · six surfaces mapped · five gap tables, one owner each · kiro-IDE is the floor ·
   the authorship row was WRONG and is corrected — its veto had already fired (see §2) ·
   the interceptor row is LIVE again as of v0.51 (dead 2026-08-12 → 2026-08-14; the window is recorded, not erased) ·
   **the legend now splits N/A (nothing to build) from ❌ (buildable, unbuilt), which one mark used to carry together** —
-  after the split the ONLY ❌ in the whole record are the four authorship parser cells
+  after the split the ONLY ❌ in the whole record are the four authorship parser cells ·
+  a sixth table added 2026-08-15 — the agent-surface ladder's capability-vs-built status
+  (see [ADR-LADDER](0013_ladder.md)); it is hand-maintained, not re-derived from a code
+  table like the five above, and is named as such
 audience: §1 humans (skim) · §2 agents (build)
-update-rule: ANY change to what a surface can capture — a new store, a vendor field appearing or disappearing, a gap opening or closing — updates the matrix in §1 AND the owning gap table named in §2, in the same change, and bumps its DOC-REGISTRY row. A cell moving between N/A and ❌ is such a change: it reassigns the gap's OWNER (vendor ⇄ cage) and must state which act closes it — a probe for N/A, a parser for ❌
+update-rule: ANY change to what a surface can capture — a new store, a vendor field appearing or disappearing, a gap opening or closing — updates the matrix in §1 AND the owning gap table named in §2, in the same change, and bumps its DOC-REGISTRY row. A cell moving between N/A and ❌ is such a change — it reassigns the gap's OWNER (vendor ⇄ cage) and must state which act closes it — a probe for N/A, a parser for ❌
 ---
 
 # ADR-COVERAGE — the six surfaces, what each yields, and why an absence is never a zero
@@ -188,6 +191,41 @@ cells are refusals of the same family as the interceptor row: cage can see the h
 will not name a session it was not given, and closing "the most recent task by proximity" is the
 guess it refuses to make. Neither becomes ❌ until a vendor documents an event — never an invented
 name, which is the class this project has paid for twice.
+
+**The agent-surface ladder — what each layer unlocks, and what still holds**
+
+> This table answers a different question from the legend above: not *"can a surface
+> yield this value"* but *"does this layer of the agent surface unlock this capability,
+> and does that promise still hold."* **The ✅ / ⚠️ / ❌ below are layer-unlock marks, not
+> this record's surface-coverage legend** — reusing one glyph set for two questions in
+> one document is exactly the collapse §1 warns against, so read this table on its own
+> terms. **`Built, still true?` uses a THIRD, deliberately different mark — 🟢 / 🟡 /
+> 🔴 — never ✅/⚠️/❌, so a row is never read by mixing two mark systems by accident:**
+> 🟢 holds as designed · 🟡 built and running, but narrower than what was designed or
+> promised · 🔴 removed above L0 entirely, nothing left of the original promise. The
+> shape traces to the 2026-08-02 agent-surface design; the **Built, still true?**
+> column is this record's own, checked against live code and tests as of 2026-08-15,
+> not against that design doc. [ADR-LADDER](0013_ladder.md) owns the layers
+> themselves — this table is coverage's cross-cut of them, not a restatement.
+
+| capability | L0 · hookless | +L1 · hooks + steering | +L2 · MCP | +L3 · skills | Built, still true? |
+|---|---|---|---|---|---|
+| Token capture | ✅ at import/read | ✅ real-time | — | — | 🟢 **holds** |
+| Savings receipts | ✅ shim + transcript | ✅ agent identity at capture | — | — | 🟡 **half only** — closes half A of `cage insights adoption`'s `NO_LINK`; half B is still open |
+| Task open/close | ⚠️ manual | ✅ auto on session boundary | ✅ agent closes its own | ✅ closes with a label | 🟡 **narrowed** — auto-close still writes `outcome="auto"`, but its original consumers (`compare`/`estimate`/`calibration`/NET-1) were all deleted by SURFACE-CUT and USAGE-ONLY weeks later |
+| Provenance | ⚠️ transcript only | ✅ post-commit | — | — | 🟢 **holds** |
+| Budget | ⚠️ advisory | *(designed)* blocks before a paid call | *(designed)* agent self-checks | *(designed)* re-plans under budget | 🔴 **removed above L0** — `budget.check`'s only caller went with the money subsystem; every hook event exits 0 unconditionally; no `budget`/`roi` MCP tool exists; no re-planning skill was ever built |
+| Tool awareness | ❌ | ✅ steering text | — | ✅ knows when it's worth it | 🟢 **holds** — `cage-analyst`, `cage-doctor-triage` |
+| Agent reads its numbers | ❌ | ❌ | ✅ read tools | ✅ interprets them | 🟡 **narrowed** — one read tool (`cage_why`) survives of the original eight; `cage_verdict`/`cage_compare` were both later removed |
+| Method-tag honesty relayed | ❌ | ❌ | ⚠️ raw JSON | ✅ refusals relayed, never smoothed | 🟢 **holds**, mechanically — `steering.lint`'s banned-arithmetic check |
+| Proactive behaviour | ❌ | ⚠️ passive nudge | ❌ | ✅ "check the graph first" | 🟢 **holds** |
+| Multi-step workflows | ❌ | ❌ | ❌ | ✅ triage · release · lab-run | 🟢 **holds, larger than scoped** — all seven skills shipped (`task-closer`, `analyst`, `doctor-triage`, `honesty-reviewer`, `release`, `lab-runner`, `windows-shim`), not the three named at design time |
+
+**Not re-derived, and said so.** Unlike the four tables above, this one has no code-level
+`*_GAPS`/`*_COVERAGE` table behind it to catch drift — it is hand-maintained against
+[ADR-LADDER](0013_ladder.md) and the code it cites. A stale cell here is caught by
+review only, the same honestly-stated limit as the un-instrumented matrix-recompute
+veto below.
 
 ### What we can't say, and why
 

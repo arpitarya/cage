@@ -137,7 +137,7 @@ def test_a_custom_claude_source_inherits_the_quarantined_defects():
     Asserted as a documentation gate rather than a behaviour one: the behaviour is
     deliberate, and what must not happen is it going unmentioned."""
     from pathlib import Path
-    adr = (Path(__file__).resolve().parents[1] / "docs" / "adr" / "0006_consumer.md")
+    adr = (Path(__file__).resolve().parents[1] / "docs" / "adr" / "0007_consumer.md")
     text = adr.read_text(encoding="utf-8").lower()
     assert "claude-dedup" in text
     assert 'format = "claude"' in text or "format = `claude`" in text

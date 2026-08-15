@@ -1,4 +1,4 @@
-"""Golden tests for the GATED output blocks in docs/adr/0002_cli.md (ADR-CLI).
+"""Golden tests for the GATED output blocks in docs/adr/0003_cli.md (ADR-CLI).
 
 `docs/cli-output-spec.md` and `tools/docgen` were absorbed into ADR-CLI and no
 longer exist — ADR-CLI's "What the output looks like" section is the one place
@@ -12,7 +12,7 @@ This test asserts the live output equals them.
 
 Regenerate after an intentional rendering change:
     CAGE_BLESS_GOLDENS=1 python -m pytest tests/test_output_spec.py
-then paste the new body into the matching GATED block in docs/adr/0002_cli.md.
+then paste the new body into the matching GATED block in docs/adr/0003_cli.md.
 
 The S1–S4 study fixtures went with the fleet study in v0.51 (STUDY-CUT); §4 is
 deliberately left as a gap in the numbering rather than renumbered, so a golden

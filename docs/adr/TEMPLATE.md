@@ -11,6 +11,15 @@ update-rule: ANY change to this agent's capture (parser · store · schema field
 > The five laws in [README.md](README.md) bind this record already — **restate none of
 > them.** Cite a law only where this agent bends, tests, or nearly broke it.
 > Cite in prose as **ADR-<NAME>**, never "ADR 000N" (see README).
+>
+> **⚠️ Frontmatter is a plain `key: value` block, not free prose, and a bare colon
+> breaks it.** Never write `word: ` (colon immediately followed by a space, or by the
+> end of a line) inside a `status` or `update-rule` value — it reads as the start of a
+> new field to any real parser and to `tests/test_adr_frontmatter.py`, which fails the
+> suite the moment it appears. Use an em dash (`—`) or a comma instead: `"such a
+> change — it reassigns…"`, never `"such a change: it reassigns…"`. This has broken
+> two records already (`0002_coverage.md`, `0009_authorship.md`) — the test exists so
+> a third time is caught before merge, not found on the next read.
 
 ---
 

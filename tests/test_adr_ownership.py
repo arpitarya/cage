@@ -34,30 +34,30 @@ OWNERS: dict[str, str] = {
     # ADR-INTEGRITY — tamper-evidence over the append-only files
     "integrity": "0010_integrity",
     # ADR-CLI — the surface and how a view reaches a terminal
-    "cli": "0002_cli", "clicmds": "0002_cli", "cliutil": "0002_cli",
-    "verbmap": "0002_cli", "render": "0002_cli", "display": "0002_cli",
-    "csvout": "0002_cli", "viewexport": "0002_cli", "runstamp": "0002_cli",
-    "explain": "0002_cli", "explain_data": "0002_cli", "explain_types": "0002_cli",
-    "chats": "0002_cli", "commitview": "0002_cli",
+    "cli": "0003_cli", "clicmds": "0003_cli", "cliutil": "0003_cli",
+    "verbmap": "0003_cli", "render": "0003_cli", "display": "0003_cli",
+    "csvout": "0003_cli", "viewexport": "0003_cli", "runstamp": "0003_cli",
+    "explain": "0003_cli", "explain_data": "0003_cli", "explain_types": "0003_cli",
+    "chats": "0003_cli", "commitview": "0003_cli",
     # ADR-CLAUDE — the claude parser and its wiring, and nothing about authorship
-    "claudewire": "0003_claude",
+    "claudewire": "0004_claude",
     # ADR-COPILOT / ADR-KIRO — thin wiring; their parsers live in the shared `transcript`
-    "copilotwire": "0004_copilot",
-    "kirowire": "0005_kiro",
+    "copilotwire": "0005_copilot",
+    "kirowire": "0006_kiro",
     # ADR-CONSUMERS — the non-agent capture paths
-    "metering": "0006_consumer", "usageparse": "0006_consumer",
-    "usagelog": "0006_consumer", "manifest": "0006_consumer",
+    "metering": "0007_consumer", "usageparse": "0007_consumer",
+    "usagelog": "0007_consumer", "manifest": "0007_consumer",
     # ADR-AUTHORSHIP — who wrote which lines; cross-agent by decision, not claude's
     "authorcapture": "0009_authorship", "linematch": "0009_authorship",
     "commitjoin": "0009_authorship", "provenance": "0009_authorship",
     "origin": "0009_authorship", "originrecord": "0009_authorship",
     "notessync": "0009_authorship", "verifycmd": "0009_authorship",
     # ADR-GRAPHIFY — the interceptor and the tier-0 savings emitters
-    "graphifychat": "0007_graphify", "graphifymeter": "0007_graphify",
-    "graphifymodel": "0007_graphify", "graphifytx": "0007_graphify",
-    "pathshim": "0007_graphify", "runshim": "0007_graphify",
-    "adoptcmd": "0007_graphify", "compress": "0007_graphify",
-    "responsecache": "0007_graphify",
+    "graphifychat": "0008_graphify", "graphifymeter": "0008_graphify",
+    "graphifymodel": "0008_graphify", "graphifytx": "0008_graphify",
+    "pathshim": "0008_graphify", "runshim": "0008_graphify",
+    "adoptcmd": "0008_graphify", "compress": "0008_graphify",
+    "responsecache": "0008_graphify",
     # ADR-CLEANUP — what .cage/state/ debris may ever be deleted
     "cleanup": "0011_cleanup",
     # ADR-CONFIG — the config file itself: resolution, precedence, the knob boundary,
@@ -65,16 +65,20 @@ OWNERS: dict[str, str] = {
     "policy": "0012_config", "policysync": "0012_config",
     "tomledit": "0012_config", "cfgio": "0012_config",
     "initcmd": "0012_config",
+    # ADR-LADDER — the four layers above L0 and the floor gate
+    "mcpserver": "0013_ladder", "hookcmd": "0013_ladder",
+    "attest": "0013_ladder", "steering": "0013_ladder",
+    "wiringscan": "0013_ladder",
 }
 
 #: Claimed by MORE than one record, on purpose. `transcript.py` is one file holding three
 #: vendors' parsers; routing a copilot change to the claude record would send it to the
 #: wrong reviewer, and splitting the file is a different decision than this test.
 SHARED: dict[str, tuple[str, ...]] = {
-    "transcript": ("0003_claude", "0004_copilot", "0005_kiro", "0009_authorship"),
-    "importcmd": ("0003_claude", "0004_copilot", "0005_kiro", "0006_consumer",
+    "transcript": ("0004_claude", "0005_copilot", "0006_kiro", "0009_authorship"),
+    "importcmd": ("0004_claude", "0005_copilot", "0006_kiro", "0007_consumer",
                   "0009_authorship"),
-    "agents": ("0003_claude", "0004_copilot", "0005_kiro"),
+    "agents": ("0004_claude", "0005_copilot", "0006_kiro"),
 }
 
 #: Infrastructure with no decision of its own — claimed **explicitly, never by silence**,
@@ -83,7 +87,6 @@ SHARED: dict[str, tuple[str, ...]] = {
 NO_RECORD: dict[str, str] = {
     "__init__": "package metadata and the version literal",
     "__main__": "`python -m cage` entry point",
-    "attest": "L1 attestation store — behaviour is stated in CLAUDE.md's agent-surface ladder",
     "capturelog": "always-on capture breadcrumb; counts only, read by no view",
     "debuglog": "the CAGE_DEBUG sink",
     "demo": "seeds the worked example",
@@ -91,17 +94,13 @@ NO_RECORD: dict[str, str] = {
     "doctorcmd": "diagnoses the capture paths; owns no decision of its own",
     "freshness": "import-staleness advice line",
     "hookbypass": "L1 re-entry guard",
-    "hookcmd": "L1 hook entry point — the ladder is CLAUDE.md's",
     "lockutil": "the one fail-open cross-process lock helper",
-    "mcpserver": "L2 surface — the tool list is CLAUDE.md's",
     "outcomes": "the task-outcome store",
     "pathprobe": "read-only path probe for doctor",
     "repoceiling": "repo-root resolution",
-    "steering": "L1/L3 document rendering",
     "taskcorr": "task correlation helper",
     "taskgroup": "the one closed-task join",
     "tasks": "the task record",
-    "wiringscan": "wiring liveness detector",
 }
 
 

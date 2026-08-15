@@ -178,7 +178,7 @@ decision as of 2026-08-14, and is stated there rather than restated here.
 > (deleting them breaks user config silently). **CLAUDE-DEDUP and CLAUDE-SUBAGENT-KEY are
 > therefore not fixed and never will be here** — this record forbids repairing them on the
 > way out, because the measurement has to outlive the code. A custom source declaring
-> `format = "claude"` inherits both, which [ADR-CONSUMERS](0006_consumer.md) states
+> `format = "claude"` inherits both, which [ADR-CONSUMERS](0007_consumer.md) states
 > outright so its author does not have to discover it.
 >
 > **Four things had to move with the leg, and each was a silent failure if missed:** the

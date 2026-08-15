@@ -29,7 +29,7 @@ COPILOT-JETBRAINS-UNPROBED).
   timestamp-proximity fallback is **forbidden**. Fix is a task grain on the metric kinds —
   a schema decision. Candidate: derive the window from `tasks.jsonl` (session + ts).
 
-## [ADR-CLI](../docs/adr/0002_cli.md) — the surface
+## [ADR-CLI](../docs/adr/0003_cli.md) — the surface
 
 - **CONTINUOUS-CAPTURE** — **Arpit's call.** `cage import` is manual-only (`watch`/`proxy`
   gone) and Claude Code sweeps transcripts at ~30 days, so a missed import is permanent
@@ -42,7 +42,7 @@ COPILOT-JETBRAINS-UNPROBED).
   were `study start`/`study join`, both since removed with the fleet study — the *gap*
   is unchanged). A real parse-check is a separate gate to build, not a docs edit.
 
-## [ADR-COPILOT](../docs/adr/0004_copilot.md)
+## [ADR-COPILOT](../docs/adr/0005_copilot.md)
 
 - **COPILOT-JETBRAINS-UNPROBED** — hands-only, one command. The JetBrains plugin drives the
   local CLI, but the `events.jsonl` writer is gated on `getReverseCallHandler() === undefined`
@@ -50,11 +50,11 @@ COPILOT-JETBRAINS-UNPROBED).
   `~/.copilot/session-state/*/events.jsonl`; `workspace.yaml`'s `client_name` names the
   surface. Pair with GFX-IDE-PATH-UNPROBED.
 
-## [ADR-COVERAGE](../docs/adr/0008_coverage.md)
+## [ADR-COVERAGE](../docs/adr/0002_coverage.md)
 
 - **COVERAGE-STRIKE-2** — **Arpit's call.** The "two strikes → a gate" rule (CLAUDE.md) named
   a remedy after the second stale-cell incident: a generator derived from ADR-COVERAGE's own
-  tables. A third incident (**COVERAGE-STRIKE-3**, `docs/adr/0008_coverage.md`'s copilot-CLI
+  tables. A third incident (**COVERAGE-STRIKE-3**, `docs/adr/0002_coverage.md`'s copilot-CLI
   Chat title cell, fixed in the 2026-08-15 ADR correctness sweep) showed that remedy would
   **not** have caught it — the cell was wrong because a belief about the code went stale, not
   because arithmetic drifted, and a generator built on the same belief reproduces it.
@@ -66,7 +66,7 @@ COPILOT-JETBRAINS-UNPROBED).
   shippable separately since it would have caught STRIKE 1. Awaiting Arpit's accept or
   override.
 
-## [ADR-KIRO](../docs/adr/0005_kiro.md)
+## [ADR-KIRO](../docs/adr/0006_kiro.md)
 
 - **AUTHORSHIP-CODE-CATCHUP** — the record is ratified and says in its own §1 that three of
   its decisions are unbuilt; honest, but only until this closes. **(a)** `COVERAGE_GAPS` still
@@ -85,11 +85,11 @@ COPILOT-JETBRAINS-UNPROBED).
   (`chatSessions` first; `chatEditingSessions` self-deletes on stop, so it needs a cadence
   cage lacks — pairs with CONTINUOUS-CAPTURE). Ratified as an order, not as work.
 
-## [ADR-GRAPHIFY](../docs/adr/0007_graphify.md)
+## [ADR-GRAPHIFY](../docs/adr/0008_graphify.md)
 
 - **GFX-IDE-PATH-UNPROBED** — hands-only, one probe. Whether an IDE-spawned terminal inherits
   the project's `bin/` (so the graphify shim actually resolves there) has never been measured
-  (Arpit skipped it 2026-08-14); `docs/adr/0008_coverage.md` marks every IDE interceptor cell
+  (Arpit skipped it 2026-08-14); `docs/adr/0002_coverage.md` marks every IDE interceptor cell
   `‡ UNPROBED` on this account alone. Run one graphify query from a real IDE terminal (VS Code
   / Kiro / JetBrains) and check whether a receipt files. Pair with COPILOT-JETBRAINS-UNPROBED
   (ADR-COPILOT) — same class of probe, same machine visit could do both.

@@ -3,7 +3,7 @@
 One builder per scenario family; every id and timestamp is pinned so the
 rendered output is byte-stable — `tests/test_output_spec.py` asserts against
 `tests/fixtures/goldens/*.txt`, and `tests/test_adr_output_blocks.py` asserts
-`docs/adr/0002_cli.md`'s GATED blocks are byte-identical to those same fixture
+`docs/adr/0003_cli.md`'s GATED blocks are byte-identical to those same fixture
 files (one artifact, docs and tests cannot disagree).
 
 Numbers are chosen to exercise every rule, not to be pretty: exact-priced

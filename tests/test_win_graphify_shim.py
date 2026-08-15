@@ -1,6 +1,6 @@
 """The Windows graphify interceptor (`graphify.cmd`) and its contract with the POSIX twin.
 
-Two implementations of one behaviour spec — [docs/adr/0007_graphify.md](../docs/adr/0007_graphify.md),
+Two implementations of one behaviour spec — [docs/adr/0008_graphify.md](../docs/adr/0008_graphify.md),
 behaviours B1–B8, divergences D1–D7. These tests are that contract, executable.
 
 Two tiers, deliberately:

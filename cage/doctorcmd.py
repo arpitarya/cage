@@ -644,7 +644,7 @@ def _interceptor(root: Path, scan) -> tuple[str, str]:
     script with no extension, and Windows resolves a bare `graphify` only through
     PATHEXT — so a project scaffolded on POSIX and opened on Windows has an interceptor
     file, on PATH, naming live verbs, that **can never run**. Reporting that as ✅ would
-    recreate F1 on a new OS (docs/adr/0007_graphify.md)."""
+    recreate F1 on a new OS (docs/adr/0008_graphify.md)."""
     from cage import paths
     shim = root / "bin" / paths.graphify_shim_name()
     other = next(p for p in paths.graphify_shims(root) if p != shim)
@@ -716,7 +716,7 @@ def _path_interceptor(root: Path) -> tuple[str, str]:
 
 def _launcher_gap(root: Path) -> tuple[str, str]:
     """GF-LAUNCHER: python-launcher mode removes `cage` from PATH entirely, but the
-    graphify interceptor's capability probe (docs/adr/0007_graphify.md B5) needs exactly that — it
+    graphify interceptor's capability probe (docs/adr/0008_graphify.md B5) needs exactly that — it
     runs `cage interceptor graphify --help` before deciding whether to meter. So **neither twin**
     can ever meter a graphify call in this mode; both degrade to correct, unmetered
     passthrough, silently. That combination — launcher mode ON, an interceptor installed

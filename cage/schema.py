@@ -323,7 +323,7 @@ def make_consumer_metric(*, route: str, provider: str = "", model: str = "",
     directory shape every other producer now owns (`ledger/consumer/`).
 
     **This kind is an honest near-duplicate of `calls`, and that was the objection.**
-    [ADR-CONSUMERS](../docs/adr/0006_consumer.md) rejected giving consumers a metric
+    [ADR-CONSUMERS](../docs/adr/0007_consumer.md) rejected giving consumers a metric
     ledger precisely because *"a metric kind exists to hold vendor-native facts a caller
     could not supply. For a library caller there is no vendor store — the kind would be a
     rename of `calls` with a longer path."* That reasoning is still correct **about the

@@ -315,7 +315,7 @@ def active_ledger_source(start: Path | None = None) -> str:
 
 # ── the graphify interceptor twins ──────────────────────────────────────────────
 #
-# One behaviour contract (docs/adr/0007_graphify.md), two implementations: the
+# One behaviour contract (docs/adr/0008_graphify.md), two implementations: the
 # extensionless POSIX `graphify` and the Windows `graphify.cmd`. The names live here,
 # with the rest of "where things live", so the writer (`adoptcmd`) and every read
 # surface (`pathshim`, `wiringscan`, `doctorcmd`) share one enumeration — a read
@@ -1269,7 +1269,7 @@ class Footprint:
         mechanism — the same precedent `copilot_dir` names, for the same reason (smallest
         diff, already tested), and NOT a generalization of `shard()`.
 
-        Named `consumer/` to match [ADR-CONSUMERS](../docs/adr/0006_consumer.md)'s own
+        Named `consumer/` to match [ADR-CONSUMERS](../docs/adr/0007_consumer.md)'s own
         vocabulary rather than `lib/`: the *default* agent name is `lib`, but a caller may
         stamp any name (a proxy row, a named application), and the directory is the
         producer's home, not one agent's."""

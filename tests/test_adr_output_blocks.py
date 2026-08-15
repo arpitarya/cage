@@ -32,7 +32,7 @@ import pytest
 from cage import cli
 
 REPO = Path(__file__).resolve().parent.parent
-DOC = REPO / "docs" / "adr" / "0002_cli.md"
+DOC = REPO / "docs" / "adr" / "0003_cli.md"
 GOLD = REPO / "tests" / "fixtures" / "goldens"
 
 HEADING = "## What the output looks like"

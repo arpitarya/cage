@@ -150,7 +150,7 @@ Additive/optional, never in an id.
 belong to the *machine* rather than to a project. Distinct from its older role as the
 project-less **fallback** sink: kiro's IDE rows land there even from inside a project,
 because their source has no project dimension to attribute by
-([ADR-KIRO](adr/0005_kiro.md)).
+([ADR-KIRO](adr/0006_kiro.md)).
 
 **routed leg** — the one place a single `cage import` sweep writes **two** ledgers: kiro's
 IDE rows to the machine ledger, everything else to the active sink. Fully contained in
@@ -216,7 +216,7 @@ Enumerated once in [paths.py](../cage/paths.py) (`GRAPHIFY_SHIMS`) so no read su
 can see only one.
 
 **shim contract** — the written behaviour spec both interceptor twins implement and are
-tested against ([docs/adr/0007_graphify.md](adr/0007_graphify.md)): behaviours **B1–B8**
+tested against ([docs/adr/0008_graphify.md](adr/0008_graphify.md)): behaviours **B1–B8**
 (binding on every twin) and divergences **D1–D7** (real and permanent — cmd has no
 `exec`, so the real binary runs as a child process). Two implementations of an unwritten
 contract drift; this is the written one, and the first artifact of the

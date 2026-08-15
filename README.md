@@ -75,7 +75,7 @@ cage insights commits           # per commit: tokens, hours, and the agent/human
 cage query "how is a saving calculated"  # explain any number — live formula, $0
 ```
 
-**Every command, in one page: [docs/adr/0002_cli.md](docs/adr/0002_cli.md)** — the 4 daily verbs, the 5
+**Every command, in one page: [docs/adr/0003_cli.md](docs/adr/0003_cli.md)** — the 4 daily verbs, the 5
 groups, the hidden plumbing and every flag. It's checked against the live parser by
 `tests/test_cli_reference.py`, so it can't quietly drift out of date.
 

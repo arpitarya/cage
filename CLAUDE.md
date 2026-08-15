@@ -555,7 +555,7 @@ rows likewise aggregate to refs/notes/cage-ledger (CI-sole-writer) for the team 
   there as a wiring bug, not a lint nit. See the wiring-liveness paragraph above: a
   verb deleted outright (never added to `REMOVED`) is the harder case the live-parser
   detector exists to catch. **It is also a documentation migration:**
-  [docs/adr/0002_cli.md](docs/adr/0002_cli.md) is the complete command reference and
+  [docs/adr/0003_cli.md](docs/adr/0003_cli.md) is the complete command reference and
   `tests/test_cli_reference.py` gates it against the live parser, so the rename lands
   in the doc in the same change or the suite goes red.
 - **`paths.py` splits on contact, never wholesale.** The next change that touches one
@@ -878,11 +878,11 @@ fires a trigger updates the doc *and* bumps its row):
   gate/status — so a reader (or an executing agent) sees the whole shape before
   any detail, and a stale plan is spottable at a glance. Existing plans gain the
   index on contact (the fix-on-contact rule), new plans start with it.
-- **[docs/adr/0007_graphify.md](docs/adr/0007_graphify.md)** — the graphify interceptor
+- **[docs/adr/0008_graphify.md](docs/adr/0008_graphify.md)** — the graphify interceptor
   behaviour contract: one spec, two twins. Update in the same change as **any** twin
   edit, marker-set change, or new tool interceptor (every future one implements this
   same shape). Two implementations of an unwritten contract drift.
-- **[docs/adr/0002_cli.md](docs/adr/0002_cli.md)** — **the complete CLI reference**: every command,
+- **[docs/adr/0003_cli.md](docs/adr/0003_cli.md)** — **the complete CLI reference**: every command,
   group, action, flag and choice list, the removed-verb migration table, and the
   surface's known gaps. Update it in the *same change* as any CLI surface change — a
   command added/renamed/removed, a flag added/dropped, a choice list changed. It is
@@ -948,17 +948,19 @@ don't restate them, apply them.
 
 ## Decision records (ADRs)
 
-**The set is TWELVE records — one per thing cage meters, plus one for what binds them all,
-one for the surface it is all read through, one for the map of what each surface can and
-cannot yield, one for the cross-agent question of who wrote which lines, one for
-proving nothing already recorded has changed, one for what may ever be deleted, and one
-for the file that holds every decision you get to make** —
-[ADR-LAWS](docs/adr/0001_laws.md) · [ADR-CLI](docs/adr/0002_cli.md) ·
-[ADR-CLAUDE](docs/adr/0003_claude.md) · [ADR-COPILOT](docs/adr/0004_copilot.md) ·
-[ADR-KIRO](docs/adr/0005_kiro.md) · [ADR-CONSUMERS](docs/adr/0006_consumer.md) ·
-[ADR-GRAPHIFY](docs/adr/0007_graphify.md) · [ADR-COVERAGE](docs/adr/0008_coverage.md) ·
+**The set is THIRTEEN records — one per thing cage meters, plus one for what binds them all,
+one for the map of what each surface can and cannot yield, one for the surface it is all
+read through, one for the cross-agent question of who wrote which lines, one for
+proving nothing already recorded has changed, one for what may ever be deleted, one
+for the file that holds every decision you get to make, and one for the layers an
+agent reaches all of it through** —
+[ADR-LAWS](docs/adr/0001_laws.md) · [ADR-COVERAGE](docs/adr/0002_coverage.md) ·
+[ADR-CLI](docs/adr/0003_cli.md) · [ADR-CLAUDE](docs/adr/0004_claude.md) ·
+[ADR-COPILOT](docs/adr/0005_copilot.md) · [ADR-KIRO](docs/adr/0006_kiro.md) ·
+[ADR-CONSUMERS](docs/adr/0007_consumer.md) · [ADR-GRAPHIFY](docs/adr/0008_graphify.md) ·
 [ADR-AUTHORSHIP](docs/adr/0009_authorship.md) · [ADR-INTEGRITY](docs/adr/0010_integrity.md) ·
-[ADR-CLEANUP](docs/adr/0011_cleanup.md) · [ADR-CONFIG](docs/adr/0012_config.md).
+[ADR-CLEANUP](docs/adr/0011_cleanup.md) · [ADR-CONFIG](docs/adr/0012_config.md) ·
+[ADR-LADDER](docs/adr/0013_ladder.md).
 Index, the ownership table and the standing rule: [docs/adr/README.md](docs/adr/README.md).
 Author new ones from [docs/adr/TEMPLATE.md](docs/adr/TEMPLATE.md).
 
@@ -1191,8 +1193,7 @@ each agent only needs thin idiomatic wiring (`agents.py` orchestrates):
   (`--scope`; **`--team` and `ledger-sync` were deleted in v0.50** — `mergeutil.union_by_id`
   survives and is still `notes-sync`'s merge core, ADR-LAWS).
 - **The agent surface is a four-layer ladder, and L0 is the floor**
-  ([archive/v0.41-agent-surface-layers.proposal.md](work/archive/v0.41-agent-surface-layers.proposal.md);
-  `cage query agent-layers`). **L0 hookless** (pull capture + interceptor + every CLI
+  ([ADR-LADDER](docs/adr/0013_ladder.md); `cage query agent-layers`). **L0 hookless** (pull capture + interceptor + every CLI
   view — *this is cage*, never optional) → **L1 hooks+steering** (`cage setup --hooks`) →
   **L2 MCP** → **L3 skills** (`--skills`). Everything above L0 is **opt-in and two-way**:
   a plain `cage setup` both declines to wire a layer and *removes* one already wired.
@@ -1386,7 +1387,7 @@ each agent only needs thin idiomatic wiring (`agents.py` orchestrates):
   fully/partially/not-wired/needs-healing verdict, never forking the liveness logic;
   `cage query wiring-inventory` explains it.
 - **The graphify interceptor is a TWIN PAIR against ONE written contract**
-  ([docs/adr/0007_graphify.md](docs/adr/0007_graphify.md), v0.38.0) — `data/shims/graphify`
+  ([docs/adr/0008_graphify.md](docs/adr/0008_graphify.md), v0.38.0) — `data/shims/graphify`
   (POSIX sh) and `data/shims/graphify.cmd` (Windows). Windows resolves a bare name only
   through `PATHEXT`, which has **no extensionless entry**, so the sh shim alone could
   never be *found* there and the shim capture route was structurally absent. The

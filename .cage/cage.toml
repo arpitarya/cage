@@ -15,7 +15,7 @@
 # a cage_version stamp (initcmd.run) — that one IS historical and is never rewritten.
 [meta]
 policy_version = "0.27.0"
-cage_version = "0.51.0"
+cage_version = "0.51.1"
 
 # Auto-capture switch. Each agent's hook runs `cage import --agent <itself>` to meter
 # its own on-disk usage log; set enabled=false to pause that without unwiring any hooks

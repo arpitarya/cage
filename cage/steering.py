@@ -558,7 +558,7 @@ _SKILL_WINDOWS_SHIM = Doc(
     layer="L3",
     body="""
 The interceptor is **two implementations of one contract**
-(`docs/adr/0007_graphify.md`): `data/shims/graphify` (POSIX sh) and `data/shims/graphify.cmd`
+(`docs/adr/0008_graphify.md`): `data/shims/graphify` (POSIX sh) and `data/shims/graphify.cmd`
 (Windows). Windows resolves a bare name only through `PATHEXT`, which has no
 extensionless entry — so the sh shim alone could never be *found* there, and the shim
 capture route was structurally absent on Windows until the twin existed.

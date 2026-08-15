@@ -97,7 +97,7 @@ def _candidates(name: str, env: dict[str, str] | None = None) -> list[str]:
     execute an extensionless file, so including the bare name would let the POSIX twin
     (`bin/graphify`) be reported as the interceptor that runs when in fact nothing
     resolves — the exact false ✅ this module exists to prevent. Cage's Windows
-    interceptor is `graphify.cmd` (docs/adr/0007_graphify.md); the real graphify is a PyPI
+    interceptor is `graphify.cmd` (docs/adr/0008_graphify.md); the real graphify is a PyPI
     console script, so on Windows it is `Scripts\\graphify.exe`.
 
     Order matters twice over: resolution is **directory-major, extension-minor** (every

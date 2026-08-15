@@ -48,14 +48,14 @@ across nine phases on 2026-08-15 and archived:
 [handoff](../work/archive/v0.51-ledger-restructure.handoff.md) ·
 [prompt](../work/archive/v0.51-ledger-restructure.prompt.md) — the pair is **named, not
 cited**. Its design of record is [ADR-INTEGRITY](adr/0010_integrity.md) plus the reversal
-notes in [ADR-CONSUMERS](adr/0006_consumer.md) and [ADR-KIRO](adr/0005_kiro.md) §2.
+notes in [ADR-CONSUMERS](adr/0007_consumer.md) and [ADR-KIRO](adr/0006_kiro.md) §2.
 
 **METRICS-PRIMARY** — the flip that made those three ledgers the SOURCE of derived
 spend from a pinned cutover — was built and green on 2026-08-14 and archived:
 [handoff](../work/archive/v0.50-metrics-primary.handoff.md) ·
 [prompt](../work/archive/v0.50-metrics-primary.prompt.md) — the pair is **named, not cited**.
-Its design of record is [ADR-CLAUDE](adr/0003_claude.md) §2, [ADR-COPILOT](adr/0004_copilot.md) §2
-and [ADR-KIRO](adr/0005_kiro.md) §2.
+Its design of record is [ADR-CLAUDE](adr/0004_claude.md) §2, [ADR-COPILOT](adr/0005_copilot.md) §2
+and [ADR-KIRO](adr/0006_kiro.md) §2.
 
 **USAGE-ONLY** — the deletion of the money subsystem, and the largest removal in the
 project's history — was built and green on 2026-08-14 and archived:
@@ -100,7 +100,7 @@ The maintained doc set, governed by the *Documentation discipline* section of
 and `OPEN-WORK.md` above; `MACHINE.md` moved with them. Each bullet below links
 to its real location.
 
-- **[CLI.md](adr/0002_cli.md) — every `cage` command in one place.** The 5 daily verbs, the 7
+- **[CLI.md](adr/0003_cli.md) — every `cage` command in one place.** The 5 daily verbs, the 7
   groups, the 4 hidden plumbing commands and every flag, plus the removed-verb
   migration table and the surface's known gaps. **Test-gated**: `tests/test_cli_reference.py`
   checks it bidirectionally against `cli.build_parser()`, so a rename that misses this
@@ -119,8 +119,8 @@ to its real location.
   ADR-GRAPHIFY §2. One document per agent now carries both *what is captured* and *why*,
   so a capture change and its rationale can no longer drift apart. The same
   update-in-the-same-change rule applies, now to the ADR:
-  [ADR-CLI](adr/0002_cli.md) · [ADR-CLAUDE](adr/0003_claude.md) · [ADR-COPILOT](adr/0004_copilot.md) ·
-  [ADR-KIRO](adr/0005_kiro.md) · [ADR-CONSUMERS](adr/0006_consumer.md) · [ADR-GRAPHIFY](adr/0007_graphify.md).
+  [ADR-CLI](adr/0003_cli.md) · [ADR-CLAUDE](adr/0004_claude.md) · [ADR-COPILOT](adr/0005_copilot.md) ·
+  [ADR-KIRO](adr/0006_kiro.md) · [ADR-CONSUMERS](adr/0007_consumer.md) · [ADR-GRAPHIFY](adr/0008_graphify.md).
 - [FORMULAS.md](FORMULAS.md) — every computed number: formula · code home ·
   method tag · the knobs that move it.
 - [WORKLOG.md](../work/WORKLOG.md) — the running per-session handoff (append every
@@ -140,9 +140,9 @@ to its real location.
 ## Standing records
 
 - **[adr/](adr/README.md) — the durable *why*: [ADR-LAWS](adr/0001_laws.md) plus one
-  record per metered thing** (restructured 2026-08-14): [ADR-CLI](adr/0002_cli.md) · [ADR-CLAUDE](adr/0003_claude.md) ·
-  [ADR-COPILOT](adr/0004_copilot.md) · [ADR-KIRO](adr/0005_kiro.md) ·
-  [ADR-CONSUMERS](adr/0006_consumer.md) · [ADR-GRAPHIFY](adr/0007_graphify.md). Each has **§1 for humans** (one screen, Mermaid +
+  record per metered thing** (restructured 2026-08-14): [ADR-CLI](adr/0003_cli.md) · [ADR-CLAUDE](adr/0004_claude.md) ·
+  [ADR-COPILOT](adr/0005_copilot.md) · [ADR-KIRO](adr/0006_kiro.md) ·
+  [ADR-CONSUMERS](adr/0007_consumer.md) · [ADR-GRAPHIFY](adr/0008_graphify.md). Each has **§1 for humans** (one screen, Mermaid +
   ASCII diagrams) and **§2 for agents** (the binding detail, ending in a veto condition).
   The five laws that bind them all — pull-only · one sink · append-only ·
   counts-never-content · usage-never-cost — live in [ADR-LAWS](adr/0001_laws.md), each

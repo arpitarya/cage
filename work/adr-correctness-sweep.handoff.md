@@ -18,7 +18,7 @@ verification passes; every finding re-confirmed against the working tree before 
 ## ⚠️ Read this before you touch a file
 
 **A concurrent session was mid-flight in this repo on 2026-08-14** and had staged work across
-14 files, including `docs/adr/0002_cli.md` (+444 lines), `docs/adr/0005_kiro.md`, `CLAUDE.md`,
+14 files, including `docs/adr/0003_cli.md` (+444 lines), `docs/adr/0006_kiro.md`, `CLAUDE.md`,
 `work/OPEN-WORK.md`, and a new `tests/test_adr_output_blocks.py`. It **ratified and reversed
 KIRO-CALLS-LEG**: kiro's `calls` leg is retired like claude's and copilot's, and
 `tokens_generated.jsonl` is relocated into `ledger/kiro/` as `source="ide-log"`. That work landed
@@ -93,7 +93,7 @@ left uncovered — a gate that implies coverage it lacks is the failure this fil
 Each fix touches **both** the mermaid block and its hand-paired ASCII twin. The house rule is
 exact agreement; a fix to one only is a new defect.
 
-### ADR-CLAUDE (`0003_claude.md`) — delete the `join_table` box
+### ADR-CLAUDE (`0004_claude.md`) — delete the `join_table` box
 
 | line | current | do |
 |---|---|---|
@@ -110,7 +110,7 @@ live writer** — a reader currently sees a running second writer that does not 
 Lines 168, 288, 358, 360 in §2 discuss `join_table` in the retirement argument and are **correct
 in context** — leave them; they read as the record of a decision, not a live flow.
 
-### ADR-COPILOT (`0004_copilot.md`) — delete the `calls row` box
+### ADR-COPILOT (`0005_copilot.md`) — delete the `calls row` box
 
 | line | current | do |
 |---|---|---|
@@ -123,7 +123,7 @@ gone."* Credits are **still captured verbatim** and that must survive the edit �
 metric row (`cage/transcript.py:1087`, `:1151`; `schema.make_copilot_metric(credits=…)`). The
 `MM -->|"chat + cli-delta ONLY"| SP` spine arrow is correct; do not touch it.
 
-### ADR-KIRO (`0005_kiro.md`) — credits is a projection, not a sibling
+### ADR-KIRO (`0006_kiro.md`) — credits is a projection, not a sibling
 
 | line | current | do |
 |---|---|---|
@@ -141,7 +141,7 @@ it**, only re-parent the credits edge.
 
 ---
 
-## P2 — ADR-CLI (`0002_cli.md`)
+## P2 — ADR-CLI (`0003_cli.md`)
 
 The worst record in the set: seven live errors, and **six are cases where the document
 contradicts itself** rather than merely lagging the code. Verified against `cli.build_parser()`.
@@ -176,7 +176,7 @@ module built to prevent it: a user typing the old verb is handed a second dead v
 
 ## P3 — the other five records
 
-### ADR-COVERAGE (`0008_coverage.md`) — this is strike 3
+### ADR-COVERAGE (`0002_coverage.md`) — this is strike 3
 
 | line | claim | truth |
 |---|---|---|
@@ -208,7 +208,7 @@ assumption** — do not close them by writing ✅.
 | 59, 68 | both twins name `provenance.jsonl` | `ledger/provenance/provenance-<month>.jsonl` since P3c (`paths.py:1165-1170`) — the record's own Storage note at `:190` says so |
 | 90 | "the model that wrote it \| the commit message's own trailer, read at render time" | sits under **What we can say** with no not-built mark, while its neighbours at 91-93 are bolded **absent**. It is AUTHORSHIP-CODE-CATCHUP item (c) and no parser exists. **Mark it not-built inline** |
 
-### ADR-CONSUMERS (`0006_consumer.md`)
+### ADR-CONSUMERS (`0007_consumer.md`)
 
 Lines 48 and 67 — the *"Where they sit"* diagram pair still shows the **pre-P1 single write**
 (`L --> CA["calls-YYYY-MM.jsonl"]`). P1 dual-writes: `metering.py:64-65` appends the `calls` row
@@ -217,7 +217,7 @@ above (`:30-34`) already says *"Your application got one in v0.51, at `ledger/co
 section titled *Where they sit* shows one of the two places it sits. Both twins agree with each
 other, so this is one stale pair, not a twin mismatch.
 
-### ADR-GRAPHIFY (`0007_graphify.md`)
+### ADR-GRAPHIFY (`0008_graphify.md`)
 
 | line | claim | truth |
 |---|---|---|
