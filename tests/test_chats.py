@@ -396,15 +396,16 @@ def test_csv_is_never_truncated(root, pol):
 
 # ── kiro-IDE: one row, no fabricated per-chat identity ──────────────────────────
 
-def test_kiro_ide_chats_are_absent_because_kiro_has_no_token_spine(root, pol):
-    """The honest consequence of `ledger.ABSENT_SPINES` (USAGE-ONLY, ADR 0011).
-
-    Kiro's IDE `calls` rows are suppressed from `spend()` — there is no IDE token store
-    on this install, so cage will not present a token figure for it. It renders NOTHING
-    here rather than a fabricated row, and the reason is stated on `cage report` and by
-    `cage doctor`'s three-way store probe. The constant-session collapse this test used
-    to pin (`KIRO_IDE_LABEL`) is still implemented and still correct — it simply has no
-    rows to apply to until a Kiro ships the store."""
+def test_calls_shaped_kiro_ide_rows_stay_absent_from_spend(root, pol):
+    """The honest consequence of `ledger.ABSENT_SPINES` (USAGE-ONLY, ADR 0011) —
+    narrower now than this test used to claim. Kiro has never had a `calls`-shaped
+    IDE row on any real install (`SPEND_SOURCES["kiro"] = ()`), so one written here
+    directly still renders NOTHING via `chats.summarize`'s `spend()`-backed calls
+    path. That is NOT the same claim as "kiro IDE chats are absent" — since
+    LEDGER-READ-SURFACE (2026-08-15) a real IDE row (metrics-shaped, from
+    `ledger.kiro_metrics()`) DOES render; see `test_an_ide_metrics_row_renders_as_a_
+    chat_row_with_real_tokens`. This test pins only that the `spend()` path itself
+    is untouched — a hypothetical calls-shaped kiro row would still be dropped."""
     _call(root, "c_k1", agent="kiro", session="kiro", surface="ide",
           provider="kiro", model="agent", tin=100, tout=0)
     _call(root, "c_k2", agent="kiro", session="kiro", surface="ide",
@@ -478,6 +479,17 @@ def _credit(root: Path, *, session: str, agent: str = "kiro", credits: float = 3
     """One kiro-CLI credits row — a different row shape with no tokens and no call."""
     ledger.append_row(root, "credits", schema.make_credit(
         session=session, credits=credits, agent=agent, turns=turns, ts=ts))
+
+
+def _metric(root: Path, *, row_ref: str, source: str = "ide-log", tin: int = 500,
+           tout: int = 0, ts: str = "2026-07-01T10:00:00Z", metric_id: str | None = None):
+    """One kiro-IDE metrics row (LEDGER-READ-SURFACE) — a third row shape, store-
+    verbatim coarse tokens, no call and no credits. `session`/`surface` are left at
+    `schema.make_kiro_metric`'s own defaults so every row lands under the same
+    constant `KIRO_IDE_LABEL` bucket, exactly as the real IDE log always does."""
+    ledger.append_row(root, "kiro", schema.make_kiro_metric(
+        source=source, session="kiro", surface="ide", tokens_in=tin, tokens_out=tout,
+        row_ref=row_ref, ts=ts, metric_id=metric_id))
 
 
 def test_the_routed_sink_is_named_in_the_empty_view_too(root, pol):
@@ -576,6 +588,89 @@ def test_credit_row_agent_pct_refuses_via_existing_coverage_gap(root, pol):
     r = chats.summarize(root, pol)["rows"][0]
     assert r["auth_refusal"] == chats.COVERAGE
     assert authorcapture.coverage_note() in chats.render_chats(chats.summarize(root, pol))
+
+
+# ── LEDGER-READ-SURFACE: a kiro-IDE metrics row is its own chat row ────────────
+
+def test_an_ide_metrics_row_renders_as_a_chat_row_with_real_tokens(root, pol):
+    """The gap this closes: an IDE metrics row used to be invisible to `insights
+    chats` entirely (`ledger.spend()` suppresses every kiro row, any shape). It now
+    renders like a credits chat does — its own row — except tokens are real, store-
+    verbatim counts, not dashed: only `calls` (there was no call) and `credits`
+    (there was no credit) are absent here."""
+    _metric(root, row_ref="1", tin=500, tout=0)
+    out = chats.render_chats(chats.summarize(root, pol, agent="kiro"))
+    lines = out.splitlines()
+    row = next(l for l in lines if l.startswith("kiro"))
+    assert "500" in row
+    assert "—" in row.split()  # credits still dashes
+
+
+def test_multiple_ide_calls_collapse_into_one_bucket(root, pol):
+    """The IDE log stamps every call under the same constant session
+    (`KIRO_IDE_LABEL`) — distinct calls sum into one chat row, not one row each."""
+    _metric(root, row_ref="1", tin=100, tout=0)
+    _metric(root, row_ref="2", tin=200, tout=0)
+    rows = chats.summarize(root, pol, agent="kiro")["rows"]
+    assert len(rows) == 1
+    assert rows[0]["calls"] == 2 and rows[0]["tokens_in"] == 300
+    assert rows[0]["title"] == chats.KIRO_IDE_LABEL
+
+
+def test_ide_metrics_row_keeps_the_footer_caveat_and_names_kiro_metrics(root, pol):
+    _metric(root, row_ref="1")
+    out = chats.render_chats(chats.summarize(root, pol))
+    assert "kiro (no session identity)" in out
+    assert "cage query kiro-metrics" in out
+    assert "kiro-routing" not in out  # the pre-reversal pointer is gone
+
+
+def test_absence_note_is_silent_when_an_ide_row_is_on_screen(root, pol):
+    """The blanket "kiro records no tokens" line must not sit beside a row that
+    contradicts it. With only an IDE metrics row shown, the tokens-absence footer
+    line does not fire."""
+    _metric(root, row_ref="1", tin=500)
+    out = chats.render_chats(chats.summarize(root, pol, agent="kiro"))
+    assert "kiro tokens: —" not in out
+
+
+def test_absence_note_still_fires_for_a_credits_only_kiro_view(root, pol):
+    """The same footer line still fires when every shown kiro row is credits-shaped
+    (no IDE row on screen to contradict it) — the per-row gating in
+    `_unit_absence_notes` narrows the trigger, it does not delete it."""
+    _credit(root, session="kc1")
+    out = chats.render_chats(chats.summarize(root, pol, agent="kiro"))
+    assert "kiro tokens: —" in out
+
+
+def test_ide_metrics_row_moves_no_call_or_credits_chat_cell(root, pol):
+    """The same money-independent carve-out CHATS-CREDITS pins, for the third row
+    shape: an IDE metrics row can only ever add a row of its own."""
+    _call(root, "c_1", agent="claude-code", session="s1", tin=100, tout=10, cached=5)
+    _credit(root, session="kc1", credits=7.0)
+    before = chats.summarize(root, pol)
+    _metric(root, row_ref="1", tin=500)
+    after = chats.summarize(root, pol)
+    s1_before = next(r for r in before["rows"] if r["session"] == "s1")
+    s1_after = next(r for r in after["rows"] if r["session"] == "s1")
+    kc1_before = next(r for r in before["rows"] if r["session"] == "kc1")
+    kc1_after = next(r for r in after["rows"] if r["session"] == "kc1")
+    numeric_fields = ("calls", "tokens_in", "cached_in", "cache_write_in",
+                      "tokens_out", "credits")
+    for f in numeric_fields:
+        assert s1_after[f] == s1_before[f], f"call chat {f} moved"
+        assert kc1_after[f] == kc1_before[f], f"credits chat {f} moved"
+    assert {r["session"] for r in after["rows"]} - {r["session"] for r in before["rows"]} \
+        == {"kiro"}
+
+
+def test_ide_metrics_row_since_filters_by_ts(root, pol):
+    _metric(root, row_ref="old", ts="2020-01-01T00:00:00Z")
+    _metric(root, row_ref="new")  # default ts: 2026-07-01T10:00:00Z
+    data = chats.summarize(root, pol, since="7d")
+    assert data["rows"] == []
+    data_recent = chats.summarize(root, pol, since="100d")
+    assert len(data_recent["rows"]) == 1 and data_recent["rows"][0]["tokens_in"] > 0
 
 
 # ── --agent filter ───────────────────────────────────────────────────────────

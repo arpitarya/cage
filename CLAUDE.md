@@ -1015,7 +1015,7 @@ device. Three parts, each load-bearing:
 ## Dev
 
 ```bash
-just test          # python -m pytest -q   (1563 tests; +10 Windows-only skips, +1 opt-in dogfood-age skip)
+just test          # python -m pytest -q   (1571 tests; +10 Windows-only skips, +1 opt-in dogfood-age skip)
 just demo          # seed §4.4 + print attrib/matrix
 cage --version
 ```
@@ -1159,7 +1159,7 @@ each agent only needs thin idiomatic wiring (`agents.py` orchestrates):
   `project` on the credit row. Pre-existing duplicated rows are never rewritten
   (append-only); `chats.kiro_routed_line` now always returns `""` (there is nothing left
   to explain — kiro rows are simply in the ledger you're looking at) but is kept as a
-  stable call site rather than deleted. Hooks are an optional
+  stable call site rather than deleted. **`insights chats` also gained a real read of kiro's IDE usage the same day (LEDGER-READ-SURFACE)**: `chats.summarize` now reads `ledger.kiro_metrics()`'s IDE-sourced rows directly — a third bucket kind alongside calls and kiro-CLI credits (CHATS-CREDITS), collapsed under the existing constant-session `KIRO_IDE_LABEL`, real coarse tokens shown (credits dashed, the store has none). This is a narrower, separate read from `ledger.spend()`, which still excludes kiro entirely — the cross-agent total is untouched. Hooks are an optional
   CLI-only real-time add-on (they don't fire under a VS Code extension). **Capture-on-read**
   (capture-architecture Phase 1) makes a *read* the primary trigger: `report`/`insights *`/
   the MCP read tools call `importcmd.ensure_captured` before rendering (throttled on

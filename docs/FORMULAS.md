@@ -277,10 +277,12 @@ is unchanged and still tested: a `state/` row can never move a derived number.
 
 ### 2.13 Chats view — no new math, one column per ledger field
 
-`cage insights chats` ([chats.py](../cage/chats.py)) is a pure group-by over `calls`,
-summed per `(agent, surface, session)` bucket — every column is a straight ledger field
-or the existing token sums (§1). No formula lives here that isn't already
-spec'd elsewhere.
+`cage insights chats` ([chats.py](../cage/chats.py)) is a group-by over `calls` plus two
+narrower row shapes kept structurally apart by a trailing discriminator in the bucket
+key — kiro-CLI `ledger.credits` rows (CHATS-CREDITS) and kiro-IDE `ledger.kiro_metrics()`
+rows (LEDGER-READ-SURFACE, both documented in the bullets below) — summed per
+`(agent, surface, session)` bucket. Every column is still a straight ledger field or the
+existing token sums (§1). No formula lives here that isn't already spec'd elsewhere.
 
 | column | source |
 |---|---|
@@ -319,6 +321,19 @@ spec'd elsewhere.
   first; this is ordering, never arithmetic, so it does not blend the two axes. No
   manifest row exists for a kiro-CLI conversation today, so its title always falls back
   to the session id (a future store-side title is a follow-up, not this change).
+- **Kiro-IDE metrics rows render too (LEDGER-READ-SURFACE, 2026-08-15)** — a fourth row
+  shape, `ledger.kiro_metrics()`'s IDE-sourced rows (`source` `ide`/`ide-log`), read
+  directly and bucketed apart from any call/credits bucket by the same trailing
+  discriminator CHATS-CREDITS introduced. Unlike a credits row, tokens are **not**
+  dashed — the store carries real, if coarse, counts (output is frequently `0`, never
+  estimated); only `credits` dashes (the IDE store has none). Every row lands under
+  the same constant `KIRO_IDE_LABEL` chat (`kiro (no session identity)`, the same
+  constant-session collapse the carve-out above already documents), summing `calls`/
+  `tokens_in`/`tokens_out` across every distinct IDE call this run captured. This read
+  is separate from — and never joins — `ledger.spend()`: kiro still contributes zero
+  tokens to any cross-agent total (ADR-KIRO), so this bullet changes what `chats`
+  shows and nothing about `report`/`insights commits`. `agent%` still refuses via the
+  existing coverage gap (kiro's stores hold no edit text, same as its CLI credits).
 - **No method tag on the grouping itself** — the same reasoning as §2.12: a sum and a
   sort are not a claim about how a number was priced. `cost` inherits `call_usd_match`'s
   tag exactly like `report` (§1), which means a bucket with any credits-priced row
@@ -353,14 +368,16 @@ spec'd elsewhere.
   call-based chat (`tests/test_chats.py::
   test_reading_credits_adds_a_row_and_moves_no_call_chat_cell`).
 - **The filter is blamed only when the filter is the reason.** `No chats match agent
-  'kiro' — the filter is empty, not the ledger` is true about the filter and misleading
-  about kiro-IDE, whose absence is structural (IDE rows routed to the machine ledger,
-  [ADR-KIRO](adr/0006_kiro.md)). Kiro-CLI used
-  to carry a second structural reason (credits rows produced no chat at all); CHATS-
-  CREDITS removed it by giving those rows a real chat row, so the only structural
-  reason left is the IDE-routing one. The empty view names the reasons it can evidence,
-  and only for the agent asked about; an absence with no structural cause keeps the
-  filter message unchanged.
+  'kiro' — the filter is empty, not the ledger` is true about the filter and was once
+  misleading about kiro-IDE, whose absence used to be structural (`calls`-shaped IDE
+  rows suppressed by `ledger.ABSENT_SPINES`/`SPEND_SOURCES`, [ADR-KIRO](adr/0006_kiro.md)).
+  Kiro-CLI carried a second structural reason (credits rows produced no chat at all);
+  CHATS-CREDITS removed it by giving those rows a real chat row. LEDGER-READ-SURFACE
+  (2026-08-15) then did the same for real IDE usage — a metrics row now renders — so
+  today the `calls`-shaped-IDE reason applies only to the hypothetical case no real
+  Kiro install produces (see the LEDGER-READ-SURFACE bullet above). The empty view
+  names the reasons it can evidence, and only for the agent asked about; an absence
+  with no structural cause keeps the filter message unchanged.
 - Ranking (`tokens_in` desc, then session id) and the top-20 cut (`--all` lifts it) are
   render-time only — `chats.summarize()` returns every row un-truncated, so `--all` can
   never move a number, only how many rows are shown. CSV is never truncated. Explained

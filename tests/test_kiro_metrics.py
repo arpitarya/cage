@@ -1,9 +1,12 @@
 """KIRO-METRICS — the `.cage/ledger/kiro/` per-chat metrics ledger.
 
-Capture-only: a new row shape (`schema.make_kiro_metric`) fed by Kiro's IDE
-`devdata.sqlite` and CLI SQLite store, collapsed last-write-wins at read
-(`ledger.kiro_metrics`), and read by NO derived view in this build. What this file
-pins, following `docs/kiro-metrics-ledger.handoff.md` §9 (mirrors
+Capture-only substrate (`schema.make_kiro_metric`) fed by Kiro's IDE `devdata.sqlite`
+and CLI SQLite store, collapsed last-write-wins at read (`ledger.kiro_metrics`). Since
+LEDGER-READ-SURFACE (2026-08-15) it IS read by one derived view — `insights chats`
+reads IDE-sourced rows directly and renders them as their own chat line, mirroring the
+existing CHATS-CREDITS pattern for kiro-CLI credits; `ledger.spend()` still excludes
+kiro entirely (ADR-KIRO), so the read stays out of every cross-agent total. What this
+file pins, following `docs/kiro-metrics-ledger.handoff.md` §9 (mirrors
 `tests/test_copilot_metrics.py`'s structure — the twin kind):
 
 1. The substrate — enum validation, omit-at-zero, None-sentinel `credits`, `km_` ids.
@@ -16,9 +19,10 @@ pins, following `docs/kiro-metrics-ledger.handoff.md` §9 (mirrors
 5. Counts-never-content: a `history[].user` sentinel never reaches a written shard byte.
 6. Re-import is idempotent; a grown conversation appends a fresh row and the collapse
    read resolves to the latest/largest.
-7. Routing (ADR 0006, inherited never re-decided): IDE rows land only in the routed
-   sink; CLI rows stay workspace-scoped to the project.
-8. No derived view moves by one byte whether the `kiro/` tree exists or not.
+7. Routing (ADR-LEDGER, reversed 2026-08-15): every kiro row — IDE and CLI alike —
+   lands in whichever ledger is active for the run, like any other agent.
+8. `insights chats` now moves when an IDE metrics row is present (LEDGER-READ-SURFACE);
+   the cross-agent spend/report total does not (ADR-KIRO) — pinned separately below.
 """
 from __future__ import annotations
 
@@ -30,6 +34,7 @@ from types import SimpleNamespace
 import pytest
 
 from cage import cli, doctorcmd, importcmd, ledger, paths, schema, transcript
+from cage.chats import KIRO_IDE_LABEL
 from srcseed import mkcage
 
 PROMPT_BODY_SENTINEL = "please refactor the auth module to use JWT tokens instead"
@@ -422,19 +427,45 @@ def _render(argv: list[str], capsys) -> str:
     return capsys.readouterr().out
 
 
-def test_report_and_chats_byte_identical_with_kiro_tree_present_or_absent(proj, capsys):
+def test_chats_now_moves_since_the_read_surface_landed(tmp_path, monkeypatch, capsys):
+    """Superseded (LEDGER-READ-SURFACE, closed 2026-08-15): this test used to be named
+    `test_report_and_chats_byte_identical_with_kiro_tree_present_or_absent` and pinned
+    the OPPOSITE — that a kiro metrics row moved `insights chats` by zero bytes. That
+    was always the gap, not a law: `chats.py` now reads `ledger.kiro_metrics()` directly
+    (mirrors CHATS-CREDITS), so an IDE row renders as its own chat line. Note the
+    original test never actually isolated `proj` as the CLI's resolved root (no
+    `mkcage`/`chdir`), so both "before" and "after" silently read an empty global
+    ledger and the assertion held vacuously — fixed here alongside the behavior
+    change."""
+    root = _isolate(tmp_path, monkeypatch)
     from cage import demo
-    demo.seed(proj)
-    ledger.append_row(proj, "kiro", schema.make_kiro_metric(
+    demo.seed(root)
+    before = _render(["insights", "chats"], capsys)
+    ledger.append_row(root, "kiro", schema.make_kiro_metric(
         source="ide", session="kiro", surface="ide", tokens_in=999, tokens_out=999,
         row_ref="1", ts="2026-08-13T00:00:00Z", metric_id="km_present"))
-    before = {" ".join(v): _render(v, capsys)
-             for v in (["insights", "chats"], ["insights", "chats"])}
-    for sh in paths.Footprint(proj).kiro_metric_shards():
-        sh.unlink()
-    after = {" ".join(v): _render(v, capsys)
-            for v in (["insights", "chats"], ["insights", "chats"])}
+    after = _render(["insights", "chats"], capsys)
+    assert before != after
+    assert "999" not in before and "999" in after
+    assert KIRO_IDE_LABEL in after
+
+
+def test_report_spend_total_is_untouched_by_kiro_ide_metrics(tmp_path, monkeypatch):
+    """The invariant `test_chats_now_moves_since_the_read_surface_landed` does NOT
+    touch: kiro still contributes zero tokens to the cross-agent spend/report total
+    (ADR-KIRO). `chats.py` reads `ledger.kiro_metrics()` directly — a second, narrower
+    surface — never through `ledger.spend()`, so `SPEND_SOURCES["kiro"] = ()` and the
+    total stay exactly as before."""
+    root = _isolate(tmp_path, monkeypatch)
+    from cage import demo
+    demo.seed(root)
+    before = [dict(c) for c in ledger.spend(root)]
+    ledger.append_row(root, "kiro", schema.make_kiro_metric(
+        source="ide", session="kiro", surface="ide", tokens_in=999, tokens_out=999,
+        row_ref="1", ts="2026-08-13T00:00:00Z", metric_id="km_present"))
+    after = [dict(c) for c in ledger.spend(root)]
     assert before == after
+    assert ledger.SPEND_SOURCES["kiro"] == ()
 
 
 # ── 11 · doctor advisory ──────────────────────────────────────────────────────

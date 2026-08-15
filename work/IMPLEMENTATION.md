@@ -8,6 +8,71 @@ Entry format:
 
 ```
 
+## 2026-08-15 — LEDGER-READ-SURFACE closed: kiro-IDE metrics now print on `cage insights chats`
+
+- **Built (`cage/chats.py`):** `_bucket_key`'s `credits: bool` widened to a `kind: str`
+  discriminator (`call`/`credits`/`metrics`); `summarize()` reads
+  `ledger.kiro_metrics()`'s IDE-sourced rows (`source` in `ide`/`ide-log`) directly and
+  buckets them under the existing constant-session `KIRO_IDE_LABEL`, summing
+  `calls`/`tokens_in`/`tokens_out`/`cached_in` across every distinct IDE call — real,
+  coarse tokens shown (unlike a kiro-CLI credits row, which dashes). This read never
+  touches `ledger.spend()`; kiro still contributes zero tokens to any cross-agent total
+  (ADR-KIRO's core invariant, untouched).
+- **Built (`cage/chats.py`, `cage/units.py`, `cage/display.py`):** `_row_dashes_unit` +
+  rewritten `_unit_absence_notes` so the blanket "kiro records no tokens" footer line
+  only fires when every kiro row on screen is credits-shaped (an IDE row on the same
+  screen would otherwise contradict it); footer caveat re-pointed from the dead
+  `kiro-routing` query to `kiro-metrics`; `units.py`'s `ABSENT["kiro"][TOKENS]` reason
+  and module docstring scoped explicitly to the spend/report surface; `display.py`'s
+  stale comment fixed.
+- **Fixed:** `test_report_and_chats_byte_identical_with_kiro_tree_present_or_absent`
+  was vacuous — it never isolated its `proj` fixture as the CLI's resolved root, so
+  both sides of the assertion silently read an empty global ledger regardless of the
+  row it wrote. Replaced with two real tests (one pinning the new chats behavior, one
+  pinning the spend-total invariant it does not touch).
+- **Docs:** `docs/FORMULAS.md` §2.13 (new bullet, two stale pre-ADR-LEDGER sentences
+  fixed) · `docs/adr/0006_kiro.md` (Known gaps: "no read surface" item struck through
+  and closed, "no token spine" item qualified to name the surface it's about;
+  Reference: new citation) · `CLAUDE.md` Chats view bullet.
+- **Files:** `cage/chats.py` · `cage/units.py` · `cage/display.py` ·
+  `docs/FORMULAS.md` · `docs/adr/0006_kiro.md` · `CLAUDE.md` ·
+  `tests/test_chats.py` · `tests/test_kiro_metrics.py` · `work/OPEN-WORK.md` ·
+  `work/WORKLOG.md`.
+- **Test status:** `just test` **1571 passed, 11 skipped** (8 net new).
+- **Next step:** a dedicated `cage insights kiro` view stays unbuilt — narrower scope,
+  not requested; named in ADR-KIRO's Known gaps rather than filed as a new queue item.
+
+## 2026-08-15 — v0.52.0: ADR-LEDGER ships — Kiro IDE rows stop routing to the machine ledger; ADR-MATRIX ratified
+
+- **Built (`cage/paths.py`):** `kiro_ledger`/`kiro_routed` retired as routing decisions
+  — kept as stable call sites, now always return `root` / `None`. Law 2 in ADR-LAWS
+  ("one sink per run") is now exceptionless.
+- **Built (`cage/importcmd.py`):** `_kiro_leg` and `_drop_routed_kiro_state` — the
+  routed leg's own lock/cursors/health/manifest/`import_id` machinery — deleted
+  outright, not just unreachable. `_import_rollup` now unconditionally excludes kiro's
+  collected rows from any summed total (a real regression caught and fixed in the same
+  change: kiro's rows became reachable from `collected` on every real sweep once the
+  routed leg was removed, where before they lived in a separate list that never
+  reached this function).
+- **Docs:** new `docs/adr/0015_ledger.md` (ADR-LEDGER, ratified + shipped same day) ·
+  new `docs/adr/0014_matrix.md` (ADR-MATRIX, ratified — design only, nothing built) ·
+  `docs/adr/0001_laws.md`, `0003_cli.md`, `0006_kiro.md`, `0009_authorship.md`,
+  `docs/adr/README.md` updated; ADR set now fifteen records.
+- **Released:** `__version__` 0.52.0, CHANGELOG entry, README *What's new* replaced.
+- **Files:** `cage/paths.py` · `cage/importcmd.py` · `cage/chats.py` ·
+  `cage/doctorcmd.py` · `cage/explain_data.py` · `cage/pathprobe.py` ·
+  `docs/adr/0001_laws.md` · `docs/adr/0003_cli.md` · `docs/adr/0006_kiro.md` ·
+  `docs/adr/0009_authorship.md` · `docs/adr/0014_matrix.md` · `docs/adr/0015_ledger.md` ·
+  `docs/adr/README.md` · nine test files · `cage/__init__.py` · `CHANGELOG.md` ·
+  `README.md` · `CLAUDE.md` · `work/OPEN-WORK.md` · `work/WORKLOG.md` ·
+  `work/DOC-REGISTRY.md`.
+- **Test status:** `just test` **1563 passed, 11 skipped**.
+- **Evidence:** the accepted-cost measurement (a fresh workspace's ledger picking up
+  22/28 rows belonging to a different workspace under the old routed scheme) is in
+  ADR-LEDGER's own Reference section.
+- **Next step:** LEDGER-READ-SURFACE (above, same day) was a separate, narrower ask —
+  reading kiro's IDE rows into `cage insights chats` — not required by this reversal.
+
 ## 2026-08-15 — v0.51.1: DUMMYREPO-STALE-VERBS closed whole, and two CI checks were asserting the opposite of their names
 
 - **Built (`tools/dummyrepo/run.py`):** `assert_exact_rows` → `assert_captured_facts` —

@@ -9,7 +9,11 @@ unit does not exist, never a `0`.
     agent     tokens   credits
     claude    ✓        —  no credit unit exists on disk for Claude Code
     copilot   ✓        ✓
-    kiro      —        ✓  (its IDE token store is absent; CLI spend is credits-only)
+    kiro      —*       ✓  (spend/report total excludes kiro entirely; its CLI's token
+                           columns are still null. * `insights chats` shows real, if
+                           coarse, per-chat IDE token counts read directly off a separate
+                           log — LEDGER-READ-SURFACE, 2026-08-15 — but that read never
+                           joins this table's `tokens` column or any cross-agent total.)
 
 **Why the two absences must never render identically.** One is a vendor law (Claude Code
 has no credit concept at all) and one is a missing store on this machine (a future Kiro
@@ -45,17 +49,21 @@ UNITS = (TOKENS, CREDITS)
 #: row here at all. Reasons are whole sentences: they are rendered verbatim to users.
 ABSENT: dict[str, dict[str, str]] = {
     "claude": {CREDITS: "Claude Code records no credit unit on disk"},
-    # Widened in P2 (v0.51). It read "no IDE token store on this install", which named
-    # ONE surface and one cause — and a reader could fairly conclude the CLI had tokens.
-    # **Both** Kiro surfaces lack them, for two different vendor reasons, and the sentence
-    # is rendered verbatim to users so it has to carry both: the IDE ships no token store
-    # (`devdata.sqlite` is absent on every install probed; its `tokens_generated.jsonl`
-    # twin is 0-output and unsummable), and the CLI's store HAS token columns that are
-    # still NULL (kiro-cli 2.16.0). The second is an upgrade-watch, not a permanent
-    # absence — which is exactly the distinction one clause could not make.
-    "kiro": {TOKENS: "Kiro records no tokens on either surface — the IDE ships no token "
-                     "store, and the CLI's token columns are still null (2.16.0). Its "
-                     "usage is credits"},
+    # Widened in P2 (v0.51), then narrowed again by LEDGER-READ-SURFACE (2026-08-15):
+    # `insights chats` now reads `ledger.kiro_metrics()` directly and shows real, if
+    # coarse, per-chat IDE token counts (`tokens_generated.jsonl` — the only IDE store
+    # any probed install has; `devdata.sqlite` remains absent everywhere). This entry
+    # is about a DIFFERENT surface: the cross-agent spend/report total, which still
+    # excludes kiro entirely (`ledger.spend()`'s `SPEND_SOURCES["kiro"] = ()`,
+    # ADR-KIRO) — that invariant is untouched. `chats.py`'s `_unit_absence_notes` only
+    # renders this sentence when every kiro row on screen is credits-shaped, so it
+    # never sits beside a row it contradicts; the sentence itself must still be true
+    # on ITS OWN surface (the spend total) even though the chats view has since grown
+    # a second, narrower read surface this sentence is not describing.
+    "kiro": {TOKENS: "Kiro contributes no tokens to any spend/report total — its CLI's "
+                     "token columns are still null (2.16.0), and IDE token counts, "
+                     "where present, are shown per-chat by `insights chats` reading a "
+                     "separate log, never through this total"},
 }
 
 

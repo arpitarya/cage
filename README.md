@@ -238,7 +238,7 @@ cage insights commits --csv --since 30d                  # per-commit rows for a
 
 ## The `$0` guarantee
 
-Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 1563 tests; `cage demo` seeds a real ledger you can read with `cage insights chats`.
+Every derived view is parse / arithmetic over the log — **no LLM call, ever, on the read or maintenance path.** The only model spend is whatever your agent already does; Cage just meters it. The semantic cache and learned compressor ship behind opt-in `[embeddings]` / `[ml]` extras; the default install is model-free and dependency-free. 1571 tests; `cage demo` seeds a real ledger you can read with `cage insights chats`.
 
 **Honest limits.** Marginal-by-fixed-order is defensible and `$0`, but it is an *ordering convention*, not a Shapley value (that's a deferred audit mode). And a counterfactual cell is an honest reconstruction, never an invoice — the `method` column says so on every row, on purpose.
 
@@ -246,7 +246,7 @@ Every derived view is parse / arithmetic over the log — **no LLM call, ever, o
 
 Latest release below — full history and detail in [CHANGELOG.md](CHANGELOG.md).
 
-- **v0.52.0 — ADR-LEDGER: Kiro's IDE token rows stop routing to the machine ledger.** Every source now captures into the one ledger a `cage import` run resolves — Claude, Copilot, Kiro CLI and Kiro IDE alike — reversing the one exception ADR-KIRO carved into "one sink per run." The accepted cost: the same Kiro IDE turn can now land as a separate row in more than one project's ledger. Also ships ADR-MATRIX, the ratified (not yet built) design for a token-cost view across tool combinations. ([CHANGELOG](CHANGELOG.md))
+- **v0.53.0 — Kiro's IDE token usage now prints on `cage insights chats`.** Captured since v0.51 but never rendered anywhere: `chats.summarize` now reads Kiro's IDE metrics ledger directly and shows real, coarse tokens as their own chat row — a narrower read than `ledger.spend()`, which still excludes Kiro from every cross-agent total. ([CHANGELOG](CHANGELOG.md))
 
 ## The name
 

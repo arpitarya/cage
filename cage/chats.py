@@ -202,14 +202,18 @@ def _authorship_cells(agent: str, auth: dict | None) -> dict:
     return cells
 
 
-def _bucket_key(c: dict, *, credits: bool = False) -> tuple[str, str, str, bool]:
-    """The chat bucket key. The trailing ``credits`` flag keeps a credits-row bucket
-    structurally apart from a call bucket sharing the same `(agent, surface, session)`
-    — today that overlap cannot happen (kiro-CLI records credits *instead of* calls),
-    but the discriminator means a future agent that records both shapes for the same
-    conversation gets two rows, never one bucket silently blending both axes."""
+def _bucket_key(c: dict, *, kind: str = "call") -> tuple[str, str, str, str]:
+    """The chat bucket key. The trailing ``kind`` discriminator (``"call"`` /
+    ``"credits"`` / ``"metrics"``) keeps a non-call-shaped bucket structurally apart
+    from a call bucket sharing the same `(agent, surface, session)` — today that
+    overlap cannot happen (kiro-CLI records credits *instead of* calls, kiro-IDE
+    metrics rows *instead of* calls since KIRO-CALLS-LEG), but the discriminator means
+    a future agent that records more than one row shape for the same conversation gets
+    separate rows, never one bucket silently blending different axes. (Widened from a
+    two-valued ``credits`` bool to a three-valued string when kiro-IDE metrics rows
+    gained their own chats bucket — LEDGER-READ-SURFACE.)"""
     a = _agents.row_surface(c.get("agent")) or c.get("agent") or "?"
-    return a, c.get("surface", ""), c.get("session", ""), credits
+    return a, c.get("surface", ""), c.get("session", ""), kind
 
 
 def _new_bucket() -> dict:
@@ -223,9 +227,14 @@ def _new_bucket() -> dict:
     # `from_credits` marks a bucket built from a `ledger.credits` row rather than a
     # call: it never mixes with a call bucket (the key discriminator above), and every
     # renderer reads this flag to dash the token cells instead of printing a lying 0.
+    # `from_metrics` marks a bucket built from a `ledger.kiro_metrics` (IDE) row rather
+    # than a call: unlike `from_credits`, it does NOT dash the token cells — an IDE
+    # metrics row's tokens are the one real fact this bucket has (LEDGER-READ-SURFACE).
+    # It exists so a renderer can tell "this bucket's tokens are store-verbatim but
+    # coarse and never enter any cross-chat/cross-agent total" from an ordinary call.
     return {"calls": 0, "tokens_in": 0, "cached_in": 0, "cache_write_in": 0,
             "tokens_out": 0, "premium": 0, "credits": None, "credits_calls": 0,
-            "from_credits": False}
+            "from_credits": False, "from_metrics": False}
 
 
 def summarize(root: Path, pol: dict, since: str | None = None,
@@ -238,6 +247,18 @@ def summarize(root: Path, pol: dict, since: str | None = None,
     raw_credits = ledger.credits(root)
     credit_rows = (ledger.since(ledger.credits(root, since=since), since)
                   if since else raw_credits)
+    # Kiro-IDE metrics rows (`ledger/kiro/`, LEDGER-READ-SURFACE): store-verbatim
+    # per-call token counts from `tokens_generated.jsonl`, read directly here rather
+    # than through `spend()` — `spend()` stays the cross-agent TOTAL basis and kiro
+    # stays out of it (`SPEND_SOURCES["kiro"] = ()`, `ledger.ABSENT_SPINES` unchanged);
+    # this is a per-chat display only, exactly the same carve-out CHATS-CREDITS made
+    # for kiro-CLI credits. `ide`/`ide-log` are the SAME counter from two stores
+    # (`importcmd._MANIFEST_SOURCES["kiro"]`) — only one is ever non-empty on a real
+    # install, so summing both here is safe today and matches doctor's own reporting.
+    raw_ide = [m for m in ledger.kiro_metrics(root) if m.get("source") in ("ide", "ide-log")]
+    ide_rows = ([m for m in ledger.kiro_metrics(root, since=since)
+                if m.get("source") in ("ide", "ide-log")]
+               if since else raw_ide)
     names = _title_map(root)
     buckets: dict[tuple[str, str, str, bool], dict] = {}
     legacy_human = 0
@@ -263,23 +284,46 @@ def summarize(root: Path, pol: dict, since: str | None = None,
     # folded into a call bucket's token sums — the discriminator in `_bucket_key`
     # guarantees that even if a future agent's session id collided with a call chat's.
     for cr in credit_rows:
-        b = buckets.setdefault(_bucket_key(cr, credits=True), _new_bucket())
+        b = buckets.setdefault(_bucket_key(cr, kind="credits"), _new_bucket())
         b["from_credits"] = True
         cred = cr.get("credits")
         if isinstance(cred, bool) or not isinstance(cred, (int, float)):
             continue
         b["credits"] = (b["credits"] or 0.0) + float(cred)
 
+    # Kiro-IDE metrics rows (LEDGER-READ-SURFACE): every IDE call stamps a constant
+    # `session="kiro"`, so this loop collapses ALL of them into ONE bucket by
+    # construction — the same collapse the `KIRO_IDE_LABEL` branch below has always
+    # been ready to label, since before any row ever reached it (its rows used to be
+    # `calls`, suppressed from `spend()` by `ABSENT_SPINES["kiro"]`; they are metrics
+    # rows now, read here instead — the row SHAPE moved, the collapse did not).
+    for m in ide_rows:
+        b = buckets.setdefault(
+            _bucket_key({"agent": "kiro", "surface": m.get("surface") or "ide",
+                        "session": m.get("session") or "kiro"}, kind="metrics"),
+            _new_bucket())
+        b["from_metrics"] = True
+        b["calls"] += 1
+        b["tokens_in"] += m.get("tokens_in", 0)
+        b["tokens_out"] += m.get("tokens_out", 0)
+        b["cached_in"] += m.get("cached_in", 0)
+        # A future store recording a real per-call credit here is not a contradiction
+        # of "kiro-CLI is the credits home" — it would just be a second, independent
+        # credits fact, kept as a COUNT exactly like every other credits value.
+        cred = m.get("credits")
+        if cred is not None and not isinstance(cred, bool) and isinstance(cred, (int, float)):
+            b["credits"] = (b["credits"] or 0.0) + float(cred)
+
     authorship = _authorship_map(root)
     # A session that appears under more than one surface: provenance carries no surface,
     # so its counts attach to every one of those buckets. Detected here so render can
     # footnote it rather than let a reader read two rows as independent evidence.
     per_session: dict[tuple[str, str], int] = {}
-    for (a, _surf, session, _cred) in buckets:
+    for (a, _surf, session, _kind) in buckets:
         per_session[(a, session)] = per_session.get((a, session), 0) + 1
 
     rows: list[dict] = []
-    for (a, surf, session, _cred), b in buckets.items():
+    for (a, surf, session, _kind), b in buckets.items():
         if a == "kiro" and surf == "ide":
             title, named = KIRO_IDE_LABEL, False
         else:
@@ -302,7 +346,7 @@ def summarize(root: Path, pol: dict, since: str | None = None,
             # The agents actually present, so a renderer can apply the cross-agent
             # credit law (`units.summable`) without re-deriving the set.
             "agents_present": sorted({r["agent"] for r in rows if r["agent"]}),
-            "any_calls": bool(raw_calls) or bool(raw_credits)}
+            "any_calls": bool(raw_calls) or bool(raw_credits) or bool(raw_ide)}
 
 
 # ── rendering ────────────────────────────────────────────────────────────────
@@ -411,22 +455,47 @@ def _num_cell(r: dict, field: str) -> str:
     return DASH if r.get("from_credits") else render.tok(r[field])
 
 
+def _row_dashes_unit(r: dict, unit: str) -> bool:
+    """Does this ONE chat row actually show `—` for ``unit`` — as opposed to the
+    agent-level claim in `units.ABSENT`, which used to be a permanent per-agent fact
+    for every unit but stopped being one for kiro+tokens the day IDE metrics rows
+    gained a chats bucket (LEDGER-READ-SURFACE): a kiro-CLI credits row still dashes
+    tokens, but a kiro-IDE metrics row now shows real ones, on the SAME screen. Used to
+    keep `_unit_absence_notes` from asserting an absence a row right above it
+    contradicts."""
+    if unit == units.TOKENS:
+        return bool(r.get("from_credits"))
+    if unit == units.CREDITS:
+        return r.get("credits") is None
+    return False
+
+
 def _unit_absence_notes(shown: list[dict]) -> list[str]:
     """One footer line per (agent, unit) absence actually on screen, in the unit
-    policy's own words (`units.ABSENT`).
+    policy's own words (`units.ABSENT`) — but only when the absence is actually true of
+    every shown row for that agent. Fires unconditionally for claude+credits (a
+    permanent vendor law, no row shape changes it); for kiro+tokens it now fires only
+    when every kiro row on screen is a credits row (`from_credits`) — since a kiro-IDE
+    metrics row (LEDGER-READ-SURFACE) shows real, if coarse, tokens, and the blanket
+    "kiro records no tokens" line would directly contradict a row sitting right above
+    it in the same table.
 
     **The two absences must not read alike** — claude having no credit concept is a
-    vendor law; kiro having no tokens is two different missing things a future release
-    could ship (no IDE token store at all, and CLI columns that exist but are null). A
-    shared `—` in the cell is a column-width fact; the *reason* is what tells them apart,
-    and it is why neither renders as `0`."""
+    vendor law; kiro's CLI credits carrying no tokens is a store-shape fact that a
+    kiro-IDE row on the same screen can and does contradict. A shared `—` in the cell
+    is a column-width fact; the *reason* is what tells them apart, and it is why
+    neither renders as `0`."""
     seen = {r["agent"] for r in shown if r.get("agent")}
     out = []
     for agent in sorted(seen):
+        agent_rows = [r for r in shown if r["agent"] == agent]
         for unit in units.UNITS:
             reason = units.absent_reason(agent, unit)
-            if reason:
-                out.append(f"· {agent} {unit}: — ({reason})")
+            if not reason:
+                continue
+            if not all(_row_dashes_unit(r, unit) for r in agent_rows):
+                continue  # at least one shown row for this agent actually carries it
+            out.append(f"· {agent} {unit}: — ({reason})")
     return out
 
 
@@ -458,9 +527,12 @@ def _authorship_footer(foot, shown: list[dict]) -> None:
 
 def render_chats(data: dict, disp=None, show_all: bool = False,
                  kiro_route: str = "") -> str:
-    """The text table (tokens and credits — the two units cage records). ``kiro_route`` is
-    the already-computed `kiro_routed_line` (read at the CLI boundary, so this renderer
-    stays pure) — why a project view shows no kiro-IDE rows (ADR 0006)."""
+    """The text table (tokens and credits — the two units cage records). ``kiro_route``
+    is the already-computed `kiro_routed_line` — always `""` since ADR-LEDGER
+    (2026-08-15) retired the routed-sink case it used to explain; kept as a parameter
+    for source compatibility. Kiro-IDE rows print here now (LEDGER-READ-SURFACE): one
+    collapsed row per ledger, store-verbatim tokens, never entering any cross-agent
+    total."""
     from cage import display as _d
     from cage import render
     disp = disp or _d.DEFAULT
@@ -516,10 +588,12 @@ def render_chats(data: dict, disp=None, show_all: bool = False,
         n = data["legacy_human"]
         foot.caveat(f"· {n} legacy human-axis row(s) excluded — the agent-vs-human "
                     "axis was removed in v0.36 (`cage query savings-axis`)")
-    if any(r["agent"] == "kiro" and r["surface"] == "ide" for r in rows):
+    if any(r.get("from_metrics") for r in shown):
         foot.caveat("· kiro (no session identity): its IDE log stamps every run under "
-                    "the same constant session, so all of kiro's chats collapse into "
-                    "this one row (`cage query kiro-routing`)")
+                    "the same constant session, so all of kiro's IDE calls collapse "
+                    "into this one row — tokens are store-verbatim but coarse (output "
+                    "often 0) and never enter any cross-agent total "
+                    "(`cage query kiro-metrics`)")
     if any(r.get("from_credits") for r in shown):
         foot.caveat("· kiro CLI reports credits only — its store carries no token "
                     "counts, so token cells are '—' (`cage query copilot-credits`)")

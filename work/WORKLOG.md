@@ -12,6 +12,59 @@ by milestone) — the worklog is what *happened this session*.
 
 ---
 
+## 2026-08-15 — Cowork — LEDGER-READ-SURFACE closed: kiro-IDE metrics now print on `insights chats`
+
+- **Asked:** "kiro cli and ide both should print on cage insights chats" — kiro-CLI
+  conversations already rendered (CHATS-CREDITS); kiro-IDE usage did not, because
+  `chats.summarize` only ever read `ledger.spend()`, which unconditionally excludes
+  kiro (`SPEND_SOURCES["kiro"] = ()`). No code anywhere read `ledger.kiro_metrics()`
+  into a view — the exact gap already scoped as `LEDGER-READ-SURFACE` in
+  `work/OPEN-WORK.md`.
+- **Done:** wired a third bucket kind into `cage/chats.py`, mirroring CHATS-CREDITS —
+  `_bucket_key` takes a `kind` discriminator (`call`/`credits`/`metrics`) instead of a
+  bool; `summarize()` reads `ledger.kiro_metrics()`'s IDE-sourced rows (`source` in
+  `ide`/`ide-log`) directly and buckets them under the existing constant-session
+  `KIRO_IDE_LABEL`, summing `calls`/`tokens_in`/`tokens_out`/`cached_in` across every
+  distinct IDE call. Unlike a credits row, tokens are NOT dashed (the store carries
+  real, coarse counts); only `credits` dashes. This read never touches `ledger.spend()`
+  — kiro still contributes zero tokens to any cross-agent total (ADR-KIRO's core
+  invariant, untouched). Added `_row_dashes_unit` + rewrote `_unit_absence_notes` so
+  the blanket "kiro records no tokens" footer line only fires when every kiro row on
+  screen is credits-shaped — an IDE row on the same screen would otherwise contradict
+  it. Reworded the footer caveat to point at `cage query kiro-metrics` instead of the
+  now-dead `kiro-routing`. Updated `units.py`'s `ABSENT["kiro"][TOKENS]` reason and its
+  module-docstring table (it was describing the spend/report surface only — now says
+  so explicitly) and `display.py`'s stale comment. Fixed a genuinely vacuous test
+  (`test_report_and_chats_byte_identical_with_kiro_tree_present_or_absent` never
+  isolated `proj` as the CLI's resolved root — no `mkcage`/`chdir` — so both sides of
+  its assertion silently read an empty global ledger; replaced with two real tests,
+  one pinning the new chats behavior and one pinning the spend-total invariant it does
+  NOT touch). Added ~10 new tests in `tests/test_chats.py` (own-row rendering, constant-
+  session collapse across multiple IDE calls, footer wording, absence-note gating both
+  ways, money-independence, `since` filtering) mirroring the CHATS-CREDITS precedent
+  tests. Updated `docs/FORMULAS.md` §2.13 (new bullet, fixed two stale sentences that
+  still described the pre-ADR-LEDGER "IDE rows routed to the machine ledger" world) and
+  `docs/adr/0006_kiro.md` (Known gaps: closed the "no read surface" item, qualified the
+  "no token spine" item to name which surface it's actually about; Reference: new
+  citation). Verified against the real repo's full `pytest` (not a sandbox subset):
+  1547 passed, 14 skipped, 6 failed — all six pre-confirmed environment artifacts (git-
+  dependent doc-link/backtick checks with no `.git` in the extracted copy; a
+  root-ignores-chmod test) carried over unchanged from the prior session's Task A
+  verification, not new regressions.
+- **Decided/open:** `cage insights kiro`, a dedicated view, is still not built — this
+  closes only the chats-view half of `LEDGER-READ-SURFACE`. `work/OPEN-WORK.md` still
+  needs its `LEDGER-READ-SURFACE` entry marked closed (next step). No `ide` (vs
+  `ide-log`) row has ever been observed on a real install — both are read identically
+  here, matching `_MANIFEST_SOURCES["kiro"]`'s existing precedent that exactly one of
+  the pair is ever populated.
+- **Next:** mark `LEDGER-READ-SURFACE` closed in `work/OPEN-WORK.md`, then commit every
+  changed file back to the user's real repo via the device bridge (their standing
+  instruction: "put everything in the repo").
+- **Cost:** unmeasured — `cage insights chats` is per-chat and can't isolate this
+  session (CLAUDE.md `Cost:` rule).
+
+---
+
 ## 2026-08-15 — Cowork — corrected: kiro has no token spine, ever — ADR-MATRIX's kiro table was wrong
 
 - **Asked:** "claude has tokens, kiro and copilot have credits double check on that so

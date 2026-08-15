@@ -114,32 +114,6 @@ CONTINUOUS-CAPTURE · COVERAGE-STRIKE-2 · two hands-only probes
   (`chatSessions` first; `chatEditingSessions` self-deletes on stop, so it needs a cadence
   cage lacks — pairs with CONTINUOUS-CAPTURE). Ratified as an order, not as work.
 
-## [ADR-LEDGER](../docs/adr/0015_ledger.md)
-
-- **LEDGER-REVERSAL-VERIFY — closed 2026-08-15, same day.** ADR-LEDGER reverses
-  ADR-KIRO's Kiro-IDE machine-ledger routing: every source now captures into the run's
-  one active ledger, no exceptions. The code change (`paths.kiro_ledger`/`kiro_routed`
-  collapsed to constants, `importcmd._kiro_leg`/`_drop_routed_kiro_state` deleted) was
-  run against the **real** suite (not a sandboxed subset) — `1512 passed, 14 skipped`,
-  the remaining failures all environment artifacts unrelated to this change (missing
-  `README.md`/`tools/`/`.git` in the scratch copy the run happened in, and a `chmod`
-  permission test that root's own write ignores). One real regression surfaced and was
-  fixed in the same change: `_import_rollup` was reading kiro's collected rows into the
-  `total` line (previously unreachable from a real project sweep — kiro's rows lived in
-  a separate `collected` list via the now-deleted routed leg — reachable on every sweep
-  once kiro joined the main loop). It now excludes kiro's rows unconditionally, per
-  ADR-KIRO's "Kiro contributes no tokens to any total." Test files updated for the new
-  routing: `test_kiro_routing.py`, `test_import_unified.py`, `test_kiro_metrics.py`,
-  `test_capture_health.py`, `test_capture_log.py`, `test_capture_quality.py`,
-  `test_manifest.py`, `test_platform_paths.py`, plus `test_adr_counts.py`'s `_WORDS`
-  table (missing "fourteen"/"fifteen" — a pre-existing gap, unrelated to this change,
-  fixed in passing since the ADR count bump exposed it).
-- **LEDGER-READ-SURFACE** — unaffected by the reversal, still open: no `cage insights
-  kiro` view or chats-view columns read `.cage/ledger/kiro/` (`ledger.kiro_metrics()`
-  is capture-only). Tracked here rather than only in ADR-KIRO's Known gaps because the
-  reversal makes the project-ledger copy of these rows more likely to be what a user
-  actually wants to see next.
-
 ## [ADR-GRAPHIFY](../docs/adr/0008_graphify.md)
 
 - **GFX-IDE-PATH-UNPROBED** — hands-only, one probe. Whether an IDE-spawned terminal inherits

@@ -2,6 +2,35 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
+## v0.53.0 (2026-08-16) — LEDGER-READ-SURFACE: Kiro's IDE token usage now prints on `cage insights chats`
+
+**Behaviour change.** Kiro-IDE tokens (`.cage/ledger/kiro/`, the metrics ledger
+LEDGER-RESTRUCTURE (v0.51) introduced) had no read surface anywhere — captured but
+never rendered. Kiro-CLI conversations already appeared as chat rows (CHATS-CREDITS);
+IDE usage did not, because `chats.summarize` only ever read `ledger.spend()`, which
+unconditionally excludes Kiro (`SPEND_SOURCES["kiro"] = ()`).
+
+- `chats.summarize()` now also reads `ledger.kiro_metrics()`'s IDE-sourced rows
+  directly and collapses them under the existing constant-session `KIRO_IDE_LABEL`,
+  mirroring the kiro-CLI credits pattern. Real, coarse tokens render (unlike a
+  kiro-CLI credits row, which dashes) — `calls`/`tokens_in`/`tokens_out`/`cached_in`
+  summed across every distinct IDE call.
+- **This is a narrower, separate read from `ledger.spend()`, which still excludes
+  Kiro entirely** — the cross-agent spend total is untouched; ADR-KIRO's "Kiro
+  contributes no tokens to any total" still holds.
+- The footer's blanket "kiro records no tokens" line now only fires when every kiro
+  row on screen is credits-shaped, so it no longer contradicts an IDE row rendered
+  on the same screen; the caveat now points at `cage query kiro-metrics` instead of
+  the retired `kiro-routing` query (dead since ADR-LEDGER, v0.52.0).
+- A dedicated `cage insights kiro` view is still not built — out of scope here; noted
+  in [ADR-KIRO](docs/adr/0006_kiro.md)'s Known gaps.
+
+Also fixed a vacuous test found in the same change:
+`test_report_and_chats_byte_identical_with_kiro_tree_present_or_absent` never
+isolated its fixture as the CLI's resolved root, so both sides of its assertion
+silently read an empty global ledger regardless of the row it wrote — replaced with
+two real tests.
+
 ## v0.52.0 (2026-08-16) — ADR-LEDGER: Kiro's IDE rows stop routing to the machine ledger
 
 **Behaviour change.** From 2026-08-01 to 2026-08-15, Kiro's IDE token log
