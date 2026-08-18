@@ -18,7 +18,7 @@ update-rule: ANY change to claude capture (parser · store · schema field · un
 counts each API request **exactly once**, and reports tokens — never dollars.
 
 The one thing worth knowing: the same request appears in the transcript **two to three
-times**. Cage's original reader counted all of them and was inflating Claude by **2.00×**.
+times**. Cage's original reader counted all of them and was inflating Claude by **1.979×**.
 The reader that replaced it folds the duplicates away. Both readers still run; only the
 folded one is believed.
 
@@ -108,8 +108,12 @@ flowchart TD
   `uuid`; every duplicate assistant row becomes a `calls` row.
   `transcript.parse_claude_chat_metrics` folds on `(requestId, message.id)`, last
   occurrence wins. Over a full matched window (2026-07-12 → 2026-08-14) the two disagreed
-  by exactly **2.00×** — 43,973 `calls` rows against 21,955 folded requests. **The folded
-  count is the correct one.**
+  by **1.979×** — 44,659 `calls` rows against 22,566 folded requests. **The folded
+  count is the correct one.** The figure is *close to* 2.00× and deliberately **not
+  rounded to it**: the measurement doc records that distinction in its own words ("not
+  equal to it — recorded as found"), and a duplicate assistant row repeats a *cumulative*
+  count rather than adding an independent one, so rows and tokens were never going to
+  inflate in step (tokens went 1.881×).
 - Two `calls`-path defects produced that gap and are still open **in `parse_calls`**:
   **CLAUDE-DEDUP** (duplicate assistant rows counted) and **CLAUDE-SUBAGENT-KEY** (a
   subagent transcript's rows keyed by filename, landing spend in a phantom chat).
@@ -244,10 +248,40 @@ Ingest: `importcmd._ingest_claude_metrics`, own kind `"claude"`, own id namespac
 Health: `cage doctor`'s `claude-metrics` check reports raw vs. collapsed row counts and
 nudges when the newest transcript is >25 days old.
 
+### Field-level trace — data point → source file → exact key → function
+
+> Drills the two tables above to the exact on-disk key and the function that reads it,
+> for anyone auditing a single number back to its source. **Vendor-recorded** = quoted
+> verbatim from the transcript; **cage-derived** = computed, reshaped, or stamped by
+> cage — never a literal field on disk. Only one store exists for Claude Code; every row
+> below reads `~/.claude/projects/<slug>/**/*.jsonl` unless noted otherwise.
+
+| Data point | Source file (on disk) | Field/key read | Extracted by | Vendor-recorded / cage-derived |
+|---|---|---|---|---|
+| Assistant-turn record | `~/.claude/projects/<slug>/**/*.jsonl` | `type == "assistant"` | `transcript.parse_calls` / `_fold_claude_records` | vendor-recorded |
+| tokens_out | same row | `message.usage.output_tokens` | `_usage_to_row` / `_fold_claude_chat` | vendor-recorded |
+| tokens_in (input component) | same row | `message.usage.input_tokens` | `_usage_to_row` | vendor-recorded |
+| cached_in (cache read) | same row | `message.usage.cache_read_input_tokens` | `_usage_to_row` / `_fold_claude_chat` | vendor-recorded |
+| cache_write_in (cache creation) | same row | `message.usage.cache_creation_input_tokens` | `_usage_to_row` / `_fold_claude_chat` | vendor-recorded |
+| tokens_in (stored total) | — | sum of the three fields above | `_usage_to_row` / `_fold_claude_chat` | **cage-derived** — sum of three vendor fields |
+| cache-write TTL split (5m / 1h) | same row | `message.usage.cache_creation.ephemeral_5m_input_tokens` / `ephemeral_1h_input_tokens` | `_fold_claude_chat` | vendor-recorded |
+| thinking tokens | same row | `message.usage.output_tokens_details.thinking_tokens` | `_fold_claude_chat` | vendor-recorded |
+| web_search / web_fetch counts | same row | `message.usage.server_tool_use.web_search_requests` / `web_fetch_requests` | `_fold_claude_chat` | vendor-recorded |
+| model id | same row | `message.model` | `_usage_to_row` / `_fold_claude_chat` | vendor-recorded |
+| call id | same row | `uuid` (no-uuid fallback: sha1 of agent/session/model/tokens/ts) | `parse_calls` / `_composite_id` | vendor-recorded; fallback **cage-derived** |
+| timestamp | same row | `timestamp` | `parse_calls` / `_fold_claude_chat` (max per chat) | vendor-recorded |
+| session id (chat key) | same row | `sessionId` (fallback: filename-derived hint) | `_claude_chat_key` | vendor-recorded; fallback **cage-derived** |
+| sidechain (subagent) tokens | same row | `isSidechain`, joined to its parent chat via `sessionId` | `_fold_claude_chat` | vendor-recorded flag; the split itself **cage-derived** |
+| project | same row | `cwd` (basename only) | `parse_calls` / `_fold_claude_chat` | **cage-derived** — basename of a vendor field |
+| chat title | separate `{"type":"summary"}` record | `summary` (last one wins) | `session_name_claude` | vendor-recorded — a label only, never a call row |
+| per-model breakdown, inflation evidence (`raw_rows`/`requests`) | — | grouped sums / counts over the folded rows | `_fold_claude_chat` / `_fold_claude_records` | **cage-derived** |
+| edited file paths (authorship) | same row | `message.content[].type=="tool_use"`, name in `{Edit,Write,MultiEdit,NotebookEdit}` → `input.file_path` / `input.notebook_path` | `parse_provenance` | vendor-recorded |
+| credits / dollars | — | no such field exists on disk; no price table applied | n/a | **absent** — ADR-LAWS forbids inventing usage or pricing Claude Code doesn't expose |
+
 ### Known gaps and defects (open)
 
 - **CLAUDE-DEDUP** *(calls path only)* — `calls` keys by row `uuid` and counts every
-  duplicate assistant row; that surface stays inflated ~2–3× (3.17× measured live, 2.00×
+  duplicate assistant row; that surface stays inflated ~2–3× (3.17× measured live, 1.979×
   over the full matched window). Dodged by construction in the metric ledger; **not fixed
   in `parse_calls`, and deliberately so.**
 - **CLAUDE-SUBAGENT-KEY** *(calls path only)* — `calls` keys a subagent transcript's rows
@@ -288,7 +322,8 @@ nudges when the newest transcript is >25 days old.
 
 ### Reference
 
-- **The 2.00× measurement**, full matched window, 43,973 `calls` rows vs 21,955 requests:
+- **The 1.979× measurement**, full matched window, 44,659 `calls` rows vs 22,566 requests
+  (1.881× on tokens):
   [work/regression/2026-08-14-calls-vs-metric-crosscheck.md](../../work/regression/2026-08-14-calls-vs-metric-crosscheck.md).
   *(Re-pointed 2026-08-14: this cited archived ADRs 0010 and 0011, which under
   **named-never-cited** back nothing. The live measurement doc is the grounding.)*
@@ -327,11 +362,15 @@ nudges when the newest transcript is >25 days old.
 - **Contingent (auto-revisits on evidence):** whether `parse_calls` is retired; the
   matcher and its gate; which grains `SPEND_SOURCES["claude"]` names; whether a `task`
   grain becomes capturable (TASK-GRAIN-SPINE).
-- **Invariant (moves only by ratified reversal of this ADR):** **no ledger row is ever
-  mutated**; **no line body and no line hash is ever persisted**; **`human` is never
-  written without an attestation**; **unknown is never redistributed**; **no USD, rate,
-  or valuation on any surface built from these rows**; a spine source is **point-in-time,
-  never cumulative**. None of these are volume- or performance-gated.
+- **Invariant (moves only by ratified reversal of this ADR):** a spine source is
+  **point-in-time, never cumulative**. Not volume- or performance-gated.
+  - Also binding here, but **owned elsewhere and deliberately not restated** (a second
+    copy can drift, and drift in a law is invisible until it prints a wrong number):
+    append-only and usage-never-cost are **ADR-LAWS** Laws 3 and 5; *no line body and no
+    line hash is ever persisted*, *`human` is never written without an attestation* and
+    *unknown is never redistributed* are **ADR-AUTHORSHIP**'s — this record's own
+    frontmatter states authorship left it on 2026-08-14, so restating them here
+    contradicted that.
 
 **3 · Deliberately not taken.**
 

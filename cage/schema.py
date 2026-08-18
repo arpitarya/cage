@@ -626,20 +626,19 @@ def make_copilot_metric(*, source: str, session: str, surface: str = "",
 
 # The three grains a Kiro store actually persists usage at (KIRO-METRICS,
 # docs/kiro-metrics-ledger.handoff.md §4.1) — Kiro's own on-disk stores, not the wire
-# protocol (which carries more but is proxy-only, out of scope here): `ide` (IDE
-# `devdata.sqlite`, per LLM call, timestamped) · `cli-conv` (CLI SQLite store, per
-# conversation, cumulative-verbatim) · `cli-turn` (same store, per history turn — the
-# populated `request_metadata` fields, plus token slots that are NULL today but
-# schema-present). A closed enum, like `COPILOT_METRIC_SOURCES` — `make_kiro_metric`
+# protocol (which carries more but is proxy-only, out of scope here): `ide-log` (the
+# IDE's append-only `tokens_generated.jsonl`, per LLM call) · `cli-conv` (CLI SQLite
+# store, per conversation, cumulative-verbatim) · `cli-turn` (same store, per history
+# turn — the populated `request_metadata` fields, plus token slots that are NULL today
+# but schema-present). A closed enum, like `COPILOT_METRIC_SOURCES` — `make_kiro_metric`
 # validates it.
-# `ide` and `ide-log` are the SAME counter read from Kiro's two IDE stores — the
-# timestamped `devdata.sqlite` table and the append-only `tokens_generated.jsonl`.
-# They are separate grains rather than one merged grain because they carry different
-# row keys and different fidelity, and merging them would mean choosing at write time
-# which store is authoritative — a derive-time question. Only one of the pair is
-# manifest-eligible at a time (`importcmd._MANIFEST_SOURCES`); today that is
-# `ide-log`, the store that actually exists on every install ever probed.
-KIRO_METRIC_SOURCES = ("ide", "ide-log", "cli-conv", "cli-turn")
+#
+# A fourth source, `ide`, lived here through 2026-08-15 for `devdata.sqlite` — a SQLite
+# twin of the SAME counter `ide-log` reads, timestamped and with a cursorable `id` the
+# jsonl lacks. It was never observed on any install cage has probed; its dead reader
+# was removed (DEVDATA-CUT, docs/adr/0006_kiro.md) rather than kept armed for a store
+# that may never ship — see that record's Veto condition for what would bring it back.
+KIRO_METRIC_SOURCES = ("ide-log", "cli-conv", "cli-turn")
 
 
 def make_kiro_metric(*, source: str, session: str = "", surface: str = "",
@@ -677,12 +676,7 @@ def make_kiro_metric(*, source: str, session: str = "", surface: str = "",
     omits them (the upgrade-watch: the day Kiro starts filling those fields, capture
     picks them up with zero code change).
 
-    **The 2026-02-28 IDE semantics cutover is recorded, never corrected, here**: before
-    that date `tokens_prompt` was the full context per call; after, it is incremental.
-    A row's own `ts` is the only signal a derive-time reader has to branch on — this
-    constructor stores the store's number verbatim either way.
-
-    `row_ref` is the store's own row key (`devdata.sqlite`'s `id`, or the CLI turn's
+    `row_ref` is the store's own row key (`ide-log`'s line index, or the CLI turn's
     `request_metadata.message_id`) — provenance, and the dedupe anchor.
 
     `metric_id` is always supplied by a parser as a deterministic id that folds in the

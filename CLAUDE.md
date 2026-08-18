@@ -1015,7 +1015,7 @@ device. Three parts, each load-bearing:
 ## Dev
 
 ```bash
-just test          # python -m pytest -q   (1571 tests; +10 Windows-only skips, +1 opt-in dogfood-age skip)
+just test          # python -m pytest -q   (1562 tests; +10 Windows-only skips, +1 opt-in dogfood-age skip)
 just demo          # seed §4.4 + print attrib/matrix
 cage --version
 ```
@@ -1119,10 +1119,13 @@ each agent only needs thin idiomatic wiring (`agents.py` orchestrates):
   point a base URL at), `transcript.py` (Claude Code / Copilot CLI / Kiro session
   logs — `LOG_BEARING` is now all three of `agents.SURFACES`; Kiro's `tokens_generated.jsonl`
   is coarse so the proxy stays its higher-fidelity fallback. A capture-only sibling
-  ledger, `.cage/ledger/kiro/` (KIRO-METRICS), records what that log's timestamped
-  SQLite twin `devdata.sqlite` and the CLI store's per-turn metadata carry beyond
-  `calls`/`credits` — never priced, not yet read by any derived view, an
-  upgrade-watch armed for the CLI's still-NULL token slots). transcript.py also feeds
+  ledger, `.cage/ledger/kiro/` (KIRO-METRICS), records what that log and the CLI
+  store's per-turn metadata carry beyond `calls`/`credits` — never priced, IDE rows
+  read directly by `cage insights chats` (LEDGER-READ-SURFACE) but never folded into
+  any total, an upgrade-watch armed for the CLI's still-NULL token slots. (A second
+  IDE store, `devdata.sqlite`, never observed on any probed install, had its own
+  reader kept armed alongside this one through 2026-08-15, then removed — DEVDATA-CUT
+  — rather than held indefinitely for a store that never shipped.) transcript.py also feeds
   a THIRD capture-only sibling, `.cage/ledger/claude/` (CLAUDE-METRICS): one row per
   Claude Code chat, correctly folded — THE DEDUP LAW (fold duplicate assistant rows
   per `(requestId, message.id)`, last wins) plus a subagent-to-parent join via each

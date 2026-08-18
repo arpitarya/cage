@@ -1,29 +1,34 @@
 """KIRO-METRICS — the `.cage/ledger/kiro/` per-chat metrics ledger.
 
-Capture-only substrate (`schema.make_kiro_metric`) fed by Kiro's IDE `devdata.sqlite`
-and CLI SQLite store, collapsed last-write-wins at read (`ledger.kiro_metrics`). Since
-LEDGER-READ-SURFACE (2026-08-15) it IS read by one derived view — `insights chats`
-reads IDE-sourced rows directly and renders them as their own chat line, mirroring the
-existing CHATS-CREDITS pattern for kiro-CLI credits; `ledger.spend()` still excludes
-kiro entirely (ADR-KIRO), so the read stays out of every cross-agent total. What this
-file pins, following `docs/kiro-metrics-ledger.handoff.md` §9 (mirrors
-`tests/test_copilot_metrics.py`'s structure — the twin kind):
+Capture-only substrate (`schema.make_kiro_metric`) fed by Kiro's IDE
+`tokens_generated.jsonl` and CLI SQLite store, collapsed last-write-wins at read
+(`ledger.kiro_metrics`). Since LEDGER-READ-SURFACE (2026-08-15) it IS read by one
+derived view — `insights chats` reads IDE-sourced rows directly and renders them as
+their own chat line, mirroring the existing CHATS-CREDITS pattern for kiro-CLI
+credits; `ledger.spend()` still excludes kiro entirely (ADR-KIRO), so the read stays
+out of every cross-agent total. What this file pins, following
+`docs/kiro-metrics-ledger.handoff.md` §9 (mirrors `tests/test_copilot_metrics.py`'s
+structure — the twin kind):
 
 1. The substrate — enum validation, omit-at-zero, None-sentinel `credits`, `km_` ids.
-2. The IDE parser records exactly what `devdata.sqlite` carries, verbatim.
-3. The CLI parser: conv + turn rows, the upgrade-watch (NULL token slots today), and
+2. The CLI parser: conv + turn rows, the upgrade-watch (NULL token slots today), and
    both `conversations_v2`/`conversations` table shapes.
-4. `parse_kiro_cli_credits` stays byte-identical after the `_kiro_cli_conversations`
+3. `parse_kiro_cli_credits` stays byte-identical after the `_kiro_cli_conversations`
    extraction (the existing `tests/test_kiro_routing.py` suite is the primary pin;
    this file adds one direct regression check too).
-5. Counts-never-content: a `history[].user` sentinel never reaches a written shard byte.
-6. Re-import is idempotent; a grown conversation appends a fresh row and the collapse
+4. Counts-never-content: a `history[].user` sentinel never reaches a written shard byte.
+5. Re-import is idempotent; a grown conversation appends a fresh row and the collapse
    read resolves to the latest/largest.
-7. Routing (ADR-LEDGER, reversed 2026-08-15): every kiro row — IDE and CLI alike —
+6. Routing (ADR-LEDGER, reversed 2026-08-15): every kiro row — IDE and CLI alike —
    lands in whichever ledger is active for the run, like any other agent.
-8. `insights chats` now moves when an IDE metrics row is present (LEDGER-READ-SURFACE);
+7. `insights chats` now moves when an IDE metrics row is present (LEDGER-READ-SURFACE);
    the cross-agent spend/report total does not (ADR-KIRO) — pinned separately below.
-"""
+
+A second IDE source, `ide` (a `devdata.sqlite` SQLite twin of the SAME counter), had
+its own parser and its own tests here through 2026-08-15 — it was never observed on
+any install cage has probed, and its dead reader was removed rather than kept armed
+indefinitely (DEVDATA-CUT, docs/adr/0006_kiro.md). `ide-log` is kiro IDE's one real
+source; every fixture below uses it."""
 from __future__ import annotations
 
 import json
@@ -67,7 +72,7 @@ def test_make_kiro_metric_validates_source():
 
 
 def test_make_kiro_metric_omit_at_zero():
-    row = schema.make_kiro_metric(source="ide", metric_id="km_x")
+    row = schema.make_kiro_metric(source="ide-log", metric_id="km_x")
     for k in ("session", "surface", "turn", "model", "provider", "tokens_in",
               "tokens_out", "cached_in", "cached_out", "credits", "context_pct",
               "turns", "chunks", "prompt_bytes", "response_bytes", "tool_uses",
@@ -85,25 +90,19 @@ def test_make_kiro_metric_none_sentinel_credits_never_omit_at_default():
 
 
 def test_make_kiro_metric_default_id_namespace():
-    row = schema.make_kiro_metric(source="ide")
+    row = schema.make_kiro_metric(source="ide-log")
     assert row["id"].startswith("km_")
 
 
 # ── fixture builders ─────────────────────────────────────────────────────────
 
-def _devdata_db(path: Path, rows: list[tuple]) -> Path:
-    """rows = [(id, tokens_prompt, tokens_generated, timestamp)] — a minimal
-    `devdata.sqlite` `tokens_generated` table, plus one extra unrecognized column to
-    prove the explicit-column SELECT (`parse_kiro_ide_metrics`) survives it."""
+def _ide_log(path: Path, rows: list[tuple]) -> Path:
+    """rows = [(promptTokens, generatedTokens)] — a minimal `tokens_generated.jsonl`,
+    kiro IDE's one real store, one JSON object per line (`parse_kiro_ide_log_metrics`)."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    con = sqlite3.connect(path)
-    con.execute("CREATE TABLE tokens_generated (id INTEGER, tokens_prompt INTEGER, "
-               "tokens_generated INTEGER, timestamp TEXT, model TEXT)")
-    for row_id, tin, tout, ts in rows:
-        con.execute("INSERT INTO tokens_generated VALUES (?,?,?,?,?)",
-                   (row_id, tin, tout, ts, "unexpected-extra-column-value"))
-    con.commit()
-    con.close()
+    lines = [json.dumps({"model": "agent", "provider": "kiro", "promptTokens": tin,
+                        "generatedTokens": tout}) for tin, tout in rows]
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return path
 
 
@@ -151,48 +150,13 @@ def _cli_db(path: Path, rows: list[tuple], table: str = "conversations_v2") -> P
     return path
 
 
-# ── 2 · IDE devdata.sqlite parser ────────────────────────────────────────────
-
-def test_ide_parser_exact_rows(tmp_path):
-    db = _devdata_db(tmp_path / "devdata.sqlite",
-                     [(1, 100, 20, "2026-08-13T10:00:00Z"),
-                      (2, 50, 0, "2026-08-13T10:05:00Z")])
-    rows = transcript.parse_kiro_ide_metrics(db)
-    assert len(rows) == 2
-    assert rows[0]["source"] == "ide" and rows[0]["surface"] == "ide"
-    assert rows[0]["session"] == "kiro"
-    assert rows[0]["tokens_in"] == 100 and rows[0]["tokens_out"] == 20
-    assert rows[0]["row_ref"] == "1"
-    assert rows[0]["ts"] == "2026-08-13T10:00:00.000Z"
-    assert rows[1]["tokens_in"] == 50 and "tokens_out" not in rows[1]
-
-
-def test_ide_parser_skips_both_counts_zero(tmp_path):
-    db = _devdata_db(tmp_path / "devdata.sqlite", [(1, 0, 0, "2026-08-13T10:00:00Z")])
-    assert transcript.parse_kiro_ide_metrics(db) == []
-
-
-def test_ide_parser_survives_extra_unknown_column(tmp_path):
-    """`_devdata_db` always adds an extra `model` column beyond the four
-    (`id, tokens_prompt, tokens_generated, timestamp`) the explicit-column SELECT
-    reads — it must never leak into the row, and its presence must never crash."""
-    db = _devdata_db(tmp_path / "devdata.sqlite", [(1, 10, 5, "2026-08-13T10:00:00Z")])
-    rows = transcript.parse_kiro_ide_metrics(db)
-    assert len(rows) == 1
-    assert "model" not in rows[0]
-
-
-def test_ide_parser_missing_db_returns_empty(tmp_path):
-    assert transcript.parse_kiro_ide_metrics(tmp_path / "nope.sqlite") == []
-
-
-def test_ide_parser_epoch_ms_timestamp(tmp_path):
-    """`timestamp` shape is one of the pending real-store probes — the fallback path
-    for a raw epoch-ms number must also work, not just ISO text."""
-    db = _devdata_db(tmp_path / "devdata.sqlite", [(1, 10, 5, 1755080400000)])
-    rows = transcript.parse_kiro_ide_metrics(db)
-    assert rows[0]["ts"] is not None
-
+# ── 2 · IDE ide-log parser (kiro IDE's one real store) ───────────────────────
+#
+# `parse_kiro_ide_log_metrics` itself is exercised end-to-end by `test_calls_retired.py`,
+# `test_manifest.py` and `test_import_unified.py` — no direct unit test duplicated here.
+# A second IDE source, `ide` (`devdata.sqlite`), had a direct parser test section here
+# through 2026-08-15; removed with the dead reader (DEVDATA-CUT, docs/adr/0006_kiro.md)
+# — it was never observed on any install cage has probed.
 
 # ── 3 · CLI SQLite store parser ──────────────────────────────────────────────
 
@@ -337,9 +301,9 @@ def test_kiro_metrics_collapse_keeps_latest_largest_row(proj):
 
 def test_kiro_metrics_distinct_grain_keys_never_collapse(proj):
     root = proj
-    a = schema.make_kiro_metric(source="ide", row_ref="1", tokens_in=5,
+    a = schema.make_kiro_metric(source="ide-log", row_ref="1", tokens_in=5,
                                 ts="2026-08-01T00:00:00Z", metric_id="km_a")
-    b = schema.make_kiro_metric(source="ide", row_ref="2", tokens_in=5,
+    b = schema.make_kiro_metric(source="ide-log", row_ref="2", tokens_in=5,
                                 ts="2026-08-01T00:01:00Z", metric_id="km_b")
     ledger.append_row(root, "kiro", a)
     ledger.append_row(root, "kiro", b)
@@ -386,8 +350,7 @@ def test_kiro_metrics_ide_and_cli_rows_both_land_in_the_active_ledger(
     for the same import. That split is gone; what's unchanged is CLI's workspace
     scoping itself (still keyed by cwd, still real attribution)."""
     root = _isolate(tmp_path, monkeypatch)
-    devdata = paths.kiro_devdata_db()
-    _devdata_db(devdata, [(1, 100, 20, "2026-08-13T10:00:00Z")])
+    _ide_log(paths.kiro_token_log(), [(100, 20)])
     doc = _cli_doc(credits=0.5, turns=[_cli_turn(message_id="m1")])
     clidb = _cli_db(tmp_path / "kiro-cli" / "data.sqlite3",
                    [(str(root.resolve()), "mine", doc, 1755080500000)])
@@ -399,7 +362,7 @@ def test_kiro_metrics_ide_and_cli_rows_both_land_in_the_active_ledger(
     importcmd.run(root, "all", _args())
 
     # IDE rows: this run's own active ledger — no separate machine sink anymore.
-    project_ide = [r for r in ledger.kiro_metrics_raw(root) if r["source"] == "ide"]
+    project_ide = [r for r in ledger.kiro_metrics_raw(root) if r["source"] == "ide-log"]
     assert len(project_ide) == 1
     assert not (paths.global_home() / ".cage" / "ledger").exists()
 
@@ -411,8 +374,7 @@ def test_kiro_metrics_ide_and_cli_rows_both_land_in_the_active_ledger(
 
 def test_kiro_metrics_reimport_is_idempotent_against_the_active_ledger(tmp_path, monkeypatch):
     root = _isolate(tmp_path, monkeypatch)
-    devdata = paths.kiro_devdata_db()
-    _devdata_db(devdata, [(1, 100, 20, "2026-08-13T10:00:00Z")])
+    _ide_log(paths.kiro_token_log(), [(100, 20)])
     importcmd.run(root, "all", _args())
     first = len(ledger.kiro_metrics_raw(root))
     importcmd.run(root, "all", _args())
@@ -442,7 +404,7 @@ def test_chats_now_moves_since_the_read_surface_landed(tmp_path, monkeypatch, ca
     demo.seed(root)
     before = _render(["insights", "chats"], capsys)
     ledger.append_row(root, "kiro", schema.make_kiro_metric(
-        source="ide", session="kiro", surface="ide", tokens_in=999, tokens_out=999,
+        source="ide-log", session="kiro", surface="ide", tokens_in=999, tokens_out=999,
         row_ref="1", ts="2026-08-13T00:00:00Z", metric_id="km_present"))
     after = _render(["insights", "chats"], capsys)
     assert before != after
@@ -461,7 +423,7 @@ def test_report_spend_total_is_untouched_by_kiro_ide_metrics(tmp_path, monkeypat
     demo.seed(root)
     before = [dict(c) for c in ledger.spend(root)]
     ledger.append_row(root, "kiro", schema.make_kiro_metric(
-        source="ide", session="kiro", surface="ide", tokens_in=999, tokens_out=999,
+        source="ide-log", session="kiro", surface="ide", tokens_in=999, tokens_out=999,
         row_ref="1", ts="2026-08-13T00:00:00Z", metric_id="km_present"))
     after = [dict(c) for c in ledger.spend(root)]
     assert before == after
@@ -473,11 +435,11 @@ def test_report_spend_total_is_untouched_by_kiro_ide_metrics(tmp_path, monkeypat
 def test_doctor_kiro_metrics_advisory_renders_per_source(proj):
     root = proj
     ledger.append_row(root, "kiro", schema.make_kiro_metric(
-        source="ide", tokens_in=10, row_ref="1", ts="2026-08-13T00:00:00Z",
+        source="ide-log", tokens_in=10, row_ref="1", ts="2026-08-13T00:00:00Z",
         metric_id="km_1"))
     level, detail = doctorcmd._kiro_metrics(root)
     assert level == "ok"
-    assert "ide: 1 row(s)" in detail
+    assert "ide-log: 1 row(s)" in detail
     assert "cli-conv: none yet" in detail
     assert "cli-turn: none yet" in detail
 

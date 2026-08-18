@@ -208,16 +208,17 @@ def test_reimport_never_double_records_the_relocated_store(proj, tmp_path):
     assert [r["id"] for r in once] == [r["id"] for r in twice]
 
 
-def test_exactly_one_of_the_two_ide_grains_is_manifest_eligible(proj):
-    """`ide` (devdata.sqlite) and `ide-log` (tokens_generated.jsonl) are the SAME counter
-    from Kiro's two IDE stores. Listing both in `_MANIFEST_SOURCES` would count one
-    install's IDE traffic twice the day `devdata.sqlite` finally ships — the `copilot`
-    `cli`/`cli-delta` hazard, one store later. Pinned as a rule rather than as today's
-    value so flipping the pair stays legal and adding to it does not."""
-    both = {"ide", "ide-log"}
-    listed = both & set(importcmd._MANIFEST_SOURCES["kiro"])
-    assert len(listed) == 1, f"exactly one of {both} may be manifest-eligible, got {listed}"
-    assert both <= set(schema.KIRO_METRIC_SOURCES), "both grains must remain writable"
+def test_ide_log_is_the_one_ide_grain_and_is_manifest_eligible(proj):
+    """`ide-log` (`tokens_generated.jsonl`) is kiro IDE's one real store and its one
+    grain in `schema.KIRO_METRIC_SOURCES`. A second grain, `ide` (a `devdata.sqlite`
+    SQLite twin of the SAME counter), existed here through 2026-08-15 for the day that
+    store might ship — it was never observed on any probed install and its dead reader
+    was removed (DEVDATA-CUT, docs/adr/0006_kiro.md) rather than kept armed
+    indefinitely. `ide-log` must stay both a valid source and manifest-eligible so a
+    kiro IDE session is counted exactly once, never zero and never twice."""
+    assert "ide-log" in schema.KIRO_METRIC_SOURCES
+    assert "ide" not in schema.KIRO_METRIC_SOURCES
+    assert "ide-log" in importcmd._MANIFEST_SOURCES["kiro"]
 
 
 # ── the knock-ons P5 had to carry with it ───────────────────────────────────────

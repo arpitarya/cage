@@ -264,13 +264,17 @@ above) — the metrics kind widens coverage to three more, never re-routes the f
 **kiro metrics row** — a `.cage/ledger/kiro/` row (`schema.make_kiro_metric`,
 KIRO-METRICS) — a capture-only sibling to `calls`/`credits`, never a widened row of
 either. Records, store-verbatim, per-chat Kiro facts neither of those kinds holds:
-IDE `devdata.sqlite` per-call tokens **with timestamps** (`source="ide"`), CLI
-per-conversation credits/context/turns (`source="cli-conv"`), and CLI per-turn timing/
-size/tool-use metadata plus the CLI's NULL-today token slots (`source="cli-turn"`,
-the *kiro upgrade-watch*). Collapsed last-write-wins per `(source, session, turn,
-row_ref)` at read (`ledger.kiro_metrics`); read by no derived view yet. Routing
-inherits ADR 0006 unchanged: `ide` rows ride the routed machine sink, `cli-*` rows stay
-workspace-scoped. [schema.py](../cage/schema.py), [ledger.py](../cage/ledger.py),
+IDE `tokens_generated.jsonl` per-call tokens (`source="ide-log"`, kiro IDE's one real
+store — a second, `devdata.sqlite`-backed grain never observed on any probed install
+was removed 2026-08-15, DEVDATA-CUT), CLI per-conversation credits/context/turns
+(`source="cli-conv"`), and CLI per-turn timing/size/tool-use metadata plus the CLI's
+NULL-today token slots (`source="cli-turn"`, the *kiro upgrade-watch*). Collapsed
+last-write-wins per `(source, session, turn, row_ref)` at read
+(`ledger.kiro_metrics`); read directly by `cage insights chats`, which renders
+IDE-sourced rows as their own chat line (LEDGER-READ-SURFACE, 2026-08-15) — never
+folded into `spend()` or any cross-agent total. Routing since ADR-LEDGER
+(2026-08-15): every row, IDE or CLI, lands in whichever ledger is active for the run,
+like any other agent's. [schema.py](../cage/schema.py), [ledger.py](../cage/ledger.py),
 PLAN §3.12.
 
 **claude metrics row** — a `.cage/ledger/claude/` row (`schema.make_claude_metric`,

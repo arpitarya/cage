@@ -437,6 +437,53 @@ Tested in both pairings (`bash + cmd`, `cmd + cmd`) — `tests/test_win_graphify
   ships it. Anyone auditing the twins reads it from the repo or GitHub, not from an
   installed copy.
 
+### Capture reference — signal → field → row
+
+> graphify is not a vendor-log parser like ADR-CLAUDE/ADR-COPILOT/ADR-KIRO — it is
+> cage's own interceptor, so most of what it captures is **cage-derived by design**: it
+> reads a live signal (a subprocess's stdout, or the calling agent's own transcript/store
+> for the transcript-detection route) once, computes a receipt, and never persists the
+> signal itself (counts-never-content). "Source file" below names where a field is
+> **written**, since there is no vendor file to read a captured field back from.
+
+| Data point | Source file (on disk) | Field/key | Extracted / computed by | Vendor-recorded / cage-derived |
+|---|---|---|---|---|
+| graphify subcommand (`op`) | *(live argv — not a file)*; written into all three files below | `op` | `graphifymeter._op_of()` | **cage-derived** — parsed from the intercepted command line |
+| graphify's answer text | shim route: live subprocess stdout; transcript route: the calling agent's own log/store (Claude `.jsonl`, Copilot `events.jsonl`/`chatSessions/*.jsonl`, Kiro `conversations_v2`) | *(held in memory only — never written; counts-never-content)* | `graphifymeter.run()` / `graphifytx.detect_and_file*()` | vendor-recorded — the wrapped tool's/agent's own output, consumed transiently |
+| `actual` (tokens in the answer) | `ledger/graphify/savings-<month>.jsonl` | `actual` | `graphifymeter.toks()` = `len(text) / CHARS_PER_TOKEN` | **cage-derived** — a char-count estimate, not a vendor token count |
+| cited source-file paths | parsed from the answer text, resolved on disk | *(never written — count only, PII guard)* | `graphifymeter._cited_files()` | vendor-recorded strings, read transiently |
+| `raw_alternative` (counterfactual cost) | `ledger/graphify/savings-<month>.jsonl` | `raw_alternative` | `graphifymeter._raw_alternative()` — reads each cited file via `Path.read_text` | **cage-derived** — the counterfactual cage builds |
+| `source_files` (count) | same | `source_files` | `graphifymeter._meter()` / `graphifytx._file_query()` (`len(files)`) | **cage-derived** |
+| `saved` | same | `saved` | `schema.make_savings()` = `raw_alternative − actual` | **cage-derived** — arithmetic, can't disagree with its inputs |
+| `method` | same | `method` | literal `"modeled"` at every call site | **cage-derived** — fixed tag |
+| `confidence` | same | `confidence` | `constants.GRAPHIFY_RECEIPT_CONFIDENCE` / `GRAPHIFY_REPORT_READ_CONFIDENCE` | **cage-derived** — hard-coded constant, not measured per-receipt |
+| `session` | same | `session` (`""` on the shim route; passed through on the transcript route) | `graphifymeter._meter()` (shim) / `graphifytx.detect_and_file*()` (transcript) | shim route **cage-derived** (deliberate honest-absence); transcript route vendor-recorded — id comes from the agent's own store |
+| receipt `id` | same | `id` | `graphifymeter.receipt_id()` = sha1(`session\|op\|args_hash\|answer_hash`) | **cage-derived** |
+| `import_id` (manifest link) ‡ | `ledger/graphify/savings-<month>.jsonl` + `state/imports.jsonl` | `import_id` | `manifest.new_graphify_id()` | **cage-derived** — generated linking id |
+| manifest row | `state/imports.jsonl` | `source_path` / `saving_id` / `saved` / `source_files` / `ts` / `session_name` | `manifest.record_graphify()` | **cage-derived** — `source_path` is the live cwd basename, not read from any vendor file |
+| usage row † | `state/graphify-usage.jsonl` | `exit` / `ms` / `outcome` / `route` | `usagelog.record()` | mixed — on the **shim/native route** `exit`/`ms` are the wrapped subprocess's real code/duration (`graphifymeter.run`); `outcome`/`route` are always cage's own classification |
+| report-read counterfactual | reads `graphify-out/graph.json` (graphify's own output file); result lands in the same savings row, `op="report-read"` | `raw_alternative` / `source_files` | `repoceiling.corpus_tokens()`, via `graphifytx._file_report_read()` | **cage-derived** — computed over graphify's own graph file |
+| per-chat "without gfx" / "saved %" | *(render-time only — never written)* | n/a | `graphifychat.summarize()` (`without = tokens + saved`; `pct = 100·saved/without`) | **cage-derived**, not persisted |
+
+**‡ `import_id` and the manifest row are the shim/native route only.** `graphifytx`'s
+transcript-detection route never calls `manifest.new_graphify_id()`/`record_graphify()`,
+so a savings row filed from a transcript carries no `import_id` and gets no manifest row
+at all. Stated because the absence is structural, not a capture gap.
+
+**† The usage row's `exit`/`ms` are honest only on the shim/native route.**
+`graphifytx._file_query` stamps a synthetic `exit=0, ms=0` on every receipt it files —
+a transcript records that a command *ran*, not what it returned or how long it took —
+and `_file_report_read` writes no usage row at all. Named rather than smoothed: a
+synthetic zero that reads as a measured success is exactly the kind of cell the method
+law exists to prevent, and the honest fix (if one is ever wanted) is a distinct
+`route`-scoped absence marker, not a better guess.
+
+**Not in this table on purpose:** `graphifymodel.repo_ceiling()` /
+`repoceiling.community_corpus()` — a separate day-one *ceiling projection* that
+**no live surface reads** (GFX-MODEL-ORPHAN; both its consumers were deleted in v0.50,
+[docs/FORMULAS.md](../FORMULAS.md) §2.10). It never writes to a savings row, so listing
+it beside `corpus_tokens()` would claim a write path that does not exist.
+
 ### Alternatives rejected
 
 - **Content-only id (session excluded)** — collapses the same query across sessions into

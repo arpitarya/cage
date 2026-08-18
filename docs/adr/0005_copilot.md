@@ -215,7 +215,7 @@ spend spine.**
 | tokens in/out (VS Code chat) | `workspaceStorage/*/chatSessions/*.jsonl` → per-request `promptTokens`/`completionTokens` | `calls` row (`c_cop<hash>`, surface `vscode`) |
 | credits per request (VS Code) | same row → `copilotCredits` (float, verbatim) | `calls.credits` — the only thing that meters `copilot/auto`, where the routed model is unknown |
 | tokens + cached (CLI) | `~/.copilot/session-state/*/events.jsonl` → `session.shutdown` per-model cumulative, delta'd | `calls` rows incl. `cached_in` (surface `cli`) |
-| credits (CLI) | `session.shutdown` → `totalPremiumRequests` (float, cumulative, delta'd) | `calls.credits` (+ legacy int `premium`, unused) |
+| credits (CLI) | `session.shutdown` → `totalPremiumRequests` (float, cumulative, delta'd) | `calls.credits` (+ legacy int `premium` — no rendered column since COPILOT-PREMIUM-DEAD, but still summed into the payload and still in `--json`) |
 | group billing | `billed_with` — one carrier row per multi-model shutdown | siblings named, never silently dropped |
 
 Chats land from **four** `chatSessions` roots: the per-workspace store, `no-workspace/`,
@@ -244,11 +244,55 @@ Reader: `ledger.copilot_metrics` collapses last-write-wins per
 Health: `cage doctor`'s `copilot-metrics` check names per-source coverage **and the
 enabling setting for each gated store**. `cage query copilot-metrics` explains it.
 
+### Field-level trace — data point → source file → exact key → function
+
+> Drills the two tables above to the exact on-disk key and the function that reads it.
+> **Vendor-recorded** = quoted verbatim from a Copilot store; **cage-derived** =
+> computed, reshaped, or delta'd by cage — never a literal field on disk. *(gated)* rows
+> only populate when the named VS Code setting is on.
+
+| Data point | Source file (on disk) | Field/key read | Extracted by | Vendor-recorded / cage-derived |
+|---|---|---|---|---|
+| Input tokens (chat) | `<vscode-user>/…/chatSessions/*.jsonl` (4 roots) | `promptTokens` / `inputTokens` | `_vscode_chat_requests` → `parse_copilot_vscode_calls` / `parse_copilot_vscode_metrics` | vendor-recorded |
+| Output tokens (chat) | same | `completionTokens` / `outputTokens` | same | vendor-recorded |
+| Cached tokens (chat, agent-host sessions only) | same | `modelTotals[].cachedTokens` | `_copilot_model_totals` → `parse_copilot_vscode_metrics` | vendor-recorded — honest-0 when `modelTotals` is absent (classic-extension sessions) |
+| Credits per request (chat) | same | `copilotCredits` | `parse_copilot_vscode_calls` / `_vscode_metrics` | vendor-recorded, verbatim |
+| Session credits (running total) | same | `sessionCopilotCredits` | `parse_copilot_vscode_metrics` | vendor-recorded — collapsed max/last, never summed |
+| Model id (chat) | same | `modelId` | both VS Code parsers | vendor-recorded |
+| Provider (openai/anthropic/google) | — | no such field on disk | `_copilot_provider(model)` | **cage-derived** — string-prefix heuristic on the model id |
+| Timestamp (chat) | same | `timestamp` (epoch ms) | `_epoch_ms_iso()` in both VS Code parsers | vendor-recorded value; ISO string is a format conversion |
+| Session id (chat) | same | `kind:0` record's `v.sessionId` (fallback: file stem) | `_vscode_chat_requests` | vendor-recorded |
+| Elapsed / waiting ms | same | `elapsedMs` / `timeSpentWaiting` | `parse_copilot_vscode_metrics` | vendor-recorded |
+| Project (calls row) | `workspaceStorage/<hash>/workspace.json` → `folder`, or same chatSessions row → `toolSpecificData.cwd.path` | — | `_vscode_project()` | **cage-derived** — basename/decode of a URI, no vendor "project" field |
+| Tokens in/out/cached, cumulative (CLI) | `~/.copilot/session-state/*/events.jsonl` | `modelMetrics[model].usage.{inputTokens,outputTokens,cacheReadTokens}` | `parse_copilot_cli_metrics` (`source="cli"`) | vendor-recorded, verbatim cumulative |
+| Tokens in/out/cached, per-shutdown delta (CLI) | same | same keys, differenced against the prior shutdown | `parse_copilot_calls`; `cli-delta` twin in `parse_copilot_cli_metrics` | **cage-derived** — arithmetic over a vendor cumulative counter |
+| Credits, cumulative (CLI) | same | `totalPremiumRequests` (float) | `parse_copilot_cli_metrics` (`source="cli"`) | vendor-recorded, verbatim cumulative |
+| Credits, per-shutdown delta (CLI) | same | same key, differenced | `parse_copilot_calls`; `cli-delta` twin | **cage-derived** — delta of a vendor counter |
+| `nano_aiu` (CLI) | same | `totalNanoAiu` | `parse_copilot_cli_metrics` | vendor-recorded, verbatim |
+| Real routed model + tokens + `nano_aiu`, per call *(gated: agentHost debug log)* ※ | `<vscode-user>/agentHostUsage/<sanitizedSessionId>.jsonl` | `model` / `inputTokens` / `outputTokens` / `cacheReadTokens` / `totalNanoAiu`, keyed by `turnId` | `parse_copilot_sidecar_metrics` | vendor-recorded |
+| Tokens + model + time-to-first-token, per call *(gated: agentDebugLog file logging)* | `.../debug-logs/<sessionId>/*.jsonl` | `attrs.inputTokens` / `attrs.outputTokens` / `attrs.model` / `attrs.ttft` | `parse_copilot_debuglog_metrics` | vendor-recorded — whitelist read, same lines carry prompt bodies |
+| Tokens + cached + ttft + model, per call *(gated: OTel sqlite exporter)* ※ | `agent-traces.db` (SQLite, table `spans` WHERE `operation_name='chat'`) | `input_tokens` / `output_tokens` / `cached_tokens` / `ttft_ms` / `COALESCE(response_model, request_model)` | `parse_copilot_otel_metrics` | vendor-recorded |
+
+**※ The paths for these three gated stores are `UNVERIFIED-LAYOUT` on Windows** —
+`agentHostUsage`, `debug-logs` and `agent-traces.db` are *inferred from the VS Code
+user-dir convention, never pinned on a real Windows install*, which is what
+`paths.copilot_metric_sources` says in its own words. The table above states them flat
+because that is how the resolver reads them; the hedge belongs beside them, since a
+path stated as fact is precisely how the F1 class (a capture route that is silently
+absent rather than loudly broken) has bitten this project before. macOS/Linux layouts
+are verified.
+
 ### Known gaps (open)
 
-- **CLI credit-delta loss** — the credit delta is dropped when the first-listed model has
-  no token delta. Open in the *calls* CLI parser only; the metrics CLI parser records
-  cumulative verbatim and structurally dodges it.
+- ~~**CLI credit-delta loss**~~ — **CLOSED 2026-08-03** (REV-CREDITS defect 1), verified
+  against code 2026-08-18. The gap read "the credit delta is dropped when the first-listed
+  model has no token delta"; both halves are now false. `transcript._place_billing_delta`
+  picks the carrier as the **largest token mover** (ties on model name) — deterministic and
+  **independent of `modelMetrics`' dict order**, so "first-listed" names nothing — and when
+  *every* model idled with a non-zero credit delta it **appends a zero-token carrier row**
+  rather than dropping the credit. Kept struck rather than deleted: it was a live veto
+  trigger, and a reader who remembers the defect needs to find its resolution, not a
+  silence.
 - **Cache-write tokens** — persisted by **no** Copilot store. Permanently honest-empty;
   not a cage gap. (Measured: 0 of 57 vscode rows carried `cached_in`, 2026-08-14.)
 - **No read surface for `.cage/ledger/copilot/`** — a `cage insights copilot` view, or new
@@ -301,10 +345,14 @@ enabling setting for each gated store**. `cage query copilot-metrics` explains i
    misreads it as a reset. **Name the session and the two figures** when reopening; an
    argument that it "might" happen is not enough. The change lands in
    `transcript.parse_copilot_calls` (negative handling), not a storage redesign.
-2. **The open CLI credit-delta defect** — the credit delta is dropped when the
-   first-listed model has no token delta. Open in the *calls* CLI parser only; the metric
-   CLI parser records cumulative verbatim and structurally dodges it. Reopen with the
-   count of affected shutdowns from a real store.
+2. ~~**The open CLI credit-delta defect**~~ — **FIRED AND RESOLVED, 2026-08-03**
+   (REV-CREDITS defect 1; confirmed against `transcript._place_billing_delta`
+   2026-08-18). The trigger asked for "the count of affected shutdowns from a real
+   store" before acting; the defect was instead fixed outright, so the count was never
+   needed and this trigger can no longer fire. Struck, not deleted — a numbered trigger
+   that silently vanishes reads as an oversight. **Nothing replaces it**: no successor
+   condition was identified, and inventing one to keep the slot filled would be exactly
+   the aspirational veto this record's own rules forbid.
 3. **`SPEND_SOURCES` membership.** A new store joins the spine **only** if it is
    point-in-time **and** covers a surface no existing spine covers. Adding a store to the
    metric kind does **not** add it to the spine — that separation is the design.
@@ -318,11 +366,16 @@ enabling setting for each gated store**. `cage query copilot-metrics` explains i
 
 - **Contingent (auto-revisits on evidence):** which sources are cumulative; which stores
   are gated and by which setting; the four chatSessions roots; whether cache-write ever
-  becomes available; the CLI credit-delta defect.
-- **Invariant (moves only by ratified reversal of this ADR):** **no ledger row is ever
-  mutated**; **credits are never summed or ranked across agents**; **no conversion between
-  tokens, credits and currency in any direction**; **absence is never rendered as `0`**;
-  a spine source is **point-in-time, never cumulative**.
+  becomes available. *(The CLI credit-delta defect was listed here until 2026-08-18 — it
+  has been fixed since 2026-08-03, so it can no longer auto-revisit anything; see
+  trigger 2 above.)*
+- **Invariant (moves only by ratified reversal of this ADR):** **absence is never
+  rendered as `0`**; a spine source is **point-in-time, never cumulative**.
+  - Also binding here, but **owned by ADR-LAWS and deliberately not restated** — a second
+    copy can drift, and drift in a law is invisible until it prints a wrong number:
+    append-only (**Law 3**) and usage-never-cost, which carries both *credits are never
+    summed or ranked across agents* and *no conversion between units in any direction*
+    (**Law 5**, enforced in code by `units.summable`).
 
 **3 · Deliberately not taken.**
 

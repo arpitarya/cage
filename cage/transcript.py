@@ -1504,11 +1504,12 @@ def parse_kiro_ide_log_metrics(token_log: Path, session: str = "") -> list[dict]
     This is the same file `parse_kiro_calls` reads, and the same facts. It exists
     because kiro's transcript→`calls` leg was retired (KIRO-CALLS-LEG, ratified by
     Arpit) on the condition that the facts move rather than disappear: for claude and
-    copilot the retired leg was a duplicate of a metric twin, and kiro IDE had no twin —
-    `parse_kiro_ide_metrics` reads `devdata.sqlite`, absent on every install ever
-    probed. So the leg was not deleted, it was **relocated** into the kiro-metrics
-    ledger, where the rows read as usage facts rather than as spend the ledger then has
-    to exclude from every total.
+    copilot the retired leg was a duplicate of a metric twin, and kiro IDE had no
+    twin — its only candidate twin, `devdata.sqlite`, was never observed on any
+    probed install and its dead reader was removed 2026-08-15 (DEVDATA-CUT). So the
+    leg was not deleted, it was **relocated** into the kiro-metrics ledger, where the
+    rows read as usage facts rather than as spend the ledger then has to exclude from
+    every total.
 
     **What is lost relative to the retired leg: nothing.** The store carries the same
     four fields either way, and the retired `calls` rows never had a real `ts` either —
@@ -1551,84 +1552,13 @@ def parse_kiro_ide_log_metrics(token_log: Path, session: str = "") -> list[dict]
     return rows
 
 
-def parse_kiro_ide_metrics(db_path: Path) -> list[dict]:
-    """Kiro-metrics rows from the IDE's timestamped twin of `parse_kiro_calls`'s jsonl
-    — `dev_data/devdata.sqlite`, table `tokens_generated` (the `source="ide"` leg of
-    KIRO-METRICS, handoff §4.4). The SAME counter as the jsonl, plus a `timestamp` and
-    a cursorable `id` the jsonl never carried.
-
-    Read-only (`mode=ro&immutable=1`); never writes, migrates, or locks the DB.
-    **Explicit-column SELECT, never `SELECT *`**: `id, tokens_prompt, tokens_generated,
-    timestamp` are the four columns the research probe assumed (2026-08-13 §6,
-    UNVERIFIED-COLUMNS — the real schema probe is still pending); any column beyond
-    those four stays unread until that probe confirms it, so an unexpected extra
-    column can never leak into a row. Rows where both counts are 0 are skipped, the
-    same rule `parse_kiro_calls` applies. Any `sqlite3.Error` — a missing table, a
-    schema surprise, a lock — returns `[]`: fail-open, never a crash, never a guess.
-
-    **The 2026-02-28 `tokens_prompt` semantics cutover is recorded verbatim, never
-    corrected, here**: before that date the store's `tokens_prompt` was the full
-    context sent per call; after, it is incremental. This parser stores the number
-    exactly as the row carries it either way — branching on it is a derive-time
-    concern, if it is ever needed.
-
-    `session="kiro"` (the store has none — the same honest constant `parse_kiro_calls`
-    uses) and `surface="ide"`. `row_ref=str(id)` is both provenance and the dedupe
-    anchor. `ts` from `timestamp`: tried as ISO-8601 text first, then as an epoch
-    ms/s number: `_epoch_ms_iso` per row (Kiro's exact text/epoch shape is another
-    piece of the pending schema probe) — a row whose `timestamp` parses neither way
-    still lands, just with no `ts` (the legacy unpartitioned shard, never lost)."""
-    if not db_path.exists():
-        return []
-    uri = f"file:{db_path}?mode=ro&immutable=1"
-    try:
-        con = sqlite3.connect(uri, uri=True)
-    except sqlite3.Error:
-        return []
-    rows: list[dict] = []
-    try:
-        cur = con.execute("SELECT id, tokens_prompt, tokens_generated, timestamp "
-                          "FROM tokens_generated ORDER BY id")
-        for row_id, tokens_prompt, tokens_generated, timestamp in cur:
-            inp = int(tokens_prompt) if isinstance(tokens_prompt, (int, float)) else 0
-            out = int(tokens_generated) if isinstance(tokens_generated, (int, float)) else 0
-            if not (inp or out):
-                continue
-            ts = _kiro_devdata_ts(timestamp)
-            rows.append(schema.make_kiro_metric(
-                source="ide", session="kiro", surface="ide", tokens_in=inp,
-                tokens_out=out, row_ref=str(row_id), ts=ts,
-                metric_id=f"km_ide{int(row_id):08d}"))
-    except sqlite3.Error:
-        return rows
-    finally:
-        con.close()
-    return rows
-
-
-def _kiro_devdata_ts(value) -> str | None:
-    """Best-effort `ts` for a `devdata.sqlite` row: try an ISO-8601 text timestamp
-    first, then an epoch ms/s number — Kiro's exact `timestamp` column shape is one of
-    the pending real-store probes (research 2026-08-13 §6). Returns ``None`` (never
-    raises) when neither reading is plausible, so the row still lands, just without a
-    `ts` (the legacy unpartitioned shard)."""
-    if isinstance(value, str) and value:
-        try:
-            text = value[:-1] + "+00:00" if value.endswith("Z") else value
-            dt = _dt.datetime.fromisoformat(text)
-            if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=_dt.timezone.utc)
-            return dt.astimezone(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.") + \
-                f"{dt.microsecond // 1000:03d}Z"
-        except ValueError:
-            pass
-    if isinstance(value, (int, float)) and not isinstance(value, bool):
-        # Epoch seconds vs milliseconds: a millisecond value for "now" is ~13 digits;
-        # a second value is ~10. `_epoch_ms_iso` expects ms, so a second-scale number
-        # is scaled up first.
-        ms = value if value > 1e12 else value * 1000
-        return _epoch_ms_iso(ms)
-    return None
+# `parse_kiro_ide_metrics` (read `dev_data/devdata.sqlite`'s `tokens_generated` table,
+# the `source="ide"` leg of KIRO-METRICS) and its `_kiro_devdata_ts` timestamp helper
+# were removed 2026-08-15 (DEVDATA-CUT, docs/adr/0006_kiro.md) — the db was never found
+# on any of the installs cage has probed. `parse_kiro_ide_log_metrics` above (the
+# `source="ide-log"` leg, `tokens_generated.jsonl`) is the real, live IDE reader and is
+# unaffected; it already carries the same counter. Re-add a devdata reader only against
+# a real probed schema, should the store ever actually ship.
 
 
 # The Kiro CLI store is a SQLite DB, `conversations_v2(key=cwd, conversation_id,
@@ -2050,47 +1980,9 @@ def parse_kiro_cli_tool_runs(db_path: Path, workspace: str = "") -> list[dict]:
     return out
 
 
-#: The four columns `parse_kiro_ide_metrics` reads from `tokens_generated`. Named here
-#: so the doctor probe below and the parser can never disagree about what "drift" means.
-KIRO_IDE_COLUMNS = ("id", "tokens_prompt", "tokens_generated", "timestamp")
-
-
-def probe_kiro_ide_store(db_path: Path) -> tuple[str, str]:
-    """Why the kiro IDE metric source produced nothing — ``(state, detail)``.
-
-    **Three outcomes that used to render one indistinguishable zero** (USAGE-ONLY P3).
-    `parse_kiro_ide_metrics` is fail-open by design: a missing file, a missing table and
-    a renamed column all return `[]`, so `cage doctor` reported "ide: none yet" for all
-    three and a reader could not tell *Kiro is not installed* from *cage is reading the
-    wrong schema*. Only the last is a cage defect, and it was invisible.
-
-    States: ``"absent"`` (no db — Kiro IDE not installed, or never run) · ``"no-table"``
-    (db exists, no `tokens_generated` table) · ``"drift"`` (table exists but is missing
-    a column cage reads — the schema moved and capture is silently broken) · ``"ok"``
-    (readable; detail carries the row count).
-
-    Read-only and fail-open like the parser: any sqlite error is reported as its own
-    detail string rather than raised."""
-    if not db_path.exists():
-        return "absent", f"no {db_path.name} at {db_path.parent}"
-    try:
-        con = sqlite3.connect(f"file:{db_path}?mode=ro&immutable=1", uri=True)
-    except sqlite3.Error as exc:
-        return "no-table", f"{db_path.name} unreadable: {exc}"
-    try:
-        cur = con.execute("SELECT name FROM sqlite_master "
-                          "WHERE type='table' AND name='tokens_generated'")
-        if cur.fetchone() is None:
-            return "no-table", f"{db_path.name} has no `tokens_generated` table"
-        have = {r[1] for r in con.execute("PRAGMA table_info(tokens_generated)")}
-        missing = [c for c in KIRO_IDE_COLUMNS if c not in have]
-        if missing:
-            return "drift", ("`tokens_generated` is missing column(s) "
-                             f"{', '.join(missing)} — cage reads "
-                             f"{', '.join(KIRO_IDE_COLUMNS)}; the schema moved")
-        n = con.execute("SELECT count(*) FROM tokens_generated").fetchone()[0]
-        return "ok", f"{n} row(s) in `tokens_generated`"
-    except sqlite3.Error as exc:
-        return "drift", f"{db_path.name} probe failed: {exc}"
-    finally:
-        con.close()
+# `KIRO_IDE_COLUMNS` and `probe_kiro_ide_store` (the db-absent/no-table/drift/ok
+# three-way probe for `devdata.sqlite`) were removed alongside `parse_kiro_ide_metrics`
+# 2026-08-15 (DEVDATA-CUT, docs/adr/0006_kiro.md) — there was never a real store to
+# probe. `cage doctor`'s `kiro-metrics` check no longer has an `ide` source to report
+# on; `ide-log` (`tokens_generated.jsonl`) reports through the ordinary per-source
+# row-count path every other grain uses.

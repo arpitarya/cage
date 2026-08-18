@@ -12,6 +12,111 @@ by milestone) — the worklog is what *happened this session*.
 
 ---
 
+## 2026-08-18 — Cowork — ADR-FIELD-TRACE: data-point → source-file table added to ADR-CLAUDE/COPILOT/KIRO/GRAPHIFY
+
+- **Asked:** "in ADR-CLAUDE, ADR-KIRO, ADR-COPILOT, ADR-GRAPHIFY, in all four, create a
+  table which tells us what data points are picked from which file of the log; update
+  each and every one of those ADRs with that table" — dictated, then disambiguated
+  ("Quiro"/"k i r o" = Kiro, "Graphify" = ADR-GRAPHIFY, confirmed against
+  `docs/adr/README.md`'s live ownership map rather than assumed).
+- **Done:** four parallel subagents read `claudewire.py`/`copilotwire.py`/`kirowire.py`/
+  the four `graphify*.py` files against `transcript.py`, `paths.py`, and each ADR's
+  existing §2, and produced one row per data point: exact field/key, the function that
+  reads it, and **vendor-recorded vs. cage-derived** (per ADR-LAWS — never present a
+  computed value as a vendor one). Inserted as a new §2 subsection in each ADR,
+  positioned right after that ADR's existing "Capture reference" table (ADR-GRAPHIFY
+  had none — added "Capture reference — signal → field → row" in the equivalent slot,
+  after Consequences). Bumped all four [DOC-REGISTRY.md](DOC-REGISTRY.md) rows in the
+  same change, per each ADR's own update-rule.
+- **Decided:** graphify's table is shaped differently on purpose — it's cage's own
+  interceptor, not a vendor-log parser, so "source file" names where a field is
+  *written* (its own `savings-<month>.jsonl`/`imports.jsonl`/`usage-log`), not read back
+  from a vendor store; called this out in the table's intro rather than forcing it into
+  the other three ADRs' shape.
+- **Open / not independently verified this session** (flagged per-row by the research,
+  not silently assumed): `paths.py`'s Windows layouts for Copilot's `agentHostUsage`/
+  `debug-logs`/`agent-traces.db` and Kiro's IDE store are marked `UNVERIFIED-LAYOUT` in
+  the code itself; `manifest.py`/`usagelog.py`/`savings.py`/`repoceiling.py` weren't
+  read first-hand for the graphify table (fields taken from call-site kwargs); no
+  line-by-line cross-check that every `transcript.py` key name matches its `schema.py`
+  column 1:1. None of this blocks the table — it's the same "state the gap" standard
+  the ADRs already hold themselves to — but a `adr-verifier` pass against these four
+  ADRs would close it properly.
+- **Next step:** if/when a Claude Code session picks this up, run `adr-verifier` against
+  the four edited ADRs to check the new tables' claims against code, and consider
+  reading `manifest.py`/`usagelog.py`/`savings.py`/`repoceiling.py` to firm up the
+  graphify row that's currently sourced from call sites rather than definitions.
+- **Cost:** unmeasured — this is a Cowork session working through the device bridge on
+  Arpit's local `cage` checkout; `cage` itself isn't running here to isolate it
+  (CLAUDE.md `Cost:` rule).
+
+---
+
+## 2026-08-15 — Cowork — DEVDATA-CUT: removed the dead `devdata.sqlite` IDE parser/probe entirely
+
+- **Asked:** "kiro remove dev_data/devdata.sqlite DOES NOT EXIST on any install probed
+  block and the functionality from the repo" — after the LEDGER-READ-SURFACE session
+  above, a Socratic review of ADR-KIRO surfaced that the `devdata.sqlite` grain (the
+  `source="ide"` leg of KIRO-METRICS, alongside the live `ide-log` leg) had never once
+  been observed on any Kiro install cage has probed (settled by the 2026-08-14 field
+  probe), yet its parser, probe, path resolver, and schema enum entry were all still
+  live in the codebase, "kept armed" for a store that had never shipped.
+- **Done:** deleted every live code path built around the store: `paths.kiro_devdata_db`,
+  `transcript.parse_kiro_ide_metrics` + `transcript._kiro_devdata_ts`,
+  `transcript.KIRO_IDE_COLUMNS` + `transcript.probe_kiro_ide_store` (the db-absent/
+  table-missing/column-drift three-way probe), `schema.KIRO_METRIC_SOURCES`'s `"ide"`
+  entry (now `("ide-log", "cli-conv", "cli-turn")`), the devdata import block at the
+  end of `importcmd.import_kiro`, and `doctorcmd._kiro_metrics`'s three-way `"ide"`
+  probe branch (the loop now only special-cases `cli-turn`'s upgrade-watch). Fixed the
+  comments/docstrings left pointing at the deleted code across `ledger.py` (the
+  `ABSENT_SPINES` docstring no longer claims a reader is "kept" to flip the spine
+  back), `units.py` (the upgrade-watch cross-reference now correctly names the CLI's
+  NULL `request_metadata` token slots — the one upgrade-watch actually left — instead
+  of the removed devdata watch, a pre-existing mismatch caught incidentally), and
+  `chats.py` (the IDE-metrics filter simplified from a 2-tuple membership check to a
+  single `== "ide-log"` equality). Rewrote the `cage query kiro-metrics` explanation in
+  `explain_data.py` (also fixed an incidental stale "never read by any derived view"
+  claim). Updated `docs/adr/0006_kiro.md` throughout: both flow diagrams (mermaid +
+  ASCII) lost the `MISS`/`devdata.sqlite` node and its dashed edge; the status
+  frontmatter and §1 upgrade-watch bullet now name the CLI watch specifically; the
+  Decision section's `ABSENT_SPINES` paragraph, the KIRO-CALLS-LEG blockquote, the
+  capture-reference table (the `ide` row is now a strikethrough footnote, not a live
+  row), Known gaps, and Veto condition trigger #2 (no longer "a contained parser
+  change" — a future store needs a parser rebuilt from a fresh field probe, not a
+  resurrected one) were all brought in line. `docs/adr/0002_coverage.md`'s veto bullet
+  about kiro-IDE gaining a token store was marked superseded (struck the "kept" claim,
+  kept the still-valid trigger condition). `docs/GLOSSARY.md`'s "kiro metrics row"
+  entry dropped the devdata mention and picked up two more accurate fixes noticed
+  along the way (it's read by `insights chats` now, not "no derived view"; routing
+  follows ADR-LEDGER, not the pre-reversal ADR-0006 machine-sink rule). `CLAUDE.md`'s
+  adapters paragraph got the same three fixes. Test-side: rewrote
+  `tests/test_kiro_metrics.py` (new `_ide_log` jsonl-writing fixture replacing
+  `_devdata_db`'s sqlite one, every `source="ide"` call site moved to `"ide-log"`, the
+  whole "§2 IDE devdata.sqlite parser" test section deleted), `tests/test_usage_only.py`
+  (the "§6 three-way kiro-IDE probe" section — 4 tests — deleted, unused `sqlite3`/
+  `transcript` imports removed), `tests/test_calls_retired.py` (one test renamed and
+  rewritten for the single-grain reality), and `tests/test_fixture_corpus.py` (a
+  pre-existing-but-adjacent stale docstring claiming "the Kiro IDE log is read by
+  nothing" — true only briefly, before KIRO-CALLS-LEG and LEDGER-READ-SURFACE — fixed
+  alongside its devdata reference since it sat in the same paragraph). Verified against
+  the real `pytest` suite: 1536 passed, 14 skipped, 1 deselected, 0 failed (excluding
+  the two git-dependent doc-integrity test files, which fail in the extracted
+  `/tmp/cage-fresh` copy for lack of a `.git` dir — confirmed clean separately by
+  `git init`-ing a throwaway commit there and re-running them: only a pre-existing,
+  unrelated dangling `CHANGELOG.md` link failed, and manual backtick-balance checks on
+  all four touched docs came back even).
+- **Decided/open:** the removed reader is gone for good, not mothballed — the Veto
+  condition now says a future `devdata.sqlite` (or any other summable IDE store) needs
+  a parser and probe built fresh against its real, probed schema, not a resurrection of
+  the deleted one. `ide-log` (`tokens_generated.jsonl`) remains kiro IDE's one real,
+  live grain, unaffected by any of this.
+- **Next:** commit every changed file (code + tests + docs + this entry) back to the
+  user's real repo via the device bridge, per their standing "put everything in the
+  repo" instruction.
+- **Cost:** unmeasured — no per-session isolation available (CLAUDE.md `Cost:` rule).
+
+---
+
 ## 2026-08-15 — Cowork — LEDGER-READ-SURFACE closed: kiro-IDE metrics now print on `insights chats`
 
 - **Asked:** "kiro cli and ide both should print on cage insights chats" — kiro-CLI

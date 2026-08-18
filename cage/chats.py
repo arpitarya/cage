@@ -252,12 +252,12 @@ def summarize(root: Path, pol: dict, since: str | None = None,
     # than through `spend()` — `spend()` stays the cross-agent TOTAL basis and kiro
     # stays out of it (`SPEND_SOURCES["kiro"] = ()`, `ledger.ABSENT_SPINES` unchanged);
     # this is a per-chat display only, exactly the same carve-out CHATS-CREDITS made
-    # for kiro-CLI credits. `ide`/`ide-log` are the SAME counter from two stores
-    # (`importcmd._MANIFEST_SOURCES["kiro"]`) — only one is ever non-empty on a real
-    # install, so summing both here is safe today and matches doctor's own reporting.
-    raw_ide = [m for m in ledger.kiro_metrics(root) if m.get("source") in ("ide", "ide-log")]
+    # for kiro-CLI credits. `source="ide-log"` is kiro IDE's one real store — its dead
+    # `devdata.sqlite` twin (`source="ide"`) was removed 2026-08-15 (DEVDATA-CUT,
+    # docs/adr/0006_kiro.md), never having been observed on a probed install.
+    raw_ide = [m for m in ledger.kiro_metrics(root) if m.get("source") == "ide-log"]
     ide_rows = ([m for m in ledger.kiro_metrics(root, since=since)
-                if m.get("source") in ("ide", "ide-log")]
+                if m.get("source") == "ide-log"]
                if since else raw_ide)
     names = _title_map(root)
     buckets: dict[tuple[str, str, str, bool], dict] = {}

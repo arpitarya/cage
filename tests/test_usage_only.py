@@ -12,19 +12,22 @@ invariants that have no other owner now that fifteen modules and their tests are
 5. **Capture invariants that outlived their pricing** (§5) — the `credits` None sentinel
    (inherited from the deleted `test_copilot_credits.py`, whose ladder is gone but whose
    *capture* rules are not), and kiro credits retagged `measured`.
-6. **The three-way kiro-IDE probe** (§6) — db absent / table missing / column drift,
-   which used to render one indistinguishable zero.
+
+§6 used to pin the three-way kiro-IDE probe (db absent / table missing / column
+drift) for `devdata.sqlite`. That store and its reader were removed 2026-08-15
+(DEVDATA-CUT, docs/adr/0006_kiro.md) — never observed on any probed install — and the
+probe went with them; see `docs/adr/0006_kiro.md`'s Veto condition for what would
+bring a probe like it back.
 """
 from __future__ import annotations
 
 import ast
 import pathlib
 import re
-import sqlite3
 
 import pytest
 
-from cage import chats, ledger, schema, transcript, units
+from cage import chats, ledger, schema, units
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
 
@@ -253,43 +256,3 @@ def test_credits_are_never_derived_from_tokens(proj):
     """Neither direction. A token-only row records no credit at all."""
     row = _call(proj, "c_1", tin=1_000_000, tout=1_000_000)
     assert "credits" not in row
-
-
-# ── §6 · the three-way kiro-IDE probe ────────────────────────────────────────────
-
-def test_probe_reports_an_absent_store(tmp_path):
-    state, detail = transcript.probe_kiro_ide_store(tmp_path / "devdata.sqlite")
-    assert state == "absent" and detail
-
-
-def test_probe_distinguishes_a_missing_table(tmp_path):
-    db = tmp_path / "devdata.sqlite"
-    sqlite3.connect(db).close()
-    state, detail = transcript.probe_kiro_ide_store(db)
-    assert state == "no-table" and "tokens_generated" in detail
-
-
-def test_probe_distinguishes_column_drift(tmp_path):
-    """The one state that is a cage defect rather than a fact about the machine —
-    and the one the old single zero hid completely."""
-    db = tmp_path / "devdata.sqlite"
-    con = sqlite3.connect(db)
-    con.execute("CREATE TABLE tokens_generated (id INTEGER, tokens_prompt INTEGER)")
-    con.commit()
-    con.close()
-    state, detail = transcript.probe_kiro_ide_store(db)
-    assert state == "drift"
-    assert "tokens_generated" in detail and "timestamp" in detail
-
-
-def test_probe_reports_a_healthy_store(tmp_path):
-    db = tmp_path / "devdata.sqlite"
-    con = sqlite3.connect(db)
-    con.execute("CREATE TABLE tokens_generated "
-                "(id INTEGER, tokens_prompt INTEGER, tokens_generated INTEGER, "
-                " timestamp TEXT)")
-    con.execute("INSERT INTO tokens_generated VALUES (1, 10, 5, '2026-01-01T00:00:00Z')")
-    con.commit()
-    con.close()
-    state, detail = transcript.probe_kiro_ide_store(db)
-    assert state == "ok" and "1 row" in detail

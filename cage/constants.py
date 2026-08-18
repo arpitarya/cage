@@ -111,18 +111,13 @@ MODEL_ROUTE_PREFIXES = ("copilot/",)
 CLEANUP_DEFAULT_DAYS = 90
 CLEANUP_THROTTLE_HOURS = 24
 
-# Bundled-prices staleness threshold (CLAUDE.md, `cage/freshness.py`). Vendor
-# list prices historically shift a few times a year, and cage never fetches a
-# rate — the bundle is only as fresh as its last build-time research pass
-# (`[meta] prices_date`). 45 days is deliberately wider than a normal release
-# cadence (a routinely-maintained bundle never nags) but narrow enough that a
-# half-year-stale table can't hide behind silence. Past it, the freshness check
-# prints "bundled prices are N days old — check for a newer cage release" on
-# post-commit / doctor / the report footer. Policy-preferred fallback (the
-# DEFAULT_CONFIDENCE pattern): `policy.toml [prices] stale_days` wins; `0`
-# disables the age signal entirely (documented opt-out). Derived views compare
-# against the newest ledger `ts`, never the wall clock — determinism law.
-PRICES_STALE_DAYS = 45
+# NOTE (2026-08-18): `PRICES_STALE_DAYS` lived here until today, the last constant
+# belonging to the deleted pricing subsystem. Every surface it named was already gone —
+# `cage/freshness.py`, `[meta] prices_date`, `policy.toml [prices] stale_days`, the
+# post-commit/doctor/report-footer nag — leaving it read by exactly one thing: a weekly
+# GitHub Actions workflow that had been failing every Monday against a
+# `cage/data/policy.toml` that no longer exists. Both are removed. Cage measures usage,
+# never cost; a constant is only the third audit layer while something audits it.
 
 # Last-import staleness gate (plan Phase 1.6, `cage/report.py`). The report footer's
 # "last import: N ago" line is advice, not a banner — it renders only when the

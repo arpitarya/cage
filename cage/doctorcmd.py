@@ -311,7 +311,14 @@ def _kiro_metrics(active: Path) -> tuple[str, str]:
     **Advisory only — the `_copilot_metrics` precedent.** Absence of a grain's rows is
     a state (kiro not installed, or no usage since last import), not a fault, so this
     check never warns or fails. Reads the ledger directly, not an on-disk file probe —
-    "what has cage actually captured", the same question `_copilot_metrics` answers."""
+    "what has cage actually captured", the same question `_copilot_metrics` answers.
+
+    A fourth source, `ide` (`devdata.sqlite`), had its own three-way absent/no-table/
+    drift probe here through 2026-08-15 — removed alongside the dead reader
+    (DEVDATA-CUT, docs/adr/0006_kiro.md): the store was never observed on any probed
+    install, so there was nothing live left to distinguish. `ide-log`
+    (`tokens_generated.jsonl`) is kiro IDE's one real source and reports through the
+    plain row-count path below, like every other grain."""
     try:
         rows = ledger.kiro_metrics_raw(active)
     except Exception as exc:  # noqa: BLE001 — a diagnostic never crashes doctor
@@ -327,25 +334,7 @@ def _kiro_metrics(active: Path) -> tuple[str, str]:
     lines = []
     for s in schema.KIRO_METRIC_SOURCES:
         n = counts.get(s, 0)
-        if s == "ide":
-            # THE THREE-WAY SPLIT (USAGE-ONLY P3). A zero here used to mean any of
-            # three things and named none of them: no store, no table, or a schema
-            # cage no longer matches. Only the third is a cage defect, and it was the
-            # one the old single zero hid. `ide` is also NOT a spend spine any more
-            # (`ledger.ABSENT_SPINES`) — this check is how a future Kiro that ships
-            # the store announces itself.
-            if n:
-                lines.append(f"ide: {n} row(s)")
-            else:
-                from cage import transcript
-                state, detail = transcript.probe_kiro_ide_store(paths.kiro_devdata_db())
-                lines.append({
-                    "absent": f"ide: no store — {detail} (Kiro IDE not installed/used)",
-                    "no-table": f"ide: store present but unusable — {detail}",
-                    "drift": f"ide: ⚠ SCHEMA DRIFT — {detail}",
-                    "ok": f"ide: store readable ({detail}) but 0 imported — run `cage import`",
-                }[state])
-        elif s == "cli-turn":
+        if s == "cli-turn":
             if not n:
                 lines.append("cli-turn: none yet")
             elif turn_upgraded:

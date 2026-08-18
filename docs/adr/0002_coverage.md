@@ -371,10 +371,13 @@ Every cell traces to a dated probe or a measurement, not an assumption:
 **1 — Falsifiable triggers, numbered, each landing somewhere named.**
 
 - **kiro-IDE gains a token store** ⇒ `ABSENT_SPINES` flips and its row moves to ✅.
-  `transcript.parse_kiro_ide_metrics` is kept **for this day** and `cage doctor` announces
-  the flip. Trigger: the store exists on a real install **and** its rows are summable —
-  non-zero output tokens and a real model id on ≥80% of rows. The 2026-08-14 probe is the
-  standing baseline to beat.
+  ~~`transcript.parse_kiro_ide_metrics` is kept **for this day** and `cage doctor`
+  announces the flip.~~ **Superseded 2026-08-15 (DEVDATA-CUT):** that reader targeted
+  `devdata.sqlite` specifically and was removed, never observed live — a future store
+  needs a parser and probe built fresh against its real schema, not a kept one flipped
+  on. The trigger itself is unchanged: the store exists on a real install **and** its
+  rows are summable — non-zero output tokens and a real model id on ≥80% of rows. The
+  2026-08-14 probe is the standing baseline to beat.
 - **kiro-CLI token slots stop being null** ⇒ `cli-turn` rows record them with **zero code
   change**; the upgrade-watch is already armed. Trigger: any non-null slot on a real store.
 - **kiro raises or removes its ~2000-token tool-output cap** ⇒ the savings route stops

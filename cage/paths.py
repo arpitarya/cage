@@ -515,19 +515,13 @@ def kiro_token_log() -> Path:
     return _first_existing(kiro_data_candidates()) / "dev_data" / "tokens_generated.jsonl"
 
 
-def kiro_devdata_db() -> Path:
-    """Kiro IDE's SQLite twin of `kiro_token_log` (KIRO-METRICS handoff §4.2):
-    `kiro.kiroagent/dev_data/devdata.sqlite`, table `tokens_generated` — the SAME
-    counter, plus a `timestamp` and a cursorable `id` the jsonl never carried. Same
-    `KIRO_DATA_DIR` override semantics as the jsonl. **UNVERIFIED-COLUMNS**: the exact
-    column list beyond `(id, tokens_prompt, tokens_generated, timestamp)` is pending
-    the real-store probe (research 2026-08-13 §6) — `transcript.parse_kiro_ide_metrics`
-    SELECTs only those four, explicit, so an unread extra column never breaks capture.
-
-    Deliberately **not** added to `_builtin_log_sources`/`sources_seed` — the calls
-    sweep must not start parsing a SQLite file with the jsonl parser; the kiro-metrics
-    leg (`importcmd.import_kiro`) resolves this path directly, single-file, no glob."""
-    return _first_existing(kiro_data_candidates()) / "dev_data" / "devdata.sqlite"
+# `kiro_devdata_db` (Kiro IDE's `dev_data/devdata.sqlite`) and its reader were removed
+# 2026-08-15 (DEVDATA-CUT, docs/adr/0006_kiro.md) — the file was never observed to
+# exist on any of the installs cage has probed (last checked 2026-08-14); the dead
+# parser was kept "armed" for a store that may never ship. `kiro_token_log` above is
+# Kiro's only real IDE store and is unaffected. If a real `devdata.sqlite` is ever
+# found on a live install, re-add the reader then, against the actual schema — see
+# ADR-KIRO's Veto condition for the trigger.
 
 
 def _builtin_log_sources(agent: str) -> list[tuple[Path, str, tuple[str, ...]]]:

@@ -216,12 +216,16 @@ def assert_captured_facts(repo: Path, specs: list[dict], env: dict) -> None:
     pointed at the parsers directly; blessing whatever the new code emits here would have
     thrown away the evidence the corpus exists to hold.
 
-    Kiro routes to the machine ledger, never the project one (ADR-KIRO)."""
+    **Every agent captures into the project ledger, kiro included** — ADR-LEDGER
+    (2026-08-15) retired kiro-IDE's machine-ledger routing, the last exception to
+    ADR-LAWS Law 2 ("one sink per run"). This helper asserted the *old* rule until
+    v0.53.0 and went red on CI the moment the reversal shipped: it is CI-only, so
+    `just test` stayed green throughout — the same silent-rot class v0.51.1 recorded
+    against this very file."""
     for spec in specs:
         agent = spec["agent"]
-        sink = (Path(env["CAGE_HOME"]) / ".cage" / "ledger") if agent == "kiro" else \
-            (repo / ".cage" / "ledger")
-        where = "machine (kiro, ADR-KIRO)" if agent == "kiro" else "project"
+        sink = repo / ".cage" / "ledger"
+        where = "project"
         want_in = sum(r.get("tokens_in", 0) for r in spec["rows"])
         want_out = sum(r.get("tokens_out", 0) for r in spec["rows"])
         got = _metric_rows_at(sink, agent)

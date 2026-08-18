@@ -303,10 +303,9 @@ def _scan(root: Path, agent: str, src: Path, pattern, since,
 _MANIFEST_SOURCES: dict[str, tuple[str, ...]] = {
     "claude": ("request",),            # per-request; `transcript` is their fold
     "copilot": ("chat", "cli-delta"),  # `cli` is cumulative — its delta twin instead
-    # `cli-turn` is per-turn within `cli-conv`; `ide`/`ide-log` are the SAME IDE
-    # counter from two stores, so exactly ONE of that pair is ever listed here — today
-    # `ide-log` (`tokens_generated.jsonl`), the store that exists on every install ever
-    # probed. The day `devdata.sqlite` ships, flip the pair rather than adding to it.
+    # `cli-turn` is per-turn within `cli-conv`; `ide-log` (`tokens_generated.jsonl`) is
+    # kiro IDE's one real store (DEVDATA-CUT, 2026-08-15 — its dead `devdata.sqlite`
+    # twin was removed, never having been observed on a probed install).
     "kiro": ("ide-log", "cli-conv"),
 }
 
@@ -819,7 +818,7 @@ def _ingest_kiro_metrics(root: Path, files: list[Path], parse, *, src: Path,
                          collect: list | None = None,
                          import_id: str = "") -> int:
     """Parse `files` into kiro-metrics rows via `parse` (the CLI conv/turn parser in the
-    always-on CLI leg, the IDE devdata parser in the IDE leg) and append the ones not
+    always-on CLI leg, the IDE jsonl parser in the IDE leg) and append the ones not
     already recorded (KIRO-METRICS handoff §4.5). Mirrors `_ingest_copilot_metrics`
     exactly: own kind (`"kiro"`), own id namespace (`km_`), own seen-set rebuilt fresh
     from `ledger.kiro_metrics_raw` each call — metrics rows never touch the call-id
@@ -1078,12 +1077,13 @@ def import_kiro(root: Path, args, *, pol: dict | None = None, seen: set | None =
         # **KIRO'S `calls` LEG IS RETIRED, AND ITS FACTS RELOCATED — not deleted.**
         # KIRO-CALLS-LEG, ratified by Arpit 2026-08-15. P5 retired this leg for claude
         # and copilot because it was a *duplicate*: `ledger/claude/` and `ledger/copilot/`
-        # carry the same traffic. Kiro IDE had no such twin — `parse_kiro_ide_metrics`
-        # reads `devdata.sqlite`, absent on every install ever probed — so retiring it
-        # unchanged would have ENDED kiro IDE capture rather than de-duplicating it.
+        # carry the same traffic. Kiro IDE had no such twin — its only candidate,
+        # `devdata.sqlite`, was never observed on any install cage has probed — so
+        # retiring it unchanged would have ENDED kiro IDE capture rather than
+        # de-duplicating it.
         #
         # So the same store is now read into the kiro-metrics ledger instead, as
-        # `source="ide-log"`. The three things that made keeping the `calls` leg
+        # `source="ide-log"`. The two things that made keeping the `calls` leg
         # defensible all survive the move:
         #   1. `tokens_generated.jsonl` still has a reader — the same four fields, the
         #      same line-index+hash dedupe, the same import-time `ts` the `calls` rows
@@ -1092,9 +1092,6 @@ def import_kiro(root: Path, args, *, pol: dict | None = None, seen: set | None =
         #      one resolved ledger, no different from claude/copilot** (ADR-LEDGER
         #      retired the old machine-only routing; see that record for the accepted
         #      cost of doing so).
-        #   3. **The upgrade-watch keeps its baseline** — arriving `ide-log` rows are
-        #      exactly what the day-devdata-ships `ide` rows get compared against, and
-        #      doctor now counts the pair side by side.
         #
         # And the reason the move is an improvement rather than a lateral: as `calls`
         # rows these were spend that every total had to exclude BY NAME
@@ -1110,20 +1107,12 @@ def import_kiro(root: Path, args, *, pol: dict | None = None, seen: set | None =
                              src=src, pol=pol, agent_cursor=agent_cursor,
                              collect=collect, import_id=import_id)
         total_files += len(files)
-    # KIRO-METRICS IDE leg (handoff §4.5): a single fixed file, not a glob — resolved
-    # directly rather than through `_scan`/`agent_log_sources` (`paths.kiro_devdata_db`
-    # is deliberately not a registered source; see its docstring). Since ADR-LEDGER
-    # (2026-08-15) `root` here is just this sweep's one resolved ledger — same as
-    # every other leg, no special-casing left. Its return folds into `total_rows` like
-    # the `ide-log` leg
-    # above, and is 0 while `ide` is the unlisted half of the manifest pair — so the two
-    # IDE stores can never both be counted into one reported number.
-    devdata = paths.kiro_devdata_db()
-    if devdata.exists():
-        total_rows += _ingest_kiro_metrics(
-            root, [devdata], transcript.parse_kiro_ide_metrics,
-            src=devdata, pol=pol, agent_cursor=agent_cursor,
-            collect=collect, import_id=import_id)
+    # A second, `devdata.sqlite`-backed IDE leg lived here through 2026-08-15
+    # (KIRO-METRICS handoff §4.5, `source="ide"`) — a single fixed file resolved
+    # directly via the since-removed `paths.kiro_devdata_db`. It was never observed on
+    # any install cage has probed, so it was removed (DEVDATA-CUT, docs/adr/0006_kiro.md)
+    # rather than kept armed indefinitely for a store that may never ship. The
+    # `ide-log` leg above is kiro IDE's one real reader.
     return total_rows, total_files
 
 

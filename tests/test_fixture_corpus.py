@@ -128,18 +128,26 @@ def test_import_captures_the_same_facts(fixture, tmp_path, monkeypatch):
     (copilot CLI: 2 call rows → 1 `cli-delta` row covering the same session), and pinning a
     count would have been pinning the grain rather than the fact.
 
-    **⚠ Kiro asserts a LOSS, and it is the sharpest consequence of P5.** For claude and
-    copilot the retired leg was a *duplicate* — the metric ledger carries the same facts.
-    Kiro IDE has **no metric twin**: `parse_kiro_ide_metrics` reads `devdata.sqlite`, which
-    is absent on every install probed, so the retired `calls` leg was the **only** reader
-    of `tokens_generated.jsonl`. After P5 the Kiro IDE log is read by nothing.
+    **⚠ Kiro asserted a LOSS at P5, and it was the sharpest consequence of that change —
+    since reversed.** For claude and copilot the retired leg was a *duplicate* — the
+    metric ledger carries the same facts. Kiro IDE had **no metric twin** at the time:
+    the one candidate reader, `parse_kiro_ide_metrics`, targeted `devdata.sqlite`, absent
+    on every install probed, so the retired `calls` leg was briefly the **only** reader of
+    `tokens_generated.jsonl` and the IDE log went unread. **KIRO-CALLS-LEG (2026-08-15)
+    closed that gap**: `tokens_generated.jsonl` is now read by
+    `parse_kiro_ide_log_metrics` into `.cage/ledger/kiro/` (`source="ide-log"`), and
+    LEDGER-READ-SURFACE (same day) made `insights chats` render those rows directly.
+    `devdata.sqlite` itself was never observed on any probed install and its dead reader
+    was removed outright rather than kept armed (DEVDATA-CUT, 2026-08-15,
+    `docs/adr/0006_kiro.md`).
 
-    That was the decision (the 2026-08-14 field probe: 28 rows, 1,576 in / **0 out**,
+    That was the P5 decision (the 2026-08-14 field probe: 28 rows, 1,576 in / **0 out**,
     model `"agent"` on every row, one byte-identical 6-row block repeated — unsummable, and
-    already excluded from every total by `ABSENT_SPINES`). It is asserted here **with its
-    reason** so nobody restores the leg by accident while reading a green suite, and it is
-    filed as `KIRO-IDE-CAPTURE-STOPPED` — stopping a writer needs its own justification,
-    its own ADR update and its own queue line, per the SURFACE-CUT rule."""
+    already excluded from every total by `ABSENT_SPINES`). It is recorded here **with its
+    reason** as history, not a current invariant this test enforces — it is filed as
+    `KIRO-IDE-CAPTURE-STOPPED`, later superseded, per the SURFACE-CUT rule that stopping
+    (and restarting) a writer needs its own justification, its own ADR update and its own
+    queue line."""
     agent = fixture.parts[0]
     spec = _load(fixture)
     root = _isolated_root(tmp_path, monkeypatch)

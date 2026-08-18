@@ -419,17 +419,20 @@ REGISTRY: tuple[Explanation, ...] = (
         "n/a — capture-only, no computed number; every field is recorded verbatim.",
         kind="concept", plan_ref="§3.11"),
     Explanation(
-        "kiro-metrics", ("kiro-metrics", "chats-ledger", "devdata", "cli-conv",
+        "kiro-metrics", ("kiro-metrics", "chats-ledger", "ide-log", "cli-conv",
                         "cli-turn", "upgrade-watch", "tokens-generated", "kiro-cli",
                         "three-grains", "per-chat-metrics"),
         "the .cage/ledger/kiro/ kind: per-chat Kiro usage, store-verbatim, at three grains",
         "A capture-only sibling to `calls`/`credits` — never widens either, never\n"
-        "  priced, never read by any derived view today. One row per\n"
+        "  priced. `insights chats` reads the IDE grain directly (LEDGER-READ-SURFACE,\n"
+        "  2026-08-15) and renders it as its own chat row; nothing here ever reaches\n"
+        "  `spend()` or any cross-agent total (ADR-KIRO). One row per\n"
         "  (source, session, turn, row_ref) key, from whichever Kiro store the machine\n"
         "  has:\n"
-        "    ide       IDE devdata.sqlite `tokens_generated` — per LLM call, the SAME\n"
-        "              counter `calls` already reads from the jsonl twin, plus a\n"
-        "              `timestamp` and a cursorable `id` the jsonl never carried\n"
+        "    ide-log   IDE tokens_generated.jsonl — per LLM call, kiro IDE's one real\n"
+        "              store. A `devdata.sqlite` SQLite twin of the same counter was\n"
+        "              probed for and never found on any real install; its dead reader\n"
+        "              was removed 2026-08-15 (DEVDATA-CUT, docs/adr/0006_kiro.md)\n"
         "    cli-conv  CLI SQLite store, per conversation — credits (usage_info sum),\n"
         "              context%, turn count; cumulative-verbatim, like `credits` rows\n"
         "    cli-turn  same store, per history[] turn — populated timing/size/tool-use\n"
@@ -437,8 +440,8 @@ REGISTRY: tuple[Explanation, ...] = (
         "              probed so far (the upgrade-watch: filled only when non-NULL,\n"
         "              never estimated — chars÷4/cumulative/chunk-count are BANNED as\n"
         "              token facts; `chunks` stays a chunk count, never `tokens_out`)\n"
-        "  Routing since ADR-LEDGER (2026-08-15): `ide` rows capture into this run's one\n"
-        "  active ledger like every other agent, no separate machine sink; `cli-conv`/\n"
+        "  Routing since ADR-LEDGER (2026-08-15): `ide-log` rows capture into this run's\n"
+        "  one active ledger like every other agent, no separate machine sink; `cli-conv`/\n"
         "  `cli-turn` rows ride the same workspace scoping the `credits` leg already\n"
         "  resolves (unaffected by that change).\n"
         "  `ledger.kiro_metrics()` collapses last-write-wins per key, winner = max\n"
@@ -447,14 +450,15 @@ REGISTRY: tuple[Explanation, ...] = (
         "  A conversation's own growth rows are NEVER summed.\n"
         "  Counts-never-content: the CLI parser reads only `request_metadata`/\n"
         "  `user_turn_metadata`/`model_info` keys, never `history[].user`/`.assistant`/\n"
-        "  `content` — the same whitelist `_kiro_cli_credit_row` already honors. The IDE\n"
-        "  parser SELECTs four explicit columns only, never `SELECT *`. Absence ≠ zero\n"
-        "  for `credits` (None-sentinel, the `make_call.credits` law, generalized).\n"
+        "  `content` — the same whitelist `_kiro_cli_credit_row` already honors. Absence\n"
+        "  ≠ zero for `credits` (None-sentinel, the `make_call.credits` law,\n"
+        "  generalized).\n"
         "  Cache tokens and per-chat IDE credits are absent from every kiro row here\n"
         "  because no on-disk Kiro store persists them at all — only the wire protocol\n"
         "  does (proxy-only, out of scope; work/research/2026-08-13-kiro-per-chat-usage-\n"
         "  fetch-spec.md).",
-        ("cage/schema.py", "cage/ledger.py", "cage/transcript.py", "cage/importcmd.py"),
+        ("cage/schema.py", "cage/ledger.py", "cage/transcript.py", "cage/importcmd.py",
+         "cage/chats.py"),
         "n/a — capture-only, no computed number; every field is recorded verbatim.",
         kind="concept", plan_ref="§3.12"),
     Explanation(

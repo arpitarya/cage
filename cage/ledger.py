@@ -498,8 +498,10 @@ def kiro_metrics(root: Path, since: str | None = None) -> list[dict]:
     `cli-turn` row already IS the state as of its own capture, so summing would
     double- or triple-count (the same law `copilot_metrics` states for `session_credits`).
     ``since`` drops dated shards whose whole month predates the cutoff (same partition
-    win as `read_kind`). Capture-only: no derived view reads this kind yet — an empty
-    ledger with no `kiro/` tree returns []."""
+    win as `read_kind`). **Read by `cage insights chats`** since LEDGER-READ-SURFACE
+    (2026-08-15) — its IDE-sourced rows render as their own chat row — but never through
+    `spend()`, so kiro still contributes zero tokens to any cross-agent total (ADR-KIRO).
+    An empty ledger with no `kiro/` tree returns []."""
     foot = paths.Footprint(root)
     cut = since_cutoff(since)
     rows: list[dict] = []
@@ -672,8 +674,12 @@ SPEND_SOURCES: dict[str, tuple[str, ...]] = {
 #: file carries 28 rows totalling 1,576 in / **0 out**, model `"agent"` on every row, and
 #: a byte-identical 6-row block repeated — it is not summable, so a spine built on it
 #: would be a fabricated number, not a measured one. Kiro renders `—` with this reason;
-#: it is never a zero. `transcript.parse_kiro_ide_metrics` is deliberately KEPT so a
-#: future Kiro that ships the store flips this back — `cage doctor` announces the flip.
+#: it is never a zero. `transcript.parse_kiro_ide_metrics`, the reader that would have
+#: flipped this back the day a real `devdata.sqlite` showed up, was itself removed
+#: 2026-08-15 (DEVDATA-CUT, docs/adr/0006_kiro.md) — never observed on any probed
+#: install, kept dead-armed for a store that may never ship. Re-add a reader against a
+#: real probed schema if that ever changes; `cage doctor` still counts every row this
+#: table's live sources land.
 ABSENT_SPINES: dict[str, str] = {
     "kiro": "no IDE token store on this install",
 }

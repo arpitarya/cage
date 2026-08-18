@@ -8,6 +8,91 @@ Entry format:
 
 ```
 
+## 2026-08-18 — v0.54.0: CI's kiro-routing assertion caught up with ADR-LEDGER; the four ADR-FIELD-TRACE tables verified against code
+
+- **Fixed (`tools/dummyrepo/run.py`) — the release-blocking half.** `assert_captured_facts`
+  still sent kiro's expected rows to the **machine** ledger (`CAGE_HOME/.cage/ledger`), the
+  routing ADR-LEDGER reversed in v0.52.0. S1 and S2 therefore failed on all nine CI legs
+  through v0.52.0 **and** v0.53.0 while `just test` stayed green — the runner is CI-only,
+  imported by no test and run by no local command. **This is the same silent-rot class
+  v0.51.1 recorded against this very file**, which is why the fix was verified by *running
+  the runner locally*: **10/10 scenarios pass**, S1/S2 included. The sink is now
+  unconditionally the project ledger for every agent.
+- **Verified (four `adr-verifier` passes, fanned out).** The 2026-08-18 ADR-FIELD-TRACE
+  tables were authored but never checked against code; the authoring session said so and
+  named the gap. Running the check found **six real defects**, all now fixed:
+  - **ADR-CLAUDE** asserted the calls-vs-metrics inflation as "exactly **2.00×** — 43,973
+    vs 21,955" in three places, while its own cited measurement doc records **1.979×**
+    (44,659 vs 22,566) and says in terms it is *"not equal to"* 2.00×. The record was
+    internally inconsistent — a fourth spot already used 1.979×. All corrected, with the
+    reason the two figures differ (rows inflate 1.979×, tokens 1.881×) stated rather than
+    rounded away.
+  - **ADR-COPILOT** listed the CLI credit-delta defect as an **open** Known gap *and* as
+    live veto trigger #2; it was fixed 2026-08-03 (REV-CREDITS defect 1). Both halves of
+    its description were also false — `_place_billing_delta` picks the carrier by
+    **largest token mover** (order-independent, so "first-listed" names nothing) and
+    **appends a zero-token carrier row** when every model idles. Struck, not deleted.
+  - **ADR-COPILOT** carried **no Windows caveat anywhere**, though `paths.copilot_metric_sources`
+    marks three of its five stores `UNVERIFIED-LAYOUT` there. Added beside the rows.
+  - **ADR-GRAPHIFY** claimed the usage row's `exit` is "the wrapped tool's real exit code
+    passed through" — true on the shim route only; `graphifytx._file_query` stamps a
+    synthetic `exit=0, ms=0`. Also credited the report-read counterfactual to
+    `graphifymodel.repo_ceiling()`/`community_corpus()`, which write to **no** savings row
+    (GFX-MODEL-ORPHAN, unread since v0.50) — it is `repoceiling.corpus_tokens()` alone.
+  - **ADR-KIRO** attributed a P2 sentence-widening to `ledger.ABSENT_SPINES`; it was
+    `units.ABSENT["kiro"][TOKENS]`, a different table read by a different renderer.
+    `ABSENT_SPINES` is unchanged. Both tables now named, with which reader reads which.
+  - **ADR-KIRO**'s hand-paired twins had diverged: the ASCII carried the DEVDATA-CUT
+    annotation, the Mermaid did not. Re-paired.
+- **Fixed (law restatements — CLAUDE.md calls these bugs, not redundancy).** ADR-CLAUDE
+  restated ADR-LAWS Law 3 plus three ADR-AUTHORSHIP invariants *after* its own frontmatter
+  says authorship left the record; ADR-COPILOT restated Laws 3 and 5. Both now name the
+  owning record instead of carrying a second copy that can drift.
+- **Fixed (stale code docstrings, found by the same pass):** `ledger.kiro_metrics` still
+  said "no derived view reads this kind yet" (false since v0.53.0), and `kirowire`'s
+  module docstring still offered the proxy as a fallback (`proxy.py` deleted in v0.50).
+- **Files:** `tools/dummyrepo/run.py` · `docs/adr/0004_claude.md` · `0005_copilot.md` ·
+  `0006_kiro.md` · `0008_graphify.md` · `cage/ledger.py` · `cage/kirowire.py` ·
+  `cage/__init__.py` · `CHANGELOG.md` · `README.md` · `CLAUDE.md` · `work/DOC-REGISTRY.md`.
+- **Test status:** `just test` **1562 passed, 11 skipped** · `python -m tools.dummyrepo`
+  **10/10** (macOS local — the check that was red on CI).
+- **Next step:** the `adr-verifier` fan-out found a defect in every one of the four
+  records it read. That hit rate is the argument for running it *in the same change* as an
+  ADR edit rather than after — filed as a note, not yet a gate.
+
+## 2026-08-15 — DEVDATA-CUT: the dead `devdata.sqlite` IDE parser/probe removed outright
+
+- **Built:** deleted the whole `devdata.sqlite`-backed IDE grain — never observed on any
+  Kiro install cage has probed (settled 2026-08-14) — rather than continuing to keep its
+  reader "armed" indefinitely. `paths.kiro_devdata_db`, `transcript.parse_kiro_ide_metrics`,
+  `transcript._kiro_devdata_ts`, `transcript.KIRO_IDE_COLUMNS`, and
+  `transcript.probe_kiro_ide_store` (the db-absent/table-missing/column-drift three-way
+  probe) are gone. `schema.KIRO_METRIC_SOURCES` drops `"ide"`, leaving
+  `("ide-log", "cli-conv", "cli-turn")` — `ide-log` (`tokens_generated.jsonl`) is kiro
+  IDE's one real store. `importcmd.import_kiro`'s devdata import block and
+  `doctorcmd._kiro_metrics`'s `"ide"` probe branch are both removed; the doctor loop now
+  only special-cases `cli-turn`'s upgrade-watch, everything else falls through to the
+  generic row-count path. `chats.py`'s IDE-metrics filter simplified from a 2-source
+  membership check to a single `== "ide-log"` equality.
+- **Fixed along the way:** `units.py`'s upgrade-watch cross-reference was pointing at the
+  removed devdata watch instead of the CLI's actual NULL `request_metadata` token slots —
+  a pre-existing mismatch, caught while updating the surrounding text.
+  `explain_data.py`'s `kiro-metrics` explanation had a stale "never read by any derived
+  view today" claim (false since LEDGER-READ-SURFACE) fixed in the same edit.
+  `tests/test_fixture_corpus.py` had an adjacent stale docstring ("the Kiro IDE log is
+  read by nothing") true only briefly, before KIRO-CALLS-LEG and LEDGER-READ-SURFACE
+  superseded it — fixed since it shared a paragraph with the devdata reference.
+- **Docs:** `docs/adr/0006_kiro.md` — both flow diagrams (mermaid + ASCII) lost the
+  `devdata.sqlite` node/edge; status frontmatter and the §1 upgrade-watch bullet now name
+  the CLI watch specifically; the Decision section, the KIRO-CALLS-LEG blockquote, the
+  capture-reference table (the `ide` row is now a struck footnote), Known gaps, and Veto
+  condition trigger #2 all updated to say the reader is gone, not flippable. Trigger #2
+  now says a future summable IDE store needs a parser rebuilt fresh, not a resurrection.
+  `docs/adr/0002_coverage.md`'s matching veto bullet marked superseded, trigger condition
+  kept. `docs/GLOSSARY.md`'s "kiro metrics row" entry and `CLAUDE.md`'s adapters
+  paragraph both dropped the devdata mention and picked up the same "read by `insights
+  chats`, not by nothing" and "routes via ADR-LEDGER" corrections.
+
 ## 2026-08-15 — LEDGER-READ-SURFACE closed: kiro-IDE metrics now print on `cage insights chats`
 
 - **Built (`cage/chats.py`):** `_bucket_key`'s `credits: bool` widened to a `kind: str`

@@ -2,6 +2,60 @@
 
 Full release notes. The README keeps a one-line summary per version; the detail lives here.
 
+## v0.54.0 (2026-08-18) — DEVDATA-CUT: the never-observed `devdata.sqlite` reader removed; CI's kiro-routing assertion caught up with ADR-LEDGER
+
+**The CI fix is the load-bearing part of this release.** `tools/dummyrepo`'s S1/S2
+scenarios still asserted that Kiro captures into the **machine** ledger — the rule
+[ADR-LEDGER](docs/adr/0015_ledger.md) reversed in v0.52.0. Because that runner is
+CI-only (imported by no test, run by no local command), `just test` stayed green
+through both v0.52.0 and v0.53.0 while the `Python package` workflow went red on all
+nine legs. This is the same silent-rot class v0.51.1 recorded **against this very
+file** — a gate nothing runs locally is a gate that rots. Now fixed and verified by
+running the runner locally: **10/10 scenarios pass.**
+
+### DEVDATA-CUT — a reader kept armed for a store that never shipped
+
+`devdata.sqlite`, the timestamped SQLite twin of Kiro's IDE log, has **never been
+observed on any Kiro install cage has probed** (settled by the 2026-08-14 field probe),
+yet its parser, probe, path resolver and schema enum entry were all still live. All of
+it is now deleted rather than held indefinitely:
+
+- Gone: `paths.kiro_devdata_db`, `transcript.parse_kiro_ide_metrics`,
+  `transcript._kiro_devdata_ts`, `transcript.KIRO_IDE_COLUMNS`,
+  `transcript.probe_kiro_ide_store` (the db-absent/table-missing/column-drift three-way
+  probe), `importcmd.import_kiro`'s devdata block, and `doctorcmd._kiro_metrics`'s
+  `"ide"` probe branch.
+- `schema.KIRO_METRIC_SOURCES` drops `"ide"` → `("ide-log", "cli-conv", "cli-turn")`.
+  `ide-log` (`tokens_generated.jsonl`) is Kiro IDE's one real store.
+- **Old ledgers still read** — a recorded `source="ide"` row parses fine; append-only
+  means the recorded past is never rewritten.
+- ADR-KIRO's veto trigger #2 now says a future summable IDE store needs a parser
+  **rebuilt from a fresh field probe**, not this one resurrected.
+
+Fixed along the way: `units.py`'s upgrade-watch cross-reference pointed at the removed
+devdata watch instead of the CLI's actual NULL `request_metadata` token slots, and
+`explain_data.py`'s `kiro-metrics` text still claimed the ledger was "never read by any
+derived view" — false since v0.53.0.
+
+### ADR-FIELD-TRACE — data-point → source-file tables in four ADRs
+
+ADR-CLAUDE, ADR-COPILOT, ADR-KIRO and ADR-GRAPHIFY each gained a §2 table giving, per
+data point: the exact field/key, the file it comes from, the function that reads it, and
+**vendor-recorded vs. cage-derived** — so no computed value can be mistaken for a vendor
+one. All four tables were then verified against the live code by `adr-verifier`, which
+corrected three claims in ADR-GRAPHIFY's table before ship: the usage row's `exit`/`ms`
+are real only on the shim route (the transcript route stamps a synthetic `exit=0, ms=0`),
+the report-read counterfactual is computed by `repoceiling.corpus_tokens()` alone (not by
+the orphaned `graphifymodel.repo_ceiling()`), and `import_id`/the manifest row are
+shim-route-only.
+
+### Also
+
+- **Deleted `.github/workflows/prices-freshness-nag.yml`** — a straggler from the
+  pricing removal. It read `cage/data/policy.toml` and cited `docs/pricing.md`, neither
+  of which has existed since; it had been failing every Monday. `constants.PRICES_STALE_DAYS`
+  went with it (zero live readers). Cage measures usage, never cost — this completes that.
+
 ## v0.53.0 (2026-08-16) — LEDGER-READ-SURFACE: Kiro's IDE token usage now prints on `cage insights chats`
 
 **Behaviour change.** Kiro-IDE tokens (`.cage/ledger/kiro/`, the metrics ledger

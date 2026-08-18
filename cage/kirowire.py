@@ -2,8 +2,9 @@
 
 Hook wiring and the steering pointer were removed with the hook machinery —
 capture is **pull-based** (`cage import --agent kiro` over
-`kiro.kiroagent/dev_data/tokens_generated.jsonl`; the proxy stays the
-higher-fidelity fallback where Kiro's log is too thin). `install` still
+`kiro.kiroagent/dev_data/tokens_generated.jsonl`, plus the CLI store; that log is
+coarse and there is no higher-fidelity fallback left — `proxy.py`/`metercmd.py` were
+deleted in SURFACE-CUT, v0.50). `install` still
 *heals*: a cage-owned `.kiro/hooks/cage.kiro.hook` written by a previous
 version is deleted.
 

@@ -16,10 +16,11 @@ unit does not exist, never a `0`.
                            joins this table's `tokens` column or any cross-agent total.)
 
 **Why the two absences must never render identically.** One is a vendor law (Claude Code
-has no credit concept at all) and one is a missing store on this machine (a future Kiro
-that ships `devdata.sqlite` flips it). Rendering both as a bare `—` invites a future
-agent to "fix" the permanent one, or to read the fixable one as permanent. Each carries
-its own sentence.
+has no credit concept at all) and one is a schema fact on this machine (the day
+kiro-cli's own `request_metadata` token slots stop being NULL, `cli-turn` rows record
+them with zero code change — the upgrade-watch, already armed). Rendering both as a
+bare `—` invites a future agent to "fix" the permanent one, or to read the fixable one
+as permanent. Each carries its own sentence.
 
 **A `0` is never an acceptable stand-in for either.** `0 credits` asserts a measurement
 that was never taken; `—` plus a reason asserts only what is true. This is the same
